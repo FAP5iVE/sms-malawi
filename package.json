@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "@prisma/adapter-neon": "^7.8.0",
+    "firebase": "^12.13.0",
+    "ws": "^8.20.0"
+  }
+}

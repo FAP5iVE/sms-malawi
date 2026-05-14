@@ -1,0 +1,18 @@
+allowBuilds:
+  "@ampproject/toolbox-optimizer": true
+  "@firebase/util": true
+  "@prisma/client": false
+  "@prisma/engines": true
+  core-js: true
+  es5-ext: true
+  esbuild: true
+  msw: true
+  prisma: true
+  protobufjs: true
+  puppeteer: true
+  sharp: true
+  unrs-resolver: true
+
+packages:
+  - "apps/*"
+  - "packages/*"

@@ -1,0 +1,245 @@
+@import 'tailwindcss';
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/inter-regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/inter-medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/inter-semibold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/inter-bold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/dmsans-regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/dmsans-medium.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/dmsans-semibold.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/dmsans-bold.woff2') format('woff2');
+}
+
+/* ─────────────────────────────────────────────
+   TAILWIND v4 THEME
+     --color-brand-navy  →  bg-brand-navy
+     --font-sans         →  font-sans
+   ───────────────────────────────────────────── */
+
+@theme {
+  /* Fonts
+     Inter    → headings, UI labels, numbers (tabular)
+     DM Sans  → body text, paragraphs, descriptions */
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+
+  /* Brand colours */
+  --color-brand-navy: #0f2744;
+  --color-brand-navy-mid: #1a3a5c;
+  --color-brand-navy-light: #2a5080;
+  --color-brand-teal: #0e8a6a;
+  --color-brand-teal-light: #1db88e;
+  --color-brand-amber: #d97706;
+  --color-brand-coral: #dc4f3a;
+  --color-brand-purple: #6b3fa0;
+
+  /* Semantic surface tokens — light mode defaults */
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-border: #dde4ec;
+  --color-text: #1e293b;
+  --color-muted: #64748b;
+
+  /* Border radius scale */
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+
+  /* Shadow scale */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* ─────────────────────────────────────────────
+   DARK MODE OVERRIDES
+   ───────────────────────────────────────────── */
+
+.dark {
+  --color-bg: #0d1521;
+  --color-surface: #141e2c;
+  --color-border: #1e2d3e;
+  --color-text: #e2eaf4;
+  --color-muted: #7a8fa6;
+}
+
+/* ─────────────────────────────────────────────
+   BASE STYLES
+   Applied globally — sets fonts, colours,
+   smooth rendering for all elements
+   ───────────────────────────────────────────── */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Headings use Inter */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-text);
+  }
+
+  /* Inputs inherit font from body */
+  input,
+  button,
+  textarea,
+  select {
+    font-family: inherit;
+  }
+
+  /* Remove default list styles */
+  ul,
+  ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  /* Links */
+  a {
+    color: var(--color-brand-teal);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+
+  /* Focus ring — accessibility */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-teal);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   CUSTOM UTILITIES
+   ───────────────────────────────────────────── */
+
+@layer utilities {
+  /* Use Inter for any element: className="font-heading" */
+  .font-heading {
+    font-family: var(--font-heading);
+  }
+
+  /* Semantic background/text shortcuts */
+  .bg-surface {
+    background-color: var(--color-surface);
+  }
+  .bg-page {
+    background-color: var(--color-bg);
+  }
+  .border-base {
+    border-color: var(--color-border);
+  }
+  .text-body {
+    color: var(--color-text);
+  }
+  .text-muted {
+    color: var(--color-muted);
+  }
+
+  /* Tabular numbers — for financial figures, marks, dates */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  /* Skeleton loading animation */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--color-border) 25%,
+      var(--color-bg) 50%,
+      var(--color-border) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-sweep 1.5s ease-in-out infinite;
+    border-radius: var(--radius);
+  }
+
+  @keyframes skeleton-sweep {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+}
