@@ -64,3 +64,6 @@ package-lock.json
 
 # VS Code
 .vscode/
+
+#serviceAccount
+**/serviceAccount.json
