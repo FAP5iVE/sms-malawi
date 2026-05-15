@@ -7,3 +7,203 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ─── STUDENTS ────────────────────────────────────────────
+model Student {
+  id               String   @id @default(cuid())
+  registrationNo   String   @unique          // auto-generated e.g. SMS-2025-0001
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime
+  sex              Sex
+  nationality      String   @default("Malawian")
+  district         String
+  village          String?
+  address          String?
+  phone            String?
+  guardianName     String
+  guardianPhone    String
+  guardianRelation String
+  photoKey         String?  // R2 object key — never a full URL
+  status           StudentStatus @default(ACTIVE)
+  classId          String?
+  class            Class?        @relation(fields: [classId], references: [id])
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([classId])
+  @@index([status])
+  @@map("students")
+}
+
+enum StudentStatus {
+  ACTIVE
+  AWAITING_MANEB_RESULTS
+  GRADUATED
+  ARCHIVED
+}
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+// ─── CLASSES ─────────────────────────────────────────────
+model Class {
+  id          String    @id @default(cuid())
+  name        String                       // "Form 1A", "Form 2B", etc.
+  form        Int                          // 1, 2, 3, or 4
+  stream      String?                      // "A", "B", "Science", "Arts"
+  teacherId   String?                      // class teacher Firebase UID
+  room        String?
+  academicYear String                      // "2025/2026"
+  students    Student[]
+  assignments Assignment[]
+  labBookings LabBooking[]
+  timetable   TimetableSlot[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([form])
+  @@index([academicYear])
+  @@map("classes")
+}
+
+// ─── ASSIGNMENTS ─────────────────────────────────────────
+model Assignment {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  subject     String
+  classId     String
+  class       Class     @relation(fields: [classId], references: [id])
+  dueDate     DateTime
+  createdByUid String                     // teacher Firebase UID
+  submissions AssignmentSubmission[]
+  createdAt   DateTime  @default(now())
+
+  @@index([classId])
+  @@map("assignments")
+}
+
+model AssignmentSubmission {
+  id           String    @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id])
+  studentId    String
+  fileKey      String?   // R2 object key for uploaded file
+  submittedAt  DateTime  @default(now())
+  status       SubmissionStatus @default(SUBMITTED)
+
+  @@unique([assignmentId, studentId])
+  @@map("assignment_submissions")
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  LATE
+  MISSING
+}
+
+// ─── LAB BOOKINGS ─────────────────────────────────────────
+model LabBooking {
+  id           String    @id @default(cuid())
+  classId      String
+  class        Class     @relation(fields: [classId], references: [id])
+  bookedByUid  String    // teacher Firebase UID
+  labName      String    @default("Science Lab")
+  date         DateTime
+  periodStart  String    // "08:00"
+  periodEnd    String    // "09:00"
+  purpose      String?
+  createdAt    DateTime  @default(now())
+
+  @@index([date])
+  @@map("lab_bookings")
+}
+
+// ─── APPLICATIONS ────────────────────────────────────────
+model Application {
+  id               String            @id @default(cuid())
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime
+  sex              Sex
+  nationality      String
+  district         String
+  village          String?
+  guardianName     String
+  guardianPhone    String
+  guardianRelation String
+  applyingForForm  Int               // 1–4
+  status           ApplicationStatus @default(PENDING)
+  reviewedByUid    String?
+  reviewedAt       DateTime?
+  notes            String?
+  convertedStudentId String?         // set when converted to Student record
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([status])
+  @@map("applications")
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  DENIED
+  AWAITING_ADMISSION
+  ADMITTED
+}
+
+// ─── TIMETABLE ───────────────────────────────────────────
+model TimetableSlot {
+  id          String    @id @default(cuid())
+  classId     String
+  class       Class     @relation(fields: [classId], references: [id])
+  day         Weekday
+  periodStart String    // "07:30"
+  periodEnd   String    // "08:30"
+  subject     String
+  teacherUid  String
+  room        String?
+  type        TimetableType @default(REGULAR)
+  academicYear String
+  term        Int       // 1, 2, or 3
+  approvedAt  DateTime?
+  approvedByUid String?
+
+  @@index([classId, day])
+  @@index([academicYear, term])
+  @@map("timetable_slots")
+}
+
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+}
+enum TimetableType {
+  REGULAR
+  EXAM
+  MANEB
+  LAB
+}
+
+// ─── AUDIT LOG ───────────────────────────────────────────
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String                         // "student.create", "student.archive"
+  entityType String                         // "Student", "Application"
+  entityId   String
+  actorUid   String
+  actorRole  String
+  metadata   Json?                          // before/after values
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorUid])
+  @@map("audit_logs")
+}

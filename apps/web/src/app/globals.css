@@ -193,6 +193,29 @@
    ───────────────────────────────────────────── */
 
 @layer utilities {
+  .input {
+    width: 100%;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    transition-property: border-color, box-shadow;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+
+  .input::placeholder {
+    color: var(--color-muted);
+  }
+
+  .input:focus {
+    outline: none;
+    border-color: var(--color-brand-teal);
+    box-shadow: 0 0 0 2px rgba(14, 138, 106, 0.4);
+  }
+
   /* Use Inter for any element: className="font-heading" */
   .font-heading {
     font-family: var(--font-heading);
