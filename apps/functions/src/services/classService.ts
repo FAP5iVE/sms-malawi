@@ -1,4 +1,3 @@
-Copy
 import { prisma } from '../lib/prisma'
 import type { CreateClassInput } from '@shared/schemas/student'
 

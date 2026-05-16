@@ -1,17 +1,6 @@
 import { create } from 'zustand'
 import type { User } from 'firebase/auth'
-
-// All 9 user roles in the system
-export type UserRole =
-  | 'admin'
-  | 'high_rank'
-  | 'finance'
-  | 'library'
-  | 'lower_rank'
-  | 'academic'
-  | 'hr'
-  | 'exam_officer'
-  | 'student'
+import type { UserRole } from '@shared/types/roles'
 
 interface AuthState {
   user: User | null

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
-import type { UserRole } from '@/store/authStore'
+import type { UserRole } from '@shared/types/roles'
 import {
   LayoutDashboard,
   Users,

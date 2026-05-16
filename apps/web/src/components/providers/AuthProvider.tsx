@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/authStore'
-import type { UserRole } from '@/store/authStore'
+import type { UserRole } from '@shared/types/roles'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, clearAuth } = useAuthStore()

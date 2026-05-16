@@ -57,12 +57,16 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
             <h2 className="font-heading font-bold text-lg text-brand-navy">
               {isEdit ? 'Edit Student' : 'Add New Student'}
             </h2>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-page">
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-page"
+              aria-label="Close panel"
+              type="button"
+            >
               <X className="w-5 h-5 text-muted" />
             </button>
           </div>
-
-          {/* Form */}
+          buttonorm */
           <form onSubmit={handleSubmit(onSubmit)} className="flex-1 p-6 space-y-5">
             <FieldGroup label="Personal Details">
               <Field label="First Name" error={errors.firstName?.message}>
@@ -156,7 +160,7 @@ function Field({
   children,
 }: {
   label: string
-  error?: string
+  error?: string | undefined // ← add "| undefined" here
   children: React.ReactNode
 }) {
   return (

@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     default: 'SMS — School Management System',
     template: '%s | SMS Malawi',
   },
-  description: 'School Management System for Malawian secondary schools',
+  description: 'School Management System for Malawian secondary schools powered by 5iveStacks Labs',
   icons: { icon: '/favicon.ico' },
 }
 

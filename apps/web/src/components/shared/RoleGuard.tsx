@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuthStore } from '@/store/authStore'
-import type { UserRole } from '@/store/authStore'
+import type { UserRole } from '@shared/types/roles'
 import { ShieldOff } from 'lucide-react'
 
 interface RoleGuardProps {

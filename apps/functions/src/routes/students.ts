@@ -46,7 +46,8 @@ studentsRouter.get(
     'exam_officer',
   ]),
   async (req, res) => {
-    const student = await studentService.getStudent(req.params.id)
+    const id = String(req.params.id)
+    const student = await studentService.getStudent(id)
     res.json(student)
   }
 )
@@ -76,8 +77,9 @@ studentsRouter.patch(
     if (!parsed.success) {
       return res.status(400).json({ errors: parsed.error.flatten() })
     }
+    const id = String(req.params.id)
     const updated = await studentService.updateStudent(
-      req.params.id,
+      id,
       parsed.data,
       req.user!.uid,
       req.user!.role
@@ -87,12 +89,8 @@ studentsRouter.patch(
 )
 
 // DELETE /students/:id — archive only (never true delete)
-studentsRouter.delete(
-  '/:id',
-  verifyAuth,
-  requireRole(['admin', 'high_rank']), // lower_rank must go through approval workflow
-  async (req, res) => {
-    const result = await studentService.archiveStudent(req.params.id, req.user!.uid, req.user!.role)
-    res.json({ archived: true, student: result })
-  }
-)
+studentsRouter.delete('/:id', verifyAuth, requireRole(['admin', 'high_rank']), async (req, res) => {
+  const id = String(req.params.id)
+  const result = await studentService.archiveStudent(id, req.user!.uid, req.user!.role)
+  res.json({ archived: true, student: result })
+})
