@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.applicationsRouter = void 0;
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
-const student_1 = require("@shared/schemas/student");
+const student_1 = require("../../../../packages/shared/schemas/student");
 const appService = __importStar(require("../services/applicationService"));
 exports.applicationsRouter = (0, express_1.Router)();
 // GET /applications

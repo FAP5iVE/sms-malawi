@@ -1,14 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  type QueryDocumentSnapshot,
-} from 'firebase/firestore'
+import { collection, query, where, orderBy, onSnapshot, type Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuthStore } from '@/store/authStore'
 
@@ -20,7 +13,7 @@ export interface Announcement {
   targetAll?: boolean
   targetRoles?: string[]
   createdByUid: string
-  createdAt: any
+  createdAt: Timestamp
 }
 
 // Real-time listener for published announcements visible to the current role
@@ -41,7 +34,7 @@ export function useAnnouncements() {
 
     const unsubscribe = onSnapshot(q, (snap) => {
       const docs = snap.docs
-        .map((d: QueryDocumentSnapshot) => ({ id: d.id, ...d.data() }) as Announcement)
+        .map((d) => ({ id: d.id, ...(d.data() as Omit<Announcement, 'id'>) }))
         .filter((a) => a.targetAll || (a.targetRoles && a.targetRoles.includes(role)))
       setAnnouncements(docs)
       setLoading(false)

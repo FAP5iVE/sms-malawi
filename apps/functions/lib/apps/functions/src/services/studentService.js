@@ -6,7 +6,7 @@ exports.createStudent = createStudent;
 exports.updateStudent = updateStudent;
 exports.archiveStudent = archiveStudent;
 const prisma_1 = require("../lib/prisma");
-const malawi_1 = require("@shared/constants/malawi");
+const malawi_1 = require("../../../../packages/shared/constants/malawi");
 // ─── LIST STUDENTS ───────────────────────────────────────
 async function listStudents(filters) {
     const { classId, status, page = 1, limit = 50 } = filters;

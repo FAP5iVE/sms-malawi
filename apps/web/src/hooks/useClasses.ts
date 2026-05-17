@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getAuth } from 'firebase/auth'
 import type { CreateClassInput } from '@shared/schemas/student'
+import type { ApiClass, ApiTimetableSlot } from '@shared/types/api'
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = await getAuth().currentUser?.getIdToken()
@@ -8,12 +9,12 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options?.headers,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options?.headers ?? {}),
     },
   })
   if (!res.ok) throw new Error(`API error ${res.status}`)
-  return res.json()
+  return res.json() as Promise<T>
 }
 
 export const classKeys = {
@@ -27,14 +28,14 @@ export function useClasses(academicYear?: string) {
   return useQuery({
     queryKey: classKeys.list(academicYear),
     queryFn: () =>
-      apiFetch<any[]>(academicYear ? `/classes?academicYear=${academicYear}` : '/classes'),
+      apiFetch<ApiClass[]>(academicYear ? `/classes?academicYear=${academicYear}` : '/classes'),
   })
 }
 
 export function useClass(id: string) {
   return useQuery({
     queryKey: classKeys.detail(id),
-    queryFn: () => apiFetch<any>(`/classes/${id}`),
+    queryFn: () => apiFetch<ApiClass>(`/classes/${id}`),
     enabled: !!id,
   })
 }
@@ -42,7 +43,7 @@ export function useClass(id: string) {
 export function useClassTimetable(classId: string, term: number) {
   return useQuery({
     queryKey: classKeys.timetable(classId, term),
-    queryFn: () => apiFetch<any[]>(`/classes/${classId}/timetable?term=${term}`),
+    queryFn: () => apiFetch<ApiTimetableSlot[]>(`/classes/${classId}/timetable?term=${term}`),
     enabled: !!classId,
   })
 }
@@ -51,7 +52,7 @@ export function useCreateClass() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: CreateClassInput) =>
-      apiFetch<any>('/classes', { method: 'POST', body: JSON.stringify(data) }),
+      apiFetch<ApiClass>('/classes', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: classKeys.all() }),
   })
 }

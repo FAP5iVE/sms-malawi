@@ -7,8 +7,6 @@
     "outDir": "lib",
     "rootDir": "../..",
     "strict": true,
-    // Disable exactOptionalPropertyTypes for the functions project
-    // to avoid string|undefined conflicts across service boundaries
     "exactOptionalPropertyTypes": false,
     "esModuleInterop": true,
     "skipLibCheck": true,

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getAuth } from 'firebase/auth'
+import type { ApiApplication, ApiStudent } from '@shared/types/api'
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = await getAuth().currentUser?.getIdToken()
@@ -7,12 +8,12 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options?.headers,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options?.headers ?? {}),
     },
   })
   if (!res.ok) throw new Error(`API error ${res.status}`)
-  return res.json()
+  return res.json() as Promise<T>
 }
 
 export const appKeys = {
@@ -21,10 +22,9 @@ export const appKeys = {
 }
 
 export function useApplications(status?: string) {
-  const qs = status ? `?status=${status}` : ''
   return useQuery({
     queryKey: appKeys.list(status),
-    queryFn: () => apiFetch<any[]>(`/applications${qs}`),
+    queryFn: () => apiFetch<ApiApplication[]>(`/applications${status ? `?status=${status}` : ''}`),
   })
 }
 
@@ -32,7 +32,7 @@ export function useUpdateApplicationStatus() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, status, notes }: { id: string; status: string; notes?: string }) =>
-      apiFetch<any>(`/applications/${id}/status`, {
+      apiFetch<ApiApplication>(`/applications/${id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status, notes }),
       }),
@@ -44,7 +44,7 @@ export function useConvertToStudent() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, classId }: { id: string; classId?: string }) =>
-      apiFetch<any>(`/applications/${id}/convert`, {
+      apiFetch<ApiStudent>(`/applications/${id}/convert`, {
         method: 'POST',
         body: JSON.stringify({ classId }),
       }),
