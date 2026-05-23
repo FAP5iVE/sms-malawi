@@ -62,3 +62,15 @@ export function useArchiveStudent() {
     onSuccess: () => qc.invalidateQueries({ queryKey: studentKeys.all() }),
   })
 }
+
+// Fetches the signed view URL for a student's profile photo
+// URL is valid until Appwrite revokes it — refetch every 50 minutes
+export function useStudentPhotoUrl(studentId: string, hasPhoto: boolean) {
+  return useQuery({
+    queryKey: ['student-photo', studentId],
+    queryFn: () => apiFetch<{ url: string }>(`/students/${studentId}/photo`),
+    enabled: !!studentId && hasPhoto,
+    staleTime: 50 * 60 * 1000, // 50 minutes
+    gcTime: 60 * 60 * 1000, // 60 minutes
+  })
+}

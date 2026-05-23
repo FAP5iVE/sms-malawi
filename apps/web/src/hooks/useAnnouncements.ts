@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { collection, query, where, orderBy, onSnapshot, type Timestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { useAuthStore } from '@/store/authStore'
+import { COLLECTIONS } from '@shared/constants/malawi'
 
 export interface Announcement {
   id: string
@@ -27,7 +28,7 @@ export function useAnnouncements() {
 
     // Listen to published announcements that target this role or all users
     const q = query(
-      collection(db, 'announcements'),
+      collection(db, COLLECTIONS.ANNOUNCEMENTS),
       where('status', '==', 'PUBLISHED'),
       orderBy('createdAt', 'desc')
     )

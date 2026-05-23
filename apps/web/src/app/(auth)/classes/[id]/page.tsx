@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { getAuth } from 'firebase/auth'
 import { useClass, useClassTimetable } from '@/hooks/useClasses'
+import type { ApiClass, ApiTimetableSlot } from '@shared/types/api'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { AttendanceSheet } from '@/components/classes/AttendanceSheet'
-import { ArrowLeft, Users, ClipboardCheck, Clock } from 'lucide-react'
+import { ArrowLeft, Users, ClipboardCheck, Clock, BookOpen } from 'lucide-react'
 
 type Tab = 'roster' | 'attendance' | 'timetable' | 'assignments'
 
@@ -20,11 +22,42 @@ export default function ClassDetailPage() {
   )
 }
 
+interface ApiAssignment {
+  id: string
+  title: string
+  subject: string
+  dueDate: string
+  submissions?: unknown[]
+}
+
+interface RosterStudent {
+  id: string
+  firstName: string
+  lastName: string
+  registrationNo: string
+  sex: string
+}
+
 function ClassDetailContent() {
   const { id } = useParams<{ id: string }>()
   const { data: cls, isLoading } = useClass(id)
   const { data: slots = [] } = useClassTimetable(id, 1)
   const [activeTab, setActiveTab] = useState<Tab>('roster')
+  const [assignments, setAssignments] = useState<ApiAssignment[]>([])
+
+  // Fetch assignments when tab opens
+  useEffect(() => {
+    if (activeTab !== 'assignments') return
+    getAuth()
+      .currentUser?.getIdToken()
+      .then((token) =>
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/classes/${id}/assignments`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then((r) => r.json())
+          .then(setAssignments)
+      )
+  }, [activeTab, id])
 
   if (isLoading) {
     return (
@@ -40,9 +73,10 @@ function ClassDetailContent() {
   }
 
   const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: 'roster', label: 'Student Roster', icon: Users },
+    { id: 'roster', label: 'Students', icon: Users },
     { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
     { id: 'timetable', label: 'Timetable', icon: Clock },
+    { id: 'assignments', label: 'Assignments', icon: BookOpen },
   ]
 
   return (
@@ -113,7 +147,7 @@ function ClassDetailContent() {
               </tr>
             </thead>
             <tbody>
-              {(cls.students ?? []).map((student: any, i: number) => (
+              {(cls.students ?? []).map((student: RosterStudent, i: number) => (
                 <tr
                   key={student.id}
                   className="border-b border-base hover:bg-page transition-colors"
@@ -190,7 +224,7 @@ function ClassDetailContent() {
                   </td>
                 </tr>
               ) : (
-                slots.map((slot: any) => (
+                slots.map((slot: ApiTimetableSlot) => (
                   <tr key={slot.id} className="border-b border-base hover:bg-page">
                     <td className="px-4 py-3 font-medium">{slot.day}</td>
                     <td className="px-4 py-3 text-muted tabular font-mono text-xs">
@@ -203,6 +237,48 @@ function ClassDetailContent() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {activeTab === 'assignments' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-heading font-semibold text-brand-navy">Assignments</h3>
+            <RoleGuard allowed={['admin', 'high_rank', 'academic']}>
+              <button
+                onClick={() => {
+                  /* AssignmentForm not yet implemented */
+                }}
+                className="flex items-center gap-2 bg-brand-teal text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-brand-teal-light transition-colors"
+              >
+                + New Assignment
+              </button>
+            </RoleGuard>
+          </div>
+
+          {assignments.length === 0 ? (
+            <div className="text-center py-12 text-muted text-sm border border-base rounded-xl">
+              No assignments yet. Click &quot;New Assignment&quot; to create one.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {assignments.map((a) => (
+                <div key={a.id} className="bg-surface border border-base rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-heading font-semibold text-body">{a.title}</p>
+                      <p className="text-sm text-muted mt-0.5">
+                        {a.subject} · Due: {new Date(a.dueDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className="text-xs bg-brand-teal/10 text-brand-teal px-2.5 py-1 rounded-full font-semibold">
+                      {a.submissions?.length ?? 0} submitted
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

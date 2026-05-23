@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { verifyAuth, requireRole } from '../middleware/auth'
 import { CreateClassSchema, CreateTimetableSlotSchema } from '@shared/schemas/student'
 import * as classService from '../services/classService'
+import { assignmentsRouter } from './assignments'
 
 export const classesRouter = Router()
 
@@ -86,3 +87,5 @@ classesRouter.post(
     res.status(201).json(slot)
   }
 )
+
+classesRouter.use('/:classId/assignments', assignmentsRouter)

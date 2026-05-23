@@ -39,35 +39,49 @@ const auth_1 = require("../middleware/auth");
 const student_1 = require("../../../../packages/shared/schemas/student");
 const appService = __importStar(require("../services/applicationService"));
 exports.applicationsRouter = (0, express_1.Router)();
-// GET /applications
+// POST /applications/public — no auth required (from /apply page)
+exports.applicationsRouter.post('/public', async (req, res) => {
+    const parsed = student_1.PublicApplicationSchema.safeParse(req.body);
+    if (!parsed.success)
+        return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+    try {
+        const app = await appService.createPublicApplication(parsed.data);
+        return res.status(201).json({ id: app.id, status: app.status });
+    }
+    catch (err) {
+        console.error('Public application error:', err);
+        return res.status(500).json({ error: 'Failed to submit application. Please try again.' });
+    }
+});
+// GET /applications — authenticated list
 exports.applicationsRouter.get('/', auth_1.verifyAuth, (0, auth_1.requireRole)(['admin', 'high_rank', 'lower_rank']), async (req, res) => {
     const { status } = req.query;
     const apps = await appService.listApplications(status);
-    res.json(apps);
+    return res.json(apps);
 });
-// POST /applications — public endpoint (application form page)
-exports.applicationsRouter.post('/', async (req, res) => {
+// POST /applications — internal (within the system)
+exports.applicationsRouter.post('/', auth_1.verifyAuth, (0, auth_1.requireRole)(['admin', 'high_rank', 'lower_rank']), async (req, res) => {
     const parsed = student_1.CreateApplicationSchema.safeParse(req.body);
     if (!parsed.success)
         return res.status(400).json({ errors: parsed.error.flatten() });
     const app = await appService.createApplication(parsed.data);
-    res.status(201).json(app);
+    return res.status(201).json(app);
 });
-// PATCH /applications/:id/status — approve / deny / await admission
+// PATCH /applications/:id/status
 exports.applicationsRouter.patch('/:id/status', auth_1.verifyAuth, (0, auth_1.requireRole)(['admin', 'high_rank', 'lower_rank']), async (req, res) => {
-    const { status, notes } = req.body;
-    if (!['APPROVED', 'DENIED', 'AWAITING_ADMISSION'].includes(status)) {
-        return res.status(400).json({ error: 'Invalid status' });
-    }
-    const id = String(req.params.id);
+    const id = String(req.params.id); // ← was missing (caused TS2304)
+    const { notes } = req.body;
+    const status = req.body.status;
+    if (!['APPROVED', 'DENIED', 'AWAITING_ADMISSION'].includes(status))
+        return res.status(400).json({ error: 'Invalid status transition' });
     const updated = await appService.updateApplicationStatus(id, status, req.user.uid, notes);
-    res.json(updated);
+    return res.json(updated);
 });
-// POST /applications/:id/convert — convert approved application to Student record
+// POST /applications/:id/convert — approved app → Student
 exports.applicationsRouter.post('/:id/convert', auth_1.verifyAuth, (0, auth_1.requireRole)(['admin', 'high_rank']), async (req, res) => {
-    const { classId } = req.body;
     const id = String(req.params.id);
+    const { classId } = req.body;
     const student = await appService.convertToStudent(id, classId, req.user.uid, req.user.role);
-    res.status(201).json(student);
+    return res.status(201).json(student);
 });
 //# sourceMappingURL=applications.js.map

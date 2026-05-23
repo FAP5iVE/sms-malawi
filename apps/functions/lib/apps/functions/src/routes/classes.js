@@ -38,6 +38,7 @@ const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const student_1 = require("../../../../packages/shared/schemas/student");
 const classService = __importStar(require("../services/classService"));
+const assignments_1 = require("./assignments");
 exports.classesRouter = (0, express_1.Router)();
 // GET /classes
 exports.classesRouter.get('/', auth_1.verifyAuth, (0, auth_1.requireRole)([
@@ -98,4 +99,5 @@ exports.classesRouter.post('/:id/timetable', auth_1.verifyAuth, (0, auth_1.requi
     const slot = await classService.createTimetableSlot(parsed.data);
     res.status(201).json(slot);
 });
+exports.classesRouter.use('/:classId/assignments', assignments_1.assignmentsRouter);
 //# sourceMappingURL=classes.js.map

@@ -2,9 +2,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getAuth } from 'firebase/auth'
 import type { ApiApplication, ApiStudent } from '@shared/types/api'
 
+function getApiUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL
+
+  // Local emulator: Functions run at http://127.0.0.1:5001/<project-id>/<region>/api
+  // Adjust the project-id and region to match your firebase.json / index.ts
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'sms-malawi-52a44'
+  return `http://127.0.0.1:5001/${projectId}/africa-south1/api`
+}
+
+const API_URL = getApiUrl()
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = await getAuth().currentUser?.getIdToken()
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
+  const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

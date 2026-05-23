@@ -1,3 +1,5 @@
+'use client'
+
 import {
   Banknote,
   TrendingUp,
@@ -11,19 +13,21 @@ import {
 import { StatCard } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { PlaceholderWidget } from '@/components/dashboards/AdminDashboard'
+import { useFinanceSummary } from '@/hooks/useFinances'
+import { formatMWK } from '@shared/constants/malawi'
 import type { QuickAction } from '@/components/shared/QuickActions'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
     label: 'Record Payment',
-    href: '/finances/payments/new',
+    href: '/finances',
     icon: PlusCircle,
     color: 'bg-brand-teal/10',
     text: 'text-brand-teal',
   },
   {
     label: 'Generate Receipt',
-    href: '/finances/receipts',
+    href: '/finances',
     icon: Receipt,
     color: 'bg-emerald-50',
     text: 'text-emerald-600',
@@ -37,7 +41,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
   {
     label: 'Student Balances',
-    href: '/finances',
+    href: '/finances?tab=invoices',
     icon: Users,
     color: 'bg-brand-amber/10',
     text: 'text-brand-amber',
@@ -45,13 +49,17 @@ const QUICK_ACTIONS: QuickAction[] = [
 ]
 
 export function FinanceDashboard() {
+  const { data: summary, isLoading } = useFinanceSummary('2025/2026', 1)
+
+  const fmt = (v?: number) => (isLoading ? 'Loading…' : formatMWK(v ?? 0))
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           label="Total Collected"
-          value="MWK —"
-          icon={Banknote}
+          value={fmt(summary?.totalCollected)}
+          icon={TrendingUp}
           trend="neutral"
           trendLabel="this term"
           iconColor="bg-emerald-50"
@@ -59,7 +67,7 @@ export function FinanceDashboard() {
         />
         <StatCard
           label="Outstanding Fees"
-          value="MWK —"
+          value={fmt(summary?.totalOutstanding)}
           icon={TrendingDown}
           trend="neutral"
           trendLabel="unpaid"
@@ -67,20 +75,20 @@ export function FinanceDashboard() {
           iconText="text-brand-coral"
         />
         <StatCard
-          label="Total Income"
-          value="MWK —"
-          icon={TrendingUp}
+          label="Total Expenses"
+          value={fmt(summary?.totalExpenses)}
+          icon={Banknote}
           trend="neutral"
-          trendLabel="this month"
+          trendLabel="approved"
           iconColor="bg-brand-teal/10"
           iconText="text-brand-teal"
         />
         <StatCard
-          label="Pending Payroll"
-          value="—"
+          label="Collection Rate"
+          value={isLoading ? '…' : `${summary?.collectionPercent ?? 0}%`}
           icon={Clock}
           trend="neutral"
-          trendLabel="staff"
+          trendLabel="of target"
           iconColor="bg-brand-amber/10"
           iconText="text-brand-amber"
         />

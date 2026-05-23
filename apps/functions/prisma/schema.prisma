@@ -23,7 +23,7 @@ model Student {
   guardianName     String
   guardianPhone    String
   guardianRelation String
-  photoKey         String?  // R2 object key — never a full URL
+  photoKey         String? 
   status           StudentStatus @default(ACTIVE)
   classId          String?
   class            Class?        @relation(fields: [classId], references: [id])
@@ -206,3 +206,277 @@ model AuditLog {
   @@index([actorUid])
   @@map("audit_logs")
 }
+
+
+// ─── FEE STRUCTURE ───────────────────────────────────────
+model FeeStructure {
+  id           String   @id @default(cuid())
+  name         String                        // "Tuition", "Boarding", "Exam", "Uniform", "Library", "Transport"
+  amount       Decimal  @db.Decimal(12, 2)   // MWK amount
+  classId      String?                       // null = applies to all classes
+  academicYear String
+  term         Int?                          // null = applies to all terms
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([academicYear, classId])
+  @@map("fee_structures")
+}
+
+// ─── STUDENT INVOICE (per term per student) ───────────────
+model Invoice {
+  id              String          @id @default(cuid())
+  studentId       String
+  academicYear    String
+  term            Int
+  subtotal        Decimal         @db.Decimal(12, 2)
+  discount        Decimal         @db.Decimal(12, 2) @default(0)
+  latePenalty     Decimal         @db.Decimal(12, 2) @default(0)
+  totalAmount     Decimal         @db.Decimal(12, 2)
+  paidAmount      Decimal         @db.Decimal(12, 2) @default(0)
+  balance         Decimal         @db.Decimal(12, 2)   // totalAmount - paidAmount
+  status          InvoiceStatus   @default(UNPAID)
+  dueDate         DateTime
+  scholarshipId   String?
+  payments        Payment[]
+  notes           InvoiceNote[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@unique([studentId, academicYear, term])   // one invoice per student per term
+  @@index([studentId])
+  @@index([status])
+  @@index([academicYear, term])
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+    UNPAID
+    PARTIAL
+    PAID 
+    OVERDUE
+     }
+
+// ─── PAYMENT RECORD ──────────────────────────────────────
+model Payment {
+  id           String        @id @default(cuid())
+  invoiceId    String
+  invoice      Invoice       @relation(fields: [invoiceId], references: [id])
+  amount       Decimal       @db.Decimal(12, 2)
+  method       PaymentMethod
+  reference    String?       // bank ref, mobile money transaction ID
+  receiptKey   String?       // R2 object key for generated PDF receipt
+  recordedByUid String
+  notes        String?
+  paidAt       DateTime      @default(now())
+
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+enum PaymentMethod {
+   CASH  
+   BANK_TRANSFER  
+   MOBILE_MONEY  
+   CHEQUE 
+   }
+
+// ─── INVOICE NOTES (sticky notes on transactions) ────────
+model InvoiceNote {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  body      String
+  authorUid String
+  createdAt DateTime @default(now())
+
+  @@map("invoice_notes")
+}
+
+// ─── EXPENSE ─────────────────────────────────────────────
+model Expense {
+  id           String          @id @default(cuid())
+  category     ExpenseCategory
+  description  String
+  amount       Decimal         @db.Decimal(12, 2)
+  receiptKey   String?         // R2 object key for scanned receipt
+  academicYear String
+  term         Int
+  approvedByUid String?
+  approvedAt   DateTime?
+  status       ExpenseStatus   @default(PENDING)
+  recordedByUid String
+  incurredAt   DateTime
+  createdAt    DateTime        @default(now())
+
+  @@index([academicYear, term])
+  @@index([category])
+  @@map("expenses")
+}
+
+enum ExpenseCategory { 
+  SALARIES  
+  UTILITIES  
+  MAINTENANCE  
+  PROCUREMENT  
+  LIBRARY  
+  TRANSPORT  
+  MISCELLANEOUS 
+  }
+
+enum ExpenseStatus  { 
+  PENDING  
+  APPROVED  
+  REJECTED 
+  }
+
+// ─── PAYROLL ─────────────────────────────────────────────
+model PayrollRun {
+  id           String          @id @default(cuid())
+  month        Int             // 1–12
+  year         Int
+  status       PayrollStatus   @default(PROCESSING)
+  totalGross   Decimal         @db.Decimal(12, 2)
+  totalNet     Decimal         @db.Decimal(12, 2)
+  runByUid     String
+  completedAt  DateTime?
+  createdAt    DateTime        @default(now())
+  payslips     Payslip[]
+
+  @@unique([month, year])
+  @@map("payroll_runs")
+}
+
+enum PayrollStatus { 
+  PROCESSING  
+  COMPLETED  
+  FAILED 
+  }
+
+model Payslip {
+  id            String     @id @default(cuid())
+  payrollRunId  String
+  payrollRun    PayrollRun @relation(fields: [payrollRunId], references: [id])
+  staffUid      String
+  staffName     String
+  grossSalary   Decimal    @db.Decimal(12, 2)
+  paye          Decimal    @db.Decimal(12, 2)  // income tax
+  pension       Decimal    @db.Decimal(12, 2)
+  loanDeduction Decimal    @db.Decimal(12, 2) @default(0)
+  netSalary     Decimal    @db.Decimal(12, 2)
+  payslipKey    String?    // R2 object key for PDF payslip
+  createdAt     DateTime   @default(now())
+
+  @@index([staffUid])
+  @@index([payrollRunId])
+  @@map("payslips")
+}
+
+// ─── SALARY STRUCTURE ────────────────────────────────────
+model SalaryStructure {
+  id           String   @id @default(cuid())
+  staffUid     String   @unique
+  baseSalary   Decimal  @db.Decimal(12, 2)
+  allowances   Decimal  @db.Decimal(12, 2) @default(0)
+  loanBalance  Decimal  @db.Decimal(12, 2) @default(0)
+  monthlyLoanDeduction Decimal @db.Decimal(12, 2) @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@map("salary_structures")
+}
+
+// ─── BUDGET ──────────────────────────────────────────────
+model Budget {
+  id           String   @id @default(cuid())
+  academicYear String
+  term         Int?     // null = annual budget
+  department   String
+  category     String
+  description  String?
+  allocated    Decimal  @db.Decimal(12, 2)
+  spent        Decimal  @db.Decimal(12, 2) @default(0)
+  createdByUid String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([academicYear])
+  @@map("budgets")
+}
+
+// ─── SCHOLARSHIP / BURSARY ───────────────────────────────
+model Scholarship {
+  id           String           @id @default(cuid())
+  name         String
+  studentId    String
+  discountType DiscountType
+  value        Decimal          @db.Decimal(12, 2)  // % or fixed MWK amount
+  academicYear String
+  isActive     Boolean          @default(true)
+  notes        String?
+  createdAt    DateTime         @default(now())
+
+  @@index([studentId])
+  @@map("scholarships")
+}
+
+enum DiscountType { 
+  PERCENTAGE  
+  FIXED_AMOUNT 
+  }
+
+// ─── INSTALLMENT PLAN ────────────────────────────────────
+model InstallmentPlan {
+  id           String              @id @default(cuid())
+  invoiceId    String              @unique           // one plan per invoice
+  totalAmount  Decimal             @db.Decimal(12, 2)
+  installments Installment[]
+  createdByUid String
+  createdAt    DateTime            @default(now())
+
+  @@map("installment_plans")
+}
+
+model Installment {
+  id        String          @id @default(cuid())
+  planId    String
+  plan      InstallmentPlan @relation(fields: [planId], references: [id])
+  dueDate   DateTime
+  amount    Decimal         @db.Decimal(12, 2)
+  paidAt    DateTime?
+  status    InstallmentStatus @default(PENDING)
+
+  @@index([planId])
+  @@map("installments")
+}
+
+enum InstallmentStatus { 
+  PENDING  
+  PAID  
+  OVERDUE 
+  }
+
+// ─── LIBRARY FINE (bridge between Library and Finance) ────
+model LibraryFine {
+  id              String          @id @default(cuid())
+  studentId       String
+  bookTitle       String
+  firestoreDocId  String          @unique            // Firestore doc ID in library collection
+  amount          Decimal         @db.Decimal(10, 2)
+  reason          String
+  status          FineStatus      @default(PENDING)
+  markedByUid     String          // librarian who raised the fine
+  paidAt          DateTime?
+  clearedByUid    String?         // finance staff who marked it paid
+  createdAt       DateTime        @default(now())
+
+  @@index([studentId])
+  @@index([status])
+  @@map("library_fines")
+}
+
+enum FineStatus { 
+  PENDING  
+  PAID 
+  WAIVED 
+  }

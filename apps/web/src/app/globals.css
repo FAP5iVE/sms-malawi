@@ -73,9 +73,9 @@
   --font-mono: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
 
   /* Brand colours */
-  --color-brand-navy: #0f2744;
-  --color-brand-navy-mid: #1a3a5c;
-  --color-brand-navy-light: #2a5080;
+  --color-brand-navy: #005eb8;
+  --color-brand-navy-mid: #007fff;
+  --color-brand-navy-light: #2d68c4;
   --color-brand-teal: #0e8a6a;
   --color-brand-teal-light: #1db88e;
   --color-brand-amber: #d97706;
@@ -83,10 +83,10 @@
   --color-brand-purple: #6b3fa0;
 
   /* Semantic surface tokens — light mode defaults */
-  --color-bg: #f8fafc;
+  --color-bg: #fffbee;
   --color-surface: #ffffff;
   --color-border: #dde4ec;
-  --color-text: #1e293b;
+  --color-text: #268bd2;
   --color-muted: #64748b;
 
   /* Border radius scale */
@@ -107,11 +107,11 @@
    ───────────────────────────────────────────── */
 
 .dark {
-  --color-bg: #0d1521;
-  --color-surface: #141e2c;
-  --color-border: #1e2d3e;
-  --color-text: #e2eaf4;
-  --color-muted: #7a8fa6;
+  --color-bg: #002b36;
+  --color-surface: #073642;
+  --color-border: #586e75;
+  --color-text: #fffbee;
+  --color-muted: #93a1a1;
 }
 
 /* ─────────────────────────────────────────────

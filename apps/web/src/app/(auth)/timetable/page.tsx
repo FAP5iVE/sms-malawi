@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getAuth } from 'firebase/auth'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { useClasses } from '@/hooks/useClasses'
+import type { ApiTimetableSlot, ApiClass } from '@shared/types/api'
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'] as const
 const DAY_LABELS = {
@@ -30,7 +31,7 @@ function TimetableContent() {
   const [selectedClassId, setSelectedClassId] = useState('')
   const [term, setTerm] = useState(1)
 
-  const { data: slots = [], isLoading } = useQuery({
+  const { data: slots = [], isLoading } = useQuery<ApiTimetableSlot[]>({
     queryKey: ['timetable', selectedClassId, term],
     queryFn: async () => {
       if (!selectedClassId) return []
@@ -47,10 +48,10 @@ function TimetableContent() {
   // Group slots by day
   const byDay = DAYS.reduce(
     (acc, day) => {
-      acc[day] = slots.filter((s: any) => s.day === day)
+      acc[day] = slots.filter((s: ApiTimetableSlot) => s.day === day)
       return acc
     },
-    {} as Record<string, any[]>
+    {} as Record<string, ApiTimetableSlot[]>
   )
 
   return (
@@ -68,7 +69,7 @@ function TimetableContent() {
           aria-label="Select class"
         >
           <option value="">Select class</option>
-          {classes.map((c: any) => (
+          {(classes as ApiClass[]).map((c: ApiClass) => (
             <option key={c.id} value={c.id}>
               {c.name}
             </option>
@@ -118,18 +119,20 @@ function TimetableContent() {
                   </td>
                 </tr>
               ) : (
-                // Get unique periods
-                [...new Set(slots.map((s: any) => s.periodStart))]
+                // Get unique periods — type the Set as string[] so .map gets string values
+                [...new Set<string>(slots.map((s: ApiTimetableSlot) => s.periodStart))]
                   .sort()
                   .map((periodStart: string) => {
-                    const row = slots.find((s: any) => s.periodStart === periodStart)
+                    const row = slots.find((s: ApiTimetableSlot) => s.periodStart === periodStart)
                     return (
                       <tr key={periodStart} className="border-b border-base hover:bg-page">
                         <td className="px-4 py-3 text-muted font-mono text-xs tabular">
                           {periodStart}–{row?.periodEnd}
                         </td>
                         {DAYS.map((day) => {
-                          const slot = byDay[day]?.find((s: any) => s.periodStart === periodStart)
+                          const slot = byDay[day]?.find(
+                            (s: ApiTimetableSlot) => s.periodStart === periodStart
+                          )
                           return (
                             <td key={day} className="px-4 py-3">
                               {slot ? (

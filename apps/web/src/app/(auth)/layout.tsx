@@ -1,10 +1,18 @@
+'use client'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { Sidebar } from '@/components/shared/Sidebar'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { useInactivityTimer } from '@/hooks/useInactivityTimer'
+
+function InactivityWatcher() {
+  useInactivityTimer()
+  return null
+}
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
+      <InactivityWatcher />
       <div className="flex h-screen overflow-hidden bg-page">
         {/* Left sidebar — shows role-appropriate nav items */}
         <Sidebar />

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MALAWI_SUBJECTS = exports.ACADEMIC_TERMS = exports.MALAWI_PUBLIC_HOLIDAYS_2026 = exports.MALAWI_DISTRICTS = void 0;
+exports.STORAGE_BUCKET_IDS = exports.SCHOOL_BUCKET_ID = exports.COLLECTIONS = exports.MALAWI_SUBJECTS = exports.ACADEMIC_TERMS = exports.MALAWI_PUBLIC_HOLIDAYS_2026 = exports.MALAWI_DISTRICTS = void 0;
 exports.formatMWK = formatMWK;
 exports.generateRegistrationNo = generateRegistrationNo;
 // ─── MALAWI DISTRICTS ─────────────────────────────────────
@@ -100,4 +100,23 @@ exports.MALAWI_SUBJECTS = [
     'Performing Arts',
     'Religious and Moral Education',
 ];
+// ─── FIRESTORE COLLECTION NAMES ──────────────────────────
+// Use these constants everywhere — never hard-code collection strings in hooks
+exports.COLLECTIONS = {
+    ANNOUNCEMENTS: 'announcements',
+    CALENDAR_EVENTS: 'calendar_events',
+    ATTENDANCE: 'attendance',
+    NOTIFICATIONS: 'notifications',
+    AUDIT_LOGS: 'audit_logs',
+};
+// ─── APPWRITE STORAGE ─────────────────────────────────────
+// ONE bucket handles ALL file types (photos, PDFs, eBooks, payslips, report cards)
+// Bucket ID: school_files — matches what was created in Appwrite dashboard
+exports.SCHOOL_BUCKET_ID = 'school_files';
+exports.STORAGE_BUCKET_IDS = {
+    STUDENT_FILES: exports.SCHOOL_BUCKET_ID,
+    DIGITAL_LIBRARY: exports.SCHOOL_BUCKET_ID,
+    PAYSLIPS: exports.SCHOOL_BUCKET_ID,
+    REPORT_CARDS: exports.SCHOOL_BUCKET_ID,
+};
 //# sourceMappingURL=malawi.js.map

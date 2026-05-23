@@ -39,6 +39,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.api = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
+const Sentry = __importStar(require("@sentry/node"));
 const express_1 = __importDefault(require("express"));
 const helmet_1 = __importDefault(require("helmet"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
@@ -46,13 +47,24 @@ const students_1 = require("./routes/students");
 const classes_1 = require("./routes/classes");
 const applications_1 = require("./routes/applications");
 const timetable_1 = require("./routes/timetable");
+const finances_1 = require("./routes/finances");
+const payroll_1 = require("./routes/payroll");
 // Initialise Firebase Admin SDK once
 admin.initializeApp();
+Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV ?? 'development',
+});
 const app = (0, express_1.default)();
+const globalLimiter = (0, express_rate_limit_1.default)({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+    validate: { creationStack: false },
+});
 // ── Security middleware ────────────────────────────────────
 app.use((0, helmet_1.default)());
 app.use(express_1.default.json({ limit: '2mb' }));
-app.use((0, express_rate_limit_1.default)({ windowMs: 15 * 60 * 1000, max: 300 }));
+app.use(globalLimiter);
 // ── CORS for local dev + production domain ────────────────
 app.use((req, res, next) => {
     const allowed = ['http://localhost:3000', 'https://sms-malawi-52a44.web.app'];
@@ -70,10 +82,13 @@ app.use('/students', students_1.studentsRouter);
 app.use('/classes', classes_1.classesRouter);
 app.use('/applications', applications_1.applicationsRouter);
 app.use('/timetable', timetable_1.timetableRouter);
+app.use('/finances', finances_1.financesRouter);
+app.use('/payroll', payroll_1.payrollRouter);
 // ── Health check ──────────────────────────────────────────
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
 // ── Error handler ─────────────────────────────────────────
 app.use((err, _req, res, _next) => {
+    Sentry.captureException(err);
     console.error(err);
     res.status(err.status ?? 500).json({ error: err.message ?? 'Internal error' });
 });

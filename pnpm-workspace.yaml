@@ -3,6 +3,7 @@ allowBuilds:
   "@firebase/util": true
   "@prisma/client": false
   "@prisma/engines": true
+  '@sentry/cli': true
   core-js: true
   es5-ext: true
   esbuild: true

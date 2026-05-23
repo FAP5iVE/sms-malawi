@@ -32,12 +32,19 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.studentsRouter = void 0;
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const student_1 = require("../../../../packages/shared/schemas/student");
+const multer_1 = __importDefault(require("multer"));
+const storage_1 = require("../lib/storage");
 const studentService = __importStar(require("../services/studentService"));
+// multer with memory storage — file stays in RAM, we forward to Appwrite
+const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 exports.studentsRouter = (0, express_1.Router)();
 // GET /students — list with filters
 exports.studentsRouter.get('/', auth_1.verifyAuth, (0, auth_1.requireRole)([
@@ -98,5 +105,34 @@ exports.studentsRouter.delete('/:id', auth_1.verifyAuth, (0, auth_1.requireRole)
     const id = String(req.params.id);
     const result = await studentService.archiveStudent(id, req.user.uid, req.user.role);
     res.json({ archived: true, student: result });
+});
+// POST /students/:id/photo — upload student profile photo
+exports.studentsRouter.post('/:id/photo', auth_1.verifyAuth, (0, auth_1.requireRole)(['admin', 'high_rank', 'lower_rank']), upload.single('photo'), async (req, res) => {
+    const id = String(req.params.id);
+    if (!req.file)
+        return res.status(400).json({ error: 'No file uploaded' });
+    // Upload to Appwrite student_files bucket
+    const fileId = await (0, storage_1.uploadFile)(storage_1.STORAGE_BUCKETS.STUDENT_FILES, req.file.buffer, req.file.originalname, req.file.mimetype);
+    // Save the Appwrite fileId in the student's photoKey column in Neon
+    await studentService.updateStudent(id, { photoKey: fileId }, req.user.uid, req.user.role);
+    return res.json({ fileId });
+});
+// GET /students/:id/photo — get a signed view URL for the student's photo
+exports.studentsRouter.get('/:id/photo', auth_1.verifyAuth, (0, auth_1.requireRole)([
+    'admin',
+    'high_rank',
+    'finance',
+    'library',
+    'lower_rank',
+    'academic',
+    'hr',
+    'exam_officer',
+]), async (req, res) => {
+    const id = String(req.params.id);
+    const student = await studentService.getStudent(id);
+    if (!student.photoKey)
+        return res.status(404).json({ error: 'No photo uploaded' });
+    const url = await (0, storage_1.getViewUrl)(storage_1.STORAGE_BUCKETS.STUDENT_FILES, student.photoKey);
+    return res.json({ url });
 });
 //# sourceMappingURL=students.js.map

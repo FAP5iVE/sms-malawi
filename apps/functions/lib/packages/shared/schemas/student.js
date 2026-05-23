@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateTimetableSlotSchema = exports.CreateClassSchema = exports.CreateApplicationSchema = exports.ApplicationStatusSchema = exports.UpdateStudentSchema = exports.CreateStudentSchema = exports.SexSchema = exports.StudentStatusSchema = void 0;
+exports.AnnouncementSchema = exports.PublicApplicationSchema = exports.CreateTimetableSlotSchema = exports.CreateClassSchema = exports.CreateApplicationSchema = exports.ApplicationStatusSchema = exports.UpdateStudentSchema = exports.CreateStudentSchema = exports.SexSchema = exports.StudentStatusSchema = void 0;
 const zod_1 = require("zod");
 // ─── ENUMS ───────────────────────────────────────────────
 exports.StudentStatusSchema = zod_1.z.enum([
@@ -25,6 +25,7 @@ exports.CreateStudentSchema = zod_1.z.object({
     guardianPhone: zod_1.z.string().min(10, 'Valid guardian phone required'),
     guardianRelation: zod_1.z.string().min(1, 'Relationship required'),
     classId: zod_1.z.string().optional(),
+    status: exports.StudentStatusSchema.optional(),
 });
 exports.UpdateStudentSchema = exports.CreateStudentSchema.partial().extend({
     status: exports.StudentStatusSchema.optional(),
@@ -71,5 +72,39 @@ exports.CreateTimetableSlotSchema = zod_1.z.object({
     type: zod_1.z.enum(['REGULAR', 'EXAM', 'MANEB', 'LAB']).default('REGULAR'),
     academicYear: zod_1.z.string(),
     term: zod_1.z.number().int().min(1).max(3),
+});
+// ─── PUBLIC APPLICATION (unauthenticated /apply page) ───────
+// Extended version of CreateApplicationSchema — includes all fields
+// from the multi-step apply form (§3.3)
+exports.PublicApplicationSchema = zod_1.z.object({
+    firstName: zod_1.z.string().min(2).max(100),
+    otherNames: zod_1.z.string().optional(),
+    surname: zod_1.z.string().min(2).max(100),
+    dateOfBirth: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    sex: zod_1.z.enum(['male', 'female']),
+    nationality: zod_1.z.string().min(1),
+    district: zod_1.z.string().optional(),
+    religion: zod_1.z.string().optional(),
+    address: zod_1.z.string().min(5),
+    phone: zod_1.z.string().min(7), // already formatted with country code
+    email: zod_1.z.string().email().optional().or(zod_1.z.literal('')),
+    classApplying: zod_1.z.enum(['Form 1', 'Form 2', 'Form 3', 'Form 4']),
+    previousSchool: zod_1.z.string().optional(),
+    reasonForTransfer: zod_1.z.string().optional(),
+    academicYear: zod_1.z.string().min(4),
+    guardianName: zod_1.z.string().min(2),
+    guardianRelationship: zod_1.z.string().min(1),
+    guardianPhone: zod_1.z.string().min(7),
+    guardianEmail: zod_1.z.string().email().optional().or(zod_1.z.literal('')),
+    guardianAddress: zod_1.z.string().optional(),
+});
+// ─── ANNOUNCEMENT ─────────────────────────────────────────
+exports.AnnouncementSchema = zod_1.z.object({
+    title: zod_1.z.string().min(3).max(200),
+    body: zod_1.z.string().min(10),
+    targetAll: zod_1.z.boolean().default(false),
+    targetRoles: zod_1.z.array(zod_1.z.string()).optional(),
+    targetClass: zod_1.z.string().optional(), // classId if targeting specific class
+    status: zod_1.z.enum(['DRAFT', 'PENDING_APPROVAL', 'PUBLISHED']).default('DRAFT'),
 });
 //# sourceMappingURL=student.js.map

@@ -102,3 +102,25 @@ export const MALAWI_SUBJECTS = [
   'Performing Arts',
   'Religious and Moral Education',
 ] as const
+
+// ─── FIRESTORE COLLECTION NAMES ──────────────────────────
+// Use these constants everywhere — never hard-code collection strings in hooks
+export const COLLECTIONS = {
+  ANNOUNCEMENTS: 'announcements',
+  CALENDAR_EVENTS: 'calendar_events',
+  ATTENDANCE: 'attendance',
+  NOTIFICATIONS: 'notifications',
+  AUDIT_LOGS: 'audit_logs',
+} as const
+
+// ─── APPWRITE STORAGE ─────────────────────────────────────
+// ONE bucket handles ALL file types (photos, PDFs, eBooks, payslips, report cards)
+// Bucket ID: school_files — matches what was created in Appwrite dashboard
+export const SCHOOL_BUCKET_ID = 'school_files' as const
+
+export const STORAGE_BUCKET_IDS = {
+  STUDENT_FILES: SCHOOL_BUCKET_ID,
+  DIGITAL_LIBRARY: SCHOOL_BUCKET_ID,
+  PAYSLIPS: SCHOOL_BUCKET_ID,
+  REPORT_CARDS: SCHOOL_BUCKET_ID,
+} as const

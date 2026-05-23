@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.listApplications = listApplications;
+exports.createPublicApplication = createPublicApplication;
 exports.createApplication = createApplication;
 exports.updateApplicationStatus = updateApplicationStatus;
 exports.convertToStudent = convertToStudent;
@@ -10,6 +11,24 @@ async function listApplications(status) {
     return prisma_1.prisma.application.findMany({
         where: status ? { status: status } : undefined,
         orderBy: { createdAt: 'desc' },
+    });
+}
+// Public (unauthenticated) application — from the /apply page
+async function createPublicApplication(data) {
+    return prisma_1.prisma.application.create({
+        data: {
+            firstName: data.firstName,
+            lastName: data.surname, // schema uses 'surname'
+            dateOfBirth: new Date(data.dateOfBirth),
+            sex: data.sex === 'male' ? 'MALE' : 'FEMALE',
+            nationality: data.nationality,
+            district: data.district ?? '',
+            guardianName: data.guardianName,
+            guardianPhone: data.guardianPhone,
+            guardianRelation: data.guardianRelationship,
+            applyingForForm: parseInt(data.classApplying.replace('Form ', '')),
+            status: 'PENDING',
+        },
     });
 }
 async function createApplication(data) {

@@ -4,7 +4,7 @@
   "description": "",
   "main": "lib/apps/functions/src/index.js",
   "engines": {
-    "node": "22"
+    "node": ">=18"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -17,17 +17,25 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1048.0",
+    "@aws-sdk/s3-request-presigner": "^3.1048.0",
     "@google-cloud/tasks": "^6.2.2",
     "@neondatabase/serverless": "^1.1.0",
     "@prisma/adapter-neon": "^7.8.0",
     "@prisma/client": "^6.19.3",
+    "@sentry/node": "^10.53.1",
+    "@types/multer": "^2.1.0",
     "algoliasearch": "^5.52.1",
+    "date-fns": "^4.1.0",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "express": "^4.22.1",
     "express-rate-limit": "^8.5.1",
     "firebase-admin": "^13.9.0",
     "firebase-functions": "^7.2.5",
     "helmet": "^8.1.0",
+    "multer": "^2.1.1",
+    "node-appwrite": "^24.1.0",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.3",
     "puppeteer": "^24.43.0",

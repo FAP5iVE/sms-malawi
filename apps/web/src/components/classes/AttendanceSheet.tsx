@@ -43,11 +43,11 @@ export function AttendanceSheet({ classId, students, date = new Date() }: Attend
       }
     })
     return unsub
-  }, [classId, dateStr, students.length])
+  }, [docPath, students])
 
   async function toggle(studentId: string) {
     const current = record[studentId] ?? 'ABSENT'
-    const next = current === 'PRESENT' ? 'ABSENT' : 'PRESENT'
+    const next =( current === 'PRESENT' ? 'ABSENT' : 'PRESENT') as 'PRESENT' | 'ABSENT'
     const newRecord = { ...record, [studentId]: next }
     setRecord(newRecord)
 

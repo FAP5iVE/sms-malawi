@@ -14,6 +14,7 @@ dist/
 .env
 .env.local
 .env.*.local
+.env.example
 
 # Firebase
 .firebase/
@@ -54,6 +55,7 @@ Thumbs.db
 .vscode/settings.json
 
 # Secrets
+service-account.json
 serviceAccount.json
 
 # Ignore npm lock because using pnpm
@@ -67,3 +69,10 @@ package-lock.json
 
 #serviceAccount
 **/serviceAccount.json
+
+#sentry
+.env.sentry-build-plugin
+
+.github/
+ci.yml
+.git

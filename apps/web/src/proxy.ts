@@ -28,7 +28,7 @@ const PROTECTED_PATHS = [
   '/timetable',
 ]
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const session = request.cookies.get(AUTH_COOKIE)?.value
 
