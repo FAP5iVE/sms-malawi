@@ -162,7 +162,7 @@ function Calendar({
           )
         },
         DayButton: ({ ...props }) => (
-          <CalendarDayButton locale={locale ?? undefined} {...props} />
+          <CalendarDayButton {...(locale ? { locale } : {})} {...props} />
         ),
         WeekNumber: ({ children, ...props }) => {
           return (
