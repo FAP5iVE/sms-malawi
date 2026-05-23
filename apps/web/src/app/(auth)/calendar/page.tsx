@@ -7,7 +7,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
 import { RoleGuard } from '@/components/shared/RoleGuard'
-import { MALAWI_PUBLIC_HOLIDAYS_2026, ACADEMIC_TERMS } from '@shared/constants/malawi'
+import { MALAWI_PUBLIC_HOLIDAYS_2026 } from '@shared/constants/malawi'
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 
@@ -60,18 +60,21 @@ export default function CalendarPage() {
 function CalendarContent() {
   const [firestoreEvents, setFirestoreEvents] = useState<CalEvent[]>([])
 
-  useEffect(() => {
-    const q = query(collection(db, 'calendar_events'), orderBy('start'))
-    return onSnapshot(q, (snap) => {
-      setFirestoreEvents(
-        snap.docs.map((d) => ({
+useEffect(() => {
+  const q = query(collection(db, 'calendar_events'), orderBy('start'))
+  return onSnapshot(q, (snap) => {
+    setFirestoreEvents(
+      snap.docs.map((d) => {
+        const data = d.data() as Omit<CalEvent, 'id'>
+        return {
           id: d.id,
-          color: '#D97706',
-          ...(d.data() as any),
-        }))
-      )
-    })
-  }, [])
+          ...data,
+          color: data.color ?? '#D97706',
+        }
+      })
+    )
+  })
+}, [])
 
   const allEvents = [...HOLIDAY_EVENTS, ...TERM_EVENTS, ...firestoreEvents]
 

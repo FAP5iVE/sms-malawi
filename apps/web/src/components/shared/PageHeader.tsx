@@ -1,20 +1,5 @@
 'use client'
 
-/**
- * FILE: apps/web/src/components/shared/PageHeader.tsx
- * REPLACES: existing PageHeader (fixes non-functional dropdown + bell)
- *
- * FIXES from landingpage_design.txt:
- *   ✅ Bell dropdown now opens/closes correctly
- *   ✅ User dropdown (ChevronDown) now opens/closes correctly
- *   ✅ Dark/Light/System theme toggle added to dropdown
- *
- * HOW IT WORKS:
- *   - Click bell → notification panel slides down (closes on click outside)
- *   - Click user avatar/name → dropdown menu opens (closes on click outside)
- *   - Dropdown includes: Profile, Theme toggle, Sign Out
- */
-
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'firebase/auth'
@@ -69,7 +54,6 @@ export function PageHeader() {
 
   const unreadCount = MOCK_NOTIFICATIONS.filter((n) => n.unread).length
 
-  // Close dropdowns on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false)
@@ -78,8 +62,6 @@ export function PageHeader() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
-
-  // Theme is read lazily in useState above — no effect needed for initial read
 
   useEffect(() => {
     const root = document.documentElement
@@ -95,6 +77,7 @@ export function PageHeader() {
   }, [theme])
 
   async function handleSignOut() {
+    if (!auth) return // auth is only null during SSR; never reached in browser
     await signOut(auth)
     document.cookie = 'sms_session=; path=/; max-age=0'
     router.push('/')
@@ -106,20 +89,15 @@ export function PageHeader() {
     { value: 'system', icon: <Monitor className="w-3.5 h-3.5" />, label: 'System' },
   ]
 
-  // themeOptions used only in the dropdown buttons below
-
   return (
     <header className="h-16 border-b border-base bg-surface flex items-center justify-between px-6 shrink-0 relative z-30">
-      {/* Left — current term indicator */}
       <div className="flex items-center gap-2">
         <span className="text-xs font-semibold font-heading bg-brand-teal/10 text-brand-teal border border-brand-teal/20 px-3 py-1 rounded-full">
           {CURRENT_TERM}
         </span>
       </div>
 
-      {/* Right — bell + user */}
       <div className="flex items-center gap-2">
-        {/* ── NOTIFICATION BELL ─────────────────────────────────────── */}
         <div ref={bellRef} className="relative">
           <button
             onClick={() => {
@@ -137,7 +115,6 @@ export function PageHeader() {
             )}
           </button>
 
-          {/* Notification panel */}
           {bellOpen && (
             <div className="absolute right-0 top-full mt-2 w-80 bg-surface border border-base rounded-2xl shadow-lg overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-base">
@@ -162,9 +139,7 @@ export function PageHeader() {
                       )}
                       <div className={n.unread ? '' : 'pl-3.5'}>
                         <p className="text-xs font-heading font-semibold text-body">{n.title}</p>
-                        <p className="text-xs text-muted font-sans mt-0.5 leading-relaxed">
-                          {n.body}
-                        </p>
+                        <p className="text-xs text-muted font-sans mt-0.5 leading-relaxed">{n.body}</p>
                         <p className="text-[10px] text-muted mt-1 font-sans">{n.time}</p>
                       </div>
                     </div>
@@ -180,7 +155,6 @@ export function PageHeader() {
           )}
         </div>
 
-        {/* ── USER DROPDOWN ──────────────────────────────────────────── */}
         <div ref={userRef} className="relative">
           <button
             onClick={() => {
@@ -193,9 +167,7 @@ export function PageHeader() {
               <span className="text-white text-xs font-bold font-heading">{initials}</span>
             </div>
             <div className="text-left hidden sm:block">
-              <p className="text-sm font-semibold font-heading text-body leading-none">
-                {displayName}
-              </p>
+              <p className="text-sm font-semibold font-heading text-body leading-none">{displayName}</p>
               <p className="text-xs text-muted mt-0.5">{subtitle ?? role}</p>
             </div>
             <ChevronDown
@@ -203,38 +175,28 @@ export function PageHeader() {
             />
           </button>
 
-          {/* Dropdown menu */}
           {userOpen && (
             <div className="absolute right-0 top-full mt-2 w-56 bg-surface border border-base rounded-2xl shadow-lg overflow-hidden">
-              {/* User info header */}
               <div className="px-4 py-3 border-b border-base">
                 <p className="text-sm font-heading font-semibold text-body">{displayName}</p>
                 <p className="text-xs text-muted font-sans">{user?.email}</p>
               </div>
 
-              {/* Menu items */}
               <div className="py-1.5">
                 <button
-                  onClick={() => {
-                    setUserOpen(false)
-                    router.push('/settings')
-                  }}
+                  onClick={() => { setUserOpen(false); router.push('/settings') }}
                   className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-muted hover:text-body hover:bg-page transition-colors"
                 >
                   <User className="w-4 h-4" /> Profile
                 </button>
                 <button
-                  onClick={() => {
-                    setUserOpen(false)
-                    router.push('/settings')
-                  }}
+                  onClick={() => { setUserOpen(false); router.push('/settings') }}
                   className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-muted hover:text-body hover:bg-page transition-colors"
                 >
                   <Settings className="w-4 h-4" /> Settings
                 </button>
               </div>
 
-              {/* Theme toggle */}
               <div className="px-4 py-2.5 border-t border-base">
                 <p className="text-[10px] font-heading font-semibold text-muted uppercase tracking-widest mb-2">
                   Theme
@@ -258,7 +220,6 @@ export function PageHeader() {
                 </div>
               </div>
 
-              {/* Sign out */}
               <div className="py-1.5 border-t border-base">
                 <button
                   onClick={handleSignOut}

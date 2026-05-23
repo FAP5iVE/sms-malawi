@@ -1,13 +1,5 @@
 'use client'
 
-/**
- * FILE: apps/web/src/app/(public)/forgot-password/page.tsx
- * NEW FILE — Forgot password flow
- *
- * Referenced from login page: <Link href="/forgot-password">
- * Flow: Enter email → Firebase sendPasswordResetEmail → success state → back to login
- */
-
 import { useState } from 'react'
 import Link from 'next/link'
 import { sendPasswordResetEmail } from 'firebase/auth'
@@ -22,6 +14,7 @@ export default function ForgotPasswordPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!auth) return // auth is only null during SSR; never reached in browser
     setError(null)
     setLoading(true)
     try {
@@ -30,7 +23,6 @@ export default function ForgotPasswordPage() {
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
       if (code === 'auth/user-not-found') {
-        // Don't reveal whether the email exists — security best practice
         setSent(true)
       } else if (code === 'auth/invalid-email') {
         setError('Please enter a valid email address.')
@@ -44,8 +36,6 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen grid lg:grid-cols-[1fr_1fr] font-sans">
-
-      {/* Left decorative panel — matches login page style */}
       <div className="hidden lg:flex flex-col justify-between bg-brand-navy p-12">
         <Link href="/" className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm w-fit">
           <ArrowLeft className="w-4 h-4" />
@@ -65,17 +55,13 @@ export default function ForgotPasswordPage() {
         </p>
       </div>
 
-      {/* Right — form */}
       <div className="flex flex-col justify-center px-6 sm:px-12 lg:px-16 py-12 bg-page">
-
         <Link href="/login" className="flex items-center gap-1.5 text-muted text-sm mb-12 hover:text-body transition-colors w-fit">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to login
         </Link>
 
         <div className="w-full max-w-sm mx-auto">
-
           {sent ? (
-            /* Success state */
             <div className="text-center">
               <div className="w-16 h-16 rounded-full bg-brand-teal/15 flex items-center justify-center mx-auto mb-5">
                 <CheckCircle2 className="w-8 h-8 text-brand-teal" />
@@ -93,7 +79,6 @@ export default function ForgotPasswordPage() {
               </Link>
             </div>
           ) : (
-            /* Email entry form */
             <>
               <div className="mb-8">
                 <h1 className="font-heading text-3xl font-bold text-brand-navy mb-2 tracking-tight">

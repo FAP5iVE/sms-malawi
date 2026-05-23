@@ -11,6 +11,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
+    if (!auth) return // server-side guard — auth is null during SSR
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         clearAuth()
@@ -31,7 +33,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(user, role ?? null, subtitle ?? null)
     })
 
-    // Clean up listener on unmount
     return () => unsubscribe()
   }, [setUser, clearAuth, router])
 

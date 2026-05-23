@@ -2,9 +2,6 @@ import { initializeApp, getApps, getApp } from 'firebase/app'
 import { getAuth, connectAuthEmulator } from 'firebase/auth'
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 
-/*
-  All values come from apps/web/.env.local
-*/
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
@@ -17,8 +14,12 @@ const firebaseConfig = {
 // Prevent duplicate app init in Next.js dev mode (hot reload)
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 
-export const auth = getAuth(app)
+// Firestore is safe server-side (used for data fetching in RSC/SSR)
 export const db = getFirestore(app)
+
+// Auth is client-only — initializing it on the server causes
+// auth/invalid-api-key during static prerendering
+export const auth = typeof window !== 'undefined' ? getAuth(app) : null
 
 /**
  * Connect to local emulators when running in development.
@@ -38,8 +39,11 @@ export const db = getFirestore(app)
  * The guard (typeof window !== 'undefined') prevents this running on the
  * server during SSR, and the flag check prevents it in production.
  */
-if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true') {
-  // connectAuthEmulator / connectFirestoreEmulator are safe to call multiple
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: false })
+if (
+  typeof window !== 'undefined' &&
+  process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === 'true'
+) {
+  // auth is guaranteed non-null here since typeof window !== 'undefined'
+  connectAuthEmulator(auth!, 'http://127.0.0.1:9099', { disableWarnings: false })
   connectFirestoreEmulator(db, '127.0.0.1', 8080)
 }

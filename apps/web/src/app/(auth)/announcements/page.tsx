@@ -7,6 +7,8 @@ import { AnnouncementForm } from '@/components/announcements/AnnouncementForm'
 import { useAuthStore } from '@/store/authStore'
 import { Bell, PlusCircle, Megaphone } from 'lucide-react'
 
+export const dynamic = 'force-dynamic'
+
 export default function AnnouncementsPage() {
   return (
     <RoleGuard

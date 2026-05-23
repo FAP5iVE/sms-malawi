@@ -1,18 +1,5 @@
 'use client'
 
-/**
- * FILE: apps/web/src/app/(public)/login/page.tsx
- * REPLACES: existing login page
- *
- * Premium split-screen login page:
- * - Left panel: brand panel with animated decorative elements, school logo,
- *   home icon back-link, SVG illustration placeholder, copyright line
- * - Right panel: clean minimalist form with improved spacing
- *
- * TO ADD LOGO: replace the "S" div below with <Image src="/images/logo.png" ... />
- * TO ADD ILLUSTRATION: replace the placeholder div with <Image src="/images/login-illustration.svg" ... />
- */
-
 import { useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -25,7 +12,6 @@ import {
   ArrowLeft,
   Loader2,
   GraduationCap,
-  Users,
   BookOpen,
   Award,
   Home,
@@ -42,6 +28,7 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
+    if (!auth) return // auth is only null during SSR; never reached in browser
     setError(null)
     setLoading(true)
 
@@ -107,29 +94,19 @@ export default function LoginPage() {
       `}</style>
 
       <div className="min-h-screen grid lg:grid-cols-[1fr_1fr] font-sans">
-        {/* ── LEFT PANEL — Brand ─────────────────────────────────────────── */}
         <div className="hidden lg:flex flex-col relative overflow-hidden bg-brand-navy">
-          {/* Animated background shapes */}
           <div className="absolute inset-0 pointer-events-none">
-            {/* Glow blob */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full login-glow-blob" />
-
-            {/* Outer dashed ring */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] h-[420px] rounded-full border-2 border-dashed border-white/10 login-ring-cw" />
-
-            {/* Inner ring */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full border border-brand-teal/20 login-ring-ccw" />
 
-            {/* Floating decorative cards */}
             <div className="absolute top-1/4 left-10 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 backdrop-blur-sm login-drift-a">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-brand-teal/30 flex items-center justify-center">
                   <GraduationCap className="w-3.5 h-3.5 text-brand-teal-light" />
                 </div>
                 <div>
-                  <div className="text-white text-[10px] font-heading font-bold">
-                    1,247 Students
-                  </div>
+                  <div className="text-white text-[10px] font-heading font-bold">1,247 Students</div>
                   <div className="text-white/40 text-[9px] font-sans">Enrolled 2025/2026</div>
                 </div>
               </div>
@@ -153,35 +130,25 @@ export default function LoginPage() {
                   <BookOpen className="w-3.5 h-3.5 text-brand-purple" />
                 </div>
                 <div>
-                  <div className="text-white text-[10px] font-heading font-bold">
-                    Digital Library
-                  </div>
+                  <div className="text-white text-[10px] font-heading font-bold">Digital Library</div>
                   <div className="text-white/40 text-[9px] font-sans">1,200+ Resources</div>
                 </div>
               </div>
             </div>
 
-            {/* Geometric doodles */}
             <div className="absolute top-12 right-12 w-8 h-8 border-2 border-white/10 rounded-lg rotate-12" />
             <div className="absolute bottom-20 left-8 w-5 h-5 border border-brand-teal/30 rounded-full" />
             <div className="absolute top-1/3 right-20 w-3 h-3 bg-brand-teal/40 rounded-full" />
             <div className="absolute bottom-1/4 right-16 w-6 h-6 border border-white/10 rounded login-diamond" />
           </div>
 
-          {/* Panel content */}
           <div className="relative z-10 flex flex-col h-full p-10">
-            {/* Top — Home button */}
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm w-fit"
-            >
+            <Link href="/" className="inline-flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm w-fit">
               <Home className="w-4 h-4" />
               <span className="font-heading font-medium">Back to homepage</span>
             </Link>
 
-            {/* Middle — Logo + illustration */}
             <div className="flex-1 flex flex-col items-center justify-center text-center">
-              {/* Logo */}
               <div className="w-20 h-20 rounded-3xl bg-white/10 border border-white/15 flex items-center justify-center mb-6 shadow-xl overflow-hidden">
                 <Image
                   src="/images/logo.png"
@@ -192,13 +159,10 @@ export default function LoginPage() {
                   className="object-contain w-auto h-auto"
                 />
               </div>
-
               <h2 className="font-heading font-bold text-3xl text-white mb-2">SMS Malawi</h2>
               <p className="text-white/40 text-sm font-sans max-w-xs leading-relaxed mb-10">
                 School Management System — empowering educators and students across Malawi.
               </p>
-
-              {/* Illustration */}
               <Image
                 src="/images/login.svg"
                 alt="Login illustration"
@@ -209,25 +173,18 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Bottom — copyright */}
             <p className="text-white/25 text-xs font-sans text-center">
               © {new Date().getFullYear()} SMS Malawi. All rights reserved.
             </p>
           </div>
         </div>
 
-        {/* ── RIGHT PANEL — Form ─────────────────────────────────────────── */}
         <div className="flex flex-col justify-center px-6 sm:px-12 lg:px-16 py-12 bg-page min-h-screen lg:min-h-0">
-          {/* Mobile back link */}
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-muted text-sm mb-12 lg:hidden hover:text-body transition-colors w-fit"
-          >
+          <Link href="/" className="flex items-center gap-1.5 text-muted text-sm mb-12 lg:hidden hover:text-body transition-colors w-fit">
             <ArrowLeft className="w-3.5 h-3.5" /> Home
           </Link>
 
           <div className="w-full max-w-sm mx-auto login-form-anim">
-            {/* Header */}
             <div className="mb-8">
               <h1 className="font-heading text-3xl font-bold text-brand-navy mb-2 tracking-tight">
                 Welcome back
@@ -236,12 +193,8 @@ export default function LoginPage() {
             </div>
 
             <form onSubmit={handleLogin} className="space-y-5 login-form-anim-delay">
-              {/* Email */}
               <div>
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-heading font-medium text-body mb-1.5"
-                >
+                <label htmlFor="email" className="block text-sm font-heading font-medium text-body mb-1.5">
                   Email address
                 </label>
                 <input
@@ -256,16 +209,12 @@ export default function LoginPage() {
                 />
               </div>
 
-              {/* Password */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label htmlFor="password" className="text-sm font-heading font-medium text-body">
                     Password
                   </label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs text-brand-teal hover:text-brand-teal-light transition-colors font-heading"
-                  >
+                  <Link href="/forgot-password" className="text-xs text-brand-teal hover:text-brand-teal-light transition-colors font-heading">
                     Forgot password?
                   </Link>
                 </div>
@@ -291,7 +240,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Error message */}
               {error && (
                 <div className="text-sm text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3 flex items-start gap-2">
                   <span className="mt-0.5 shrink-0">⚠</span>
@@ -299,7 +247,6 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {/* Submit */}
               <button
                 type="submit"
                 disabled={loading}
@@ -310,7 +257,6 @@ export default function LoginPage() {
               </button>
             </form>
 
-            {/* Divider with roles note */}
             <div className="mt-8 pt-8 border-t border-base">
               <p className="text-xs text-muted text-center font-sans">
                 This portal is for authorised students and staff only.
