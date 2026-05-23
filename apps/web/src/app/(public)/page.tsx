@@ -61,40 +61,35 @@ import {
   Zap,
 } from 'lucide-react'
 
-// ── THEME HOOK ──────────────────────────────────────────────────────────────
+// -- THEME HOOK --------------------------------------------------------------
 type Theme = 'light' | 'dark' | 'system'
 
 function useTheme() {
-
   const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem('sms-theme') as Theme | null) ?? 'system'
+    () =>
+      typeof window !== 'undefined'
+        ? (localStorage.getItem('sms-theme') as Theme | null) ?? 'system'
+        : 'system'
   )
-  const [mounted, setMounted] = useState(false)
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional mount flag
-  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
     const root = document.documentElement
     const apply = (t: Theme) => {
       if (t === 'system') {
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-        root.classList.toggle('dark', prefersDark)
+        root.classList.toggle('dark', window.matchMedia('(prefers-color-scheme: dark)').matches)
       } else {
         root.classList.toggle('dark', t === 'dark')
       }
     }
     apply(theme)
     localStorage.setItem('sms-theme', theme)
-
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const handler = () => {
-      if (theme === 'system') apply('system')
-    }
+    const handler = () => { if (theme === 'system') apply('system') }
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [theme])
 
-  return { theme, setTheme, mounted }
+  return { theme, setTheme }  // mounted removed
 }
 
 // ── FLOATING CARD ────────────────────────────────────────────────────────────
@@ -271,7 +266,7 @@ const services = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
-  const { theme, setTheme, mounted } = useTheme()
+  const { theme, setTheme } = useTheme()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeSection, setActiveSection] = useState('')
@@ -427,13 +422,13 @@ export default function LandingPage() {
                     neutral first render (no icon) doesn't trigger a warning
                     on the one frame before `mounted` flips to true. */}
                 <button
-                  onClick={cycleTheme}
-                  className="p-2 rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
-                  title={mounted ? `Theme: ${theme}` : 'Theme'}
-                  suppressHydrationWarning
-                >
-                  {mounted ? themeIcons[theme] : <Monitor className="w-4 h-4" />}
-                </button>
+                onClick={cycleTheme}
+                className="p-2 rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
+                title={`Theme: ${theme}`}
+                suppressHydrationWarning
+              >
+                <span suppressHydrationWarning>{themeIcons[theme]}</span>
+              </button>
 
                 {/* Login CTA */}
                 <Link
