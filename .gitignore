@@ -76,3 +76,4 @@ package-lock.json
 .github/
 ci.yml
 .git
+.vercel
