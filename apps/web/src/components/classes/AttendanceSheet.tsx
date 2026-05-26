@@ -31,7 +31,7 @@ export function AttendanceSheet({ classId, students, date = new Date() }: Attend
 
   // Real-time listener for today's attendance
   useEffect(() => {
-    const ref = doc(db, docPath)
+    const ref = doc(db!, docPath)
     const unsub = onSnapshot(ref, (snap) => {
       if (snap.exists()) {
         const data = snap.data()
@@ -53,7 +53,7 @@ export function AttendanceSheet({ classId, students, date = new Date() }: Attend
 
     setSaving(true)
     await setDoc(
-      doc(db, docPath),
+      doc(db!, docPath),
       {
         ...newRecord,
         markedByUid: user?.uid,
