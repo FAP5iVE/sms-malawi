@@ -30,7 +30,7 @@ export function AnnouncementForm({ onClose }: Props) {
     if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Validation error')
     setLoading(true)
     try {
-      await addDoc(collection(db, 'ANNOUNCEMENTS'), {
+      await addDoc(collection(db!, 'ANNOUNCEMENTS'), {
         ...parsed.data,
         createdByUid: user?.uid,
         createdAt: serverTimestamp(),

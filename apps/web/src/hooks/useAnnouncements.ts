@@ -28,7 +28,7 @@ export function useAnnouncements() {
 
     // Listen to published announcements that target this role or all users
     const q = query(
-      collection(db, COLLECTIONS.ANNOUNCEMENTS),
+      collection(db!, COLLECTIONS.ANNOUNCEMENTS),
       where('status', '==', 'PUBLISHED'),
       orderBy('createdAt', 'desc')
     )
