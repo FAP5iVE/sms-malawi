@@ -25,6 +25,6 @@ function getPrisma(): PrismaClient {
 // the actual client is only created on the first property access (first DB call).
 export const prisma = new Proxy({} as PrismaClient, {
   get(_target, prop: string | symbol) {
-    return (getPrisma() as Record<string | symbol, unknown>)[prop]
+    return (getPrisma() as unknown as Record<string | symbol, unknown>)[prop]
   },
 })
