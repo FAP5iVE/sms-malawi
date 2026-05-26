@@ -1,11 +1,18 @@
+// apps/web/src/hooks/useFinances.ts
+// This is the ORIGINAL correct file. Replace yours with this exactly.
+// Do NOT add type annotations to the apiFetch generic calls — the angle brackets
+// inside JSX/TSX are sometimes misread as HTML tags, causing the parse errors you saw.
+'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getAuth } from 'firebase/auth'
 import type { ApiFinanceSummary, ApiInvoice, ApiExpense, ApiScholarship } from '@shared/types/api'
 import type { RecordPaymentInput } from '@shared/schemas/finance'
 
+// Base fetch helper — adds auth token to every request automatically
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = await getAuth().currentUser?.getIdToken()
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
+  const base = process.env.NEXT_PUBLIC_API_URL ?? ''
+  const res = await fetch(`${base}/api${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -34,7 +41,7 @@ export function useFinanceSummary(academicYear: string, term: number) {
     queryKey: financeKeys.summary(academicYear, term),
     queryFn: () =>
       apiFetch<ApiFinanceSummary>(`/finances/summary?academicYear=${academicYear}&term=${term}`),
-    refetchInterval: 30_000, // poll every 30s for live dashboard widget
+    refetchInterval: 30_000,
   })
 }
 
@@ -74,19 +81,18 @@ export function useExpenses(filters: { academicYear?: string; term?: number } = 
   })
 }
 
+// Budget vs Actual — returns array of {department, category, allocated, spent, remaining}
 export function useBudgetVsActual(academicYear: string) {
   return useQuery({
     queryKey: financeKeys.budget(academicYear),
     queryFn: () =>
-      apiFetch<
-        {
-          department: string
-          category: string
-          allocated: number
-          spent: number
-          remaining: number
-        }[]
-      >(`/finances/budget?academicYear=${academicYear}`),
+      apiFetch<Array<{
+        department: string
+        category: string
+        allocated: number
+        spent: number
+        remaining: number
+      }>>(`/finances/budget?academicYear=${academicYear}`),
   })
 }
 

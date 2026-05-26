@@ -3,9 +3,11 @@ import { getAuth } from 'firebase/auth'
 import type { CreateClassInput } from '@shared/schemas/student'
 import type { ApiClass, ApiTimetableSlot } from '@shared/types/api'
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
+
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = await getAuth().currentUser?.getIdToken()
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
+  const res = await fetch(`${API_BASE}/api${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

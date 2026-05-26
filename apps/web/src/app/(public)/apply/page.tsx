@@ -124,7 +124,7 @@ function Field({
   className = '',
 }: {
   label: string
-  error?: string | undefined // ✅ fixed: was `error?: string`
+  error?: string | undefined
   required?: boolean
   children: React.ReactNode
   hint?: string
@@ -201,7 +201,6 @@ export default function ApplyPage() {
   const nationality = watch('nationality')
   const isMalawian = nationality === 'Malawi'
 
-  // Fields per step for validation-on-next
   const STEP_FIELDS: (keyof ApplicationInput)[][] = [
     ['firstName', 'surname', 'dateOfBirth', 'sex', 'nationality'],
     ['address', 'countryCode', 'phone'],
@@ -215,18 +214,11 @@ export default function ApplyPage() {
     if (valid) setStep((s) => Math.min(s + 1, STEPS.length - 1))
   }
 
-  // Resolve the Functions emulator URL the same way useApplications does
-  const apiUrl = (() => {
-    if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL
-    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'sms-malawi-52a44'
-    return `http://127.0.0.1:5001/${projectId}/africa-south1/api`
-  })()
-
   async function onSubmit(data: ApplicationInput) {
     setSubmitting(true)
     setServerError(null)
     try {
-      const res = await fetch(`${apiUrl}/applications/public`, {
+      const res = await fetch(`/api/applications/public`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -377,6 +369,7 @@ export default function ApplyPage() {
         {/* Form card */}
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="bg-surface border border-base rounded-3xl p-6 sm:p-8 mb-6">
+
             {/* -- STEP 0: Personal Details -- */}
             {step === 0 && (
               <>
@@ -490,7 +483,7 @@ export default function ApplyPage() {
                       placeholder="Village, Traditional Authority, District"
                     />
                   </Field>
-                  <Field label="Phone Number" required error={errors.phone?.message}>
+                  <Field label="Phone Number" required error={errors.phone?.message} className="col-span-full">
                     <div className="flex gap-2">
                       <select
                         {...register('countryCode')}
@@ -514,7 +507,7 @@ export default function ApplyPage() {
                     label="Email Address"
                     error={errors.email?.message}
                     hint="Optional — for application updates"
-                    className="col-span-full sm:col-span-1"
+                    className="col-span-full"
                   >
                     <input
                       {...register('email')}
@@ -622,7 +615,7 @@ export default function ApplyPage() {
                       ))}
                     </select>
                   </Field>
-                  <Field label="Guardian Phone" required error={errors.guardianPhone?.message}>
+                  <Field label="Guardian Phone" required error={errors.guardianPhone?.message} className="col-span-full">
                     <div className="flex gap-2">
                       <select
                         {...register('guardianCountryCode')}
@@ -646,7 +639,7 @@ export default function ApplyPage() {
                     label="Guardian Email"
                     error={errors.guardianEmail?.message}
                     hint="Optional"
-                    className="col-span-full sm:col-span-1"
+                    className="col-span-full"
                   >
                     <input
                       {...register('guardianEmail')}
@@ -680,7 +673,6 @@ export default function ApplyPage() {
                   title="Review Your Application"
                   subtitle="Please check all details before submitting"
                 />
-                {/* Summary blocks */}
                 {[
                   {
                     heading: 'Personal Details',

@@ -15,5 +15,5 @@ allowBuilds:
   unrs-resolver: true
 
 packages:
-  - "apps/*"
+  - "apps/web*"
   - "packages/*"
