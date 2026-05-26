@@ -306,9 +306,6 @@ importers:
 
   packages/shared:
     dependencies:
-      '@dataconnect/generated':
-        specifier: file:src/dataconnect-generated
-        version: file:packages/shared/src/dataconnect-generated
       zod:
         specifier: ^3.25.76
         version: 3.25.76
@@ -553,9 +550,6 @@ packages:
     engines: {node: '>=20.0.0', yarn: '>=1.22.18'}
     peerDependencies:
       storybook: ^0.0.0-0 || ^10.1.0 || ^10.1.0-0 || ^10.2.0-0 || ^10.3.0-0 || ^10.4.0-0
-
-  '@dataconnect/generated@file:packages/shared/src/dataconnect-generated':
-    resolution: {directory: packages/shared/src/dataconnect-generated, type: directory}
 
   '@date-fns/tz@1.4.1':
     resolution: {integrity: sha512-P5LUNhtbj6YfI3iJjw5EL9eUAG6OitD0W3fWQcpQjDRc/QIsL0tRNuO1PcDvPccWL1fSTXXdE1ds+l95DV/OFA==}
@@ -8013,8 +8007,6 @@ snapshots:
     transitivePeerDependencies:
       - '@chromatic-com/cypress'
       - '@chromatic-com/playwright'
-
-  '@dataconnect/generated@file:packages/shared/src/dataconnect-generated': {}
 
   '@date-fns/tz@1.4.1': {}
 
