@@ -61,6 +61,7 @@ function CalendarContent() {
   const [firestoreEvents, setFirestoreEvents] = useState<CalEvent[]>([])
 
 useEffect(() => {
+  if (!db) return
   const q = query(collection(db, 'calendar_events'), orderBy('start'))
   return onSnapshot(q, (snap) => {
     setFirestoreEvents(
