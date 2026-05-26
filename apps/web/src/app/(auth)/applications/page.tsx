@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import type { ApiApplication } from '@shared/types/api'
 import {
   useApplications,
   useUpdateApplicationStatus,
@@ -83,7 +84,7 @@ function ApplicationsContent() {
                     ))}
                   </tr>
                 ))
-              : apps.map((app: unknown) => (
+              : apps.map((app: ApiApplication) => (
                   <tr key={app.id} className="border-b border-base hover:bg-page">
                     <td className="px-4 py-3 font-medium">
                       {app.firstName} {app.lastName}
