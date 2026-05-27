@@ -60,6 +60,7 @@ model Class {
   assignments Assignment[]
   labBookings LabBooking[]
   timetable   TimetableSlot[]
+  exams       Exam[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -480,3 +481,142 @@ enum FineStatus {
   PAID 
   WAIVED 
   }
+
+  // ─── EXAMS ───────────────────────────────────────────────
+
+model Exam {
+  id            String     @id @default(cuid())
+  type          ExamType
+  subject       String
+  classId       String
+  class         Class      @relation(fields: [classId], references: [id])
+  title         String
+  date          DateTime
+  timeStart     String
+  timeEnd       String
+  venue         String
+  maxMark       Decimal    @db.Decimal(6,2) @default(100)
+  weightPercent Decimal    @db.Decimal(5,2) @default(100)
+  academicYear  String
+  term          Int
+  status        ExamStatus @default(SCHEDULED)
+  createdByUid  String
+  marks         ExamMark[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([classId, term])
+  @@index([academicYear, term])
+  @@map("exams")
+}
+
+enum ExamType {
+  WEEKLY_TEST
+  ASSIGNMENT
+  QUIZ
+  MIDTERM
+  END_TERM
+  MANEB_JCE
+  MANEB_MSCE
+}
+
+enum ExamStatus {
+  SCHEDULED
+  IN_PROGRESS
+  MARKS_PENDING
+  MARKS_DRAFT
+  MARKS_FINAL
+  RESULTS_APPROVED
+  RESULTS_RELEASED
+}
+
+model ExamMark {
+  id           String    @id @default(cuid())
+  examId       String
+  exam         Exam      @relation(fields: [examId], references: [id])
+  studentId    String
+  mark         Decimal?  @db.Decimal(6,2)
+  absent       Boolean   @default(false)
+  comment      String?
+  enteredByUid String
+  isDraft      Boolean   @default(true)
+  finalizedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([examId, studentId])
+  @@index([studentId])
+  @@map("exam_marks")
+}
+
+model TermResult {
+  id             String   @id @default(cuid())
+  studentId      String
+  classId        String
+  academicYear   String
+  term           Int
+  totalMark      Decimal  @db.Decimal(6,2)
+  average        Decimal  @db.Decimal(5,2)
+  grade          String
+  position       Int?
+  passStatus     Boolean
+  subjectResults Json
+  attendanceDays Int      @default(0)
+  absentDays     Int      @default(0)
+  teacherComment String?
+  headComment    String?
+  reportCardKey  String?
+  releasedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([studentId, academicYear, term])
+  @@index([classId, academicYear, term])
+  @@map("term_results")
+}
+
+model AnnualResult {
+  id             String   @id @default(cuid())
+  studentId      String
+  classId        String
+  academicYear   String
+  annualAverage  Decimal  @db.Decimal(5,2)
+  finalGrade     String
+  annualPosition Int?
+  passStatus     Boolean
+  promoted       Boolean  @default(false)
+  nextClassId    String?
+  createdAt      DateTime @default(now())
+
+  @@unique([studentId, academicYear])
+  @@map("annual_results")
+}
+
+model ManebRecord {
+  id            String        @id @default(cuid())
+  studentId     String
+  examType      ManebExamType
+  candidateNo   String        @unique
+  centerNo      String
+  centerName    String
+  academicYear  String
+  subjectGrades Json
+  overallGrade  String?
+  status        ManebStatus   @default(REGISTERED)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([studentId])
+  @@map("maneb_records")
+}
+
+enum ManebExamType {
+    JCE 
+    MSCE
+ }
+enum ManebStatus   {
+    REGISTERED
+    SITTING
+    RESULTS_RECEIVED 
+    CERTIFIED
+ }

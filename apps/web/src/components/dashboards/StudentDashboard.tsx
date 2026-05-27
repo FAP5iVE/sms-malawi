@@ -12,6 +12,9 @@ import { StatCard } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { PlaceholderWidget } from '@/components/dashboards/AdminDashboard'
 import type { QuickAction } from '@/components/shared/QuickActions'
+import { StudentResultsView } from '@/components/exams/StudentResultsView'
+import { useAuthStore } from '@/store/authStore'
+
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
@@ -39,6 +42,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 ]
 
 export function StudentDashboard() {
+  const { role, user } = useAuthStore()
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -106,6 +110,10 @@ export function StudentDashboard() {
           sub="Class report chart — wired in Phase 5"
           h="h-56"
         />
+      </div>
+      <div className="bg-surface border border-base rounded-2xl p-5">
+        <h3 className="font-heading font-semibold text-brand-navy mb-4">My Exam Results</h3>
+        {user?.uid && <StudentResultsView studentId={user.uid} />}
       </div>
     </div>
   )

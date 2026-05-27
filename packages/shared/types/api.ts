@@ -306,3 +306,55 @@ export interface ApiScholarship {
   academicYear: string
   isActive: boolean
 }
+
+export interface ApiExam {
+  id: string
+  type: string
+  subject: string
+  classId: string
+  title: string
+  date: string
+  timeStart: string
+  timeEnd: string
+  venue: string
+  maxMark: number
+  weightPercent: number
+  academicYear: string
+  term: number
+  status: string
+  createdByUid: string
+  _count?: { marks: number }
+}
+
+export interface ApiTermResult {
+  id: string
+  studentId: string
+  classId: string
+  academicYear: string
+  term: number
+  totalMark: number
+  average: number
+  grade: string
+  position: number | null
+  passStatus: boolean
+  subjectResults: Record<string, { average: number; grade: string; pass: boolean }>
+  attendanceDays: number
+  absentDays: number
+  teacherComment: string | null
+  headComment: string | null
+  reportCardKey: string | null
+  releasedAt: string | null
+}
+
+export interface ApiManebRecord {
+  id: string
+  studentId: string
+  examType: 'JCE' | 'MSCE'
+  candidateNo: string
+  centerNo: string
+  centerName: string
+  academicYear: string
+  subjectGrades: Record<string, string>
+  overallGrade: string | null
+  status: 'REGISTERED' | 'SITTING' | 'RESULTS_RECEIVED' | 'CERTIFIED'
+}

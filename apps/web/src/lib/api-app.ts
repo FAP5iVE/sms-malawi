@@ -9,6 +9,7 @@ import { applicationsRouter } from '@/server/routes/applications'
 import { timetableRouter } from '@/server/routes/timetable'
 import { financesRouter } from '@/server/routes/finances'
 import { payrollRouter } from '@/server/routes/payroll'
+import { examsRouter } from '@/server/routes/exams'
 import { announcementsRouter } from '@/server/routes/announcements'
 
 export function createApiApp() {
@@ -40,6 +41,7 @@ export function createApiApp() {
   app.use('/timetable', timetableRouter)
   app.use('/finances', financesRouter)
   app.use('/payroll', payrollRouter)
+  app.use('/exams', examsRouter)
   app.use('/announcements', announcementsRouter)
   app.get('/health', (_req: Request, res: Response) => res.json({ status: 'ok', ts: Date.now() }))
 
