@@ -132,12 +132,6 @@ const NAV_ITEMS: NavItem[] = [
     icon: Settings,
     roles: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
   },
-  {
-  label: 'Exams',
-  href: '/exams',
-  icon: GraduationCap,
-  roles: ['admin', 'high_rank', 'lower_rank', 'academic', 'exam_officer', 'student'],
-},
 ]
 
 const ROLE_LABELS: Record<UserRole, string> = {
