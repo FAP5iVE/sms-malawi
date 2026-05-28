@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/fee-reminders",
-      "schedule": "0 5 * * *"
+      "schedule": "0 5 * * *" 
     },
     {
       "path": "/api/cron/late-penalties",
@@ -11,7 +11,23 @@
     {
       "path": "/api/cron/installment-check",
       "schedule": "10 22 * * *"
-    }
+    },
+
+{
+
+ "path": "/api/cron/contract-alerts", 
+
+"schedule": "0 6 * * *"  },  
+
+{
+
+ "path": "/api/cron/overdue-library", 
+
+"schedule": "15 22 * * *" 
+
+}
+
+    
   ],
   "functions": {
     "apps/web/src/app/api/**": {

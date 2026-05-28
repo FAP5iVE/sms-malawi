@@ -88,13 +88,13 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Library',
     href: '/library',
     icon: Library,
-    roles: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'student'],
+    roles: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'student','exam_officer'],
   },
   {
     label: 'HR',
     href: '/hr',
     icon: UserCog,
-    roles: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr'],
+    roles: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr','exam_officer'],
   },
   {
     label: 'Announcements',

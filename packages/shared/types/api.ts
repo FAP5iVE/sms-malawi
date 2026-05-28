@@ -358,3 +358,85 @@ export interface ApiManebRecord {
   overallGrade: string | null
   status: 'REGISTERED' | 'SITTING' | 'RESULTS_RECEIVED' | 'CERTIFIED'
 }
+export interface ApiStaffProfile {
+  id: string
+  uid: string
+  employeeNo: string
+  firstName: string
+  lastName: string
+  role: string
+  department: string
+  jobTitle: string
+  status: string
+  employmentType: string
+  contractExpiry?: string
+  photoKey?: string
+  dateJoined: string
+}
+
+export interface ApiLeaveRequest {
+  id: string
+  staffId: string
+  leaveType: string
+  startDate: string
+  endDate: string
+  days: number
+  reason: string
+  status: string
+  reviewNotes?: string
+  staff?: { firstName: string; lastName: string; department: string }
+}
+
+export interface ApiContractAlert {
+  id: string
+  firstName: string
+  lastName: string
+  department: string
+  contractExpiry: string
+}
+export interface ApiBook {
+  id: string
+  title: string
+  author: string
+  isbn?: string
+  category: string
+  totalCopies: number
+  availableCopies: number
+  barcode?: string
+}
+
+export interface ApiBorrowing {
+  id: string
+  bookId: string
+  studentId?: string
+  staffId?: string
+  borrowerType: string
+  issuedAt: string
+  dueDate: string
+  returnedAt?: string
+  status: string
+  fineAmount?: number
+  book?: { title: string; author: string; isbn?: string }
+}
+
+export interface ApiDigitalResource {
+  id: string
+  title: string
+  type: string
+  subject?: string
+  form?: number
+  academicYear?: string
+  fileSize: number
+  mimeType: string
+  approved: boolean
+  uploadedByUid: string
+  approvedAt?: string
+}
+
+export interface ApiLibraryStats {
+  totalBooks: number
+  activeBorrowings: number
+  overdueBorrowings: number
+  pendingFines: number
+  digitalCount: number
+}

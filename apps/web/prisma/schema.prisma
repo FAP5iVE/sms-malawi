@@ -27,6 +27,7 @@ model Student {
   status           StudentStatus @default(ACTIVE)
   classId          String?
   class            Class?        @relation(fields: [classId], references: [id])
+  borrowings       Borrowing[]
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -619,4 +620,246 @@ enum ManebStatus   {
     SITTING
     RESULTS_RECEIVED 
     CERTIFIED
+ }
+
+// ─── HR MODULE ────────────────────────────────────────────
+
+model StaffProfile {
+  id                  String         @id @default(cuid())
+  uid                 String         @unique   // Firebase Auth UID
+  employeeNo          String         @unique
+  firstName           String
+  lastName            String
+  email               String         @unique
+  phone               String?
+  role                String         // matches UserRole values
+  department          String
+  jobTitle            String
+  employmentType      EmploymentType @default(FULL_TIME)
+  status              StaffStatus    @default(ACTIVE)
+  dateJoined          DateTime
+  contractExpiry      DateTime?
+  photoKey            String?        // Appwrite file ID
+  salaryStructureId   String?
+  leaveBalances       LeaveBalance[]
+  leaveRequests       LeaveRequest[]
+  loans               StaffLoan[]
+  performanceNotes    PerformanceNote[]
+  borrowings          Borrowing[]
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@index([department])
+  @@index([contractExpiry])
+  @@map("staff_profiles")
+}
+
+enum EmploymentType { 
+  FULL_TIME  
+  PART_TIME  
+  CONTRACT  
+  TEMPORARY 
+  }
+enum StaffStatus    { 
+  ACTIVE  
+  ON_LEAVE  
+  SUSPENDED  
+  TERMINATED 
+  }
+model LeaveBalance {
+  id          String      @id @default(cuid())
+  staffId     String
+  staff       StaffProfile @relation(fields: [staffId], references: [id])
+  leaveType   LeaveType
+  totalDays   Int         @default(0)
+  usedDays    Int         @default(0)
+  pendingDays Int         @default(0)
+  year        Int         // calendar year
+
+  @@unique([staffId, leaveType, year])
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id           String       @id @default(cuid())
+  staffId      String
+  staff        StaffProfile @relation(fields: [staffId], references: [id])
+  leaveType    LeaveType
+  startDate    DateTime
+  endDate      DateTime
+  days         Int
+  reason       String
+  status       LeaveStatus  @default(PENDING)
+  reviewedByUid String?
+  reviewedAt   DateTime?
+  reviewNotes  String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([staffId])
+  @@index([status])
+  @@map("leave_requests")
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  MATERNITY
+  PATERNITY
+  STUDY
+  UNPAID
+  EMERGENCY
+}
+
+enum LeaveStatus { 
+  PENDING  
+  APPROVED  
+  REJECTED  
+  CANCELLED 
+  }
+
+model StaffLoan {
+  id              String       @id @default(cuid())
+  staffId         String
+  staff           StaffProfile @relation(fields: [staffId], references: [id])
+  amount          Decimal      @db.Decimal(12,2)
+  monthlyDeduction Decimal     @db.Decimal(10,2)
+  totalRepaid     Decimal      @db.Decimal(12,2) @default(0)
+  balance         Decimal      @db.Decimal(12,2)
+  reason          String
+  status          LoanStatus   @default(PENDING)
+  approvedByUid   String?
+  approvedAt      DateTime?
+  disbursedAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([staffId])
+  @@map("staff_loans")
+}
+
+enum LoanStatus { 
+  PENDING  
+  APPROVED  
+  DISBURSED  
+  REPAYING  
+  SETTLED  
+  REJECTED 
+  }
+
+model PerformanceNote {
+  id          String       @id @default(cuid())
+  staffId     String
+  staff       StaffProfile @relation(fields: [staffId], references: [id])
+  academicYear String
+  term        Int
+  rating      Int          // 1–5
+  notes       String
+  authorUid   String
+  createdAt   DateTime     @default(now())
+
+  @@index([staffId, academicYear])
+  @@map("performance_notes")
+}
+
+// ─── LIBRARY MODULE ───────────────────────────────────────
+
+model Book {
+  id            String       @id @default(cuid())
+  title         String
+  author        String
+  isbn          String?      @unique
+  category      BookCategory
+  publisher     String?
+  publishedYear Int?
+  totalCopies   Int          @default(1)
+  availableCopies Int        @default(1)
+  barcode       String?      @unique
+  coverKey      String?      // Appwrite file ID
+  borrowings    Borrowing[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([category])
+  @@index([title])
+  @@map("books")
+}
+
+enum BookCategory {
+  TEXTBOOK
+  REFERENCE
+  FICTION
+  NONFICTION
+  SCIENCE
+  MATHEMATICS
+  HUMANITIES
+  PAST_PAPER
+  OTHER
+}
+
+model Borrowing {
+  id           String         @id @default(cuid())
+  bookId       String
+  book         Book           @relation(fields: [bookId], references: [id])
+  borrowerType BorrowerType
+  issuedByUid  String
+  issuedAt     DateTime       @default(now())
+  dueDate      DateTime
+  returnedAt   DateTime?
+  status       BorrowStatus   @default(ACTIVE)
+  fineAmount   Decimal?       @db.Decimal(8,2)
+  fineId       String?        // links to LibraryFine if created
+  notes        String?
+  studentId    String?
+  student      Student?     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  staffId      String?
+  staff        StaffProfile? @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([studentId])
+  @@index([staffId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("borrowings")
+}
+
+enum BorrowerType { 
+  STUDENT
+  STAFF 
+  }
+
+enum BorrowStatus { 
+  ACTIVE  
+  RETURNED  
+  OVERDUE  
+  LOST 
+  }
+
+model DigitalResource {
+  id           String           @id @default(cuid())
+  title        String
+  type         DigitalResType
+  subject      String?
+  form         Int?             // 1–4, null = all forms
+  academicYear String?          // for past papers
+  fileKey      String           // Appwrite file ID
+  fileSize     Int              // bytes
+  mimeType     String           // application/pdf or application/epub+zip
+  uploadedByUid String
+  approved     Boolean          @default(false)
+  approvedByUid String?
+  approvedAt   DateTime?
+  createdAt    DateTime         @default(now())
+
+  @@index([type, approved])
+  @@index([form, subject])
+  @@map("digital_resources")
+}
+
+enum DigitalResType { 
+  EBOOK
+  PAST_PAPER
+  REFERENCE
+  STUDY_GUIDE
  }
