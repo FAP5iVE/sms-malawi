@@ -33,9 +33,10 @@ export async function getSchoolPerformanceReport(academicYear: string, term: num
       orderBy: { form: 'asc' },
     }),
     prisma.student.groupBy({
-      by: ['classId'],
-      where: { status: 'ACTIVE' },
-      _count: true,
+  by: ['classId'],
+  where: { status: 'ACTIVE' },
+  _count: true,
+  orderBy: { classId: 'asc' },
     }),
   ])
   const overall = termResults.length > 0 ? {
