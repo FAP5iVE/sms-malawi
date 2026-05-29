@@ -96,10 +96,11 @@ export async function getLibraryReport() {
 // ─── HR REPORTS ──────────────────────────────────────────
 export async function getHRReport() {
   const [staffByDept, leaveUsage, activeLoans, expiringContracts] = await prisma.$transaction([
-    prisma.staffProfile.groupBy({ by: ['department'], _count: true, where: { status: 'ACTIVE' } }),
-    prisma.leaveRequest.groupBy({
-      by: ['leaveType'],
-      _count: true,
+  prisma.staffProfile.groupBy({ by: ['department'], _count: true, where: { status: 'ACTIVE' }, orderBy: { department: 'asc' } }),
+  prisma.leaveRequest.groupBy({
+  by: ['leaveType'],
+  _count: true,
+  orderBy: { leaveType: 'asc' },
       where: { status: 'APPROVED', startDate: { gte: new Date(new Date().getFullYear(), 0, 1) } },
     }),
     prisma.staffLoan.findMany({
