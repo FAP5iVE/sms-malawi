@@ -1,5 +1,4 @@
-// apps/web/src/lib/api-app.ts
-// Fixed: replaced any types with proper Express types
+
 import express, { type Request, type Response, type NextFunction } from 'express'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
@@ -11,6 +10,12 @@ import { financesRouter } from '@/server/routes/finances'
 import { payrollRouter } from '@/server/routes/payroll'
 import { examsRouter } from '@/server/routes/exams'
 import { announcementsRouter } from '@/server/routes/announcements'
+import { reportsRouter } from '@/server/routes/reports'
+import { usersRouter }   from '@/server/routes/users'
+import { healthRouter }  from '@/server/routes/health'
+import { hrRouter } from '@/server/routes/hr'
+import { libraryRouter } from '@/server/routes/library'
+
 
 export function createApiApp() {
   const app = express()
@@ -44,6 +49,12 @@ export function createApiApp() {
   app.use('/exams', examsRouter)
   app.use('/announcements', announcementsRouter)
   app.get('/health', (_req: Request, res: Response) => res.json({ status: 'ok', ts: Date.now() }))
+  app.use('/reports', reportsRouter)
+  app.use('/users',   usersRouter)
+  app.use('/health',  healthRouter)
+  app.use('/hr', hrRouter)
+  app.use('/library',  libraryRouter)
+  
 
   // Error handler — typed properly to avoid any
   app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {

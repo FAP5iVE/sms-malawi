@@ -84,164 +84,7 @@ export interface ApiInvoice {
   status: string
   dueDate: string
   payments?: ApiPayment[]
-}
-
-export interface ApiPayment {
-  id: string
-  invoiceId: string
-  amount: number
-  method: string
-  reference?: string
-  receiptKey?: string
-  receiptUrl?: string // signed URL from R2 — generated on request
-  paidAt: string
-}
-
-export interface ApiExpense {
-  id: string
-  category: string
-  description: string
-  amount: number
-  academicYear: string
-  term: number
-  status: string
-  incurredAt: string
-}
-
-export interface ApiPayrollRun {
-  id: string
-  month: number
-  year: number
-  status: string
-  totalGross: number
-  totalNet: number
-  completedAt?: string
-  payslips?: ApiPayslip[]
-}
-
-export interface ApiPayslip {
-  id: string
-  staffUid: string
-  staffName: string
-  grossSalary: number
-  paye: number
-  pension: number
-  loanDeduction: number
-  netSalary: number
-  payslipUrl?: string // signed URL from R2
-}
-
-export interface ApiFinanceSummary {
-  totalCollected: number
-  totalOutstanding: number
-  totalExpenses: number
-  collectionTarget: number
-  collectionPercent: number // 0–100
-}
-
-export interface ApiScholarship {
-  id: string
-  name: string
-  studentId: string
-  discountType: string
-  value: number
-  academicYear: string
-  isActive: boolean
-} // ─── FINANCE API TYPES ────────────────────────────────────
-
-export interface ApiInvoice {
-  id: string
-  studentId: string
-  academicYear: string
-  term: number
-  subtotal: number
-  discount: number
-  latePenalty: number
-  totalAmount: number
-  paidAmount: number
-  balance: number
-  status: string
-  dueDate: string
-  payments?: ApiPayment[]
-}
-
-export interface ApiPayment {
-  id: string
-  invoiceId: string
-  amount: number
-  method: string
-  reference?: string
-  receiptKey?: string
-  receiptUrl?: string // signed URL from R2 — generated on request
-  paidAt: string
-}
-
-export interface ApiExpense {
-  id: string
-  category: string
-  description: string
-  amount: number
-  academicYear: string
-  term: number
-  status: string
-  incurredAt: string
-}
-
-export interface ApiPayrollRun {
-  id: string
-  month: number
-  year: number
-  status: string
-  totalGross: number
-  totalNet: number
-  completedAt?: string
-  payslips?: ApiPayslip[]
-}
-
-export interface ApiPayslip {
-  id: string
-  staffUid: string
-  staffName: string
-  grossSalary: number
-  paye: number
-  pension: number
-  loanDeduction: number
-  netSalary: number
-  payslipUrl?: string // signed URL from R2
-}
-
-export interface ApiFinanceSummary {
-  totalCollected: number
-  totalOutstanding: number
-  totalExpenses: number
-  collectionTarget: number
-  collectionPercent: number // 0–100
-}
-
-export interface ApiScholarship {
-  id: string
-  name: string
-  studentId: string
-  discountType: string
-  value: number
-  academicYear: string
-  isActive: boolean
-} // ─── FINANCE API TYPES ────────────────────────────────────
-
-export interface ApiInvoice {
-  id: string
-  studentId: string
-  academicYear: string
-  term: number
-  subtotal: number
-  discount: number
-  latePenalty: number
-  totalAmount: number
-  paidAmount: number
-  balance: number
-  status: string
-  dueDate: string
-  payments?: ApiPayment[]
+  
 }
 
 export interface ApiPayment {
@@ -306,7 +149,6 @@ export interface ApiScholarship {
   academicYear: string
   isActive: boolean
 }
-
 export interface ApiExam {
   id: string
   type: string
@@ -439,4 +281,93 @@ export interface ApiLibraryStats {
   overdueBorrowings: number
   pendingFines: number
   digitalCount: number
+}
+
+// ─── REPORT RESPONSE TYPES ───────────────────────────────
+export interface ApiAdminReport {
+  totalStudents:  number
+  activeStudents: number
+  totalStaff:     number
+  totalInvoices:  number
+  paidInvoices:   number
+  totalExams:     number
+}
+
+export interface ApiClassStat {
+  name:   string
+  _count: { students: number }
+}
+
+export interface ApiSchoolReport {
+  overall?:    { passRate: number; average: number; total: number }
+  classStats?: ApiClassStat[]
+}
+
+export interface ApiFinanceReport {
+  collected?:     number   // NOTE: backend returns 'collected', not 'totalCollected'
+  outstanding?:   number
+  target?:        number
+  collectionPct?: number
+}
+
+export interface ApiLibraryReport {
+  stats?:             { _sum?: { totalCopies?: number; availableCopies?: number } }
+  overdueBorrowings?: unknown[]
+  pendingApprovals?:  number
+}
+
+export interface ApiExamReport {
+  pendingMarks?:    number
+  approvedResults?: number
+  manebRecords?:    Pick<ApiManebRecord, 'id'>[]
+}
+
+export interface ApiStudentReport {
+  results: Pick<ApiTermResult, 'id' | 'academicYear' | 'term' | 'average' | 'grade' | 'position' | 'passStatus'>[]
+}
+
+export interface ApiAuditLogEntry {
+  id:         string
+  action:     string
+  entityType: string
+  entityId:   string
+  actorUid:   string
+  actorRole:  string
+  createdAt:  string
+}
+
+export interface ApiAuditLogResponse {
+  logs: ApiAuditLogEntry[]
+}
+
+// ─── ADMIN / SYSTEM TYPES ────────────────────────────────
+
+export interface ApiFirebaseUser {
+  uid:                    string
+  email:                  string
+  displayName?:           string
+  phone?:                 string
+  role?:                  string
+  disabled:               boolean
+  requiresPasswordChange: boolean
+  lastSignIn?:            string
+}
+
+export interface ApiUserListResponse {
+  users: ApiFirebaseUser[]
+}
+
+export interface ApiServiceHealth {
+  name:       string
+  status:     'ok' | 'degraded' | 'down'
+  latencyMs?: number
+  details?:   string
+}
+
+export interface ApiSystemHealth {
+  overall:            string
+  checkedAt:          string
+  actionsLast24h:     number
+  activeUsersLastHr:  number
+  services:           ApiServiceHealth[]
 }

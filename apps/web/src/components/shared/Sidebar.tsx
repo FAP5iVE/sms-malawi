@@ -1,21 +1,5 @@
 'use client'
 
-/**
- * FILE: apps/web/src/components/shared/Sidebar.tsx
- * REPLACES: existing Sidebar
- *
- * FIXES from landingpage_design.txt:
- *   ✅ Removed the mysterious "N" letter bottom-left
- *   ✅ Removed the beach/palm-tree rounded icon bottom-right
- *   ✅ Collapsible sidebar (icon-only mode)
- *   ✅ Clean bottom section: only the logged-in user's role badge
- *
- * These decorative artefacts (N / palm-tree) were likely rendered by
- * Tailwind purging issues or a browser extension — but they are
- * definitely NOT in this clean rebuild. If they still appear, check
- * browser extensions (e.g. Grammarly, Honey) that inject UI.
- */
-
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
@@ -28,7 +12,6 @@ import {
   CalendarDays,
   Bell,
   Clock,
-  FileText,
   Banknote,
   Library,
   UserCog,
@@ -37,6 +20,8 @@ import {
   ShieldCheck,
   ChevronsLeft,
   ChevronsRight,
+  BarChart2,
+  
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -111,7 +96,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     label: 'Reports',
     href: '/reports',
-    icon: FileText,
+    icon: BarChart2,
     roles: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer'],
   },
   {

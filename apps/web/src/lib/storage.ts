@@ -1,6 +1,4 @@
-// apps/web/src/lib/storage.ts
-// Fixed: Buffer type issue — use Uint8Array cast for Blob constructor
-// Fixed: removed unused InputFile import
+
 import * as sdk from 'node-appwrite'
 
 export const SCHOOL_BUCKET = 'school_files' as const

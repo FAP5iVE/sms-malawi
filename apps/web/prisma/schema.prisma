@@ -863,3 +863,21 @@ enum DigitalResType {
   REFERENCE
   STUDY_GUIDE
  }
+
+ // ─── NOTIFICATION PREFERENCES ────────────────────────────
+model UserNotificationPref {
+  id               String  @id @default(cuid())
+  uid              String  @unique   // Firebase Auth UID
+  emailFeeReminder Boolean @default(true)
+  emailLeaveUpdate Boolean @default(true)
+  emailResultRelease Boolean @default(true)
+  emailContractAlert Boolean @default(true)
+  emailAnnouncement Boolean @default(true)
+  smsFeeReminder   Boolean @default(false)
+  smsResultRelease Boolean @default(false)
+  pushAnnouncement Boolean @default(true)
+  pushResultRelease Boolean @default(true)
+  updatedAt        DateTime @updatedAt
+
+  @@map("user_notification_prefs")
+}
