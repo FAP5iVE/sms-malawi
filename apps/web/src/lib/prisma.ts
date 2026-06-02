@@ -1,30 +1,96 @@
-// apps/web/src/lib/prisma.ts
-// Fixed: no-explicit-any in Proxy get — use unknown cast chain instead
-import { PrismaClient } from '@prisma/client'
+import 'server-only'
+import { neonConfig, Pool } from '@neondatabase/serverless'
 import { PrismaNeon } from '@prisma/adapter-neon'
+import { PrismaClient } from '@prisma/client'
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined }
+// ─── NEON SERVERLESS CONFIGURATION ───────────────────────
+// poolQueryViaFetch = true  →  each SQL query becomes an HTTP POST to
+// Neon's serverless driver endpoint.  No persistent TCP/WebSocket
+// connection is held between queries, which means zero connection
+// exhaustion across any number of concurrent Vercel Lambda invocations.
+//
+// fetchConnectionCache = true  →  Neon reuses the underlying HTTP
+// keep-alive connection within a single Lambda warm window, reducing
+// per-query latency without maintaining a real connection slot in PG.
+neonConfig.poolQueryViaFetch = true
+neonConfig.fetchConnectionCache = true
 
-function getPrisma(): PrismaClient {
-  if (!globalForPrisma.prisma) {
-    // Lazy require so neonConfig.webSocketConstructor = ws runs ONLY on first DB call,
-    // not at module load time (avoids Firebase emulator 10-second timeout).
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const ws = require('ws') as typeof import('ws').default
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { neonConfig } = require('@neondatabase/serverless') as typeof import('@neondatabase/serverless')
-    neonConfig.webSocketConstructor = ws
+// ─── DEV LOGGING HELPER ───────────────────────────────────
+type LogLevel = 'query' | 'info' | 'warn' | 'error'
 
-    const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! })
-    globalForPrisma.prisma = new PrismaClient({ adapter })
-  }
-  return globalForPrisma.prisma
+const devLogLevels: LogLevel[] = ['error', 'warn']
+const queryLogLevels: LogLevel[] = ['query', 'error', 'warn']
+
+function getLogLevels(): LogLevel[] {
+  if (process.env.NODE_ENV === 'production') return devLogLevels
+  if (process.env.PRISMA_QUERY_LOG === '1') return queryLogLevels
+  return devLogLevels
 }
 
-// Proxy so callers write `prisma.student.findMany()` as normal —
-// the actual client is only created on the first property access (first DB call).
-export const prisma = new Proxy({} as PrismaClient, {
-  get(_target, prop: string | symbol) {
-    return (getPrisma() as unknown as Record<string | symbol, unknown>)[prop]
-  },
-})
+// ─── CLIENT FACTORY ───────────────────────────────────────
+function createPrismaClient(): PrismaClient {
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      '[prisma] DATABASE_URL is not set. ' +
+        'Import env.ts before prisma.ts in your server startup to catch this earlier.'
+    )
+  }
+
+  // Pool with HTTP mode — connection_limit=1 is intentional:
+  // each serverless invocation needs at most one logical connection.
+  // Neon's serverless driver multiplexes all queries from a single
+  // invocation through its connection pooler on the server side.
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 1,
+  })
+
+  const adapter = new PrismaNeon(pool)
+
+  const client = new PrismaClient({
+    adapter,
+    log: getLogLevels().map((level) => ({
+      emit: 'event' as const,
+      level,
+    })),
+  })
+
+  // Structured log events in development
+  if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(client as any).$on('error', (e: { message: string; target: string }) => {
+      console.error('[prisma:error]', e.target, e.message)
+    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(client as any).$on('warn', (e: { message: string; target: string }) => {
+      console.warn('[prisma:warn]', e.target, e.message)
+    })
+    if (process.env.PRISMA_QUERY_LOG === '1') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(client as any).$on(
+        'query',
+        (e: { query: string; duration: number }) => {
+          console.log(`[prisma:query] ${e.duration}ms — ${e.query}`)
+        }
+      )
+    }
+  }
+
+  return client
+}
+
+// ─── GLOBAL SINGLETON ─────────────────────────────────────
+// In development, Next.js hot-reload re-evaluates modules on every
+// file change.  Without the global guard, each reload leaks a new
+// PrismaClient instance.  In production this is unnecessary but
+// harmless — each warm Lambda reuses the module-level instance.
+const globalForPrisma = globalThis as unknown as {
+  __prisma?: PrismaClient
+}
+
+export const prisma: PrismaClient =
+  globalForPrisma.__prisma ?? createPrismaClient()
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.__prisma = prisma
+}

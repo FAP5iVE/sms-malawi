@@ -1,5 +1,22 @@
 @import 'tailwindcss';
 
+/* ─────────────────────────────────────────────────────────
+   DARK MODE VARIANT
+   Tells Tailwind v4 to generate dark: utilities that activate
+   when the .dark class is present on any ancestor element.
+   next-themes sets this class on <html> via attribute="class".
+   Without this declaration, dark: utilities use prefers-color-scheme
+   (media query) instead — which breaks manual theme switching.
+   ───────────────────────────────────────────────────────── */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ─────────────────────────────────────────────────────────
+   FONT FACES
+   Self-hosted for zero network dependency — critical for
+   Malawi where CDN latency can be high.
+   ───────────────────────────────────────────────────────── */
+
 @font-face {
   font-family: 'Inter';
   font-style: normal;
@@ -58,73 +75,236 @@
   src: url('/fonts/dmsans-bold.woff2') format('woff2');
 }
 
-/* ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────
    TAILWIND v4 THEME
-     --color-brand-navy  →  bg-brand-navy
-     --font-sans         →  font-sans
-   ───────────────────────────────────────────── */
+   Maps design token names to Tailwind utility classes.
+   --color-* tokens become bg-*, text-*, border-* utilities.
+   --font-* tokens become font-* utilities.
+   ───────────────────────────────────────────────────────── */
 
 @theme {
-  /* Fonts
-     Inter    → headings, UI labels, numbers (tabular)
-     DM Sans  → body text, paragraphs, descriptions */
-  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-heading: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+  /* ── Typography stacks */
+  --font-sans:    'DM Sans',  ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-heading: 'Inter',    ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono:    ui-monospace, 'Cascadia Code', 'Fira Code', Consolas, monospace;
 
-  /* Brand colours */
-  --color-brand-navy: #005eb8;
-  --color-brand-navy-mid: #007fff;
-  --color-brand-navy-light: #2d68c4;
-  --color-brand-teal: #0e8a6a;
+  /* ── Semantic colour utilities mapped to CSS variables
+        These respond to .dark class through the variables below  */
+  --color-background:          hsl(var(--background));
+  --color-foreground:          hsl(var(--foreground));
+  --color-card:                hsl(var(--card));
+  --color-card-foreground:     hsl(var(--card-foreground));
+  --color-popover:             hsl(var(--popover));
+  --color-popover-foreground:  hsl(var(--popover-foreground));
+  --color-primary:             hsl(var(--primary));
+  --color-primary-foreground:  hsl(var(--primary-foreground));
+  --color-secondary:           hsl(var(--secondary));
+  --color-secondary-foreground:hsl(var(--secondary-foreground));
+  --color-muted:               hsl(var(--muted));
+  --color-muted-foreground:    hsl(var(--muted-foreground));
+  --color-accent:              hsl(var(--accent));
+  --color-accent-foreground:   hsl(var(--accent-foreground));
+  --color-destructive:         hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border:              hsl(var(--border));
+  --color-input:               hsl(var(--input));
+  --color-ring:                hsl(var(--ring));
+
+  /* ── Chart palette (used by components/ui/chart.tsx) */
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  /* ── Sidebar (used by components/ui/sidebar.tsx) */
+  --color-sidebar:                    hsl(var(--sidebar-background));
+  --color-sidebar-foreground:         hsl(var(--sidebar-foreground));
+  --color-sidebar-primary:            hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent:             hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground:  hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border:             hsl(var(--sidebar-border));
+  --color-sidebar-ring:               hsl(var(--sidebar-ring));
+
+  /* ── School brand colours (static — same in light and dark) */
+  --color-brand-navy:       #1e3a5f;
+  --color-brand-navy-mid:   #2e86ab;
+  --color-brand-navy-light: #4a90d9;
+  --color-brand-teal:       #0e8a6a;
   --color-brand-teal-light: #1db88e;
-  --color-brand-amber: #d97706;
-  --color-brand-coral: #dc4f3a;
-  --color-brand-purple: #6b3fa0;
+  --color-brand-amber:      #d97706;
+  --color-brand-coral:      #dc4f3a;
+  --color-brand-purple:     #6b3fa0;
 
-  /* Semantic surface tokens — light mode defaults */
-  --color-bg: #fffbee;
-  --color-surface: #ffffff;
-  --color-border: #dde4ec;
-  --color-text: #268bd2;
-  --color-muted: #64748b;
+  /* ── Radius tokens */
+  --radius-sm: 0.25rem;
+  --radius:    0.5rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl:1.5rem;
+  --radius-full: 9999px;
 
-  /* Border radius scale */
-  --radius-sm: 4px;
-  --radius: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 24px;
-
-  /* Shadow scale */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.06);
+  /* ── Shadow tokens */
+  --shadow-sm:
+    0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow:
+    0 1px 3px 0 rgb(0 0 0 / 0.1),
+    0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg:
+    0 10px 15px -3px rgb(0 0 0 / 0.1),
+    0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl:
+    0 20px 25px -5px rgb(0 0 0 / 0.1),
+    0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
-/* ─────────────────────────────────────────────
-   DARK MODE OVERRIDES
-   ───────────────────────────────────────────── */
-
-.dark {
-  --color-bg: #002b36;
-  --color-surface: #073642;
-  --color-border: #586e75;
-  --color-text: #fffbee;
-  --color-muted: #93a1a1;
-}
-
-/* ─────────────────────────────────────────────
-   BASE STYLES
-   Applied globally — sets fonts, colours,
-   smooth rendering for all elements
-   ───────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────
+   DESIGN TOKEN DEFINITIONS
+   :root  → light mode values
+   .dark  → dark mode overrides (applied by next-themes)
+   ───────────────────────────────────────────────────────── */
 
 @layer base {
+
+  /* ── LIGHT MODE ─────────────────────────────────────── */
+
+  :root {
+    /* Page and surface */
+    --background:           215 25% 97%;   /* #f4f7f9 — clean cool grey page bg */
+    --foreground:           222 47% 11%;   /* #0f172a — near-black body text */
+    --card:                 0 0% 100%;     /* #ffffff — card surface */
+    --card-foreground:      222 47% 11%;
+    --popover:              0 0% 100%;
+    --popover-foreground:   222 47% 11%;
+
+    /* Primary (brand navy) */
+    --primary:              213 51% 24%;   /* #1e3a5f — brand navy */
+    --primary-foreground:   0 0% 100%;     /* white text on navy */
+
+    /* Secondary (light blue-grey) */
+    --secondary:            215 25% 93%;   /* #e8edf3 — secondary panels */
+    --secondary-foreground: 222 47% 11%;
+
+    /* Muted areas */
+    --muted:                215 25% 93%;
+    --muted-foreground:     215 16% 47%;   /* #64748b — muted text */
+
+    /* Accent (used for hover states) */
+    --accent:               215 25% 93%;
+    --accent-foreground:    222 47% 11%;
+
+    /* Destructive (danger/delete) */
+    --destructive:          0 84% 60%;     /* #f04646 */
+    --destructive-foreground: 0 0% 100%;
+
+    /* UI chrome */
+    --border:               220 13% 88%;   /* #dde2ea — subtle borders */
+    --input:                220 13% 88%;
+    --ring:                 213 51% 24%;   /* match primary for focus rings */
+
+    /* Border radius reference (used by shadcn components via var(--radius)) */
+    --radius: 0.5rem;
+
+    /* Charts — school palette */
+    --chart-1: 213 51% 42%;   /* navy-blue */
+    --chart-2: 186 72% 37%;   /* teal */
+    --chart-3: 43 74% 49%;    /* amber */
+    --chart-4: 262 52% 47%;   /* purple */
+    --chart-5: 0 72% 56%;     /* coral-red */
+
+    /* Sidebar — uses brand navy surface */
+    --sidebar-background:          213 51% 15%;  /* deep navy #0e2240 */
+    --sidebar-foreground:          215 25% 93%;  /* off-white */
+    --sidebar-primary:             210 40% 98%;  /* nearly white for active items */
+    --sidebar-primary-foreground:  213 51% 15%;  /* navy text on white active */
+    --sidebar-accent:              213 51% 22%;  /* slightly lighter navy for hover */
+    --sidebar-accent-foreground:   215 25% 93%;
+    --sidebar-border:              213 51% 22%;
+    --sidebar-ring:                213 80% 60%;
+
+    /* ── Custom semantic shortcuts (legacy compat + new utilities) */
+    --color-page:    215 25% 97%;  /* same as --background */
+    --color-surface: 0 0% 100%;   /* same as --card */
+    --color-text:    222 47% 11%; /* same as --foreground */
+    --color-muted-val: 215 16% 47%;
+  }
+
+  /* ── DARK MODE ──────────────────────────────────────── */
+  /* Applied when next-themes sets class="dark" on <html> */
+
+  .dark {
+    /* Page and surface — elevation hierarchy in dark mode:
+       background (lowest) → card → popover (highest)
+       Elevation is signalled by lighter surfaces, not shadows. */
+    --background:           224 44% 7%;    /* #070e1a — deepest layer */
+    --foreground:           215 25% 93%;   /* #e4eaf3 — off-white text */
+    --card:                 224 36% 11%;   /* #111827 — card surface */
+    --card-foreground:      215 25% 93%;
+    --popover:              224 36% 13%;   /* #141f2e — popover (above card) */
+    --popover-foreground:   215 25% 93%;
+
+    /* Primary — lightened for dark backgrounds
+       Never use the same navy as light mode — it disappears on dark bg */
+    --primary:              210 68% 62%;   /* #4a9bd4 — light blue */
+    --primary-foreground:   224 44% 7%;    /* dark bg as text on primary */
+
+    /* Secondary */
+    --secondary:            224 25% 18%;   /* #1f2a3c — dark secondary panel */
+    --secondary-foreground: 215 25% 93%;
+
+    /* Muted */
+    --muted:                224 25% 18%;
+    --muted-foreground:     215 16% 58%;   /* #8a9bb5 — readable muted */
+
+    /* Accent */
+    --accent:               224 25% 20%;
+    --accent-foreground:    215 25% 93%;
+
+    /* Destructive — desaturated in dark mode to avoid vibrating */
+    --destructive:          0 62% 42%;     /* #b83232 */
+    --destructive-foreground: 215 25% 93%;
+
+    /* UI chrome */
+    --border:               224 25% 20%;   /* #1e2a3c — subtle dark border */
+    --input:                224 25% 20%;
+    --ring:                 210 68% 62%;   /* match primary */
+
+    /* Charts — slightly desaturated for dark bg */
+    --chart-1: 210 68% 62%;   /* light blue */
+    --chart-2: 165 60% 42%;   /* teal */
+    --chart-3: 43 74% 60%;    /* amber */
+    --chart-4: 262 52% 66%;   /* purple */
+    --chart-5: 0 72% 65%;     /* coral */
+
+    /* Sidebar — slightly lighter than page background for definition */
+    --sidebar-background:          224 44% 9%;   /* #0a1120 */
+    --sidebar-foreground:          215 25% 93%;
+    --sidebar-primary:             210 68% 62%;
+    --sidebar-primary-foreground:  224 44% 7%;
+    --sidebar-accent:              224 44% 13%;
+    --sidebar-accent-foreground:   215 25% 93%;
+    --sidebar-border:              224 25% 16%;
+    --sidebar-ring:                210 68% 62%;
+
+    /* Custom semantic shortcuts */
+    --color-page:     224 44% 7%;
+    --color-surface:  224 36% 11%;
+    --color-text:     215 25% 93%;
+    --color-muted-val: 215 16% 58%;
+  }
+
+  /* ── GLOBAL RESETS ─────────────────────────────────── */
+
   *,
   *::before,
   *::after {
     box-sizing: border-box;
+    border-color: hsl(var(--border));
   }
 
   html {
@@ -134,45 +314,30 @@
   }
 
   body {
-    background-color: var(--color-bg);
-    color: var(--color-text);
-    font-family: var(--font-sans);
-    font-size: 15px;
-    line-height: 1.65;
-    -webkit-font-smoothing: antialiased;
+    background-color: hsl(var(--background));
+    color:            hsl(var(--foreground));
+    font-family:      var(--font-sans);
+    font-size:        15px;
+    line-height:      1.65;
+    -webkit-font-smoothing:  antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
   }
 
-  /* Headings use Inter */
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
+  /* Headings */
+  h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
     font-weight: 700;
-    line-height: 1.2;
-    color: var(--color-text);
+    line-height:  1.2;
+    color: hsl(var(--foreground));
   }
 
-  /* Inputs inherit font from body */
-  input,
-  button,
-  textarea,
-  select {
+  /* Form elements inherit font */
+  input, button, textarea, select {
     font-family: inherit;
   }
 
-  /* Remove default list styles */
-  ul,
-  ol {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-
-  /* Links */
+  /* Default link colour */
   a {
     color: var(--color-brand-teal);
     text-decoration: none;
@@ -181,89 +346,256 @@
     text-decoration: underline;
   }
 
-  /* Focus ring — accessibility */
+  /* Focus ring — accessible, school-branded */
   :focus-visible {
-    outline: 2px solid var(--color-brand-teal);
+    outline:        2px solid hsl(var(--ring));
     outline-offset: 2px;
-    border-radius: var(--radius-sm);
+    border-radius:  var(--radius-sm);
+  }
+
+  /* Remove list styles globally (components style their own lists) */
+  ul, ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
   }
 }
 
-/* ─────────────────────────────────────────────
+/* ─────────────────────────────────────────────────────────
    CUSTOM UTILITIES
-   ───────────────────────────────────────────── */
+   Defined with @layer utilities so Tailwind's purge system
+   tree-shakes unused ones in production builds.
+   ───────────────────────────────────────────────────────── */
 
 @layer utilities {
-  .input {
-    width: 100%;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    padding: 0.625rem 0.875rem;
-    font-size: 0.875rem;
-    background-color: var(--color-surface);
-    color: var(--color-text);
-    transition-property: border-color, box-shadow;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 150ms;
+
+  /* ── Semantic surface shortcuts
+        These are the legacy shorthand classes used throughout
+        the dashboard components. They now correctly respond to
+        the .dark class on <html>. */
+
+  .bg-page {
+    background-color: hsl(var(--background));
+  }
+  .bg-surface {
+    background-color: hsl(var(--card));
+  }
+  .text-body {
+    color: hsl(var(--foreground));
+  }
+  .text-muted {
+    color: hsl(var(--muted-foreground));
+  }
+  .border-base {
+    border-color: hsl(var(--border));
   }
 
-  .input::placeholder {
-    color: var(--color-muted);
-  }
-
-  .input:focus {
-    outline: none;
-    border-color: var(--color-brand-teal);
-    box-shadow: 0 0 0 2px rgba(14, 138, 106, 0.4);
-  }
-
-  /* Use Inter for any element: className="font-heading" */
+  /* ── Font class shortcuts */
   .font-heading {
     font-family: var(--font-heading);
   }
-
-  /* Semantic background/text shortcuts */
-  .bg-surface {
-    background-color: var(--color-surface);
-  }
-  .bg-page {
-    background-color: var(--color-bg);
-  }
-  .border-base {
-    border-color: var(--color-border);
-  }
-  .text-body {
-    color: var(--color-text);
-  }
-  .text-muted {
-    color: var(--color-muted);
+  .font-body {
+    font-family: var(--font-sans);
   }
 
-  /* Tabular numbers — for financial figures, marks, dates */
+  /* ── Tabular numbers — financial data, marks, student IDs */
   .tabular {
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum';
   }
 
-  /* Skeleton loading animation */
+  /* ── Input base style (used in custom non-shadcn inputs) */
+  .input {
+    width:            100%;
+    border:           1px solid hsl(var(--input));
+    border-radius:    var(--radius-lg);
+    padding:          0.625rem 0.875rem;
+    font-size:        0.875rem;
+    background-color: hsl(var(--background));
+    color:            hsl(var(--foreground));
+    transition-property:       border-color, box-shadow;
+    transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration:       150ms;
+  }
+  .input::placeholder {
+    color: hsl(var(--muted-foreground));
+  }
+  .input:focus {
+    outline:    none;
+    border-color: hsl(var(--ring));
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.25);
+  }
+
+  /* ── Skeleton loader
+        Works in both light and dark — gradient pulls from
+        the current --muted / --background token values.  */
   .skeleton {
     background: linear-gradient(
       90deg,
-      var(--color-border) 25%,
-      var(--color-bg) 50%,
-      var(--color-border) 75%
+      hsl(var(--muted)) 25%,
+      hsl(var(--muted) / 0.5) 50%,
+      hsl(var(--muted)) 75%
     );
     background-size: 200% 100%;
     animation: skeleton-sweep 1.5s ease-in-out infinite;
     border-radius: var(--radius);
   }
 
-  @keyframes skeleton-sweep {
-    0% {
-      background-position: 200% 0;
-    }
-    100% {
-      background-position: -200% 0;
-    }
+  /* ── Status badge colour overrides for dark mode
+        Tailwind's opaque amber-100 etc. look washed out in dark mode.
+        These utility classes produce correct contrast on dark surfaces. */
+
+  .badge-amber-dark {
+    background-color: hsl(43 74% 18% / 0.8);
+    color:            hsl(43 74% 70%);
+    border-color:     hsl(43 74% 30% / 0.5);
   }
+
+  .badge-green-dark {
+    background-color: hsl(142 52% 16% / 0.8);
+    color:            hsl(142 52% 65%);
+    border-color:     hsl(142 52% 26% / 0.5);
+  }
+
+  .badge-red-dark {
+    background-color: hsl(0 62% 20% / 0.8);
+    color:            hsl(0 62% 72%);
+    border-color:     hsl(0 62% 30% / 0.5);
+  }
+
+  .badge-blue-dark {
+    background-color: hsl(210 68% 20% / 0.8);
+    color:            hsl(210 68% 72%);
+    border-color:     hsl(210 68% 30% / 0.5);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   ANIMATION KEYFRAMES
+   ───────────────────────────────────────────────────────── */
+
+@keyframes skeleton-sweep {
+  0%   { background-position:  200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-from-right {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-from-bottom {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* Expose as utilities for Framer Motion fallback and CSS-only use */
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 200ms cubic-bezier(0, 0, 0.2, 1) both;
+  }
+  .animate-slide-right {
+    animation: slide-in-from-right 200ms cubic-bezier(0, 0, 0.2, 1) both;
+  }
+  .animate-slide-bottom {
+    animation: slide-in-from-bottom 200ms cubic-bezier(0, 0, 0.2, 1) both;
+  }
+  .animate-scale-in {
+    animation: scale-in 150ms cubic-bezier(0, 0, 0.2, 1) both;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   REDUCED MOTION
+   Respects the OS-level "reduce motion" accessibility setting.
+   All transitions and animations are suppressed.
+   Framer Motion reads the motionStore.motionEnabled flag instead;
+   this CSS rule is the zero-JS fallback for components that
+   use CSS transitions directly.
+   ───────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration:        0.01ms !important;
+    animation-iteration-count: 1      !important;
+    transition-duration:       0.01ms !important;
+    scroll-behavior:           auto   !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   PRINT STYLES
+   Hide all navigation chrome when printing — report cards,
+   fee statements, payslips, student profiles.
+   ───────────────────────────────────────────────────────── */
+
+@media print {
+  /* Hide navigation */
+  nav,
+  aside,
+  [data-sidebar],
+  [data-mobile-nav],
+  header,
+  [data-page-header] {
+    display: none !important;
+  }
+
+  /* Ensure content fills the full width */
+  main,
+  [data-printable] {
+    width:   100% !important;
+    margin:  0    !important;
+    padding: 0    !important;
+  }
+
+  /* Force white background — saves toner */
+  body {
+    background-color: #ffffff !important;
+    color:            #000000 !important;
+  }
+
+  /* Page break rules for multi-page documents */
+  .print-break-before { break-before: page; }
+  .print-break-after  { break-after:  page; }
+  .print-no-break     { break-inside: avoid; }
+}
+
+/* ─────────────────────────────────────────────────────────
+   SCROLLBAR STYLING
+   Thin, subtle scrollbars matching the surface tokens.
+   WebKit (Chrome, Safari, Edge) only — Firefox uses
+   the scrollbar-width: thin CSS property instead.
+   ───────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width:  6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+::-webkit-scrollbar-thumb {
+  background:    hsl(var(--muted));
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* Firefox */
+* {
+  scrollbar-width:  thin;
+  scrollbar-color:  hsl(var(--muted)) hsl(var(--background));
 }
