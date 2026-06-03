@@ -23,6 +23,7 @@ import { logger }              from '@/lib/logger'
 import { settingsRouter }      from '@/server/routes/settings'
 import { auditRouter }         from '@/server/routes/audit'
 import { pendingActionsRouter }from '@/server/routes/pendingActions'
+import { notificationsRouter } from '@/server/routes/notifications'
 
 // ─── RATE LIMIT CONFIGURATION ────────────────────────────
 // ⚠  The default MemoryStore is per-Lambda-instance and therefore NOT
@@ -185,6 +186,7 @@ export function createApiApp() {
   app.use('/settings',      settingsRouter)
   app.use('/audit',         auditRouter)
   app.use('/pending-actions', pendingActionsRouter)
+  app.use('/notifications',   notificationsRouter)
   app.use('/hr',            hrRouter)
   app.use('/library',       libraryRouter)
 

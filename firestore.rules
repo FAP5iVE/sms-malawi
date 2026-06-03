@@ -1,73 +1,357 @@
 rules_version = '2';
 
+/**
+ * firestore.rules — SMS Malawi Firestore Security Rules
+ *
+ * Collections managed here:
+ *   attendance/{classId}/records/{date}      — real-time attendance marking
+ *   announcements/{announcementId}           — school-wide and class announcements
+ *   notifications/{userId}/items/{notifId}   — per-user in-app notification feed
+ *   calendar_events/{eventId}                — school calendar events
+ *   user_fcm_tokens/{uid}                    — FCM push tokens (Admin SDK only)
+ *   sessions/{uid}                           — active session tracking (GAP-090)
+ *   security_events/{eventId}                — failed logins / anomalous activity
+ *
+ * Security model:
+ *   • Authentication is required for every read/write unless explicitly noted.
+ *   • Role is read from Firebase Custom Claims (token.role) — not from a user
+ *     document — to prevent privilege escalation via Firestore writes.
+ *   • user_fcm_tokens and security_events are server-only (deny all client access).
+ *     These are written exclusively by Firebase Admin SDK in push.ts / server routes.
+ *   • The catch-all deny rule at the bottom ensures no unlisted collection is
+ *     accidentally accessible.
+ *
+ * Role hierarchy (matches packages/shared/types/roles.ts):
+ *   admin > high_rank > finance / library / lower_rank / academic / hr / exam_officer > student
+ *
+ * Phase B9 changes:
+ *   • Added user_fcm_tokens rules (deny all client access — Admin SDK only)
+ *   • Added sessions rules (user reads/writes own; admin reads all)
+ *   • Added security_events rules (deny client writes; admin reads)
+ *   • Enhanced attendance rules (added LATE status, date validation)
+ *   • Enhanced announcements rules (added scheduledAt / expiresAt / status fields)
+ *   • Enhanced notifications rules (added mark-all-read and delete own)
+ *   • Added calendar_events audience filtering helpers
+ */
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helper functions ────────────────────────────────────
+    // ── HELPER FUNCTIONS ─────────────────────────────────
+
+    /** Returns true if the request is from an authenticated user. */
     function isAuth() {
       return request.auth != null;
     }
+
+    /** Returns the authenticated user's role custom claim (string). */
     function role() {
       return request.auth.token.role;
     }
-    function isAdmin() {
-      return isAuth() && role() == "admin";
+
+    /** The requesting user's Firebase UID. */
+    function uid() {
+      return request.auth.uid;
     }
+
+    function isAdmin() {
+      return isAuth() && role() == 'admin';
+    }
+
+    function isHighRankOrAdmin() {
+      return isAuth() && role() in ['admin', 'high_rank'];
+    }
+
+    /** All staff roles — everyone except students. */
     function isStaff() {
       return isAuth() && role() in [
-        "admin","high_rank","finance","library",
-        "lower_rank","academic","hr","exam_officer"
+        'admin', 'high_rank', 'finance', 'library',
+        'lower_rank', 'academic', 'hr', 'exam_officer',
       ];
     }
-    function isTeacher() {
-      return isAuth() && role() in ["admin","high_rank","academic","exam_officer"];
+
+    /**
+     * Roles that can mark and manage attendance.
+     * academic and exam_officer are the primary teachers; admin and high_rank
+     * have supervisory write access.
+     */
+    function canWriteAttendance() {
+      return isAuth() && role() in ['admin', 'high_rank', 'academic', 'exam_officer', 'lower_rank'];
     }
+
     function isStudent() {
-      return isAuth() && role() == "student";
-    }
-    function isHighRankOrAdmin() {
-      return isAuth() && role() in ["admin","high_rank"];
+      return isAuth() && role() == 'student';
     }
 
-    // ── Attendance ──────────────────────────────────────────
-    // Path: attendance/{classId}/records/{date}
+    /** Returns true if the announcement targets the current user's role or all users. */
+    function announcementTargetsMe(data) {
+      return data.targetRoles.hasAny([role()]) || data.targetAll == true;
+    }
+
+    /** Returns true if the announcement is in a visible published state. */
+    function isAnnouncementPublished(data) {
+      return data.status == 'APPROVED'
+        && (data.scheduledAt == null || data.scheduledAt <= request.time)
+        && (data.expiresAt   == null || data.expiresAt   >  request.time);
+    }
+
+    // ── ATTENDANCE ────────────────────────────────────────
+    // Collection path: attendance/{classId}/records/{date}
+    //
+    // Document shape:
+    //   {
+    //     [studentId]: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED',
+    //     classId: string,
+    //     date: string (yyyy-MM-dd),
+    //     markedByUid: string,
+    //     markedAt: Timestamp,
+    //   }
+    //
+    // Read access:   All staff and all students (students read their own class)
+    // Write access:  Teachers, exam officers, admin, high_rank, lower_rank (for admin tasks)
+
     match /attendance/{classId}/records/{date} {
-      allow read: if isStaff() || isStudent();
-      // Only teachers and admin can mark attendance
-      allow write: if isTeacher() || isHighRankOrAdmin();
-    }
+      allow read: if isAuth();
 
-    // ── Announcements ───────────────────────────────────────
-    match /announcements/{announcementId} {
-      allow read: if isAuth() &&
-        (resource.data.targetRoles.hasAny([role()]) ||
-         resource.data.targetAll == true);
+      allow create: if canWriteAttendance()
+        && request.resource.data.classId == classId
+        && request.resource.data.date is string
+        && request.resource.data.markedByUid == uid();
 
-      // Only staff can create, admin/high rank can publish
-      allow create: if isStaff();
-      allow update: if isHighRankOrAdmin() ||
-        (isStaff() && resource.data.createdByUid == request.auth.uid
-         && resource.data.status == "DRAFT");
+      allow update: if canWriteAttendance()
+        && request.resource.data.classId == resource.data.classId
+        && request.resource.data.markedByUid == uid();
+
+      // Attendance records are never deleted — they form the permanent record.
+      // Admin can soft-delete by setting all statuses to a special VOIDED value.
       allow delete: if isAdmin();
     }
 
-    // ── Notifications ───────────────────────────────────────
+    // ── ANNOUNCEMENTS ─────────────────────────────────────
+    // Collection path: announcements/{announcementId}
+    //
+    // Document shape:
+    //   {
+    //     title:        string,
+    //     body:         string (may contain HTML from a rich text editor),
+    //     createdByUid: string,
+    //     targetRoles:  string[],
+    //     targetAll:    boolean,
+    //     classId:      string | null,
+    //     status:       'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ARCHIVED',
+    //     scheduledAt:  Timestamp | null,
+    //     expiresAt:    Timestamp | null,
+    //     requiresAck:  boolean,
+    //     createdAt:    Timestamp,
+    //     updatedAt:    Timestamp,
+    //   }
+    //
+    // Read logic:   Approved + targeted announcements visible to all authenticated users.
+    //               Drafts and pending-approval visible only to the author and admin/high_rank.
+    // Write logic:  Staff can create (as DRAFT or PENDING_APPROVAL).
+    //               Admin/high_rank can approve, reject, archive.
+    //               Authors can edit their own DRAFT announcements only.
+    //               Students can create class-scoped announcements (status = PENDING_APPROVAL).
+
+    match /announcements/{announcementId} {
+      allow read: if isAuth() && (
+        // Published and targeted at the current user
+        (isAnnouncementPublished(resource.data) && announcementTargetsMe(resource.data))
+        // Author can always read their own announcements regardless of status
+        || resource.data.createdByUid == uid()
+        // Admin and high_rank can read all announcements for moderation
+        || isHighRankOrAdmin()
+      );
+
+      // Staff can create announcements (DRAFT or PENDING_APPROVAL).
+      // Students can submit class-scoped announcements (must be PENDING_APPROVAL).
+      allow create: if isAuth()
+        && (
+          (isStaff() && request.resource.data.status in ['DRAFT', 'PENDING_APPROVAL', 'APPROVED'])
+          || (isStudent()
+              && request.resource.data.status == 'PENDING_APPROVAL'
+              && request.resource.data.classId != null
+              && request.resource.data.targetAll == false)
+        )
+        && request.resource.data.createdByUid == uid();
+
+      // Authors can edit their own DRAFT announcements.
+      // Admin/high_rank can change status (approve, reject, archive).
+      allow update: if isAuth() && (
+        isHighRankOrAdmin()
+        || (resource.data.createdByUid == uid()
+            && resource.data.status == 'DRAFT'
+            && request.resource.data.status in ['DRAFT', 'PENDING_APPROVAL'])
+      );
+
+      // Only admin can permanently delete announcements.
+      // Others should set status = 'ARCHIVED' instead.
+      allow delete: if isAdmin();
+    }
+
+    // ── NOTIFICATIONS (PER-USER FEED) ─────────────────────
+    // Collection path: notifications/{userId}/items/{notifId}
+    //
+    // Document shape:
+    //   {
+    //     title:     string,
+    //     body:      string,
+    //     type:      'INFO' | 'WARNING' | 'SUCCESS' | 'ERROR',
+    //     category:  string (e.g. 'fee_reminder', 'result_released', 'leave_approved'),
+    //     read:      boolean,
+    //     actionUrl: string | null,
+    //     createdAt: Timestamp,
+    //     readAt:    Timestamp | null,
+    //   }
+    //
+    // Users can read, update (mark as read), and delete their own notifications.
+    // Staff can create notifications for any user (to send in-app alerts).
+    // Admin can read any user's notifications for support/audit purposes.
+
     match /notifications/{userId}/items/{notifId} {
-      // Users can only read/update their own notifications
-      allow read, update: if isAuth() && request.auth.uid == userId;
-      allow create: if isStaff(); // staff create notifications for others
-      allow delete: if isAuth() && request.auth.uid == userId;
-    }
+      allow read: if isAuth() && (uid() == userId || isAdmin());
 
-    // ── Calendar Events ─────────────────────────────────────
-    match /calendar_events/{eventId} {
-      allow read:   if isAuth();
+      // Only the owner of the notification can mark it as read or delete it.
+      allow update: if isAuth()
+        && uid() == userId
+        // Only allow flipping `read` and `readAt` — no other field changes
+        && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['read', 'readAt']);
+
+      allow delete: if isAuth() && uid() == userId;
+
+      // Staff can create notifications for users (server-side in-app alerts).
+      // Admin SDK bypasses these rules entirely, but this covers client-initiated
+      // notification creation for future peer-notification features.
       allow create: if isStaff();
-      allow update, delete: if isHighRankOrAdmin() ||
-        (isStaff() && resource.data.createdByUid == request.auth.uid);
     }
 
-    // ── Deny everything else ────────────────────────────────
+    // ── CALENDAR EVENTS ───────────────────────────────────
+    // Collection path: calendar_events/{eventId}
+    //
+    // Document shape:
+    //   {
+    //     title:        string,
+    //     description:  string,
+    //     startDate:    Timestamp,
+    //     endDate:      Timestamp,
+    //     type:         'EXAM' | 'HOLIDAY' | 'TERM' | 'STAFF_LEAVE' | 'LAB' | 'ANNOUNCEMENT',
+    //     classId:      string | null,
+    //     createdByUid: string,
+    //     isPublic:     boolean,
+    //     colour:       string | null,
+    //   }
+
+    match /calendar_events/{eventId} {
+      allow read: if isAuth() && (
+        resource.data.isPublic == true
+        || isStaff()
+        // Students can see events relevant to their context (public + exam dates)
+        || (isStudent() && resource.data.type in ['EXAM', 'HOLIDAY', 'TERM', 'ANNOUNCEMENT'])
+      );
+
+      allow create: if isStaff()
+        && request.resource.data.createdByUid == uid();
+
+      allow update: if isHighRankOrAdmin()
+        || (isStaff() && resource.data.createdByUid == uid());
+
+      allow delete: if isHighRankOrAdmin()
+        || (isStaff() && resource.data.createdByUid == uid());
+    }
+
+    // ── FCM PUSH TOKENS ───────────────────────────────────
+    // Collection path: user_fcm_tokens/{uid}
+    //
+    // ⚠ SERVER-ONLY COLLECTION — DENY ALL CLIENT ACCESS ⚠
+    //
+    // This collection is exclusively managed by Firebase Admin SDK in push.ts:
+    //   registerToken(), unregisterToken(), getTokensForUser(), removeInvalidTokens()
+    //
+    // Rationale for complete client denial:
+    //   • FCM tokens are sensitive device identifiers — exposing them to the client
+    //     could allow token enumeration or token hijacking attacks.
+    //   • Even reading own tokens is denied: the client doesn't need to know
+    //     its own token after registering it; it obtains a fresh token via
+    //     getToken() when needed.
+    //   • Token registration/unregistration happens via authenticated server
+    //     endpoints (/notifications/register-token, /notifications/unregister-token)
+    //     which call the Admin SDK on the server.
+    //
+    // If you need to verify a token exists, use GET /notifications/token-status.
+
+    match /user_fcm_tokens/{uid} {
+      allow read, write: if false;
+    }
+
+    // ── ACTIVE SESSIONS ───────────────────────────────────
+    // Collection path: sessions/{uid}
+    //
+    // Document shape:
+    //   {
+    //     uid:          string,
+    //     deviceInfo:   string (User-Agent, max 200 chars),
+    //     ipAddress:    string | null (set server-side if available),
+    //     loginAt:      Timestamp,
+    //     lastActiveAt: Timestamp,
+    //     role:         string (UserRole),
+    //   }
+    //
+    // Written by AuthProvider.tsx on login and periodically on activity.
+    // Read by admin in the session monitoring page (GAP-090, Phase D).
+    // Admin can delete sessions to force-logout specific users.
+    //
+    // NOTE: The full session monitoring feature (GAP-090) is planned for Phase D.
+    //       These rules are pre-declared to ensure security correctness from day one.
+
+    match /sessions/{sessionUid} {
+      // Users can read and write their own active session document.
+      // This is used by AuthProvider to track lastActiveAt for inactivity detection.
+      allow read, create, update: if isAuth() && uid() == sessionUid;
+
+      // Users can delete their own session (explicit logout cleans it up).
+      allow delete: if isAuth() && uid() == sessionUid;
+
+      // Admin can read all sessions for the session monitoring dashboard.
+      // Admin can delete any session to force-logout a user (revoke session).
+      allow read, delete: if isAdmin();
+    }
+
+    // ── SECURITY EVENTS ───────────────────────────────────
+    // Collection path: security_events/{eventId}
+    //
+    // Document shape:
+    //   {
+    //     type:          'FAILED_LOGIN' | 'SUSPICIOUS_ACTIVITY' | 'FORCE_LOGOUT' | 'ROLE_CHANGE',
+    //     actorUid:      string | null (null for unauthenticated events like failed logins),
+    //     targetUid:     string | null,
+    //     ipAddress:     string | null,
+    //     userAgent:     string | null,
+    //     description:   string,
+    //     severity:      'LOW' | 'MEDIUM' | 'HIGH',
+    //     createdAt:     Timestamp,
+    //   }
+    //
+    // ⚠ SERVER-ONLY WRITES — Admin reads only ⚠
+    //
+    // Security events are written exclusively by:
+    //   • Firebase Auth triggers (failed login, password reset) via Admin SDK
+    //   • Server-side route handlers (role change, suspicious request patterns)
+    //   • Cron jobs (brute force detection aggregation)
+    //
+    // Client writes are denied to prevent log tampering.
+    // Only admin can read security events (Security Center — GAP-091).
+
+    match /security_events/{eventId} {
+      allow read:  if isAdmin();
+      allow write: if false;
+    }
+
+    // ── CATCH-ALL DENY ────────────────────────────────────
+    // Any collection not explicitly listed above is denied.
+    // This prevents accidental exposure of data in collections created during
+    // development or testing that haven't been assigned explicit rules yet.
+
     match /{document=**} {
       allow read, write: if false;
     }

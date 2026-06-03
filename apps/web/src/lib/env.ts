@@ -69,6 +69,9 @@ const clientSchema = z.object({
     .string()
     .min(1, 'NEXT_PUBLIC_FIREBASE_APP_ID is required'),
   NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: z.string().optional(),
+  // VAPID key for Firebase Cloud Messaging push notifications.
+  // Generate in Firebase Console → Project Settings → Cloud Messaging → Web Push certificates.
+  NEXT_PUBLIC_FIREBASE_VAPID_KEY: z.string().optional(),
 
   // App URLs
   NEXT_PUBLIC_APP_URL: z.string().url().optional().default('http://localhost:3000'),
@@ -158,6 +161,7 @@ export const env = {
     _client.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   NEXT_PUBLIC_FIREBASE_APP_ID: _client.NEXT_PUBLIC_FIREBASE_APP_ID,
   NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: _client.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  NEXT_PUBLIC_FIREBASE_VAPID_KEY: _client.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
   NEXT_PUBLIC_APP_URL: _client.NEXT_PUBLIC_APP_URL,
   NEXT_PUBLIC_API_URL: _client.NEXT_PUBLIC_API_URL,
   NEXT_PUBLIC_ALGOLIA_APP_ID: _client.NEXT_PUBLIC_ALGOLIA_APP_ID,
