@@ -162,7 +162,8 @@ auditRouter.get(
   verifyAuth,
   requireAnyPermission(['userMgmt.viewAuditLogs', 'report.viewAuditLogs', 'exam.viewExamAuditLog']),
   async (req: Request, res: Response) => {
-    const { type, id } = req.params
+    const type = String(req.params['type'] ?? '')
+    const id   = String(req.params['id']   ?? '')
 
     if (!type || !id) {
       res.status(400).json({ error: 'Entity type and id are required.' })
@@ -206,7 +207,7 @@ auditRouter.get(
   verifyAuth,
   requirePermission('userMgmt.viewAuditLogs'),
   async (req: Request, res: Response) => {
-    const { uid } = req.params
+    const uid = String(req.params['uid'] ?? '')
 
     if (!uid) {
       res.status(400).json({ error: 'Actor UID is required.' })
@@ -248,7 +249,7 @@ auditRouter.get(
   verifyAuth,
   requirePermission('userMgmt.viewAuditLogs'),
   async (req: Request, res: Response) => {
-    const { id } = req.params
+    const id = String(req.params['id'] ?? '')
 
     const row = await (await import('@/lib/prisma')).prisma.auditLog.findUnique({
       where: { id },
