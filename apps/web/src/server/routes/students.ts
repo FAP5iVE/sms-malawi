@@ -126,7 +126,7 @@ studentsRouter.get(
   requireAnyPermission(['student.view', 'student.viewOwn']),
   async (req: Request, res: Response) => {
     const { user } = req
-    const { id }   = req.params
+    const id = String(req.params['id'] ?? '')
 
     if (!id) {
       res.status(400).json({ error: 'Student ID is required.' })
@@ -243,7 +243,7 @@ studentsRouter.patch(
   requirePermission('student.edit'),
   async (req: Request, res: Response) => {
     const { user } = req
-    const { id }   = req.params
+    const id = String(req.params['id'] ?? '')
 
     if (!user || !id) {
       res.status(400).json({ error: 'Student ID is required.' })
@@ -291,7 +291,7 @@ studentsRouter.delete(
   requirePermission('student.softDelete'),
   async (req: Request, res: Response) => {
     const { user } = req
-    const { id }   = req.params
+    const id = String(req.params['id'] ?? '')
 
     if (!user || !id) {
       res.status(400).json({ error: 'Student ID is required.' })
@@ -333,7 +333,7 @@ studentsRouter.patch(
   requireRole(['admin', 'high_rank', 'exam_officer']),
   async (req: Request, res: Response) => {
     const { user } = req
-    const { id }   = req.params
+    const id = String(req.params['id'] ?? '')
     const { status } = req.body as { status?: StudentStatus }
 
     if (!user || !id) {
@@ -370,7 +370,7 @@ studentsRouter.post(
   requireRole(['admin']),
   async (req: Request, res: Response) => {
     const { user } = req
-    const { id }   = req.params
+    const id = String(req.params['id'] ?? '')
     const { firebaseUid } = req.body as { firebaseUid?: string }
 
     if (!user || !id) {
@@ -405,7 +405,7 @@ studentsRouter.post(
   requirePermission('application.convertToStudent'),
   async (req: Request, res: Response) => {
     const { user }          = req
-    const { applicationId } = req.params
+    const applicationId = String(req.params['applicationId'] ?? '')
 
     if (!user || !applicationId) {
       res.status(400).json({ error: 'applicationId is required.' })
@@ -463,7 +463,7 @@ studentsRouter.get(
   requireAnyPermission(['student.viewFeeStatus', 'student.viewOwn']),
   async (req: Request, res: Response) => {
     const { user } = req
-    let { id }     = req.params
+    let id = String(req.params['id'] ?? '')
 
     if (!user) {
       res.status(401).json({ error: 'Not authenticated.' })
