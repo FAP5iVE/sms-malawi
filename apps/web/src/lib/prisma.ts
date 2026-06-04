@@ -4,40 +4,23 @@ import { neonConfig } from '@neondatabase/serverless'
 import { PrismaNeon } from '@prisma/adapter-neon'
 import { PrismaClient } from '@prisma/client'
 
-// ─── NEON SERVERLESS CONFIGURATION ───────────────────────
-// poolQueryViaFetch = true  →  each SQL query becomes an HTTP POST to
-// Neon's serverless driver endpoint.  No persistent TCP/WebSocket
-// connection is held between queries, which means zero connection
-// exhaustion across any number of concurrent Vercel Lambda invocations.
-//
-// fetchConnectionCache = true  →  Neon reuses the underlying HTTP
-// keep-alive connection within a single Lambda warm window, reducing
-// per-query latency without maintaining a real connection slot in PG.
+// ─── NEON SERVERLESS CONFIGURATION ──────────────────────────
 neonConfig.poolQueryViaFetch = true
-neonConfig.fetchConnectionCache = true
+// fetchConnectionCache is deprecated (now always true) — removed
 
-// ─── DEV LOGGING HELPER ───────────────────────────────────
+// ─── DEV LOGGING HELPER ──────────────────────────────────────
 type LogLevel = 'query' | 'info' | 'warn' | 'error'
-
 const devLogLevels: LogLevel[] = ['error', 'warn']
 const queryLogLevels: LogLevel[] = ['query', 'error', 'warn']
-
 function getLogLevels(): LogLevel[] {
   if (process.env.NODE_ENV === 'production') return devLogLevels
   if (process.env.PRISMA_QUERY_LOG === '1') return queryLogLevels
   return devLogLevels
 }
 
-// ─── CLIENT FACTORY ───────────────────────────────────────
+// ─── CLIENT FACTORY ──────────────────────────────────────────
 function createPrismaClient(): PrismaClient {
-
-  // Pool with HTTP mode — connection_limit=1 is intentional:
-  // each serverless invocation needs at most one logical connection.
-  // Neon's serverless driver multiplexes all queries from a single
-  // invocation through its connection pooler on the server side.
- 
   const adapter = new PrismaNeon({ connectionString: env.DATABASE_URL })
-
   const client = new PrismaClient({
     adapter,
     log: getLogLevels().map((level) => ({
@@ -46,7 +29,6 @@ function createPrismaClient(): PrismaClient {
     })),
   })
 
-  // Structured log events in development
   if (process.env.NODE_ENV !== 'production') {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(client as any).$on('error', (e: { message: string; target: string }) => {
@@ -58,30 +40,37 @@ function createPrismaClient(): PrismaClient {
     })
     if (process.env.PRISMA_QUERY_LOG === '1') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(client as any).$on(
-        'query',
-        (e: { query: string; duration: number }) => {
-          console.log(`[prisma:query] ${e.duration}ms — ${e.query}`)
-        }
-      )
+      ;(client as any).$on('query', (e: { query: string; duration: number }) => {
+        console.log(`[prisma:query] ${e.duration}ms — ${e.query}`)
+      })
     }
   }
 
   return client
 }
 
-// ─── GLOBAL SINGLETON ─────────────────────────────────────
-// In development, Next.js hot-reload re-evaluates modules on every
-// file change.  Without the global guard, each reload leaks a new
-// PrismaClient instance.  In production this is unnecessary but
-// harmless — each warm Lambda reuses the module-level instance.
+// ─── GLOBAL SINGLETON ────────────────────────────────────────
+// __prisma persists on globalThis across Next.js HMR re-evaluations in dev.
+// In production each warm Lambda reuses the same module-cached instance.
 const globalForPrisma = globalThis as unknown as {
   __prisma?: PrismaClient
 }
 
-export const prisma: PrismaClient =
-  globalForPrisma.__prisma ?? createPrismaClient()
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.__prisma = prisma
+function getPrismaInstance(): PrismaClient {
+  if (!globalForPrisma.__prisma) {
+    globalForPrisma.__prisma = createPrismaClient()
+  }
+  return globalForPrisma.__prisma
 }
+
+// Proxy defers createPrismaClient() — and therefore env.DATABASE_URL —
+// until the first property access at request time, not at module load.
+// All existing call sites (prisma.user.findMany, prisma.$transaction, etc.)
+// continue working with zero changes.
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_: PrismaClient, prop: string | symbol) {
+    const client = getPrismaInstance()
+    const val = (client as unknown as Record<string | symbol, unknown>)[prop]
+    return typeof val === 'function' ? (val as (...args: unknown[]) => unknown).bind(client) : val
+  },
+})
