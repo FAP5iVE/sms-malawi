@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { createStudent } from '@/server/services/studentService'
+import  {create as createStudent } from '@/server/services/studentService'
 import type { CreateApplicationInput, PublicApplicationInput } from '@shared/schemas/student'
 import { ApplicationStatus } from '@prisma/client'
 
