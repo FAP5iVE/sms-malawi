@@ -14,6 +14,7 @@ model Student {
   registrationNo   String   @unique          // auto-generated e.g. SMS-2025-0001
   firstName        String
   lastName         String
+  otherNames       String?
   dateOfBirth      DateTime
   sex              Sex
   nationality      String   @default("Malawian")
@@ -21,6 +22,7 @@ model Student {
   village          String?
   address          String?
   phone            String?
+  email            String?
   guardianName     String
   guardianPhone    String
   guardianRelation String
@@ -30,6 +32,7 @@ model Student {
   classId          String?
   class            Class?        @relation(fields: [classId], references: [id])
   borrowings       Borrowing[]
+  invoices         Invoice[]
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -244,6 +247,7 @@ model Invoice {
   status          InvoiceStatus   @default(UNPAID)
   dueDate         DateTime
   scholarshipId   String?
+  student         Student       @relation(fields: [studentId], references: [id])
   payments        Payment[]
   notes           InvoiceNote[]
   createdAt       DateTime        @default(now())

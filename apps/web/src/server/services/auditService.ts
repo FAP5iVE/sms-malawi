@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { logger } from '@/lib/logger'
 import type { UserRole } from '@shared/types/roles'
 
@@ -25,7 +26,7 @@ export type Severity = typeof SEVERITY[keyof typeof SEVERITY]
 //  Unmapped actions default to MEDIUM.
 // ─────────────────────────────────────────────────────────
 
-const ACTION_SEVERITY: Readonly<Record<string, Severity>> = {
+export const ACTION_SEVERITY: Readonly<Record<string, Severity>> = {
   // ── Auth / User management
   'auth.login_success':           SEVERITY.LOW,
   'auth.login_failed':            SEVERITY.HIGH,
@@ -343,7 +344,7 @@ export async function log(entry: AuditEntry): Promise<void> {
       entityId:   entry.entityId,
       actorUid:   entry.actorUid,
       actorRole:  entry.actorRole,
-      metadata:   (entry.metadata ?? null) as object | null,
+     metadata: (entry.metadata ?? Prisma.JsonNull) as Prisma.InputJsonValue,
     },
     select: { id: true }, // Minimal select — we don't use the returned row
   })
@@ -377,7 +378,7 @@ export function logAsync(entry: AuditEntry): void {
         entityId:   entry.entityId,
         actorUid:   entry.actorUid,
         actorRole:  entry.actorRole,
-        metadata:   (entry.metadata ?? null) as object | null,
+        metadata:   (entry.metadata ?? Prisma.JsonNull) as Prisma.InputJsonValue,
       },
       select: { id: true },
     })
@@ -407,7 +408,7 @@ export async function logBatch(entries: AuditEntry[]): Promise<void> {
           entityId:   entry.entityId,
           actorUid:   entry.actorUid,
           actorRole:  entry.actorRole,
-          metadata:   (entry.metadata ?? null) as object | null,
+          metadata: (entry.metadata ?? Prisma.JsonNull) as Prisma.InputJsonValue,
         },
         select: { id: true },
       })

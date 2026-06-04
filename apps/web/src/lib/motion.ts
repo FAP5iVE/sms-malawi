@@ -420,9 +420,6 @@ export const SCALE_POP_VARIANTS: Variants = {
 // ─────────────────────────────────────────────────────────────────────────────
 // REDUCED MOTION UTILITIES
 // ─────────────────────────────────────────────────────────────────────────────
-
-type VariantMap = Record<string, Record<string, unknown>>
-
 /**
  * Strips all spatial motion from a Variants map when reduced motion is active.
  * Returns a set of variants where every state is visually equivalent
@@ -435,13 +432,13 @@ type VariantMap = Record<string, Record<string, unknown>>
  *   const variants = reducedMotionVariants(motionEnabled, PAGE_VARIANTS)
  *   <motion.div variants={variants} initial="initial" animate="animate" />
  */
-export function reducedMotionVariants<T extends VariantMap>(
+export function reducedMotionVariants(
   motionEnabled: boolean,
-  variants: T,
-): T {
+  variants: Variants,
+): Variants {
   if (motionEnabled) return variants
 
-  const safe: VariantMap = {}
+  const safe: Variants = {}
   for (const key of Object.keys(variants)) {
     safe[key] = {
       opacity: 1,
@@ -452,7 +449,7 @@ export function reducedMotionVariants<T extends VariantMap>(
       transition: { duration: 0 },
     }
   }
-  return safe as T
+  return safe
 }
 
 /**

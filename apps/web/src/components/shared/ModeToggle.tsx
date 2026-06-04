@@ -58,7 +58,10 @@ export function ModeToggle({ showLabel = false, className }: ModeToggleProps) {
   // next-themes requires mounted state to avoid hydration mismatch —
   // the server doesn't know the user's stored theme preference.
   const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
+  useEffect(() => {
+   const id = requestAnimationFrame(() => setMounted(true))
+   return () => cancelAnimationFrame(id)
+  }, [])
 
   if (!mounted) {
     // Render an inert placeholder with the same dimensions to prevent

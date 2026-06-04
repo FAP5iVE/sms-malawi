@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { SETTING_KEYS, type SettingKey } from './settings'
+import { SETTING_KEYS, type SettingKey } from '../types/settings'
 
 // ─────────────────────────────────────────────────────────
 //  INDIVIDUAL VALUE SCHEMAS
@@ -9,9 +9,12 @@ const academicYearSchema = z
   .string()
   .regex(/^\d{4}\/\d{4}$/, 'Must be in "YYYY/YYYY" format, e.g. "2025/2026"')
   .refine((v) => {
-    const [start, end] = v.split('/').map(Number)
-    return end === start + 1
-  }, 'End year must be exactly one year after start year')
+  const parts = v.split('/').map(Number)
+  const start = parts[0]
+  const end   = parts[1]
+  if (start === undefined || end === undefined) return false
+  return end === start + 1
+}, 'End year must be exactly one year after start year')
 
 const termSchema = z.union([z.literal(1), z.literal(2), z.literal(3)])
 
@@ -55,14 +58,14 @@ const payeBracketsSchema = z
   .array(payeBracketSchema)
   .min(1, 'At least one PAYE bracket is required')
   .refine((brackets) => {
-    // Ensure brackets are in ascending order by minAnnualMwk
-    for (let i = 1; i < brackets.length; i++) {
-      if (brackets[i].minAnnualMwk <= brackets[i - 1].minAnnualMwk) {
-        return false
-      }
-    }
-    return true
-  }, 'PAYE brackets must be in ascending order of minAnnualMwk')
+  for (let i = 1; i < brackets.length; i++) {
+    const current  = brackets[i]
+    const previous = brackets[i - 1]
+    if (!current || !previous) return false
+    if (current.minAnnualMwk <= previous.minAnnualMwk) return false
+  }
+  return true
+}, 'PAYE brackets must be in ascending order of minAnnualMwk')
   .refine((brackets) => {
     // Exactly one bracket should have maxAnnualMwk = null (the top bracket)
     const topBrackets = brackets.filter((b) => b.maxAnnualMwk === null)

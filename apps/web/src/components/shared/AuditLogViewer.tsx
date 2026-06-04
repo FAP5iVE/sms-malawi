@@ -72,7 +72,7 @@ interface AuditLogViewerProps {
 //  SEVERITY CONFIG
 // ─────────────────────────────────────────────────────────
 
-const SEVERITY_CONFIG: Record
+const SEVERITY_CONFIG: Record<
   Severity,
   { label: string; badgeClass: string }
 > = {
@@ -110,9 +110,11 @@ function MetadataDiffRow({ row }: { row: AuditLogRow }) {
   return (
     <TableRow className="bg-muted/20">
       <TableCell colSpan={7} className="p-0">
-        <button
+                <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setExpanded((v) => !v)}
-          className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full text-left"
+          className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full justify-start h-auto"
           aria-expanded={expanded}
         >
           {expanded ? (
@@ -123,7 +125,7 @@ function MetadataDiffRow({ row }: { row: AuditLogRow }) {
           {changes && changes.length > 0
             ? `${changes.length} field${changes.length === 1 ? '' : 's'} changed`
             : 'View metadata'}
-        </button>
+        </Button>
 
         {expanded && (
           <div className="px-4 pb-3 space-y-3">
@@ -497,7 +499,6 @@ export function AuditLogViewer({
                 selected={dateFrom}
                 onSelect={(d) => { setDateFrom(d); setDateFromOpen(false); setPage(1) }}
                 disabled={{ after: dateTo ?? new Date() }}
-                initialFocus
               />
             </PopoverContent>
           </Popover>
@@ -516,7 +517,6 @@ export function AuditLogViewer({
                 selected={dateTo}
                 onSelect={(d) => { setDateTo(d); setDateToOpen(false); setPage(1) }}
                 disabled={{ before: dateFrom, after: new Date() }}
-                initialFocus
               />
             </PopoverContent>
           </Popover>

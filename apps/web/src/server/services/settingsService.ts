@@ -89,7 +89,8 @@ function parseValue<K extends SettingKey>(
     return SETTING_META[key].defaultValue
   }
   // Runtime validation ensures the stored JSON is still valid
-  const schema = SETTING_VALUE_SCHEMAS[key]
+  const schema = SETTING_VALUE_SCHEMAS[key as keyof typeof SETTING_VALUE_SCHEMAS]
+  if (!schema) return SETTING_META[key].defaultValue
   const result = schema.safeParse(rawValue)
   if (!result.success) {
     logger.warn(
@@ -210,13 +211,16 @@ export async function set<K extends SettingKey>(
 ): Promise<void> {
   // Runtime validation before writing to DB
   const schema = SETTING_VALUE_SCHEMAS[key]
-  const parsed = schema.safeParse(value)
-  if (!parsed.success) {
-    throw Object.assign(new Error(`Invalid value for setting "${key}".`), {
-      status: 400,
-      validationErrors: parsed.error.flatten(),
-    })
-  }
+    if (!schema) {
+    throw Object.assign(new Error(`No schema registered for setting "${key}".`), { status: 500 })
+    }
+    const parsed = schema.safeParse(value)
+    if (!parsed.success) {
+       throw Object.assign(new Error(`Invalid value for setting "${key}".`), {
+        status: 400,
+         validationErrors: parsed.error.flatten(),
+       })
+     }
 
   const meta = SETTING_META[key]
 
@@ -260,13 +264,19 @@ export async function setMany(
 
   for (const { key, value } of updates) {
     const schema = SETTING_VALUE_SCHEMAS[key]
-    const parsed = schema.safeParse(value)
-    if (!parsed.success) {
-      throw Object.assign(
-        new Error(`Invalid value for setting "${key}": ${parsed.error.message}`),
-        { status: 400, key, validationErrors: parsed.error.flatten() }
-      )
-    }
+  if (!schema) {
+     throw Object.assign(
+       new Error(`No schema registered for setting "${key}".`),
+       { status: 500, key }
+     )
+   }
+   const parsed = schema.safeParse(value)
+   if (!parsed.success) {
+     throw Object.assign(
+       new Error(`Invalid value for setting "${key}": ${parsed.error.message}`),
+       { status: 400, key, validationErrors: parsed.error.flatten() }
+     )
+   }
     validated.push({ key, value: parsed.data })
   }
 

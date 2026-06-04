@@ -1,3 +1,6 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
 CREATE TYPE "StudentStatus" AS ENUM ('ACTIVE', 'AWAITING_MANEB_RESULTS', 'GRADUATED', 'ARCHIVED');
 
@@ -79,6 +82,9 @@ CREATE TYPE "BorrowStatus" AS ENUM ('ACTIVE', 'RETURNED', 'OVERDUE', 'LOST');
 -- CreateEnum
 CREATE TYPE "DigitalResType" AS ENUM ('EBOOK', 'PAST_PAPER', 'REFERENCE', 'STUDY_GUIDE');
 
+-- CreateEnum
+CREATE TYPE "PendingActionStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED');
+
 -- CreateTable
 CREATE TABLE "students" (
     "id" TEXT NOT NULL,
@@ -96,6 +102,7 @@ CREATE TABLE "students" (
     "guardianPhone" TEXT NOT NULL,
     "guardianRelation" TEXT NOT NULL,
     "photoKey" TEXT,
+    "firebaseUid" TEXT,
     "status" "StudentStatus" NOT NULL DEFAULT 'ACTIVE',
     "classId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -683,14 +690,54 @@ CREATE TABLE "user_notification_prefs" (
     CONSTRAINT "user_notification_prefs_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "pending_actions" (
+    "id" TEXT NOT NULL,
+    "entityType" TEXT NOT NULL,
+    "entityId" TEXT NOT NULL,
+    "action" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "requestedByUid" TEXT NOT NULL,
+    "requestedByRole" TEXT NOT NULL,
+    "targetState" JSONB,
+    "status" "PendingActionStatus" NOT NULL DEFAULT 'PENDING',
+    "reviewedByUid" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "reviewNotes" TEXT,
+    "expiresAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "pending_actions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "system_settings" (
+    "key" TEXT NOT NULL,
+    "value" JSONB NOT NULL,
+    "description" TEXT,
+    "category" TEXT NOT NULL DEFAULT 'system',
+    "isPublic" BOOLEAN NOT NULL DEFAULT false,
+    "updatedByUid" TEXT,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "system_settings_pkey" PRIMARY KEY ("key")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "students_registrationNo_key" ON "students"("registrationNo");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "students_firebaseUid_key" ON "students"("firebaseUid");
 
 -- CreateIndex
 CREATE INDEX "students_classId_idx" ON "students"("classId");
 
 -- CreateIndex
 CREATE INDEX "students_status_idx" ON "students"("status");
+
+-- CreateIndex
+CREATE INDEX "students_firebaseUid_idx" ON "students"("firebaseUid");
 
 -- CreateIndex
 CREATE INDEX "classes_form_idx" ON "classes"("form");
@@ -869,6 +916,21 @@ CREATE INDEX "digital_resources_form_subject_idx" ON "digital_resources"("form",
 -- CreateIndex
 CREATE UNIQUE INDEX "user_notification_prefs_uid_key" ON "user_notification_prefs"("uid");
 
+-- CreateIndex
+CREATE INDEX "pending_actions_status_idx" ON "pending_actions"("status");
+
+-- CreateIndex
+CREATE INDEX "pending_actions_entityType_entityId_idx" ON "pending_actions"("entityType", "entityId");
+
+-- CreateIndex
+CREATE INDEX "pending_actions_requestedByUid_idx" ON "pending_actions"("requestedByUid");
+
+-- CreateIndex
+CREATE INDEX "pending_actions_createdAt_idx" ON "pending_actions"("createdAt");
+
+-- CreateIndex
+CREATE INDEX "system_settings_category_idx" ON "system_settings"("category");
+
 -- AddForeignKey
 ALTER TABLE "students" ADD CONSTRAINT "students_classId_fkey" FOREIGN KEY ("classId") REFERENCES "classes"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -922,3 +984,4 @@ ALTER TABLE "borrowings" ADD CONSTRAINT "borrowings_studentId_fkey" FOREIGN KEY 
 
 -- AddForeignKey
 ALTER TABLE "borrowings" ADD CONSTRAINT "borrowings_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "staff_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

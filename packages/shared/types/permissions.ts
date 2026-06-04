@@ -125,6 +125,7 @@ export type Permission =
   | 'finance.manageInstallmentPlans' // Create / edit installment plans
   | 'finance.viewLibraryFines'       // View library fines in finance module
   | 'finance.clearLibraryFine'       // Mark a library fine as paid
+  | 'finance.waiveFine'              // Waive a library fine (finance + library coordination)
   | 'finance.viewOwnStatement'       // View own fee statement (student)
   | 'finance.runPayroll'             // Process monthly payroll run
   | 'finance.approvePayroll'         // Approve a completed payroll run (high_rank)

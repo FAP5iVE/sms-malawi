@@ -4,7 +4,7 @@ import { prisma }                  from '@/lib/prisma'
 import { logger }                  from '@/lib/logger'
 import * as auditService           from '@/server/services/auditService'
 import { sendPendingActionCreated }from '@/server/services/notificationService'
-import type { PendingActionStatus } from '@prisma/client'
+import {Prisma, type PendingActionStatus } from '@prisma/client'
 import type { UserRole }           from '@shared/types/roles'
 
 // ─────────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ export async function create(
       description:    input.description,
       requestedByUid: input.requestedByUid,
       requestedByRole:input.requestedByRole,
-      targetState:    (input.targetState ?? null) as object | null,
+      targetState: (input.targetState ?? Prisma.JsonNull) as Prisma.InputJsonValue,
       status:         'PENDING',
       expiresAt:      input.expiresAt ? new Date(input.expiresAt) : null,
     },

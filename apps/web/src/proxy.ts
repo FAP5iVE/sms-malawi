@@ -128,7 +128,7 @@ function getAllowedRoles(pathname: string): readonly UserRole[] | null {
     .filter((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
     .sort((a, b) => b.length - a.length)[0]
 
-  return match ? PAGE_ROLES[match] : null
+  return match ? (PAGE_ROLES[match] ?? null) : null
 }
 
 function buildRedirect(request: NextRequest, destination: string): NextResponse {

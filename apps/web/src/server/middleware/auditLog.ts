@@ -1,7 +1,7 @@
 import 'server-only'
 
 import type { Request, Response, NextFunction } from 'express'
-import { logAsync, log, type AuditEntry, type AuditMetadata, SEVERITY, ACTION_SEVERITY } from '@/server/services/auditService'
+import { logAsync, log, type AuditEntry, type Severity, SEVERITY, ACTION_SEVERITY } from '@/server/services/auditService'
 
 // ─────────────────────────────────────────────────────────
 //  TYPE AUGMENTATION
@@ -99,9 +99,9 @@ export function auditResponseInterceptor(
         actorRole,
       }
 
-      const isCritical = [SEVERITY.CRITICAL, SEVERITY.HIGH].includes(
-        ACTION_SEVERITY[pendingEntry.entry.action] ?? SEVERITY.MEDIUM
-      )
+     const isCritical = (
+      [SEVERITY.CRITICAL, SEVERITY.HIGH] as Severity[]
+      ).includes(ACTION_SEVERITY[pendingEntry.entry.action] ?? SEVERITY.MEDIUM)
 
       if (pendingEntry.synchronous || isCritical) {
         // Cannot await in a sync function — schedule immediately
@@ -189,7 +189,7 @@ export function auditPatch(action: string, entityType: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const actorUid  = req.user?.uid  ?? 'anonymous'
     const actorRole = req.user?.role ?? 'unknown'
-    const entityId  = req.params['id'] ?? req.params['studentId'] ?? 'unknown'
+    const entityId = String(req.params['id'] ?? req.params['studentId'] ?? 'unknown')
     const requestBody = req.body as Record<string, unknown>
 
     const originalJson = res.json.bind(res)
@@ -232,7 +232,7 @@ export function auditDelete(action: string, entityType: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const actorUid  = req.user?.uid  ?? 'anonymous'
     const actorRole = req.user?.role ?? 'unknown'
-    const entityId  = req.params['id'] ?? 'unknown'
+    const entityId = String(req.params['id'] ?? 'unknown')
 
     const originalJson = res.json.bind(res)
     res.json = function (body: unknown) {

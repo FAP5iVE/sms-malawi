@@ -329,7 +329,7 @@ export async function list(
   ])
 
   const students: ApiStudentSummary[] = rows.map((row) => {
-    const latestInvoice  = row.invoices[0]
+    const latestInvoice  = row.invoices[0] as { balance: Prisma.Decimal | number; totalAmount: Prisma.Decimal | number } | undefined
     const feeBalance     = latestInvoice ? Number(latestInvoice.balance)     : 0
     const feeTotal       = latestInvoice ? Number(latestInvoice.totalAmount)  : 0
 
@@ -409,7 +409,7 @@ export async function getById(id: string): Promise<ApiStudentDetail | null> {
 
   if (!row) return null
 
-  const latestInvoice  = row.invoices[0]
+  const latestInvoice  = row.invoices[0] as { balance: Prisma.Decimal | number; totalAmount: Prisma.Decimal | number } | undefined
   const feeBalance     = latestInvoice ? Number(latestInvoice.balance)    : 0
   const feeTotal       = latestInvoice ? Number(latestInvoice.totalAmount) : 0
 
@@ -557,7 +557,7 @@ export async function update(
     throw Object.assign(new Error('Student not found.'), { status: 404 })
   }
 
-  const updateData: Prisma.StudentUpdateInput = {}
+  const updateData: Prisma.StudentUncheckedUpdateInput = {}
   if (input.firstName        !== undefined) updateData.firstName        = input.firstName
   if (input.lastName         !== undefined) updateData.lastName         = input.lastName
   if (input.otherNames       !== undefined) updateData.otherNames       = input.otherNames

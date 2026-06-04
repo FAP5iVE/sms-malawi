@@ -363,25 +363,28 @@ export async function sendEmail(
   }
 
   // ── Build Resend payload
-  const payload: Parameters<typeof client.emails.send>[0] = {
-    from:     input.from    ?? FROM,
-    to:       recipients,
-    subject:  input.subject,
-    reply_to: input.replyTo ?? REPLY_TO,
-    ...(input.html ? { html: input.html } : {}),
-    ...(input.text ? { text: input.text } : {}),
-    ...(input.cc   ? { cc:   normaliseRecipients(input.cc)  } : {}),
-    ...(input.bcc  ? { bcc:  normaliseRecipients(input.bcc) } : {}),
-    ...(input.tags        ? { tags:    input.tags        } : {}),
-    ...(input.headers     ? { headers: input.headers     } : {}),
-    ...(input.attachments ? {
-      attachments: input.attachments.map((a) => ({
-        filename:     a.filename,
-        content:      a.content,
-        content_type: a.contentType,
-      })),
-    } : {}),
-  }
+const base = {
+  from:     input.from    ?? FROM,
+  to:       recipients,
+  subject:  input.subject,
+  reply_to: input.replyTo ?? REPLY_TO,
+  ...(input.cc      ? { cc:      normaliseRecipients(input.cc)  } : {}),
+  ...(input.bcc     ? { bcc:     normaliseRecipients(input.bcc) } : {}),
+  ...(input.tags    ? { tags:    input.tags                     } : {}),
+  ...(input.headers ? { headers: input.headers                  } : {}),
+  ...(input.attachments ? {
+    attachments: input.attachments.map((a) => ({
+      filename:     a.filename,
+      content:      a.content,
+      content_type: a.contentType,
+    })),
+  } : {}),
+}
+
+// Satisfy the discriminated union — provide html, text, or both
+const payload: Parameters<typeof client.emails.send>[0] = input.html
+  ? { ...base, html: input.html, ...(input.text ? { text: input.text } : {}) }
+  : { ...base, text: input.text! }
 
   // ── Send with retry loop
   let lastError: unknown = null

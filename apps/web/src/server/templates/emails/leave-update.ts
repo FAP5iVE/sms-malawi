@@ -27,7 +27,7 @@ const LEAVE_TYPE_LABELS: Record<string, string> = {
   EMERGENCY: 'Emergency Leave',
 }
 
-const STATUS_CONFIG: Record
+const STATUS_CONFIG: Record<
   LeaveUpdateStatus,
   { label: string; color: string; emoji: string; headerColor: string }
 > = {

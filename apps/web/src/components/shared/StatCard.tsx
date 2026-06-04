@@ -138,7 +138,7 @@ export function StatCard({
 
   const cardVariants = motionEnabled
     ? {
-        hidden: STAT_CARD_VARIANTS.hidden,
+        hidden: STAT_CARD_VARIANTS.hidden ?? { opacity: 0, y: 12, scale: 0.97 },
         visible: {
           ...STAT_CARD_VARIANTS.visible as object,
           transition: cardTransition,

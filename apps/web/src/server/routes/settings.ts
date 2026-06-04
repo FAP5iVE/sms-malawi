@@ -28,7 +28,6 @@ const CATEGORY_UPDATE_PERMISSION: Record<SettingCategory, Permission> = {
   hr:             'settings.manageHRConfig',
   security:       'settings.manageSecurityConfig',
   system:         'settings.manageSystemConfig',
-  notification:   'settings.updateNotifPrefs',
 }
 
 // ─────────────────────────────────────────────────────────
@@ -157,6 +156,10 @@ settingsRouter.patch(
 
     // Validate the incoming value against the setting's Zod schema
     const schema = SETTING_VALUE_SCHEMAS[key]
+    if (!schema) {
+        res.status(500).json({ error: `No schema registered for setting "${key}".` })
+        return
+      }
     const parsed = schema.safeParse(req.body.value)
     if (!parsed.success) {
       res.status(400).json({

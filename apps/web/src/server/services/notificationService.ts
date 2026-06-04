@@ -13,12 +13,24 @@ import {
 import { getIdentitySettings } from '@/server/services/settingsService'
 import type { SchoolBranding } from '@/server/templates/emails/base'
 
-import { renderFeeReminder,     type FeeReminderData     } from '@/server/templates/emails/fee-reminder'
-import { renderResultRelease,   type ResultReleaseData   } from '@/server/templates/emails/result-release'
-import { renderLeaveUpdate,     type LeaveUpdateData     } from '@/server/templates/emails/leave-update'
-import { renderContractAlert,   type ContractAlertData   } from '@/server/templates/emails/contract-alert'
-import { renderOverdueLibrary,  type OverdueLibraryData  } from '@/server/templates/emails/overdue-library'
-import { renderAnnouncement,    type AnnouncementEmailData } from '@/server/templates/emails/announcement'
+import { renderFeeReminder, type FeeReminderData } from '@/server/templates/emails/fee-reminder'
+import {
+  renderResultRelease,
+  type ResultReleaseData,
+} from '@/server/templates/emails/result-release'
+import { renderLeaveUpdate, type LeaveUpdateData } from '@/server/templates/emails/leave-update'
+import {
+  renderContractAlert,
+  type ContractAlertData,
+} from '@/server/templates/emails/contract-alert'
+import {
+  renderOverdueLibrary,
+  type OverdueLibraryData,
+} from '@/server/templates/emails/overdue-library'
+import {
+  renderAnnouncement,
+  type AnnouncementEmailData,
+} from '@/server/templates/emails/announcement'
 
 // ─────────────────────────────────────────────────────────
 //  TYPES
@@ -26,31 +38,43 @@ import { renderAnnouncement,    type AnnouncementEmailData } from '@/server/temp
 
 export interface NotificationResult {
   emailResult?: EmailResult
-  pushResult?:  PushResult
-  smsSent:      boolean
-  skipped:      boolean
-  skipReason?:  string
+  pushResult?: PushResult
+  smsSent: boolean
+  skipped: boolean
+  skipReason?: string
 }
 
 export interface BulkNotificationResult {
-  sent:    number
+  sent: number
   skipped: number
-  failed:  number
+  failed: number
   results: NotificationResult[]
 }
 
 /** Default prefs — used when no UserNotificationPref row exists for a user. */
-const DEFAULT_PREFS = {
-  emailFeeReminder:    true,
-  emailLeaveUpdate:    true,
-  emailResultRelease:  true,
-  emailContractAlert:  true,
-  emailAnnouncement:   true,
-  smsFeeReminder:      false,
-  smsResultRelease:    false,
-  pushAnnouncement:    true,
-  pushResultRelease:   true,
-} as const
+interface NotifPrefs {
+  emailFeeReminder: boolean
+  emailLeaveUpdate: boolean
+  emailResultRelease: boolean
+  emailContractAlert: boolean
+  emailAnnouncement: boolean
+  smsFeeReminder: boolean
+  smsResultRelease: boolean
+  pushAnnouncement: boolean
+  pushResultRelease: boolean
+}
+
+const DEFAULT_PREFS: NotifPrefs = {
+  emailFeeReminder: true,
+  emailLeaveUpdate: true,
+  emailResultRelease: true,
+  emailContractAlert: true,
+  emailAnnouncement: true,
+  smsFeeReminder: false,
+  smsResultRelease: false,
+  pushAnnouncement: true,
+  pushResultRelease: true,
+}
 
 // ─────────────────────────────────────────────────────────
 //  INTERNAL HELPERS
@@ -60,7 +84,7 @@ const DEFAULT_PREFS = {
  * Fetch a user's notification preferences.
  * Returns DEFAULT_PREFS if no record exists.
  */
-async function getPrefs(uid: string): Promise<typeof DEFAULT_PREFS> {
+async function getPrefs(uid: string): Promise<NotifPrefs> {
   try {
     const row = await prisma.userNotificationPref.findUnique({
       where: { uid },
@@ -68,15 +92,15 @@ async function getPrefs(uid: string): Promise<typeof DEFAULT_PREFS> {
     if (!row) return DEFAULT_PREFS
 
     return {
-      emailFeeReminder:    row.emailFeeReminder,
-      emailLeaveUpdate:    row.emailLeaveUpdate,
-      emailResultRelease:  row.emailResultRelease,
-      emailContractAlert:  row.emailContractAlert,
-      emailAnnouncement:   row.emailAnnouncement,
-      smsFeeReminder:      row.smsFeeReminder,
-      smsResultRelease:    row.smsResultRelease,
-      pushAnnouncement:    row.pushAnnouncement,
-      pushResultRelease:   row.pushResultRelease,
+      emailFeeReminder: row.emailFeeReminder,
+      emailLeaveUpdate: row.emailLeaveUpdate,
+      emailResultRelease: row.emailResultRelease,
+      emailContractAlert: row.emailContractAlert,
+      emailAnnouncement: row.emailAnnouncement,
+      smsFeeReminder: row.smsFeeReminder,
+      smsResultRelease: row.smsResultRelease,
+      pushAnnouncement: row.pushAnnouncement,
+      pushResultRelease: row.pushResultRelease,
     }
   } catch (err) {
     logger.error({ err, uid }, '[notificationService] Failed to fetch prefs — using defaults')
@@ -93,20 +117,20 @@ async function getSchoolBranding(): Promise<SchoolBranding> {
     const identity = await getIdentitySettings()
     const loginUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://school.mw'
     return {
-      schoolName:    identity.schoolName,
+      schoolName: identity.schoolName,
       schoolAddress: identity.schoolAddress,
-      schoolEmail:   identity.schoolEmail,
-      schoolPhone:   identity.schoolPhone,
+      schoolEmail: identity.schoolEmail,
+      schoolPhone: identity.schoolPhone,
       loginUrl,
     }
   } catch (err) {
     logger.error({ err }, '[notificationService] Failed to load school branding — using fallbacks')
     return {
-      schoolName:    'School Management System',
+      schoolName: 'School Management System',
       schoolAddress: 'Malawi',
-      schoolEmail:   'info@school.mw',
-      schoolPhone:   '',
-      loginUrl:      process.env.NEXT_PUBLIC_APP_URL ?? 'https://school.mw',
+      schoolEmail: 'info@school.mw',
+      schoolPhone: '',
+      loginUrl: process.env.NEXT_PUBLIC_APP_URL ?? 'https://school.mw',
     }
   }
 }
@@ -132,38 +156,34 @@ function attemptSms(to: string, message: string, purpose: string): boolean {
 
 export interface FeeReminderParams {
   /** Recipient email address. Typically the guardian's or student's email. */
-  to:           string
+  to: string
   /** Firebase UID of the student — used to look up push pref. */
-  studentUid?:  string
+  studentUid?: string
   /** Guardian phone number for optional SMS. E.164 format. */
   guardianPhone?: string
-  data:         FeeReminderData
+  data: FeeReminderData
 }
 
 /**
  * Send a fee reminder notification.
  * Channels: email (always), SMS (if configured + pref), push (if pref).
  */
-export async function sendFeeReminder(
-  params: FeeReminderParams
-): Promise<NotificationResult> {
+export async function sendFeeReminder(params: FeeReminderParams): Promise<NotificationResult> {
   const result: NotificationResult = { smsSent: false, skipped: false }
 
-  const prefs = params.studentUid
-    ? await getPrefs(params.studentUid)
-    : DEFAULT_PREFS
+  const prefs = params.studentUid ? await getPrefs(params.studentUid) : DEFAULT_PREFS
 
   const school = await getSchoolBranding()
 
   // ── Email
   if (prefs.emailFeeReminder) {
-    const msg  = renderFeeReminder(params.data, school)
+    const msg = renderFeeReminder(params.data, school)
     const emailResult = await sendEmail({
-      to:      params.to,
+      to: params.to,
       subject: msg.subject,
-      html:    msg.html,
-      text:    msg.text,
-      tags:    [{ name: 'type', value: 'fee_reminder' }],
+      html: msg.html,
+      text: msg.text,
+      tags: [{ name: 'type', value: 'fee_reminder' }],
     })
     result.emailResult = emailResult
 
@@ -174,7 +194,7 @@ export async function sendFeeReminder(
       )
     }
   } else {
-    result.skipped    = true
+    result.skipped = true
     result.skipReason = 'emailFeeReminder preference is off'
   }
 
@@ -192,32 +212,30 @@ export async function sendFeeReminder(
 // ─────────────────────────────────────────────────────────
 
 export interface ResultReleaseParams {
-  to:          string
+  to: string
   studentUid?: string
-  data:        ResultReleaseData
+  data: ResultReleaseData
 }
 
 /**
  * Notify a student that their term results have been released.
  * Channels: email + push (based on pref).
  */
-export async function sendResultRelease(
-  params: ResultReleaseParams
-): Promise<NotificationResult> {
+export async function sendResultRelease(params: ResultReleaseParams): Promise<NotificationResult> {
   const result: NotificationResult = { smsSent: false, skipped: false }
 
-  const prefs  = params.studentUid ? await getPrefs(params.studentUid) : DEFAULT_PREFS
+  const prefs = params.studentUid ? await getPrefs(params.studentUid) : DEFAULT_PREFS
   const school = await getSchoolBranding()
 
   // ── Email
   if (prefs.emailResultRelease) {
-    const msg  = renderResultRelease(params.data, school)
+    const msg = renderResultRelease(params.data, school)
     const emailResult = await sendEmail({
-      to:      params.to,
+      to: params.to,
       subject: msg.subject,
-      html:    msg.html,
-      text:    msg.text,
-      tags:    [{ name: 'type', value: 'result_release' }],
+      html: msg.html,
+      text: msg.text,
+      tags: [{ name: 'type', value: 'result_release' }],
     })
     result.emailResult = emailResult
   }
@@ -225,13 +243,13 @@ export async function sendResultRelease(
   // ── Push
   if (prefs.pushResultRelease && params.studentUid) {
     const pushPayload: PushNotificationPayload = {
-      title:       'Results Released',
-      body:        `Your Term ${params.data.term} ${params.data.academicYear} results are now available.`,
+      title: 'Results Released',
+      body: `Your Term ${params.data.term} ${params.data.academicYear} results are now available.`,
       clickAction: '/exams',
-      tag:         `results_term${params.data.term}_${params.data.academicYear.replace('/', '_')}`,
+      tag: `results_term${params.data.term}_${params.data.academicYear.replace('/', '_')}`,
       data: {
-        type:        'result_release',
-        term:        String(params.data.term),
+        type: 'result_release',
+        term: String(params.data.term),
         academicYear: params.data.academicYear,
       },
     }
@@ -253,21 +271,19 @@ export async function sendResultRelease(
 // ─────────────────────────────────────────────────────────
 
 export interface LeaveUpdateParams {
-  to:       string
+  to: string
   staffUid: string
-  data:     LeaveUpdateData
+  data: LeaveUpdateData
 }
 
 /**
  * Notify a staff member that their leave request status has changed.
  * Channel: email only (based on pref).
  */
-export async function sendLeaveUpdate(
-  params: LeaveUpdateParams
-): Promise<NotificationResult> {
+export async function sendLeaveUpdate(params: LeaveUpdateParams): Promise<NotificationResult> {
   const result: NotificationResult = { smsSent: false, skipped: false }
 
-  const prefs  = await getPrefs(params.staffUid)
+  const prefs = await getPrefs(params.staffUid)
   const school = await getSchoolBranding()
 
   if (!prefs.emailLeaveUpdate) {
@@ -276,12 +292,12 @@ export async function sendLeaveUpdate(
 
   const msg = renderLeaveUpdate(params.data, school)
   const emailResult = await sendEmail({
-    to:      params.to,
+    to: params.to,
     subject: msg.subject,
-    html:    msg.html,
-    text:    msg.text,
-    tags:    [
-      { name: 'type',   value: 'leave_update' },
+    html: msg.html,
+    text: msg.text,
+    tags: [
+      { name: 'type', value: 'leave_update' },
       { name: 'status', value: params.data.status },
     ],
   })
@@ -296,19 +312,17 @@ export async function sendLeaveUpdate(
 
 export interface ContractAlertParams {
   /** HR team email address. */
-  to:      string | string[]
+  to: string | string[]
   /** HR staff UIDs — used to check pref (uses union — sends if ANY hr uid has pref on). */
   hrUids?: string[]
-  data:    ContractAlertData
+  data: ContractAlertData
 }
 
 /**
  * Send a contract expiry alert to the HR team.
  * Channels: email (always — contract alerts bypass individual prefs for HR team).
  */
-export async function sendContractAlert(
-  params: ContractAlertParams
-): Promise<NotificationResult> {
+export async function sendContractAlert(params: ContractAlertParams): Promise<NotificationResult> {
   const result: NotificationResult = { smsSent: false, skipped: false }
   const school = await getSchoolBranding()
 
@@ -317,11 +331,11 @@ export async function sendContractAlert(
 
   if (recipients.length === 1) {
     const emailResult = await sendEmail({
-      to:      recipients[0]!,
+      to: recipients[0]!,
       subject: msg.subject,
-      html:    msg.html,
-      text:    msg.text,
-      tags:    [{ name: 'type', value: 'contract_alert' }],
+      html: msg.html,
+      text: msg.text,
+      tags: [{ name: 'type', value: 'contract_alert' }],
     })
     result.emailResult = emailResult
   } else {
@@ -330,9 +344,9 @@ export async function sendContractAlert(
       emails: recipients.map((to) => ({
         to,
         subject: msg.subject,
-        html:    msg.html,
-        text:    msg.text,
-        tags:    [{ name: 'type', value: 'contract_alert' }],
+        html: msg.html,
+        text: msg.text,
+        tags: [{ name: 'type', value: 'contract_alert' }],
       })),
       continueOnError: true,
     })
@@ -348,9 +362,9 @@ export async function sendContractAlert(
 // ─────────────────────────────────────────────────────────
 
 export interface OverdueLibraryParams {
-  to:           string
+  to: string
   borrowerUid?: string
-  data:         OverdueLibraryData
+  data: OverdueLibraryData
 }
 
 /**
@@ -367,11 +381,11 @@ export async function sendOverdueLibraryWarning(
 
   const msg = renderOverdueLibrary(params.data, school)
   const emailResult = await sendEmail({
-    to:      params.to,
+    to: params.to,
     subject: msg.subject,
-    html:    msg.html,
-    text:    msg.text,
-    tags:    [{ name: 'type', value: 'overdue_library' }],
+    html: msg.html,
+    text: msg.text,
+    tags: [{ name: 'type', value: 'overdue_library' }],
   })
   result.emailResult = emailResult
 
@@ -384,12 +398,12 @@ export async function sendOverdueLibraryWarning(
 
 export interface AnnouncementNotifParams {
   /** Individual email addresses of recipients. */
-  emails:     string[]
+  emails: string[]
   /** Firebase UIDs — used for push notification delivery. */
-  uids?:      string[]
+  uids?: string[]
   /** Optional FCM topic to use instead of individual uid sends. */
-  topic?:     string
-  data:       AnnouncementEmailData
+  topic?: string
+  data: AnnouncementEmailData
   /**
    * When true, each recipient's pushAnnouncement preference is checked
    * before sending push. Default: true.
@@ -408,21 +422,21 @@ export async function sendAnnouncementNotification(
   params: AnnouncementNotifParams
 ): Promise<BulkNotificationResult> {
   const checkPrefs = params.checkPrefs ?? true
-  const school     = await getSchoolBranding()
-  const msg        = renderAnnouncement(params.data, school)
+  const school = await getSchoolBranding()
+  const msg = renderAnnouncement(params.data, school)
 
-  let sent    = 0
+  let sent = 0
   let skipped = 0
-  let failed  = 0
+  let failed = 0
   const results: NotificationResult[] = []
 
   // ── Email batch
   const emailInputs: SendEmailInput[] = params.emails.map((to) => ({
     to,
     subject: msg.subject,
-    html:    msg.html,
-    text:    msg.text,
-    tags:    [{ name: 'type', value: 'announcement' }],
+    html: msg.html,
+    text: msg.text,
+    tags: [{ name: 'type', value: 'announcement' }],
   }))
 
   if (emailInputs.length > 0) {
@@ -430,13 +444,13 @@ export async function sendAnnouncementNotification(
       emails: emailInputs,
       continueOnError: true,
     })
-    sent    += batchResult.successCount
-    failed  += batchResult.failureCount
+    sent += batchResult.successCount
+    failed += batchResult.failureCount
     results.push(
       ...batchResult.results.map((r) => ({
         emailResult: r,
-        smsSent:     false,
-        skipped:     false,
+        smsSent: false,
+        skipped: false,
       }))
     )
   }
@@ -444,12 +458,12 @@ export async function sendAnnouncementNotification(
   // ── Push — topic mode (preferred for large groups)
   if (params.topic) {
     const pushPayload: PushNotificationPayload = {
-      title:       params.data.title,
-      body:        params.data.body.slice(0, 200),
+      title: params.data.title,
+      body: params.data.body.slice(0, 200),
       clickAction: '/announcements',
-      tag:         `announcement_${params.data.announcementId}`,
+      tag: `announcement_${params.data.announcementId}`,
       data: {
-        type:           'announcement',
+        type: 'announcement',
         announcementId: params.data.announcementId,
       },
     }
@@ -461,12 +475,14 @@ export async function sendAnnouncementNotification(
     }
     results.push({
       pushResult: {
-        ok:          topicResult.ok,
-        uid:         params.topic,
-        sentCount:   topicResult.ok ? 1 : 0,
+        ok: topicResult.ok,
+        uid: params.topic,
+        sentCount: topicResult.ok ? 1 : 0,
         failedCount: topicResult.ok ? 0 : 1,
-        messageIds:  topicResult.messageId ? [topicResult.messageId] : [],
-        ...(!topicResult.ok ? { error: topicResult.error ?? 'Topic send failed', code: 'FCM_API_ERROR' } : {}),
+        messageIds: topicResult.messageId ? [topicResult.messageId] : [],
+        ...(!topicResult.ok
+          ? { error: topicResult.error ?? 'Topic send failed', code: 'FCM_API_ERROR' }
+          : {}),
       } as PushResult,
       smsSent: false,
       skipped: false,
@@ -483,12 +499,12 @@ export async function sendAnnouncementNotification(
       }
 
       const pushPayload: PushNotificationPayload = {
-        title:       params.data.title,
-        body:        params.data.body.slice(0, 200),
+        title: params.data.title,
+        body: params.data.body.slice(0, 200),
         clickAction: '/announcements',
-        tag:         `announcement_${params.data.announcementId}`,
+        tag: `announcement_${params.data.announcementId}`,
         data: {
-          type:           'announcement',
+          type: 'announcement',
           announcementId: params.data.announcementId,
         },
       }
@@ -500,7 +516,8 @@ export async function sendAnnouncementNotification(
       } else {
         failed++
       }
-      results.push({ pushResult, smsSent: false, skipped: pushResult.code === 'NO_TOKENS' })
+      const isNoTokens = !pushResult.ok && pushResult.code === 'NO_TOKENS'
+      results.push({ pushResult, smsSent: false, skipped: isNoTokens })
     }
   }
 
@@ -513,14 +530,14 @@ export async function sendAnnouncementNotification(
 
 export interface PendingActionParams {
   /** Firebase UIDs of the reviewers (admin, high_rank) to notify. */
-  reviewerUids:   string[]
+  reviewerUids: string[]
   /** Email addresses corresponding to reviewerUids. */
   reviewerEmails: string[]
-  action:         string
-  entityType:     string
-  entityId:       string
-  requestedBy:    string
-  description:    string
+  action: string
+  entityType: string
+  entityId: string
+  requestedBy: string
+  description: string
 }
 
 /**
@@ -532,10 +549,10 @@ export interface PendingActionParams {
 export async function sendPendingActionCreated(
   params: PendingActionParams
 ): Promise<BulkNotificationResult> {
-  const school   = await getSchoolBranding()
+  const school = await getSchoolBranding()
   const loginUrl = `${school.loginUrl}/user-management`
 
-  const subject  = `⏳ Action pending your approval — ${params.entityType}: ${params.action}`
+  const subject = `⏳ Action pending your approval — ${params.entityType}: ${params.action}`
   const htmlBody = `
     <p>A new action requires your approval in the ${school.schoolName} portal.</p>
     <table style="width:100%;border-collapse:collapse;margin:16px 0;">
@@ -548,35 +565,38 @@ export async function sendPendingActionCreated(
   `
   const textBody = `A pending action requires your approval.\n\nAction: ${params.action}\nEntity: ${params.entityType} (${params.entityId})\nRequested By: ${params.requestedBy}\nDescription: ${params.description}\n\nLog in to review: ${loginUrl}`
 
-  let sent = 0; let failed = 0; let skipped = 0
+  let sent = 0
+  let failed = 0
+  const skipped = 0
   const results: NotificationResult[] = []
 
   for (let i = 0; i < params.reviewerEmails.length; i++) {
     const email = params.reviewerEmails[i]
-    const uid   = params.reviewerUids[i]
+    const uid = params.reviewerUids[i]
 
     if (!email) continue
 
     const emailResult = await sendEmail({
-      to:      email,
+      to: email,
       subject,
-      html:    `<div style="font-family:Arial,sans-serif;max-width:600px;color:#374151;">${htmlBody}<p><a href="${loginUrl}" style="background:#1e3a5f;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">Review Pending Action</a></p></div>`,
-      text:    textBody,
-      tags:    [{ name: 'type', value: 'pending_action' }],
+      html: `<div style="font-family:Arial,sans-serif;max-width:600px;color:#374151;">${htmlBody}<p><a href="${loginUrl}" style="background:#1e3a5f;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">Review Pending Action</a></p></div>`,
+      text: textBody,
+      tags: [{ name: 'type', value: 'pending_action' }],
     })
 
-    if (emailResult.ok) sent++; else failed++
+    if (emailResult.ok) sent++
+    else failed++
 
     const notifResult: NotificationResult = { emailResult, smsSent: false, skipped: false }
 
     // Push notification — not pref-gated for approval requests
     if (uid) {
       const pushResult = await sendToUser(uid, {
-        title:       'Action Pending Approval',
-        body:        `${params.action} on ${params.entityType} requires your approval.`,
+        title: 'Action Pending Approval',
+        body: `${params.action} on ${params.entityType} requires your approval.`,
         clickAction: '/user-management',
-        tag:         `pending_action_${params.entityId}`,
-        data:        { type: 'pending_action', entityType: params.entityType, entityId: params.entityId },
+        tag: `pending_action_${params.entityId}`,
+        data: { type: 'pending_action', entityType: params.entityType, entityId: params.entityId },
       })
       notifResult.pushResult = pushResult
     }
@@ -592,10 +612,10 @@ export async function sendPendingActionCreated(
 // ─────────────────────────────────────────────────────────
 
 export interface BulkFeeReminderItem {
-  to:           string
-  studentUid?:  string
+  to: string
+  studentUid?: string
   guardianPhone?: string
-  data:         FeeReminderData
+  data: FeeReminderData
 }
 
 /**
@@ -606,7 +626,9 @@ export interface BulkFeeReminderItem {
 export async function sendBulkFeeReminders(
   items: BulkFeeReminderItem[]
 ): Promise<BulkNotificationResult> {
-  let sent = 0; let skipped = 0; let failed = 0
+  let sent = 0
+  let skipped = 0
+  let failed = 0
   const results: NotificationResult[] = []
 
   for (const item of items) {
@@ -635,34 +657,35 @@ export async function sendBulkFeeReminders(
 // ─────────────────────────────────────────────────────────
 
 export interface UpdateNotifPrefsInput {
-  uid:                  string
-  emailFeeReminder?:    boolean
-  emailLeaveUpdate?:    boolean
-  emailResultRelease?:  boolean
-  emailContractAlert?:  boolean
-  emailAnnouncement?:   boolean
-  smsFeeReminder?:      boolean
-  smsResultRelease?:    boolean
-  pushAnnouncement?:    boolean
-  pushResultRelease?:   boolean
+  uid: string
+  emailFeeReminder?: boolean
+  emailLeaveUpdate?: boolean
+  emailResultRelease?: boolean
+  emailContractAlert?: boolean
+  emailAnnouncement?: boolean
+  smsFeeReminder?: boolean
+  smsResultRelease?: boolean
+  pushAnnouncement?: boolean
+  pushResultRelease?: boolean
 }
 
 /**
  * Upsert a user's notification preferences.
  * Called from the PATCH /users/notification-prefs route.
  */
-export async function updateNotifPrefs(
-  input: UpdateNotifPrefsInput
-): Promise<void> {
+export async function updateNotifPrefs(input: UpdateNotifPrefsInput): Promise<void> {
   const { uid, ...prefs } = input
 
   await prisma.userNotificationPref.upsert({
-    where:  { uid },
+    where: { uid },
     create: { uid, ...DEFAULT_PREFS, ...prefs },
     update: prefs,
   })
 
-  logger.info({ uid, updated: Object.keys(prefs) }, '[notificationService] Notification prefs updated')
+  logger.info(
+    { uid, updated: Object.keys(prefs) },
+    '[notificationService] Notification prefs updated'
+  )
 }
 
 /**

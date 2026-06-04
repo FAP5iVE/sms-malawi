@@ -1,5 +1,5 @@
 import 'server-only'
-import { neonConfig, Pool } from '@neondatabase/serverless'
+import { neonConfig } from '@neondatabase/serverless'
 import { PrismaNeon } from '@prisma/adapter-neon'
 import { PrismaClient } from '@prisma/client'
 
@@ -40,12 +40,7 @@ function createPrismaClient(): PrismaClient {
   // each serverless invocation needs at most one logical connection.
   // Neon's serverless driver multiplexes all queries from a single
   // invocation through its connection pooler on the server side.
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    max: 1,
-  })
-
-  const adapter = new PrismaNeon(pool)
+ const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL })
 
   const client = new PrismaClient({
     adapter,

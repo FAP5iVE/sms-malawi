@@ -47,7 +47,7 @@ import type { PendingActionStatus } from '@prisma/client'
 //  CONFIG
 // ─────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record
+const STATUS_CONFIG: Record<
   PendingActionStatus,
   { label: string; icon: React.ElementType; badgeClass: string }
 > = {
