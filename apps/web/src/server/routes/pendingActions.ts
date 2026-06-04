@@ -74,7 +74,8 @@ pendingActionsRouter.get(
 pendingActionsRouter.get(
   '/entity/:type/:id',
   async (req: Request, res: Response) => {
-    const { type, id } = req.params
+    const type = String(req.params['type'] ?? '')
+const id   = String(req.params['id']   ?? '')
 
     if (!type || !id) {
       res.status(400).json({ error: 'Entity type and ID are required.' })
@@ -95,7 +96,7 @@ pendingActionsRouter.get('/:id', async (req: Request, res: Response) => {
   const { user } = req
   if (!user) { res.status(401).json({ error: 'Not authenticated.' }); return }
 
-  const row = await pendingActionService.getById(req.params.id ?? '')
+  const row = await pendingActionService.getById(String(req.params['id'] ?? ''))
 
   if (!row) {
     res.status(404).json({ error: 'Pending action not found.' })
@@ -190,7 +191,7 @@ pendingActionsRouter.patch(
     if (!user) { res.status(401).json({ error: 'Not authenticated.' }); return }
 
     const { notes } = req.body as { notes?: string }
-    const id        = req.params.id
+    const id        = String(req.params['id'] ?? '')
 
     if (!id) {
       res.status(400).json({ error: 'Pending action ID is required.' })
@@ -221,7 +222,7 @@ pendingActionsRouter.patch(
     if (!user) { res.status(401).json({ error: 'Not authenticated.' }); return }
 
     const { notes } = req.body as { notes?: string }
-    const id        = req.params.id
+    const id = String(req.params['id'] ?? '')
 
     if (!id) {
       res.status(400).json({ error: 'Pending action ID is required.' })
@@ -248,7 +249,7 @@ pendingActionsRouter.patch('/:id/cancel', async (req: Request, res: Response) =>
   const { user } = req
   if (!user) { res.status(401).json({ error: 'Not authenticated.' }); return }
 
-  const id = req.params.id
+  const id = String(req.params['id'] ?? '')
   if (!id) {
     res.status(400).json({ error: 'Pending action ID is required.' })
     return
