@@ -1,4 +1,5 @@
 import 'server-only'
+import { env } from '@/lib/env'
 import { neonConfig } from '@neondatabase/serverless'
 import { PrismaNeon } from '@prisma/adapter-neon'
 import { PrismaClient } from '@prisma/client'
@@ -29,18 +30,13 @@ function getLogLevels(): LogLevel[] {
 
 // ─── CLIENT FACTORY ───────────────────────────────────────
 function createPrismaClient(): PrismaClient {
-  if (!process.env.DATABASE_URL) {
-    throw new Error(
-      '[prisma] DATABASE_URL is not set. ' +
-        'Import env.ts before prisma.ts in your server startup to catch this earlier.'
-    )
-  }
 
   // Pool with HTTP mode — connection_limit=1 is intentional:
   // each serverless invocation needs at most one logical connection.
   // Neon's serverless driver multiplexes all queries from a single
   // invocation through its connection pooler on the server side.
- const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL })
+ 
+  const adapter = new PrismaNeon({ connectionString: env.DATABASE_URL })
 
   const client = new PrismaClient({
     adapter,
