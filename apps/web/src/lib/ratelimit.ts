@@ -37,7 +37,8 @@ import 'server-only'
  *   cron     — Cron supplementary guard (per-route):  3 req / 10 min
  */
 
-import rateLimit, { type Options, type RequestHandler } from 'express-rate-limit'
+import rateLimit, { type Options } from 'express-rate-limit'
+import type { RequestHandler } from 'express'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIER CONFIG
