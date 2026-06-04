@@ -117,55 +117,51 @@ function validateClientEnv() {
 
 // Validate eagerly at module load — fails the build / server start immediately
 // so misconfigurations are caught before the first request, not during it.
-const _server = validateServerEnv()
-const _client = validateClientEnv()
+// Lazy validation — only runs at request time, not during Next.js build phase
+let _server: z.infer<typeof serverSchema> | null = null
+let _client: z.infer<typeof clientSchema> | null = null
+
+function getServerEnv() {
+  if (!_server) _server = validateServerEnv()
+  return _server
+}
+
+function getClientEnv() {
+  if (!_client) _client = validateClientEnv()
+  return _client
+}
 
 // ─── EXPORTED ENV OBJECT ──────────────────────────────────
 // Import `env` instead of `process.env` everywhere — type-safe & validated.
 export const env = {
-  // ── Database
-  DATABASE_URL: _server.DATABASE_URL,
-  DIRECT_URL: _server.DIRECT_URL,
-
-  // ── Firebase Admin
-  FIREBASE_PROJECT_ID: _server.FIREBASE_PROJECT_ID,
-  FIREBASE_CLIENT_EMAIL: _server.FIREBASE_CLIENT_EMAIL,
-  // Normalise escaped newlines that Vercel injects into private keys
-  FIREBASE_PRIVATE_KEY: _server.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-
-  // ── Appwrite
-  APPWRITE_ENDPOINT: _server.APPWRITE_ENDPOINT,
-  APPWRITE_PROJECT_ID: _server.APPWRITE_PROJECT_ID,
-  APPWRITE_API_KEY: _server.APPWRITE_API_KEY,
-
-  // ── Cron
-  CRON_SECRET: _server.CRON_SECRET,
-
-  // ── Optional services
-  RESEND_API_KEY: _server.RESEND_API_KEY,
-  ALGOLIA_APP_ID: _server.ALGOLIA_APP_ID,
-  ALGOLIA_API_KEY: _server.ALGOLIA_API_KEY,
-
-  // ── Runtime flags
-  NODE_ENV: _server.NODE_ENV,
-  IS_PRODUCTION: _server.NODE_ENV === 'production',
-  IS_DEVELOPMENT: _server.NODE_ENV === 'development',
-  VERCEL_ENV: _server.VERCEL_ENV,
-
-  // ── Public (client-safe — safe to expose to the browser)
-  NEXT_PUBLIC_FIREBASE_API_KEY: _client.NEXT_PUBLIC_FIREBASE_API_KEY,
-  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: _client.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  NEXT_PUBLIC_FIREBASE_PROJECT_ID: _client.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: _client.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:
-    _client.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  NEXT_PUBLIC_FIREBASE_APP_ID: _client.NEXT_PUBLIC_FIREBASE_APP_ID,
-  NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: _client.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
-  NEXT_PUBLIC_FIREBASE_VAPID_KEY: _client.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-  NEXT_PUBLIC_APP_URL: _client.NEXT_PUBLIC_APP_URL,
-  NEXT_PUBLIC_API_URL: _client.NEXT_PUBLIC_API_URL,
-  NEXT_PUBLIC_ALGOLIA_APP_ID: _client.NEXT_PUBLIC_ALGOLIA_APP_ID,
-  NEXT_PUBLIC_ALGOLIA_SEARCH_KEY: _client.NEXT_PUBLIC_ALGOLIA_SEARCH_KEY,
-} as const
+  get DATABASE_URL()                             { return getServerEnv().DATABASE_URL },
+  get DIRECT_URL()                               { return getServerEnv().DIRECT_URL },
+  get FIREBASE_PROJECT_ID()                      { return getServerEnv().FIREBASE_PROJECT_ID },
+  get FIREBASE_CLIENT_EMAIL()                    { return getServerEnv().FIREBASE_CLIENT_EMAIL },
+  get FIREBASE_PRIVATE_KEY()                     { return getServerEnv().FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') },
+  get APPWRITE_ENDPOINT()                        { return getServerEnv().APPWRITE_ENDPOINT },
+  get APPWRITE_PROJECT_ID()                      { return getServerEnv().APPWRITE_PROJECT_ID },
+  get APPWRITE_API_KEY()                         { return getServerEnv().APPWRITE_API_KEY },
+  get CRON_SECRET()                              { return getServerEnv().CRON_SECRET },
+  get RESEND_API_KEY()                           { return getServerEnv().RESEND_API_KEY },
+  get ALGOLIA_APP_ID()                           { return getServerEnv().ALGOLIA_APP_ID },
+  get ALGOLIA_API_KEY()                          { return getServerEnv().ALGOLIA_API_KEY },
+  get NODE_ENV()                                 { return getServerEnv().NODE_ENV },
+  get IS_PRODUCTION()                            { return getServerEnv().NODE_ENV === 'production' },
+  get IS_DEVELOPMENT()                           { return getServerEnv().NODE_ENV === 'development' },
+  get VERCEL_ENV()                               { return getServerEnv().VERCEL_ENV },
+  get NEXT_PUBLIC_FIREBASE_API_KEY()             { return getClientEnv().NEXT_PUBLIC_FIREBASE_API_KEY },
+  get NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN()         { return getClientEnv().NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN },
+  get NEXT_PUBLIC_FIREBASE_PROJECT_ID()          { return getClientEnv().NEXT_PUBLIC_FIREBASE_PROJECT_ID },
+  get NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET()      { return getClientEnv().NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET },
+  get NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID() { return getClientEnv().NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID },
+  get NEXT_PUBLIC_FIREBASE_APP_ID()              { return getClientEnv().NEXT_PUBLIC_FIREBASE_APP_ID },
+  get NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID()      { return getClientEnv().NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID },
+  get NEXT_PUBLIC_FIREBASE_VAPID_KEY()           { return getClientEnv().NEXT_PUBLIC_FIREBASE_VAPID_KEY },
+  get NEXT_PUBLIC_APP_URL()                      { return getClientEnv().NEXT_PUBLIC_APP_URL },
+  get NEXT_PUBLIC_API_URL()                      { return getClientEnv().NEXT_PUBLIC_API_URL },
+  get NEXT_PUBLIC_ALGOLIA_APP_ID()               { return getClientEnv().NEXT_PUBLIC_ALGOLIA_APP_ID },
+  get NEXT_PUBLIC_ALGOLIA_SEARCH_KEY()           { return getClientEnv().NEXT_PUBLIC_ALGOLIA_SEARCH_KEY },
+}
 
 export type Env = typeof env
