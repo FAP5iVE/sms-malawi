@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import  {create as createStudent } from '@/server/services/studentService'
 import type { CreateApplicationInput, PublicApplicationInput } from '@shared/schemas/student'
 import { ApplicationStatus } from '@prisma/client'
+import type { UserRole } from '@shared/types/roles'
 
 export async function listApplications(status?: string) {
   return prisma.application.findMany({
@@ -74,7 +75,7 @@ export async function convertToStudent(
   applicationId: string,
   classId: string | undefined,
   actorUid: string,
-  actorRole: string
+  actorRole: UserRole
 ) {
   const app = await prisma.application.findUniqueOrThrow({ where: { id: applicationId } })
 
