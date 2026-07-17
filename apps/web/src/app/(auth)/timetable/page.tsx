@@ -1,8 +1,29 @@
+/*
+ * apps/web/src/app/(auth)/timetable/page.tsx
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R13 — Announcements, Timetable & Calendar Domain
+ * [PURPOSE]:
+ *   1. Replaced the raw fetch() call (zero error handling — a non-2xx
+ *      response's error body was consumed via res.json() as if it were
+ *      valid timetable data, and NEXT_PUBLIC_API_URL had no `?? ''`
+ *      fallback unlike every other correctly-built call site) with the
+ *      R1-consolidated apiFetch — which already handles both the base-URL
+ *      fallback and non-2xx error throwing internally — and a proper
+ *      queryKeys.classes.timetable()-keyed query.
+ *   2. RoleGuard.allowed was missing finance/library/hr — all three hold
+ *      timetable.view's universal grant per the permission matrix
+ *      (confirmed: the backend GET /classes/:id/timetable route already
+ *      gates on requirePermission('timetable.view') as of R6, so this
+ *      was a frontend-only gap blocking three roles from a page their
+ *      own backend route already allows them to call).
+ * [DEPENDS ON]: apps/web/src/lib/api-client.ts (apiFetch, queryKeys)
+ */
 'use client'
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getAuth } from 'firebase/auth'
+import { apiFetch, queryKeys } from '@/lib/api-client'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { useClasses } from '@/hooks/useClasses'
 import type { ApiTimetableSlot, ApiClass } from '@shared/types/api'
@@ -19,7 +40,7 @@ const DAY_LABELS = {
 export default function TimetablePage() {
   return (
     <RoleGuard
-      allowed={['admin', 'high_rank', 'lower_rank', 'academic', 'exam_officer', 'student']}
+      allowed={['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student']}
     >
       <TimetableContent />
     </RoleGuard>
@@ -32,16 +53,8 @@ function TimetableContent() {
   const [term, setTerm] = useState(1)
 
   const { data: slots = [], isLoading } = useQuery<ApiTimetableSlot[]>({
-    queryKey: ['timetable', selectedClassId, term],
-    queryFn: async () => {
-      if (!selectedClassId) return []
-      const token = await getAuth().currentUser?.getIdToken()
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/classes/${selectedClassId}/timetable?term=${term}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      return res.json()
-    },
+    queryKey: queryKeys.classes.timetable(selectedClassId, undefined, term),
+    queryFn: () => apiFetch<ApiTimetableSlot[]>(`/classes/${selectedClassId}/timetable?term=${term}`),
     enabled: !!selectedClassId,
   })
 

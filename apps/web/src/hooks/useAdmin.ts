@@ -1,26 +1,24 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: apps/web/src/hooks/useAdmin.ts
+ * [R-PHASE]: R1 — API Client & Query-Key Singleton Consolidation
+ * [PURPOSE]: User/admin management hooks — repointed at the canonical apiFetch/queryKeys singleton.
+ * [DEPENDS ON]: W/lib/api-client.ts
+ */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getAuth } from 'firebase/auth'
 import type { CreateUserInput, NotificationPrefInput } from '@shared/schemas/admin'
-
-async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
-  const token = await getAuth().currentUser?.getIdToken()
-  const res = await fetch(`/api${path}`, {
-    ...opts, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts?.headers },
-  })
-  if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? `API error ${res.status}`)
-  return res.json() as Promise<T>
-}
+import { apiFetch, queryKeys } from '@/lib/api-client'
 
 export function useUsers() {
-  return useQuery({ queryKey: ['users'], queryFn: () => apiFetch('/users') })
+  return useQuery({ queryKey: queryKeys.admin.users(), queryFn: () => apiFetch('/users') })
 }
 
 export function useCreateUser() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: CreateUserInput) => apiFetch('/users', { method: 'POST', body: JSON.stringify(data) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.admin.users() }),
   })
 }
 
@@ -29,7 +27,7 @@ export function useUpdateUserRole() {
   return useMutation({
     mutationFn: ({ uid, role }: { uid: string; role: string }) =>
       apiFetch('/users/role', { method: 'PATCH', body: JSON.stringify({ uid, role }) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.admin.users() }),
   })
 }
 
@@ -38,7 +36,7 @@ export function useToggleUserDisabled() {
   return useMutation({
     mutationFn: ({ uid, disabled }: { uid: string; disabled: boolean }) =>
       apiFetch(`/users/${uid}/disable`, { method: 'PATCH', body: JSON.stringify({ disabled }) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.admin.users() }),
   })
 }
 
@@ -49,7 +47,7 @@ export function useSendPasswordReset() {
 }
 
 export function useNotificationPrefs() {
-  return useQuery({ queryKey: ['users','notification-prefs'], queryFn: () => apiFetch('/users/me/notification-prefs') })
+  return useQuery({ queryKey: queryKeys.admin.notifPrefs(), queryFn: () => apiFetch('/users/me/notification-prefs') })
 }
 
 export function useUpdateNotificationPrefs() {
@@ -57,6 +55,6 @@ export function useUpdateNotificationPrefs() {
   return useMutation({
     mutationFn: (data: NotificationPrefInput) =>
       apiFetch('/users/me/notification-prefs', { method: 'PATCH', body: JSON.stringify(data) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['users','notification-prefs'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.admin.notifPrefs() }),
   })
 }

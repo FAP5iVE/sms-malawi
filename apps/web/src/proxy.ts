@@ -1,5 +1,26 @@
+/**
+ * apps/web/src/proxy.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R3 — Gateway Hardening
+ * [PURPOSE]: Four independent fixes, all UX-routing-layer only (this file's
+ *   own documented posture — real authorization is server-side):
+ *   (1) PAGE_ROLES['/finances'] gains 'hr' — HR staff hold
+ *       finance.viewOwnStatement/hr.viewOwnPayslips per PERMISSIONS_MAP.md
+ *       but were locked out of the page that surfaces them.
+ *   (2) PAGE_ROLES['/reports'] gains 'student' — students hold three
+ *       report.viewOwn* permissions but could not reach the page.
+ *   (3) PUBLIC_PATHS drops '/explore' — no route exists at this path; it
+ *       was a dead entry (also the target of a dead homepage anchor per
+ *       Phase 8E).
+ *   (4) BYPASS_PREFIXES drops '/fonts/' and '/images/' — both are already
+ *       excluded by config.matcher's own negative-lookahead pattern below;
+ *       keeping them here was a harmless but confusing double-exclusion.
+ * [DEPENDS ON]: none
+ */
 import { NextRequest, NextResponse } from 'next/server'
 import type { UserRole } from '@shared/types/roles'
+import { getAllowedRolesForPath } from '@shared/constants/pageAccess'
 
 // ─── COOKIE NAMES ─────────────────────────────────────────
 // These constants must stay in sync with AuthProvider.tsx
@@ -38,14 +59,11 @@ const PUBLIC_PATHS = [
   '/forgot-password',
   '/change-password',
   '/',           // landing page
-  '/explore',    // school website
 ] as const
 
 /** Path prefixes that bypass proxy logic entirely (handled by Next.js). */
 const BYPASS_PREFIXES = [
   '/_next/',
-  '/fonts/',
-  '/images/',
   '/favicon',
   '/api/',       // API routes authenticate themselves via verifyAuth.ts
 ] as const
@@ -58,53 +76,9 @@ const BYPASS_PREFIXES = [
  *
  * Roles listed = roles ALLOWED to access that path prefix.
  */
-const PAGE_ROLES: Record<string, readonly UserRole[]> = {
-  '/dashboard': [
-    'admin', 'high_rank', 'finance', 'library', 'lower_rank',
-    'academic', 'hr', 'exam_officer', 'student',
-  ],
-  '/students': [
-    'admin', 'high_rank', 'finance', 'library', 'lower_rank',
-    'academic', 'hr', 'exam_officer',
-  ],
-  '/classes': [
-    'admin', 'high_rank', 'lower_rank', 'academic', 'exam_officer', 'student',
-  ],
-  '/exams': [
-    'admin', 'high_rank', 'lower_rank', 'academic', 'exam_officer', 'student',
-  ],
-  '/timetable': [
-    'admin', 'high_rank', 'finance', 'library', 'lower_rank',
-    'academic', 'hr', 'exam_officer', 'student',
-  ],
-  '/finances': ['admin', 'high_rank', 'finance', 'student'],
-  '/library': [
-    'admin', 'high_rank', 'finance', 'library', 'lower_rank',
-    'academic', 'hr', 'exam_officer', 'student',
-  ],
-  '/hr': [
-    'admin', 'high_rank', 'finance', 'library', 'lower_rank',
-    'academic', 'hr', 'exam_officer',
-  ],
-  '/announcements': [
-    'admin', 'high_rank', 'finance', 'library', 'lower_rank',
-    'academic', 'hr', 'exam_officer', 'student',
-  ],
-  '/calendar': [
-    'admin', 'high_rank', 'finance', 'library', 'lower_rank',
-    'academic', 'hr', 'exam_officer', 'student',
-  ],
-  '/reports': [
-    'admin', 'high_rank', 'finance', 'library', 'lower_rank',
-    'academic', 'hr', 'exam_officer',
-  ],
-  '/applications': ['admin', 'high_rank', 'lower_rank'],
-  '/user-management': ['admin'],
-  '/settings': [
-    'admin', 'high_rank', 'finance', 'library', 'lower_rank',
-    'academic', 'hr', 'exam_officer', 'student',
-  ],
-}
+// [R16] PAGE_ROLES relocated to the shared /constants/pageAccess
+// PAGE_ACCESS map (imported above as getAllowedRolesForPath) so this edge
+// proxy and W/config/navigation.ts consume ONE role-per-page source.
 
 // ─── HELPERS ──────────────────────────────────────────────
 
@@ -116,19 +90,6 @@ function isPublicPath(pathname: string): boolean {
 
 function isBypassPath(pathname: string): boolean {
   return BYPASS_PREFIXES.some((prefix) => pathname.startsWith(prefix))
-}
-
-/**
- * Returns the UserRole[] allowed for this pathname, or null if the path
- * is not in the role map (meaning it has no role restriction).
- */
-function getAllowedRoles(pathname: string): readonly UserRole[] | null {
-  // Exact match first, then prefix match (longest prefix wins)
-  const match = Object.keys(PAGE_ROLES)
-    .filter((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
-    .sort((a, b) => b.length - a.length)[0]
-
-  return match ? (PAGE_ROLES[match] ?? null) : null
 }
 
 function buildRedirect(request: NextRequest, destination: string): NextResponse {
@@ -178,7 +139,7 @@ export function proxy(request: NextRequest): NextResponse {
   // ── Layer 4: Role-based page access
   // If the page has a role restriction, check the sms_role cookie.
   // This is UX-level only — the API enforces real authorisation.
-  const allowedRoles = getAllowedRoles(pathname)
+  const allowedRoles = getAllowedRolesForPath(pathname)
 
   if (allowedRoles !== null) {
     if (!roleRaw || !allowedRoles.includes(roleRaw)) {

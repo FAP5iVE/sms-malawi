@@ -1,3 +1,13 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: packages/shared/schemas/settings.ts
+ * [R-PHASE]: R8 — Academics IV: Report Cards, Transcripts, Promotion & Risk
+ *   Assessment
+ * [PURPOSE]: Adds validation schemas for SCHOOL_LOGO_URL and the six new
+ *   risk threshold settings keys, matching this same phase's additions to
+ *   types/settings.ts.
+ * [DEPENDS ON]: none
+ */
 import { z } from 'zod'
 import { SETTING_KEYS, type SettingKey } from '../types/settings'
 
@@ -121,6 +131,8 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
     z.string().url('Must be a valid URL').max(300).or(z.literal('')),
   [SETTING_KEYS.SCHOOL_FOUNDED_YEAR]:
     z.number().int().min(1800).max(new Date().getFullYear()),
+  [SETTING_KEYS.SCHOOL_LOGO_URL]:
+    z.string().url('Must be a valid URL').max(1000).or(z.literal('')),
 
   // ── Exam and grading
   [SETTING_KEYS.EXAM_PASS_MARK_THRESHOLD]:
@@ -137,6 +149,20 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
     percentSchema('Minimum average'),
   [SETTING_KEYS.PROMOTION_REQUIRED_PASSES]:
     positiveIntSchema('Required passes').max(20),
+
+  // ── Student risk thresholds
+  [SETTING_KEYS.RISK_FEE_DEBT_HIGH]:
+    percentSchema('High fee-debt threshold'),
+  [SETTING_KEYS.RISK_FEE_DEBT_MEDIUM]:
+    percentSchema('Medium fee-debt threshold'),
+  [SETTING_KEYS.RISK_ABSENCE_HIGH]:
+    percentSchema('High absence threshold'),
+  [SETTING_KEYS.RISK_ABSENCE_MEDIUM]:
+    percentSchema('Medium absence threshold'),
+  [SETTING_KEYS.RISK_SUBJECT_FAILS_HIGH]:
+    nonNegativeIntSchema('High subject-fails threshold').max(20),
+  [SETTING_KEYS.RISK_SUBJECT_FAILS_MEDIUM]:
+    nonNegativeIntSchema('Medium subject-fails threshold').max(20),
 
   // ── Finance — fees
   [SETTING_KEYS.FINANCE_LATE_PENALTY_PER_DAY]:
@@ -185,6 +211,13 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
     positiveIntSchema('Study leave days').max(180),
   [SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS]:
     positiveIntSchema('Emergency leave days').max(30),
+  // R15 (typecheck cleanup): SETTING_KEYS gained
+  // HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS in R14 but this exhaustive
+  // { [K in SettingKey] } map was never extended — a blocking type error
+  // the baseline environment masked behind an unresolved-zod module error.
+  // Bounds mirror the contract-alert pipeline's sensible range.
+  [SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS]:
+    positiveIntSchema('Contract expiry lookahead days').max(365),
 
   // ── Security
   [SETTING_KEYS.SESSION_TIMEOUT_STUDENT_MINS]:

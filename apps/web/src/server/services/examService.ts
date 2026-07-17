@@ -1,66 +1,93 @@
 /**
  * apps/web/src/server/services/examService.ts
  *
- * MANEB Grading (MSCE — Form 4):
- *   Grade 1: 80–100% | Grade 2: 70–79% | Grade 3: 60–69%
- *   Grade 4: 50–59%  | Grade 5: 40–49% | Grade 6: 35–39%
- *   Grade 7: 30–34%  | Grade 8: 25–29% | Grade 9: 0–24%
- *   Pass = Grade 1–6 (35%+)
+ * [CHANGE TYPE]: MAJOR REWRITE of four areas within the file (unrelated
+ *   exports such as exam CRUD basics, approveResults/releaseResults/
+ *   unlockMarks/getStudentResults/getClassAnalytics/MANEB are unaffected).
+ * [R-PHASE]: R7 — Academics III: Exam Pipeline Repair & Grading Engine
+ *   Unification
+ * [PURPOSE]:
+ *   (1) Removed the private calcGrade() function and the MSCE_GRADES/
+ *   JCE_GRADES constants entirely. computeTermResults() now imports and
+ *   awaits gradeService.ts's exported, async, database-backed calcGrade()
+ *   — this is the single change that makes the Phase 1B grading-settings
+ *   admin UI finally affect real computed results; previously that panel
+ *   was decorative, since every real result was computed through this
+ *   file's own hardcoded, pre-gradeService table.
+ *   (2) enterMarks(): now advances Exam.status through IN_PROGRESS →
+ *   MARKS_DRAFT as marks are entered, not only ExamMark.isDraft — an exam
+ *   previously stayed frozen at SCHEDULED forever regardless of real
+ *   marks-entry progress, since this function never touched Exam.status
+ *   at all. Only advances forward (SCHEDULED/IN_PROGRESS/MARKS_PENDING →
+ *   MARKS_DRAFT); never regresses an exam already past draft-marks entry.
+ *   (3) finalizeMarks(): now validates mark *validity*, not merely row
+ *   *existence* — rejects finalization if any ExamMark row has
+ *   `mark: null && absent: false`. The previous check only confirmed a
+ *   row existed per active student, which an uninitialized client-side
+ *   entry could satisfy without ever containing a real mark value.
+ *   (4) Removed the PDF report-card generation function and its private
+ *   HTML-building helper and browser-launcher, and the standalone student
+ *   promotion-engine function, entirely — confirmed duplicate/overlapping
+ *   implementations of logic that belongs solely to reportCardService.ts
+ *   (Phase 3B) and promotionService.ts (Phase 3C) respectively. Leaving
+ *   both implementations live was the direct cause of the
+ *   two-independent-PDF-pipelines conflict Phase 3A flagged. Their now-dead
+ *   imports (puppeteer-core, @sparticuz/chromium, uploadFile,
+ *   STORAGE_BUCKETS) are removed with them — both packages remain genuine
+ *   dependencies (receiptService.ts has its own independent puppeteer
+ *   usage; reportCardService.ts uses jsPDF instead), only this file's
+ *   import lines are dead. This file's MANEB record management exports are
+ *   *not* duplicates and are *not* removed — they are this file's correct,
+ *   sole implementation.
+ *   Consequential (necessary to keep the build passing once the standalone
+ *   promotion function above is removed): exams.ts's POST /promote route —
+ *   its only caller — is deleted outright rather than repointed, since a
+ *   complete, correct, already-wired implementation already exists at the
+ *   dedicated /promotion route (server/routes/promotion.ts →
+ *   promotionService.ts's own export of the same name) with zero relation
+ *   to the broken route; keeping both would reintroduce the exact
+ *   duplicate-implementation problem this phase removes.
+ *   Consequential (needed for exams/page.tsx's explicit "All classes"
+ *   fix): the exam-listing function's classId parameter is now optional,
+ *   building the Prisma filter conditionally, so selecting "All classes"
+ *   can run one aggregated query instead of the route always requiring a
+ *   class.
+ *   Consequential (needed for MarksEntrySheet.tsx's explicit
+ *   draft-restore fix): added a new exported function to read back
+ *   previously-saved ExamMark rows for an exam — none existed before.
+ *   Consequential (explicit follow-up instruction — the internal exam
+ *   pipeline must never be used for a term MANEB itself grades):
+ *   createExam() now rejects creating an END_TERM exam for Form 2 Term 3
+ *   or Form 4 Term 3 (the JCE/MSCE national sittings — see
+ *   @shared/constants/malawi's MANEB_NATIONAL_FORM_TERM) and rejects
+ *   creating a MANEB_JCE/MANEB_MSCE-typed exam at all, at any form/term —
+ *   those two enum values exist on Exam.type but MANEB results must only
+ *   ever be recorded via ManebRecord, never through ExamMark/
+ *   computeTermResults(). computeTermResults() itself now refuses to run
+ *   for a MANEB national term for the same reason, even if an Exam row
+ *   for one exists from before this guard was added.
+ *   Added `import 'server-only'`; removed the leftover
+ *   `// ← WAS '../lib/prisma'`-style refactor-artifact comments on every
+ *   import line.
+ * [DEPENDS ON]: apps/web/src/server/services/gradeService.ts (calcGrade),
+ *   @shared/constants/malawi (getManebExamType)
  *
- * JCE Grading (Form 2):
- *   Grade A: 80–100% | B: 70–79% | C: 60–69%
- *   D: 50–59% | E: 35–49% | F: 0–34% (fail)
- *   Pass = A–E (35%+)
- *
- * Internal Exams:
- *   Form 1 & 2 → JCE scale (A–F, pass = E or above, 35%+)
- *   Form 3 & 4 → MSCE scale (1–9, pass = Grade 6 or above, 35%+)
- * Source: maneb.mw — verify before production.
+ * [R8 ADDENDUM — Academics IV: Report Cards, Transcripts, Promotion & Risk
+ *   Assessment]: listExams() now also returns className/totalStudents/
+ *   feeBlockedCount/marksEntered per exam — ResultsReleaseWorkflow.tsx
+ *   needs these for its per-exam release-readiness summary and previously
+ *   had no source for any of them.
  */
-import { prisma }            from '@/lib/prisma'          // ← WAS '../lib/prisma'
-import { logger }            from '@/lib/logger'          // ← WAS '../lib/logger'
-import { checkBalanceGate } from '@/server/services/feeService'   // ← WAS './feeService'
-import { uploadFile, STORAGE_BUCKETS } from '@/lib/storage'  // ← WAS '../lib/storage'
-import puppeteer            from 'puppeteer-core'          // ← WAS 'puppeteer' (see chromium note)
-import chromium             from '@sparticuz/chromium'
+import 'server-only'
+
+import { prisma }           from '@/lib/prisma'
+import { logger }           from '@/lib/logger'
+import { checkBalanceGate } from '@/server/services/feeService'
+import { calcGrade }        from '@/server/services/gradeService'
+import { getManebExamType } from '@shared/constants/malawi'
 import type { CreateExamInput, BulkMarkEntryInput, CreateManebRecordInput } from '@shared/schemas/exam'
 import type { Decimal } from '@prisma/client/runtime/library'
-
-// ─── GRADING CONSTANTS (official MANEB standards) ────────
-const MSCE_GRADES = [
-  { min: 80, grade: '1', pass: true  },
-  { min: 70, grade: '2', pass: true  },
-  { min: 60, grade: '3', pass: true  },
-  { min: 50, grade: '4', pass: true  },
-  { min: 40, grade: '5', pass: true  },
-  { min: 35, grade: '6', pass: true  },
-  { min: 30, grade: '7', pass: false },
-  { min: 25, grade: '8', pass: false },
-  { min:  0, grade: '9', pass: false },
-]
-
-const JCE_GRADES = [
-  { min: 80, grade: 'A', pass: true  },
-  { min: 70, grade: 'B', pass: true  },
-  { min: 60, grade: 'C', pass: true  },
-  { min: 50, grade: 'D', pass: true  },
-  { min: 35, grade: 'E', pass: true  },
-  { min:  0, grade: 'F', pass: false },
-]
-
-// Internal exams: Form 1 & 2 use JCE grading (A–F); Form 3 & 4 use MSCE grading (1–9)
-function calcGrade(percentage: number, examType: string, classForm?: number): { grade: string; pass: boolean } {
-  let table
-  if (examType === 'MANEB_MSCE') {
-    table = MSCE_GRADES
-  } else if (examType === 'MANEB_JCE') {
-    table = JCE_GRADES
-  } else {
-    // Internal exams: delegate to JCE scale for Forms 1–2, MSCE scale for Forms 3–4
-    table = (classForm !== undefined && classForm >= 3) ? MSCE_GRADES : JCE_GRADES
-  }
-  return table.find((g) => percentage >= g.min) ?? { grade: 'F', pass: false }
-}
+import type { ExamStatus } from '@prisma/client'
 
 function toNumber(v: Decimal | number | null | undefined): number {
   if (v === null || v === undefined) return 0
@@ -68,7 +95,30 @@ function toNumber(v: Decimal | number | null | undefined): number {
 }
 
 // ─── CREATE EXAM ─────────────────────────────────────────
+// Form 2 Term 3 (JCE) and Form 4 Term 3 (MSCE) are MANEB national
+// examinations — the school does not set, mark, or grade them, so no
+// internal Exam of type END_TERM may be created for those slots; results
+// for them arrive via ManebRecord (createManebRecord()) instead. The two
+// MANEB_* exam types are reserved for that same import path and may never
+// be created through this internal pipeline at all, regardless of
+// form/term — creating one here would let MANEB marks flow through
+// ExamMark/computeTermResults(), the exact parallel-grading-path this
+// phase closes.
 export async function createExam(data: CreateExamInput, actorUid: string) {
+  if (data.type === 'MANEB_JCE' || data.type === 'MANEB_MSCE') {
+    throw new Error(
+      `${data.type === 'MANEB_JCE' ? 'JCE' : 'MSCE'} results come from MANEB, not internal marks entry. Record them via the MANEB panel (createManebRecord) once MANEB releases results.`
+    )
+  }
+
+  const targetClass = await prisma.class.findUniqueOrThrow({ where: { id: data.classId }, select: { form: true } })
+  const manebType = getManebExamType(targetClass.form, data.term)
+  if (manebType && data.type === 'END_TERM') {
+    throw new Error(
+      `Form ${targetClass.form} Term ${data.term} is the national ${manebType} examination, administered by MANEB — the school does not set an internal end-of-term exam for this slot. Record results via the MANEB panel once MANEB releases them.`
+    )
+  }
+
   const exam = await prisma.exam.create({
     data: { ...data, date: new Date(data.date), createdByUid: actorUid },
     include: { class: { select: { name: true, form: true } } },
@@ -77,15 +127,63 @@ export async function createExam(data: CreateExamInput, actorUid: string) {
   return exam
 }
 
-export async function listExams(classId: string, academicYear: string, term: number) {
-  return prisma.exam.findMany({
-    where: { classId, academicYear, term },
-    include: { _count: { select: { marks: true } } },
+// classId is optional — omitted entirely, the query aggregates across
+// every class for the given academicYear/term (the exams list page's
+// "All classes…" filter, previously disabled outright rather than
+// supported by this function).
+// classId is optional — omitted entirely, the query aggregates across
+// every class for the given academicYear/term (the exams list page's
+// "All classes…" filter, previously disabled outright rather than
+// supported by this function). Also returns className/totalStudents/
+// feeBlockedCount/marksEntered — ResultsReleaseWorkflow.tsx (R8) needs
+// these to render its per-exam release-readiness summary; the underlying
+// joins were straightforward additions to a query that already had to
+// touch Class and ExamMark.
+export async function listExams(classId: string | undefined, academicYear: string, term: number) {
+  const exams = await prisma.exam.findMany({
+    where: {
+      ...(classId ? { classId } : {}),
+      academicYear,
+      term,
+    },
+    include: {
+      class: { select: { name: true } },
+      _count: { select: { marks: true } },
+    },
     orderBy: { date: 'asc' },
   })
+
+  return Promise.all(
+    exams.map(async (exam) => {
+      const [totalStudents, feeBlockedCount] = await Promise.all([
+        prisma.student.count({ where: { classId: exam.classId, status: 'ACTIVE' } }),
+        prisma.invoice.count({
+          where: {
+            academicYear,
+            term,
+            balance: { gt: 0 },
+            student: { classId: exam.classId, status: 'ACTIVE' },
+          },
+        }),
+      ])
+      return {
+        ...exam,
+        className:     exam.class.name,
+        totalStudents,
+        feeBlockedCount,
+        marksEntered:  exam._count.marks,
+      }
+    }),
+  )
 }
 
 // ─── ENTER MARKS (bulk upsert) ────────────────────────────
+
+// Only these statuses may advance to MARKS_DRAFT as a result of marks
+// being entered — an exam already past draft-marks entry (MARKS_FINAL and
+// beyond) is never regressed by a later enterMarks() call.
+const ADVANCEABLE_TO_MARKS_DRAFT: ExamStatus[] = ['SCHEDULED', 'IN_PROGRESS', 'MARKS_PENDING']
+
 export async function enterMarks(data: BulkMarkEntryInput, actorUid: string) {
   const { entries, isDraft } = data
   const exam = await prisma.exam.findUniqueOrThrow({ where: { id: entries[0]!.examId } })
@@ -103,8 +201,21 @@ export async function enterMarks(data: BulkMarkEntryInput, actorUid: string) {
       })
     )
   )
+
+  if (isDraft && ADVANCEABLE_TO_MARKS_DRAFT.includes(exam.status)) {
+    await prisma.exam.update({ where: { id: exam.id }, data: { status: 'MARKS_DRAFT' } })
+  }
+
   logger.info({ event: 'marks.enter', examId: entries[0]!.examId, count: entries.length, isDraft, actorUid })
   return upserted
+}
+
+// ─── READ MARKS (draft-restore for MarksEntrySheet.tsx) ──
+export async function getMarksForExam(examId: string) {
+  return prisma.examMark.findMany({
+    where: { examId },
+    orderBy: { studentId: 'asc' },
+  })
 }
 
 // ─── FINALIZE MARKS ──────────────────────────────────────
@@ -113,10 +224,23 @@ export async function finalizeMarks(examId: string, actorUid: string) {
     where: { id: examId },
     include: { class: { include: { students: { where: { status: 'ACTIVE' } } } } },
   })
-  const markedIds = (await prisma.examMark.findMany({ where: { examId }, select: { studentId: true } })).map((m) => m.studentId)
+
+  const marks = await prisma.examMark.findMany({
+    where:  { examId },
+    select: { studentId: true, mark: true, absent: true },
+  })
+  const markedIds = marks.map((m) => m.studentId)
   const missing = exam.class.students.filter((s) => !markedIds.includes(s.id))
   if (missing.length > 0)
     throw new Error(`Missing marks for ${missing.length} student(s). Enter all marks first.`)
+
+  // Row *existence* alone is not enough — a row can exist with mark: null
+  // and absent: false (an uninitialized client-side entry that was upserted
+  // with defaults but never actually given a real value). Reject those too.
+  const invalid = marks.filter((m) => m.mark === null && !m.absent)
+  if (invalid.length > 0)
+    throw new Error(`${invalid.length} student(s) have no mark entered and are not marked absent. Enter a mark or mark them absent before finalizing.`)
+
   await prisma.examMark.updateMany({ where: { examId }, data: { isDraft: false, finalizedAt: new Date() } })
   await prisma.exam.update({ where: { id: examId }, data: { status: 'MARKS_FINAL' } })
   logger.info({ event: 'marks.finalized', examId, actorUid })
@@ -156,12 +280,22 @@ export async function getStudentResults(studentId: string, academicYear: string,
 }
 
 // ─── COMPUTE TERM RESULTS ────────────────────────────────
+// Refuses to run for a MANEB national term (Form 2 Term 3 / Form 4 Term 3)
+// — those results come from MANEB itself (ManebRecord), never from
+// aggregating internally-marked Exam/ExamMark rows, even if some were
+// mistakenly created before createExam()'s own guard was added.
 export async function computeTermResults(classId: string, academicYear: string, term: number, actorUid: string) {
-  const [students, classRecord] = await Promise.all([
-    prisma.student.findMany({ where: { classId, status: 'ACTIVE' } }),
-    prisma.class.findUniqueOrThrow({ where: { id: classId }, select: { form: true } }),
-  ])
+  const classRecord = await prisma.class.findUniqueOrThrow({ where: { id: classId }, select: { form: true } })
   const classForm: number = classRecord.form // e.g. 1, 2, 3, or 4
+
+  const manebType = getManebExamType(classForm, term)
+  if (manebType) {
+    throw new Error(
+      `Form ${classForm} Term ${term} is the national ${manebType} examination — results come from MANEB, not internal computation. Record them via the MANEB panel once MANEB releases them.`
+    )
+  }
+
+  const students = await prisma.student.findMany({ where: { classId, status: 'ACTIVE' } })
   const exams = await prisma.exam.findMany({
     where: { classId, academicYear, term, status: 'RESULTS_RELEASED' },
     include: { marks: true },
@@ -180,12 +314,15 @@ export async function computeTermResults(classId: string, academicYear: string, 
     let totalAvg = 0, subjectCount = 0
     for (const [subject, data] of Object.entries(subjectMap)) {
       const avg = data.marks.length > 0 ? data.marks.reduce((a, b) => a + b, 0) / data.marks.length : 0
-      const { grade, pass } = calcGrade(avg, 'INTERNAL', classForm)
+      // gradeService.calcGrade() is the single grade-boundary authority
+      // anywhere in the codebase now — persisted exactly as returned, no
+      // local override.
+      const { grade, pass } = await calcGrade(avg, 'INTERNAL', classForm)
       subjectResults[subject] = { average: Math.round(avg * 100) / 100, grade, pass }
       totalAvg += avg; subjectCount++
     }
     const overallAvg = subjectCount > 0 ? totalAvg / subjectCount : 0
-    const { grade, pass } = calcGrade(overallAvg, 'INTERNAL', classForm)
+    const { grade, pass } = await calcGrade(overallAvg, 'INTERNAL', classForm)
     await prisma.termResult.upsert({
       where: { studentId_academicYear_term: { studentId: student.id, academicYear, term } },
       create: { studentId: student.id, classId, academicYear, term, totalMark: subjectCount * overallAvg, average: Math.round(overallAvg * 100) / 100, grade, passStatus: pass, subjectResults },
@@ -205,131 +342,14 @@ export async function computeTermResults(classId: string, academicYear: string, 
   return { computed: results.length }
 }
 
-// ─── PROMOTION ENGINE ────────────────────────────────────
-export async function runPromotion(
-  academicYear: string,
-  actorUid: string,
-  rules = { minimumAverage: 50, requiredSubjectPasses: 5, passMark: 50 }
-) {
-  const termResults = await prisma.termResult.findMany({ where: { academicYear, term: 3 } })
-  const promoted: string[] = [], repeating: string[] = []
-  for (const result of termResults) {
-    const subjects = result.subjectResults as Record<string, { pass: boolean }>
-    const passes = Object.values(subjects).filter((s) => s.pass).length
-    const ok = toNumber(result.average) >= rules.minimumAverage && passes >= rules.requiredSubjectPasses
-    if (ok) promoted.push(result.studentId); else repeating.push(result.studentId)
-    await prisma.annualResult.upsert({
-      where: { studentId_academicYear: { studentId: result.studentId, academicYear } },
-      create: { studentId: result.studentId, classId: result.classId, academicYear, annualAverage: result.average, finalGrade: result.grade, passStatus: ok, promoted: ok },
-      update: { passStatus: ok, promoted: ok },
-    })
-  }
-  logger.info({ event: 'promotion.run', academicYear, promoted: promoted.length, repeating: repeating.length, actorUid })
-  return { promoted: promoted.length, repeating: repeating.length }
-}
-
-// ─── REPORT CARD PDF ─────────────────────────────────────
-async function launchBrowser() {
-  if (process.env.NODE_ENV !== 'production') {
-    return puppeteer.launch({
-      executablePath: process.platform === 'win32'
-        ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-        : process.platform === 'darwin'
-          ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-          : '/usr/bin/google-chrome',
-      headless: true,
-      args: ['--no-sandbox'],
-    })
-  }
-  return puppeteer.launch({
-    args: chromium.args,
-    executablePath: await chromium.executablePath(),
-  })
-}
-
-export async function generateReportCard(studentId: string, academicYear: string, term: number): Promise<string> {
-  const [student, result] = await prisma.$transaction([
-    prisma.student.findUniqueOrThrow({ where: { id: studentId }, include: { class: true } }),
-    prisma.termResult.findFirstOrThrow({ where: { studentId, academicYear, term } }),
-  ])
-  const browser = await launchBrowser()
-  const page = await browser.newPage()
-  await page.setContent(buildReportCardHtml(student, result, academicYear, term), { waitUntil: 'load' })
-  const pdf = Buffer.from(await page.pdf({ format: 'A4', printBackground: true }))
-  await browser.close()
-  const filename = `report-card-${studentId}-${academicYear.replace('/','-')}-term${term}.pdf`
-  const fileId = await uploadFile(STORAGE_BUCKETS.REPORT_CARDS, pdf, filename, 'application/pdf')
-  await prisma.termResult.updateMany({ where: { studentId, academicYear, term }, data: { reportCardKey: fileId, releasedAt: new Date() } })
-  logger.info({ event: 'report_card.generated', studentId, academicYear, term, fileId })
-  return fileId
-}
-
-function buildReportCardHtml(
-  student: { firstName: string; lastName: string; registrationNo: string; class?: { name: string } | null },
-  result: { average: unknown; grade: string; position?: number | null; passStatus: boolean; subjectResults: unknown; teacherComment?: string | null; headComment?: string | null },
-  academicYear: string,
-  term: number
-): string {
-  const avg = toNumber(result.average as number)
-  const subjects = result.subjectResults as Record<string, { average: number; grade: string; pass: boolean }>
-  const subjectRows = Object.entries(subjects).map(([subj, data]) => `
-    <tr><td>${subj}</td><td>${data.average.toFixed(1)}%</td><td>${data.grade}</td>
-    <td style="color:${data.pass ? 'green' : 'red'}">${data.pass ? 'Pass' : 'Fail'}</td></tr>`).join('')
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <style>
-    body{font-family:Arial,sans-serif;padding:30px;color:#1E293B;}
-    .header{text-align:center;border-bottom:3px solid #0F2744;padding-bottom:16px;margin-bottom:20px;}
-    .school-name{font-size:22px;font-weight:bold;color:#0F2744;}
-    .report-title{font-size:16px;color:#0E8A6A;margin-top:4px;}
-    .student-info{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;padding:14px;background:#F8FAFC;border-radius:8px;}
-    .info-label{font-size:11px;text-transform:uppercase;color:#94A3B8;}
-    .info-value{font-weight:600;color:#1E293B;}
-    table{width:100%;border-collapse:collapse;margin-bottom:20px;}
-    th{background:#0F2744;color:white;padding:8px 12px;text-align:left;font-size:12px;}
-    td{padding:8px 12px;border-bottom:1px solid #E2E8F0;font-size:13px;}
-    .summary{background:#0E8A6A;color:white;padding:14px;border-radius:8px;display:flex;justify-content:space-around;}
-    .sum-item{text-align:center;}
-    .sum-val{font-size:22px;font-weight:bold;}
-    .sum-lbl{font-size:11px;opacity:.8;}
-    .status{font-size:15px;font-weight:bold;text-align:center;margin-top:16px;padding:10px;border-radius:6px;background:${result.passStatus ? '#DCFCE7' : '#FEE9E6'};color:${result.passStatus ? '#15803D' : '#B91C1C'};}
-    .comment-box{border:1px solid #E2E8F0;border-radius:6px;padding:10px;min-height:50px;margin-bottom:10px;}
-  </style></head><body>
-  <div class="header">
-    <div class="school-name">SMS Malawi — School Management System</div>
-    <div class="report-title">Term ${term} Report Card — ${academicYear}</div>
-  </div>
-  <div class="student-info">
-    <div><div class="info-label">Student Name</div><div class="info-value">${student.firstName} ${student.lastName}</div></div>
-    <div><div class="info-label">Registration No</div><div class="info-value">${student.registrationNo}</div></div>
-    <div><div class="info-label">Class</div><div class="info-value">${student.class?.name ?? '—'}</div></div>
-    <div><div class="info-label">Position</div><div class="info-value">${result.position ?? '—'}</div></div>
-  </div>
-  <table><thead><tr><th>Subject</th><th>Average</th><th>Grade</th><th>Result</th></tr></thead>
-  <tbody>${subjectRows}</tbody></table>
-  <div class="summary">
-    <div class="sum-item"><div class="sum-val">${avg.toFixed(1)}%</div><div class="sum-lbl">Overall Average</div></div>
-    <div class="sum-item"><div class="sum-val">${result.grade}</div><div class="sum-lbl">Grade</div></div>
-    <div class="sum-item"><div class="sum-val">${result.position ?? '—'}</div><div class="sum-lbl">Position</div></div>
-  </div>
-  <div class="status">${result.passStatus ? '✓ Pass and Proceed' : '✗ Repeat Class'}</div>
-  <div style="margin-top:20px">
-    <h4 style="margin-bottom:8px;color:#0F2744">Comments</h4>
-    <div style="font-size:11px;color:#94A3B8;margin-bottom:4px">Class Teacher</div>
-    <div class="comment-box">${result.teacherComment ?? ''}</div>
-    <div style="font-size:11px;color:#94A3B8;margin-bottom:4px">Head Teacher</div>
-    <div class="comment-box">${result.headComment ?? ''}</div>
-  </div>
-  </body></html>`
-}
-
 // ─── MANEB ────────────────────────────────────────────────
 export async function createManebRecord(data: CreateManebRecordInput, actorUid: string) {
-  const record = await prisma.manebRecord.create({ 
-            data: {
+  const record = await prisma.manebRecord.create({
+    data: {
       ...data,
-      overallGrade: data.overallGrade ?? null, 
+      overallGrade: data.overallGrade ?? null,
     },
-   })
+  })
   logger.info({ event: 'maneb.record.create', recordId: record.id, actorUid })
   return record
 }
@@ -339,6 +359,38 @@ export async function listManebRecords(academicYear: string, examType?: 'JCE' | 
     where: { academicYear, ...(examType ? { examType } : {}) },
     orderBy: { candidateNo: 'asc' },
   })
+}
+
+/**
+ * [R18] Bulk MANEB record import. A thin, sequential loop over the existing
+ * createManebRecord() — the single, audit-confirmed sole write path for MANEB
+ * results — so every created row goes through exactly the same validation and
+ * logging as a single create. Rows are validated and inserted independently:
+ * a failed row (e.g. a duplicate candidateNo, which is @unique) is collected
+ * into `errors` and does not abort the remaining rows. Returns the created
+ * records and a per-row error list for the caller to surface. This does NOT
+ * introduce a second MANEB write path — it is a batching wrapper only.
+ */
+export async function bulkCreateManebRecords(rows: CreateManebRecordInput[], actorUid: string) {
+  const created: Awaited<ReturnType<typeof createManebRecord>>[] = []
+  const errors: Array<{ index: number; candidateNo: string; error: string }> = []
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i]
+    if (!row) continue
+    try {
+      created.push(await createManebRecord(row, actorUid))
+    } catch (err) {
+      errors.push({
+        index: i,
+        candidateNo: row.candidateNo,
+        error: err instanceof Error ? err.message : 'Unknown error creating MANEB record',
+      })
+    }
+  }
+
+  logger.info({ event: 'maneb.record.bulk_create', created: created.length, failed: errors.length, actorUid })
+  return { created, errors }
 }
 
 // ─── ANALYTICS ───────────────────────────────────────────

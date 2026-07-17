@@ -3,7 +3,9 @@ import 'server-only'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { logger } from '@/lib/logger'
+import { getRedis } from '@/lib/redis'
 import type { UserRole } from '@shared/types/roles'
+import { AUDIT_DEFAULT_PAGE_SIZE, AUDIT_MAX_PAGE_SIZE } from '@shared/constants/audit'
 
 // ─────────────────────────────────────────────────────────
 //  SEVERITY LEVELS
@@ -369,7 +371,28 @@ export async function log(entry: AuditEntry): Promise<void> {
  *     actorRole: req.user!.role,
  *   })
  */
+// R19: durable audit queue key (Upstash). When Redis is configured, logAsync
+// LPUSHes entries here and flushAuditQueue() drains them to Neon — so a Lambda
+// recycled immediately after the response no longer silently drops the
+// MEDIUM/LOW entry the old un-awaited create() could lose.
+const AUDIT_QUEUE_KEY = 'audit:queue'
+
 export function logAsync(entry: AuditEntry): void {
+  const redis = getRedis()
+
+  if (redis) {
+    // Enqueue durably, then opportunistically drain. Once the LPUSH resolves
+    // the entry lives in Redis; even if this instance is recycled before the
+    // flush finishes, a later flush (here or via cron) still persists it.
+    redis
+      .lpush(AUDIT_QUEUE_KEY, entry)
+      .then(() => flushAuditQueue())
+      .catch((err: unknown) => {
+        logger.error({ err, entry }, '[auditService] logAsync enqueue failed')
+      })
+    return
+  }
+
   prisma.auditLog
     .create({
       data: {
@@ -386,6 +409,47 @@ export function logAsync(entry: AuditEntry): void {
       // Never let an audit log failure propagate — log internally only
       logger.error({ err, entry }, '[auditService] logAsync write failed')
     })
+}
+
+/**
+ * Drain queued audit entries from Redis to Neon. Safe to call from a cron or
+ * opportunistically after an enqueue. No-op when Upstash is not configured
+ * (nothing is ever queued in that case). Returns the number persisted.
+ */
+export async function flushAuditQueue(max = 100): Promise<number> {
+  const redis = getRedis()
+  if (!redis) return 0
+
+  const drained: AuditEntry[] = []
+  for (let i = 0; i < max; i++) {
+    const entry = await redis.rpop<AuditEntry>(AUDIT_QUEUE_KEY)
+    if (!entry) break
+    drained.push(entry)
+  }
+  if (drained.length === 0) return 0
+
+  try {
+    await prisma.auditLog.createMany({
+      data: drained.map((entry) => ({
+        action:     entry.action,
+        entityType: entry.entityType,
+        entityId:   entry.entityId,
+        actorUid:   entry.actorUid,
+        actorRole:  entry.actorRole,
+        metadata:   (entry.metadata ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+      })),
+    })
+    return drained.length
+  } catch (err) {
+    // Persistence failed — return the entries to the queue so none are lost.
+    try {
+      await redis.lpush(AUDIT_QUEUE_KEY, ...drained)
+    } catch (reErr) {
+      logger.error({ reErr, count: drained.length }, '[auditService] failed to requeue audit entries after write failure')
+    }
+    logger.error({ err, count: drained.length }, '[auditService] flushAuditQueue write failed — entries requeued')
+    return 0
+  }
 }
 
 /**
@@ -420,8 +484,6 @@ export async function logBatch(entries: AuditEntry[]): Promise<void> {
 //  QUERY OPERATIONS
 // ─────────────────────────────────────────────────────────
 
-const DEFAULT_PAGE_SIZE = 25
-const MAX_PAGE_SIZE     = 100
 
 /**
  * Query audit logs with full filtering and pagination.
@@ -445,10 +507,10 @@ export async function query(
     dateTo,
     search,
     page = 1,
-    pageSize = DEFAULT_PAGE_SIZE,
+    pageSize = AUDIT_DEFAULT_PAGE_SIZE,
   } = filters
 
-  const safePageSize = Math.min(pageSize, MAX_PAGE_SIZE)
+  const safePageSize = Math.min(pageSize, AUDIT_MAX_PAGE_SIZE)
   const safeOffset   = (Math.max(page, 1) - 1) * safePageSize
 
   // Build Prisma where clause

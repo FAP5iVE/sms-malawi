@@ -1,50 +1,45 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: apps/web/src/components/finances/InvoiceNotes.tsx
+ * [R-PHASE]: R9 — Finance I: Invoicing, Fees & the Accounting Ledger
+ *   Reconnection (originally R1 — API Client & Query-Key Singleton
+ *   Consolidation)
+ * [PURPOSE]: Replaced `note.authorUid.slice(0,8)` with the note's joined
+ *   author name (ApiInvoiceNote.author, sourced the same way as
+ *   InvoicesTab.tsx's "Student" column — a real display name instead of a
+ *   raw truncated ID). Switched the local `InvoiceNote` interface for the
+ *   shared `ApiInvoiceNote` type now that the route returns a joined
+ *   `author` field.
+ * [DEPENDS ON]: W/lib/api-client.ts; finances.ts's GET /invoices/:id/notes
+ *   (this phase's author-join addition)
+ */
 'use client'
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getAuth } from 'firebase/auth'
 import { formatDistanceToNow } from 'date-fns'
 import { StickyNote, Send, Loader2 } from 'lucide-react'
-
-interface InvoiceNote {
-  id: string
-  body: string
-  authorUid: string
-  createdAt: string
-}
-
-async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
-  const token = await getAuth().currentUser?.getIdToken()
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
-    ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(opts?.headers ?? {}),
-    },
-  })
-  if (!res.ok) throw new Error(`API error ${res.status}`)
-  return res.json()
-}
+import { apiFetch, queryKeys } from '@/lib/api-client'
+import type { ApiInvoiceNote } from '@shared/types/api'
 
 export function InvoiceNotes({ invoiceId }: { invoiceId: string }) {
   const qc = useQueryClient()
   const [draft, setDraft] = useState('')
 
   const { data: notes = [], isLoading } = useQuery({
-    queryKey: ['invoice-notes', invoiceId],
-    queryFn: () => apiFetch<InvoiceNote[]>(`/finances/invoices/${invoiceId}/notes`),
+    queryKey: queryKeys.finances.invoiceNotes(invoiceId),
+    queryFn: () => apiFetch<ApiInvoiceNote[]>(`/finances/invoices/${invoiceId}/notes`),
   })
 
   const { mutate: addNote, isPending } = useMutation({
     mutationFn: (body: string) =>
-      apiFetch<InvoiceNote>(`/finances/invoices/${invoiceId}/notes`, {
+      apiFetch<ApiInvoiceNote>(`/finances/invoices/${invoiceId}/notes`, {
         method: 'POST',
         body: JSON.stringify({ body }),
       }),
     onSuccess: () => {
       setDraft('')
-      void qc.invalidateQueries({ queryKey: ['invoice-notes', invoiceId] })
+      void qc.invalidateQueries({ queryKey: queryKeys.finances.invoiceNotes(invoiceId) })
     },
   })
 
@@ -65,7 +60,8 @@ export function InvoiceNotes({ invoiceId }: { invoiceId: string }) {
             <div key={note.id} className="bg-white rounded-lg px-3 py-2 border border-amber-100">
               <p className="text-sm text-body">{note.body}</p>
               <p className="text-xs text-muted mt-1">
-                {note.authorUid.slice(0, 8)} ·{' '}
+                {note.author ? `${note.author.firstName} ${note.author.lastName}` : 'Staff member'}{' '}
+                ·{' '}
                 {formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}
               </p>
             </div>

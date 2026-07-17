@@ -6,6 +6,7 @@ import * as auditService           from '@/server/services/auditService'
 import { sendPendingActionCreated }from '@/server/services/notificationService'
 import {Prisma, type PendingActionStatus } from '@prisma/client'
 import type { UserRole }           from '@shared/types/roles'
+import { PENDING_ACTION_REVIEWER_ROLES } from '@shared/constants/pendingActions'
 
 // ─────────────────────────────────────────────────────────
 //  ALLOWED ACTIONS
@@ -112,10 +113,9 @@ export interface PendingActionCounts {
 //  HELPER: Roles that may review (approve / reject) actions
 // ─────────────────────────────────────────────────────────
 
-const REVIEWER_ROLES: readonly UserRole[] = ['admin', 'high_rank']
 
 export function canReview(role: UserRole): boolean {
-  return REVIEWER_ROLES.includes(role)
+  return PENDING_ACTION_REVIEWER_ROLES.includes(role)
 }
 
 // ─────────────────────────────────────────────────────────

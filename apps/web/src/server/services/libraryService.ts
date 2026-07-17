@@ -1,11 +1,67 @@
+/*
+ * apps/web/src/server/services/libraryService.ts
+ *
+ * [CHANGE TYPE]: MAJOR REWRITE of the digital-resource and fine-lifecycle
+ *   functions — borrowing/return core logic (issueBorrowing, listBorrowings,
+ *   markOverdueBorrowings, the catalog functions) is otherwise correct and
+ *   unaffected.
+ * [R-PHASE]: R12 — Library Domain & the Storage API Contract Fix
+ *   (previously R10 — Finance II: Payroll, Forecasting & the
+ *   Finance↔Library Reconciliation)
+ * [PURPOSE]:
+ *   1. uploadDigitalResource()/getDigitalResourceViewUrl(): fixed the
+ *      build-breaking storage-contract bug — uploadFile() was called with
+ *      STORAGE_BUCKETS.DIGITAL_LIBRARY (a StorageBucket, the literal
+ *      'school_files', not a FilePrefix) and getDigitalResourceViewUrl()
+ *      imported a `getViewUrl` export that does not exist in storage.ts.
+ *      Repointed at FILE_PREFIX.DIGITAL_RESOURCE (added this phase) and
+ *      getSignedViewUrl() respectively — the correct choice per that
+ *      function's own doc comment ("All sensitive file access must go
+ *      through this"), not getPublicViewUrl (explicitly documented as
+ *      forbidden for protected categories). Also fixed
+ *      uploadDigitalResource() assigning uploadFile()'s whole UploadResult
+ *      object directly to the `fileKey` string column instead of its
+ *      `.fileId` — the identical class of defect R10 fixed in
+ *      receiptService.ts/reportExportService.ts.
+ *   2. returnBook(): removed the `borrowing.borrowerType === 'STUDENT'`
+ *      gate on LibraryFine creation — a staff borrower now accrues a real
+ *      LibraryFine row the same as a student would (previously a staff
+ *      borrower's computed fineAmount was written to Borrowing.fineAmount
+ *      only, with no LibraryFine row ever created, so no finance-module
+ *      consequence ever reached them). The new LibraryFine row also links
+ *      back to its Borrowing via the new borrowingId relation (schema,
+ *      this phase).
+ *   3. returnBook(): FINE_PER_DAY_MWK is no longer a hardcoded module
+ *      constant — the per-day rate now comes from
+ *      settingsService.get(SETTING_KEYS.LIBRARY_FINE_PER_DAY), so an
+ *      admin editing the Library Settings panel actually changes what
+ *      returnBook() charges on the very next return.
+ *   4. returnBook(): a DAMAGED condition is now persisted on the
+ *      Borrowing row's new `condition` field (schema, this phase) instead
+ *      of collapsing into the identical RETURNED status a clean return
+ *      produces — the returned status/condition pair is now
+ *      (RETURNED, GOOD) for a clean return, (RETURNED, DAMAGED) for a
+ *      damaged-but-returned copy, and (LOST, LOST) for a lost copy.
+ *   5. returnBook(): marking a copy LOST now decrements Book.totalCopies
+ *      (not only availableCopies) — getLibraryStats().totalBooks
+ *      previously kept counting a lost, unreplaced copy as part of the
+ *      collection indefinitely.
+ *   6. Added `import 'server-only'`.
+ * [DEPENDS ON]: apps/web/src/lib/storage.ts (FILE_PREFIX.DIGITAL_RESOURCE,
+ *   same phase), apps/web/prisma/schema.prisma (LibraryFine.staffId/
+ *   borrowingId, Borrowing.condition — same phase),
+ *   apps/web/src/server/services/settingsService.ts (SETTING_KEYS.
+ *   LIBRARY_FINE_PER_DAY — already existed prior to this phase)
+ */
+import 'server-only'
 import { prisma }   from '@/lib/prisma'
 import { logger }   from '@/lib/logger'
-import { uploadFile, getViewUrl, STORAGE_BUCKETS } from '@/lib/storage'
+import { uploadFile, getSignedViewUrl, FILE_PREFIX } from '@/lib/storage'
 import { differenceInDays }   from 'date-fns'
 import type { CreateBookInput, IssueBorrowingInput, ReturnBorrowingInput, CreateDigitalResourceInput } from '@shared/schemas/library'
-
-// ─── FINE RATE ─────────────────────────────────────────
-const FINE_PER_DAY_MWK = 50  // MWK 50 per overdue day
+import * as algolia from '@/server/services/algoliaService'
+import * as settingsService from '@/server/services/settingsService'
+import { SETTING_KEYS } from '@shared/types/settings'
 
 // ─── CATALOG ─────────────────────────────────────────────
 export async function listBooks(filters: {
@@ -49,6 +105,15 @@ export async function createBook(data: CreateBookInput, actorUid: string) {
     },
   })
   logger.info({ event: 'book.create', bookId: book.id, actorUid })
+  void algolia.indexBook({
+    objectID:       book.id,
+    title:          book.title,
+    author:         book.author,
+    isbn:           book.isbn ?? null,
+    category:       book.category,
+    totalCopies:    book.totalCopies,
+    availableCopies: book.availableCopies,
+  })
   return book
 }
 
@@ -97,39 +162,51 @@ export async function returnBook(borrowingId: string, data: ReturnBorrowingInput
   })
   if (borrowing.status === 'RETURNED') throw new Error('Book already returned.')
 
+  const finePerDayMwk = await settingsService.get(SETTING_KEYS.LIBRARY_FINE_PER_DAY)
+
   const now        = new Date()
   const overdueDays = Math.max(0, differenceInDays(now, borrowing.dueDate))
-  const fineAmount  = overdueDays * FINE_PER_DAY_MWK
+  const fineAmount  = overdueDays * finePerDayMwk
 
   let fineId: string | undefined
 
   await prisma.$transaction(async (tx) => {
     // Create fine in LibraryFine table if overdue (bridges to Finance module)
-    if (fineAmount > 0 && borrowing.borrowerType === 'STUDENT') {
+    // — a STUDENT and a STAFF borrower both accrue a real fine row; there
+    // is no borrower-type gate here any more (R12).
+    if (fineAmount > 0) {
       const fine = await tx.libraryFine.create({
         data: {
-          studentId:     borrowing.studentId!,
+          studentId:     borrowing.studentId,
+          staffId:       borrowing.staffId,
           bookTitle:     borrowing.book.title,
+          borrowingId:   borrowing.id,
           amount:        fineAmount,
-          reason:        `${overdueDays} overdue day(s) at MWK ${FINE_PER_DAY_MWK}/day`,
-          firestoreDocId: borrowingId, // re-use borrowingId as reference
+          reason:        `${overdueDays} overdue day(s) at MWK ${finePerDayMwk}/day`,
           markedByUid:   actorUid,
         },
       })
       fineId = fine.id
     }
 
-    const status = data.condition === 'LOST'     ? 'LOST'
-                 : data.condition === 'DAMAGED'  ? 'RETURNED'
-                 : 'RETURNED'
+    const status    = data.condition === 'LOST' ? 'LOST' : 'RETURNED'
+    const condition = data.condition ?? 'GOOD'
 
     await tx.borrowing.update({
       where: { id: borrowingId },
-      data: { returnedAt: now, status, fineAmount: fineAmount || null, fineId: fineId ?? null, notes: data.notes ?? null },
+      data: { returnedAt: now, status, condition, fineAmount: fineAmount || null, fineId: fineId ?? null, notes: data.notes ?? null },
     })
 
-    // Only restore copy if not lost
-    if (data.condition !== 'LOST') {
+    if (data.condition === 'LOST') {
+      // A lost copy leaves the collection entirely — decrement both
+      // totalCopies and (implicitly, by not restoring it) availableCopies,
+      // so getLibraryStats().totalBooks stops overstating the collection.
+      await tx.book.update({
+        where: { id: borrowing.bookId },
+        data: { totalCopies: { decrement: 1 } },
+      })
+    } else {
+      // GOOD or DAMAGED — the physical copy is back on the shelf either way.
       await tx.book.update({
         where: { id: borrowing.bookId },
         data: { availableCopies: { increment: 1 } },
@@ -137,7 +214,7 @@ export async function returnBook(borrowingId: string, data: ReturnBorrowingInput
     }
   })
 
-  logger.info({ event: 'book.returned', borrowingId, overdueDays, fineAmount, actorUid })
+  logger.info({ event: 'book.returned', borrowingId, overdueDays, fineAmount, condition: data.condition ?? 'GOOD', actorUid })
   return { overdueDays, fineAmount, fineId }
 }
 
@@ -190,7 +267,7 @@ export async function uploadDigitalResource(
   fileSize: number,
   uploaderUid: string
 ) {
-  const fileKey = await uploadFile(STORAGE_BUCKETS.DIGITAL_LIBRARY, buffer, filename, mimeType)
+  const uploaded = await uploadFile(FILE_PREFIX.DIGITAL_RESOURCE, buffer, filename, mimeType)
   const resource = await prisma.digitalResource.create({
     data: {
       title:        data.title,
@@ -198,7 +275,7 @@ export async function uploadDigitalResource(
       subject:      data.subject ?? null,
       form:         data.form ?? null,
       academicYear: data.academicYear ?? null,
-      fileKey,
+      fileKey:      uploaded.fileId,
       fileSize,
       mimeType,
       uploadedByUid: uploaderUid,
@@ -220,7 +297,7 @@ export async function getDigitalResourceViewUrl(resourceId: string, actorRole: s
   const resource = await prisma.digitalResource.findUniqueOrThrow({ where: { id: resourceId } })
   if (!resource.approved && actorRole === 'student')
     throw Object.assign(new Error('Resource not yet approved.'), { status: 403 })
-  return getViewUrl(STORAGE_BUCKETS.DIGITAL_LIBRARY, resource.fileKey)
+  return getSignedViewUrl(resource.fileKey)
 }
 
 // ─── LIBRARY REPORTS ─────────────────────────────────────

@@ -1,10 +1,30 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: apps/web/src/app/(public)/apply/page.tsx
+ * [R-PHASE]: R5 — Academics I: Admissions & Student Records
+ * [PURPOSE]: Imports the unified ApplicationSchema from
+ *   @shared/schemas/student in place of the local ApplicationSchema
+ *   definition — the local schema's field set (firstName/otherNames/
+ *   surname/classApplying/guardianRelationship/countryCode/
+ *   guardianCountryCode) is now the canonical, server-validated shape, so
+ *   no field renaming is needed here. The one real change: `sex`'s <select>
+ *   options move from lowercase 'male'/'female' to uppercase 'MALE'/
+ *   'FEMALE', matching SexSchema (the canonical schema now used for both
+ *   client and server validation) and the real Prisma Sex enum — the
+ *   previous lowercase values matched neither. No other change to the
+ *   5-step form UI structure.
+ * [DEPENDS ON]: @shared/schemas/student (ApplicationSchema)
+ */
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { MALAWI_DISTRICTS } from '@shared/constants/malawi'
+import { ApplicationSchema } from '@shared/schemas/student'
+import type { ApplicationInput } from '@shared/schemas/student'
+import { MALAWI_DISTRICTS, FORM_LABELS } from '@shared/constants/malawi'
+import { getCountriesForForm, COUNTRY_CALLING_CODES } from '@shared/constants/countries'
+import { GUARDIAN_RELATIONSHIPS } from '@shared/constants/admissions'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -19,93 +39,6 @@ import {
   ChevronRight,
   ChevronLeft,
 } from 'lucide-react'
-
-// -- COUNTRIES LIST ------------------------------------------------------------
-const COUNTRIES = [
-  'Malawi',
-  'Zambia',
-  'Mozambique',
-  'Tanzania',
-  'Zimbabwe',
-  'South Africa',
-  'Kenya',
-  'Uganda',
-  'Rwanda',
-  'Ethiopia',
-  'Botswana',
-  'Namibia',
-  'Angola',
-  'Democratic Republic of Congo',
-  'United Kingdom',
-  'United States',
-  'India',
-  'China',
-  'Germany',
-  'France',
-  'Australia',
-  'Canada',
-  'Brazil',
-  'Other',
-]
-
-const COUNTRY_CODES = [
-  { code: '+265', label: 'Malawi (+265)' },
-  { code: '+260', label: 'Zambia (+260)' },
-  { code: '+258', label: 'Mozambique (+258)' },
-  { code: '+255', label: 'Tanzania (+255)' },
-  { code: '+263', label: 'Zimbabwe (+263)' },
-  { code: '+27', label: 'South Africa (+27)' },
-  { code: '+254', label: 'Kenya (+254)' },
-  { code: '+44', label: 'UK (+44)' },
-  { code: '+1', label: 'USA/Canada (+1)' },
-  { code: '+91', label: 'India (+91)' },
-]
-
-const GUARDIAN_RELATIONSHIPS = [
-  'Father',
-  'Mother',
-  'Guardian',
-  'Uncle',
-  'Aunt',
-  'Grandparent',
-  'Elder Sibling',
-  'Other Relative',
-  'Other',
-]
-
-// -- ZOD SCHEMA ----------------------------------------------------------------
-const ApplicationSchema = z.object({
-  // Personal
-  firstName: z.string().min(2, 'First name is required'),
-  otherNames: z.string().optional(),
-  surname: z.string().min(2, 'Surname is required'),
-  dateOfBirth: z.string().min(1, 'Date of birth is required'),
-  sex: z.enum(['male', 'female'], { required_error: 'Please select sex' }),
-  nationality: z.string().min(1, 'Nationality is required'),
-  district: z.string().optional(),
-  religion: z.string().optional(),
-  // Contact
-  address: z.string().min(5, 'Address is required'),
-  countryCode: z.string().min(1, 'Select country code'),
-  phone: z.string().min(7, 'Phone number is required'),
-  email: z.string().email('Enter a valid email').optional().or(z.literal('')),
-  // Academic
-  classApplying: z.enum(['Form 1', 'Form 2', 'Form 3', 'Form 4'], {
-    required_error: 'Please select the form',
-  }),
-  previousSchool: z.string().optional(),
-  reasonForTransfer: z.string().optional(),
-  academicYear: z.string().min(1, 'Academic year is required'),
-  // Guardian
-  guardianName: z.string().min(2, 'Guardian name is required'),
-  guardianRelationship: z.string().min(1, 'Relationship is required'),
-  guardianCountryCode: z.string().min(1, 'Select country code'),
-  guardianPhone: z.string().min(7, 'Guardian phone is required'),
-  guardianEmail: z.string().email('Enter a valid email').optional().or(z.literal('')),
-  guardianAddress: z.string().optional(),
-})
-
-type ApplicationInput = z.infer<typeof ApplicationSchema>
 
 // -- HELPERS -------------------------------------------------------------------
 const inputCls =
@@ -227,13 +160,22 @@ export default function ApplyPage() {
           guardianPhone: `${data.guardianCountryCode}${data.guardianPhone.replace(/^0/, '')}`,
         }),
       })
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(err.error ?? 'Submission failed. Please try again.')
+     if (!res.ok) {
+        const body = await res.json() as { error?: string; message?: string }
+        if (body.error === 'DUPLICATE') {
+          setServerError(body.message ?? 'A duplicate application was found. Please contact the admissions office if you believe this is an error.')
+        } else {
+          throw new Error(body.message ?? body.error ?? 'Submission failed')
+        }
+        return
       }
       setSubmitted(true)
-    } catch (e) {
-      setServerError(e instanceof Error ? e.message : 'Submission failed. Please try again.')
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setServerError(err.message)
+      } else {
+        setServerError('Failed to submit application. Please try again.')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -413,8 +355,8 @@ export default function ApplyPage() {
                       className={`${inputCls} ${errors.sex ? inputError : inputBase}`}
                     >
                       <option value="">Select…</option>
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
+                      <option value="MALE">Male</option>
+                      <option value="FEMALE">Female</option>
                     </select>
                   </Field>
                   <Field label="Religion" error={errors.religion?.message} hint="Optional">
@@ -434,9 +376,9 @@ export default function ApplyPage() {
                       {...register('nationality')}
                       className={`${inputCls} ${errors.nationality ? inputError : inputBase}`}
                     >
-                      {COUNTRIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
+                      {getCountriesForForm().map((c) => (
+                        <option key={c.code} value={c.name}>
+                          {c.name}
                         </option>
                       ))}
                     </select>
@@ -489,9 +431,9 @@ export default function ApplyPage() {
                         {...register('countryCode')}
                         className={`${inputCls} ${inputBase} w-40 flex-shrink-0`}
                       >
-                        {COUNTRY_CODES.map((c) => (
-                          <option key={c.code} value={c.code}>
-                            {c.label}
+                        {COUNTRY_CALLING_CODES.map((c) => (
+                          <option key={c.code} value={c.callingCode}>
+                            {c.name} ({c.callingCode})
                           </option>
                         ))}
                       </select>
@@ -535,7 +477,7 @@ export default function ApplyPage() {
                       className={`${inputCls} ${errors.classApplying ? inputError : inputBase}`}
                     >
                       <option value="">Select form…</option>
-                      {['Form 1', 'Form 2', 'Form 3', 'Form 4'].map((f) => (
+                      {FORM_LABELS.map((f) => (
                         <option key={f} value={f}>
                           {f}
                         </option>
@@ -621,9 +563,9 @@ export default function ApplyPage() {
                         {...register('guardianCountryCode')}
                         className={`${inputCls} ${inputBase} w-40 flex-shrink-0`}
                       >
-                        {COUNTRY_CODES.map((c) => (
-                          <option key={c.code} value={c.code}>
-                            {c.label}
+                        {COUNTRY_CALLING_CODES.map((c) => (
+                          <option key={c.code} value={c.callingCode}>
+                            {c.name} ({c.callingCode})
                           </option>
                         ))}
                       </select>

@@ -1,3 +1,18 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: apps/web/src/server/routes/students.ts
+ * [R-PHASE]: R5 — Academics I: Admissions & Student Records
+ * [PURPOSE]: PATCH /:id/status: removed the requireRole(['admin',
+ *   'high_rank','exam_officer']) check entirely — Phase 10A confirmed the
+ *   permission matrix itself is correct (student.edit is scoped to
+ *   high_rank/lower_rank); the route's own requireRole list was the
+ *   incorrect, over-granting half of the contradiction (it let admin and
+ *   exam_officer through despite neither holding student.edit), not the
+ *   permission check. requirePermission('student.edit') alone is now
+ *   authoritative. The inline VALID_STATUSES array is replaced with a
+ *   derivation from StudentStatusSchema.options.
+ * [DEPENDS ON]: @shared/schemas/student (StudentStatusSchema)
+ */
 import 'server-only'
 
 import { Router, type Request, type Response } from 'express'
@@ -9,6 +24,7 @@ import {
 } from '@/server/middleware/verifyPermission'
 import * as studentService             from '@/server/services/studentService'
 import * as pendingActionService       from '@/server/services/pendingActionService'
+import { StudentStatusSchema }         from '@shared/schemas/student'
 import type { StudentStatus, Sex }     from '@prisma/client'
 import type { UserRole }               from '@shared/types/roles'
 
@@ -63,7 +79,7 @@ studentsRouter.get(
     }
 
     const {
-      search, classId, status, sex, form, page, pageSize,
+      search, classId, status, sex, form, page, pageSize, sortBy, sortDir,
     } = req.query
 
     const result = await studentService.list({
@@ -74,6 +90,10 @@ studentsRouter.get(
       form:     form     ? parseInt(String(form), 10)    : undefined,
       page:     page     ? parseInt(String(page), 10)    : 1,
       pageSize: pageSize ? parseInt(String(pageSize), 10) : 25,
+      // R15 — server-side sort; the service allow-lists the column and
+      // falls back to the default ordering for anything unrecognised.
+      sortBy:   sortBy   ? String(sortBy)                : undefined,
+      sortDir:  sortDir === 'desc' ? 'desc' : sortDir === 'asc' ? 'asc' : undefined,
     })
 
     res.json({ ...result, capabilities: req.can })
@@ -330,7 +350,6 @@ studentsRouter.delete(
 studentsRouter.patch(
   '/:id/status',
   requirePermission('student.edit'),
-  requireRole(['admin', 'high_rank', 'exam_officer']),
   async (req: Request, res: Response) => {
     const { user } = req
     const id = String(req.params['id'] ?? '')
@@ -346,10 +365,7 @@ studentsRouter.patch(
       return
     }
 
-    const VALID_STATUSES: StudentStatus[] = [
-      'ACTIVE', 'AWAITING_MANEB_RESULTS', 'GRADUATED', 'ARCHIVED',
-    ]
-    if (!VALID_STATUSES.includes(status)) {
+    if (!StudentStatusSchema.options.includes(status)) {
       res.status(400).json({ error: `Invalid status "${status}".` })
       return
     }

@@ -42,38 +42,20 @@ import {
   FileText,
 } from 'lucide-react'
 import type { PendingActionStatus } from '@prisma/client'
+import { PENDING_ACTION_LABELS, PENDING_ACTION_STATUS_CONFIG, type PendingActionIconName } from '@shared/constants/pendingActions'
+
+const STATUS_ICONS: Record<PendingActionIconName, React.ElementType> = {
+  clock: Clock,
+  check: CheckCircle2,
+  x: XCircle,
+  alert: AlertTriangle,
+}
 
 // ─────────────────────────────────────────────────────────
 //  CONFIG
 // ─────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<
-  PendingActionStatus,
-  { label: string; icon: React.ElementType; badgeClass: string }
-> = {
-  PENDING:   { label: 'Pending',   icon: Clock,         badgeClass: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400' },
-  APPROVED:  { label: 'Approved',  icon: CheckCircle2,  badgeClass: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400' },
-  REJECTED:  { label: 'Rejected',  icon: XCircle,       badgeClass: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400' },
-  CANCELLED: { label: 'Cancelled', icon: XCircle,       badgeClass: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400' },
-  EXPIRED:   { label: 'Expired',   icon: AlertTriangle, badgeClass: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400' },
-}
 
-const ACTION_LABELS: Record<string, string> = {
-  'student.create':           'Create Student',
-  'student.edit':             'Edit Student',
-  'student.softDelete':       'Delete Student',
-  'student.statusChange':     'Change Student Status',
-  'class.create':             'Create Class',
-  'class.edit':               'Edit Class',
-  'class.softDelete':         'Delete Class',
-  'timetable.slotCreate':     'Add Timetable Slot',
-  'timetable.slotEdit':       'Edit Timetable Slot',
-  'timetable.slotDelete':     'Remove Timetable Slot',
-  'announcement.publish':     'Publish Announcement',
-  'announcement.classPublish':'Publish Class Announcement',
-  'hr.leaveApproval':         'Leave Request',
-  'application.statusChange': 'Change Application Status',
-}
 
 // ─────────────────────────────────────────────────────────
 //  REVIEW DIALOG
@@ -93,7 +75,7 @@ function ReviewDialog({ action, mode, onClose, onConfirm, isPending }: ReviewDia
   if (!action || !mode) return null
 
   const isApprove    = mode === 'approve'
-  const actionLabel  = ACTION_LABELS[action.action] ?? action.action
+  const actionLabel  = PENDING_ACTION_LABELS[action.action] ?? action.action
   const title        = isApprove ? 'Approve Action' : 'Reject Action'
   const description  = isApprove
     ? `Confirm you want to approve "${actionLabel}" for ${action.entityType} ${action.entityId}. This will immediately apply the requested change.`
@@ -219,9 +201,9 @@ function ActionCard({
   onCancel,
   isCancelling,
 }: ActionCardProps) {
-  const cfg         = STATUS_CONFIG[action.status]
-  const StatusIcon  = cfg.icon
-  const actionLabel = ACTION_LABELS[action.action] ?? action.action
+  const cfg         = PENDING_ACTION_STATUS_CONFIG[action.status]
+  const StatusIcon  = STATUS_ICONS[cfg.icon]
+  const actionLabel = PENDING_ACTION_LABELS[action.action] ?? action.action
   const isOwn       = action.requestedByUid === currentUid
   const isPending   = action.status === 'PENDING'
   const isExpired   = action.status === 'EXPIRED'

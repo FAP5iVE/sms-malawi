@@ -1,32 +1,35 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: apps/web/src/components/finances/PayrollTab.tsx
+ * [R-PHASE]: R1 — API Client & Query-Key Singleton Consolidation; R15 —
+ *   UI/UX Polish routes the "Run Payroll" button — previously one
+ *   unconfirmed tap creating a real payroll run for every staff member —
+ *   through the shared ConfirmDialog, and adds a visible onError to the
+ *   mutation, which previously discarded failures silently.
+ * [DEPENDS ON]: W/lib/api-client.ts,
+ *   W/components/shared/ConfirmDialog.tsx (R15)
+ */
 'use client'
 
+import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { getAuth } from 'firebase/auth'
 import { formatMWK } from '@shared/constants/malawi'
 import type { ApiPayrollRun } from '@shared/types/api'
-import { Loader2 } from 'lucide-react'
-
-async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
-  const token = await getAuth().currentUser?.getIdToken()
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
-    ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  })
-  if (!res.ok) throw new Error(`API error ${res.status}`)
-  return res.json()
-}
+import { Loader2, AlertTriangle } from 'lucide-react'
+import { apiFetch, queryKeys } from '@/lib/api-client'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 
 export function PayrollTab() {
   const year = new Date().getFullYear()
+  // R15 — run-payroll confirmation dialog visibility + visible failure state
+  const [confirmRunOpen, setConfirmRunOpen] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
   const {
     data: runs = [],
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ['payroll', year],
+    queryKey: queryKeys.finances.payroll.list({ year }),
     queryFn: () => apiFetch<ApiPayrollRun[]>(`/payroll?year=${year}`),
   })
 
@@ -37,11 +40,14 @@ export function PayrollTab() {
         body: JSON.stringify({ month, year }),
       }),
     onSuccess: () => {
+      setRunError(null)
       void refetch()
     },
+    onError: (e: Error) => setRunError(e.message),
   })
 
   const currentMonth = new Date().getMonth() + 1
+  const currentMonthName = new Date(year, currentMonth - 1).toLocaleString('en', { month: 'long' })
 
   return (
     <div className="space-y-4">
@@ -50,15 +56,26 @@ export function PayrollTab() {
           Payroll History {year}
         </h3>
         <button
-          onClick={() => triggerPayroll({ month: currentMonth, year })}
+          onClick={() => setConfirmRunOpen(true)}
           disabled={isPending}
           className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brand-navy-mid disabled:opacity-60"
           type="button"
         >
-          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          Run {new Date(year, currentMonth - 1).toLocaleString('en', { month: 'long' })} Payroll
+          {isPending ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : null}
+          Run {currentMonthName} Payroll
         </button>
       </div>
+
+      {/* R15 — visible run failure (previously silently discarded) */}
+      {runError && (
+        <div
+          className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-brand-coral"
+          role="alert"
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden />
+          {runError}
+        </div>
+      )}
 
       <div className="bg-surface border border-base rounded-xl overflow-hidden">
         <table className="w-full text-sm">
@@ -119,6 +136,19 @@ export function PayrollTab() {
           </tbody>
         </table>
       </div>
+
+      {/* R15 — confirmation before creating a real payroll run */}
+      <ConfirmDialog
+        open={confirmRunOpen}
+        title={`Run ${currentMonthName} ${year} payroll?`}
+        description="A payroll run will be created for every active staff member for this period, computing gross and net pay from their current contracts, allowances and deductions. Payroll runs are real financial records."
+        confirmLabel="Run Payroll"
+        onConfirm={() => {
+          setConfirmRunOpen(false)
+          triggerPayroll({ month: currentMonth, year })
+        }}
+        onCancel={() => setConfirmRunOpen(false)}
+      />
     </div>
   )
 }

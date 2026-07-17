@@ -1,3 +1,20 @@
+/**
+ * apps/web/src/server/routes/users.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT — added one route
+ * [R-PHASE]: R2 — Auth Session & Login Flow Correctness
+ * [PURPOSE]: Adds POST /users/me/clear-password-change-flag, following this
+ *   file's existing /me/notification-prefs self-service convention (no
+ *   requireRole gate — any authenticated user may clear only their own
+ *   requiresPasswordChange claim, a strict narrowing of ability that grants
+ *   nothing, so self-service with no role gate is the correct posture).
+ *   Called by change-password/page.tsx immediately after updatePassword()
+ *   succeeds — previously nothing in the codebase ever called the Admin SDK
+ *   to clear this claim, permanently locking new accounts out after their
+ *   first password change.
+ * [DEPENDS ON]: R1 (this route is called via the R1-consolidated apiFetch
+ *   from change-password/page.tsx)
+ */
 import { Router } from 'express'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { CreateUserSchema, UpdateUserRoleSchema, NotificationPrefSchema } from '@shared/schemas/admin'
@@ -61,4 +78,13 @@ usersRouter.patch('/me/notification-prefs', verifyAuth,
     const parsed = NotificationPrefSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     return res.json(await userService.updateNotificationPrefs(req.user!.uid, parsed.data))
+  })
+
+// POST /users/me/clear-password-change-flag — self-service only, clears the
+// caller's own requiresPasswordChange claim. No requireRole gate: narrowing
+// an ability to "only your own account" grants nothing extra.
+usersRouter.post('/me/clear-password-change-flag', verifyAuth,
+  async (req, res) => {
+    await userService.clearPasswordChangeRequirement(req.user!.uid)
+    return res.json({ ok: true })
   })

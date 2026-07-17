@@ -1,37 +1,63 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "pnpm --filter web build",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "outputDirectory": "apps/web/.next",
   "crons": [
-    {
-      "path": "/api/cron/fee-reminders",
-      "schedule": "0 5 * * *" 
-    },
-    {
-      "path": "/api/cron/late-penalties",
-      "schedule": "5 22 * * *"
-    },
-    {
-      "path": "/api/cron/installment-check",
-      "schedule": "10 22 * * *"
-    },
-
-{
-
- "path": "/api/cron/contract-alerts", 
-
-"schedule": "0 6 * * *"  },  
-
-{
-
- "path": "/api/cron/overdue-library", 
-
-"schedule": "15 22 * * *" 
-
-}
-
-    
+    { "path": "/api/cron/fee-reminders",   "schedule": "0 8 * * *" },
+    { "path": "/api/cron/overdue-library", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/risk-detection",  "schedule": "0 2 * * 1" },
+    { "path": "/api/cron/contract-alerts", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/installment-check","schedule": "0 5 * * *" },
+    { "path": "/api/cron/late-penalties",  "schedule": "0 4 * * *" }
   ],
-  "functions": {
-    "apps/web/src/app/api/**": {
-      "maxDuration": 60
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options",           "value": "DENY" },
+        { "key": "X-Content-Type-Options",    "value": "nosniff" },
+        { "key": "Referrer-Policy",            "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy",         "value": "camera=(), microphone=(), geolocation=()" },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.firebaseapp.com https://*.googleapis.com https://*.sentry.io; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cloud.appwrite.io; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.sentry.io wss://*.firebaseio.com; frame-ancestors 'none';"
+        }
+      ]
+    },
+    {
+      "source": "/api/files/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "private, no-store" }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, must-revalidate" }
+      ]
     }
-  }
+  ],
+  "redirects": [
+    {
+      "source": "/home",
+      "destination": "/",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/newsletter/confirm",
+      "destination": "/api/public/newsletter/confirm"
+    },
+    {
+      "source": "/newsletter/unsubscribe",
+      "destination": "/api/public/newsletter/unsubscribe"
+    }
+  ]
 }

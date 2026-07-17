@@ -26,6 +26,23 @@ import 'server-only'
  *   app.use(globalErrorHandler)
  *
  * Phase A9 — extracted from api-app.ts globalErrorHandler inline function.
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (R3 — Gateway Hardening), two changes:
+ *   (1) The top-of-function logger.error() call previously passed the raw
+ *       error object wholesale, including Prisma's `.meta` field — which,
+ *       for a P2002 unique-constraint violation, contains the literal
+ *       offending value (e.g. the actual duplicate registration number or
+ *       email), landing unredacted in server-side log storage. Now logs
+ *       `err.meta ? Object.keys(err.meta) : undefined` instead — field
+ *       names stay visible for debugging, literal values do not. The
+ *       client-facing response was already correctly scrubbed and is
+ *       unchanged.
+ *   (2) PRISMA_ERROR_MAP's fallback path previously mapped every unmapped
+ *       PrismaClientKnownRequestError code to a generic 400 "Database
+ *       constraint error." — including infrastructure-class codes like
+ *       P2024 (connection-pool timeout) and P2028 (transaction API error),
+ *       which are not constraint violations at all and should surface as
+ *       a retryable 503, not a 400 implying the request itself was bad.
  */
 
 import type { Request, Response, NextFunction } from 'express'
@@ -112,6 +129,20 @@ const PRISMA_ERROR_MAP: Record<string, { status: number; message: string }> = {
   },
 }
 
+/**
+ * PrismaClientKnownRequestError codes that represent an infrastructure-class
+ * failure — the query itself was well-formed, but the database could not
+ * service it in time — rather than a constraint violation caused by the
+ * request's own data. These fall through PRISMA_ERROR_MAP (they're
+ * deliberately not given a fixed message there, since they're transient)
+ * and are mapped to a 503 by globalErrorHandler below instead of the
+ * generic 400 fallback every other unmapped code receives.
+ */
+const INFRASTRUCTURE_PRISMA_CODES = new Set<string>([
+  'P2024', // Timed out fetching a new connection from the connection pool
+  'P2028', // Transaction API error (e.g. transaction timed out or aborted)
+])
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ERROR HANDLER
 // ─────────────────────────────────────────────────────────────────────────────
@@ -121,6 +152,10 @@ type AppError = Error & {
   status?: number
   /** express body-parser sets this to 'entity.parse.failed' for malformed JSON */
   type?: string
+  /** Present on Prisma errors (e.g. PrismaClientKnownRequestError.code) */
+  code?: string
+  /** Present on Prisma errors — may contain literal offending values; never logged wholesale, see below */
+  meta?: Record<string, unknown>
 }
 
 /**
@@ -141,7 +176,19 @@ export function globalErrorHandler(
   // ── Always log the full error server-side ──────────────────────────────────
   // Sentry's automatic Express instrumentation (configured in instrumentation.ts)
   // will also capture this via the error-handling hook.
-  logger.error({ err, status: err.status }, '[api] Unhandled Express error')
+  // NOTE: err.meta is deliberately reduced to its key names only — for a
+  // P2002 unique-constraint violation, err.meta contains the literal
+  // offending value (e.g. the actual duplicate registration number or
+  // email); field names remain useful for debugging without that value
+  // landing unredacted in server-side log storage.
+  logger.error({
+    err: {
+      message:  err.message,
+      code:     err.code,
+      status:   err.status,
+      metaKeys: err.meta ? Object.keys(err.meta) : undefined,
+    },
+  }, '[api] Unhandled Express error')
 
   // ── Prevent double-send if response already started ───────────────────────
   if (res.headersSent) return
@@ -149,9 +196,18 @@ export function globalErrorHandler(
   // ── Prisma known request errors (constraint violations, not-found, etc.) ───
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     const mapped = PRISMA_ERROR_MAP[err.code]
-    res
-      .status(mapped?.status ?? 400)
-      .json({ error: mapped?.message ?? 'Database constraint error.' })
+    if (mapped) {
+      res.status(mapped.status).json({ error: mapped.message })
+      return
+    }
+    // Infrastructure-class failures (e.g. connection-pool timeout) are not
+    // constraint violations — a 400 would wrongly imply the request's own
+    // data was invalid. Surface these as a retryable 503 instead.
+    if (INFRASTRUCTURE_PRISMA_CODES.has(err.code)) {
+      res.status(503).json({ error: 'Database temporarily unavailable. Please try again in a moment.' })
+      return
+    }
+    res.status(400).json({ error: 'Database constraint error.' })
     return
   }
 

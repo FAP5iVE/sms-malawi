@@ -1,4 +1,20 @@
+/*
+ * packages/shared/schemas/hr.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R11 — HR Domain: Loans UI, Leave-Conflict Wiring & Directory
+ *   Access Correction
+ * [PURPOSE]: CreateStaffSchema.role replaced the unconstrained
+ *   `z.string().min(1)` with `z.enum(USER_ROLES)` — the real 9-role
+ *   union already used everywhere else in the codebase
+ *   (S/types/roles.ts) — so an invalid role string is rejected at the
+ *   API boundary rather than silently persisting. Matches this same
+ *   phase's schema.prisma fix converting StaffProfile.role from an
+ *   unenforced String to a real Prisma enum.
+ * [DEPENDS ON]: S/types/roles.ts (USER_ROLES)
+ */
 import { z } from 'zod'
+import { USER_ROLES } from '@shared/types/roles'
 
 export const CreateStaffSchema = z.object({
   uid:            z.string().min(1),
@@ -7,7 +23,7 @@ export const CreateStaffSchema = z.object({
   lastName:       z.string().min(1),
   email:          z.string().email(),
   phone:          z.string().optional(),
-  role:           z.string().min(1),
+  role:           z.enum(USER_ROLES),
   department:     z.string().min(1),
   jobTitle:       z.string().min(1),
   employmentType: z.enum(['FULL_TIME','PART_TIME','CONTRACT','TEMPORARY']).default('FULL_TIME'),

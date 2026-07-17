@@ -1,7 +1,42 @@
 
+/*
+ * apps/web/src/server/services/receiptService.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R10 — Finance II: Payroll, Forecasting & the Finance↔Library
+ *   Reconciliation
+ * [PURPOSE]:
+ *   1. buildPayslipHtml()'s hardcoded "Pension (5%)" label now derives
+ *      the percentage from a `pensionPercent` value the caller
+ *      (payrollService.ts, this same phase) passes through from
+ *      SETTING_KEYS.FINANCE_PENSION_PERCENT — the two can never silently
+ *      disagree if the rate is ever changed in Settings.
+ *   3. Removed an unused, build-breaking import of a nonexistent
+ *      `getViewUrl` export (no such export exists in storage.ts — the
+ *      real helper is `getSignedViewUrl`; this is the identical defect
+ *      already fixed in finances.ts during R9). Nothing in this file
+ *      actually calls it, so it is simply removed rather than swapped in
+ *      unused.
+ *   4. THIRD DISCOVERED BUG, found while making fix #1: both
+ *      generateReceipt() and generatePayslipPdf() passed
+ *      STORAGE_BUCKETS.PAYSLIPS (a StorageBucket — the single literal
+ *      'school_files') to uploadFile(), whose first parameter is a
+ *      FilePrefix, not a StorageBucket — the identical class of defect
+ *      already fixed in R10's reportExportService.ts and finances.ts.
+ *      Both functions also returned uploadFile()'s whole `UploadResult`
+ *      object where their own declared return type (and every caller —
+ *      feeService.recordPayment(), payrollService.processMonthlyPayroll())
+ *      expects a plain fileId string; a Payment/Payslip row's
+ *      receiptKey/payslipKey has genuinely never been a valid file
+ *      reference. Both are corrected to use their real FILE_PREFIX
+ *      category (RECEIPT / PAYSLIP) and return `.fileId`.
+ * [DEPENDS ON]: payrollService.ts (passes pensionPercent through, same
+ *   phase)
+ */
+
 import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
-import { uploadFile, getViewUrl, STORAGE_BUCKETS } from '@/lib/storage'
+import { uploadFile, FILE_PREFIX } from '@/lib/storage'
 import { formatMWK } from '@shared/constants/malawi'
 
 async function launchBrowser() {
@@ -43,7 +78,8 @@ export async function generateReceipt(
   const pdfBuffer = Buffer.from(await page.pdf({ format: 'A4', printBackground: true }))
   await browser.close()
   const filename = `receipt_${paymentId}.pdf`
-  return uploadFile(STORAGE_BUCKETS.PAYSLIPS, pdfBuffer, filename, 'application/pdf')
+  const uploaded = await uploadFile(FILE_PREFIX.RECEIPT, pdfBuffer, filename, 'application/pdf')
+  return uploaded.fileId
 }
 
 // --- PAYSLIP PDF ------------------------------------------
@@ -57,6 +93,7 @@ export async function generatePayslipPdf(
     grossSalary: number
     paye: number
     pension: number
+    pensionPercent: number
     loanDeduction: number
     netSalary: number
   },
@@ -70,7 +107,8 @@ export async function generatePayslipPdf(
   const pdfBuffer = Buffer.from(await page.pdf({ format: 'A4', printBackground: true }))
   await browser.close()
   const filename = `payslip_${data.staffUid}_${year}-${String(month).padStart(2, '0')}.pdf`
-  return uploadFile(STORAGE_BUCKETS.PAYSLIPS, pdfBuffer, filename, 'application/pdf')
+  const uploaded = await uploadFile(FILE_PREFIX.PAYSLIP, pdfBuffer, filename, 'application/pdf')
+  return uploaded.fileId
 }
 
 // --- HTML TEMPLATES ---------------------------------------
@@ -110,7 +148,7 @@ function buildReceiptHtml(d: {
 
 function buildPayslipHtml(data: {
   staffUid: string; staffName: string; grossSalary: number
-  paye: number; pension: number; loanDeduction: number; netSalary: number
+  paye: number; pension: number; pensionPercent: number; loanDeduction: number; netSalary: number
   monthName: string; year: number
 }): string {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
@@ -130,7 +168,7 @@ function buildPayslipHtml(data: {
       <table>
         <tr><td>Gross Salary</td><td>${formatMWK(data.grossSalary)}</td></tr>
         <tr><td>PAYE Tax</td><td>- ${formatMWK(data.paye)}</td></tr>
-        <tr><td>Pension (5%)</td><td>- ${formatMWK(data.pension)}</td></tr>
+        <tr><td>Pension (${data.pensionPercent}%)</td><td>- ${formatMWK(data.pension)}</td></tr>
         ${data.loanDeduction > 0 ? `<tr><td>Loan Deduction</td><td>- ${formatMWK(data.loanDeduction)}</td></tr>` : ''}
         <tr><td class="net">Net Pay</td><td class="net">${formatMWK(data.netSalary)}</td></tr>
       </table>

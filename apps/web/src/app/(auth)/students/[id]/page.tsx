@@ -1,3 +1,31 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: apps/web/src/app/(auth)/students/[id]/page.tsx
+ * [R-PHASE]: R5 — Academics I: Admissions & Student Records; further
+ *   edited in R8 — Academics IV: Report Cards, Transcripts, Promotion &
+ *   Risk Assessment
+ * [PURPOSE — R5]: (1) Edit button visibility moves from RoleGuard(['admin',
+ *   'high_rank','lower_rank']) to PermissionGuard permission="student.edit"
+ *   — admin correctly lacks student.edit per the confirmed-correct
+ *   permission matrix. (2) The Fee Status card's hardcoded "Fee balance
+ *   visible after Finance module is complete" placeholder is replaced with
+ *   the real feeBalance/riskLevel values already present on the
+ *   ApiStudentDetail object this page already fetches via useStudent() —
+ *   no new backend call needed, this is a wiring-only fix (both fields
+ *   were added to the shared ApiStudent type in this same phase).
+ * [PURPOSE — R8]: Added a "Report Card" entry point (button + term
+ *   selector) opening PrintableReportCard.tsx as an in-browser print
+ *   preview — distinct from the downloadable-PDF path
+ *   reportCardService.ts owns — via the new useReportCardData() hook
+ *   (GET /exams/report-card/:studentId/data, this same phase). The query
+ *   only runs once the panel is opened (studentId is passed as '' until
+ *   then, keeping the hook's own `enabled` check off by default), so
+ *   simply viewing a profile never triggers an extra fee-gated fetch.
+ * [DEPENDS ON]: @shared/types/api (ApiStudent.feeBalance/riskLevel),
+ *   apps/web/src/components/shared/StudentRiskBadge.tsx,
+ *   apps/web/src/hooks/useExams.ts (useReportCardData),
+ *   apps/web/src/hooks/usePublic.ts (usePublicSchoolInfo)
+ */
 'use client'
 
 import { useParams } from 'next/navigation'
@@ -5,9 +33,15 @@ import { useState } from 'react'
 import { useRef } from 'react'
 import { useReactToPrint } from 'react-to-print'
 import { useStudent } from '@/hooks/useStudents'
+import { useReportCardData } from '@/hooks/useExams'
+import { usePublicSchoolInfo } from '@/hooks/usePublic'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { StudentForm } from '@/components/students/StudentForm'
-import { ArrowLeft, AlertCircle, Pencil, Printer } from 'lucide-react'
+import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
+import { PrintableReportCard } from '@/components/shared/PrintableReportCard'
+import { formatMWK } from '@shared/constants/malawi'
+import { ArrowLeft, Pencil, Printer, FileText, Loader2, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
 export default function StudentProfilePage() {
@@ -36,6 +70,16 @@ function ProfileContent() {
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({ contentRef: printRef })
 
+  const { data: schoolInfo } = usePublicSchoolInfo()
+  const academicYear = schoolInfo?.currentYear ?? '2025/2026'
+  const [showReportCard, setShowReportCard] = useState(false)
+  const [reportCardTerm, setReportCardTerm] = useState<1 | 2 | 3>(3)
+  const {
+    data:      reportCardData,
+    isLoading: reportCardLoading,
+    error:     reportCardError,
+  } = useReportCardData(showReportCard ? id : '', academicYear, reportCardTerm)
+
   if (isLoading)
     return (
       <div className="space-y-4">
@@ -61,7 +105,7 @@ function ProfileContent() {
         <span className="ml-auto font-mono text-xs text-muted bg-page px-2 py-1 rounded border border-base">
           {student.registrationNo}
         </span>
-        <RoleGuard allowed={['admin', 'high_rank', 'lower_rank']}>
+        <PermissionGuard permission="student.edit">
           <button
             onClick={() => setEditing(true)}
             className="flex items-center gap-1.5 border border-base px-3 py-1.5 rounded-lg text-sm hover:bg-page"
@@ -69,13 +113,31 @@ function ProfileContent() {
           >
             <Pencil className="w-3.5 h-3.5" /> Edit
           </button>
-        </RoleGuard>
+        </PermissionGuard>
         <button
           onClick={handlePrint}
           className="flex items-center gap-1.5 border border-base px-3 py-1.5 rounded-lg text-sm hover:bg-page"
         >
           <Printer className="w-3.5 h-3.5" /> Print
         </button>
+        <div className="flex items-center gap-1.5">
+          <select
+            value={reportCardTerm}
+            onChange={(e) => setReportCardTerm(Number(e.target.value) as 1 | 2 | 3)}
+            aria-label="Report card term"
+            className="border border-base rounded-lg text-sm px-2 py-1.5 bg-surface min-h-[36px]"
+          >
+            {[1, 2, 3].map((t) => (
+              <option key={t} value={t}>Term {t}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => setShowReportCard(true)}
+            className="flex items-center gap-1.5 border border-base px-3 py-1.5 rounded-lg text-sm hover:bg-page"
+          >
+            <FileText className="w-3.5 h-3.5" /> Report Card
+          </button>
+        </div>
       </div>
 
       <div ref={printRef}>
@@ -120,22 +182,58 @@ function ProfileContent() {
           </div>
         </div>
 
-        {/* Fee balance badge card */}
+        {/* Fee balance + risk card */}
         <div className="bg-surface border border-base rounded-xl p-5 mt-4">
           <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
             Fee Status
           </p>
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-brand-amber" />
-            <p className="text-sm text-muted">
-              Fee balance visible after Finance module is complete. Check the Finances tab for
-              outstanding invoices.
-            </p>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-muted mb-1">Outstanding Balance</p>
+              <p
+                className={`text-lg font-heading font-bold ${
+                  (student.feeBalance ?? 0) > 0 ? 'text-brand-coral' : 'text-brand-teal'
+                }`}
+              >
+                {formatMWK(student.feeBalance ?? 0)}
+              </p>
+            </div>
+            <StudentRiskBadge riskLevel={student.riskLevel ?? 'NONE'} variant="card" />
           </div>
         </div>
       </div>
 
       {editing && <StudentForm studentId={id} onClose={() => setEditing(false)} />}
+
+      {showReportCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="absolute inset-0" onClick={() => setShowReportCard(false)} />
+          <div className="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl p-4">
+            {reportCardLoading && (
+              <div className="flex items-center justify-center gap-2 py-16 text-muted text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading report card…
+              </div>
+            )}
+            {reportCardError && (
+              <div className="flex flex-col items-center gap-2 py-16 text-center">
+                <AlertTriangle className="w-6 h-6 text-brand-coral" />
+                <p className="text-sm text-brand-coral font-medium">
+                  {reportCardError instanceof Error ? reportCardError.message : 'Failed to load report card.'}
+                </p>
+                <button
+                  onClick={() => setShowReportCard(false)}
+                  className="mt-2 text-sm text-muted hover:text-body underline"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+            {reportCardData && (
+              <PrintableReportCard data={reportCardData} onClose={() => setShowReportCard(false)} />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

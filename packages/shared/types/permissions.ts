@@ -1,3 +1,62 @@
+/**
+ * packages/shared/types/permissions.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R4 — Auth/Security Domain; further edited in R6 — Academics
+ *   II (class.markAttendance) and R7 — Academics III: Exam Pipeline Repair
+ *   & Grading Engine Unification (exam.computeResults — POST /exams/compute
+ *   had no PERMISSIONS_MAP entry at all; added and granted to academic/
+ *   exam_officer, the two roles that already hold exam.enterOwnClassMarks/
+ *   exam.approveResults respectively for the same class-level workflow).
+ * [PURPOSE]: Adds a new 'search.globalSearch' permission (first entry in a
+ *   new 'search' domain) and grants it to the six staff UserRole values
+ *   with a confirmed legitimate school-wide lookup need: admin, high_rank,
+ *   finance, library, academic, hr.
+ *   MASTER_ROADMAP.md's R4 change list names this set using the product's
+ *   conceptual nine-role model — "admin, headteacher, deputy_headteacher,
+ *   teacher, hr, finance, librarian" — which does not match this file's
+ *   actual UserRole enum (S/types/roles.ts: admin, high_rank, finance,
+ *   library, lower_rank, academic, hr, exam_officer, student — confirmed
+ *   by reading roles.ts directly, not assumed). Mapping applied: headteacher
+ *   + deputy_headteacher both collapse to the single high_rank role (its
+ *   own header comment below confirms "Headteacher, deputy headteacher,
+ *   principal" — and a duplicate 'high_rank' object key would be a syntax
+ *   error regardless); teacher → academic; librarian → library. The
+ *   roadmap's acceptance criteria independently confirms the exclusion
+ *   side of this mapping — "returns 403 for student and parent/lower_rank
+ *   roles" pairs the roadmap's conceptual "parent" role with this codebase's
+ *   actual 'lower_rank' role by name, and lower_rank's own header comment
+ *   ("Secretaries, registrars, administrative assistants") confirms it is
+ *   correctly excluded regardless of the label mismatch. 'exam_officer' is
+ *   named in neither the grant list nor the exclusion list; consistent with
+ *   this file's own documented convention (ROLE_PERMISSIONS is a
+ *   deliberately curated allowlist, not a blanket grant — confirmed
+ *   elsewhere in this audit for the admin block specifically), it is left
+ *   ungranted rather than assumed-included.
+ *
+ *   R9 — Finance I: Invoicing, Fees & the Accounting Ledger Reconnection —
+ *   granted 'finance.rejectExpense' (previously a confirmed-dead
+ *   permission, held by zero roles) to high_rank, exactly mirroring
+ *   'finance.approveExpense''s real grant (verified by reading this file
+ *   directly — high_rank only, not also 'finance' as the roadmap's own
+ *   prose speculatively suggested) since approve and reject are the same
+ *   expense-review workflow's two outcomes and share one authorization
+ *   boundary.
+ *
+ *   R14 — Analytics & Reports Domain — adds
+ *   'report.viewAnyStudentPerformance' and grants it to admin, high_rank
+ *   and finance. The /analytics/student/* and /reports/student routes
+ *   already let those three roles pass an arbitrary studentId and read any
+ *   student's performance, subject breakdown or fee statement, but NO
+ *   permission in the matrix formally covered that capability — the three
+ *   student-scoped report.viewOwn* permissions authorise a student to read
+ *   their OWN record and nothing more. Rather than remove an oversight
+ *   function the school plausibly needs, R14 names the capability and gates
+ *   those routes on it explicitly. finance receives it because its own
+ *   fee-statement lookup by studentId is the same capability applied to the
+ *   finance domain; no other role does.
+ * [DEPENDS ON]: none
+ */
 import type { UserRole } from './roles'
 
 // ─────────────────────────────────────────────────────────
@@ -37,6 +96,7 @@ export type Permission =
   | 'class.viewAssignments'          // View class assignments
   | 'class.submitAssignment'         // Submit an assignment (student)
   | 'class.viewAnalytics'            // View class analytics panel
+  | 'class.markAttendance'           // Mark and view attendance for a class (R6)
 
   // ── APPLICATION ──────────────────────────────────────
   | 'application.view'               // View admission applications
@@ -97,6 +157,16 @@ export type Permission =
   | 'report.viewOwnPerformance'      // Own exam results and performance trend (student)
   | 'report.viewOwnAttendance'       // Own attendance record (student)
   | 'report.viewOwnFeeStatement'     // Own fee statement and payment history (student)
+  | 'report.viewAnyStudentPerformance' // [R14] Look up ANY student's performance /
+                                     // subject breakdown / fee statement by studentId.
+                                     // Formalises an oversight capability the
+                                     // /analytics/student/* and /reports/student
+                                     // routes already served in practice for
+                                     // admin/high_rank/finance, but which no
+                                     // permission in the matrix covered — the
+                                     // student-scoped report.viewOwn* permissions
+                                     // deliberately do NOT authorise reading
+                                     // another student's record.
   | 'report.export'                  // Export any permitted report to PDF or XLSX
 
   // ── FINANCE ──────────────────────────────────────────
@@ -212,6 +282,7 @@ export type Permission =
   | 'exam.viewSchoolAnalytics'       // View school-wide exam performance analytics
   | 'exam.viewExamAuditLog'          // View who entered / changed / released marks
   | 'exam.manageManebTimetable'      // Manage MANEB national exam timetable entries
+  | 'exam.computeResults'            // Trigger term-result computation for a class (R7)
 
   // ── USER MANAGEMENT ──────────────────────────────────
   | 'userMgmt.createUser'            // Create a new Firebase Auth account + staff record
@@ -251,6 +322,18 @@ export type Permission =
   | 'settings.manageHRConfig'        // HR module settings, leave policy (hr)
   | 'settings.manageCommunicationPrefs' // Communication workflow settings (lower_rank)
   | 'settings.manageClassroomPrefs'  // Classroom and teaching preferences (academic)
+
+  // ── SEARCH (new domain) ──────────────────────────────────
+  | 'search.globalSearch'           // Unscoped school-wide lookup across students and staff
+
+  // ── PLACEMENT (R18 — advisory university placement) ──────────
+  | 'placement.viewOwn'             // A student views their own placement + recommendations
+  | 'placement.recordOwnChoice'     // A student records their own ranked choices / self-reports outcome
+  | 'placement.view'                // View any student's placement + the cohort (all roles, incl. student)
+  | 'placement.viewAnalytics'       // View cohort placement analytics (all roles, incl. student)
+  | 'placement.manage'              // Generate eligibility, set choices for a student (high_rank, exam_officer)
+  | 'placement.recordOutcome'       // Record a placement outcome for a student (high_rank, exam_officer)
+  | 'placement.verifyOutcome'       // Verify a recorded placement outcome (high_rank only)
 
 // ─────────────────────────────────────────────────────────
 //  ROLE → PERMISSION MAP
@@ -307,6 +390,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'report.viewLoginAttempts',
     'report.viewDatabaseMetrics',
     'report.viewBackupStatus',
+    'report.viewAnyStudentPerformance',   // [R14] oversight lookup of any student
     'report.export',
 
     // Finance — system log visibility only (no write operations)
@@ -356,6 +440,13 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'settings.manageSystemConfig',
     'settings.manageSecurityConfig',
     'settings.manageMonitoringConfig',
+
+    // Search — school-wide lookup
+    'search.globalSearch',
+
+    // Placement — advisory view + analytics (R18)
+    'placement.view',
+    'placement.viewAnalytics',
   ]),
 
   // ── HIGH_RANK ─────────────────────────────────────────
@@ -435,6 +526,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'report.viewAttendanceSummary',
     'report.viewClassPerformance',
     'report.viewAuditLogs',
+    'report.viewAnyStudentPerformance',   // [R14] oversight lookup of any student
     'report.export',
 
     // Finance — view and approve only (no write / transaction rights)
@@ -444,6 +536,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'finance.viewPayments',
     'finance.viewExpenses',
     'finance.approveExpense',
+    'finance.rejectExpense',
     'finance.viewBudget',
     'finance.approveBudget',
     'finance.viewScholarships',
@@ -516,6 +609,16 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'settings.manageGradingConfig',
     'settings.manageSchedulingRules',
     'settings.manageManebConfig',
+
+    // Search — school-wide lookup
+    'search.globalSearch',
+
+    // Placement — full advisory control incl. verification (R18)
+    'placement.view',
+    'placement.viewAnalytics',
+    'placement.manage',
+    'placement.recordOutcome',
+    'placement.verifyOutcome',
   ]),
 
   // ── FINANCE ───────────────────────────────────────────
@@ -549,6 +652,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'report.viewExpenseBreakdown',
     'report.viewPayrollSummary',
     'report.viewScholarshipSummary',
+    'report.viewAnyStudentPerformance',   // [R14] any student's fee statement
     'report.export',
 
     // Finance — full business operations
@@ -606,6 +710,13 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'settings.updateNotifPrefs',
     'settings.manageFinanceConfig',
     'settings.managePayrollConfig',
+
+    // Search — school-wide lookup
+    'search.globalSearch',
+
+    // Placement — advisory view + analytics (R18)
+    'placement.view',
+    'placement.viewAnalytics',
   ]),
 
   // ── LIBRARY ───────────────────────────────────────────
@@ -684,6 +795,13 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'settings.viewPersonal',
     'settings.updateNotifPrefs',
     'settings.manageLibraryConfig',
+
+    // Search — school-wide lookup
+    'search.globalSearch',
+
+    // Placement — advisory view + analytics (R18)
+    'placement.view',
+    'placement.viewAnalytics',
   ]),
 
   // ── LOWER_RANK ────────────────────────────────────────
@@ -757,6 +875,10 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'settings.viewPersonal',
     'settings.updateNotifPrefs',
     'settings.manageCommunicationPrefs',
+
+    // Placement — advisory view + analytics (R18)
+    'placement.view',
+    'placement.viewAnalytics',
   ]),
 
   // ── ACADEMIC ──────────────────────────────────────────
@@ -775,6 +897,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'class.giveAssignment',
     'class.viewAssignments',
     'class.viewAnalytics',
+    'class.markAttendance',
 
     // Applications — no access (§3.8.1.6)
 
@@ -828,6 +951,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'exam.edit',
     'exam.enterOwnClassMarks',
     'exam.finalizeMarks',
+    'exam.computeResults',
     'exam.viewReleasedResults',
     'exam.viewDraftMarks',      // Own draft marks only — enforced at service layer
     'exam.viewClassAnalytics',
@@ -837,6 +961,13 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'settings.viewPersonal',
     'settings.updateNotifPrefs',
     'settings.manageClassroomPrefs',
+
+    // Search — school-wide lookup
+    'search.globalSearch',
+
+    // Placement — advisory view + analytics (R18)
+    'placement.view',
+    'placement.viewAnalytics',
   ]),
 
   // ── HR ────────────────────────────────────────────────
@@ -917,6 +1048,13 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'settings.viewPersonal',
     'settings.updateNotifPrefs',
     'settings.manageHRConfig',
+
+    // Search — school-wide lookup
+    'search.globalSearch',
+
+    // Placement — advisory view + analytics (R18)
+    'placement.view',
+    'placement.viewAnalytics',
   ]),
 
   // ── EXAM_OFFICER ──────────────────────────────────────
@@ -980,6 +1118,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'exam.delete',
     'exam.viewDraftMarks',
     'exam.approveResults',
+    'exam.computeResults',
     'exam.viewReleasedResults',
     'exam.viewAllResults',
     'exam.runPromotionEngine',
@@ -1001,6 +1140,12 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'settings.manageGradingConfig',
     'settings.manageSchedulingRules',
     'settings.manageManebConfig',
+
+    // Placement — manage + record outcomes; verification is high_rank only (R18)
+    'placement.view',
+    'placement.viewAnalytics',
+    'placement.manage',
+    'placement.recordOutcome',
   ]),
 
   // ── STUDENT ───────────────────────────────────────────
@@ -1055,6 +1200,12 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Settings — personal profile and notification preferences only
     'settings.viewPersonal',
     'settings.updateNotifPrefs',
+
+    // Placement — own placement self-service + cohort/analytics visibility (R18)
+    'placement.viewOwn',
+    'placement.recordOwnChoice',
+    'placement.view',
+    'placement.viewAnalytics',
   ]),
 } as const
 

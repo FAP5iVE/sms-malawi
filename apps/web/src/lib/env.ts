@@ -36,7 +36,7 @@ const serverSchema = z.object({
     .min(32, 'CRON_SECRET must be at least 32 characters for security'),
   RESEND_API_KEY: z.string().optional(),
   ALGOLIA_APP_ID: z.string().optional(),
-  ALGOLIA_API_KEY: z.string().optional(),
+  ALGOLIA_ADMIN_KEY: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   VERCEL_ENV: z.enum(['production', 'preview', 'development']).optional(),
 })
@@ -146,7 +146,7 @@ export const env = {
   // ── Optional
   get RESEND_API_KEY()  { return getServerEnv().RESEND_API_KEY },
   get ALGOLIA_APP_ID()  { return getServerEnv().ALGOLIA_APP_ID },
-  get ALGOLIA_API_KEY() { return getServerEnv().ALGOLIA_API_KEY },
+  get ALGOLIA_ADMIN_KEY() { return getServerEnv().ALGOLIA_ADMIN_KEY },
 
   // ── Runtime
   get NODE_ENV()       { return getServerEnv().NODE_ENV },

@@ -1,3 +1,27 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: packages/shared/types/settings.ts
+ * [R-PHASE]: R8 — Academics IV: Report Cards, Transcripts, Promotion & Risk
+ *   Assessment
+ * [PURPOSE]: Adds SCHOOL_LOGO_URL (PrintableReportCard.tsx's real logo,
+ *   replacing the hardcoded "CREST" text placeholder) and six risk
+ *   threshold keys (RISK_FEE_DEBT_HIGH/MEDIUM, RISK_ABSENCE_HIGH/MEDIUM,
+ *   RISK_SUBJECT_FAILS_HIGH/MEDIUM) — riskService.ts's thresholds were the
+ *   one hardcoded-threshold set in the exam/academic domain with no
+ *   admin-configuration mechanism at all, unlike grading and promotion.
+ *
+ *   R14 — Analytics & Reports Domain — adds
+ *   HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS. reportService.getHRReport()'s
+ *   contract-expiry window was a hardcoded 60-day literal, independent of
+ *   (and free to silently drift from) the 60-day default the contract-alert
+ *   pipeline uses. Contract-expiry lookahead is a real school policy value,
+ *   so it belongs in SystemSettings alongside every other admin-configurable
+ *   HR threshold rather than as a magic number inside one report function.
+ * [DEPENDS ON]: none
+ */
+
+import { DEFAULT_PAYE_BRACKETS } from '../constants/malawi/finance'
+
 // ─────────────────────────────────────────────────────────
 //  COMPLEX VALUE INTERFACES
 //  Defined before the value map so the map can reference them.
@@ -54,6 +78,7 @@ export const SETTING_KEYS = {
   SCHOOL_EMAIL:                   'school_email',
   SCHOOL_WEBSITE:                 'school_website',
   SCHOOL_FOUNDED_YEAR:            'school_founded_year',
+  SCHOOL_LOGO_URL:                'school_logo_url',
 
   // ── Exam and grading
   EXAM_PASS_MARK_THRESHOLD:       'exam_pass_mark_threshold',
@@ -64,6 +89,14 @@ export const SETTING_KEYS = {
   // ── Student promotion
   PROMOTION_MIN_AVERAGE:          'promotion_min_average',
   PROMOTION_REQUIRED_PASSES:      'promotion_required_passes',
+
+  // ── Student risk thresholds
+  RISK_FEE_DEBT_HIGH:             'risk_fee_debt_high',
+  RISK_FEE_DEBT_MEDIUM:           'risk_fee_debt_medium',
+  RISK_ABSENCE_HIGH:              'risk_absence_high',
+  RISK_ABSENCE_MEDIUM:            'risk_absence_medium',
+  RISK_SUBJECT_FAILS_HIGH:        'risk_subject_fails_high',
+  RISK_SUBJECT_FAILS_MEDIUM:      'risk_subject_fails_medium',
 
   // ── Finance — fee and penalty
   FINANCE_LATE_PENALTY_PER_DAY:   'finance_late_penalty_per_day',
@@ -92,6 +125,9 @@ export const SETTING_KEYS = {
   HR_PATERNITY_LEAVE_DAYS:        'hr_paternity_leave_days',
   HR_STUDY_LEAVE_DAYS:            'hr_study_leave_days',
   HR_EMERGENCY_LEAVE_DAYS:        'hr_emergency_leave_days',
+
+  // ── HR — contract management
+  HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS: 'hr_contract_expiry_lookahead_days',
 
   // ── Security — session
   SESSION_TIMEOUT_STUDENT_MINS:   'session_timeout_student_mins',
@@ -156,6 +192,7 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.SCHOOL_EMAIL]:          string
   readonly [SETTING_KEYS.SCHOOL_WEBSITE]:        string
   readonly [SETTING_KEYS.SCHOOL_FOUNDED_YEAR]:   number
+  readonly [SETTING_KEYS.SCHOOL_LOGO_URL]:       string  // Appwrite file view URL, '' if none uploaded
 
   // ── Exam and grading
   readonly [SETTING_KEYS.EXAM_PASS_MARK_THRESHOLD]: number  // whole-number percent, default 35
@@ -166,6 +203,15 @@ export interface SettingValueMap {
   // ── Promotion
   readonly [SETTING_KEYS.PROMOTION_MIN_AVERAGE]:      number  // percent, default 35
   readonly [SETTING_KEYS.PROMOTION_REQUIRED_PASSES]:  number  // subject count, default 5
+
+  // ── Student risk thresholds — the boundaries riskService.ts's
+  // assessStudentRisk() checks (percentages except subject-fail counts)
+  readonly [SETTING_KEYS.RISK_FEE_DEBT_HIGH]:        number  // % balance remaining, default 70
+  readonly [SETTING_KEYS.RISK_FEE_DEBT_MEDIUM]:      number  // % balance remaining, default 40
+  readonly [SETTING_KEYS.RISK_ABSENCE_HIGH]:         number  // % absent, default 25
+  readonly [SETTING_KEYS.RISK_ABSENCE_MEDIUM]:       number  // % absent, default 15
+  readonly [SETTING_KEYS.RISK_SUBJECT_FAILS_HIGH]:   number  // subject count, default 4
+  readonly [SETTING_KEYS.RISK_SUBJECT_FAILS_MEDIUM]: number  // subject count, default 2
 
   // ── Finance — fees
   readonly [SETTING_KEYS.FINANCE_LATE_PENALTY_PER_DAY]:    number  // MWK
@@ -194,6 +240,7 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS]:     number
   readonly [SETTING_KEYS.HR_STUDY_LEAVE_DAYS]:         number
   readonly [SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS]:     number
+  readonly [SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS]: number  // days
 
   // ── Security
   readonly [SETTING_KEYS.SESSION_TIMEOUT_STUDENT_MINS]: number
@@ -223,28 +270,6 @@ export interface SettingMeta<K extends SettingKey = SettingKey> {
   description: string
   defaultValue: SettingValueMap[K]
 }
-
-/** Default Malawi PAYE brackets (2025 — verify with MRA before production). */
-const DEFAULT_PAYE_BRACKETS: PayeBracket[] = [
-  {
-    minAnnualMwk: 0,
-    maxAnnualMwk: 1_200_000,
-    ratePercent: 0,
-    label: 'Tax-free band (0 – MWK 1,200,000)',
-  },
-  {
-    minAnnualMwk: 1_200_001,
-    maxAnnualMwk: 2_400_000,
-    ratePercent: 25,
-    label: '25% band (MWK 1,200,001 – 2,400,000)',
-  },
-  {
-    minAnnualMwk: 2_400_001,
-    maxAnnualMwk: null,
-    ratePercent: 30,
-    label: '30% band (above MWK 2,400,000)',
-  },
-]
 
 export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
   // ── Academic
@@ -376,6 +401,13 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     description: 'Year the school was established.',
     defaultValue: 1990,
   },
+  [SETTING_KEYS.SCHOOL_LOGO_URL]: {
+    key: SETTING_KEYS.SCHOOL_LOGO_URL,
+    category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
+    isPublic: true,
+    description: 'Signed Appwrite view URL for the school crest/logo, shown on report cards and transcripts. Empty until one is uploaded.',
+    defaultValue: '',
+  },
 
   // ── Exam and grading
   [SETTING_KEYS.EXAM_PASS_MARK_THRESHOLD]: {
@@ -423,6 +455,50 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     defaultValue: 5,
   },
 
+  // ── Student risk thresholds
+  [SETTING_KEYS.RISK_FEE_DEBT_HIGH]: {
+    key: SETTING_KEYS.RISK_FEE_DEBT_HIGH,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Fee balance remaining (% of total) above which a student is flagged HIGH risk.',
+    defaultValue: 70,
+  },
+  [SETTING_KEYS.RISK_FEE_DEBT_MEDIUM]: {
+    key: SETTING_KEYS.RISK_FEE_DEBT_MEDIUM,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Fee balance remaining (% of total) above which a student is flagged MEDIUM risk.',
+    defaultValue: 40,
+  },
+  [SETTING_KEYS.RISK_ABSENCE_HIGH]: {
+    key: SETTING_KEYS.RISK_ABSENCE_HIGH,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Absence rate (%) above which a student is flagged HIGH risk.',
+    defaultValue: 25,
+  },
+  [SETTING_KEYS.RISK_ABSENCE_MEDIUM]: {
+    key: SETTING_KEYS.RISK_ABSENCE_MEDIUM,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Absence rate (%) above which a student is flagged MEDIUM risk.',
+    defaultValue: 15,
+  },
+  [SETTING_KEYS.RISK_SUBJECT_FAILS_HIGH]: {
+    key: SETTING_KEYS.RISK_SUBJECT_FAILS_HIGH,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Number of failed subjects above which a student is flagged HIGH risk.',
+    defaultValue: 4,
+  },
+  [SETTING_KEYS.RISK_SUBJECT_FAILS_MEDIUM]: {
+    key: SETTING_KEYS.RISK_SUBJECT_FAILS_MEDIUM,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Number of failed subjects at or above which a student is flagged MEDIUM risk.',
+    defaultValue: 2,
+  },
+
   // ── Finance — fees and penalties
   [SETTING_KEYS.FINANCE_LATE_PENALTY_PER_DAY]: {
     key: SETTING_KEYS.FINANCE_LATE_PENALTY_PER_DAY,
@@ -466,7 +542,7 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     category: SETTING_CATEGORIES.FINANCE,
     isPublic: false,
     description: 'PAYE income tax brackets. Each bracket defines a monthly income range and tax rate. Verify with MRA annually.',
-    defaultValue: DEFAULT_PAYE_BRACKETS,
+    defaultValue: DEFAULT_PAYE_BRACKETS.brackets,
   },
 
   // ── Library
@@ -569,6 +645,13 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     isPublic: false,
     description: 'Emergency leave entitlement in days per calendar year.',
     defaultValue: 3,
+  },
+  [SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS]: {
+    key: SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS,
+    category: SETTING_CATEGORIES.HR,
+    isPublic: false,
+    description: 'How many days ahead of a contract end date a staff contract counts as "expiring soon" in HR reports and alerts.',
+    defaultValue: 60,
   },
 
   // ── Security
@@ -677,6 +760,7 @@ export interface SchoolIdentitySettings {
   schoolEmail: string
   schoolWebsite: string
   schoolFoundedYear: number
+  schoolLogoUrl: string
   currentAcademicYear: string
   timezone: string
   currency: string

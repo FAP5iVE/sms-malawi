@@ -13,6 +13,15 @@
  *
  * Export: StatCard, StatCardGrid
  * StatCardGrid = motion container that orchestrates true stagger across children.
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R15 — UI/UX Polish: Shared Components, Dashboards,
+ *   Confirmation Dialogs & Data-Display Consistency
+ * [PURPOSE]: Added statValue() — the single formatting helper every role
+ *   dashboard's newly-wired stat cards share ('…' while the backing query
+ *   loads, '—' only when the value is genuinely unavailable, the formatted
+ *   figure otherwise), so nine dashboards don't each re-implement the same
+ *   three-state ternary.
  */
 
 import { motion } from 'framer-motion'
@@ -27,6 +36,27 @@ import {
   reducedMotionTransition,
 } from '@/lib/motion'
 import { cn } from '@/lib/utils'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STAT VALUE FORMATTER (R15)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Three-state stat-card value: '…' while loading, '—' when the resolved
+ * value is null/undefined (query errored or the figure doesn't exist), the
+ * formatted value otherwise. `format` defaults to en-US thousands grouping
+ * for numbers and String() passthrough for strings.
+ */
+export function statValue(
+  isLoading: boolean,
+  value: number | string | null | undefined,
+  format?: (v: number | string) => string,
+): string {
+  if (isLoading) return '…'
+  if (value === null || value === undefined) return '—'
+  if (format) return format(value)
+  return typeof value === 'number' ? value.toLocaleString('en-US') : value
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES

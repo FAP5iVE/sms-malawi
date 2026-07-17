@@ -1,20 +1,40 @@
 'use client'
 
-import { useState } from 'react'
-import { RoleGuard } from '@/components/shared/RoleGuard'
-import { useAuthStore } from '@/store/authStore'
-import { InvoicesTab } from '@/components/finances/InvoicesTab'
-import { ExpensesTab } from '@/components/finances/ExpensesTab'
-import { PayrollTab } from '@/components/finances/PayrollTab'
-import { BudgetTab } from '@/components/finances/BudgetTab'
-import { useFinanceSummary } from '@/hooks/useFinances'
-import { ScholarshipTab } from '@/components/finances/ScholarshipTab'
-import { ReportsExportPanel } from '@/components/finances/ReportsExportPanel'
-import { LibraryFinesTab } from '@/components/finances/LibraryFinesTab'
-import { formatMWK } from '@shared/constants/malawi'
-import { Banknote, TrendingDown, TrendingUp, PieChart } from 'lucide-react'
+/**
+ * apps/web/src/app/(auth)/finances/page.tsx
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R15 — UI/UX Polish: Shared Components, Dashboards,
+ *   Confirmation Dialogs & Data-Display Consistency
+ * [PURPOSE]: Initialises the active tab from ?tab= (post-hydration,
+ *   validated against the role-visible tab list) so FinanceDashboard's
+ *   corrected quick actions can deep-link into Invoices/Expenses/etc.
+ * [DEPENDS ON]: none
+ */
 
-type Tab = 'invoices' | 'expenses' | 'payroll' | 'budget' | 'scholarships' | 'fines' | 'reports'
+import { useState, useEffect }   from 'react'
+import { RoleGuard }             from '@/components/shared/RoleGuard'
+import { useAuthStore }          from '@/store/authStore'
+import { InvoicesTab }           from '@/components/finances/InvoicesTab'
+import { ExpensesTab }           from '@/components/finances/ExpensesTab'
+import { PayrollTab }            from '@/components/finances/PayrollTab'
+import { BudgetTab }             from '@/components/finances/BudgetTab'
+import { useFinanceSummary }     from '@/hooks/useFinances'
+import { ScholarshipTab }        from '@/components/finances/ScholarshipTab'
+import { ReportsExportPanel }    from '@/components/finances/ReportsExportPanel'
+import { LibraryFinesTab }       from '@/components/finances/LibraryFinesTab'
+import { formatMWK }             from '@shared/constants/malawi'
+import { Banknote, TrendingDown, TrendingUp, PieChart } from 'lucide-react'
+import { ModuleTabs }            from '@/components/shared/ModuleTabs'
+
+type Tab =
+  | 'invoices'
+  | 'expenses'
+  | 'payroll'
+  | 'budget'
+  | 'scholarships'
+  | 'fines'
+  | 'reports'
 
 export default function FinancesPage() {
   return (
@@ -25,7 +45,7 @@ export default function FinancesPage() {
 }
 
 function FinancesContent() {
-  const { role } = useAuthStore()
+  const { role }   = useAuthStore()
   const [activeTab, setActiveTab] = useState<Tab>('invoices')
   const YEAR = '2025/2026'
   const TERM = 1
@@ -35,15 +55,29 @@ function FinancesContent() {
   const isStudent = role === 'student'
   const isFinance = role === 'finance' || role === 'admin'
 
+  // Build visible tab list — filtered by role, then mapped to clean TabItem shape
+  // (strips the `show` field before passing to ModuleTabs for type safety)
   const TABS = [
-    { id: 'invoices' as Tab, label: isStudent ? 'My Fees' : 'Invoices', show: true },
-    { id: 'expenses' as Tab, label: 'Expenses', show: isFinance },
-    { id: 'payroll' as Tab, label: 'Payroll', show: isFinance },
-    { id: 'budget' as Tab, label: 'Budget', show: !isStudent },
-    { id: 'scholarships' as Tab, label: 'Scholarships', show: isFinance },
-    { id: 'fines' as Tab, label: 'Library Fines', show: isFinance },
-    { id: 'reports' as Tab, label: 'Reports', show: isFinance },
-  ].filter((t) => t.show)
+    { id: 'invoices'     as Tab, label: isStudent ? 'My Fees' : 'Invoices', show: true        },
+    { id: 'expenses'     as Tab, label: 'Expenses',                          show: isFinance    },
+    { id: 'payroll'      as Tab, label: 'Payroll',                           show: isFinance    },
+    { id: 'budget'       as Tab, label: 'Budget',                            show: !isStudent   },
+    { id: 'scholarships' as Tab, label: 'Scholarships',                      show: isFinance    },
+    { id: 'fines'        as Tab, label: 'Library Fines',                     show: isFinance    },
+    { id: 'reports'      as Tab, label: 'Reports',                           show: isFinance    },
+  ]
+    .filter((t) => t.show)
+    .map(({ id, label }) => ({ id, label }))
+
+  // R15 — initialise the active tab from ?tab= so dashboard quick actions
+  // (Record Payment / Generate Receipt → /finances?tab=invoices etc.) can
+  // deep-link. Runs once post-hydration (no SSR mismatch) and only accepts
+  // a tab this role can actually see.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    if (t && TABS.some((tab) => tab.id === t)) setActiveTab(t as Tab)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, [])
 
   return (
     <div className="space-y-5">
@@ -90,33 +124,23 @@ function FinancesContent() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-base">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            aria-label={tab.label}
-            className={[
-              'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
-              activeTab === tab.id
-                ? 'border-brand-teal text-brand-teal'
-                : 'border-transparent text-muted hover:text-body',
-            ].join(' ')}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Mobile-scrollable tab navigation — C7 */}
+      <ModuleTabs<Tab>
+        tabs={TABS}
+        active={activeTab}
+        onChange={setActiveTab}
+        variant="underline"
+        id="finance-tabs"
+      />
 
       {/* Tab content */}
-      {activeTab === 'invoices' && <InvoicesTab academicYear={YEAR} term={TERM} />}
-      {activeTab === 'expenses' && <ExpensesTab academicYear={YEAR} term={TERM} />}
-      {activeTab === 'payroll' && <PayrollTab />}
-      {activeTab === 'budget' && <BudgetTab academicYear={YEAR} />}
-      {activeTab === 'scholarships' && <ScholarshipTab academicYear={YEAR} />}
-      {activeTab === 'fines' && <LibraryFinesTab />}
-      {activeTab === 'reports' && <ReportsExportPanel academicYear={YEAR} term={TERM} />}
+      {activeTab === 'invoices'     && <InvoicesTab      academicYear={YEAR} term={TERM} />}
+      {activeTab === 'expenses'     && <ExpensesTab      academicYear={YEAR} term={TERM} />}
+      {activeTab === 'payroll'      && <PayrollTab />}
+      {activeTab === 'budget'       && <BudgetTab        academicYear={YEAR} />}
+      {activeTab === 'scholarships' && <ScholarshipTab   academicYear={YEAR} />}
+      {activeTab === 'fines'        && <LibraryFinesTab />}
+      {activeTab === 'reports'      && <ReportsExportPanel academicYear={YEAR} term={TERM} />}
     </div>
   )
 }
@@ -136,7 +160,9 @@ function SummaryCard({
 }) {
   return (
     <div className="bg-surface border border-base rounded-xl p-4 flex items-start gap-3">
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${bg}`}>
+      <div
+        className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${bg}`}
+      >
         <Icon className={`w-5 h-5 ${color}`} />
       </div>
       <div>

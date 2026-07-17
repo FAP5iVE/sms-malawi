@@ -20,6 +20,7 @@ export const NotificationPrefSchema = z.object({
   emailResultRelease:z.boolean().optional(),
   emailContractAlert:z.boolean().optional(),
   emailAnnouncement: z.boolean().optional(),
+  emailPlacementUpdate: z.boolean().optional(),
   smsFeeReminder:    z.boolean().optional(),
   smsResultRelease:  z.boolean().optional(),
   pushAnnouncement:  z.boolean().optional(),

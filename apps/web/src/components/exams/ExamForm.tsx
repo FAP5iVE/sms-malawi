@@ -1,4 +1,22 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: apps/web/src/components/exams/ExamForm.tsx
+ * [R-PHASE]: R7 — Academics III: Exam Pipeline Repair & Grading Engine
+ *   Unification
+ * [PURPOSE]: EXAM_TYPES centralization deferred to R15 — not otherwise
+ *   touched by this phase's own change list. Consequential fix: onSubmit()
+ *   previously discarded a failed createExam.mutate() silently — no
+ *   onError handler existed at all. This phase's examService.ts now
+ *   genuinely rejects certain submissions (an END_TERM exam for Form 2/
+ *   Form 4's MANEB national term, or a MANEB_JCE/MANEB_MSCE exam type
+ *   created through this internal form at all — MANEB results belong in
+ *   ManebRecord, never here), so a silent failure would leave the user
+ *   with no feedback and an open form that appears to have done nothing.
+ *   Added minimal inline error surfacing for exactly this case.
+ * [DEPENDS ON]: none
+ */
 'use client'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateExamSchema } from '@shared/schemas/exam'
@@ -6,21 +24,12 @@ import type { CreateExamInput } from '@shared/schemas/exam'
 import { useCreateExam } from '@/hooks/useExams'
 import { useClasses } from '@/hooks/useClasses'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, AlertTriangle } from 'lucide-react'
 import type { ApiClass } from '@shared/types/api'
 import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
+import { EXAM_TYPES } from '@shared/constants/exams'
 
 interface Props { onClose: () => void; academicYear: string; term: number }
-
-const EXAM_TYPES = [
-  { value: 'WEEKLY_TEST', label: 'Weekly Test' },
-  { value: 'ASSIGNMENT',  label: 'Assignment' },
-  { value: 'QUIZ',        label: 'Quiz' },
-  { value: 'MIDTERM',     label: 'Midterm Exam' },
-  { value: 'END_TERM',    label: 'End of Term Exam' },
-  { value: 'MANEB_JCE',   label: 'MANEB JCE (Form 2)' },
-  { value: 'MANEB_MSCE',  label: 'MANEB MSCE (Form 4)' },
-] as const
 
 const ic = 'w-full border border-base rounded-xl px-4 py-3 text-sm bg-surface text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal transition-all'
 
@@ -28,6 +37,7 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
   const { data: classesData } = useClasses(academicYear)
   const classes = (classesData ?? []) as ApiClass[]
   const createExam = useCreateExam()
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const { register, handleSubmit, formState: { errors } } = useForm<CreateExamInput>({
     resolver: zodResolver(CreateExamSchema),
@@ -35,7 +45,13 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
   })
 
   function onSubmit(data: CreateExamInput) {
-    createExam.mutate(data, { onSuccess: onClose })
+    setSubmitError(null)
+    createExam.mutate(data, {
+      onSuccess: onClose,
+      onError: (err) => {
+        setSubmitError(err instanceof Error ? err.message : 'Failed to schedule exam. Please try again.')
+      },
+    })
   }
 
   return (
@@ -104,6 +120,12 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
                 <input type="number" {...register('weightPercent', { valueAsNumber: true })} className={ic} min={1} max={100} />
               </div>
             </div>
+            {submitError && (
+              <p role="alert" className="mx-6 mb-4 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
+                {submitError}
+              </p>
+            )}
             <div className="px-6 py-4 border-t border-base flex justify-end gap-3">
               <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm border border-base rounded-xl hover:bg-page">Cancel</button>
               <button type="submit" disabled={createExam.isPending}

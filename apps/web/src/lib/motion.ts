@@ -396,6 +396,35 @@ export const LIST_ITEM_VARIANTS: Variants = {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// TABLE ROW STAGGER  (R15 — moved here from DataTable.tsx so the shared
+// table entrance animation lives with every other named motion constant)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Stagger container for a <motion.tbody>. Table-element-safe (no transform
+ * on the container itself). Stagger only applies for small datasets —
+ * ≤ 15 rows — to prevent slow, drawn-out animations on large tables.
+ */
+export const TBODY_STAGGER = (count: number): Variants => ({
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: count <= 15 ? 0.03 : 0,
+    },
+  },
+})
+
+/** Per-<motion.tr> entrance used with TBODY_STAGGER. */
+export const TR_VARIANTS: Variants = {
+  hidden:  { opacity: 0, y: 4 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: DURATION.fast, ease: EASE.out },
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SCALE / POP
 // Notification badges, count pills, success states.
 // ─────────────────────────────────────────────────────────────────────────────

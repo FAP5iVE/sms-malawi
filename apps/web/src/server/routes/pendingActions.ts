@@ -1,7 +1,27 @@
+/**
+ * apps/web/src/server/routes/pendingActions.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R3 — Gateway Hardening
+ * [PURPOSE]: POST /expire-stale sat behind this router's own top-level
+ *   `pendingActionsRouter.use(verifyAuth)` (a Firebase-ID-token check),
+ *   which unconditionally rejected Vercel's CRON_SECRET-bearing scheduler
+ *   request with a 401 before the handler's own isCron branch ever ran —
+ *   pending actions never expired in production as a direct result of this
+ *   ordering. The route is now registered BEFORE the router-level
+ *   verifyAuth mount, with its own composite verifyCronOrAdmin middleware:
+ *   a valid CRON_SECRET bearer token grants access with no Firebase token
+ *   at all; anything else falls through to a real verifyAuth + admin-role
+ *   check (fail-closed the same way the five real cron route files are —
+ *   an unset CRON_SECRET can never match any bearer token, including the
+ *   literal string "Bearer undefined"). Every other route in this file is
+ *   unchanged and continues to sit behind the router-level verifyAuth.
+ * [DEPENDS ON]: none
+ */
 import 'server-only'
 
-import { Router, type Request, type Response } from 'express'
-import { verifyAuth }                           from '@/lib/verifyAuth'
+import { Router, type Request, type Response, type NextFunction } from 'express'
+import { verifyAuth, requireRole }              from '@/lib/verifyAuth'
 import { requireAnyPermission }                 from '@/server/middleware/verifyPermission'
 import * as pendingActionService                from '@/server/services/pendingActionService'
 import type { PendingActionStatus }             from '@prisma/client'
@@ -9,7 +29,39 @@ import type { PendingActionType }               from '@/server/services/pendingA
 
 export const pendingActionsRouter = Router()
 
-// All routes require authentication
+/**
+ * Grants access to either:
+ *   - a caller presenting the exact CRON_SECRET bearer token (Vercel's
+ *     scheduler — no Firebase ID token involved at all), or
+ *   - a caller with a verified Firebase session holding the admin role.
+ * Fail-closed: if CRON_SECRET is unset, the left side of the && below is
+ * falsy, so no bearer token — including the literal string
+ * "Bearer undefined" — can ever match it; every request then falls through
+ * to the real Firebase-auth + admin-role check.
+ */
+async function verifyCronOrAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const authHeader = req.headers.authorization
+  if (process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`) {
+    next()
+    return
+  }
+  await verifyAuth(req, res, () => requireRole(['admin'])(req, res, next))
+}
+
+// ─────────────────────────────────────────────────────────
+//  POST /pending-actions/expire-stale
+//  Mark expired actions. Called by nightly cron.
+//  Registered ahead of the router-level verifyAuth mount below so a
+//  CRON_SECRET-bearing request never gets rejected by a Firebase-token
+//  check it was never meant to pass — see file header comment.
+// ─────────────────────────────────────────────────────────
+
+pendingActionsRouter.post('/expire-stale', verifyCronOrAdmin, async (_req: Request, res: Response) => {
+  const count = await pendingActionService.expireStale()
+  res.json({ expired: count, ts: new Date().toISOString() })
+})
+
+// All routes below require authentication
 pendingActionsRouter.use(verifyAuth)
 
 // ─────────────────────────────────────────────────────────
@@ -257,25 +309,4 @@ pendingActionsRouter.patch('/:id/cancel', async (req: Request, res: Response) =>
 
   const row = await pendingActionService.cancel(id, user.uid, user.role)
   res.json(row)
-})
-
-// ─────────────────────────────────────────────────────────
-//  POST /pending-actions/expire-stale
-//  Mark expired actions. Called by nightly cron.
-// ─────────────────────────────────────────────────────────
-
-pendingActionsRouter.post('/expire-stale', async (req: Request, res: Response) => {
-  const { user } = req
-  // Allow both admin role AND Vercel cron (Authorization: Bearer CRON_SECRET)
-  const authHeader = req.headers.authorization
-  const isCron     = authHeader === `Bearer ${process.env.CRON_SECRET}`
-  const isAdmin    = user?.role === 'admin'
-
-  if (!isCron && !isAdmin) {
-    res.status(403).json({ error: 'Access denied.' })
-    return
-  }
-
-  const count = await pendingActionService.expireStale()
-  res.json({ expired: count, ts: new Date().toISOString() })
 })

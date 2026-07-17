@@ -1,4 +1,43 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: packages/shared/schemas/exam.ts
+ * [R-PHASE]: R7 — Academics III: Exam Pipeline Repair & Grading Engine
+ *   Unification
+ * [PURPOSE]: Adds ExamStatusSchema (mirroring the Prisma ExamStatus enum,
+ *   which cannot be imported client-side) and
+ *   EXAM_MARKS_ENTERABLE_STATUSES, a schema-derived constant replacing the
+ *   hand-typed ['SCHEDULED','IN_PROGRESS','MARKS_PENDING','MARKS_DRAFT']
+ *   literal previously duplicated inline in exams/page.tsx — matches the
+ *   .extract()-derived-subset pattern established in R5's
+ *   ApplicationStatusTransitionSchema. Full constants centralization is
+ *   R15's job; this is the immediate correctness fix since the enum values
+ *   were a disconnected, independently-typed literal with no single source
+ *   of truth. Also adds UpdateExamSchema (a .partial() of CreateExamSchema,
+ *   matching the UpdateClassSchema/UpdateStudentSchema convention) for the
+ *   new PATCH /exams/:id route — no update schema existed since no PATCH
+ *   route existed before this phase.
+ * [DEPENDS ON]: none
+ */
 import { z } from 'zod'
+
+export const ExamStatusSchema = z.enum([
+  'SCHEDULED',
+  'IN_PROGRESS',
+  'MARKS_PENDING',
+  'MARKS_DRAFT',
+  'MARKS_FINAL',
+  'RESULTS_APPROVED',
+  'RESULTS_RELEASED',
+])
+
+// Statuses during which a teacher can still open MarksEntrySheet and enter
+// marks for an exam — everything up through MARKS_DRAFT, before finalization.
+export const EXAM_MARKS_ENTERABLE_STATUSES = ExamStatusSchema.extract([
+  'SCHEDULED',
+  'IN_PROGRESS',
+  'MARKS_PENDING',
+  'MARKS_DRAFT',
+]).options
 
 export const CreateExamSchema = z.object({
   type:          z.enum(['WEEKLY_TEST','ASSIGNMENT','QUIZ','MIDTERM','END_TERM','MANEB_JCE','MANEB_MSCE']),
@@ -14,6 +53,11 @@ export const CreateExamSchema = z.object({
   academicYear:  z.string().min(1),
   term:          z.number().int().min(1).max(3),
 })
+
+// Every field optional — a PATCH only needs to send what's actually
+// changing. Matches the .partial() pattern established for
+// UpdateClassSchema/UpdateStudentSchema.
+export const UpdateExamSchema = CreateExamSchema.partial()
 
 export const MarkEntrySchema = z.object({
   examId:    z.string().min(1),
@@ -55,6 +99,8 @@ export const PromotionRulesSchema = z.object({
 })
 
 export type CreateExamInput       = z.input<typeof CreateExamSchema>
+export type UpdateExamInput        = z.infer<typeof UpdateExamSchema>
 export type BulkMarkEntryInput     = z.infer<typeof BulkMarkEntrySchema>
 export type CreateManebRecordInput = z.infer<typeof CreateManebRecordSchema>
 export type PromotionRulesInput    = z.infer<typeof PromotionRulesSchema>
+export type ExamStatus             = z.infer<typeof ExamStatusSchema>

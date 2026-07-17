@@ -1,5 +1,18 @@
 'use client'
-import { useState } from 'react'
+
+/**
+ * apps/web/src/app/(auth)/user-management/page.tsx
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R15 — UI/UX Polish: Shared Components, Dashboards,
+ *   Confirmation Dialogs & Data-Display Consistency
+ * [PURPOSE]: Initialises the active tab from ?tab= (post-hydration) so
+ *   AdminDashboard's de-duplicated System Health quick action can
+ *   deep-link to /user-management?tab=health.
+ * [DEPENDS ON]: none
+ */
+
+import { useState, useEffect } from 'react'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { useUsers, useCreateUser, useUpdateUserRole, useToggleUserDisabled, useSendPasswordReset } from '@/hooks/useAdmin'
 import { useSystemHealth } from '@/hooks/useReports'
@@ -19,6 +32,13 @@ export default function UserManagementPage() {
 function UserManagementContent() {
   const [tab, setTab] = useState<'users'|'health'>('users')
   const [showCreate, setShowCreate] = useState(false)
+
+  // R15 — ?tab=health deep-link support (AdminDashboard's System Health
+  // quick action). Runs once post-hydration.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    if (t === 'users' || t === 'health') setTab(t)
+  }, [])
   const [form, setForm] = useState<Partial<CreateUserInput>>({})
   const { data: usersData } = useUsers()
   const { data: health } = useSystemHealth()

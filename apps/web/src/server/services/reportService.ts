@@ -1,6 +1,40 @@
+/**
+ * apps/web/src/server/services/reportService.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R14 — Analytics & Reports Domain
+ * [PURPOSE]: Two confirmed defects, both of which silently returned wrong
+ *   data rather than failing visibly.
+ *
+ *   1. getAcademicReport(teacherUid, academicYear) — its own comment says
+ *      "Teacher sees their own classes' performance", but its
+ *      prisma.class.findMany() filtered on academicYear ALONE, with no
+ *      teacherId constraint at all, so it returned the ENTIRE school's class
+ *      performance to any academic-role caller. The teacherUid parameter was
+ *      accepted, echoed back in the response, and otherwise unused. This is
+ *      inconsistent with analyticsService's correctly-scoped
+ *      getAcademicClassSubjectPerformance()/getAcademicAssignmentCompletion(),
+ *      which answer the same framing for the same role and DO scope by
+ *      teacher. The missing `teacherId: teacherUid` constraint is added.
+ *
+ *   2. getHRReport() — its contract-expiry lookahead was a hardcoded 60-day
+ *      literal (`60 * 24 * 60 * 60 * 1000`), a second independent hardcoding
+ *      of the same window the contract-alert pipeline uses, free to drift
+ *      from it silently. Now read from
+ *      SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS (S/types/settings.ts,
+ *      same phase) — the admin-configurable source — and echoed back on the
+ *      response as `lookaheadDays` so the report can state the window it
+ *      actually applied rather than leaving the reader to assume one.
+ *
+ *   Also adds `import 'server-only'`, matching every other service file.
+ * [DEPENDS ON]: S/types/settings.ts (HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS),
+ *   W/server/services/settingsService.ts
+ */
+import 'server-only'
 import { prisma }  from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
-import { logger }  from '@/lib/logger'
+import { SETTING_KEYS } from '@shared/types/settings'
+import * as settingsService from '@/server/services/settingsService'
 
 // ─── ADMIN REPORTS ────────────────────────────────────────
 export async function getAdminSystemReport() {
@@ -95,12 +129,27 @@ export async function getLibraryReport() {
 
 // ─── HR REPORTS ──────────────────────────────────────────
 export async function getHRReport() {
+  // [R14] Was a hardcoded 60-day window. Contract-expiry lookahead is a real
+  // school policy value, so it comes from SystemSettings — the mechanism that
+  // exists precisely so a value like this is never a literal, and never a
+  // SECOND literal independently maintained alongside the contract-alert
+  // pipeline's own.
+  const lookaheadDays = await settingsService.get(
+    SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS,
+  )
+  const expiryCutoff = new Date(Date.now() + lookaheadDays * 24 * 60 * 60 * 1000)
+
   const [staffByDept, leaveUsage, activeLoans, expiringContracts] = await prisma.$transaction([
-  prisma.staffProfile.groupBy({ by: ['department'], _count: true, where: { status: 'ACTIVE' }, orderBy: { department: 'asc' } }),
-  prisma.leaveRequest.groupBy({
-  by: ['leaveType'],
-  _count: true,
-  orderBy: { leaveType: 'asc' },
+    prisma.staffProfile.groupBy({
+      by: ['department'],
+      _count: true,
+      where: { status: 'ACTIVE' },
+      orderBy: { department: 'asc' },
+    }),
+    prisma.leaveRequest.groupBy({
+      by: ['leaveType'],
+      _count: true,
+      orderBy: { leaveType: 'asc' },
       where: { status: 'APPROVED', startDate: { gte: new Date(new Date().getFullYear(), 0, 1) } },
     }),
     prisma.staffLoan.findMany({
@@ -108,17 +157,33 @@ export async function getHRReport() {
       select: { amount: true, balance: true, totalRepaid: true },
     }),
     prisma.staffProfile.count({
-      where: { contractExpiry: { lte: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000) }, status: 'ACTIVE' },
+      where: { contractExpiry: { lte: expiryCutoff }, status: 'ACTIVE' },
     }),
   ])
   const totalLoanBalance = activeLoans.reduce((s, l) => s + Number(l.balance), 0)
-  return { staffByDept, leaveUsage, activeLoans: activeLoans.length, totalLoanBalance, expiringContracts }
+  return {
+    staffByDept,
+    leaveUsage,
+    activeLoans: activeLoans.length,
+    totalLoanBalance,
+    expiringContracts,
+    lookaheadDays,
+  }
 }
 
 // ─── ACADEMIC REPORTS ────────────────────────────────────
 export async function getAcademicReport(teacherUid: string, academicYear: string) {
-  // Teacher sees their own classes' performance
-  const myClasses = await prisma.class.findMany({ where: { academicYear } })
+  // [R14] `teacherId: teacherUid` was missing entirely. This function's own
+  // comment has always said "Teacher sees their own classes' performance",
+  // but the query filtered on academicYear alone — so it returned every class
+  // in the school to any academic-role caller, and the teacherUid argument
+  // was accepted, echoed back in the response, and otherwise never used.
+  const myClasses = await prisma.class.findMany({
+    where: { academicYear, teacherId: teacherUid },
+    select: { id: true, name: true, form: true },
+    orderBy: [{ form: 'asc' }, { name: 'asc' }],
+  })
+
   // For each class, get term results summary
   const summaries = await Promise.all(
     myClasses.map(async (c) => {
@@ -127,6 +192,7 @@ export async function getAcademicReport(teacherUid: string, academicYear: string
         select: { average: true, passStatus: true, term: true },
       })
       return {
+        classId: c.id,
         className: c.name,
         form: c.form,
         total: results.length,

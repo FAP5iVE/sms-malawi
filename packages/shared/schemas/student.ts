@@ -1,3 +1,28 @@
+/**
+ * [CHANGE TYPE]: MAJOR REWRITE (application-schema portion only, R5); further
+ *   edited in R6 — Academics II: Classes, Assignments & the Attendance
+ *   Rebuild; further edited in R13 — Announcements, Timetable & Calendar
+ *   Domain
+ * [FILE]: packages/shared/schemas/student.ts
+ * [PURPOSE]: R5 unified the two independently-diverged application schemas
+ *   (CreateApplicationSchema: lastName/guardianRelation/applyingForForm:number
+ *   vs. PublicApplicationSchema: surname/guardianRelationship/
+ *   classApplying:string) into one canonical ApplicationSchema, used by both
+ *   the unauthenticated /apply page and the internal application-intake
+ *   route. R6 adds: ClassStatusSchema + UpdateClassSchema (the Class entity
+ *   had no update schema at all — PATCH /classes/:id didn't exist before
+ *   this phase); CreateAssignmentSchema + SubmitAssignmentSchema (the
+ *   assignments route previously did manual, non-Zod field validation);
+ *   AttendanceStatusSchema + AttendanceEntrySchema + MarkAttendanceSchema
+ *   (new — backs the Postgres-based Attendance rebuild). CreateStudentSchema/
+ *   UpdateStudentSchema/CreateClassSchema/CreateTimetableSlotSchema are
+ *   unchanged. R13 removes AnnouncementSchema entirely — it was misfiled
+ *   here with no relation to the Student domain; relocated to the new
+ *   packages/shared/schemas/announcement.ts, which also reconciles it
+ *   against the two other previously-independent announcement-audience
+ *   vocabularies (see that file's header).
+ * [DEPENDS ON]: none
+ */
 import { z } from 'zod'
 
 // ─── ENUMS ───────────────────────────────────────────────
@@ -41,21 +66,60 @@ export const ApplicationStatusSchema = z.enum([
   'ADMITTED',
 ])
 
-export const CreateApplicationSchema = z.object({
-  firstName: z.string().min(1).max(100),
-  lastName: z.string().min(1).max(100),
-  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+// Subset of ApplicationStatusSchema that a reviewer may transition an
+// application to via PATCH /applications/:id/status — PENDING (the initial
+// state) and ADMITTED (set only by the convert-to-student flow) are excluded.
+// Derived with .extract() rather than a hand-typed literal array so it can
+// never drift out of sync with the canonical status enum above.
+export const ApplicationStatusTransitionSchema = ApplicationStatusSchema.extract([
+  'APPROVED',
+  'DENIED',
+  'AWAITING_ADMISSION',
+])
+
+// ─── APPLICATION (unified — replaces the former CreateApplicationSchema
+// and PublicApplicationSchema, which independently diverged on field names
+// for the same concepts: lastName/surname and guardianRelation/
+// guardianRelationship. One schema, one naming convention, used by both the
+// unauthenticated /apply page and the internal (staff-entered) creation
+// path. countryCode/guardianCountryCode are UI-only concerns (the calling-
+// code selects next to the phone number inputs on the /apply form) — the
+// service layer never re-derives `phone`/`guardianPhone` from them; the
+// client is expected to have already produced the fully-formatted number
+// before submitting. ───────────────────────────────────────
+export const ApplicationSchema = z.object({
+  firstName: z.string().min(2, 'First name is required').max(100),
+  otherNames: z.string().optional(),
+  surname: z.string().min(2, 'Surname is required').max(100),
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD format'),
   sex: SexSchema,
-  nationality: z.string().min(1),
-  district: z.string().min(1),
+  nationality: z.string().min(1, 'Nationality is required'),
+  district: z.string().optional(),
   village: z.string().optional(),
-  guardianName: z.string().min(1),
-  guardianPhone: z.string().min(10),
-  guardianRelation: z.string().min(1),
-  applyingForForm: z.number().int().min(1).max(4),
+  religion: z.string().optional(),
+  address: z.string().min(5, 'Address is required'),
+  countryCode: z.string().min(1, 'Select country code'),
+  phone: z.string().min(7, 'Phone number is required'),
+  email: z.string().email('Enter a valid email').optional().or(z.literal('')),
+  classApplying: z.enum(['Form 1', 'Form 2', 'Form 3', 'Form 4'], {
+    required_error: 'Please select the form',
+  }),
+  previousSchool: z.string().optional(),
+  reasonForTransfer: z.string().optional(),
+  academicYear: z.string().min(1, 'Academic year is required'),
+  guardianName: z.string().min(2, 'Guardian name is required'),
+  guardianRelationship: z.string().min(1, 'Relationship is required'),
+  guardianCountryCode: z.string().min(1, 'Select country code'),
+  guardianPhone: z.string().min(7, 'Guardian phone is required'),
+  guardianEmail: z.string().email('Enter a valid email').optional().or(z.literal('')),
+  guardianAddress: z.string().optional(),
 })
 
+export type ApplicationInput = z.infer<typeof ApplicationSchema>
+
 // ─── CLASS ───────────────────────────────────────────────
+export const ClassStatusSchema = z.enum(['ACTIVE', 'ARCHIVED'])
+
 export const CreateClassSchema = z.object({
   name: z.string().min(1),
   form: z.number().int().min(1).max(4),
@@ -63,6 +127,14 @@ export const CreateClassSchema = z.object({
   teacherId: z.string().optional(),
   room: z.string().optional(),
   academicYear: z.string().regex(/^\d{4}\/\d{4}$/, 'Format: 2025/2026'),
+})
+
+// Partial of CreateClassSchema — every field optional, since a PATCH only
+// needs to send the fields actually changing. `status` is intentionally
+// NOT part of CreateClassSchema (a class is always created ACTIVE) but is
+// a valid PATCH target for the archive/restore flow.
+export const UpdateClassSchema = CreateClassSchema.partial().extend({
+  status: ClassStatusSchema.optional(),
 })
 
 // ─── TIMETABLE SLOT ──────────────────────────────────────
@@ -79,47 +151,40 @@ export const CreateTimetableSlotSchema = z.object({
   term: z.number().int().min(1).max(3),
 })
 
-// ─── PUBLIC APPLICATION (unauthenticated /apply page) ───────
-// Extended version of CreateApplicationSchema — includes all fields
-// from the multi-step apply form (§3.3)
-export const PublicApplicationSchema = z.object({
-  firstName: z.string().min(2).max(100),
-  otherNames: z.string().optional(),
-  surname: z.string().min(2).max(100),
-  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  sex: z.enum(['male', 'female']),
-  nationality: z.string().min(1),
-  district: z.string().optional(),
-  religion: z.string().optional(),
-  address: z.string().min(5),
-  phone: z.string().min(7), // already formatted with country code
-  email: z.string().email().optional().or(z.literal('')),
-  classApplying: z.enum(['Form 1', 'Form 2', 'Form 3', 'Form 4']),
-  previousSchool: z.string().optional(),
-  reasonForTransfer: z.string().optional(),
-  academicYear: z.string().min(4),
-  guardianName: z.string().min(2),
-  guardianRelationship: z.string().min(1),
-  guardianPhone: z.string().min(7),
-  guardianEmail: z.string().email().optional().or(z.literal('')),
-  guardianAddress: z.string().optional(),
+// ─── ASSIGNMENT ──────────────────────────────────────────
+export const CreateAssignmentSchema = z.object({
+  title: z.string().min(3, 'Title is required').max(200),
+  description: z.string().optional(),
+  subject: z.string().min(1, 'Subject is required'),
+  dueDate: z.string().min(1, 'Due date is required'),
 })
 
-export type PublicApplicationInput = z.infer<typeof PublicApplicationSchema>
+// The file itself arrives as multipart form data (multer), not JSON — this
+// schema validates only the metadata fields sent alongside the file.
+export const SubmitAssignmentSchema = z.object({
+  note: z.string().optional(),
+})
 
-// ─── ANNOUNCEMENT ─────────────────────────────────────────
-export const AnnouncementSchema = z.object({
-  title: z.string().min(3).max(200),
-  body: z.string().min(10),
-  targetAll: z.boolean().default(false),
-  targetRoles: z.array(z.string()).optional(),
-  targetClass: z.string().optional(), // classId if targeting specific class
-  status: z.enum(['DRAFT', 'PENDING_APPROVAL', 'PUBLISHED']).default('DRAFT'),
+// ─── ATTENDANCE ──────────────────────────────────────────
+export const AttendanceStatusSchema = z.enum(['PRESENT', 'ABSENT', 'LATE'])
+
+export const AttendanceEntrySchema = z.object({
+  studentId: z.string().min(1),
+  status: AttendanceStatusSchema,
+})
+
+export const MarkAttendanceSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD format'),
+  entries: z.array(AttendanceEntrySchema).min(1, 'At least one attendance entry is required'),
 })
 
 // ─── INFERRED TYPES ──────────────────────────────────────
 export type CreateStudentInput = z.infer<typeof CreateStudentSchema>
 export type UpdateStudentInput = z.infer<typeof UpdateStudentSchema>
-export type CreateApplicationInput = z.infer<typeof CreateApplicationSchema>
 export type CreateClassInput = z.infer<typeof CreateClassSchema>
+export type UpdateClassInput = z.infer<typeof UpdateClassSchema>
 export type CreateTimetableSlotInput = z.infer<typeof CreateTimetableSlotSchema>
+export type CreateAssignmentInput = z.infer<typeof CreateAssignmentSchema>
+export type SubmitAssignmentInput = z.infer<typeof SubmitAssignmentSchema>
+export type MarkAttendanceInput = z.infer<typeof MarkAttendanceSchema>
+export type AttendanceEntryInput = z.infer<typeof AttendanceEntrySchema>

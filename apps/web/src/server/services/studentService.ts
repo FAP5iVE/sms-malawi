@@ -1,40 +1,67 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: apps/web/src/server/services/studentService.ts
+ * [R-PHASE]: R5 — Academics I: Admissions & Student Records; R15 — UI/UX
+ *   Polish adds sortBy/sortDir to StudentQueryFilters with the
+ *   SORTABLE_STUDENT_COLUMNS allow-list, backing DataTable's new onSort
+ *   server-side sort dispatch for this (currently the only)
+ *   server-paginated list view.
+ * [PURPOSE]: Four changes. (1) create()'s CreateStudentInput gains a
+ *   `status` field, passed through instead of hardcoding 'ACTIVE'
+ *   unconditionally, so a validated status value from CreateStudentSchema
+ *   is no longer silently dropped. (2) generateRegistrationNo()'s
+ *   read-then-write sequence is now retried on a P2002 unique-constraint
+ *   collision (bounded, 5 attempts) so two concurrent creations in the same
+ *   calendar year can no longer generate duplicate registration numbers.
+ *   (3) This file's own local Firebase Admin singleton initializer
+ *   function — a duplicate of the one already established in
+ *   verifyAuth.ts — is removed entirely. createFromApplication()'s two
+ *   admin.auth() calls are only ever reached via routes that already run
+ *   verifyAuth first (students.ts's router-wide verifyAuth,
+ *   applications.ts's /:id/convert), and verifyAuth itself always
+ *   initializes the Firebase Admin default app before calling next(). By
+ *   the time this file's Firebase calls run, admin.auth() (no arguments)
+ *   already resolves that same default app — no local admin-app-getter
+ *   call is needed here at all. (4) computeRiskLevel()'s `termAverage`
+ *   parameter remains unsupplied until R7 (Exams/Grading) — tracked, not
+ *   fixed here. Persisted `Student.riskLevel` (a permanently-stale column
+ *   sharing a name with this file's own live-computed field) is removed
+ *   from the schema in this same phase; this file already never read or
+ *   wrote that column.
+ * [DEPENDS ON]: apps/web/src/lib/verifyAuth.ts (must run verifyAuth before
+ *   any route that reaches createFromApplication(), so the Firebase Admin
+ *   default app is already initialized by the time this file's admin.auth()
+ *   calls run)
+ */
 import 'server-only'
 
 import { prisma }        from '@/lib/prisma'
 import { logger }        from '@/lib/logger'
 import * as auditService from '@/server/services/auditService'
 import * as admin        from 'firebase-admin'
-import type { App }      from 'firebase-admin/app'
 import {
   Prisma,
   type StudentStatus,
   type Sex,
 } from '@prisma/client'
 import type { UserRole } from '@shared/types/roles'
-
-// ─────────────────────────────────────────────────────────
-//  FIREBASE ADMIN SINGLETON
-// ─────────────────────────────────────────────────────────
-
-function getAdminApp(): App {
-  if (admin.apps.length > 0) return admin.app()
-  return admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId:   process.env.FIREBASE_PROJECT_ID!,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
-      privateKey:  (process.env.FIREBASE_PRIVATE_KEY ?? '').replace(/\\n/g, '\n'),
-    }),
-  })
-}
+import * as algolia from '@/server/services/algoliaService'
 
 // ─────────────────────────────────────────────────────────
 //  REGISTRATION NUMBER GENERATOR
 //  Format: SMS-YYYY-NNNN  (e.g. SMS-2025-0042)
 //  Sequence is per academic year, zero-padded to 4 digits.
-//  Uses a Prisma aggregate to find the current year's max seq.
+//  Uses a Prisma aggregate to find the current year's max seq, wrapped in a
+//  bounded retry loop: two concurrent createStudent() calls can both read
+//  the same "last" sequence before either writes, so the actual duplicate
+//  is only detectable by the registrationNo @unique constraint rejecting
+//  the second insert (P2002) — at which point we simply recompute the next
+//  sequence and retry, rather than assuming the read was still valid.
 // ─────────────────────────────────────────────────────────
 
-async function generateRegistrationNo(): Promise<string> {
+const REGISTRATION_NO_MAX_ATTEMPTS = 5
+
+async function nextRegistrationNo(): Promise<string> {
   const year   = new Date().getFullYear()
   const prefix = `SMS-${year}-`
 
@@ -50,6 +77,13 @@ async function generateRegistrationNo(): Promise<string> {
 
   const nextSeq = lastSeq + 1
   return `${prefix}${String(nextSeq).padStart(4, '0')}`
+}
+
+function isUniqueConstraintError(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError &&
+    err.code === 'P2002'
+  )
 }
 
 // ─────────────────────────────────────────────────────────
@@ -130,6 +164,29 @@ export interface StudentQueryFilters {
   hasRisk?:    boolean
   page?:       number
   pageSize?:   number
+  /**
+   * R15 — server-side sort for DataTable's new onSort dispatch. Only the
+   * allow-listed columns in SORTABLE_STUDENT_COLUMNS are honoured; anything
+   * else silently falls back to the default lastName/firstName ordering.
+   */
+  sortBy?:     string
+  sortDir?:    'asc' | 'desc'
+}
+
+/**
+ * Column allow-list for client-requested sorts (R15). Keys match the
+ * students list's DataColumn keys; values build the Prisma orderBy.
+ * A hand-picked map — never interpolate a raw client string into orderBy.
+ */
+const SORTABLE_STUDENT_COLUMNS: Record<
+  string,
+  (dir: 'asc' | 'desc') => Prisma.StudentOrderByWithRelationInput[]
+> = {
+  registrationNo: (dir) => [{ registrationNo: dir }],
+  firstName:      (dir) => [{ firstName: dir }, { lastName: dir }],
+  lastName:       (dir) => [{ lastName: dir }, { firstName: dir }],
+  status:         (dir) => [{ status: dir }, { lastName: 'asc' }],
+  createdAt:      (dir) => [{ createdAt: dir }],
 }
 
 // ─────────────────────────────────────────────────────────
@@ -155,6 +212,8 @@ export interface CreateStudentInput {
   photoKey?:       string
   /** Firebase UID — provided when a student account is created simultaneously. */
   firebaseUid?:    string
+  /** Validated by CreateStudentSchema; defaults to ACTIVE in create() when omitted. */
+  status?:         StudentStatus
 }
 
 export interface UpdateStudentInput {
@@ -263,10 +322,20 @@ export async function list(
     form,
     page     = 1,
     pageSize = DEFAULT_PAGE_SIZE,
+    sortBy,
+    sortDir,
   } = filters
 
   const safePageSize = Math.min(pageSize, MAX_PAGE_SIZE)
   const safeOffset   = (Math.max(page, 1) - 1) * safePageSize
+
+  // R15 — resolve the requested sort against the allow-list; anything not
+  // on it (or no sort at all) keeps the long-standing default ordering.
+  const sortBuilder = sortBy ? SORTABLE_STUDENT_COLUMNS[sortBy] : undefined
+  const orderBy: Prisma.StudentOrderByWithRelationInput[] =
+    sortBuilder && (sortDir === 'asc' || sortDir === 'desc')
+      ? sortBuilder(sortDir)
+      : [{ lastName: 'asc' }, { firstName: 'asc' }]
 
   // Build where clause
   const where: Prisma.StudentWhereInput = {}
@@ -292,7 +361,7 @@ export async function list(
     prisma.student.count({ where }),
     prisma.student.findMany({
       where,
-      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      orderBy,
       skip:    safeOffset,
       take:    safePageSize,
       select: {
@@ -468,8 +537,6 @@ export async function create(
   actorUid:    string,
   actorRole:   UserRole
 ): Promise<ApiStudentDetail> {
-  const registrationNo = await generateRegistrationNo()
-
   // Validate firebaseUid uniqueness before writing (provides better error message)
   if (input.firebaseUid) {
     const existing = await prisma.student.findUnique({
@@ -484,30 +551,53 @@ export async function create(
     }
   }
 
-  const student = await prisma.student.create({
-    data: {
-      registrationNo,
-      firstName:       input.firstName,
-      lastName:        input.lastName,
-      otherNames:      input.otherNames ?? null,
-      dateOfBirth:     new Date(input.dateOfBirth),
-      sex:             input.sex,
-      nationality:     input.nationality,
-      district:        input.district,
-      village:         input.village  ?? null,
-      address:         input.address  ?? null,
-      phone:           input.phone    ?? null,
-      email:           input.email    ?? null,
-      guardianName:    input.guardianName,
-      guardianPhone:   input.guardianPhone,
-      guardianRelation:input.guardianRelation,
-      classId:         input.classId  ?? null,
-      photoKey:        input.photoKey ?? null,
-      firebaseUid:     input.firebaseUid ?? null,
-      status:          'ACTIVE',
-    },
-    select: { id: true },
-  })
+  let student: { id: string } | undefined
+  let registrationNo = ''
+  let lastErr: unknown
+
+  for (let attempt = 0; attempt < REGISTRATION_NO_MAX_ATTEMPTS; attempt++) {
+    registrationNo = await nextRegistrationNo()
+    try {
+      student = await prisma.student.create({
+        data: {
+          registrationNo,
+          firstName:       input.firstName,
+          lastName:        input.lastName,
+          otherNames:      input.otherNames ?? null,
+          dateOfBirth:     new Date(input.dateOfBirth),
+          sex:             input.sex,
+          nationality:     input.nationality,
+          district:        input.district,
+          village:         input.village  ?? null,
+          address:         input.address  ?? null,
+          phone:           input.phone    ?? null,
+          email:           input.email    ?? null,
+          guardianName:    input.guardianName,
+          guardianPhone:   input.guardianPhone,
+          guardianRelation:input.guardianRelation,
+          classId:         input.classId  ?? null,
+          photoKey:        input.photoKey ?? null,
+          firebaseUid:     input.firebaseUid ?? null,
+          status:          input.status ?? 'ACTIVE',
+        },
+        select: { id: true },
+      })
+      break
+    } catch (err) {
+      if (!isUniqueConstraintError(err)) throw err
+      lastErr = err
+      logger.warn(
+        { event: 'studentService.registrationNo_collision', attempt: attempt + 1, registrationNo },
+        '[studentService] Registration number collision — retrying'
+      )
+    }
+  }
+
+  if (!student) {
+    throw lastErr instanceof Error
+      ? lastErr
+      : new Error('Failed to generate a unique registration number after multiple attempts.')
+  }
 
   await auditService.log({
     action:     'student.create',
@@ -526,12 +616,26 @@ export async function create(
     },
   })
 
-  logger.info(
+logger.info(
     { studentId: student.id, registrationNo, actorRole },
     '[studentService] Student created'
   )
 
-  return getById(student.id) as Promise<ApiStudentDetail>
+  const created = await getById(student.id) as ApiStudentDetail
+  void algolia.indexStudent({
+    objectID:       created.id,
+    registrationNo: created.registrationNo,
+    firstName:      created.firstName,
+    lastName:       created.lastName,
+    otherNames:     created.otherNames ?? null,
+    fullName:       `${created.firstName} ${created.lastName}`,
+    className:      (created as ApiStudentDetail & { class?: { name: string; form: number; academicYear: string } | null }).class?.name ?? null,
+    form:           (created as ApiStudentDetail & { class?: { name: string; form: number; academicYear: string } | null }).class?.form ?? null,
+    status:         created.status,
+    sex:            created.sex,
+    academicYear:   (created as ApiStudentDetail & { class?: { name: string; form: number; academicYear: string } | null }).class?.academicYear ?? null,
+  })
+  return created
 }
 
 // ─────────────────────────────────────────────────────────
@@ -587,7 +691,7 @@ export async function update(
     { ...before, ...input } as Record<string, unknown>
   )
 
-  await auditService.log({
+await auditService.log({
     action:     'student.edit',
     entityType: 'Student',
     entityId:   id,
@@ -596,7 +700,15 @@ export async function update(
     metadata: { before: before as Record<string, unknown>, changes },
   })
 
-  return getById(id) as Promise<ApiStudentDetail>
+  const updated = await getById(id) as ApiStudentDetail
+  void algolia.updateStudent({
+    objectID:  id,
+    firstName: updated.firstName,
+    lastName:  updated.lastName,
+    fullName:  `${updated.firstName} ${updated.lastName}`,
+    status:    updated.status,
+  })
+  return updated
 }
 
 // ─────────────────────────────────────────────────────────
@@ -632,7 +744,7 @@ export async function softDelete(
     data:  { status: 'ARCHIVED' },
   })
 
-  await auditService.log({
+await auditService.log({
     action:     'student.archive',
     entityType: 'Student',
     entityId:   id,
@@ -644,6 +756,8 @@ export async function softDelete(
       context: { registrationNo: student.registrationNo },
     },
   })
+
+  void algolia.deleteStudent(id)
 
   logger.info({ studentId: id, actorRole }, '[studentService] Student archived')
 }
@@ -826,16 +940,13 @@ export async function createFromApplication(
     )
   }
 
-  // ── 2. Registration number
-  const registrationNo = await generateRegistrationNo()
-
   // ── 3. Optional Firebase account creation (must happen before Prisma tx)
   let firebaseUid:  string | null = null
   let tempPassword: string | null = null
 
   if (createFirebaseAccount) {
     try {
-      const fbUser = await admin.auth(getAdminApp()).createUser({
+      const fbUser = await admin.auth().createUser({
         email:         createFirebaseAccount.email,
         password:      createFirebaseAccount.password,
         displayName:   `${app.firstName} ${app.lastName}`,
@@ -846,7 +957,7 @@ export async function createFromApplication(
       tempPassword = createFirebaseAccount.password
 
       // Set custom claims immediately — role and password change flag
-      await admin.auth(getAdminApp()).setCustomUserClaims(firebaseUid, {
+      await admin.auth().setCustomUserClaims(firebaseUid, {
         role:                  'student',
         subtitle:              'Student',
         requiresPasswordChange: true,
@@ -865,43 +976,70 @@ export async function createFromApplication(
     }
   }
 
-  // ── 4 + 5. Create student and update application atomically
-  const [student] = await prisma.$transaction([
-    prisma.student.create({
-      data: {
-        registrationNo,
-        firstName:       app.firstName,
-        lastName:        app.lastName,
-        otherNames:      null,
-        dateOfBirth:     app.dateOfBirth,
-        sex:             app.sex,
-        nationality:     app.nationality,
-        district:        app.district,
-        village:         app.village,
-        address:         null,
-        phone:           null,
-        email:           createFirebaseAccount?.email ?? null,
-        guardianName:    app.guardianName,
-        guardianPhone:   app.guardianPhone,
-        guardianRelation:app.guardianRelation,
-        classId:         classId ?? null,
-        photoKey:        null,
-        firebaseUid:     firebaseUid,
-        status:          'ACTIVE',
-      },
-      select: { id: true },
-    }),
-    prisma.application.update({
-      where: { id: applicationId },
-      data: {
-        status:            'ADMITTED',
-        reviewedByUid:     actorUid,
-        reviewedAt:        new Date(),
-        // convertedStudentId updated in the second pass below
-      },
-      select: { id: true },
-    }),
-  ])
+  // ── 4 + 5. Create student and update application atomically. Retried on a
+  // registrationNo collision (bounded) — the Firebase account above is only
+  // ever created once, outside this loop, since retrying it would leave an
+  // orphaned duplicate Firebase user per attempt.
+  let student:        { id: string } | undefined
+  let registrationNo = ''
+  let lastErr: unknown
+
+  for (let attempt = 0; attempt < REGISTRATION_NO_MAX_ATTEMPTS; attempt++) {
+    registrationNo = await nextRegistrationNo()
+    try {
+      const [createdStudent] = await prisma.$transaction([
+        prisma.student.create({
+          data: {
+            registrationNo,
+            firstName:       app.firstName,
+            lastName:        app.lastName,
+            otherNames:      null,
+            dateOfBirth:     app.dateOfBirth,
+            sex:             app.sex,
+            nationality:     app.nationality,
+            district:        app.district,
+            village:         app.village,
+            address:         null,
+            phone:           null,
+            email:           createFirebaseAccount?.email ?? null,
+            guardianName:    app.guardianName,
+            guardianPhone:   app.guardianPhone,
+            guardianRelation:app.guardianRelation,
+            classId:         classId ?? null,
+            photoKey:        null,
+            firebaseUid:     firebaseUid,
+            status:          'ACTIVE',
+          },
+          select: { id: true },
+        }),
+        prisma.application.update({
+          where: { id: applicationId },
+          data: {
+            status:            'ADMITTED',
+            reviewedByUid:     actorUid,
+            reviewedAt:        new Date(),
+            // convertedStudentId updated in the second pass below
+          },
+          select: { id: true },
+        }),
+      ])
+      student = createdStudent
+      break
+    } catch (err) {
+      if (!isUniqueConstraintError(err)) throw err
+      lastErr = err
+      logger.warn(
+        { event: 'studentService.registrationNo_collision', attempt: attempt + 1, registrationNo },
+        '[studentService] Registration number collision — retrying'
+      )
+    }
+  }
+
+  if (!student) {
+    throw lastErr instanceof Error
+      ? lastErr
+      : new Error('Failed to generate a unique registration number after multiple attempts.')
+  }
 
   // Update convertedStudentId after we have the student ID
   await prisma.application.update({

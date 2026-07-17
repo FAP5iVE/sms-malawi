@@ -1,16 +1,20 @@
+/*
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R13 — Announcements, Timetable & Calendar Domain
+ * [PURPOSE]: AnnouncementAudience was defined locally here with no shared
+ *   source, duplicating (and risking drifting out of sync with)
+ *   announcementService.ts's own targetAll/targetRoles vocabulary — now
+ *   imported from @shared/schemas/announcement, the single reconciled
+ *   type this phase establishes across all three call sites. Both inline
+ *   `<hr>`-row reimplementations replaced with base.ts's existing,
+ *   exported, previously-zero-caller divider() helper.
+ * [DEPENDS ON]: @shared/schemas/announcement (AnnouncementAudience)
+ */
 import 'server-only'
 
 import { format } from 'date-fns'
-import { buildEmailHtml, buildEmailText, TOKEN, type EmailMessage, type SchoolBranding } from './base'
-
-export type AnnouncementAudience =
-  | 'ALL'
-  | 'STAFF'
-  | 'STUDENTS'
-  | 'ACADEMIC'
-  | 'FINANCE'
-  | 'LIBRARY'
-  | 'HR'
+import { buildEmailHtml, buildEmailText, divider, TOKEN, type EmailMessage, type SchoolBranding } from './base'
+import type { AnnouncementAudience } from '@shared/schemas/announcement'
 
 const AUDIENCE_LABELS: Record<AnnouncementAudience, string> = {
   ALL:      'All School Members',
@@ -88,11 +92,7 @@ export function renderAnnouncement(
     </tr>
 
     <!-- Divider -->
-    <tr>
-      <td style="padding:16px 32px 0;">
-        <hr style="border:none;border-top:1px solid ${TOKEN.BORDER};margin:0;" />
-      </td>
-    </tr>
+    ${divider()}
 
     <!-- Body -->
     <tr>
@@ -118,9 +118,10 @@ export function renderAnnouncement(
 
     <!-- Author footer -->
     ${data.authorName ? `
+    <tr><td style="padding:24px 0 0;"></td></tr>
+    ${divider()}
     <tr>
-      <td style="padding:24px 32px 0;">
-        <hr style="border:none;border-top:1px solid ${TOKEN.BORDER};margin:0 0 16px;" />
+      <td style="padding:16px 32px 0;">
         <p style="margin:0;font-family:${TOKEN.FONT_STACK};font-size:13px;color:${TOKEN.TEXT_MUTED};">
           This announcement was posted by <strong>${data.authorName}</strong>${data.authorTitle ? ', ' + data.authorTitle : ''} on behalf of ${school.schoolName}.
         </p>

@@ -1,11 +1,31 @@
+/**
+ * apps/web/src/app/(public)/login/page.tsx
+ *
+ * R2 — Auth Session & Login Flow Correctness.
+ *
+ * Fixes two confirmed defects from the audit:
+ *  1. A manual session cookie write using a bogus literal "1" instead
+ *     of the real Firebase UID, which also raced AuthProvider's own
+ *     cookie-setting. Cookie writes belong exclusively to AuthProvider's
+ *     onIdTokenChanged listener (see sms-erp-security Rule 1) — this page
+ *     no longer touches `document.cookie` at all.
+ *  2. `router.push('/dashboard')` fired immediately after sign-in, before the
+ *     role cookie/claim had actually propagated, producing a visible
+ *     redirect-loop-back-through-dashboard. The redirect now waits for the
+ *     auth store's `role`/`initialized` fields (set by AuthProvider once the
+ *     ID token's custom claims are read) before navigating, and honors the
+ *     `?from=` deep-link param proxy.ts already attaches — validated to
+ *     reject protocol-relative/external targets.
+ */
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
+import { useAuthStore } from '@/store/authStore'
 import {
   Eye,
   EyeOff,
@@ -17,14 +37,60 @@ import {
   Home,
 } from 'lucide-react'
 
+/**
+ * Only allow an internal, same-origin path as a post-login redirect target.
+ * Rejects absolute URLs ("https://evil.example") and protocol-relative
+ * targets ("//evil.example") — both of which would otherwise send an
+ * authenticated user off the app's own origin.
+ */
+function sanitizeRedirectTarget(from: string | null): string | null {
+  if (!from) return null
+  if (!from.startsWith('/')) return null
+  if (from.startsWith('//')) return null
+  return from
+}
+
+// `useSearchParams()` requires a Suspense boundary or `next build` fails its
+// static-generation bailout check ("should be wrapped in a suspense
+// boundary"). The default export below supplies that boundary; all page
+// logic lives in LoginForm.
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  )
+}
+
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { role, initialized } = useAuthStore((s) => ({
+    role: s.role,
+    initialized: s.initialized,
+  }))
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState(false)
+  const hasRedirected = useRef(false)
+
+  const safeFrom = sanitizeRedirectTarget(searchParams.get('from'))
+
+  // Once sign-in has been submitted and AuthProvider has resolved the
+  // post-token role claim, redirect exactly once. Guarded by a ref so a
+  // later, unrelated role change elsewhere in the app session can never
+  // re-trigger this navigation.
+  useEffect(() => {
+    if (!submitted) return
+    if (hasRedirected.current) return
+    if (!initialized || !role) return
+    hasRedirected.current = true
+    router.replace(safeFrom ?? '/dashboard')
+  }, [submitted, initialized, role, safeFrom, router])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -34,8 +100,9 @@ export default function LoginPage() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password)
-      document.cookie = `sms_session=1; path=/; max-age=18000; SameSite=Strict`
-      router.push('/dashboard')
+      // Do not set cookies or navigate here — AuthProvider's onIdTokenChanged
+      // listener owns both, and the useEffect above navigates once it has.
+      setSubmitted(true)
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
       if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
@@ -45,7 +112,6 @@ export default function LoginPage() {
       } else {
         setError('Something went wrong. Please try again.')
       }
-    } finally {
       setLoading(false)
     }
   }

@@ -1,4 +1,37 @@
 // apps/web/src/server/services/feeService.ts
+//
+// [CHANGE TYPE]: TARGETED EDIT, two fixes (a third — the "joined student
+//   name on list functions" fix — applies to GET /invoices and
+//   GET /scholarships directly in finances.ts, since that is where the
+//   real list logic lives; see finances.ts's header comment)
+// [R-PHASE]: R9 — Finance I: Invoicing, Fees & the Accounting Ledger
+//   Reconnection
+// [PURPOSE]:
+//   1. checkBalanceGate() now resolves the incoming identifier through
+//      studentService.resolveStudentFromUid() before querying. Its sole
+//      caller, examService.getStudentResults(), is reached with a Firebase
+//      UID in its confirmed caller chain — previously that UID was passed
+//      straight through to this function's `studentId` param, which
+//      queries Invoice.studentId (a Prisma FK, never a Firebase UID). No
+//      invoice would ever match, so `!invoice` was always true and the
+//      gate reported open (no outstanding balance) unconditionally —
+//      genuinely-indebted students were never actually blocked. A UID
+//      that fails to resolve to a Student record is treated as gate-open
+//      (fee status cannot be evaluated for an unlinked account, so this
+//      function does not itself deny access — see caller for the actual
+//      403).
+//   2. recordPayment() — THIS PHASE'S HEADLINE FIX — now calls
+//      accountingService.recordPaymentEntry() immediately after the
+//      payment row is persisted, reconnecting real tuition revenue to the
+//      double-entry ledger for the first time. accountingService's own
+//      functions use the global prisma singleton rather than accepting an
+//      external transaction client, so this call cannot be nested inside
+//      the payment/invoice-update $transaction above it; it runs
+//      immediately after that transaction commits, wrapped in the same
+//      try/catch-and-log-compensating-error pattern this function already
+//      uses for receipt generation directly below it — a ledger-posting
+//      failure is logged for reconciliation rather than rolling back an
+//      already-committed, real payment.
 // Fixed: Promise on checkBalanceGate (was empty Promise<>)
 // Fixed: removed empty Promise<> from $transaction return (let TypeScript infer)
 // Fixed: payment.paidAt (not recordedAt — actual Prisma field name)
@@ -6,20 +39,29 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import type { GenerateInvoiceInput, RecordPaymentInput } from '@shared/schemas/finance'
 import { generateReceipt } from '@/server/services/receiptService'
+import * as accountingService from '@/server/services/accountingService'
+import { resolveStudentFromUid } from '@/server/services/studentService'
 
 export async function checkBalanceGate(
   studentId: string,
   term: number,
   academicYear: string
 ): Promise<boolean> {
+  // [R9] The incoming identifier may be a Firebase UID (confirmed live via
+  // examService.getStudentResults()'s caller chain) rather than a Prisma
+  // Student.id — resolve it first so the Invoice.studentId lookup below
+  // actually matches a real row instead of silently matching nothing.
+  const resolved = await resolveStudentFromUid(studentId)
+  const realStudentId = resolved?.id ?? studentId
+
   const invoice = await prisma.invoice.findUnique({
-    where: { studentId_academicYear_term: { studentId, academicYear, term } },
+    where: { studentId_academicYear_term: { studentId: realStudentId, academicYear, term } },
     select: { balance: true, status: true },
   })
   if (!invoice) return true
   const balance = Number(invoice.balance)
   const gateOpen = balance <= 0
-  logger.info({ event: 'fee_gate_check', studentId, academicYear, term, balance, gateOpen })
+  logger.info({ event: 'fee_gate_check', studentId: realStudentId, academicYear, term, balance, gateOpen })
   return gateOpen
 }
 
@@ -133,6 +175,26 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
     select: { firstName: true, lastName: true, registrationNo: true },
   })
 
+  // [R9] HEADLINE FIX — reconnect real tuition revenue to the double-entry
+  // accounting ledger. accountingService.recordPaymentEntry() already
+  // existed, fully correct, but nothing ever called it — every
+  // AccountingLedgerTab.tsx view showed near-zero revenue regardless of
+  // how much tuition had actually been collected. A posting failure here
+  // must not roll back an already-committed, real payment — logged for
+  // reconciliation instead, matching the receipt-generation pattern
+  // immediately below.
+  try {
+    await accountingService.recordPaymentEntry({
+      invoiceId:   data.invoiceId,
+      studentName: student ? `${student.firstName} ${student.lastName}` : invoice.studentId,
+      amount:      data.amount,
+      paymentRef:  payment.reference ?? payment.id,
+      actorUid,
+    })
+  } catch (err) {
+    logger.error({ event: 'accounting.payment_posting_failed', paymentId: payment.id, invoiceId: data.invoiceId, err })
+  }
+
   let receiptKey: string | undefined
   try {
     if (student) {
@@ -157,18 +219,39 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
   return { payment: { ...payment, receiptKey }, invoice: updatedInvoice }
 }
 
-export async function applyLatePenalties(penaltyRate = 0.05): Promise<number> {
+// R19: the late-payment penalty rate is an admin-configurable percentage
+// exposed in FinanceSettings.tsx and persisted as the `late_payment_penalty_pct`
+// SystemSettings row by the /settings/finance route (a raw, string-keyed
+// setting outside the typed SETTING_KEYS map). Reading it here — instead of a
+// hardcoded 0.05 — makes the admin control actually take effect. Value is a
+// percentage (e.g. 5 => 5%); we convert to a fraction. Falls back to 5% to
+// match the FinanceSettings default when the row is absent or invalid.
+const LATE_PENALTY_PCT_SETTING_KEY = 'late_payment_penalty_pct'
+const DEFAULT_LATE_PENALTY_RATE = 0.05
+
+async function resolveLatePenaltyRate(): Promise<number> {
+  const row = await prisma.systemSettings.findUnique({
+    where: { key: LATE_PENALTY_PCT_SETTING_KEY },
+  })
+  if (!row) return DEFAULT_LATE_PENALTY_RATE
+  const pct = Number(row.value)
+  if (!Number.isFinite(pct) || pct < 0) return DEFAULT_LATE_PENALTY_RATE
+  return pct / 100
+}
+
+export async function applyLatePenalties(penaltyRate?: number): Promise<number> {
+  const rate = penaltyRate ?? (await resolveLatePenaltyRate())
   const overdue = await prisma.invoice.findMany({
     where: { status: { in: ['UNPAID', 'PARTIAL'] }, dueDate: { lt: new Date() }, latePenalty: { equals: 0 } },
   })
   for (const inv of overdue) {
-    const penalty = Number(inv.balance) * penaltyRate
+    const penalty = Number(inv.balance) * rate
     await prisma.invoice.update({
       where: { id: inv.id },
       data: { latePenalty: { increment: penalty }, totalAmount: { increment: penalty }, balance: { increment: penalty }, status: 'OVERDUE' },
     })
   }
-  logger.info({ event: 'late_penalties.applied', count: overdue.length, rate: penaltyRate })
+  logger.info({ event: 'late_penalties.applied', count: overdue.length, rate })
   return overdue.length
 }
 

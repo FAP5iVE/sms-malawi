@@ -25,9 +25,26 @@
  *   <MotionBottomSheet open={open} onClose={() => setOpen(false)} title="Filters">
  *     <FilterForm />
  *   </MotionBottomSheet>
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R15 — UI/UX Polish: Shared Components, Dashboards,
+ *   Confirmation Dialogs & Data-Display Consistency
+ * [PURPOSE]:
+ *   (1) The `trapFocus` prop's documented `inert` behaviour is now actually
+ *       implemented — previously the JSDoc promised a focus trap that the
+ *       component never applied, so a keyboard user could Tab straight out
+ *       of an open sheet into the page behind it. While open (and
+ *       trapFocus !== false), every direct child of <body> other than the
+ *       sheet's own portal-less subtree receives the `inert` attribute,
+ *       restored on close/unmount.
+ *   (2) The two nearly-identical titled/untitled close-button
+ *       motion.button blocks are extracted into one shared CloseButton
+ *       sub-component.
+ * [DEPENDS ON]: none
  */
 
 import { useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence, useDragControls, useMotionValue, useTransform } from 'framer-motion'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -36,7 +53,6 @@ import {
   SHEET_UP_VARIANTS,
   OVERLAY_VARIANTS,
   DURATION,
-  EASE,
   SPRING,
   reducedMotionVariants,
 } from '@/lib/motion'
@@ -81,6 +97,32 @@ const DRAG_DISMISS_THRESHOLD = 0.3
 const DRAG_DISMISS_VELOCITY = 500
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CLOSE BUTTON — shared between the titled and untitled header layouts (R15)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CloseButton({
+  onClose,
+  motionEnabled,
+}: {
+  onClose: () => void
+  motionEnabled: boolean
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClose}
+      whileHover={motionEnabled ? { scale: 1.1 } : undefined}
+      whileTap={motionEnabled ? { scale: 0.9 } : undefined}
+      transition={SPRING.tight}
+      className="w-8 h-8 min-h-[44px] min-w-[44px] rounded-lg flex items-center justify-center text-muted hover:text-body hover:bg-page transition-colors"
+      aria-label="Close sheet"
+    >
+      <X className="w-4 h-4" aria-hidden />
+    </motion.button>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -123,6 +165,42 @@ export function MotionBottomSheet({
     }
   }, [open])
 
+  // ── Focus trap via `inert` (R15 — implements what the trapFocus JSDoc
+  //    always documented). The sheet renders through a portal directly under
+  //    <body>, so every OTHER direct child of <body> can be marked inert
+  //    while the sheet is open — a keyboard user can no longer Tab out of
+  //    the sheet into the page behind it, and assistive technology stops
+  //    exposing the background content. Restored on close/unmount. Elements
+  //    that were already inert before the sheet opened are left untouched.
+  useEffect(() => {
+    if (!open || !trapFocus) return
+
+    const sheetEl = sheetRef.current
+    const affected: HTMLElement[] = []
+
+    for (const child of Array.from(document.body.children)) {
+      if (!(child instanceof HTMLElement)) continue
+      // Skip the sheet's own portal subtree (panel + overlay live inside it)
+      if (sheetEl && (child === sheetEl || child.contains(sheetEl))) continue
+      if (child.inert) continue
+      child.inert = true
+      affected.push(child)
+    }
+
+    // Move focus into the dialog so Tab starts inside the trapped region,
+    // and restore it to wherever it was when the sheet closes.
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
+    sheetEl?.focus()
+
+    return () => {
+      affected.forEach((el) => {
+        el.inert = false
+      })
+      previouslyFocused?.focus()
+    }
+  }, [open, trapFocus])
+
   // ── Drag end handler — check if user dragged enough to dismiss ────────────
   const handleDragEnd = useCallback(
     (_: unknown, info: { offset: { y: number }; velocity: { y: number } }) => {
@@ -153,7 +231,13 @@ export function MotionBottomSheet({
       }
     : sheetVariants
 
-  return (
+  // The sheet portals directly under <body> so the inert-based focus trap
+  // above can mark every other body child inert without touching the
+  // sheet's own subtree. SSR guard: nothing to portal to on the server —
+  // the sheet only ever opens from client interaction, so this is safe.
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -180,6 +264,7 @@ export function MotionBottomSheet({
             role="dialog"
             aria-modal="true"
             aria-label={title ?? 'Bottom sheet'}
+            tabIndex={-1}
             variants={reducedSheetVariants}
             initial="hidden"
             animate="visible"
@@ -234,32 +319,14 @@ export function MotionBottomSheet({
                   >
                     {title}
                   </h2>
-                  <motion.button
-                    onClick={onClose}
-                    whileHover={motionEnabled ? { scale: 1.1 } : undefined}
-                    whileTap={motionEnabled ? { scale: 0.9 } : undefined}
-                    transition={{ type: 'spring', stiffness: 400, damping: 40 }}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-body hover:bg-page transition-colors"
-                    aria-label="Close sheet"
-                  >
-                    <X className="w-4 h-4" />
-                  </motion.button>
+                  <CloseButton onClose={onClose} motionEnabled={motionEnabled} />
                 </div>
               )}
 
               {/* Close button when no title */}
               {title == null && (
                 <div className="flex justify-end w-full">
-                  <motion.button
-                    onClick={onClose}
-                    whileHover={motionEnabled ? { scale: 1.1 } : undefined}
-                    whileTap={motionEnabled ? { scale: 0.9 } : undefined}
-                    transition={{ type: 'spring', stiffness: 400, damping: 40 }}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-body hover:bg-page transition-colors"
-                    aria-label="Close sheet"
-                  >
-                    <X className="w-4 h-4" />
-                  </motion.button>
+                  <CloseButton onClose={onClose} motionEnabled={motionEnabled} />
                 </div>
               )}
             </div>
@@ -274,7 +341,8 @@ export function MotionBottomSheet({
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
 

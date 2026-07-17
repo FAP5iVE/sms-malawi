@@ -19,6 +19,7 @@ import {
   type ResultReleaseData,
 } from '@/server/templates/emails/result-release'
 import { renderLeaveUpdate, type LeaveUpdateData } from '@/server/templates/emails/leave-update'
+import { renderPlacementUpdate, type PlacementUpdateData } from '@/server/templates/emails/placement-update'
 import {
   renderContractAlert,
   type ContractAlertData,
@@ -58,6 +59,7 @@ interface NotifPrefs {
   emailResultRelease: boolean
   emailContractAlert: boolean
   emailAnnouncement: boolean
+  emailPlacementUpdate: boolean
   smsFeeReminder: boolean
   smsResultRelease: boolean
   pushAnnouncement: boolean
@@ -70,6 +72,7 @@ const DEFAULT_PREFS: NotifPrefs = {
   emailResultRelease: true,
   emailContractAlert: true,
   emailAnnouncement: true,
+  emailPlacementUpdate: true,
   smsFeeReminder: false,
   smsResultRelease: false,
   pushAnnouncement: true,
@@ -97,6 +100,7 @@ async function getPrefs(uid: string): Promise<NotifPrefs> {
       emailResultRelease: row.emailResultRelease,
       emailContractAlert: row.emailContractAlert,
       emailAnnouncement: row.emailAnnouncement,
+      emailPlacementUpdate: row.emailPlacementUpdate,
       smsFeeReminder: row.smsFeeReminder,
       smsResultRelease: row.smsResultRelease,
       pushAnnouncement: row.pushAnnouncement,
@@ -109,10 +113,20 @@ async function getPrefs(uid: string): Promise<NotifPrefs> {
 }
 
 /**
+ * [CHANGE TYPE]: TARGETED EDIT (this function only)
+ * [R-PHASE]: R5 — Academics I: Admissions & Student Records
+ * [PURPOSE]: Exported (was module-private) so applicationService.ts's
+ *   application-confirmation emails and public.ts's newsletter-confirmation
+ *   email can reuse this exact branding lookup instead of each defining
+ *   their own duplicate copy — the school-info route's own duplicate direct
+ *   `prisma.systemSettings` query is being replaced with settingsService
+ *   calls in this same phase, so a third independent branding lookup here
+ *   would be the same class of drift repeated a third time.
+ *
  * Fetch school identity settings for email branding.
  * Returns sensible fallbacks if settings are unavailable.
  */
-async function getSchoolBranding(): Promise<SchoolBranding> {
+export async function getSchoolBranding(): Promise<SchoolBranding> {
   try {
     const identity = await getIdentitySettings()
     const loginUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://school.mw'
@@ -261,6 +275,64 @@ export async function sendResultRelease(params: ResultReleaseParams): Promise<No
   if (prefs.smsResultRelease && params.to) {
     const smsBody = `${school.schoolName}: Term ${params.data.term} results for ${params.data.studentName} are now available. Log in to view: ${school.loginUrl}`
     result.smsSent = attemptSms(params.to, smsBody, 'result_release')
+  }
+
+  return result
+}
+
+// ─────────────────────────────────────────────────────────
+//  PLACEMENT UPDATE
+// ─────────────────────────────────────────────────────────
+
+export interface PlacementUpdateParams {
+  to: string
+  studentUid?: string
+  data: PlacementUpdateData
+}
+
+/**
+ * Notify a student that their university-placement outcome has been confirmed
+ * or verified. Channels: email + push (based on pref). Follows the
+ * sendResultRelease shape exactly; the email is gated by the new
+ * emailPlacementUpdate preference and the push by pushResultRelease (placement
+ * outcomes are part of the same academic-results notification family).
+ */
+export async function sendPlacementUpdate(params: PlacementUpdateParams): Promise<NotificationResult> {
+  const result: NotificationResult = { smsSent: false, skipped: false }
+
+  const prefs = params.studentUid ? await getPrefs(params.studentUid) : DEFAULT_PREFS
+  const school = await getSchoolBranding()
+
+  // ── Email
+  if (prefs.emailPlacementUpdate) {
+    const msg = renderPlacementUpdate(params.data, school)
+    const emailResult = await sendEmail({
+      to: params.to,
+      subject: msg.subject,
+      html: msg.html,
+      text: msg.text,
+      tags: [{ name: 'type', value: 'placement_update' }],
+    })
+    result.emailResult = emailResult
+  } else {
+    result.skipped = true
+    result.skipReason = 'emailPlacementUpdate preference is off'
+  }
+
+  // ── Push
+  if (prefs.pushResultRelease && params.studentUid) {
+    const pushPayload: PushNotificationPayload = {
+      title: `Placement ${params.data.statusLabel}`,
+      body:
+        params.data.programmeName && params.data.universityName
+          ? `${params.data.programmeName} — ${params.data.universityName}`
+          : 'Your university placement has been updated.',
+      clickAction: '/my-placement',
+      tag: 'placement_update',
+      data: { type: 'placement_update' },
+    }
+    const pushResult = await sendToUser(params.studentUid, pushPayload)
+    result.pushResult = pushResult
   }
 
   return result

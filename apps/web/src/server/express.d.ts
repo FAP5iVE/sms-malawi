@@ -1,3 +1,25 @@
+/**
+ * apps/web/src/server/express.d.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R4 — Auth/Security Domain
+ * [PURPOSE]: Removes the req.auditLog / req.auditLog.critical type
+ *   augmentation (and its sole supporting type, AuditLoggerFunctions) now
+ *   that server/middleware/auditLog.ts — the only file that ever set
+ *   req.auditLog — has been deleted in this same phase (zero callers
+ *   anywhere in the 23-router system; see that file's own removal and
+ *   api-app.ts's updated header comment for the exhaustive-grep
+ *   justification).
+ *   [NOTE] req.pendingAudit (and the auditResponseInterceptor middleware
+ *   its doc comment references) is left untouched — it is outside this
+ *   phase's change list — but a grep alongside this edit shows it has the
+ *   same zero-consumer profile as the removed req.auditLog: no file in this
+ *   codebase implements auditResponseInterceptor or calls
+ *   req.pendingAudit.set() anywhere. Flagged here for a future phase to
+ *   confirm and remove; not acted on in R4 since the roadmap's change list
+ *   for this file names only the auditLog augmentation.
+ * [DEPENDS ON]: R4's own deletion of server/middleware/auditLog.ts
+ */
 import type { UserRole } from '@shared/types/roles'
 
 type AuditLogInput = {
@@ -10,11 +32,6 @@ type AuditLogInput = {
     changes?: Array<{ field: string; oldValue: unknown; newValue: unknown }>
     context?: Record<string, unknown>
   }
-}
-
-interface AuditLoggerFunctions {
-  (input: AuditLogInput): void
-  critical: (input: AuditLogInput) => Promise<void>
 }
 
 declare global {
@@ -37,14 +54,6 @@ declare global {
        * whether req.user.role holds that permission.
        */
       can?: Record<string, boolean>
-
-      /**
-       * Set by injectAuditLogger middleware.
-       * Call with audit log input after a successful operation.
-       *   req.auditLog({ action, entityType, entityId })         // fire-and-forget
-       *   await req.auditLog.critical({ action, ... })           // synchronous
-       */
-      auditLog?: AuditLoggerFunctions
 
       /**
        * Set by auditResponseInterceptor middleware.

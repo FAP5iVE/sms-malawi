@@ -1,15 +1,42 @@
 'use client'
 
-import { useAuthStore } from '../../../store/authStore'
-import { AdminDashboard } from '../../../components/dashboards/AdminDashboard'
-import { HighRankDashboard } from '../../../components/dashboards/HighRankDashboard'
-import { FinanceDashboard } from '../../../components/dashboards/FinanceDashboard'
-import { LibraryDashboard } from '../../../components/dashboards/LibraryDashboard'
-import { LowerRankDashboard } from '../../../components/dashboards/LowerRankDashboard'
-import { AcademicDashboard } from '../../../components/dashboards/AcademicDashboard'
-import { HRDashboard } from '../../../components/dashboards/HRDashboard'
-import { ExamOfficerDashboard } from '../../../components/dashboards/ExamOfficerDashboard'
-import { StudentDashboard } from '../../../components/dashboards/StudentDashboard'
+/**
+ * apps/web/src/app/(auth)/dashboard/page.tsx
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R15 — UI/UX Polish: Shared Components, Dashboards,
+ *   Confirmation Dialogs & Data-Display Consistency
+ * [PURPOSE]: (1) The nine relative '../../../' imports converted to the
+ *   project's @/ alias (sms-erp-constraints import convention — this was
+ *   the only page still using relative paths into src roots). (2) The
+ *   greeting was hardcoded to "Good morning" regardless of wall-clock
+ *   time — now derived from the hour, the same hardcoded-display-value
+ *   class of defect this phase removes from the dashboards themselves.
+ *   Judgment call, flagged: the greeting fix is not in R15's literal
+ *   change list, but it is a hardcoded user-visible value on the exact
+ *   surface this phase rewrites, and leaving it would fail the phase's
+ *   own no-hardcoded-values output standard on a file already being
+ *   edited.
+ * [DEPENDS ON]: W/components/dashboards/* (this phase's rewrites)
+ */
+
+import { useAuthStore } from '@/store/authStore'
+import { AdminDashboard } from '@/components/dashboards/AdminDashboard'
+import { HighRankDashboard } from '@/components/dashboards/HighRankDashboard'
+import { FinanceDashboard } from '@/components/dashboards/FinanceDashboard'
+import { LibraryDashboard } from '@/components/dashboards/LibraryDashboard'
+import { LowerRankDashboard } from '@/components/dashboards/LowerRankDashboard'
+import { AcademicDashboard } from '@/components/dashboards/AcademicDashboard'
+import { HRDashboard } from '@/components/dashboards/HRDashboard'
+import { ExamOfficerDashboard } from '@/components/dashboards/ExamOfficerDashboard'
+import { StudentDashboard } from '@/components/dashboards/StudentDashboard'
+
+/** Time-of-day greeting: morning until noon, afternoon until 17:00, evening after. */
+function greetingForHour(hour: number): string {
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}
 
 export default function DashboardPage() {
   const { role, user, subtitle, initialized } = useAuthStore()
@@ -35,7 +62,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold text-brand-navy">
-          Good morning, {displayName} 👋
+          {greetingForHour(new Date().getHours())}, {displayName} 👋
         </h1>
         <p className="text-muted text-sm mt-0.5">
           {subtitle} · {role?.replace('_', ' ')}

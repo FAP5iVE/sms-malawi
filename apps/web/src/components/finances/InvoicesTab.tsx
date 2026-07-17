@@ -1,8 +1,32 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT, three fixes (listed below)
+ * [FILE]: apps/web/src/components/finances/InvoicesTab.tsx
+ * [R-PHASE]: R9 — Finance I: Invoicing, Fees & the Accounting Ledger
+ *   Reconnection
+ * [PURPOSE]:
+ *   1. Student self-service invoice viewing now calls
+ *      GET /finances/balance/:studentId (ownership-checked, reachable by
+ *      the `student` role) via the new useStudentBalance() hook, instead
+ *      of GET /finances/invoices (whose role list excludes `student`
+ *      entirely, so a student rendering this tab under the old code
+ *      always saw an empty table).
+ *   2. "Student" column now renders the joined student name
+ *      (inv.student.firstName/lastName, added to ApiInvoice this phase)
+ *      instead of `inv.studentId.slice(-8)`.
+ *   3. "Pay" button now gates on usePermissions().can('finance.recordPayment')
+ *      instead of the previous `role !== 'student'` check, which
+ *      incorrectly showed the button to every staff role (including
+ *      admin, high_rank, library, hr — none of which hold this
+ *      permission by design; recording a payment is a `finance`-role
+ *      business operation) rather than just the one role that holds it.
+ * [DEPENDS ON]: W/hooks/useFinances.ts (useStudentBalance), W/hooks/usePermissions.ts
+ */
 'use client'
 
 import { useState } from 'react'
-import { useInvoices, useRecordPayment } from '@/hooks/useFinances'
+import { useInvoices, useStudentBalance, useRecordPayment } from '@/hooks/useFinances'
 import { useAuthStore } from '@/store/authStore'
+import { usePermissions } from '@/hooks/usePermissions'
 import { formatMWK } from '@shared/constants/malawi'
 import { PlusCircle, Loader2 } from 'lucide-react'
 import { InvoiceNotes } from '@/components/finances/InvoiceNotes'
@@ -17,15 +41,35 @@ const STATUS_COLORS: Record<string, string> = {
   UNPAID: 'bg-brand-amber/10 text-brand-amber border-brand-amber/30',
   OVERDUE: 'bg-brand-coral/10 text-brand-coral border-brand-coral/30',
 }
+
+function studentDisplayName(inv: ApiInvoice, isOwnRecord: boolean): string {
+  if (inv.student) return `${inv.student.firstName} ${inv.student.lastName}`
+  return isOwnRecord ? 'You' : '—'
+}
+
 export function InvoicesTab({ academicYear, term }: { academicYear: string; term: number }) {
   const { role, user } = useAuthStore()
+  const { can } = usePermissions()
+  const isStudent = role === 'student'
+  const canRecordPayment = can('finance.recordPayment')
+
   const [statusFilter, setStatusFilter] = useState('')
   const [payingInvoice, setPayingInvoice] = useState<ApiInvoice | null>(null)
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null)
+
   const filters: Record<string, string | number> = { academicYear, term }
-  if (role === 'student') filters.studentId = user?.uid ?? ''
   if (statusFilter) filters.status = statusFilter
-  const { data: invoices = [], isLoading } = useInvoices(filters)
+
+  const { data: staffInvoices = [], isLoading: staffLoading } = useInvoices(filters, !isStudent)
+  const { data: balanceData, isLoading: balanceLoading } = useStudentBalance(
+    user?.uid ?? '',
+    academicYear,
+    isStudent
+  )
+
+  const invoices = isStudent ? (balanceData?.invoices ?? []) : staffInvoices
+  const isLoading = isStudent ? balanceLoading : staffLoading
+
   const { mutate: recordPayment, isPending } = useRecordPayment()
   const [payAmount, setPayAmount] = useState('')
   const [payMethod, setPayMethod] = useState<PaymentMethodType>('CASH')
@@ -117,16 +161,16 @@ export function InvoicesTab({ academicYear, term }: { academicYear: string; term
                   <tr
                     key={inv.id}
                     onClick={() =>
-                      role !== 'student' &&
+                      !isStudent &&
                       setExpandedInvoiceId(expandedInvoiceId === inv.id ? null : inv.id)
                     }
                     className={[
                       'border-b border-base hover:bg-page',
-                      role !== 'student' ? 'cursor-pointer' : '',
+                      !isStudent ? 'cursor-pointer' : '',
                     ].join(' ')}
                   >
-                    <td className="px-4 py-3 font-mono text-xs text-muted tabular">
-                      {inv.studentId.slice(-8)}
+                    <td className="px-4 py-3 text-sm font-medium">
+                      {studentDisplayName(inv, isStudent)}
                     </td>
                     <td className="px-4 py-3">Term {inv.term}</td>
                     <td className="px-4 py-3 text-right tabular font-medium">
@@ -152,7 +196,7 @@ export function InvoicesTab({ academicYear, term }: { academicYear: string; term
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {role !== 'student' && inv.status !== 'PAID' && (
+                      {canRecordPayment && inv.status !== 'PAID' && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -166,7 +210,7 @@ export function InvoicesTab({ academicYear, term }: { academicYear: string; term
                       )}
                     </td>
                   </tr>
-                  {role !== 'student' && expandedInvoiceId === inv.id && (
+                  {!isStudent && expandedInvoiceId === inv.id && (
                     <tr key={`${inv.id}-notes`} className="border-b border-base bg-page">
                       <td colSpan={7} className="px-6 py-4">
                         <InvoiceNotes invoiceId={inv.id} />

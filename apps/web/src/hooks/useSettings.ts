@@ -1,9 +1,26 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: apps/web/src/hooks/useSettings.ts
+ * [R-PHASE]: R8 — Academics IV: Report Cards, Transcripts, Promotion & Risk
+ *   Assessment; R15 — UI/UX Polish adds useCurrentAcademicPeriod() below —
+ *   the sanctioned any-role client read of SETTING_KEYS.
+ *   CURRENT_ACADEMIC_YEAR / CURRENT_TERM (both isPublic), backing
+ *   PageHeader's term badge and every dashboard's year/term wiring.
+ * [PURPOSE]: Adds useGradingScales(examType) — PrintableReportCard.tsx
+ *   needs the real, DB-backed grading scale (gradeService.ts, via the
+ *   already-existing, open-to-all-authenticated-roles GET
+ *   /settings/grading-scales route) to retire its own standalone
+ *   GRADE_SCALE taxonomy, the third independent grading definition in the
+ *   codebase.
+ * [DEPENDS ON]: none
+ */
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api-client'
 import { queryKeys } from '@/lib/api-client'
 import { useAuthStore } from '@/store/authStore'
+import { SETTING_KEYS } from '@shared/types/settings'
 import type {
   SettingKey,
   SettingValueMap,
@@ -12,6 +29,30 @@ import type {
   SchoolIdentitySettings,
   SettingRow,
 } from '@shared/types/settings'
+
+// ─────────────────────────────────────────────────────────
+//  GRADING SCALES (real DB-backed grade boundaries — gradeService.ts)
+// ─────────────────────────────────────────────────────────
+
+export interface GradingScaleRow {
+  id:           string
+  examType:     'MSCE' | 'JCE' | 'INTERNAL_F1F2' | 'INTERNAL_F3F4'
+  grade:        string
+  minPercent:   number
+  maxPercent:   number
+  pass:         boolean
+  label:        string | null
+  displayOrder: number
+}
+
+/** All grading scale rows, optionally filtered to one exam type client-side. */
+export function useGradingScales(examType?: GradingScaleRow['examType']) {
+  return useQuery({
+    queryKey: ['settings', 'grading-scales'],
+    queryFn:  () => apiFetch<GradingScaleRow[]>('/settings/grading-scales'),
+    select:   (rows) => (examType ? rows.filter((r) => r.examType === examType) : rows),
+  })
+}
 
 // ─────────────────────────────────────────────────────────
 //  GET SINGLE SETTING
@@ -44,6 +85,32 @@ export function useSetting<K extends SettingKey>(key: K) {
     staleTime: 30 * 60 * 1000,   // 30 minutes default
     gcTime:    60 * 60 * 1000,   // 1 hour garbage-collection
   })
+}
+
+// ─────────────────────────────────────────────────────────
+//  CURRENT ACADEMIC PERIOD  (R15)
+//  The one sanctioned client-side source for "which academic year and
+//  term is it right now" — SETTING_KEYS.CURRENT_ACADEMIC_YEAR /
+//  SETTING_KEYS.CURRENT_TERM, both isPublic per SETTING_META, so any
+//  authenticated role may read them. Replaces the hardcoded
+//  'Term 1 — 2025/2026' badge in PageHeader.tsx and FinanceDashboard.tsx's
+//  hardcoded useFinanceSummary('2025/2026', 1) arguments. Consumers gate
+//  their dependent queries with `enabled` until both values resolve.
+// ─────────────────────────────────────────────────────────
+
+export function useCurrentAcademicPeriod(): {
+  academicYear: string | undefined
+  term:         number | undefined
+  isLoading:    boolean
+} {
+  const yearQ = useSetting(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
+  const termQ = useSetting(SETTING_KEYS.CURRENT_TERM)
+
+  return {
+    academicYear: yearQ.data?.value,
+    term:         termQ.data?.value,
+    isLoading:    yearQ.isLoading || termQ.isLoading,
+  }
 }
 
 // ─────────────────────────────────────────────────────────

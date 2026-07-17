@@ -69,6 +69,12 @@ package-lock.json
 
 #serviceAccount
 **/serviceAccount.json
+service-account.json
+*.service-account.json
+**/scripts/
+scripts/
+create-test-accounts.mjs
+
 
 #sentry
 .env.sentry-build-plugin

@@ -1,11 +1,24 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: apps/web/src/lib/verifyAuth.ts
+ * [R-PHASE]: R5 — Academics I: Admissions & Student Records
+ * [PURPOSE]: Exports the Firebase Admin singleton getAdminApp() (previously
+ *   module-private) so studentService.ts's own duplicate initializer can be
+ *   deleted and import this canonical one instead — see sms-erp-backend
+ *   Rule 4 / sms-erp-constraints Rule 5 on never re-deriving a singleton
+ *   that already exists elsewhere in the codebase. No behavioral change to
+ *   verifyAuth/requireRole/getIdTokenFromRequest.
+ * [DEPENDS ON]: none
+ */
 import type { Request, Response, NextFunction } from 'express'
 import * as admin from 'firebase-admin'
 import type { App } from 'firebase-admin/app'
 import type { UserRole } from '@shared/types/roles'
+import { type NextRequest } from 'next/server'
 
 let adminApp: App | undefined
 
-function getAdminApp(): App {
+export function getAdminApp(): App {
   if (!adminApp) {
     if (admin.apps.length > 0) {
       adminApp = admin.app()
@@ -45,5 +58,24 @@ export function requireRole(allowed: UserRole[]) {
       return res.status(403).json({ error: 'Access denied for your role' })
     }
     next()
+  }
+}
+
+/**
+ * Extracts and verifies a Firebase ID token from a Next.js App Router request.
+ * Returns the decoded token or null if missing/invalid.
+ * Used by API route handlers (not Express middleware).
+ */
+export async function getIdTokenFromRequest(
+  request: NextRequest,
+): Promise<import('firebase-admin/auth').DecodedIdToken | null> {
+  const authHeader = request.headers.get('authorization') ?? ''
+  const token      = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  if (!token) return null
+  try {
+    const { getAuth } = await import('firebase-admin/auth')
+    return await getAuth().verifyIdToken(token)
+  } catch {
+    return null
   }
 }

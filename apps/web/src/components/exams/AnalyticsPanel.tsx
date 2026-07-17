@@ -1,8 +1,33 @@
 'use client'
+
+/**
+ * [CHANGE TYPE]: MAJOR REWRITE (chart migration only — the class/term
+ *   selectors, KPI cards, and all states are unchanged)
+ * [FILE]: apps/web/src/components/exams/AnalyticsPanel.tsx
+ * [R-PHASE]: R17 — Unified Charting Architecture (Phase 10C Plan)
+ * [PURPOSE]: Migrates the "Top 10 Students" panel — the audit's first
+ *   confirmed working chart — off a top-level Recharts import and onto the new
+ *   `@/components/shared/chart` module (R17 AC: "Migrate AnalyticsPanel onto
+ *   the new Chart module"). Consequences of the migration:
+ *     - Recharts is no longer imported at the top level of this component; the
+ *       `Chart` module dynamic-imports its renderer, so this panel no longer
+ *       forces Recharts into the exams-page bundle before it renders.
+ *     - The four raw medal hex literals (`#D97706`/`#94A3B8`/`#CD7F32`/
+ *       `#0E8A6A`) that coloured the bars per-rank are gone; a single palette
+ *       colour (from the R16 design-token source, applied by the renderer)
+ *       colours the series, and rank is already conveyed by the `#1…#10`
+ *       position axis. This closes the raw-hex and the missing-`ariaLabel`
+ *       gaps CROSS_a11y flagged for this exact chart.
+ * [DEPENDS ON]:
+ *   - @/components/shared/chart (R17 Chart)
+ *   - @/hooks/useExams (useClassAnalytics), @/hooks/useClasses (useClasses)
+ */
+
 import { useState } from 'react'
 import { useClassAnalytics } from '@/hooks/useExams'
 import { useClasses } from '@/hooks/useClasses'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { Chart } from '@/components/shared/chart'
+import type { ChartDataPoint } from '@/components/shared/chart'
 import { Trophy, Users, TrendingUp } from 'lucide-react'
 import type { ApiClass } from '@shared/types/api'
 
@@ -14,6 +39,11 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
   const { data: classesData }  = useClasses(academicYear)
   const classes                = (classesData ?? []) as ApiClass[]
   const { data: analytics, isLoading } = useClassAnalytics(classId, academicYear, t)
+
+  const top10Data: ChartDataPoint[] = (analytics?.top10 ?? []).map((s) => ({
+    x: `#${s.position}`,
+    average: s.average,
+  }))
 
   return (
     <div className="space-y-5">
@@ -53,7 +83,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
             ].map(({ icon: Icon, label, value, bg, ic }) => (
               <div key={label} className="bg-surface border border-base rounded-xl p-5 text-center">
                 <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center mx-auto mb-2`}>
-                  <Icon className={`w-5 h-5 ${ic}`} />
+                  <Icon className={`w-5 h-5 ${ic}`} aria-hidden />
                 </div>
                 <p className="text-2xl font-bold text-brand-navy">{value}</p>
                 <p className="text-xs text-muted mt-1">{label}</p>
@@ -64,21 +94,14 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
           {analytics.top10.length > 0 && (
             <div className="bg-surface border border-base rounded-xl p-5">
               <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide mb-4">Top 10 Students</h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={analytics.top10} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                  <XAxis dataKey="position" tick={{ fontSize: 11 }} tickFormatter={(v: number) => `#${v}`} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(value) => {
-                      const num = typeof value === 'number' ? value : 0
-                      return [`${num.toFixed(1)}%`, 'Average']
-                    }} />
-                  <Bar dataKey="average" radius={[4,4,0,0]}>
-                    {analytics.top10.map((_, i) => (
-                      <Cell key={i} fill={i === 0 ? '#D97706' : i === 1 ? '#94A3B8' : i === 2 ? '#CD7F32' : '#0E8A6A'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <Chart
+                type="bar"
+                data={top10Data}
+                series={[{ key: 'average', label: 'Average %' }]}
+                height={220}
+                emptyStateMessage="No ranked results for this class and term yet."
+                ariaLabel="Top 10 students by average score for the selected class and term"
+              />
             </div>
           )}
         </>

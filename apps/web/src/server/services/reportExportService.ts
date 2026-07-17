@@ -1,6 +1,34 @@
+/*
+ * apps/web/src/server/services/reportExportService.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R10 — Finance II: Payroll, Forecasting & the Finance↔Library
+ *   Reconciliation
+ * [PURPOSE]: Corrected the bucket/prefix used for all four financial
+ *   report uploads (Fee Collection, Outstanding Balances, Expense
+ *   Breakdown, Payroll Summary) — was STORAGE_BUCKETS.PAYSLIPS, which is
+ *   not merely a semantically wrong label (as this phase's roadmap
+ *   describes it) but a genuine type mismatch: uploadFile()'s first
+ *   parameter is a FilePrefix, not a StorageBucket, and every
+ *   StorageBucket value is the single literal 'school_files' — not a
+ *   member of the FilePrefix union at all. This also broke
+ *   canReadFile()'s prefix-based access control for every exported
+ *   report, since a school_files_-prefixed fileId matches no READ_ROLES
+ *   category. Repointed at the new FILE_PREFIX.FINANCIAL_REPORT (added
+ *   this phase in storage.ts, gated to admin/finance/high_rank — matching
+ *   this file's own POST /finances/reports/export route gate). Also
+ *   fixed uploadFile()'s return value being passed directly where a
+ *   plain fileId string was expected — uploadFile() returns an
+ *   UploadResult object; the real fileId is `.fileId`. Added
+ *   `import 'server-only'`.
+ * [DEPENDS ON]: W/lib/storage.ts (FILE_PREFIX.FINANCIAL_REPORT, same
+ *   phase)
+ */
+
+import 'server-only'
 import ExcelJS from 'exceljs'
 import { prisma } from '@/lib/prisma'
-import { uploadFile, getDownloadUrl, STORAGE_BUCKETS } from '@/lib/storage'
+import { uploadFile, getDownloadUrl, FILE_PREFIX } from '@/lib/storage'
 import { formatMWK } from '@shared/constants/malawi'
 
 type ReportType =
@@ -36,15 +64,15 @@ export async function generateFinancialReport(
   const buffer = await wb.xlsx.writeBuffer()
   const filename = `reports_${type}_${academicYear.replace('/', '-')}_term${term}_${Date.now()}.xlsx`
 
-  const fileId = await uploadFile(
-    STORAGE_BUCKETS.PAYSLIPS,
+  const uploaded = await uploadFile(
+    FILE_PREFIX.FINANCIAL_REPORT,
     Buffer.from(buffer),
     filename,
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   )
 
   // Return a download URL so the frontend can download it
-  return getDownloadUrl(STORAGE_BUCKETS.PAYSLIPS, fileId)
+  return getDownloadUrl(FILE_PREFIX.FINANCIAL_REPORT, uploaded.fileId)
 }
 
 // --- SHEET BUILDERS --------------------------------------

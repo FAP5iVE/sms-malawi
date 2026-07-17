@@ -2,29 +2,54 @@
 
 /**
  * FILE: apps/web/src/app/(public)/page.tsx
- * REPLACES: existing minimal landing page
- *
- * This is the complete single-page website (§3.1 + §3.2 combined).
- * All sections scroll on one page. Login opens as a separate /login page.
- *
- * SECTIONS:
- *   1. Sticky nav header
- *   2. Hero (full-viewport)
- *   3. About Us
- *   4. Stats / MANEB Performance
- *   5. Newsletter / Announcements
- *   6. Services & Facilities
- *   7. Gallery
- *   8. Admissions CTA
- *   9. Contact
- *  10. Footer
- *
- * Dark/Light/System mode toggle is included in the nav.
- * Login button routes to /login (separate page per spec).
+ * [CHANGE TYPE]: MAJOR REWRITE of the data layer only — visual layout and
+ *   section structure are unchanged except where a hardcoded value had no
+ *   live equivalent to replace it with (see PURPOSE).
+ * [R-PHASE]: R5 — Academics I: Admissions & Student Records
+ * [PURPOSE]:
+ *   1. Announcements, MANEB stats (hero mini-stats + the §4 stats section),
+ *      and contact/founding-year details now come from the three existing,
+ *      previously-unused public endpoints (usePublic.ts hooks) instead of
+ *      hardcoded arrays. Two figures in the original hardcoded data
+ *      ("Students enrolled", "University placements", "Above national
+ *      average", and the per-subject school-vs-national comparison bars)
+ *      had no live source behind any of the three sanctioned endpoints —
+ *      rather than leave fabricated numbers in place next to genuinely
+ *      live ones, those specific figures are replaced with real,
+ *      derivable equivalents (total MANEB candidates, years of excellence
+ *      computed from the live founding year) or removed outright (the
+ *      per-subject comparison, which would need a backend query this
+ *      phase doesn't add).
+ *   2. The newsletter subscribe form (previously nonexistent — the "§5
+ *      NEWSLETTER & ANNOUNCEMENTS" section rendered only announcements)
+ *      is wired to POST /public/newsletter/subscribe via
+ *      useNewsletterSubscribe().
+ *   3. Developer placeholder text ("Place your hero SVG illustration
+ *      here", "School photo here", the g1–g8.jpg gallery placeholders) is
+ *      removed — no real image assets exist yet (confirmed: no
+ *      hero-illustration.svg/school-photo.jpg/gallery images in
+ *      /public/images), so these fall back to a clean, non-dev-facing
+ *      icon placeholder rather than a broken <img> reference.
+ *   4. All seven previously-dead footer links (How to Apply, Entry
+ *      Requirements, Fees Structure, Scholarships, FAQs, Privacy Policy,
+ *      Terms of Use) now resolve to a real destination — the first four to
+ *      /apply or an in-page anchor, Privacy/Terms to the two new static
+ *      pages this phase adds. The remaining footer columns (Quick Links,
+ *      Academic) are fixed for the same reason while this block is open.
+ *   5. The local useTheme() hook (a second, independent theme system with
+ *      its own 'sms-theme' localStorage key) is removed in favour of
+ *      next-themes' real useTheme(), matching ModeToggle.tsx's established
+ *      pattern and the 'sms-malawi-theme' storageKey the root ThemeProvider
+ *      already wraps this entire route group with.
+ * [DEPENDS ON]: apps/web/src/hooks/usePublic.ts, next-themes (already the
+ *   app-wide theme provider — see apps/web/src/components/providers/
+ *   ThemeProvider.tsx)
  */
+'use client'
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useTheme } from 'next-themes'
 import { FaFacebook, FaTwitter, FaInstagram, FaYoutube, FaLinkedin } from 'react-icons/fa'
 import {
   Sun,
@@ -59,38 +84,16 @@ import {
   ExternalLink,
   Target,
   Zap,
+  Loader2,
+  CheckCircle2,
+  ImageIcon,
 } from 'lucide-react'
-
-// -- THEME HOOK --------------------------------------------------------------
-type Theme = 'light' | 'dark' | 'system'
-
-function useTheme() {
-  const [theme, setTheme] = useState<Theme>(
-    () =>
-      typeof window !== 'undefined'
-        ? (localStorage.getItem('sms-theme') as Theme | null) ?? 'system'
-        : 'system'
-  )
-
-  useEffect(() => {
-    const root = document.documentElement
-    const apply = (t: Theme) => {
-      if (t === 'system') {
-        root.classList.toggle('dark', window.matchMedia('(prefers-color-scheme: dark)').matches)
-      } else {
-        root.classList.toggle('dark', t === 'dark')
-      }
-    }
-    apply(theme)
-    localStorage.setItem('sms-theme', theme)
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const handler = () => { if (theme === 'system') apply('system') }
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [theme])
-
-  return { theme, setTheme }  // mounted removed
-}
+import {
+  usePublicSchoolInfo,
+  usePublicManebStats,
+  usePublicAnnouncements,
+  useNewsletterSubscribe,
+} from '@/hooks/usePublic'
 
 // ── FLOATING CARD ────────────────────────────────────────────────────────────
 function FloatCard({
@@ -164,52 +167,10 @@ function StatCounter({
   )
 }
 
-// ── ANNOUNCEMENT CARD ─────────────────────────────────────────────────────────
-const announcements = [
-  {
-    date: 'May 12, 2026',
-    category: 'MANEB',
-    title: 'MSCE 2025 Results Released — Record Pass Rate',
-    excerpt:
-      'We are proud to announce that our Form 4 cohort achieved an 89% pass rate in the 2025 MSCE examinations, surpassing the national average by 14 percentage points.',
-  },
-  {
-    date: 'Apr 28, 2026',
-    category: 'Academic',
-    title: 'Term 3 Examination Timetable Now Available',
-    excerpt:
-      'The end-of-term examinations for all forms will commence on 5th June 2026. Students are advised to collect their examination cards from the school office.',
-  },
-  {
-    date: 'Apr 15, 2026',
-    category: 'Admissions',
-    title: 'Form 1 Admissions Open for 2027 Academic Year',
-    excerpt:
-      'Applications for the 2027 intake are now open. We welcome academically motivated students from across Malawi. Apply online through the portal today.',
-  },
-  {
-    date: 'Mar 30, 2026',
-    category: 'Events',
-    title: 'Annual Inter-School Science Olympiad — 2nd Place',
-    excerpt:
-      'Our science team secured second position in the Southern Region Science Olympiad, with outstanding performances in Biology, Chemistry and Physics categories.',
-  },
-  {
-    date: 'Mar 10, 2026',
-    category: 'Initiative',
-    title: 'Digital Library Expansion: 500+ New E-Books Added',
-    excerpt:
-      'The school digital library now hosts over 1,200 academic resources including past MANEB papers, textbooks, and reference materials accessible to all enrolled students.',
-  },
-  {
-    date: 'Feb 20, 2026',
-    category: 'Extracurricular',
-    title: 'Football Team Qualifies for National Tournament',
-    excerpt:
-      'Congratulations to our football squad for qualifying for the National Secondary Schools Football Championship to be held in Lilongwe in August 2026.',
-  },
-]
-
+// ── ANNOUNCEMENT CATEGORY COLOURS ─────────────────────────────────────────────
+// Categories now come from live data (usePublicAnnouncements) rather than a
+// hardcoded array, so this is a lookup with a fallback for any category
+// string not explicitly listed, not an assumption every possible value is known.
 const categoryColors: Record<string, string> = {
   MANEB: 'bg-brand-teal/15 text-brand-teal border-brand-teal/30',
   Academic: 'bg-brand-navy/10 text-brand-navy border-brand-navy/20',
@@ -218,6 +179,7 @@ const categoryColors: Record<string, string> = {
   Initiative: 'bg-brand-teal/15 text-brand-teal border-brand-teal/30',
   Extracurricular: 'bg-brand-coral/15 text-brand-coral border-brand-coral/30',
 }
+const DEFAULT_CATEGORY_COLOR = 'bg-muted/15 text-muted border-base'
 
 // ── SERVICES ─────────────────────────────────────────────────────────────────
 const services = [
@@ -267,9 +229,49 @@ const services = [
 
 export default function LandingPage() {
   const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeSection, setActiveSection] = useState('')
+
+  // next-themes requires a mounted guard to avoid a hydration mismatch —
+  // the server doesn't know the visitor's stored theme preference yet.
+  useEffect(() => setMounted(true), [])
+
+  // ── Live public data ────────────────────────────────────────────────────
+  const { data: schoolInfo }     = usePublicSchoolInfo()
+  const { data: manebStats }     = usePublicManebStats()
+  const { data: announcements = [], isLoading: announcementsLoading } = usePublicAnnouncements()
+
+  const currentYearNum = new Date().getFullYear()
+  const yearsOfExcellence = schoolInfo ? currentYearNum - schoolInfo.founded : null
+  const overallCandidates = manebStats?.stats.reduce((sum, s) => sum + s.total, 0) ?? 0
+  const msceStat = manebStats?.stats.find((s) => s.examType === 'MSCE')
+
+  // ── Newsletter subscribe form ───────────────────────────────────────────
+  const [newsletterEmail, setNewsletterEmail]     = useState('')
+  const [newsletterMessage, setNewsletterMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  const newsletterSubscribe = useNewsletterSubscribe()
+
+  function handleNewsletterSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setNewsletterMessage(null)
+    newsletterSubscribe.mutate(
+      { email: newsletterEmail },
+      {
+        onSuccess: (res) => {
+          setNewsletterMessage({ kind: 'success', text: res.message })
+          setNewsletterEmail('')
+        },
+        onError: (err) => {
+          setNewsletterMessage({
+            kind: 'error',
+            text: err instanceof Error ? err.message : 'Failed to subscribe. Please try again.',
+          })
+        },
+      },
+    )
+  }
 
   // Intersection observer for active nav highlight
   useEffect(() => {
@@ -294,15 +296,15 @@ export default function LandingPage() {
     setMobileMenuOpen(false)
   }
 
-  const themeIcons = {
+  const themeIcons: Record<string, React.ReactNode> = {
     light: <Sun className="w-4 h-4" />,
     dark: <Moon className="w-4 h-4" />,
     system: <Monitor className="w-4 h-4" />,
   }
 
   const cycleTheme = () => {
-    const order: Theme[] = ['light', 'dark', 'system']
-    const next: Theme = order[(order.indexOf(theme) + 1) % order.length] ?? 'system'
+    const order = ['light', 'dark', 'system']
+    const next = order[(order.indexOf(theme ?? 'system') + 1) % order.length] ?? 'system'
     setTheme(next)
   }
 
@@ -418,17 +420,16 @@ export default function LandingPage() {
 
               <div className="flex items-center gap-2 ml-auto">
                 {/* Theme toggle */}
-                {/* suppressHydrationWarning on title + content so the
-                    neutral first render (no icon) doesn't trigger a warning
-                    on the one frame before `mounted` flips to true. */}
+                {/* mounted guard avoids a next-themes hydration mismatch —
+                    the server doesn't know the visitor's stored preference
+                    on the very first render. */}
                 <button
-                onClick={cycleTheme}
-                className="p-2 rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
-                title={`Theme: ${theme}`}
-                suppressHydrationWarning
-              >
-                <span suppressHydrationWarning>{themeIcons[theme]}</span>
-              </button>
+                  onClick={cycleTheme}
+                  className="p-2 rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
+                  aria-label={mounted ? `Theme: ${theme}. Click to change.` : 'Toggle theme'}
+                >
+                  {mounted ? themeIcons[theme ?? 'system'] : <Monitor className="w-4 h-4" aria-hidden />}
+                </button>
 
                 {/* Login CTA */}
                 <Link
@@ -534,9 +535,9 @@ export default function LandingPage() {
               {/* Quick stats */}
               <div className="hero-stats grid grid-cols-3 gap-6 pt-8 border-t border-white/10">
                 {[
-                  { num: '1,200+', label: 'Students enrolled' },
-                  { num: '89%', label: 'MSCE pass rate 2025' },
-                  { num: '45+', label: 'Years of excellence' },
+                  { num: overallCandidates > 0 ? `${overallCandidates}+` : '—', label: 'MANEB candidates' },
+                  { num: msceStat ? `${msceStat.passRate}%` : '—', label: 'MSCE pass rate' },
+                  { num: yearsOfExcellence != null ? `${yearsOfExcellence}+` : '—', label: 'Years of excellence' },
                 ].map((s) => (
                   <div key={s.label}>
                     <div className="text-2xl md:text-3xl font-heading font-bold text-white">
@@ -556,18 +557,15 @@ export default function LandingPage() {
               {/* Inner solid ring */}
               <div className="absolute w-[340px] h-[340px] rounded-full border border-brand-teal/20" />
 
-              {/* Central illustration placeholder */}
+              {/* Central illustration placeholder — no real hero-illustration.svg
+                  asset exists yet; this is a clean, non-developer-facing
+                  fallback rather than a broken <img> reference. */}
               <div className="w-72 h-72 rounded-3xl bg-gradient-to-br from-brand-navy-mid to-brand-navy-light border border-white/10 flex flex-col items-center justify-center gap-3 shadow-2xl">
                 <div className="w-16 h-16 rounded-2xl bg-brand-teal/20 border border-brand-teal/30 flex items-center justify-center">
-                  {/* SVG PLACEHOLDER — replace with: <Image src="/images/hero-illustration.svg" ... /> */}
-                  <BookOpen className="w-8 h-8 text-brand-teal" />
+                  <BookOpen className="w-8 h-8 text-brand-teal" aria-hidden />
                 </div>
-                <p className="text-white/30 text-xs font-sans text-center px-8">
-                  Place your hero SVG illustration here
-                  <br />
-                  <code className="text-white/20 text-[10px]">
-                    /public/images/hero-illustration.svg
-                  </code>
+                <p className="text-white/40 text-sm font-heading font-semibold text-center px-8">
+                  {schoolInfo?.schoolName ?? 'SMS Malawi'}
                 </p>
               </div>
 
@@ -578,7 +576,9 @@ export default function LandingPage() {
                     <TrendingUp className="w-4 h-4 text-brand-teal" />
                   </div>
                   <div>
-                    <div className="text-xs font-heading font-bold text-body">89%</div>
+                    <div className="text-xs font-heading font-bold text-body">
+                      {msceStat ? `${msceStat.passRate}%` : '—'}
+                    </div>
                     <div className="text-[10px] text-muted font-sans">MANEB pass rate</div>
                   </div>
                 </div>
@@ -591,7 +591,7 @@ export default function LandingPage() {
                   </div>
                   <div>
                     <div className="text-xs font-heading font-semibold text-body">Join Us</div>
-                    <div className="text-[10px] text-muted font-sans">Apply for 2027</div>
+                    <div className="text-[10px] text-muted font-sans">Apply for {schoolInfo?.currentYear ?? 'this year'}</div>
                   </div>
                 </div>
               </FloatCard>
@@ -602,8 +602,10 @@ export default function LandingPage() {
                     <Award className="w-4 h-4 text-brand-purple" />
                   </div>
                   <div>
-                    <div className="text-xs font-heading font-bold text-body">72 University</div>
-                    <div className="text-[10px] text-muted font-sans">placements 2025</div>
+                    <div className="text-xs font-heading font-bold text-body">
+                      {overallCandidates > 0 ? `${overallCandidates} Candidates` : 'MANEB Candidates'}
+                    </div>
+                    <div className="text-[10px] text-muted font-sans">{manebStats?.year ?? 'this year'}</div>
                   </div>
                 </div>
               </FloatCard>
@@ -614,8 +616,10 @@ export default function LandingPage() {
                     <Star className="w-4 h-4 text-brand-coral" />
                   </div>
                   <div>
-                    <div className="text-xs font-heading font-bold text-body">#1 Ranked</div>
-                    <div className="text-[10px] text-muted font-sans">Southern Region</div>
+                    <div className="text-xs font-heading font-bold text-body">
+                      Est. {schoolInfo?.founded ?? '—'}
+                    </div>
+                    <div className="text-[10px] text-muted font-sans">Malawi&apos;s Finest</div>
                   </div>
                 </div>
               </FloatCard>
@@ -633,22 +637,22 @@ export default function LandingPage() {
                 About Us
               </span>
               <h2 className="font-heading font-bold text-3xl md:text-4xl text-brand-navy mt-2">
-                Building Leaders Since 1979
+                Building Leaders Since {schoolInfo?.founded ?? '—'}
               </h2>
             </div>
 
             <div className="grid lg:grid-cols-2 gap-16 items-center mb-16">
-              {/* Photo placeholder */}
+              {/* Photo placeholder — no real school-photo.jpg asset exists
+                  yet; this is a clean, non-developer-facing fallback rather
+                  than a broken <img> reference. */}
               <div className="relative">
                 <div className="aspect-[4/3] rounded-3xl bg-gradient-to-br from-brand-navy-light/20 to-brand-teal/10 border border-base flex items-center justify-center overflow-hidden">
                   <div className="text-center space-y-2">
                     <div className="w-16 h-16 rounded-2xl bg-brand-navy/10 border border-base flex items-center justify-center mx-auto">
-                      <Users className="w-8 h-8 text-brand-navy/40" />
+                      <Users className="w-8 h-8 text-brand-navy/40" aria-hidden />
                     </div>
-                    <p className="text-muted text-xs font-sans">
-                      School photo here
-                      <br />
-                      <code className="text-[10px]">/public/images/school-photo.jpg</code>
+                    <p className="text-muted text-sm font-heading font-semibold">
+                      {schoolInfo?.schoolName ?? 'SMS Malawi'}
                     </p>
                   </div>
                 </div>
@@ -663,8 +667,9 @@ export default function LandingPage() {
                   A Legacy of Academic Excellence
                 </h3>
                 <p className="text-muted leading-relaxed mb-4 font-sans">
-                  Established in 1979, our school has grown from a small community institution into
-                  one of Malawi&apos;s most respected secondary schools. Over four decades, we have
+                  Established in {schoolInfo?.founded ?? '—'}, our school has grown from a small community institution into
+                  one of Malawi&apos;s most respected secondary schools. Over{' '}
+                  {yearsOfExcellence != null ? `${yearsOfExcellence} years` : 'several decades'}, we have
                   nurtured thousands of graduates who now serve across government, business,
                   medicine, law and the arts.
                 </p>
@@ -770,66 +775,64 @@ export default function LandingPage() {
                 Results That Speak for Themselves
               </h2>
               <p className="text-white/50 mt-3 max-w-2xl mx-auto font-sans">
-                Consistently outperforming national MANEB averages across JCE and MSCE examinations.
+                Our latest MANEB examination results, published as they become available.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
-              {[
-                { value: 89, suffix: '%', label: 'MSCE 2025 pass rate' },
-                { value: 1247, suffix: '+', label: 'Students enrolled' },
-                { value: 72, suffix: '', label: 'University placements 2025' },
-                { value: 14, suffix: '%', label: 'Above national average' },
-              ].map((s) => (
-                <StatCounter key={s.label} {...s} />
-              ))}
-            </div>
+            {manebStats && manebStats.stats.length > 0 ? (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
+                  {[
+                    ...manebStats.stats.slice(0, 3).map((s) => ({
+                      value: s.passRate,
+                      suffix: '%',
+                      label: `${s.examType} pass rate`,
+                    })),
+                    { value: overallCandidates, suffix: '+', label: 'Total candidates' },
+                  ].map((s) => (
+                    <StatCounter key={s.label} {...s} />
+                  ))}
+                </div>
 
-            {/* MANEB comparison cards */}
-            <div className="grid md:grid-cols-3 gap-6">
-              {[
-                { subject: 'Mathematics', school: 87, national: 61, color: 'bg-brand-teal' },
-                { subject: 'English', school: 91, national: 74, color: 'bg-brand-purple' },
-                { subject: 'Biology', school: 85, national: 58, color: 'bg-brand-amber' },
-              ].map(({ subject, school, national, color }) => (
-                <div key={subject} className="bg-white/5 border border-white/10 rounded-2xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-heading font-semibold text-white text-sm">{subject}</h4>
-                    <span className="text-brand-teal-light text-xs font-heading font-bold">
-                      MSCE 2025
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex justify-between text-xs mb-1.5">
-                        <span className="text-white/50 font-sans">Our school</span>
-                        <span className="text-white font-heading font-bold">{school}%</span>
-                      </div>
-                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${color} rounded-full`}
-                          style={{ width: `${school}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-xs mb-1.5">
-                        <span className="text-white/50 font-sans">National average</span>
-                        <span className="text-white/60 font-heading font-semibold">
-                          {national}%
+                {/* MANEB per-exam breakdown */}
+                <div className="grid md:grid-cols-3 gap-6">
+                  {manebStats.stats.map((s) => (
+                    <div key={s.examType} className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="font-heading font-semibold text-white text-sm">{s.examType}</h4>
+                        <span className="text-brand-teal-light text-xs font-heading font-bold">
+                          {manebStats.year}
                         </span>
                       </div>
-                      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-white/20 rounded-full"
-                          style={{ width: `${national}%` }}
-                        />
+                      <div className="space-y-3">
+                        <div>
+                          <div className="flex justify-between text-xs mb-1.5">
+                            <span className="text-white/50 font-sans">Pass rate</span>
+                            <span className="text-white font-heading font-bold">{s.passRate}%</span>
+                          </div>
+                          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-brand-teal rounded-full"
+                              style={{ width: `${s.passRate}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-white/50 font-sans">Candidates</span>
+                          <span className="text-white/70 font-heading font-semibold">
+                            {s.passed} passed / {s.total} total
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div className="text-center py-12 text-white/50 text-sm font-sans mb-8">
+                MANEB results for this academic year have not been published yet.
+              </div>
+            )}
 
             <div className="text-center mt-8">
               <a
@@ -838,7 +841,7 @@ export default function LandingPage() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-brand-teal-light text-sm font-heading font-semibold hover:text-white transition-colors"
               >
-                View official MANEB results portal <ExternalLink className="w-3.5 h-3.5" />
+                View official MANEB results portal <ExternalLink className="w-3.5 h-3.5" aria-hidden />
               </a>
             </div>
           </div>
@@ -858,31 +861,89 @@ export default function LandingPage() {
               </h2>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {announcements.map((a, i) => (
-                <article
-                  key={i}
-                  className="bg-surface border border-base rounded-2xl p-6 flex flex-col card-hover"
+            {announcementsLoading ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" role="status" aria-label="Loading announcements">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="bg-surface border border-base rounded-2xl p-6 h-48 animate-pulse" />
+                ))}
+              </div>
+            ) : announcements.length === 0 ? (
+              <div className="text-center py-12 text-muted text-sm font-sans">
+                No announcements have been published yet — check back soon.
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {announcements.map((a) => (
+                  <article
+                    key={a.id}
+                    className="bg-surface border border-base rounded-2xl p-6 flex flex-col card-hover"
+                  >
+                    <div className="flex items-center gap-3 mb-4">
+                      <span
+                        className={`text-xs font-heading font-semibold border px-3 py-1 rounded-full ${a.category ? (categoryColors[a.category] ?? DEFAULT_CATEGORY_COLOR) : DEFAULT_CATEGORY_COLOR}`}
+                      >
+                        {a.category ?? 'General'}
+                      </span>
+                      <time className="text-xs text-muted font-sans" dateTime={a.createdAt}>
+                        {new Date(a.createdAt).toLocaleDateString('en-MW', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </time>
+                    </div>
+                    <h3 className="font-heading font-bold text-base text-body mb-3 line-clamp-2 leading-snug">
+                      {a.title}
+                    </h3>
+                    <p className="text-muted text-sm leading-relaxed line-clamp-3 flex-1 font-sans">
+                      {a.body}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            )}
+
+            {/* Newsletter subscribe */}
+            <div className="mt-16 bg-brand-navy rounded-3xl p-8 sm:p-10 text-center">
+              <h3 className="font-heading font-bold text-xl text-white mb-2">
+                Stay in the loop
+              </h3>
+              <p className="text-white/60 text-sm font-sans mb-6 max-w-md mx-auto">
+                Subscribe for admissions updates, exam results announcements and school news —
+                delivered straight to your inbox.
+              </p>
+              <form
+                onSubmit={handleNewsletterSubmit}
+                className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto"
+              >
+                <label htmlFor="newsletter-email" className="sr-only">
+                  Email address
+                </label>
+                <input
+                  id="newsletter-email"
+                  type="email"
+                  required
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-brand-teal-light/50 focus:border-brand-teal-light transition-colors"
+                />
+                <button
+                  type="submit"
+                  disabled={newsletterSubscribe.isPending}
+                  className="flex items-center justify-center gap-2 bg-brand-teal text-white px-6 py-2.5 rounded-xl font-heading font-semibold text-sm hover:bg-brand-teal-light transition-colors disabled:opacity-60 min-h-[44px]"
                 >
-                  <div className="flex items-center gap-3 mb-4">
-                    <span
-                      className={`text-xs font-heading font-semibold border px-3 py-1 rounded-full ${categoryColors[a.category]}`}
-                    >
-                      {a.category}
-                    </span>
-                    <time className="text-xs text-muted font-sans">{a.date}</time>
-                  </div>
-                  <h3 className="font-heading font-bold text-base text-body mb-3 line-clamp-2 leading-snug">
-                    {a.title}
-                  </h3>
-                  <p className="text-muted text-sm leading-relaxed line-clamp-3 flex-1 font-sans">
-                    {a.excerpt}
-                  </p>
-                  <button className="mt-5 text-brand-teal text-xs font-heading font-semibold flex items-center gap-1 hover:gap-2 transition-all">
-                    Read more <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </article>
-              ))}
+                  {newsletterSubscribe.isPending && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+                  Subscribe
+                </button>
+              </form>
+              {newsletterMessage && (
+                <p
+                  role={newsletterMessage.kind === 'success' ? 'status' : 'alert'}
+                  className={`mt-4 text-sm font-sans flex items-center justify-center gap-1.5 ${
+                    newsletterMessage.kind === 'success' ? 'text-brand-teal-light' : 'text-brand-coral'
+                  }`}
+                >
+                  {newsletterMessage.kind === 'success' && <CheckCircle2 className="w-4 h-4" aria-hidden />}
+                  {newsletterMessage.text}
+                </p>
+              )}
             </div>
           </div>
         </section>
@@ -919,18 +980,18 @@ export default function LandingPage() {
             {/* Physical location */}
             <div className="bg-brand-navy rounded-3xl p-8 text-white flex flex-col md:flex-row items-center gap-6 md:gap-12">
               <div className="flex items-center gap-3">
-                <MapPin className="w-4 h-4 text-brand-teal-light shrink-0" />
+                <MapPin className="w-4 h-4 text-brand-teal-light shrink-0" aria-hidden />
                 <span className="font-sans text-sm text-white/70">
-                  P.O. Box 123, Blantyre, Malawi
+                  {schoolInfo?.address ?? 'P.O. Box 123, Blantyre, Malawi'}
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <Phone className="w-4 h-4 text-brand-teal-light shrink-0" />
-                <span className="font-sans text-sm text-white/70">+265 999 123 456</span>
+                <Phone className="w-4 h-4 text-brand-teal-light shrink-0" aria-hidden />
+                <span className="font-sans text-sm text-white/70">{schoolInfo?.phone ?? '+265 999 123 456'}</span>
               </div>
               <div className="flex items-center gap-3">
-                <Mail className="w-4 h-4 text-brand-teal-light shrink-0" />
-                <span className="font-sans text-sm text-white/70">info@school.edu.mw</span>
+                <Mail className="w-4 h-4 text-brand-teal-light shrink-0" aria-hidden />
+                <span className="font-sans text-sm text-white/70">{schoolInfo?.email ?? 'info@school.edu.mw'}</span>
               </div>
             </div>
           </div>
@@ -950,20 +1011,21 @@ export default function LandingPage() {
               </h2>
             </div>
 
-            {/* Hierarchical photo grid — replace bg divs with <Image> tags */}
+            {/* Hierarchical photo grid — no real gallery images exist yet
+                (confirmed: no /public/images/gallery/* assets); this is a
+                clean, non-developer-facing fallback rather than broken
+                <img> references. */}
             <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
               {/* Large feature */}
-              <div className="col-span-2 row-span-2 aspect-square rounded-2xl bg-gradient-to-br from-brand-navy-light/20 to-brand-teal/10 border border-base flex items-center justify-center text-muted text-xs font-sans text-center p-4">
-                Feature photo
-                <br />
-                <code className="text-[10px]">/public/images/gallery/g1.jpg</code>
+              <div className="col-span-2 row-span-2 aspect-square rounded-2xl bg-gradient-to-br from-brand-navy-light/20 to-brand-teal/10 border border-base flex items-center justify-center">
+                <ImageIcon className="w-10 h-10 text-brand-navy/20" aria-hidden />
               </div>
-              {[2, 3, 4, 5, 6, 7, 8].map((n) => (
+              {Array.from({ length: 7 }).map((_, i) => (
                 <div
-                  key={n}
-                  className="aspect-square rounded-xl bg-gradient-to-br from-brand-navy/5 to-brand-teal/5 border border-base flex items-center justify-center text-muted text-[10px] font-sans"
+                  key={i}
+                  className="aspect-square rounded-xl bg-gradient-to-br from-brand-navy/5 to-brand-teal/5 border border-base flex items-center justify-center"
                 >
-                  g{n}.jpg
+                  <ImageIcon className="w-5 h-5 text-brand-navy/15" aria-hidden />
                 </div>
               ))}
             </div>
@@ -1029,10 +1091,10 @@ export default function LandingPage() {
                     {
                       icon: MapPin,
                       label: 'Postal Address',
-                      value: 'P.O. Box 123, Blantyre, Malawi',
+                      value: schoolInfo?.address ?? 'P.O. Box 123, Blantyre, Malawi',
                     },
-                    { icon: Phone, label: 'Phone', value: '+265 999 123 456' },
-                    { icon: Mail, label: 'Email', value: 'info@school.edu.mw' },
+                    { icon: Phone, label: 'Phone', value: schoolInfo?.phone ?? '+265 999 123 456' },
+                    { icon: Mail, label: 'Email', value: schoolInfo?.email ?? 'info@school.edu.mw' },
                     { icon: Clock, label: 'Office Hours', value: 'Mon – Fri: 07:30 – 16:30' },
                   ].map(({ icon: Icon, label, value }) => (
                     <li key={label} className="flex items-start gap-4">
@@ -1153,34 +1215,64 @@ export default function LandingPage() {
               {[
                 {
                   title: 'Quick Links',
-                  links: ['Home', 'About Us', 'News', 'Gallery', 'Contact'],
+                  links: [
+                    { label: 'Home', href: '/' },
+                    { label: 'About Us', href: '#about' },
+                    { label: 'News', href: '#news' },
+                    { label: 'Gallery', href: '#gallery' },
+                    { label: 'Contact', href: '#contact' },
+                  ],
                 },
                 {
                   title: 'Admissions',
                   links: [
-                    'How to Apply',
-                    'Entry Requirements',
-                    'Fees Structure',
-                    'Scholarships',
-                    'FAQs',
+                    { label: 'How to Apply', href: '/apply' },
+                    { label: 'Entry Requirements', href: '/apply' },
+                    { label: 'Fees Structure', href: '/apply' },
+                    { label: 'Scholarships', href: '#contact' },
+                    { label: 'FAQs', href: '#contact' },
                   ],
                 },
                 {
                   title: 'Academic',
-                  links: ['Curriculum', 'MANEB Portal', 'Timetable', 'Library', 'Student Portal'],
+                  links: [
+                    { label: 'Curriculum', href: '#about' },
+                    { label: 'MANEB Portal', href: 'https://maneb.mw', external: true },
+                    { label: 'Timetable', href: '/login' },
+                    { label: 'Library', href: '/login' },
+                    { label: 'Student Portal', href: '/login' },
+                  ],
                 },
               ].map(({ title, links }) => (
                 <div key={title}>
                   <h4 className="font-heading font-semibold text-sm text-white mb-5">{title}</h4>
                   <ul className="space-y-3">
                     {links.map((l) => (
-                      <li key={l}>
-                        <a
-                          href="#"
-                          className="text-white/40 hover:text-white text-xs font-sans transition-colors"
-                        >
-                          {l}
-                        </a>
+                      <li key={l.label}>
+                        {l.external ? (
+                          <a
+                            href={l.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-white/40 hover:text-white text-xs font-sans transition-colors"
+                          >
+                            {l.label}
+                          </a>
+                        ) : l.href.startsWith('#') ? (
+                          <a
+                            href={l.href}
+                            className="text-white/40 hover:text-white text-xs font-sans transition-colors"
+                          >
+                            {l.label}
+                          </a>
+                        ) : (
+                          <Link
+                            href={l.href}
+                            className="text-white/40 hover:text-white text-xs font-sans transition-colors"
+                          >
+                            {l.label}
+                          </Link>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -1191,17 +1283,20 @@ export default function LandingPage() {
             {/* Footer bottom */}
             <div className="py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
               <p className="text-white/30 text-xs font-sans">
-                © {new Date().getFullYear()} SMS Malawi. All rights reserved.
+                © {new Date().getFullYear()} {schoolInfo?.schoolName ?? 'SMS Malawi'}. All rights reserved.
               </p>
               <div className="flex gap-5">
-                {['Privacy Policy', 'Terms of Use'].map((t) => (
-                  <a
-                    key={t}
-                    href="#"
+                {[
+                  { label: 'Privacy Policy', href: '/privacy' },
+                  { label: 'Terms of Use', href: '/terms' },
+                ].map((t) => (
+                  <Link
+                    key={t.label}
+                    href={t.href}
                     className="text-white/30 hover:text-white/60 text-xs font-sans transition-colors"
                   >
-                    {t}
-                  </a>
+                    {t.label}
+                  </Link>
                 ))}
               </div>
             </div>

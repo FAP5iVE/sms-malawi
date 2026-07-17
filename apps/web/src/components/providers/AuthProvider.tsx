@@ -1,8 +1,66 @@
+/**
+ * apps/web/src/components/providers/AuthProvider.tsx
+ *
+ * [CHANGE TYPE]: MAJOR REWRITE (logout-related surface only — the
+ *   onIdTokenChanged subscription's sign-in branch is unchanged)
+ * [R-PHASE]: R2 — Auth Session & Login Flow Correctness
+ * [PURPOSE]: Fixes the confirmed FCM-unregister-after-signout ordering
+ *   defect. Previously, unregisterFcmTokenFromServer(token) was called
+ *   inside the onIdTokenChanged SIGNED-OUT branch — i.e. after Firebase had
+ *   already cleared auth.currentUser — so apiFetch's internal
+ *   getAuth().currentUser lookup resolved to null and the authenticated
+ *   DELETE /notifications/unregister-token call failed before it reached
+ *   the server, leaving a stale FCM token registered indefinitely. This
+ *   file now exports `logout()`, callable from any sign-out call site,
+ *   which captures a still-valid token from the CURRENT user, unregisters
+ *   the FCM token explicitly with that token (via apiFetch's new
+ *   tokenOverride param), and only then calls Firebase signOut(auth). The
+ *   fcmTokenRef useRef is promoted to a module-level `currentFcmToken`
+ *   variable so logout() can read it from outside the component. The
+ *   onIdTokenChanged signed-out branch remains the single place cookies and
+ *   the Zustand store are cleared — logout() does not touch either.
+ * [DEPENDS ON]: R1 (api-client.ts consolidation) for the tokenOverride
+ *   parameter this file's logout() calls apiFetch with.
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (R4 — Auth/Security Domain), two further
+ *   changes on top of R2's logout-ordering change above:
+ *   (1) The `!role` branch previously warned to the console and returned,
+ *       relying entirely on Firebase's own ~55-minute automatic token
+ *       refresh to eventually re-check the claim — with `initialized`
+ *       never set to true in the meantime, every RoleGuard/PermissionGuard
+ *       in the app showed an indefinite loading skeleton for up to nearly
+ *       an hour after a fresh account's custom claims hadn't yet propagated.
+ *       Now performs a bounded retry: up to 2 attempts, 3 seconds apart,
+ *       each forcing a token refresh via user.getIdToken(true) (which
+ *       re-triggers this same onIdTokenChanged handler with fresh claims,
+ *       rather than passively waiting for the natural refresh cycle). If
+ *       the role claim still hasn't appeared after both retries, calls
+ *       setUser(user, null, subtitle) — the only store action that sets
+ *       initialized: true — so RoleGuard's existing "Access denied" panel
+ *       and PermissionGuard's fallback prop (both already-built, real
+ *       terminal UI states) take over instead of an indefinite skeleton.
+ *       No new store field or UI component was added: authStore.ts's
+ *       `initialized`/`role: null` combination is exactly the signal
+ *       RoleGuard/PermissionGuard already branch on for a denied/error
+ *       state, confirmed by reading both components directly rather than
+ *       assumed.
+ *   (2) FCM tokens expire after roughly two months. The registration effect
+ *       previously only ever registered once per browser session (gated
+ *       solely on `!currentFcmToken`), so a long-lived session (a staff
+ *       workstation left signed in, kept alive indefinitely by the ~55-
+ *       minute automatic token refresh) would silently stop receiving push
+ *       notifications once its token expired, with nothing to trigger a
+ *       re-registration. currentFcmToken is now paired with a module-level
+ *       currentFcmTokenRegisteredAt timestamp; the registration effect
+ *       re-runs registerFcmToken() if more than ~50 days have elapsed since
+ *       the last successful registration, in addition to the existing
+ *       "never registered this session" case.
+ */
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect }         from 'react'
 import { useRouter }         from 'next/navigation'
-import { onIdTokenChanged }  from 'firebase/auth'
+import { onIdTokenChanged, getAuth, signOut } from 'firebase/auth'
 import { auth, getFcmToken, removeFcmToken } from '@/lib/firebase'
 import { apiFetch }          from '@/lib/api-client'
 import { useAuthStore }      from '@/store/authStore'
@@ -37,6 +95,30 @@ function clearAuthCookies(): void {
   clearCookie(SESSION_COOKIE)
   clearCookie(ROLE_COOKIE)
 }
+
+// ─── MODULE-LEVEL FCM TOKEN STATE ─────────────────────────
+// Promoted out of the AuthProvider component (was a component-local useRef)
+// so the exported logout() function below can read/clear it from any file,
+// not just from inside the AuthProvider component's own render tree.
+// Set after a successful registerFcmToken() call; cleared in the
+// onIdTokenChanged signed-out branch and by logout() itself.
+let currentFcmToken: string | null = null
+
+// Timestamp (ms) of the last successful FCM registration. Paired with
+// currentFcmToken so the registration effect can detect a stale token —
+// FCM tokens expire after roughly two months — and re-register even within
+// a single long-lived browser session, not just once per session.
+let currentFcmTokenRegisteredAt: number | null = null
+
+/** Re-register the FCM token if more than this long has elapsed since the last registration. */
+const FCM_TOKEN_MAX_AGE_MS = 50 * 24 * 60 * 60 * 1000 // ~50 days
+
+// ─── ROLE-CLAIM BOUNDED RETRY ─────────────────────────────
+// How many times to force a token refresh and re-check for a role claim
+// before giving up and surfacing an explicit error state. See the `!role`
+// branch in the onIdTokenChanged handler below.
+const ROLE_CLAIM_MAX_RETRIES  = 2
+const ROLE_CLAIM_RETRY_DELAY_MS = 3000 // 3 seconds between attempts
 
 // ─── FCM TOKEN REGISTRATION ───────────────────────────────
 
@@ -82,17 +164,77 @@ async function registerFcmToken(): Promise<string | null> {
  * Tell the server to remove a previously registered FCM token.
  * Called as best-effort on logout — if the server call fails, the
  * client-side deregistration (removeFcmToken) is still attempted.
+ *
+ * @param authToken - Optional explicit Firebase ID token to authenticate
+ *   this call with (via apiFetch's tokenOverride param). logout() supplies
+ *   this because by the time it calls here, it has already resolved a
+ *   still-valid token from the CURRENT user, ahead of calling signOut().
+ *   When omitted (the onIdTokenChanged signed-out branch's own best-effort
+ *   call, kept as a defensive fallback for any legacy/direct signOut(auth)
+ *   caller), apiFetch falls back to its normal getAuth().currentUser
+ *   lookup, which is already null in that branch and will no-op the
+ *   Authorization header — this call is expected to fail harmlessly there.
  */
-async function unregisterFcmTokenFromServer(token: string): Promise<void> {
+async function unregisterFcmTokenFromServer(
+  token: string,
+  authToken?: string
+): Promise<void> {
   try {
-    await apiFetch<{ ok: boolean }>('/notifications/unregister-token', {
-      method: 'DELETE',
-      body: JSON.stringify({ token }),
-    })
+    await apiFetch<{ ok: boolean }>(
+      '/notifications/unregister-token',
+      {
+        method: 'DELETE',
+        body: JSON.stringify({ token }),
+      },
+      authToken
+    )
   } catch {
     // Non-critical — the token will be garbage-collected by push.ts's
     // removeInvalidTokens() when the next push send attempt encounters it.
   }
+}
+
+// ─── LOGOUT ────────────────────────────────────────────────
+
+/**
+ * Shared sign-out entry point. Every sign-out call site (InactivityManager,
+ * PageHeader's sign-out menu item, and any future one) must call this
+ * instead of calling Firebase signOut(auth) directly or hand-writing its
+ * own cookie-clearing logic.
+ *
+ * Sequencing fix (R2): captures a still-valid ID token from the CURRENT,
+ * not-yet-signed-out user and uses it to explicitly unregister the FCM
+ * token BEFORE calling signOut(auth) — the previous implementation did this
+ * in the opposite order (inside onIdTokenChanged's signed-out branch, after
+ * auth.currentUser was already null), which silently broke the
+ * authenticated unregister call every time.
+ *
+ * This function does NOT touch cookies or the Zustand store directly — the
+ * onIdTokenChanged signed-out branch (unchanged) remains the single place
+ * that happens, triggered by the signOut(auth) call below.
+ */
+export async function logout(): Promise<void> {
+  if (!auth) return // auth is null during SSR; never reached in browser
+
+  const user = getAuth().currentUser
+  if (user) {
+    let authToken: string | undefined
+    try {
+      authToken = await user.getIdToken()
+    } catch {
+      // Token fetch failed — proceed to sign-out anyway; the unregister
+      // call below will simply no-op via its own try/catch.
+      authToken = undefined
+    }
+
+    if (currentFcmToken) {
+      await unregisterFcmTokenFromServer(currentFcmToken, authToken)
+      currentFcmToken = null
+      currentFcmTokenRegisteredAt = null
+    }
+  }
+
+  await signOut(auth)
 }
 
 // ─── PROVIDER ─────────────────────────────────────────────
@@ -101,13 +243,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, clearAuth } = useAuthStore()
   const router = useRouter()
 
-  // Track the current FCM token so we can deregister on logout.
-  // useRef avoids re-renders and persists across the component lifecycle.
-  const fcmTokenRef = useRef<string | null>(null)
-
   useEffect(() => {
     // auth is null during SSR — guard prevents server-side execution
     if (!auth) return
+
+    // Tracks bounded-retry attempts for a missing role claim within the
+    // current sign-in session. Reset to 0 whenever a role claim resolves
+    // successfully or the user signs out, so each fresh sign-in gets its
+    // own full retry budget. Lives in this closure (shared across every
+    // firing of the onIdTokenChanged handler below) rather than component
+    // state, since it must not trigger a re-render on its own.
+    let roleRetryCount = 0
+    let retryTimeoutId: ReturnType<typeof setTimeout> | undefined
 
     // onIdTokenChanged fires on:
     //   • Initial sign-in
@@ -123,11 +270,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // ── Signed out ──────────────────────────────────────
       if (!user) {
-        // Deregister FCM token from the server (best-effort, authenticated call
-        // may fail if the token is already expired — that's acceptable).
-        const tokenToRemove = fcmTokenRef.current
+        // Defensive fallback only: normal sign-outs go through logout()
+        // above, which already unregisters currentFcmToken (with an
+        // explicit pre-signout token) before signOut(auth) ever fires this
+        // branch — so currentFcmToken is expected to already be null here.
+        // This remains in case something ever calls Firebase signOut(auth)
+        // directly instead of going through logout().
+        const tokenToRemove = currentFcmToken
         if (tokenToRemove) {
-          // Server-side cleanup (best effort, authenticated)
           void unregisterFcmTokenFromServer(tokenToRemove)
         }
 
@@ -135,7 +285,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // from Firebase's servers so no more notifications are sent to this device.
         void removeFcmToken()
 
-        fcmTokenRef.current = null
+        currentFcmToken = null
+        currentFcmTokenRegisteredAt = null
+        roleRetryCount = 0
         clearAuth()
         clearAuthCookies()
         return
@@ -169,16 +321,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // ── No role claim yet ────────────────────────────────
       // Can happen briefly after account creation before the Firebase Admin SDK
-      // setCustomUserClaims() call propagates to the next token refresh.
-      // Do not sign out — wait for the next automatic token refresh (~55 min)
-      // or force-refresh via getIdToken(true) from the user management page.
+      // setCustomUserClaims() call propagates. Bounded retry: force a token
+      // refresh (which re-triggers this same handler with fresh claims)
+      // up to ROLE_CLAIM_MAX_RETRIES times, a few seconds apart, rather than
+      // passively waiting for Firebase's own ~55-minute automatic refresh.
       if (!role) {
-        console.warn(
-          '[AuthProvider] User authenticated but no role claim found. ' +
-          'Waiting for role to propagate via next token refresh.'
+        if (roleRetryCount < ROLE_CLAIM_MAX_RETRIES) {
+          roleRetryCount += 1
+          console.warn(
+            `[AuthProvider] User authenticated but no role claim found ` +
+            `(retry ${roleRetryCount}/${ROLE_CLAIM_MAX_RETRIES}).`
+          )
+          retryTimeoutId = setTimeout(() => {
+            void user.getIdToken(true)
+          }, ROLE_CLAIM_RETRY_DELAY_MS)
+          return
+        }
+
+        // Retries exhausted — surface an explicit terminal state instead of
+        // leaving every RoleGuard/PermissionGuard in an indefinite loading
+        // skeleton. setUser is the only store action that sets
+        // initialized: true; passing role: null routes RoleGuard to its
+        // existing "Access denied" panel and PermissionGuard to its
+        // fallback prop — real terminal UI, not a skeleton that never
+        // resolves. The account likely needs administrator setup.
+        console.error(
+          `[AuthProvider] No role claim after ${ROLE_CLAIM_MAX_RETRIES} retries. ` +
+          'Account may need administrator setup — contact support.'
         )
+        setUser(user, null, subtitle)
         return
       }
+
+      roleRetryCount = 0 // reset for the next sign-in session
 
       // ── Set routing cookies (Edge Runtime reads these in proxy.ts) ──
       setCookie(SESSION_COOKIE, user.uid)
@@ -192,20 +367,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // This does NOT block the login flow. If it fails (user denied permissions,
       // browser doesn't support push, VAPID key missing), auth still completes.
       //
-      // We only register on the initial sign-in (fcmTokenRef is null) or if the
-      // token was previously cleared, to avoid redundant server calls on every
-      // automatic token refresh (~every 55 minutes).
-      if (!fcmTokenRef.current) {
+      // Registers when there is no current token (never registered this
+      // session, or cleared on logout) OR when the previously registered
+      // token is older than FCM_TOKEN_MAX_AGE_MS — FCM tokens expire after
+      // roughly two months, and a long-lived session (kept alive
+      // indefinitely by Firebase's own ~55-minute automatic token refresh)
+      // would otherwise never re-register once its token expired.
+      const fcmTokenIsStale =
+        currentFcmTokenRegisteredAt !== null &&
+        Date.now() - currentFcmTokenRegisteredAt > FCM_TOKEN_MAX_AGE_MS
+
+      if (!currentFcmToken || fcmTokenIsStale) {
         void (async () => {
           const token = await registerFcmToken()
           if (token) {
-            fcmTokenRef.current = token
+            currentFcmToken = token
+            currentFcmTokenRegisteredAt = Date.now()
           }
         })()
       }
     })
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+      if (retryTimeoutId) clearTimeout(retryTimeoutId)
+    }
   }, [setUser, clearAuth, router])
 
   return <>{children}</>

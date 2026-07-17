@@ -536,13 +536,31 @@
 }
 
 /* ─────────────────────────────────────────────────────────
+   A4 PAGE SETUP
+   Applied globally to all @media print contexts.
+   Margin: 15 mm top / 20 mm right, bottom, left gives
+   standard document clearance and keeps content inside
+   the A4 printable area on all major browser print engines.
+   ───────────────────────────────────────────────────────── */
+
+@page {
+  size:   A4 portrait;
+  margin: 15mm 20mm 20mm 20mm;
+}
+
+@page :first {
+  margin-top: 20mm;
+}
+
+/* ─────────────────────────────────────────────────────────
    PRINT STYLES
    Hide all navigation chrome when printing — report cards,
    fee statements, payslips, student profiles.
    ───────────────────────────────────────────────────────── */
 
 @media print {
-  /* Hide navigation */
+
+  /* ── Navigation chrome ──────────────────────────────── */
   nav,
   aside,
   [data-sidebar],
@@ -552,7 +570,7 @@
     display: none !important;
   }
 
-  /* Ensure content fills the full width */
+  /* ── Layout reset ───────────────────────────────────── */
   main,
   [data-printable] {
     width:   100% !important;
@@ -560,16 +578,154 @@
     padding: 0    !important;
   }
 
-  /* Force white background — saves toner */
+  /* ── Colour / background ────────────────────────────── */
   body {
     background-color: #ffffff !important;
     color:            #000000 !important;
   }
 
-  /* Page break rules for multi-page documents */
+  /*
+    Force colour-accurate printing — ensures brand colours,
+    status badges, and table row backgrounds render correctly.
+    Without this, browsers strip backgrounds by default.
+  */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust:         exact !important;
+  }
+
+  /* ── Typography ─────────────────────────────────────── */
+  html,
+  body {
+    font-size:   11pt !important;
+    line-height: 1.45 !important;
+  }
+
+  /* ── Hide interactive / animated elements ────────────── */
+  button:not([data-print-visible]),
+  [role="toolbar"],
+  [role="navigation"],
+  .skeleton,
+  .recharts-wrapper,
+  .apexcharts-canvas,
+  [data-radix-popper-content-wrapper],
+  [data-sonner-toast],
+  [role="tooltip"],
+  [data-framer-component] {
+    display: none !important;
+  }
+
+  /* ── Tables ─────────────────────────────────────────── */
+  table {
+    border-collapse: collapse !important;
+    width:           100%     !important;
+  }
+
+  th,
+  td {
+    border:  0.5pt solid #cccccc !important;
+    padding: 4pt 6pt             !important;
+    font-size: 9pt               !important;
+  }
+
+  /* Repeat table headers across page breaks */
+  thead {
+    display: table-header-group;
+  }
+
+  /* ── Page-break utility classes ─────────────────────── */
   .print-break-before { break-before: page; }
   .print-break-after  { break-after:  page; }
   .print-no-break     { break-inside: avoid; }
+
+  /* ── A4 document layout classes ─────────────────────── */
+
+  /*
+    .report-card
+    One student's report card per A4 page.
+    Each subsequent .report-card starts on a new page.
+    Used by PrintableReportCard.tsx (Phase C8).
+  */
+  .report-card {
+    width:      210mm !important;
+    min-height: 277mm !important;
+    padding:    0     !important;
+    margin:     0 auto !important;
+    background: #ffffff !important;
+    color:      #000000 !important;
+    font-size:  10pt   !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .report-card + .report-card {
+    break-before:     page;
+    page-break-before: always;
+  }
+
+  /*
+    .transcript
+    Academic transcript — may span multiple A4 pages.
+    Section headers use .print-break-before for page breaks.
+  */
+  .transcript {
+    width:      210mm   !important;
+    margin:     0 auto  !important;
+    background: #ffffff !important;
+    color:      #000000 !important;
+    font-size:  10pt    !important;
+  }
+
+  /*
+    .fee-statement  /  .invoice-print
+    Single-page fee statement or invoice.
+  */
+  .fee-statement,
+  .invoice-print {
+    width:      210mm  !important;
+    min-height: 277mm  !important;
+    margin:     0 auto !important;
+    background: #ffffff !important;
+    color:      #000000 !important;
+    font-size:  10pt   !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /*
+    .payslip-print
+    Half-A4 payslip (138 mm tall = 2 per A4 page).
+    Two consecutive payslips use a page break between them.
+  */
+  .payslip-print {
+    width:      210mm   !important;
+    height:     138mm   !important;
+    overflow:   hidden  !important;
+    background: #ffffff !important;
+    color:      #000000 !important;
+    font-size:  9pt     !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .payslip-print + .payslip-print {
+    break-before:     page;
+    page-break-before: always;
+  }
+
+  /*
+    .student-profile-print
+    Student ID / profile card at A5 landscape (148 mm × 105 mm).
+  */
+  .student-profile-print {
+    width:      148mm  !important;
+    height:     105mm  !important;
+    background: #ffffff !important;
+    color:      #000000 !important;
+    font-size:  9pt    !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────

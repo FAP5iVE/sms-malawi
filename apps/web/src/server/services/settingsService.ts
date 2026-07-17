@@ -1,6 +1,23 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: apps/web/src/server/services/settingsService.ts
+ * [R-PHASE]: R8 — Academics IV: Report Cards, Transcripts, Promotion & Risk
+ *   Assessment; further edited in R13 — Announcements, Timetable &
+ *   Calendar Domain
+ * [PURPOSE]: R8: getIdentitySettings() now also fetches/returns
+ *   SETTING_KEYS.SCHOOL_LOGO_URL as schoolLogoUrl — reportCardService.ts,
+ *   transcriptService.ts, and PrintableReportCard.tsx all need this to
+ *   replace their hardcoded identity-string fallbacks and the "CREST" text
+ *   placeholder respectively. R13 adds getTermDates(), wiring the six
+ *   TERM1_START..TERM3_END settings keys (which already existed with a
+ *   real admin-panel write path but zero reader anywhere) to a real
+ *   caller — calendar.ts's six hardcoded 2025/2026 TERM_PERIODS literals.
+ * [DEPENDS ON]: none
+ */
 import 'server-only'
 
 import { prisma } from '@/lib/prisma'
+import { getRedis } from '@/lib/redis'
 import { logger } from '@/lib/logger'
 import {
   SETTING_KEYS,
@@ -54,10 +71,28 @@ interface CacheEntry {
   expiresAt: number
 }
 
-// Module-level singleton — one cache per warm Lambda instance
+// In-process fallback — used only when Upstash Redis is not configured.
+// When Upstash IS configured, the cache is Redis-backed and therefore shared
+// across every Lambda instance: a write on one instance is immediately visible
+// to reads on all others, and a cold instance no longer starts with an empty
+// cache that re-fetches from Neon on every request until warmed.
 const _cache = new Map<string, CacheEntry>()
 
-function cacheGet<T>(key: string): T | undefined {
+// Namespace so settings entries never collide with other Upstash consumers.
+const REDIS_PREFIX = 'settings:'
+
+async function cacheGet<T>(key: string): Promise<T | undefined> {
+  const redis = getRedis()
+  if (redis) {
+    try {
+      const value = await redis.get<T>(REDIS_PREFIX + key)
+      return value === null ? undefined : value
+    } catch (err) {
+      logger.error({ err, key }, '[settingsService] Redis GET failed — treating as cache miss')
+      return undefined
+    }
+  }
+
   const entry = _cache.get(key)
   if (!entry) return undefined
   if (Date.now() > entry.expiresAt) {
@@ -67,8 +102,30 @@ function cacheGet<T>(key: string): T | undefined {
   return entry.value as T
 }
 
-function cacheSet(key: string, value: unknown, ttlMs: number): void {
+async function cacheSet(key: string, value: unknown, ttlMs: number): Promise<void> {
+  const redis = getRedis()
+  if (redis) {
+    try {
+      await redis.set(REDIS_PREFIX + key, value, { ex: Math.max(1, Math.ceil(ttlMs / 1000)) })
+    } catch (err) {
+      logger.error({ err, key }, '[settingsService] Redis SET failed — value not cached')
+    }
+    return
+  }
   _cache.set(key, { value, expiresAt: Date.now() + ttlMs })
+}
+
+async function cacheDelete(key: string): Promise<void> {
+  const redis = getRedis()
+  if (redis) {
+    try {
+      await redis.del(REDIS_PREFIX + key)
+    } catch (err) {
+      logger.error({ err, key }, '[settingsService] Redis DEL failed — entry may be stale until TTL')
+    }
+    return
+  }
+  _cache.delete(key)
 }
 
 // ─────────────────────────────────────────────────────────
@@ -136,7 +193,7 @@ function toSettingRow<K extends SettingKey>(
 export async function get<K extends SettingKey>(
   key: K
 ): Promise<SettingValueMap[K]> {
-  const cached = cacheGet<SettingValueMap[K]>(key)
+  const cached = await cacheGet<SettingValueMap[K]>(key)
   if (cached !== undefined) return cached
 
   const row = await prisma.systemSettings.findUnique({ where: { key } })
@@ -145,7 +202,7 @@ export async function get<K extends SettingKey>(
     ? parseValue(key, row.value)
     : SETTING_META[key].defaultValue
 
-  cacheSet(key, value, getTtl(SETTING_META[key].category))
+  await cacheSet(key, value, getTtl(SETTING_META[key].category))
   return value
 }
 
@@ -168,7 +225,7 @@ export async function getMany<K extends SettingKey>(
 
   // Serve what we have in cache
   for (const key of keys) {
-    const cached = cacheGet<SettingValueMap[K]>(key)
+    const cached = await cacheGet<SettingValueMap[K]>(key)
     if (cached !== undefined) {
       result[key] = cached as SettingValueMap[typeof key]
     } else {
@@ -191,7 +248,7 @@ export async function getMany<K extends SettingKey>(
       ? parseValue(key, row.value)
       : SETTING_META[key].defaultValue
 
-    cacheSet(key, value, getTtl(SETTING_META[key].category))
+    await cacheSet(key, value, getTtl(SETTING_META[key].category))
     result[key] = value as SettingValueMap[typeof key]
   }
 
@@ -242,7 +299,7 @@ export async function set<K extends SettingKey>(
   })
 
   // Invalidate cache so the next read fetches the fresh value
-  _cache.delete(key)
+  await cacheDelete(key)
 
   logger.info(
     { key, category: meta.category, updatedByUid },
@@ -302,7 +359,7 @@ export async function setMany(
 
   // Invalidate all updated keys from cache
   for (const { key } of updates) {
-    _cache.delete(key)
+    await cacheDelete(key)
   }
 
   logger.info(
@@ -357,7 +414,7 @@ export async function getAll(): Promise<CategoryGroupedSettings> {
  */
 export async function getPublicSettings(): Promise<Partial<SettingValueMap>> {
   const CACHE_KEY = '__public_settings__'
-  const cached = cacheGet<Partial<SettingValueMap>>(CACHE_KEY)
+  const cached = await cacheGet<Partial<SettingValueMap>>(CACHE_KEY)
   if (cached) return cached
 
   const publicKeys = (Object.keys(SETTING_META) as SettingKey[]).filter(
@@ -371,8 +428,55 @@ export async function getPublicSettings(): Promise<Partial<SettingValueMap>> {
     ;(partial as any)[key] = result[key]
   }
 
-  cacheSet(CACHE_KEY, partial, TTL_MS.ACADEMIC)
+  await cacheSet(CACHE_KEY, partial, TTL_MS.ACADEMIC)
   return partial
+}
+
+/**
+ * Get the six academic-calendar term-boundary settings
+ * (TERM1_START/END, TERM2_START/END, TERM3_START/END).
+ *
+ * These keys and their admin-panel write path (settings.actions.ts) have
+ * existed since before this phase, but had zero real reader anywhere in
+ * the app — calendar.ts's TERM_PERIODS instead hardcoded six 2025/2026
+ * date literals directly, meaning the admin-configurable term-dates panel
+ * had no effect on the actual school calendar. This is the same
+ * "Settings panel with zero effect on real computation" pattern the
+ * Grading/Promotion/Risk/Library-fine phases (R7/R8/R12) each closed for
+ * their own domain — R13 closes it here by giving calendar.ts a real
+ * caller for these six keys instead of adding a redundant, differently-
+ * named TERM_DATES key next to ones that already exist.
+ */
+export async function getTermDates(): Promise<{
+  term1: { start: string; end: string }
+  term2: { start: string; end: string }
+  term3: { start: string; end: string }
+}> {
+  const CACHE_KEY = '__term_dates__'
+  const cached = await cacheGet<{
+    term1: { start: string; end: string }
+    term2: { start: string; end: string }
+    term3: { start: string; end: string }
+  }>(CACHE_KEY)
+  if (cached) return cached
+
+  const vals = await getMany([
+    SETTING_KEYS.TERM1_START,
+    SETTING_KEYS.TERM1_END,
+    SETTING_KEYS.TERM2_START,
+    SETTING_KEYS.TERM2_END,
+    SETTING_KEYS.TERM3_START,
+    SETTING_KEYS.TERM3_END,
+  ])
+
+  const termDates = {
+    term1: { start: vals[SETTING_KEYS.TERM1_START], end: vals[SETTING_KEYS.TERM1_END] },
+    term2: { start: vals[SETTING_KEYS.TERM2_START], end: vals[SETTING_KEYS.TERM2_END] },
+    term3: { start: vals[SETTING_KEYS.TERM3_START], end: vals[SETTING_KEYS.TERM3_END] },
+  }
+
+  await cacheSet(CACHE_KEY, termDates, TTL_MS.ACADEMIC)
+  return termDates
 }
 
 /**
@@ -382,7 +486,7 @@ export async function getPublicSettings(): Promise<Partial<SettingValueMap>> {
  */
 export async function getIdentitySettings(): Promise<SchoolIdentitySettings> {
   const CACHE_KEY = '__identity_settings__'
-  const cached = cacheGet<SchoolIdentitySettings>(CACHE_KEY)
+  const cached = await cacheGet<SchoolIdentitySettings>(CACHE_KEY)
   if (cached) return cached
 
   const vals = await getMany([
@@ -396,6 +500,7 @@ export async function getIdentitySettings(): Promise<SchoolIdentitySettings> {
     SETTING_KEYS.SCHOOL_EMAIL,
     SETTING_KEYS.SCHOOL_WEBSITE,
     SETTING_KEYS.SCHOOL_FOUNDED_YEAR,
+    SETTING_KEYS.SCHOOL_LOGO_URL,
     SETTING_KEYS.CURRENT_ACADEMIC_YEAR,
     SETTING_KEYS.APP_TIMEZONE,
     SETTING_KEYS.APP_CURRENCY,
@@ -413,13 +518,14 @@ export async function getIdentitySettings(): Promise<SchoolIdentitySettings> {
     schoolEmail:        vals[SETTING_KEYS.SCHOOL_EMAIL],
     schoolWebsite:      vals[SETTING_KEYS.SCHOOL_WEBSITE],
     schoolFoundedYear:  vals[SETTING_KEYS.SCHOOL_FOUNDED_YEAR],
+    schoolLogoUrl:      vals[SETTING_KEYS.SCHOOL_LOGO_URL],
     currentAcademicYear:vals[SETTING_KEYS.CURRENT_ACADEMIC_YEAR],
     timezone:           vals[SETTING_KEYS.APP_TIMEZONE],
     currency:           vals[SETTING_KEYS.APP_CURRENCY],
     currencyLocale:     vals[SETTING_KEYS.APP_CURRENCY_LOCALE],
   }
 
-  cacheSet(CACHE_KEY, identity, TTL_MS.SCHOOL_IDENTITY)
+  await cacheSet(CACHE_KEY, identity, TTL_MS.SCHOOL_IDENTITY)
   return identity
 }
 
@@ -473,12 +579,12 @@ export async function seedDefaults(): Promise<{ seeded: number }> {
  * Invalidate a specific key from the cache.
  * Call this after an external system updates a setting directly.
  */
-export function invalidate(key: SettingKey): void {
-  _cache.delete(key)
+export async function invalidate(key: SettingKey): Promise<void> {
+  await cacheDelete(key)
   // Also invalidate compound cache keys that include this setting
-  _cache.delete('__public_settings__')
+  await cacheDelete('__public_settings__')
   if (SETTING_META[key].category === SETTING_CATEGORIES.SCHOOL_IDENTITY) {
-    _cache.delete('__identity_settings__')
+    await cacheDelete('__identity_settings__')
   }
 }
 
@@ -486,7 +592,18 @@ export function invalidate(key: SettingKey): void {
  * Invalidate the entire settings cache.
  * Use sparingly — primarily for testing or after bulk imports.
  */
-export function invalidateAll(): void {
+export async function invalidateAll(): Promise<void> {
+  const redis = getRedis()
+  if (redis) {
+    const keys = Object.keys(SETTING_META)
+    await Promise.all([
+      ...keys.map((k) => cacheDelete(k)),
+      cacheDelete('__public_settings__'),
+      cacheDelete('__identity_settings__'),
+      cacheDelete('__term_dates__'),
+    ])
+    return
+  }
   _cache.clear()
 }
 

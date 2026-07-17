@@ -7,8 +7,11 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "backfill-attendance": "tsx scripts/backfill-attendance.ts",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -29,6 +32,7 @@
     "@types/express": "^5.0.6",
     "@types/multer": "^2.1.0",
     "@types/ws": "^8.18.1",
+    "@upstash/redis": "^1.38.0",
     "@zxing/browser": "^0.2.0",
     "@zxing/library": "^0.23.0",
     "algoliasearch": "^5.52.1",
@@ -86,6 +90,8 @@
     "@storybook/addon-vitest": "^10.3.6",
     "@storybook/nextjs-vite": "^10.3.6",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -98,11 +104,13 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-storybook": "^10.3.6",
     "eslint-plugin-tailwindcss": "^3.18.3",
+    "jsdom": "^25.0.1",
     "playwright": "^1.60.0",
     "prettier": "^3.8.3",
     "prisma": "^6.19.3",
     "storybook": "^10.3.6",
     "tailwindcss": "^4.3.0",
+    "tsx": "^4.19.2",
     "typescript": "^5",
     "vite": "^8.0.12",
     "vitest": "^4.1.6"

@@ -1,9 +1,61 @@
+/*
+ * apps/web/src/server/routes/hr.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R11 — HR Domain: Loans UI, Leave-Conflict Wiring & Directory
+ *   Access Correction
+ * [PURPOSE]:
+ *   1. GET / (staff directory): corrected the role list to
+ *      ['admin','hr','high_rank'] — hr.viewAnyProfile's real, verified
+ *      grant (S/types/permissions.ts). Previously all 8 non-student
+ *      roles could list the full staff directory; five of those
+ *      (finance, academic, library, lower_rank, exam_officer) hold no
+ *      formal permission for it at all.
+ *   2. Added GET /loans — hrService.listLoans() (new this phase) needs a
+ *      route; the Loans tab's admin-management view has nothing else to
+ *      call to see loan requests across all staff. Gated to the union of
+ *      roles that can act on a loan in some way (admin/hr/finance) plus
+ *      high_rank, who formally holds hr.approveLoan on paper even though
+ *      the approve route below still gates by role, not permission (that
+ *      mismatch is pre-existing and unauthorized for this phase to
+ *      change — see hr/page.tsx's header for how the frontend reconciles
+ *      this).
+ *   3. POST /:id/photo — fixed a build-breaking call to a nonexistent
+ *      `getViewUrl` export (no such export exists in storage.ts — the
+ *      real helper is `getSignedViewUrl(fileId)`); discovered while
+ *      wiring this same route's hrService.uploadStaffPhoto() fix.
+ *      staff_photo is a READ_ROLES-gated category
+ *      (admin/high_rank/hr only), so the signed-proxy-URL helper is the
+ *      correct one, not a public/download-style URL.
+ *   4. PATCH /leave/requests/:id/review — no change to the route itself;
+ *      hrService.reviewLeave()'s return value now includes a `conflicts`
+ *      array (this phase's own leave-conflict wiring), which this route
+ *      already passes straight through via `res.json(...)`.
+ *   Added `import 'server-only'`.
+ *
+ *   [POST-R11, user-requested follow-up beyond the roadmap's literal
+ *   scope]:
+ *   5. Added GET /loans/mine — self-service loan status for the
+ *      requesting staff member; hrService.getMyLoans(uid) (same follow-up).
+ *   6. PATCH /loans/:id/approve converted from requireRole(['admin','hr'])
+ *      to requirePermission('hr.approveLoan') — high_rank formally holds
+ *      this permission but was locked out by the role-only gate; admin
+ *      does not hold it and loses the role-based bypass, matching this
+ *      codebase's consistently-applied "admin does not perform business
+ *      operations" design elsewhere. disburse/repay are intentionally
+ *      left role-gated — no dedicated permission exists for either.
+ * [DEPENDS ON]: hrService.ts (listLoans, reviewLeave conflicts, getMyLoans
+ *   — same phase/follow-up)
+ */
+import 'server-only'
 import { Router } from 'express'
 import multer from 'multer'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
+import { requirePermission } from '@/server/middleware/verifyPermission'
 import { CreateStaffSchema, LeaveRequestSchema, ReviewLeaveSchema, LoanRequestSchema, PerformanceNoteSchema } from '@shared/schemas/hr'
 import * as hrService from '@/server/services/hrService'
-import { getViewUrl, STORAGE_BUCKETS } from '@/lib/storage'
+import { getSignedViewUrl } from '@/lib/storage'
+import { prisma } from '@/lib/prisma'
 
 export const hrRouter = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } })
@@ -11,8 +63,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 const HR_ADMIN = ['admin', 'hr'] as const
 const REVIEWERS = ['admin', 'hr', 'high_rank'] as const
 
-// ── STAFF DIRECTORY (all staff can view) ──
-hrRouter.get('/', verifyAuth, requireRole(['admin','hr','high_rank','finance','academic','library','lower_rank','exam_officer']),
+// ── STAFF DIRECTORY (admin/hr/high_rank only — hr.viewAnyProfile's real grant) ──
+hrRouter.get('/', verifyAuth, requireRole([...REVIEWERS]),
   async (req, res) => {
     const { department, status, search } = req.query as Record<string, string>
     const staff = await hrService.listStaff({ department, status, search })
@@ -33,7 +85,7 @@ hrRouter.post('/:id/photo', verifyAuth, requireRole([...HR_ADMIN]), upload.singl
   async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No photo uploaded.' })
     const fileId = await hrService.uploadStaffPhoto(String(req.params.id), req.file.buffer, req.file.originalname)
-    const url = await getViewUrl(STORAGE_BUCKETS.STUDENT_FILES, fileId)
+    const url = await getSignedViewUrl(fileId)
     return res.json({ fileId, url })
   })
 
@@ -56,7 +108,7 @@ hrRouter.post('/leave/apply', verifyAuth,
     const parsed = LeaveRequestSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     // Staff can only apply for themselves
-    const staffProfile = await (await import('@/lib/prisma')).prisma.staffProfile.findFirst({
+    const staffProfile = await prisma.staffProfile.findFirst({
       where: { uid: req.user!.uid }, select: { id: true },
     })
     if (!staffProfile) return res.status(404).json({ error: 'Staff profile not found for this user.' })
@@ -67,20 +119,54 @@ hrRouter.patch('/leave/requests/:id/review', verifyAuth, requireRole([...REVIEWE
   async (req, res) => {
     const parsed = ReviewLeaveSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    // [R11] Return value now includes `conflictResult` (leaveConflictService's
+    // full output, non-blocking) for LeaveConflictWarning.tsx to render.
     return res.json(await hrService.reviewLeave(String(req.params.id), parsed.data, req.user!.uid))
   })
 
 // ── LOANS ──
+// [R11] NEW — hrService.listLoans() needs a route; the Loans tab's
+// admin-management view has no other way to see loan requests across all
+// staff. See header comment for the role-list rationale.
+hrRouter.get('/loans', verifyAuth, requireRole(['admin', 'hr', 'finance', 'high_rank']),
+  async (req, res) => {
+    const { status } = req.query as { status?: string }
+    return res.json(await hrService.listLoans(
+      status as 'PENDING' | 'APPROVED' | 'DISBURSED' | 'REPAYING' | 'SETTLED' | 'REJECTED' | undefined
+    ))
+  })
+
+// [POST-R11] NEW — self-service loan status. A staff member who submits
+// a request via POST /loans/request previously had no way to check on
+// it afterward. Placed before /loans/:id/... below so the literal
+// "mine" segment is never captured by a later :id param route (Express
+// matches in registration order; not strictly required here since no
+// existing route is a bare GET /loans/:id, but kept for clarity).
+hrRouter.get('/loans/mine', verifyAuth,
+  async (req, res) => {
+    return res.json(await hrService.getMyLoans(req.user!.uid))
+  })
+
 hrRouter.post('/loans/request', verifyAuth,
   async (req, res) => {
     const parsed = LoanRequestSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    const sp = await (await import('@/lib/prisma')).prisma.staffProfile.findFirst({ where: { uid: req.user!.uid }, select: { id: true } })
+    const sp = await prisma.staffProfile.findFirst({ where: { uid: req.user!.uid }, select: { id: true } })
     if (!sp) return res.status(404).json({ error: 'Staff profile not found.' })
     return res.status(201).json(await hrService.requestLoan(sp.id, parsed.data))
   })
 
-hrRouter.patch('/loans/:id/approve', verifyAuth, requireRole([...HR_ADMIN]),
+// [POST-R11] Converted to requirePermission('hr.approveLoan') from
+// requireRole(['admin','hr']) — verified against S/types/permissions.ts:
+// high_rank formally holds hr.approveLoan but was locked out by the
+// role-only gate; admin does not hold it at all. This matches the
+// codebase's own consistently-applied design (admin does not perform
+// // business operations — recording payments, entering marks, approving
+// loans — those belong to domain/senior-staff roles) rather than
+// perpetuating the one inconsistent exception. disburse/repay below are
+// intentionally left role-gated: no dedicated permission exists for
+// either action in the matrix, so there is no real mismatch to correct.
+hrRouter.patch('/loans/:id/approve', verifyAuth, requirePermission('hr.approveLoan'),
   async (req, res) => {return res.json(await hrService.approveLoan(String(req.params.id), req.user!.uid))})
 
 hrRouter.patch('/loans/:id/disburse', verifyAuth, requireRole(['admin','finance']),

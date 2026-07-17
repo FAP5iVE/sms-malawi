@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AUDIT_ENTITY_TYPES, AUDIT_SEVERITY_CONFIG } from '@shared/constants/audit'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
@@ -72,25 +73,7 @@ interface AuditLogViewerProps {
 //  SEVERITY CONFIG
 // ─────────────────────────────────────────────────────────
 
-const SEVERITY_CONFIG: Record<
-  Severity,
-  { label: string; badgeClass: string }
-> = {
-  CRITICAL: { label: 'Critical', badgeClass: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400' },
-  HIGH:     { label: 'High',     badgeClass: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400' },
-  MEDIUM:   { label: 'Medium',   badgeClass: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400' },
-  LOW:      { label: 'Low',      badgeClass: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400' },
-}
 
-const ENTITY_TYPES = [
-  'Student', 'Application', 'Class', 'Assignment',
-  'Exam', 'ExamMark', 'TermResult', 'AnnualResult', 'ManebRecord',
-  'Invoice', 'Payment', 'Expense', 'Budget', 'Scholarship', 'PayrollRun', 'Payslip',
-  'StaffProfile', 'LeaveRequest', 'StaffLoan', 'PerformanceNote',
-  'Book', 'Borrowing', 'DigitalResource', 'LibraryFine',
-  'TimetableSlot', 'LabBooking',
-  'Announcement', 'SystemSettings', 'User',
-] as const
 
 // ─────────────────────────────────────────────────────────
 //  METADATA DIFF VIEWER
@@ -454,7 +437,7 @@ export function AuditLogViewer({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">All entity types</SelectItem>
-              {ENTITY_TYPES.map((t) => (
+              {AUDIT_ENTITY_TYPES.map((t) => (
                 <SelectItem key={t} value={t}>{t}</SelectItem>
               ))}
             </SelectContent>
@@ -565,7 +548,7 @@ export function AuditLogViewer({
               </TableHeader>
               <TableBody>
                 {data.entries.map((entry) => {
-                  const severityConfig = SEVERITY_CONFIG[entry.severity]
+                  const severityConfig = AUDIT_SEVERITY_CONFIG[entry.severity]
                   const hasMetadata =
                     entry.metadata &&
                     (entry.metadata.before || entry.metadata.after ||

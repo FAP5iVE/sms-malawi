@@ -1,14 +1,89 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT (output in full — the button-visibility
+ *   logic, data-fetching, and "Compute Results" handler all change); R8
+ *   further adds three tabs (Report Cards, Promotion, Results Release)
+ * [FILE]: apps/web/src/app/(auth)/exams/page.tsx
+ * [R-PHASE]: R7 — Academics III: Exam Pipeline Repair & Grading Engine
+ *   Unification; further edited in R8 — Academics IV: Report Cards,
+ *   Transcripts, Promotion & Risk Assessment
+ * [PURPOSE — R8]: Added three tabs giving ReportCardGenerator.tsx,
+ *   PromotionEngine.tsx, and ResultsReleaseWorkflow.tsx (all pre-existing,
+ *   functional components with zero real importer anywhere in the app)
+ *   their first real UI homes, visible to every role except student/
+ *   lower_rank (the components themselves gate their own actions further).
+ * [PURPOSE — R7]:
+ *   1. "Compute Results" button: the local apiPost('/exams/compute') call
+ *      (sent with no request body, guaranteed to 400) is replaced with a
+ *      call through the canonical apiFetch, supplying the required
+ *      classId/academicYear/term — the local apiPost() helper (and its
+ *      firebase/auth import) is removed entirely, consistent with R1's
+ *      one-client standard. The result/error is now surfaced to the user
+ *      (previously discarded silently regardless of outcome).
+ *   2. "All classes…" filter: useExams(selectedClassId || undefined, ...)
+ *      in place of always passing selectedClassId — useExams.ts (this same
+ *      phase) no longer disables the query when classId is empty, so
+ *      selecting "All classes" runs a real aggregated query instead of
+ *      showing a misleading "No exams scheduled yet" empty state caused by
+ *      a disabled query, not an actually-empty result.
+ *   3. Replaced the hardcoded CURRENT_YEAR = '2025/2026' with
+ *      usePublicSchoolInfo()'s currentYear (the same live source R5
+ *      established for exactly this purpose), and the inline
+ *      ['SCHEDULED','IN_PROGRESS','MARKS_PENDING','MARKS_DRAFT'] status
+ *      array with EXAM_MARKS_ENTERABLE_STATUSES (@shared/schemas/exam,
+ *      this same phase) — full constants centralization is R15's job; this
+ *      is the immediate correctness fix since the file is already open for
+ *      the button fix.
+ *   4. Button-visibility booleans (canManage/canEnterMarks and two more
+ *      inline role-array checks) are replaced with usePermissions().can()
+ *      checks matching exams.ts's newly-narrowed backend gates exactly
+ *      (exam.create, exam.computeResults, exam.approveResults,
+ *      exam.authorizeRelease, exam.enterOwnClassMarks) — the old,
+ *      loosely-shared role arrays let admin/high_rank see Approve/Release/
+ *      Enter-Marks controls that the now-correctly-narrowed backend
+ *      permissions would reject, exactly the UI/backend mismatch class of
+ *      bug this audit repeatedly flags.
+ *   5. MarksEntrySheet now receives maxMark (sourced from the already-
+ *      loaded exams list) so the sheet can validate against the specific
+ *      exam's configured maximum instead of a fixed 100.
+ * [DEPENDS ON]: apps/web/src/hooks/usePublic.ts (usePublicSchoolInfo),
+ *   apps/web/src/hooks/usePermissions.ts, @shared/schemas/exam
+ *   (EXAM_MARKS_ENTERABLE_STATUSES), apps/web/src/lib/api-client.ts
+ *   (apiFetch)
+ */
+/*
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R15 — UI/UX Polish: Shared Components, Dashboards,
+ *   Confirmation Dialogs & Data-Display Consistency
+ * [PURPOSE]: (1) Initialises the active tab from ?tab= (post-hydration,
+ *   validated against TABS) so dashboard quick actions can deep-link —
+ *   /exams/marks, /exams/results and /exams/maneb never existed as
+ *   routes. (2) The My Results tab passed studentId={user.uid} (a
+ *   Firebase UID) to StudentResultsView where a Prisma Student.id is
+ *   required — resolved via useStudentMe() (same phase), matching the
+ *   StudentDashboard fix and the exams.ts route's corrected ownership
+ *   check.
+ * [DEPENDS ON]: W/hooks/useStudents.ts (useStudentMe, same phase)
+ */
 'use client'
 import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
+import { useStudentMe } from '@/hooks/useStudents'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { ExamForm } from '@/components/exams/ExamForm'
 import { MarksEntrySheet } from '@/components/exams/MarksEntrySheet'
 import { AnalyticsPanel } from '@/components/exams/AnalyticsPanel'
 import { ManebPanel } from '@/components/exams/ManebPanel'
 import { StudentResultsView } from '@/components/exams/StudentResultsView'
+import { ReportCardGenerator } from '@/components/exams/ReportCardGenerator'
+import { PromotionEngine } from '@/components/exams/PromotionEngine'
+import { ResultsReleaseWorkflow } from '@/components/exams/ResultsReleaseWorkflow'
 import { useExams, useApproveResults, useReleaseResults } from '@/hooks/useExams'
 import { useClasses } from '@/hooks/useClasses'
+import { usePublicSchoolInfo } from '@/hooks/usePublic'
+import { usePermissions } from '@/hooks/usePermissions'
+import { apiFetch } from '@/lib/api-client'
+import { EXAM_MARKS_ENTERABLE_STATUSES } from '@shared/schemas/exam'
+import { ModuleTabs }        from '@/components/shared/ModuleTabs'
 import {
   Calendar,
   Plus,
@@ -17,9 +92,13 @@ import {
   FileText,
   ChevronRight,
   Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Printer,
+  TrendingUp,
+  Send,
 } from 'lucide-react'
 import type { ApiExam, ApiClass } from '@shared/types/api'
-import { getAuth } from 'firebase/auth'
 
 const ALLOWED_ROLES = [
   'admin',
@@ -30,25 +109,27 @@ const ALLOWED_ROLES = [
   'student',
 ] as const
 
+// 'report-cards', 'promotion', and 'release' give ReportCardGenerator.tsx,
+// PromotionEngine.tsx, and ResultsReleaseWorkflow.tsx (all pre-existing,
+// functional, but previously unimported anywhere in the app) their real
+// UI homes (R8) — the components themselves gate their own actions via
+// usePermissions()/role checks; the tabs are visible to the same
+// management-facing roles the rest of this page already serves.
 const TABS = [
   { id: 'exams', label: 'Exams', icon: Calendar },
   { id: 'analytics', label: 'Analytics', icon: BarChart2 },
   { id: 'maneb', label: 'MANEB', icon: GraduationCap },
+  { id: 'report-cards', label: 'Report Cards', icon: Printer },
+  { id: 'promotion', label: 'Promotion', icon: TrendingUp },
+  { id: 'release', label: 'Results Release', icon: Send },
   { id: 'results', label: 'My Results', icon: FileText },
 ] as const
 
 type Tab = (typeof TABS)[number]['id']
 
-const CURRENT_YEAR = '2025/2026'
-
-async function apiPost(path: string) {
-  const token = await getAuth().currentUser?.getIdToken()
-  const res = await fetch(`/api${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token ?? ''}` },
-  })
-  return res.json()
-}
+// Fallback used only while usePublicSchoolInfo() is still loading —
+// matches the same fallback settingsService.ts itself uses server-side.
+const FALLBACK_YEAR = '2025/2026'
 
 export default function ExamsPage() {
   const { role, user, setTitle, setSubtitle } = useAuthStore()
@@ -58,60 +139,101 @@ export default function ExamsPage() {
   const [showForm, setShowForm] = useState(false)
   const [marksExamId, setMarksExamId] = useState<string | null>(null)
   const [computing, setComputing] = useState(false)
+  const [computeResult, setComputeResult] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+
+  const { data: myStudent, isLoading: myStudentLoading } = useStudentMe()
+  const { data: schoolInfo } = usePublicSchoolInfo()
+  const academicYear = schoolInfo?.currentYear ?? FALLBACK_YEAR
+
+  // R15 — initialise the active tab from ?tab= so dashboard quick actions
+  // can deep-link (/exams?tab=exams|analytics|maneb|release|results) —
+  // /exams/marks, /exams/results and /exams/maneb never existed as routes.
+  // Runs once post-hydration; validated against the declared tab ids.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    if (t && TABS.some((x) => x.id === t)) setTab(t as Tab)
+  }, [])
 
   useEffect(() => {
     setTitle('Exams & Results')
-    setSubtitle(`${CURRENT_YEAR} — Term ${term}`)
+    setSubtitle(`${academicYear} — Term ${term}`)
     return () => {
       setTitle(null)
       setSubtitle(null)
     }
-  }, [term, setTitle, setSubtitle])
+  }, [term, academicYear, setTitle, setSubtitle])
 
-  const { data: classesData } = useClasses(CURRENT_YEAR)
+  const { data: classesData } = useClasses(academicYear)
   const classes = (classesData ?? []) as ApiClass[]
 
-  const { data: examsData, isLoading: examsLoading } = useExams(selectedClassId, CURRENT_YEAR, term)
-  // Properly typed — useExams returns ApiExam[], data is ApiExam[] | undefined
+  const { data: examsData, isLoading: examsLoading } = useExams(
+    selectedClassId || undefined,
+    academicYear,
+    term
+  )
   const exams = (examsData ?? []) as ApiExam[]
+  const marksExam = marksExamId ? exams.find((e) => e.id === marksExamId) : undefined
 
   const approveResults = useApproveResults()
   const releaseResults = useReleaseResults()
+  const { can } = usePermissions()
 
-  const canManage = ['admin', 'high_rank', 'exam_officer'].includes(role ?? '')
-  const canEnterMarks = ['academic', 'exam_officer', 'admin'].includes(role ?? '')
+  const canScheduleExam    = can('exam.create')
+  const canComputeResults  = can('exam.computeResults')
+  const canApprove         = can('exam.approveResults')
+  const canRelease         = can('exam.authorizeRelease')
+  const canEnterMarks      = can('exam.enterOwnClassMarks')
 
   async function handleCompute() {
     if (!selectedClassId) return
     setComputing(true)
+    setComputeResult(null)
     try {
-      await apiPost(`/exams/compute`)
+      const result = await apiFetch<{ computed: number }>('/exams/compute', {
+        method: 'POST',
+        body: JSON.stringify({ classId: selectedClassId, academicYear, term }),
+      })
+      setComputeResult({
+        kind: 'success',
+        text: `Computed results for ${result.computed} student(s).`,
+      })
+    } catch (err) {
+      setComputeResult({
+        kind: 'error',
+        text: err instanceof Error ? err.message : 'Failed to compute results.',
+      })
     } finally {
       setComputing(false)
     }
   }
 
-  // Hide 'My Results' tab for non-students
-  const visibleTabs = TABS.filter((t) => t.id !== 'results' || role === 'student')
+  // Hide 'My Results' tab for non-students; hide the management tabs
+  // (Report Cards, Promotion, Results Release) from student/lower_rank —
+  // the components themselves also gate their actions, this just avoids
+  // showing a tab whose contents a role can only ever view, never act on.
+  const MANAGEMENT_TABS: Tab[] = ['report-cards', 'promotion', 'release']
+  const visibleTabs = TABS.filter((t) => {
+    if (t.id === 'results') return role === 'student'
+    if (MANAGEMENT_TABS.includes(t.id)) return role !== 'student' && role !== 'lower_rank'
+    return true
+  })
 
   return (
     <RoleGuard allowed={[...ALLOWED_ROLES]}>
       <div className="min-h-screen bg-page">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-          {/* Tab bar */}
-          <div className="flex gap-1 bg-surface border border-base rounded-xl p-1 w-fit">
-            {visibleTabs.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                onClick={() => setTab(id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                  tab === id ? 'bg-brand-navy text-white' : 'text-muted hover:text-body'
-                }`}
-              >
-                <Icon className="w-4 h-4" /> {label}
-              </button>
-            ))}
-          </div>
+          {/* R19 — real page heading (was absent, unlike sibling module pages),
+             giving assistive tech and E2E heading-role checks a landmark. */}
+          <h1 className="font-heading text-2xl font-bold text-brand-navy">Exams</h1>
+
+          {/* Mobile-scrollable pill tab navigation — C7 */}
+            <ModuleTabs<Tab>
+              tabs={visibleTabs}
+              active={tab}
+              onChange={setTab}
+              variant="pill"
+              id="exams-tabs"
+            />
 
           {/* ── EXAMS TAB ── */}
           {tab === 'exams' && (
@@ -142,31 +264,47 @@ export default function ExamsPage() {
                     </option>
                   ))}
                 </select>
-                {canManage && (
-                  <>
-                    <button
-                      onClick={() => setShowForm(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-brand-teal text-white rounded-xl text-sm font-semibold hover:bg-brand-teal-light ml-auto"
-                    >
-                      <Plus className="w-4 h-4" /> Schedule Exam
-                    </button>
-                    {selectedClassId && (
-                      <button
-                        onClick={handleCompute}
-                        disabled={computing}
-                        className="flex items-center gap-2 px-4 py-2 border border-base rounded-xl text-sm hover:bg-page disabled:opacity-60"
-                      >
-                        {computing ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <BarChart2 className="w-4 h-4" />
-                        )}
-                        Compute Results
-                      </button>
+                {canScheduleExam && (
+                  <button
+                    onClick={() => setShowForm(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-brand-teal text-white rounded-xl text-sm font-semibold hover:bg-brand-teal-light ml-auto"
+                  >
+                    <Plus className="w-4 h-4" /> Schedule Exam
+                  </button>
+                )}
+                {canComputeResults && selectedClassId && (
+                  <button
+                    onClick={handleCompute}
+                    disabled={computing}
+                    className="flex items-center gap-2 px-4 py-2 border border-base rounded-xl text-sm hover:bg-page disabled:opacity-60"
+                  >
+                    {computing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <BarChart2 className="w-4 h-4" />
                     )}
-                  </>
+                    Compute Results
+                  </button>
                 )}
               </div>
+
+              {computeResult && (
+                <p
+                  role={computeResult.kind === 'success' ? 'status' : 'alert'}
+                  className={`flex items-center gap-2 text-sm rounded-xl px-4 py-3 border ${
+                    computeResult.kind === 'success'
+                      ? 'text-brand-teal bg-brand-teal/8 border-brand-teal/20'
+                      : 'text-brand-coral bg-brand-coral/8 border-brand-coral/20'
+                  }`}
+                >
+                  {computeResult.kind === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0" aria-hidden />
+                  )}
+                  {computeResult.text}
+                </p>
+              )}
 
               {examsLoading && (
                 <div className="text-center py-16 text-muted text-sm animate-pulse">
@@ -176,7 +314,7 @@ export default function ExamsPage() {
 
               {!examsLoading && exams.length === 0 && (
                 <div className="text-center py-20 text-muted text-sm border border-base rounded-2xl">
-                  No exams scheduled yet.{canManage && ' Click "Schedule Exam" to add one.'}
+                  No exams scheduled yet.{canScheduleExam && ' Click "Schedule Exam" to add one.'}
                 </div>
               )}
 
@@ -226,12 +364,7 @@ export default function ExamsPage() {
                           <td className="px-5 py-3">
                             <div className="flex items-center gap-2">
                               {canEnterMarks &&
-                                [
-                                  'SCHEDULED',
-                                  'IN_PROGRESS',
-                                  'MARKS_PENDING',
-                                  'MARKS_DRAFT',
-                                ].includes(exam.status) && (
+                                (EXAM_MARKS_ENTERABLE_STATUSES as readonly string[]).includes(exam.status) && (
                                   <button
                                     onClick={() => setMarksExamId(exam.id)}
                                     className="text-xs text-brand-teal hover:underline flex items-center gap-1"
@@ -239,7 +372,7 @@ export default function ExamsPage() {
                                     Enter Marks <ChevronRight className="w-3 h-3" />
                                   </button>
                                 )}
-                              {canManage && exam.status === 'MARKS_FINAL' && (
+                              {canApprove && exam.status === 'MARKS_FINAL' && (
                                 <button
                                   onClick={() => approveResults.mutate(exam.id)}
                                   disabled={approveResults.isPending}
@@ -248,16 +381,15 @@ export default function ExamsPage() {
                                   Approve
                                 </button>
                               )}
-                              {['admin', 'high_rank'].includes(role ?? '') &&
-                                exam.status === 'RESULTS_APPROVED' && (
-                                  <button
-                                    onClick={() => releaseResults.mutate(exam.id)}
-                                    disabled={releaseResults.isPending}
-                                    className="text-xs text-green-700 hover:underline font-semibold"
-                                  >
-                                    Release to Students
-                                  </button>
-                                )}
+                              {canRelease && exam.status === 'RESULTS_APPROVED' && (
+                                <button
+                                  onClick={() => releaseResults.mutate(exam.id)}
+                                  disabled={releaseResults.isPending}
+                                  className="text-xs text-green-700 hover:underline font-semibold"
+                                >
+                                  Release to Students
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -272,29 +404,64 @@ export default function ExamsPage() {
           {/* ── ANALYTICS TAB ── */}
           {tab === 'analytics' && (
             <AnalyticsPanel
-              academicYear={CURRENT_YEAR}
+              academicYear={academicYear}
               selectedClassId={selectedClassId}
               term={term}
             />
           )}
 
           {/* ── MANEB TAB ── */}
-          {tab === 'maneb' && <ManebPanel academicYear={CURRENT_YEAR} />}
+          {tab === 'maneb' && <ManebPanel academicYear={academicYear} />}
 
-          {/* ── MY RESULTS TAB (students only) ── */}
-          {tab === 'results' && role === 'student' && user && (
-            <StudentResultsView studentId={user.uid} />
+          {/* ── REPORT CARDS TAB ── */}
+          {tab === 'report-cards' && <ReportCardGenerator />}
+
+          {/* ── PROMOTION TAB ── */}
+          {tab === 'promotion' && <PromotionEngine />}
+
+          {/* ── RESULTS RELEASE TAB ── */}
+          {tab === 'release' && (
+            selectedClassId ? (
+              <ResultsReleaseWorkflow
+                classId={selectedClassId}
+                academicYear={academicYear}
+                term={term}
+              />
+            ) : (
+              <div className="text-center py-16 text-muted text-sm border border-base rounded-2xl">
+                Select a class from the Exams tab to review its results release status.
+              </div>
+            )
+          )}
+
+          {/* ── MY RESULTS TAB (students only) ──
+              R15: StudentResultsView needs a Prisma Student.id —
+              examService.getStudentResults() queries TermResult.studentId
+              with it — so the signed-in student's real record id is
+              resolved through useStudentMe() (GET /students/me) instead of
+              passing the Firebase UID, which never matched any row. */}
+          {tab === 'results' && role === 'student' && (
+            myStudent?.id ? (
+              <StudentResultsView studentId={myStudent.id} />
+            ) : (
+              <p className="text-sm text-muted text-center py-16" role="status">
+                {myStudentLoading
+                  ? 'Loading your student record…'
+                  : 'Your student record could not be found. Please contact the school office.'}
+              </p>
+            )
           )}
         </div>
 
         {/* Modals */}
         {showForm && (
-          <ExamForm onClose={() => setShowForm(false)} academicYear={CURRENT_YEAR} term={term} />
+          <ExamForm onClose={() => setShowForm(false)} academicYear={academicYear} term={term} />
         )}
         {marksExamId && (
           <MarksEntrySheet
             examId={marksExamId}
             classId={selectedClassId}
+            maxMark={marksExam?.maxMark ?? 100}
             onClose={() => setMarksExamId(null)}
           />
         )}

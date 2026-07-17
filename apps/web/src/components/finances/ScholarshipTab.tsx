@@ -1,28 +1,38 @@
+/**
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [FILE]: apps/web/src/components/finances/ScholarshipTab.tsx
+ * [R-PHASE]: R9 — Finance I: Invoicing, Fees & the Accounting Ledger
+ *   Reconnection (previously R1 — API Client & Query-Key Singleton
+ *   Consolidation)
+ * [PURPOSE]:
+ *   1. "Student ID" column now shows the joined student name
+ *      (s.student.firstName/lastName, added to ApiScholarship this phase)
+ *      instead of `s.studentId.slice(-8)`.
+ *   2. The free-text "Full student Neon ID" input is replaced with a
+ *      searchable student picker (autocomplete against the existing
+ *      GET /students?search= endpoint via useStudents()'s new `search`
+ *      param) — staff no longer need to already know a student's raw
+ *      database ID to award a scholarship.
+ * [DEPENDS ON]: W/lib/api-client.ts, W/hooks/useFinances.ts,
+ *   W/hooks/useStudents.ts (search param, added this phase)
+ */
 'use client'
 
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { getAuth } from 'firebase/auth'
 import { useScholarships } from '@/hooks/useFinances'
+import { useStudents } from '@/hooks/useStudents'
 import { CreateScholarshipSchema } from '@shared/schemas/finance'
 import type { CreateScholarshipInput } from '@shared/schemas/finance'
-import type { ApiScholarship } from '@shared/types/api'
+import type { ApiScholarship, ApiStudent } from '@shared/types/api'
 import { formatMWK } from '@shared/constants/malawi'
-import { PlusCircle, GraduationCap, Loader2, X } from 'lucide-react'
+import { PlusCircle, GraduationCap, Loader2, X, Search } from 'lucide-react'
+import { apiFetch, queryKeys } from '@/lib/api-client'
 
-async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
-  const token = await getAuth().currentUser?.getIdToken()
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${path}`, {
-    ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  })
-  if (!res.ok) throw new Error(`API error ${res.status}`)
-  return res.json()
+function scholarshipStudentName(s: ApiScholarship): string {
+  return s.student ? `${s.student.firstName} ${s.student.lastName}` : '—'
 }
 
 export function ScholarshipTab({ academicYear }: { academicYear: string }) {
@@ -34,11 +44,33 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<CreateScholarshipInput>({
     resolver: zodResolver(CreateScholarshipSchema),
-    defaultValues: { academicYear, discountType: 'PERCENTAGE' },
+    defaultValues: { academicYear, discountType: 'PERCENTAGE', studentId: '' },
   })
+
+  const studentId = watch('studentId')
+  const [studentQuery, setStudentQuery] = useState('')
+  const [selectedStudentLabel, setSelectedStudentLabel] = useState('')
+  const [showResults, setShowResults] = useState(false)
+  const { data: searchResults, isLoading: isSearching } = useStudents({ search: studentQuery })
+
+  function selectStudent(s: ApiStudent) {
+    setValue('studentId', s.id, { shouldValidate: true })
+    setSelectedStudentLabel(`${s.firstName} ${s.lastName} (${s.registrationNo})`)
+    setStudentQuery('')
+    setShowResults(false)
+  }
+
+  function closeAndReset() {
+    reset()
+    setStudentQuery('')
+    setSelectedStudentLabel('')
+    setShowForm(false)
+  }
 
   const { mutate: create, isPending } = useMutation({
     mutationFn: (data: CreateScholarshipInput) =>
@@ -47,9 +79,8 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
-      reset()
-      setShowForm(false)
-      void qc.invalidateQueries({ queryKey: ['finances', 'scholarships'] })
+      closeAndReset()
+      void qc.invalidateQueries({ queryKey: queryKeys.finances.scholarships() })
     },
   })
 
@@ -80,7 +111,7 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
                 Name
               </th>
               <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                Student ID
+                Student
               </th>
               <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
                 Type
@@ -114,9 +145,7 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
               scholarships.map((s: ApiScholarship) => (
                 <tr key={s.id} className="border-b border-base hover:bg-page">
                   <td className="px-4 py-3 font-medium">{s.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted">
-                    {s.studentId.slice(-8)}
-                  </td>
+                  <td className="px-4 py-3 text-sm">{scholarshipStudentName(s)}</td>
                   <td className="px-4 py-3 text-muted text-xs">
                     {s.discountType.replace('_', ' ')}
                   </td>
@@ -144,9 +173,9 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
             <div className="flex items-center justify-between">
               <h3 className="font-heading font-bold text-lg text-brand-navy">Add Scholarship</h3>
               <button
-                onClick={() => setShowForm(false)}
+                onClick={closeAndReset}
                 aria-label="Close"
-                className="p-1.5 rounded-lg hover:bg-page"
+                className="p-1.5 rounded-lg hover:bg-page min-h-[44px]"
                 type="button"
               >
                 <X className="w-5 h-5 text-muted" />
@@ -154,41 +183,94 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
             </div>
 
             <form onSubmit={handleSubmit((d) => create(d))} className="space-y-3">
-              {[
-                {
-                  label: 'Scholarship Name',
-                  name: 'name',
-                  type: 'text',
-                  placeholder: 'e.g. Government Bursary',
-                },
-                {
-                  label: 'Student ID',
-                  name: 'studentId',
-                  type: 'text',
-                  placeholder: 'Full student Neon ID',
-                },
-                {
-                  label: 'Academic Year',
-                  name: 'academicYear',
-                  type: 'text',
-                  placeholder: '2025/2026',
-                },
-              ].map((f) => (
-                <div key={f.name}>
-                  <label className="block text-sm font-medium mb-1">{f.label}</label>
-                  <input
-                    {...register(f.name as keyof CreateScholarshipInput)}
-                    type={f.type}
-                    placeholder={f.placeholder}
-                    className="input w-full"
-                  />
-                  {errors[f.name as keyof CreateScholarshipInput] && (
-                    <p className="text-xs text-brand-coral mt-1">
-                      {errors[f.name as keyof CreateScholarshipInput]?.message as string}
-                    </p>
-                  )}
-                </div>
-              ))}
+              <div>
+                <label className="block text-sm font-medium mb-1">Scholarship Name</label>
+                <input
+                  {...register('name')}
+                  type="text"
+                  placeholder="e.g. Government Bursary"
+                  className="input w-full"
+                />
+                {errors.name && (
+                  <p className="text-xs text-brand-coral mt-1">{errors.name.message}</p>
+                )}
+              </div>
+
+              {/* [R9] Student picker — replaces the free-text raw-ID input */}
+              <div className="relative">
+                <label className="block text-sm font-medium mb-1">Student</label>
+                {selectedStudentLabel ? (
+                  <div className="flex items-center justify-between input w-full">
+                    <span className="text-sm">{selectedStudentLabel}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setValue('studentId', '', { shouldValidate: true })
+                        setSelectedStudentLabel('')
+                      }}
+                      aria-label="Clear selected student"
+                      className="text-muted hover:text-brand-coral"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      value={studentQuery}
+                      onChange={(e) => {
+                        setStudentQuery(e.target.value)
+                        setShowResults(true)
+                      }}
+                      onFocus={() => setShowResults(true)}
+                      type="text"
+                      placeholder="Search by name or registration no…"
+                      className="input w-full pl-9"
+                      aria-label="Search for a student"
+                    />
+                    {showResults && studentQuery.length >= 2 && (
+                      <div className="absolute z-10 mt-1 w-full bg-surface border border-base rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {isSearching ? (
+                          <div className="px-3 py-2 text-xs text-muted flex items-center gap-2">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Searching…
+                          </div>
+                        ) : (searchResults?.students.length ?? 0) === 0 ? (
+                          <div className="px-3 py-2 text-xs text-muted">No students found</div>
+                        ) : (
+                          searchResults?.students.map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => selectStudent(s)}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-page"
+                            >
+                              {s.firstName} {s.lastName}{' '}
+                              <span className="text-xs text-muted">({s.registrationNo})</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {errors.studentId && !studentId && (
+                  <p className="text-xs text-brand-coral mt-1">{errors.studentId.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Academic Year</label>
+                <input
+                  {...register('academicYear')}
+                  type="text"
+                  placeholder="2025/2026"
+                  className="input w-full"
+                />
+                {errors.academicYear && (
+                  <p className="text-xs text-brand-coral mt-1">{errors.academicYear.message}</p>
+                )}
+              </div>
 
               <div>
                 <label className="block text-sm font-medium mb-1">Discount Type</label>
@@ -217,15 +299,15 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
-                  className="flex-1 border border-base px-4 py-2 rounded-lg text-sm hover:bg-page"
+                  onClick={closeAndReset}
+                  className="flex-1 border border-base px-4 py-2 rounded-lg text-sm hover:bg-page min-h-[44px]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isPending}
-                  className="flex-1 bg-brand-teal text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+                  disabled={isPending || !studentId}
+                  className="flex-1 bg-brand-teal text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60 min-h-[44px]"
                 >
                   {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   Save Scholarship

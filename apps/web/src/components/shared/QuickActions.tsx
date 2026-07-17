@@ -1,3 +1,17 @@
+/**
+ * apps/web/src/components/shared/QuickActions.tsx
+ *
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [R-PHASE]: R15 — UI/UX Polish: Shared Components, Dashboards,
+ *   Confirmation Dialogs & Data-Display Consistency
+ * [PURPOSE]: React key switched from `action.href` to `action.label` —
+ *   several dashboards legitimately point two differently-labelled actions
+ *   at the same page (e.g. Finance's Record Payment / Generate Receipt both
+ *   living under /finances), which produced duplicate-key warnings and
+ *   unstable reconciliation. Labels are unique within any one dashboard's
+ *   action set; hrefs are not.
+ * [DEPENDS ON]: none
+ */
 import Link from 'next/link'
 import type { LucideIcon } from 'lucide-react'
 
@@ -22,7 +36,7 @@ export function QuickActions({ actions }: QuickActionsProps) {
           const Icon = action.icon
           return (
             <Link
-              key={action.href}
+              key={action.label}
               href={action.href}
               className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-page border border-transparent hover:border-base transition-all group text-center"
             >

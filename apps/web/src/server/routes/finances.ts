@@ -1,21 +1,98 @@
+/**
+ * apps/web/src/server/routes/finances.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT — R9's five independent fixes (below),
+ *   plus R10's GET /forecast addition and MAJOR REWRITE of the
+ *   Finance↔Library fine-settlement routes.
+ * [R-PHASE]: R9 — Finance I: Invoicing, Fees & the Accounting Ledger
+ *   Reconnection; R10 — Finance II: Payroll, Forecasting & the
+ *   Finance↔Library Reconciliation
+ * [PURPOSE — R9]:
+ *   1. GET /payments/:id/receipt — added an explicit ownership check
+ *      (studentService.assertStudentOwnership) alongside the existing role
+ *      list; a student-role user could previously fetch any other
+ *      student's receipt by iterating payment IDs. Also fixed a
+ *      build-breaking call to a nonexistent `getViewUrl` export — the real
+ *      helper is `getSignedViewUrl(fileId)`, which returns this app's own
+ *      authenticated proxy URL rather than a bucket/fileId pair.
+ *   2. GET /invoices/:id/installments — same ownership-check pattern.
+ *   3. POST /invoices/:id/installments — replaced the raw
+ *      type-assertion-only body handling with real Zod validation
+ *      (CreateInstallmentPlanSchema: a frequency enum and a count minimum
+ *      of 1), closing both the silent-misinterpretation-as-TERM_WISE bug
+ *      and the count:0 -> Infinity baseAmount division in
+ *      installmentService.createInstallmentPlan().
+ *   4. /library-fines routes — out of scope R9, addressed in R10 below.
+ *   5. Added `import 'server-only'` (was previously absent from this file).
+ *   6. GET /invoices, GET /scholarships — added a joined student name
+ *      (feeService.ts fix #2's "every list function returning invoices to
+ *      a UI" pattern — the real list logic lives inline in these route
+ *      handlers, not in a named feeService.ts function, so that is where
+ *      the include was added) for InvoicesTab.tsx's/ScholarshipTab.tsx's
+ *      "Student" columns.
+ *   7. GET /invoices/:id/notes — added a joined author name via a manual
+ *      StaffProfile lookup (authorUid is a Firebase-UID plain string with
+ *      no Prisma relation) for InvoiceNotes.tsx's author display.
+ *   8. GET /balance/:studentId — a student-role requester's Firebase UID
+ *      is now resolved to their real Prisma Student.id before querying
+ *      (Invoice.studentId is a Prisma FK, never a Firebase UID) — the
+ *      Firebase-UID-to-Prisma-ID resolution InvoicesTab.tsx's switch to
+ *      this endpoint for student self-service viewing depends on.
+ * [PURPOSE — R10]:
+ *   9. Added GET /forecast, calling forecastService.getCashFlowForecast()
+ *      — ForecastPanel.tsx has been calling this exact path since its own
+ *      phase with no matching route anywhere in the Express app.
+ *  10. MAJOR REWRITE of the Finance↔Library fine-settlement routes
+ *      (PATCH /library-fines/:id/pay, .../waive, POST /library-fines).
+ *      Removed the unsafe Prisma-and-Firestore dual write entirely —
+ *      Prisma is now the sole system of record for library fines
+ *      (consistent with R6's Attendance decision); POST /library-fines
+ *      never actually created the Firestore document its sibling routes
+ *      assumed existed, so .../pay and .../waive's `.update()` calls on a
+ *      nonexistent document were always one crash away from surfacing.
+ *      Role lists corrected against the real permission matrix (verified
+ *      directly, not assumed): GET /library-fines →
+ *      ['high_rank','finance','library'] (finance.viewLibraryFines' real
+ *      grant); PATCH .../pay → ['finance','library']
+ *      (finance.clearLibraryFine); PATCH .../waive → ['library'] only
+ *      (finance.waiveFine is held exclusively by library — neither admin
+ *      nor high_rank holds it). PATCH .../pay now also posts to the
+ *      accounting ledger under the already-seeded "4300 Library Fine
+ *      Revenue" account, the third revenue category (after tuition/R9 and
+ *      payroll/this same phase) the chart of accounts anticipated but
+ *      nothing ever posted to. POST /library-fines now validates with
+ *      CreateLibraryFineSchema instead of a raw type assertion (it no
+ *      longer accepts a client-supplied firestoreDocId at all).
+ */
 
+import 'server-only'
 import { Router } from 'express'
-import { getFirestore } from 'firebase-admin/firestore'
+import multer from 'multer'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
+import { requirePermission } from '@/server/middleware/verifyPermission'
 import {
   RecordPaymentSchema,
   GenerateInvoiceSchema,
   CreateFeeStructureSchema,
   CreateExpenseSchema,
   CreateScholarshipSchema,
+  CreateInstallmentPlanSchema,
+  CreateLibraryFineSchema,
 } from '@shared/schemas/finance'
 import { Prisma, InvoiceStatus, FineStatus } from '@prisma/client'
 import * as feeService from '@/server/services/feeService'
 import * as budgetService from '@/server/services/budgetService'
 import * as installmentService from '@/server/services/installmentService'
+import * as studentService from '@/server/services/studentService'
+import * as accountingService from '@/server/services/accountingService'
+import * as forecastService from '@/server/services/forecastService'
 import { generateFinancialReport } from '@/server/services/reportExportService'
-import { getViewUrl } from '@/lib/storage'
+import { getSignedViewUrl, uploadFile, FILE_PREFIX } from '@/lib/storage'
 import { prisma } from '@/lib/prisma'
+import { bulkGenerateInvoices } from '@/server/services/bulkInvoiceService'
+import { logger } from '@/lib/logger'
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
 
 export const financesRouter = Router()
 
@@ -86,6 +163,9 @@ financesRouter.get('/invoices', verifyAuth, requireRole([...FINANCE_ROLES]), asy
     where,
     orderBy: { createdAt: 'desc' },
     take: 100,
+    // [R9] Joined student name — the frontend never resolves a raw
+    // studentId to a name itself (InvoicesTab.tsx's "Student" column).
+    include: { student: { select: { firstName: true, lastName: true } } },
   })
   res.json(invoices)
 })
@@ -108,9 +188,18 @@ financesRouter.get(
   verifyAuth,
   requireRole(['admin', 'finance', 'high_rank', 'student']),
   async (req, res) => {
-    const id = String(req.params.studentId)
-    if (req.user!.role === 'student' && req.user!.uid !== id) {
-      return res.status(403).json({ error: 'Access denied' })
+    let id = String(req.params.studentId)
+    if (req.user!.role === 'student') {
+      // [R9] A student-role client only ever knows its own Firebase UID —
+      // resolve it to the real Prisma Student.id before querying, since
+      // Invoice.studentId is a Prisma FK, never a Firebase UID. This also
+      // makes the check tamper-proof: the URL param is ignored entirely
+      // for this role, so it cannot be swapped for another student's ID.
+      const student = await studentService.resolveStudentFromUid(req.user!.uid)
+      if (!student) {
+        return res.status(403).json({ error: 'No student record linked to your account.' })
+      }
+      id = student.id
     }
     const { academicYear = '2025/2026' } = req.query
     const result = await feeService.getStudentBalance(id, academicYear as string)
@@ -139,9 +228,17 @@ financesRouter.get(
   async (req, res) => {
     const payment = await prisma.payment.findUniqueOrThrow({
       where: { id: String(req.params.id) },
+      include: { invoice: { select: { studentId: true } } },
     })
+    // [R9] Ownership check — a student-role user may only fetch a receipt
+    // for a payment belonging to their own invoice. Prior to this fix, the
+    // role list alone let any student-role user fetch any other student's
+    // receipt by iterating payment IDs.
+    if (req.user!.role === 'student') {
+      await studentService.assertStudentOwnership(req.user!.uid, payment.invoice.studentId)
+    }
     if (!payment.receiptKey) return res.status(404).json({ error: 'Receipt not yet generated' })
-    const url = await getViewUrl('sms-payslips', payment.receiptKey)
+    const url = await getSignedViewUrl(payment.receiptKey)
     res.json({ url })
   }
 )
@@ -168,6 +265,64 @@ financesRouter.post('/expenses', verifyAuth, requireRole(['admin', 'finance']), 
   res.status(201).json(expense)
 })
 
+// [R9] Maps each ExpenseCategory to the chart-of-accounts expense code
+// accountingService.seedChartOfAccounts() seeds. LIBRARY and TRANSPORT
+// have no dedicated seeded account — mapped to 5900 Miscellaneous Expense
+// rather than adding new accounts, since this phase makes no change to
+// accountingService.ts's own ledger logic (the seeded chart is untouched).
+const EXPENSE_CATEGORY_ACCOUNT: Record<string, string> = {
+  SALARIES: '5000',
+  UTILITIES: '5100',
+  MAINTENANCE: '5200',
+  PROCUREMENT: '5300',
+  LIBRARY: '5900',
+  TRANSPORT: '5900',
+  MISCELLANEOUS: '5900',
+}
+
+// [R9] Receipt upload — an Appwrite file ID stored on Expense.receiptKey,
+// matching the field this session's schema.prisma comment fix corrects
+// from a stale "R2 object key" reference. Mirrors assignments.ts's
+// confirmed POST /:id/submit multer + uploadFile() pattern.
+financesRouter.post(
+  '/expenses/:id/receipt',
+  verifyAuth,
+  requireRole(['admin', 'finance']),
+  upload.single('file'),
+  async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
+    const uploaded = await uploadFile(
+      FILE_PREFIX.EXPENSE_RECEIPT,
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype
+    )
+    const expense = await prisma.expense.update({
+      where: { id: String(req.params.id) },
+      data: { receiptKey: uploaded.fileId },
+    })
+    res.status(201).json({ receiptKey: expense.receiptKey })
+  }
+)
+
+// [R9] Receipt view — mirrors GET /payments/:id/receipt's signed-proxy-URL
+// pattern; expense receipts are staff-only (no student ownership concept
+// applies here), matching READ_ROLES['expense_receipt'] = ['admin','finance'].
+financesRouter.get(
+  '/expenses/:id/receipt',
+  verifyAuth,
+  requireRole(['admin', 'finance']),
+  async (req, res) => {
+    const expense = await prisma.expense.findUniqueOrThrow({
+      where: { id: String(req.params.id) },
+      select: { receiptKey: true },
+    })
+    if (!expense.receiptKey) return res.status(404).json({ error: 'Receipt not yet uploaded' })
+    const url = await getSignedViewUrl(expense.receiptKey)
+    res.json({ url })
+  }
+)
+
 financesRouter.patch(
   '/expenses/:id/approve',
   verifyAuth,
@@ -178,13 +333,60 @@ financesRouter.patch(
       data: { status: 'APPROVED', approvedByUid: req.user!.uid, approvedAt: new Date() },
     })
     await budgetService.updateBudgetSpent(expense.category, expense.academicYear, Number(expense.amount))
+    // [R9] Reconnect approved expenses to the double-entry ledger — Phase
+    // 4B confirmed no money-movement operation reached accountingService
+    // before this session (not just payments). A posting failure is
+    // logged for reconciliation rather than reverting the already-applied
+    // approval, matching feeService.recordPayment()'s identical pattern.
+    try {
+      const accountCode = EXPENSE_CATEGORY_ACCOUNT[expense.category] ?? '5900'
+      const entryId = await accountingService.createJournalEntry({
+        reference: `EXP-${expense.id.slice(-8).toUpperCase()}`,
+        description: `Expense approved — ${expense.description} (${expense.category})`,
+        entryDate: new Date(),
+        actorUid: req.user!.uid,
+        lines: [
+          { accountCode, debit: Number(expense.amount), description: expense.description },
+          { accountCode: '1000', credit: Number(expense.amount), description: 'Cash paid for expense' },
+        ],
+      })
+      await accountingService.postEntry(entryId, req.user!.uid)
+    } catch (err) {
+      logger.error({ event: 'accounting.expense_posting_failed', expenseId: expense.id, err })
+    }
+    res.json(expense)
+  }
+)
+
+// [R9] NEW — expense rejection, the workflow's second outcome. Gated on
+// the now-real finance.rejectExpense permission (previously granted to
+// zero roles) rather than requireRole, since this is new surface with no
+// legacy convention to preserve — see S/types/permissions.ts's header
+// comment for why high_rank is the exact mirror of finance.approveExpense.
+// No ledger posting — only an APPROVED expense reaches accountingService.
+financesRouter.patch(
+  '/expenses/:id/reject',
+  verifyAuth,
+  requirePermission('finance.rejectExpense'),
+  async (req, res) => {
+    const expense = await prisma.expense.update({
+      where: { id: String(req.params.id) },
+      data: { status: 'REJECTED' },
+    })
     res.json(expense)
   }
 )
 
 // ── SCHOLARSHIPS
 financesRouter.get('/scholarships', verifyAuth, requireRole([...FINANCE_ROLES]), async (_req, res) => {
-  res.json(await prisma.scholarship.findMany({ orderBy: { createdAt: 'desc' } }))
+  res.json(
+    await prisma.scholarship.findMany({
+      orderBy: { createdAt: 'desc' },
+      // [R9] Joined student name — ScholarshipTab.tsx no longer shows a
+      // raw truncated studentId.
+      include: { student: { select: { firstName: true, lastName: true } } },
+    })
+  )
 })
 
 financesRouter.post('/scholarships', verifyAuth, requireRole(['admin', 'finance']), async (req, res) => {
@@ -206,21 +408,87 @@ financesRouter.get('/budget', verifyAuth, requireRole([...FINANCE_ROLES, 'high_r
   res.json(data)
 })
 
+// ── ACCOUNTING LEDGER
+// [R9] NEW — AccountingLedgerTab.tsx (Phase D6, confirmed already
+// correctly built) has always called these three paths, and
+// accountingService.getIncomeStatement()/getTrialBalance()/
+// getAccountLedger() have always been correct — but no route ever backed
+// any of the three, and the component's own import (`apiClient` — no such
+// export exists in api-client.ts, only `apiFetch`) was independently
+// build-breaking. Both gaps are hotfixed here: this phase's own headline
+// acceptance criterion ("a tuition payment produces a posting visible in
+// AccountingLedgerTab.tsx... within the same request cycle") is otherwise
+// unsatisfiable no matter how correct the write-side reconnection is.
+financesRouter.get(
+  '/accounting/income-statement',
+  verifyAuth,
+  requireRole([...FINANCE_ROLES]),
+  async (req, res) => {
+    const { from, to } = req.query as { from?: string; to?: string }
+    if (!from || !to) return res.status(400).json({ error: 'from and to are required' })
+    const statement = await accountingService.getIncomeStatement(new Date(from), new Date(to))
+    res.json(statement)
+  }
+)
+
+financesRouter.get(
+  '/accounting/trial-balance',
+  verifyAuth,
+  requireRole([...FINANCE_ROLES]),
+  async (_req, res) => {
+    res.json(await accountingService.getTrialBalance())
+  }
+)
+
+financesRouter.get(
+  '/accounting/ledger/:code',
+  verifyAuth,
+  requireRole([...FINANCE_ROLES]),
+  async (req, res) => {
+    const { from, to } = req.query as { from?: string; to?: string }
+    const lines = await accountingService.getAccountLedger(
+      String(req.params.code),
+      from ? new Date(from) : undefined,
+      to ? new Date(to) : undefined
+    )
+    res.json(lines)
+  }
+)
+
+// ── FORECAST
+// [R10] NEW — ForecastPanel.tsx has been calling this exact path since
+// its own phase with no matching route anywhere in the Express app.
+financesRouter.get(
+  '/forecast',
+  verifyAuth,
+  requireRole([...FINANCE_ROLES]),
+  async (req, res) => {
+    const { academicYear = '2025/2026', forwardMonths } = req.query as {
+      academicYear?: string
+      forwardMonths?: string
+    }
+    const report = await forecastService.getCashFlowForecast(
+      academicYear,
+      forwardMonths ? Number(forwardMonths) : undefined
+    )
+    res.json(report)
+  }
+)
+
 // ── INSTALLMENTS
 financesRouter.post(
   '/invoices/:id/installments',
   verifyAuth,
   requireRole(['admin', 'finance']),
   async (req, res) => {
-    const { frequency, count, startDate } = req.body as {
-      frequency: 'MONTHLY' | 'TERM_WISE'
-      count: number
-      startDate: string
-    }
-    if (!frequency || !count || !startDate)
-      return res.status(400).json({ error: 'frequency, count, and startDate are required' })
+    const parsed = CreateInstallmentPlanSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     const planId = await installmentService.createInstallmentPlan(
-      String(req.params.id), frequency, Number(count), new Date(startDate), req.user!.uid
+      String(req.params.id),
+      parsed.data.frequency,
+      parsed.data.count,
+      new Date(parsed.data.startDate),
+      req.user!.uid,
     )
     res.status(201).json({ planId })
   }
@@ -231,7 +499,16 @@ financesRouter.get(
   verifyAuth,
   requireRole(['admin', 'finance', 'student']),
   async (req, res) => {
-    const plan = await installmentService.getInstallmentPlan(String(req.params.id))
+    const invoiceId = String(req.params.id)
+    // [R9] Ownership check — same pattern as GET /payments/:id/receipt.
+    if (req.user!.role === 'student') {
+      const invoice = await prisma.invoice.findUniqueOrThrow({
+        where: { id: invoiceId },
+        select: { studentId: true },
+      })
+      await studentService.assertStudentOwnership(req.user!.uid, invoice.studentId)
+    }
+    const plan = await installmentService.getInstallmentPlan(invoiceId)
     if (!plan) return res.status(404).json({ error: 'No installment plan for this invoice' })
     res.json(plan)
   }
@@ -247,7 +524,24 @@ financesRouter.get(
       where: { invoiceId: String(req.params.id) },
       orderBy: { createdAt: 'desc' },
     })
-    res.json(notes)
+    // [R9] Joined author name — authorUid is a Firebase UID plain string
+    // (no Prisma relation exists for it, per this schema's convention of
+    // unenforced-string references to a person's Firebase identity), so
+    // resolving a display name is a manual StaffProfile lookup rather than
+    // a Prisma `include`. InvoiceNotes.tsx no longer shows a raw
+    // truncated authorUid.
+    const authorUids = [...new Set(notes.map((n) => n.authorUid))]
+    const authors = await prisma.staffProfile.findMany({
+      where: { uid: { in: authorUids } },
+      select: { uid: true, firstName: true, lastName: true },
+    })
+    const authorByUid = new Map(authors.map((a) => [a.uid, a]))
+    res.json(
+      notes.map((note) => ({
+        ...note,
+        author: authorByUid.get(note.authorUid) ?? undefined,
+      }))
+    )
   }
 )
 
@@ -265,11 +559,41 @@ financesRouter.post(
   }
 )
 
+// ── POST /finances/invoices/bulk-generate (admin | finance) ──────────────────
+financesRouter.post(
+  '/invoices/bulk-generate',
+  verifyAuth,
+  requireRole(['admin', 'finance']),
+  async (req, res) => {
+    const { classId = 'ALL', academicYear, term } = req.body as {
+      classId?: string
+      academicYear: string
+      term: number
+    }
+
+    if (!academicYear || !term) {
+      return res.status(400).json({ error: 'academicYear and term are required' })
+    }
+
+    const result = await bulkGenerateInvoices(
+      classId,
+      academicYear,
+      Number(term),
+      req.user!.uid,
+    )
+    return res.status(201).json(result)
+  },
+)
+
 // ── LIBRARY FINES
+// [R10] Prisma is now the sole system of record for library fines — see
+// header comment for the full rationale (POST never created the
+// Firestore document its siblings assumed existed; consistent with R6's
+// identical Attendance system-of-record decision).
 financesRouter.get(
   '/library-fines',
   verifyAuth,
-  requireRole(['admin', 'finance', 'library']),
+  requireRole(['high_rank', 'finance', 'library']),
   async (req, res) => {
     const { status = 'PENDING' } = req.query
     // Cast to FineStatus enum directly — avoids exactOptionalPropertyTypes violation
@@ -277,7 +601,31 @@ financesRouter.get(
       status: String(status) as FineStatus,
     }
     const fines = await prisma.libraryFine.findMany({ where, orderBy: { createdAt: 'desc' } })
-    res.json(fines)
+    // [R10] Joined student name — LibraryFine has no Prisma relation to
+    // Student (studentId is a plain string, no @relation), so this is a
+    // manual lookup, the same pattern established for invoice-note
+    // authors in R9. LibraryFinesTab.tsx previously showed no student
+    // identification at all (studentId existed on the interface but was
+    // never rendered in any form).
+    // [R12] studentId is now nullable — a staff-borrower fine (this
+    // phase) has none — so null is filtered out before the lookup.
+    const studentIds = [...new Set(fines.map((f) => f.studentId).filter((id): id is string => id !== null))]
+    const students = await prisma.student.findMany({
+      where:  { id: { in: studentIds } },
+      select: { id: true, firstName: true, lastName: true },
+    })
+    const studentById = new Map(students.map((s) => [s.id, s]))
+    res.json(
+      fines.map((fine) => ({
+        ...fine,
+        student: fine.studentId && studentById.get(fine.studentId)
+          ? {
+              firstName: studentById.get(fine.studentId)!.firstName,
+              lastName:  studentById.get(fine.studentId)!.lastName,
+            }
+          : undefined,
+      }))
+    )
   }
 )
 
@@ -286,15 +634,10 @@ financesRouter.post(
   verifyAuth,
   requireRole(['admin', 'library']),
   async (req, res) => {
-    const { studentId, bookTitle, amount, reason, firestoreDocId } = req.body as {
-      studentId: string
-      bookTitle: string
-      amount: number
-      reason: string
-      firestoreDocId: string
-    }
+    const parsed = CreateLibraryFineSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     const fine = await prisma.libraryFine.create({
-      data: { studentId, bookTitle, amount, reason, firestoreDocId, markedByUid: req.user!.uid },
+      data: { ...parsed.data, markedByUid: req.user!.uid },
     })
     res.status(201).json(fine)
   }
@@ -303,16 +646,33 @@ financesRouter.post(
 financesRouter.patch(
   '/library-fines/:id/pay',
   verifyAuth,
-  requireRole(['admin', 'finance']),
+  requireRole(['finance', 'library']),
   async (req, res) => {
     const fine = await prisma.libraryFine.update({
       where: { id: String(req.params.id) },
       data: { status: 'PAID', paidAt: new Date(), clearedByUid: req.user!.uid },
     })
-    await getFirestore().collection('library_fines').doc(fine.firestoreDocId).update({
-      finePaid: true,
-      fineClearedAt: new Date().toISOString(),
-    })
+    // [R10] Reconnect library fine payments to the double-entry ledger —
+    // the third revenue category (after tuition/R9 and payroll/this same
+    // phase) the chart of accounts anticipated (4300 Library Fine
+    // Revenue) but nothing ever posted to. A posting failure is logged
+    // for reconciliation rather than reverting the already-recorded
+    // payment, matching the identical pattern established in R9.
+    try {
+      const entryId = await accountingService.createJournalEntry({
+        reference:   `LIB-${fine.id.slice(-8).toUpperCase()}`,
+        description: `Library fine paid — ${fine.bookTitle} (${fine.reason})`,
+        entryDate:   new Date(),
+        actorUid:    req.user!.uid,
+        lines: [
+          { accountCode: '1000', debit: Number(fine.amount), description: 'Cash received' },
+          { accountCode: '4300', credit: Number(fine.amount), description: 'Library fine revenue' },
+        ],
+      })
+      await accountingService.postEntry(entryId, req.user!.uid)
+    } catch (err) {
+      logger.error({ event: 'accounting.library_fine_posting_failed', fineId: fine.id, err })
+    }
     res.json(fine)
   }
 )
@@ -320,14 +680,11 @@ financesRouter.patch(
 financesRouter.patch(
   '/library-fines/:id/waive',
   verifyAuth,
-  requireRole(['admin', 'high_rank']),
+  requireRole(['library']),
   async (req, res) => {
     const fine = await prisma.libraryFine.update({
       where: { id: String(req.params.id) },
-      data: { status: 'WAIVED', clearedByUid: req.user!.uid },
-    })
-    await getFirestore().collection('library_fines').doc(fine.firestoreDocId).update({
-      fineWaived: true,
+      data: { status: 'WAIVED', waivedAt: new Date(), waivedByUid: req.user!.uid, clearedByUid: req.user!.uid },
     })
     res.json(fine)
   }
