@@ -379,13 +379,24 @@ financesRouter.patch(
 
 // ── SCHOLARSHIPS
 financesRouter.get('/scholarships', verifyAuth, requireRole([...FINANCE_ROLES]), async (_req, res) => {
+  const scholarships = await prisma.scholarship.findMany({ orderBy: { createdAt: 'desc' } })
+  // [R9] Joined student name — Scholarship.studentId has no Prisma
+  // @relation (same gap as LibraryFine.studentId), so this is the same
+  // manual-lookup pattern used for library fines and invoice-note
+  // authors, not a Prisma `include`. Unlike LibraryFine.studentId,
+  // Scholarship.studentId is non-nullable, so no null-filter is needed
+  // here. ScholarshipTab.tsx no longer shows a raw truncated studentId.
+  const studentIds = [...new Set(scholarships.map((s) => s.studentId))]
+  const students = await prisma.student.findMany({
+    where: { id: { in: studentIds } },
+    select: { id: true, firstName: true, lastName: true },
+  })
+  const studentById = new Map(students.map((s) => [s.id, s]))
   res.json(
-    await prisma.scholarship.findMany({
-      orderBy: { createdAt: 'desc' },
-      // [R9] Joined student name — ScholarshipTab.tsx no longer shows a
-      // raw truncated studentId.
-      include: { student: { select: { firstName: true, lastName: true } } },
-    })
+    scholarships.map((s) => ({
+      ...s,
+      student: studentById.get(s.studentId) ?? undefined,
+    }))
   )
 })
 

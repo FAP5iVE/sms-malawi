@@ -80,7 +80,7 @@ import 'server-only'
  */
 
 import express, { type Request, type Response, type NextFunction } from 'express'
-import * as Sentry from '@sentry/node'
+import * as Sentry from '@sentry/nextjs'
 import helmet from 'helmet'
 
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
