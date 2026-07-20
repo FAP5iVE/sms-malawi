@@ -30,11 +30,23 @@
  *   userUid comparison expects.
  * [DEPENDS ON]: apps/web/prisma/schema.prisma (Payslip, TermResult,
  *   Student — unchanged, read directly from source this phase)
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (post-R19 production build fix)
+ * [PURPOSE]: Vercel production build failed TypeScript checking —
+ *   GET's second parameter was still typed as the pre-Next.js-15 synchronous
+ *   `{ params: { fileId: string } }` shape. Next.js 16 dynamic route
+ *   handlers require `params` to be a `Promise` that's awaited before use
+ *   (matches `RouteHandlerConfig`'s generated constraint). Fixed to
+ *   `{ params: Promise<{ fileId: string }> }` and `await params` before
+ *   reading `fileId`. Confirmed the only route handler in the app with a
+ *   dynamic segment using this old shape (`api/[[...slug]]/route.ts`
+ *   doesn't destructure `params` at all; the two dynamic `page.tsx` files
+ *   read the id client-side via `useParams()`, unaffected).
  */
 import { type NextRequest, NextResponse } from 'next/server'
-import { getIdTokenFromRequest }          from '@/lib/verifyAuth'
-import { canReadFile, streamFile }        from '@/lib/storage'
-import { prisma }                         from '@/lib/prisma'
+import { getIdTokenFromRequest } from '@/lib/verifyAuth'
+import { canReadFile, streamFile } from '@/lib/storage'
+import { prisma } from '@/lib/prisma'
 
 /**
  * F3 — Secure file proxy route.
@@ -45,7 +57,7 @@ import { prisma }                         from '@/lib/prisma'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { fileId: string } },
+  { params }: { params: Promise<{ fileId: string }> }
 ): Promise<NextResponse> {
   // ── 1. Verify Firebase ID token ───────────────────────────────────────────
   const decoded = await getIdTokenFromRequest(request)
@@ -53,9 +65,10 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
-  const fileId  = decodeURIComponent(params.fileId)
-  const uid     = decoded.uid
-  const role    = (decoded.role as string | undefined) ?? 'student'
+  const { fileId: rawFileId } = await params
+  const fileId = decodeURIComponent(rawFileId)
+  const uid = decoded.uid
+  const role = (decoded.role as string | undefined) ?? 'student'
 
   // ── 2. Resolve file owner for __self checks ───────────────────────────────
   // For payslips and personal docs we look up the ownerUid stored in the db.
@@ -63,7 +76,7 @@ export async function GET(
   try {
     if (fileId.startsWith('payslip_')) {
       const slip = await prisma.payslip.findFirst({
-        where:  { payslipKey: fileId },
+        where: { payslipKey: fileId },
         select: { staffUid: true },
       })
       ownerUid = slip?.staffUid ?? undefined
@@ -72,19 +85,19 @@ export async function GET(
       // (sms-erp-schema Rule 2's established convention) — resolve in
       // two steps rather than a nested include.
       const tr = await prisma.termResult.findFirst({
-        where:  { reportCardKey: fileId },
+        where: { reportCardKey: fileId },
         select: { studentId: true },
       })
       if (tr) {
         const student = await prisma.student.findUnique({
-          where:  { id: tr.studentId },
+          where: { id: tr.studentId },
           select: { firebaseUid: true },
         })
         ownerUid = student?.firebaseUid ?? undefined
       }
     } else if (fileId.startsWith('transcript_')) {
       const student = await prisma.student.findFirst({
-        where:  { transcriptKey: fileId },
+        where: { transcriptKey: fileId },
         select: { firebaseUid: true },
       })
       ownerUid = student?.firebaseUid ?? undefined
@@ -104,9 +117,9 @@ export async function GET(
     return new NextResponse(buffer as BodyInit, {
       status: 200,
       headers: {
-        'Content-Type':        mimeType,
+        'Content-Type': mimeType,
         'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
-        'Cache-Control':       'private, max-age=3600, must-revalidate',
+        'Cache-Control': 'private, max-age=3600, must-revalidate',
         'X-Content-Type-Options': 'nosniff',
       },
     })
