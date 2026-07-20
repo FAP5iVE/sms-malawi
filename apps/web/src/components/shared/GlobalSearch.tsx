@@ -104,8 +104,11 @@ function BookResult({ hit, onSelect }: { hit: BookHit; onSelect: () => void }) {
 
 function ResultsDropdown({ results, onSelect }: { results: SearchResults; onSelect: () => void }) {
   const motionEnabled = useMotionEnabled()
-  const variants      = motionEnabled ? FADE_DOWN_VARIANTS : reducedMotionVariants
-  const transition    = motionEnabled ? { ...SPRING, duration: 0.18 } : reducedMotionTransition
+  // Post-R19 production fix: reducedMotionVariants/reducedMotionTransition must be
+  // CALLED (they branch on motionEnabled internally), never assigned as a bare
+  // function reference — that shape doesn't satisfy motion.div's Variants prop type.
+  const variants      = reducedMotionVariants(motionEnabled, FADE_DOWN_VARIANTS)
+  const transition    = reducedMotionTransition(motionEnabled, { ...SPRING, duration: 0.18 })
 
   const empty = !hasResults(results)
 
