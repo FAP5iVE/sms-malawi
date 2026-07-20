@@ -1,10 +1,39 @@
 import 'server-only'
-import { algoliasearch } from 'algoliasearch'
+import { algoliasearch, type Algoliasearch } from 'algoliasearch'
+import { logger } from '@/lib/logger'
 
-const APP_ID     = process.env.ALGOLIA_APP_ID      ?? ''
-const ADMIN_KEY  = process.env.ALGOLIA_ADMIN_KEY   ?? ''
+// ─────────────────────────────────────────────────────────
+//  CLIENT INITIALISATION
+//  Lazy singleton — mirrors lib/email.ts's getResendClient() pattern.
+//  The Algolia v5 SDK's algoliasearch() factory throws synchronously
+//  ("`appId` is missing.") when constructed with an empty appId. Building
+//  the client eagerly at module scope meant this module — pulled in
+//  transitively by api-app.ts via search.ts/algoliaAdmin.ts/studentService.ts/
+//  hrService.ts/libraryService.ts — crashed Next.js's build-time "Collecting
+//  page data" step for the /api/[[...slug]] catch-all route whenever
+//  ALGOLIA_APP_ID/ALGOLIA_ADMIN_KEY weren't present in the build environment.
+//  Deferring construction to first real use (request time, when env vars are
+//  actually populated) avoids the build-time crash; every call site below
+//  already degrades gracefully to fallbackSearch() when Algolia is
+//  unavailable, so returning null here rather than throwing is consistent
+//  with this file's own existing error-handling design.
+// ─────────────────────────────────────────────────────────
 
-const adminClient = algoliasearch(APP_ID, ADMIN_KEY)
+let _adminClient: Algoliasearch | null = null
+
+function getAlgoliaAdminClient(): Algoliasearch | null {
+  if (_adminClient) return _adminClient
+  const appId    = process.env.ALGOLIA_APP_ID
+  const adminKey = process.env.ALGOLIA_ADMIN_KEY
+  if (!appId || !adminKey) {
+    if (process.env.NODE_ENV === 'production') {
+      logger.error('[algoliaService] ALGOLIA_APP_ID/ALGOLIA_ADMIN_KEY not set — search indexing is disabled, fallbackSearch() will be used')
+    }
+    return null
+  }
+  _adminClient = algoliasearch(appId, adminKey)
+  return _adminClient
+}
 
 export const STUDENTS_INDEX  = 'students'
 export const STAFF_INDEX     = 'staff_profiles'
@@ -27,16 +56,20 @@ export interface AlgoliaStudent {
 }
 
 export async function indexStudent(record: AlgoliaStudent): Promise<void> {
+  const client = getAlgoliaAdminClient()
+  if (!client) return
   try {
-    await adminClient.saveObject({ indexName: STUDENTS_INDEX, body: record })
+    await client.saveObject({ indexName: STUDENTS_INDEX, body: record })
   } catch (err) {
     console.error('[algoliaService] indexStudent failed', err)
   }
 }
 
 export async function updateStudent(record: Partial<AlgoliaStudent> & { objectID: string }): Promise<void> {
+  const client = getAlgoliaAdminClient()
+  if (!client) return
   try {
-    await adminClient.partialUpdateObject({
+    await client.partialUpdateObject({
       indexName:  STUDENTS_INDEX,
       objectID:   record.objectID,
       attributesToUpdate: record,
@@ -47,8 +80,10 @@ export async function updateStudent(record: Partial<AlgoliaStudent> & { objectID
 }
 
 export async function deleteStudent(studentId: string): Promise<void> {
+  const client = getAlgoliaAdminClient()
+  if (!client) return
   try {
-    await adminClient.deleteObject({ indexName: STUDENTS_INDEX, objectID: studentId })
+    await client.deleteObject({ indexName: STUDENTS_INDEX, objectID: studentId })
   } catch (err) {
     console.error('[algoliaService] deleteStudent failed', err)
   }
@@ -69,16 +104,20 @@ export interface AlgoliaStaff {
 }
 
 export async function indexStaff(record: AlgoliaStaff): Promise<void> {
+  const client = getAlgoliaAdminClient()
+  if (!client) return
   try {
-    await adminClient.saveObject({ indexName: STAFF_INDEX, body: record })
+    await client.saveObject({ indexName: STAFF_INDEX, body: record })
   } catch (err) {
     console.error('[algoliaService] indexStaff failed', err)
   }
 }
 
 export async function updateStaff(record: Partial<AlgoliaStaff> & { objectID: string }): Promise<void> {
+  const client = getAlgoliaAdminClient()
+  if (!client) return
   try {
-    await adminClient.partialUpdateObject({
+    await client.partialUpdateObject({
       indexName:  STAFF_INDEX,
       objectID:   record.objectID,
       attributesToUpdate: record,
@@ -89,8 +128,10 @@ export async function updateStaff(record: Partial<AlgoliaStaff> & { objectID: st
 }
 
 export async function deleteStaff(staffId: string): Promise<void> {
+  const client = getAlgoliaAdminClient()
+  if (!client) return
   try {
-    await adminClient.deleteObject({ indexName: STAFF_INDEX, objectID: staffId })
+    await client.deleteObject({ indexName: STAFF_INDEX, objectID: staffId })
   } catch (err) {
     console.error('[algoliaService] deleteStaff failed', err)
   }
@@ -109,16 +150,20 @@ export interface AlgoliaBook {
 }
 
 export async function indexBook(record: AlgoliaBook): Promise<void> {
+  const client = getAlgoliaAdminClient()
+  if (!client) return
   try {
-    await adminClient.saveObject({ indexName: BOOKS_INDEX, body: record })
+    await client.saveObject({ indexName: BOOKS_INDEX, body: record })
   } catch (err) {
     console.error('[algoliaService] indexBook failed', err)
   }
 }
 
 export async function updateBook(record: Partial<AlgoliaBook> & { objectID: string }): Promise<void> {
+  const client = getAlgoliaAdminClient()
+  if (!client) return
   try {
-    await adminClient.partialUpdateObject({
+    await client.partialUpdateObject({
       indexName:  BOOKS_INDEX,
       objectID:   record.objectID,
       attributesToUpdate: record,
@@ -129,8 +174,10 @@ export async function updateBook(record: Partial<AlgoliaBook> & { objectID: stri
 }
 
 export async function deleteBook(bookId: string): Promise<void> {
+  const client = getAlgoliaAdminClient()
+  if (!client) return
   try {
-    await adminClient.deleteObject({ indexName: BOOKS_INDEX, objectID: bookId })
+    await client.deleteObject({ indexName: BOOKS_INDEX, objectID: bookId })
   } catch (err) {
     console.error('[algoliaService] deleteBook failed', err)
   }
@@ -141,6 +188,8 @@ export async function deleteBook(bookId: string): Promise<void> {
 
 export async function bulkIndexStudents(records: AlgoliaStudent[]): Promise<void> {
   if (records.length === 0) return
+  const client = getAlgoliaAdminClient()
+  if (!client) return
   try {
     // AlgoliaStudent (and AlgoliaStaff / AlgoliaBook below) is a plain,
     // JSON-serializable interface — string/number/null fields only, no
@@ -149,7 +198,7 @@ export async function bulkIndexStudents(records: AlgoliaStudent[]): Promise<void
     // named-property interface never structurally satisfies regardless of
     // its field types — a nominal-typing gap in the SDK's own types, not a
     // real safety concern here, so the cast below is safe.
-    await adminClient.saveObjects({ indexName: STUDENTS_INDEX, objects: records as unknown as Record<string, unknown>[] })
+    await client.saveObjects({ indexName: STUDENTS_INDEX, objects: records as unknown as Record<string, unknown>[] })
   } catch (err) {
     console.error('[algoliaService] bulkIndexStudents failed', err)
   }
@@ -157,9 +206,11 @@ export async function bulkIndexStudents(records: AlgoliaStudent[]): Promise<void
 
 export async function bulkIndexStaff(records: AlgoliaStaff[]): Promise<void> {
   if (records.length === 0) return
+  const client = getAlgoliaAdminClient()
+  if (!client) return
   try {
     // See the comment on bulkIndexStudents above — same nominal-typing gap.
-    await adminClient.saveObjects({ indexName: STAFF_INDEX, objects: records as unknown as Record<string, unknown>[] })
+    await client.saveObjects({ indexName: STAFF_INDEX, objects: records as unknown as Record<string, unknown>[] })
   } catch (err) {
     console.error('[algoliaService] bulkIndexStaff failed', err)
   }
@@ -167,9 +218,11 @@ export async function bulkIndexStaff(records: AlgoliaStaff[]): Promise<void> {
 
 export async function bulkIndexBooks(records: AlgoliaBook[]): Promise<void> {
   if (records.length === 0) return
+  const client = getAlgoliaAdminClient()
+  if (!client) return
   try {
     // See the comment on bulkIndexStudents above — same nominal-typing gap.
-    await adminClient.saveObjects({ indexName: BOOKS_INDEX, objects: records as unknown as Record<string, unknown>[] })
+    await client.saveObjects({ indexName: BOOKS_INDEX, objects: records as unknown as Record<string, unknown>[] })
   } catch (err) {
     console.error('[algoliaService] bulkIndexBooks failed', err)
   }
