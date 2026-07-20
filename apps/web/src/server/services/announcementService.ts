@@ -59,7 +59,7 @@ import { deriveAudience } from '@shared/schemas/announcement'
 import { COLLECTIONS } from '@shared/constants/storage'
 import { STAFF_ROLES } from '@shared/types/roles'
 
-const db = getFirestore()
+import { getAdminApp } from '@/lib/verifyAuth'
 
 export type AnnouncementStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'SCHEDULED'
 
@@ -191,7 +191,7 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
       ? 'SCHEDULED'
       : 'PUBLISHED'
 
-  const ref = db.collection(COLLECTIONS.ANNOUNCEMENTS).doc()
+  const ref = getFirestore(getAdminApp()).collection(COLLECTIONS.ANNOUNCEMENTS).doc()
   await ref.set({
     title: data.title,
     body: data.body,
@@ -224,6 +224,7 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
 
 /** Approve a PENDING_APPROVAL announcement and publish it. */
 export async function publishAnnouncement(id: string, approvedByUid: string) {
+  const db = getFirestore(getAdminApp())
   const snap = await db.collection(COLLECTIONS.ANNOUNCEMENTS).doc(id).get()
   if (!snap.exists) {
     throw Object.assign(new Error('Announcement not found.'), { status: 404 })
@@ -261,7 +262,7 @@ export async function listAnnouncements(options?: {
 }) {
   const pageSize = Math.min(options?.pageSize ?? 25, 100)
 
-  let query: Query<DocumentData> = db
+  let query: Query<DocumentData> = getFirestore(getAdminApp())
     .collection(COLLECTIONS.ANNOUNCEMENTS)
     .orderBy('createdAt', 'desc')
 
