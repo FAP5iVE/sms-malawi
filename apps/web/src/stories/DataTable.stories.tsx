@@ -1,4 +1,4 @@
-import type { Meta, StoryObj }  from '@storybook/react'
+import type { Meta, StoryObj }  from '@storybook/nextjs-vite'
 import { DataTable }            from '@/components/shared/DataTable'
 import type { DataColumn }      from '@/components/shared/DataTable'
 

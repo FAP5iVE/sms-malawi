@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react'
+import type { Meta, StoryObj } from '@storybook/nextjs-vite'
 import { GlobalSearch }        from '@/components/shared/GlobalSearch'
 
 const meta: Meta<typeof GlobalSearch> = {

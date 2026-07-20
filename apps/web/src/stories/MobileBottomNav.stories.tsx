@@ -1,4 +1,4 @@
-import type { Meta, StoryObj, Decorator } from '@storybook/react'
+import type { Meta, StoryObj, Decorator } from '@storybook/nextjs-vite'
 import type { UserRole } from '@shared/types/roles'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { useAuthStore }    from '@/store/authStore'

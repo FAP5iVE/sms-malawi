@@ -1,4 +1,4 @@
-import type { Meta, StoryObj }  from '@storybook/react'
+import type { Meta, StoryObj }  from '@storybook/nextjs-vite'
 import { Users, AlertTriangle, BookOpen, GraduationCap } from 'lucide-react'
 import { StatCard }             from '@/components/shared/StatCard'
 
