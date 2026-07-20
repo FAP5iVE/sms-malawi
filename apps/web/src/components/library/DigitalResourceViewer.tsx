@@ -92,8 +92,22 @@ export function DigitalResourceViewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resourceId])
 
-  // Initial load
-  useEffect(() => { fetchUrl() }, [fetchUrl])
+  // Initial load. Calls viewResource.mutate(...) directly rather than via
+  // fetchUrl() — fetchUrl's leading setError(null) is a no-op on mount
+  // (error already starts null above) but would otherwise execute
+  // synchronously as part of calling fetchUrl() from this effect's body.
+  // onSuccess/onError are genuine deferred continuations (fired later, when
+  // the mutation settles), so no setState happens synchronously within this
+  // effect at all. fetchUrl itself is unchanged and still used as-is by the
+  // auto-refresh timer below (a setTimeout callback — already correctly
+  // deferred) and the "Try again" button (an event handler).
+  useEffect(() => {
+    viewResource.mutate(resourceId, {
+      onSuccess: (session) => setViewUrl(session.url),
+      onError:   (e) => setError(e instanceof Error ? e.message : 'Unable to load resource'),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resourceId])
 
   // Auto-refresh URL 60 seconds before expiry
   useEffect(() => {

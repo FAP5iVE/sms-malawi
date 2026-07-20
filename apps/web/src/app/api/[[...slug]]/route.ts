@@ -60,10 +60,13 @@ async function handleRequest(req: NextRequest): Promise<NextResponse> {
 
     // Original client, per standard x-forwarded-for chain convention: each
     // proxy hop appends its own address, so the first entry is furthest from
-    // Vercel's edge — the actual requester. Falls back to '127.0.0.1' only
-    // when the header is absent entirely (local dev, no proxy in front).
+    // Vercel's edge — the actual requester. Falls back to '127.0.0.1' when the
+    // header is absent entirely (local dev, no proxy in front) or when its
+    // first entry is empty — the `noUncheckedIndexedAccess` compiler option
+    // types `.split(',')[0]` as `string | undefined`, so the optional chain
+    // plus `||` fallback is required, not just defensive.
     const forwardedFor = req.headers.get('x-forwarded-for')
-    const remoteAddress = forwardedFor ? forwardedFor.split(',')[0].trim() : '127.0.0.1'
+    const remoteAddress = forwardedFor?.split(',')[0]?.trim() || '127.0.0.1'
 
     // Build a minimal mock of Node's IncomingMessage
     const mockReq = {

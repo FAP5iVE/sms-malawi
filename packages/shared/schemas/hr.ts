@@ -14,7 +14,7 @@
  * [DEPENDS ON]: S/types/roles.ts (USER_ROLES)
  */
 import { z } from 'zod'
-import { USER_ROLES } from '@shared/types/roles'
+import { USER_ROLES } from '../types/roles'
 
 export const CreateStaffSchema = z.object({
   uid:            z.string().min(1),

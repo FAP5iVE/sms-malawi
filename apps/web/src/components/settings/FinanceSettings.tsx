@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react'
 import { Loader2, Save }       from 'lucide-react'
-import { apiClient }           from '@/lib/api-client'
+import { apiFetch }            from '@/lib/api-client'
 
 const inputCls = 'w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25'
 
@@ -37,7 +37,7 @@ export function FinanceSettings() {
   const [error,   setError]   = useState<string | null>(null)
 
   useEffect(() => {
-    apiClient<Partial<FinanceConfig>>('/settings/finance')
+    apiFetch<Partial<FinanceConfig>>('/settings/finance')
       .then((d) => setConfig((p) => ({ ...p, ...d })))
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false))
@@ -51,7 +51,7 @@ export function FinanceSettings() {
     e.preventDefault()
     setSaving(true); setError(null); setSaved(false)
     try {
-      await apiClient('/settings/finance', { method: 'PATCH', body: JSON.stringify(config) })
+      await apiFetch('/settings/finance', { method: 'PATCH', body: JSON.stringify(config) })
       setSaved(true); setTimeout(() => setSaved(false), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')

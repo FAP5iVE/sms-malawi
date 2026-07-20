@@ -7,9 +7,9 @@
 
 import { useState, useEffect } from 'react'
 import { Loader2, Save }       from 'lucide-react'
-import { apiClient }           from '@/lib/api-client'
+import { apiFetch }            from '@/lib/api-client'
 
-const inputCls = 'w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25'
+const inputCls = 'w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25'
 
 interface AcademicPolicy {
   term1_start:            string
@@ -43,7 +43,7 @@ export function AcademicPolicySettings() {
   const [error,   setError]   = useState<string | null>(null)
 
   useEffect(() => {
-    apiClient<Partial<AcademicPolicy>>('/settings/academic-policy')
+    apiFetch<Partial<AcademicPolicy>>('/settings/academic-policy')
       .then((data) => setPolicy((prev) => ({ ...prev, ...data })))
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false))
@@ -57,7 +57,7 @@ export function AcademicPolicySettings() {
     e.preventDefault()
     setSaving(true); setError(null); setSaved(false)
     try {
-      await apiClient('/settings/academic-policy', { method: 'PATCH', body: JSON.stringify(policy) })
+      await apiFetch('/settings/academic-policy', { method: 'PATCH', body: JSON.stringify(policy) })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
@@ -153,7 +153,7 @@ export function AcademicPolicySettings() {
 
         <div className="flex items-center gap-3">
           <button type="submit" disabled={saving}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2">
+            className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2">
             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Settings</>}
           </button>
           {saved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}

@@ -5,12 +5,10 @@
  * All roles: update display name, email notification address, and password reset.
  */
 
-import { useState, useEffect } from 'react'
-import { updateProfile }       from 'firebase/auth'
+import { useState } from 'react'
+import { updateProfile, sendPasswordResetEmail, getAuth } from 'firebase/auth'
 import { Loader2, Save, KeyRound } from 'lucide-react'
-import { auth }                from '@/lib/firebase'
 import { useAuthStore }        from '@/store/authStore'
-import { sendPasswordResetEmail } from 'firebase/auth'
 
 export function ProfileSettings() {
   const { user }            = useAuthStore()
@@ -20,18 +18,27 @@ export function ProfileSettings() {
   const [error,       setError]       = useState<string | null>(null)
   const [resetSent,   setResetSent]   = useState(false)
 
-  useEffect(() => {
+  // R19 — render-time adjustment (matches AttendanceSheet.tsx and
+  // MarksEntrySheet.tsx), replacing a useEffect that called setState
+  // synchronously. `user` resolves asynchronously via useAuthStore(); this
+  // re-seeds `displayName` whenever `user`'s reference changes, exactly
+  // mirroring the effect's own `[user]` dependency, without ever calling
+  // setState from inside an effect.
+  const [prevUser, setPrevUser] = useState(user)
+  if (user !== prevUser) {
+    setPrevUser(user)
     if (user?.displayName) setDisplayName(user.displayName)
-  }, [user])
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    if (!auth.currentUser) return
+    const currentUser = getAuth().currentUser
+    if (!currentUser) return
     setSaving(true)
     setError(null)
     setSaved(false)
     try {
-      await updateProfile(auth.currentUser, { displayName: displayName.trim() })
+      await updateProfile(currentUser, { displayName: displayName.trim() })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
@@ -44,7 +51,7 @@ export function ProfileSettings() {
   async function handlePasswordReset() {
     if (!user?.email) return
     try {
-      await sendPasswordResetEmail(auth, user.email)
+      await sendPasswordResetEmail(getAuth(), user.email)
       setResetSent(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send reset email')
@@ -66,7 +73,7 @@ export function ProfileSettings() {
           <input
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            className="w-full max-w-sm min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+            className="w-full max-w-sm min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             placeholder="Your full name"
           />
         </div>
@@ -78,7 +85,7 @@ export function ProfileSettings() {
           <input
             value={user?.email ?? ''}
             readOnly
-            className="w-full max-w-sm min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-muted cursor-not-allowed"
+            className="w-full max-w-sm min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-muted cursor-not-allowed"
           />
           <p className="text-xs text-muted mt-1">Email is managed by your administrator.</p>
         </div>
@@ -91,7 +98,7 @@ export function ProfileSettings() {
           <button
             type="submit"
             disabled={saving}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2"
+            className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2"
           >
             {saving
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
@@ -112,7 +119,7 @@ export function ProfileSettings() {
           <button
             type="button"
             onClick={handlePasswordReset}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold border border-base text-muted hover:bg-page hover:text-body transition-colors flex items-center gap-2"
+            className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold border border-base text-muted hover:bg-page hover:text-body transition-colors flex items-center gap-2"
           >
             <KeyRound className="w-4 h-4" />
             Send Password Reset Email

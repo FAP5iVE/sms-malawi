@@ -40,16 +40,15 @@
  *   component, which the 'search-index' section already rendered.
  */
 
-import { useState, useEffect }  from 'react'
+import { useState, Suspense }   from 'react'
+import { useSearchParams }      from 'next/navigation'
 import {
   User,
   Settings,
-  Shield,
   BookOpen,
   GraduationCap,
   Banknote,
   Library,
-  Users,
   Bell,
   ChevronRight,
   LayoutList,
@@ -180,24 +179,34 @@ function SectionContent({ sectionId }: { sectionId: SectionId }) {
 // SETTINGS PAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function SettingsPage() {
+function SettingsPageInner() {
   const { role }  = useAuthStore()
-  const [active, setActive] = useState<SectionId>('profile')
+  const [manualSection, setManualSection] = useState<SectionId | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const visibleSections = SECTIONS.filter(
     (s) => role && s.roles.includes(role),
   )
 
-  // R15 — initialise the active section from ?section= so the header user
-  // menu (/settings?section=profile) and ExamOfficerDashboard's Exam
-  // Settings quick action (/settings?section=exam-grading) can deep-link.
-  // Runs once per role resolution; only accepts a section this role can see.
-  useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get('section')
-    if (q && visibleSections.some((s) => s.id === q)) setActive(q as SectionId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-validate only when role resolves
-  }, [role])
+  // R19 — the active section is derived during render via Next's
+  // useSearchParams() (the codebase's established pattern — see
+  // (public)/login/page.tsx, (auth)/exams/page.tsx, (auth)/finances/page.tsx,
+  // (auth)/hr/page.tsx, (auth)/library/page.tsx) instead of a useEffect that
+  // read window.location.search and called setActive. `role` — and
+  // therefore `visibleSections` — resolves asynchronously after mount, so
+  // rather than a one-time lazy initializer, `active` is split into a
+  // manual override (set only by an explicit sidebar/mobile-menu click) and
+  // a derived fallback: `?section=` is re-validated against
+  // `visibleSections` on every render, so it still takes effect once role
+  // resolves post-mount, but a manual pick — once made — is never clobbered
+  // by the URL param again, exactly mirroring the old effect's behavior.
+  const searchParams = useSearchParams()
+  const sectionParam = searchParams.get('section')
+  const urlSection: SectionId | null =
+    sectionParam && visibleSections.some((s) => s.id === sectionParam) ? (sectionParam as SectionId) : null
+
+  const active: SectionId = manualSection ?? urlSection ?? 'profile'
+  const setActive = setManualSection
 
   const activeSection = visibleSections.find((s) => s.id === active) ?? visibleSections[0]
 
@@ -243,7 +252,7 @@ export default function SettingsPage() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="w-full flex items-center justify-between gap-3 bg-surface border border-base rounded-xl px-4 py-3 min-h-[44px]"
+            className="w-full flex items-center justify-between gap-3 bg-surface border border-base rounded-xl px-4 py-3 min-h-11"
           >
             <div className="flex items-center gap-3">
               {activeSection && (
@@ -296,5 +305,15 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// `useSearchParams()` requires a Suspense boundary or `next build` fails —
+// same convention as (public)/login/page.tsx and (auth)/exams/page.tsx.
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsPageInner />
+    </Suspense>
   )
 }

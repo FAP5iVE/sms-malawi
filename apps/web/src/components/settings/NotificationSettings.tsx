@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react'
 import { Loader2, Save, Bell }  from 'lucide-react'
 import { useAuthStore }         from '@/store/authStore'
-import { apiClient }            from '@/lib/api-client'
+import { apiFetch }            from '@/lib/api-client'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NOTIFICATION CATEGORIES BY ROLE GROUP
@@ -124,7 +124,7 @@ export function NotificationSettings() {
 
   useEffect(() => {
     if (!user?.uid) return
-    apiClient<Record<string, boolean>>(`/settings/notifications`)
+    apiFetch<Record<string, boolean>>(`/settings/notifications`)
       .then((d) => setPrefs((p) => ({ ...p, ...d })))
       .catch(() => {/* use defaults */})
       .finally(() => setLoading(false))
@@ -137,7 +137,7 @@ export function NotificationSettings() {
   async function handleSave() {
     setSaving(true); setError(null); setSaved(false)
     try {
-      await apiClient('/settings/notifications', { method: 'PATCH', body: JSON.stringify(prefs) })
+      await apiFetch('/settings/notifications', { method: 'PATCH', body: JSON.stringify(prefs) })
       setSaved(true); setTimeout(() => setSaved(false), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')

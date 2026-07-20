@@ -30,56 +30,65 @@
  */
 'use client'
 import { useCallback, useMemo, useRef, useState } from 'react'
-import FullCalendar                         from '@fullcalendar/react'
-import type { EventClickArg, DatesSetArg }  from '@fullcalendar/core'
-import dayGridPlugin                        from '@fullcalendar/daygrid'
-import timeGridPlugin                       from '@fullcalendar/timegrid'
-import listPlugin                           from '@fullcalendar/list'
-import interactionPlugin                    from '@fullcalendar/interaction'
-import { AnimatePresence, motion }          from 'framer-motion'
+import FullCalendar from '@fullcalendar/react'
+import type { EventClickArg, DatesSetArg } from '@fullcalendar/core'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import listPlugin from '@fullcalendar/list'
+import interactionPlugin from '@fullcalendar/interaction'
+import { AnimatePresence, motion } from 'framer-motion'
 import { X, Calendar, Clock, MapPin, Tag, PlusCircle, Trash2, Loader2 } from 'lucide-react'
-import { RoleGuard }                        from '@/components/shared/RoleGuard'
+import { RoleGuard } from '@/components/shared/RoleGuard'
 import {
   useCalendarEvents,
   useCreateCalendarEvent,
   useDeleteCalendarEvent,
-}                                            from '@/hooks/useCalendarEvents'
-import { usePermissions }                   from '@/hooks/usePermissions'
-import { useMotionEnabled }                 from '@/store/motionStore'
-import { FADE_DOWN_VARIANTS, reducedMotionVariants, reducedMotionTransition, SPRING } from '@/lib/motion'
-import { CALENDAR_COLORS }                  from '@shared/types/calendar'
+} from '@/hooks/useCalendarEvents'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useMotionEnabled } from '@/store/motionStore'
+import {
+  FADE_DOWN_VARIANTS,
+  reducedMotionVariants,
+  reducedMotionTransition,
+  SPRING,
+} from '@/lib/motion'
+import { CALENDAR_COLORS } from '@shared/types/calendar'
 import type { CalendarEvent, CalendarEventCategory } from '@shared/types/calendar'
-import { CreateCalendarEventSchema }        from '@shared/schemas/calendarEvent'
-import { format }                           from 'date-fns'
+import { CreateCalendarEventSchema } from '@shared/schemas/calendarEvent'
+import { format } from 'date-fns'
 
 // ─── CATEGORY LEGEND ─────────────────────────────────────────────────────────
 
 const LEGEND_ITEMS: { category: CalendarEventCategory; label: string }[] = [
-  { category: 'term',         label: 'Term Dates' },
-  { category: 'holiday',      label: 'Public Holidays' },
-  { category: 'exam',         label: 'Exams' },
-  { category: 'timetable',    label: 'Timetable' },
-  { category: 'lab_booking',  label: 'Lab Bookings' },
-  { category: 'leave',        label: 'Leave' },
+  { category: 'term', label: 'Term Dates' },
+  { category: 'holiday', label: 'Public Holidays' },
+  { category: 'exam', label: 'Exams' },
+  { category: 'timetable', label: 'Timetable' },
+  { category: 'lab_booking', label: 'Lab Bookings' },
+  { category: 'leave', label: 'Leave' },
   { category: 'announcement', label: 'Events' },
-  { category: 'assignment',   label: 'Assignments' },
+  { category: 'assignment', label: 'Assignments' },
 ]
 
 // ─── CATEGORY FILTER CHIP ─────────────────────────────────────────────────────
 
 function CategoryChip({
-  category, label, active, onToggle,
+  category,
+  label,
+  active,
+  onToggle,
 }: {
-  category: CalendarEventCategory; label: string; active: boolean; onToggle: () => void
+  category: CalendarEventCategory
+  label: string
+  active: boolean
+  onToggle: () => void
 }) {
   return (
     <button
       onClick={onToggle}
       aria-pressed={active}
       className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all border ${
-        active
-          ? 'border-transparent text-white'
-          : 'border-base text-muted bg-surface hover:bg-page'
+        active ? 'border-transparent text-white' : 'border-base text-muted bg-surface hover:bg-page'
       }`}
       style={active ? { backgroundColor: CALENDAR_COLORS[category] } : {}}
     >
@@ -132,13 +141,19 @@ function CreateEventDialog({ onClose }: { onClose: () => void }) {
       <div className="bg-surface rounded-2xl w-full max-w-md shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy">New Calendar Event</h2>
-          <button onClick={onClose} aria-label="Close event form" className="p-1.5 hover:bg-page rounded-lg">
+          <button
+            onClick={onClose}
+            aria-label="Close event form"
+            className="p-1.5 hover:bg-page rounded-lg"
+          >
             <X className="w-4 h-4 text-muted" aria-hidden="true" />
           </button>
         </div>
         <form onSubmit={onSubmit} className="p-6 space-y-4">
           <div>
-            <label htmlFor="event-title" className="text-xs font-medium text-muted mb-1 block">Title</label>
+            <label htmlFor="event-title" className="text-xs font-medium text-muted mb-1 block">
+              Title
+            </label>
             <input
               id="event-title"
               value={title}
@@ -148,7 +163,12 @@ function CreateEventDialog({ onClose }: { onClose: () => void }) {
             />
           </div>
           <div>
-            <label htmlFor="event-description" className="text-xs font-medium text-muted mb-1 block">Description</label>
+            <label
+              htmlFor="event-description"
+              className="text-xs font-medium text-muted mb-1 block"
+            >
+              Description
+            </label>
             <textarea
               id="event-description"
               value={description}
@@ -159,7 +179,9 @@ function CreateEventDialog({ onClose }: { onClose: () => void }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label htmlFor="event-start" className="text-xs font-medium text-muted mb-1 block">Start</label>
+              <label htmlFor="event-start" className="text-xs font-medium text-muted mb-1 block">
+                Start
+              </label>
               <input
                 id="event-start"
                 type="datetime-local"
@@ -170,7 +192,9 @@ function CreateEventDialog({ onClose }: { onClose: () => void }) {
               />
             </div>
             <div>
-              <label htmlFor="event-end" className="text-xs font-medium text-muted mb-1 block">End (optional)</label>
+              <label htmlFor="event-end" className="text-xs font-medium text-muted mb-1 block">
+                End (optional)
+              </label>
               <input
                 id="event-end"
                 type="datetime-local"
@@ -181,7 +205,9 @@ function CreateEventDialog({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div>
-            <label htmlFor="event-category" className="text-xs font-medium text-muted mb-1 block">Category</label>
+            <label htmlFor="event-category" className="text-xs font-medium text-muted mb-1 block">
+              Category
+            </label>
             <select
               id="event-category"
               value={category}
@@ -189,7 +215,9 @@ function CreateEventDialog({ onClose }: { onClose: () => void }) {
               className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page min-h-[44px] focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             >
               {LEGEND_ITEMS.map((l) => (
-                <option key={l.category} value={l.category}>{l.label}</option>
+                <option key={l.category} value={l.category}>
+                  {l.label}
+                </option>
               ))}
             </select>
           </div>
@@ -211,7 +239,9 @@ function CreateEventDialog({ onClose }: { onClose: () => void }) {
               disabled={createEvent.isPending}
               className="px-5 py-2 text-sm bg-brand-navy text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 min-h-[44px]"
             >
-              {createEvent.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
+              {createEvent.isPending && (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+              )}
               Create
             </button>
           </div>
@@ -260,11 +290,11 @@ function EventDetailPanel({
           />
           <motion.div
             key="panel"
-            variants={motionEnabled ? FADE_DOWN_VARIANTS : reducedMotionVariants}
+            variants={reducedMotionVariants(motionEnabled, FADE_DOWN_VARIANTS)}
             initial="hidden"
             animate="visible"
             exit="hidden"
-            transition={motionEnabled ? SPRING : reducedMotionTransition}
+            transition={reducedMotionTransition(motionEnabled, SPRING.snappy)}
             className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-sm bg-surface border border-base rounded-2xl shadow-xl p-5"
           >
             <div className="flex items-start justify-between mb-4">
@@ -278,7 +308,11 @@ function EventDetailPanel({
                   {event.category.replace('_', ' ')}
                 </span>
               </div>
-              <button onClick={onClose} aria-label="Close event details" className="text-muted hover:text-brand-navy transition-colors">
+              <button
+                onClick={onClose}
+                aria-label="Close event details"
+                className="text-muted hover:text-brand-navy transition-colors"
+              >
                 <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
@@ -315,7 +349,9 @@ function EventDetailPanel({
                 </div>
               )}
               {event.meta?.description && (
-                <p className="text-sm text-muted leading-relaxed">{String(event.meta.description)}</p>
+                <p className="text-sm text-muted leading-relaxed">
+                  {String(event.meta.description)}
+                </p>
               )}
             </div>
 
@@ -345,33 +381,40 @@ function EventDetailPanel({
 // ─── CALENDAR CONTENT ────────────────────────────────────────────────────────
 
 function CalendarContent() {
-  const calRef      = useRef<InstanceType<typeof FullCalendar>>(null)
+  const calRef = useRef<InstanceType<typeof FullCalendar>>(null)
   const [dateRange, setDateRange] = useState({ start: '2025-09-01', end: '2026-07-31' })
-  const [selected,  setSelected]  = useState<CalendarEvent | null>(null)
+  const [selected, setSelected] = useState<CalendarEvent | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const { can } = usePermissions()
   const [activeCategories, setActiveCategories] = useState<Set<CalendarEventCategory>>(
-    new Set(LEGEND_ITEMS.map((l) => l.category)),
+    new Set(LEGEND_ITEMS.map((l) => l.category))
   )
 
-  const { data: serverEvents = [], isLoading, isError } = useCalendarEvents(dateRange.start, dateRange.end)
+  const {
+    data: serverEvents = [],
+    isLoading,
+    isError,
+  } = useCalendarEvents(dateRange.start, dateRange.end)
 
   const handleDatesSet = useCallback((arg: DatesSetArg) => {
     setDateRange({
       start: format(arg.start, 'yyyy-MM-dd'),
-      end:   format(arg.end,   'yyyy-MM-dd'),
+      end: format(arg.end, 'yyyy-MM-dd'),
     })
   }, [])
 
   const filteredEvents = useMemo(
     () => serverEvents.filter((e) => activeCategories.has(e.category)),
-    [serverEvents, activeCategories],
+    [serverEvents, activeCategories]
   )
 
-  const handleEventClick = useCallback((arg: EventClickArg) => {
-    const ev = serverEvents.find((e) => e.id === arg.event.id) ?? null
-    setSelected(ev)
-  }, [serverEvents])
+  const handleEventClick = useCallback(
+    (arg: EventClickArg) => {
+      const ev = serverEvents.find((e) => e.id === arg.event.id) ?? null
+      setSelected(ev)
+    },
+    [serverEvents]
+  )
 
   function toggleCategory(cat: CalendarEventCategory) {
     setActiveCategories((prev) => {
@@ -388,7 +431,9 @@ function CalendarContent() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="font-heading text-2xl font-bold text-brand-navy">Calendar</h1>
-          <p className="text-sm text-muted mt-0.5">School academic calendar — all events, exams, and schedules</p>
+          <p className="text-sm text-muted mt-0.5">
+            School academic calendar — all events, exams, and schedules
+          </p>
         </div>
         {can('calendar.createEvent') && (
           <button
@@ -421,7 +466,10 @@ function CalendarContent() {
         </div>
       )}
       {isError && (
-        <div role="alert" className="text-xs text-brand-coral bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+        <div
+          role="alert"
+          className="text-xs text-brand-coral bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+        >
           Couldn&apos;t load calendar events. Please try again.
         </div>
       )}
@@ -434,9 +482,9 @@ function CalendarContent() {
             plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             headerToolbar={{
-              left:   'prev,next today',
+              left: 'prev,next today',
               center: 'title',
-              right:  'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
+              right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
             }}
             events={filteredEvents}
             datesSet={handleDatesSet}
@@ -448,20 +496,28 @@ function CalendarContent() {
             weekends
             firstDay={1}
             buttonText={{
-              today:    'Today',
-              month:    'Month',
-              week:     'Week',
-              day:      'Day',
-              list:     'Agenda',
+              today: 'Today',
+              month: 'Month',
+              week: 'Week',
+              day: 'Day',
+              list: 'Agenda',
             }}
             eventTimeFormat={{
-              hour:   '2-digit',
+              hour: '2-digit',
               minute: '2-digit',
               hour12: false,
             }}
             views={{
-              timeGridWeek: { slotMinTime: '07:00:00', slotMaxTime: '18:00:00', slotDuration: '00:30:00' },
-              timeGridDay:  { slotMinTime: '07:00:00', slotMaxTime: '18:00:00', slotDuration: '00:30:00' },
+              timeGridWeek: {
+                slotMinTime: '07:00:00',
+                slotMaxTime: '18:00:00',
+                slotDuration: '00:30:00',
+              },
+              timeGridDay: {
+                slotMinTime: '07:00:00',
+                slotMaxTime: '18:00:00',
+                slotDuration: '00:30:00',
+              },
             }}
           />
         </div>
@@ -480,7 +536,19 @@ function CalendarContent() {
 
 export default function CalendarPage() {
   return (
-    <RoleGuard allowed={['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student']}>
+    <RoleGuard
+      allowed={[
+        'admin',
+        'high_rank',
+        'finance',
+        'library',
+        'lower_rank',
+        'academic',
+        'hr',
+        'exam_officer',
+        'student',
+      ]}
+    >
       <CalendarContent />
     </RoleGuard>
   )

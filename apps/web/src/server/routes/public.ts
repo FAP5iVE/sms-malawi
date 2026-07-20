@@ -89,10 +89,15 @@ publicRouter.get('/maneb-stats', async (req, res) => {
 
   const byType: Record<string, { total: number; passed: number }> = {}
   for (const r of records) {
-    if (!byType[r.examType]) byType[r.examType] = { total: 0, passed: 0 }
-    byType[r.examType].total += 1
+    // Capture into a local variable rather than re-indexing byType[r.examType]
+    // on each line below: with noUncheckedIndexedAccess, every fresh index
+    // expression is independently typed `{...} | undefined`, so the earlier
+    // existence check doesn't narrow later `byType[r.examType]` accesses —
+    // only a captured local binding narrows and stays narrowed.
+    const entry = byType[r.examType] ?? (byType[r.examType] = { total: 0, passed: 0 })
+    entry.total += 1
     if (r.overallGrade && !['F', 'U', 'X'].includes(r.overallGrade)) {
-      byType[r.examType].passed += 1
+      entry.passed += 1
     }
   }
 

@@ -208,6 +208,16 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
         {/* School crest/logo — real image when uploaded (settingsService.
             getIdentitySettings().schoolLogoUrl), initials fallback otherwise */}
         {data.schoolLogoUrl ? (
+          // next/image is wrong here, not just unoptimized: (1) this is a
+          // print-only crest captured by react-to-print, and next/image's
+          // lazy-loading can leave the image unloaded when the DOM is
+          // captured for PDF generation; (2) schoolLogoUrl is a dynamic,
+          // per-school Appwrite signed URL, and no images.remotePatterns is
+          // configured in next.config.ts, so next/image would throw at
+          // runtime for an unconfigured host; (3) the whole document is
+          // sized in `pt` (print points) throughout, not px, which
+          // next/image's width/height props don't accommodate.
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={data.schoolLogoUrl}
             alt={`${data.schoolName} crest`}
@@ -463,7 +473,7 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
               }}
             >
               <div style={{ fontSize: '7.5pt', fontWeight: 700, color: '#374151', textTransform: 'uppercase', marginBottom: '3pt', letterSpacing: '0.06em' }}>
-                Class Teacher's Comment
+                Class Teacher&apos;s Comment
               </div>
               <div style={{ fontSize: '8.5pt', color: '#111827', minHeight: '28pt', lineHeight: 1.5 }}>
                 {data.classTeacherComment || '—'}
@@ -474,7 +484,7 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
             </td>
             <td style={{ padding: '5pt 7pt', verticalAlign: 'top' }}>
               <div style={{ fontSize: '7.5pt', fontWeight: 700, color: '#374151', textTransform: 'uppercase', marginBottom: '3pt', letterSpacing: '0.06em' }}>
-                Head Teacher's Comment
+                Head Teacher&apos;s Comment
               </div>
               <div style={{ fontSize: '8.5pt', color: '#111827', minHeight: '28pt', lineHeight: 1.5 }}>
                 {data.headTeacherComment || '—'}
@@ -625,7 +635,7 @@ export function PrintableReportCard({ data, onClose }: PrintableReportCardProps)
           <button
             type="button"
             onClick={() => handlePrint()}
-            className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors"
+            className="flex items-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors"
           >
             <Printer className="w-4 h-4" aria-hidden />
             Print / Save PDF
@@ -635,7 +645,7 @@ export function PrintableReportCard({ data, onClose }: PrintableReportCardProps)
             <button
               type="button"
               onClick={onClose}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-base text-muted hover:bg-page hover:text-body transition-colors"
+              className="min-h-11 min-w-11 flex items-center justify-center rounded-xl border border-base text-muted hover:bg-page hover:text-body transition-colors"
               aria-label="Close preview"
             >
               <X className="w-4 h-4" />

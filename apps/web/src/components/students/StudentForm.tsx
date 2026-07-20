@@ -39,8 +39,8 @@
  *   both animate out before the component unmounts.
  *
  * 44 px touch targets:
- *   All <button> elements have min-h-[44px].
- *   All <input>, <select>, <textarea> inherit min-h-[44px] from inputCls (C5).
+ *   All <button> elements have min-h-11.
+ *   All <input>, <select>, <textarea> inherit min-h-11 from inputCls (C5).
  *
  * Photo upload:
  *   Shown above Step 1 on mobile, and in the form header section on desktop.
@@ -66,7 +66,6 @@ import {
   OVERLAY_VARIANTS,
   reducedMotionVariants,
   reducedMotionTransition,
-  SPRING,
   DURATION,
   EASE,
 } from '@/lib/motion'
@@ -76,7 +75,6 @@ import {
   ContactSection,
   FieldDivider,
   STEP_FIELDS,
-  inputCls,
 } from '@/components/students/StudentFormSections'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -102,7 +100,7 @@ const STEP_VARIANTS = {
   exit:   (d: number) => ({ x: d > 0 ? -40 :  40, opacity: 0 }),
 }
 
-const STEP_TRANSITION = { duration: 0.18, ease: 'easeOut' }
+const STEP_TRANSITION = { duration: 0.18, ease: 'easeOut' } as const
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STEP INDICATOR
@@ -478,7 +476,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                   <button
                     type="button"
                     onClick={handleClose}
-                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-muted hover:bg-page hover:text-body transition-colors"
+                    className="min-h-11 min-w-11 flex items-center justify-center rounded-xl text-muted hover:bg-page hover:text-body transition-colors"
                     aria-label="Close form"
                   >
                     <X className="w-5 h-5" />
@@ -536,7 +534,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                     <button
                       type="button"
                       onClick={handleBack}
-                      className="flex items-center gap-1.5 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-muted border border-base hover:bg-page transition-colors"
+                      className="flex items-center gap-1.5 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold text-muted border border-base hover:bg-page transition-colors"
                     >
                       <ChevronLeft className="w-4 h-4" aria-hidden />
                       Back
@@ -550,7 +548,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                     <button
                       type="button"
                       onClick={handleNext}
-                      className="flex items-center gap-1.5 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors"
+                      className="flex items-center gap-1.5 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors"
                     >
                       Next
                       <ChevronRight className="w-4 h-4" aria-hidden />
@@ -559,7 +557,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                     <button
                       type="submit"
                       disabled={isPending}
-                      className="flex items-center gap-2 min-h-[44px] px-6 rounded-xl text-sm font-heading font-semibold bg-brand-teal text-white hover:bg-brand-teal/90 transition-colors disabled:opacity-60"
+                      className="flex items-center gap-2 min-h-11 px-6 rounded-xl text-sm font-heading font-semibold bg-brand-teal text-white hover:bg-brand-teal/90 transition-colors disabled:opacity-60"
                     >
                       {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />}
                       {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Student'}
@@ -625,7 +623,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
               <button
                 type="button"
                 onClick={handleClose}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-page text-muted hover:text-body transition-colors"
+                className="min-h-11 min-w-11 flex items-center justify-center rounded-xl hover:bg-page text-muted hover:text-body transition-colors"
                 aria-label="Close dialog"
               >
                 <X className="w-5 h-5" />
@@ -679,14 +677,14 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-muted border border-base hover:bg-page transition-colors"
+                  className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold text-muted border border-base hover:bg-page transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="min-h-[44px] px-6 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors flex items-center gap-2 disabled:opacity-60"
+                  className="min-h-11 px-6 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors flex items-center gap-2 disabled:opacity-60"
                 >
                   {isPending && (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />

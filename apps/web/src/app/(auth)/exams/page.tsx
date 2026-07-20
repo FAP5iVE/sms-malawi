@@ -65,7 +65,8 @@
  * [DEPENDS ON]: W/hooks/useStudents.ts (useStudentMe, same phase)
  */
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import { useStudentMe } from '@/hooks/useStudents'
 import { RoleGuard } from '@/components/shared/RoleGuard'
@@ -131,9 +132,21 @@ type Tab = (typeof TABS)[number]['id']
 // matches the same fallback settingsService.ts itself uses server-side.
 const FALLBACK_YEAR = '2025/2026'
 
-export default function ExamsPage() {
-  const { role, user, setTitle, setSubtitle } = useAuthStore()
-  const [tab, setTab] = useState<Tab>('exams')
+function ExamsPageInner() {
+  const { role, setTitle, setSubtitle } = useAuthStore()
+  // R19 — the active tab is derived from ?tab= during render via Next's
+  // useSearchParams() (the codebase's established pattern — see
+  // (public)/login/page.tsx) instead of a useEffect that read
+  // window.location.search and called setTab post-mount. Because
+  // useSearchParams() is backed by the actual request URL on the server,
+  // this also renders the correct deep-linked tab on first paint instead of
+  // always showing 'exams' until the effect corrects it client-side.
+  // /exams/marks, /exams/results and /exams/maneb never existed as routes.
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const initialTab: Tab = tabParam && TABS.some((x) => x.id === tabParam) ? (tabParam as Tab) : 'exams'
+
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [term, setTerm] = useState(1)
   const [selectedClassId, setSelectedClassId] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -144,15 +157,6 @@ export default function ExamsPage() {
   const { data: myStudent, isLoading: myStudentLoading } = useStudentMe()
   const { data: schoolInfo } = usePublicSchoolInfo()
   const academicYear = schoolInfo?.currentYear ?? FALLBACK_YEAR
-
-  // R15 — initialise the active tab from ?tab= so dashboard quick actions
-  // can deep-link (/exams?tab=exams|analytics|maneb|release|results) —
-  // /exams/marks, /exams/results and /exams/maneb never existed as routes.
-  // Runs once post-hydration; validated against the declared tab ids.
-  useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get('tab')
-    if (t && TABS.some((x) => x.id === t)) setTab(t as Tab)
-  }, [])
 
   useEffect(() => {
     setTitle('Exams & Results')
@@ -467,5 +471,15 @@ export default function ExamsPage() {
         )}
       </div>
     </RoleGuard>
+  )
+}
+
+// `useSearchParams()` requires a Suspense boundary or `next build` fails —
+// same convention as (public)/login/page.tsx.
+export default function ExamsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ExamsPageInner />
+    </Suspense>
   )
 }

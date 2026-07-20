@@ -50,7 +50,8 @@
  *   phase)
  */
 
-import { useState, useEffect } from 'react'
+import { useState, Suspense } from 'react'
+import { useSearchParams }   from 'next/navigation'
 import { RoleGuard }         from '@/components/shared/RoleGuard'
 import { PermissionGuard }   from '@/components/shared/PermissionGuard'
 import { useAuthStore }      from '@/store/authStore'
@@ -111,24 +112,34 @@ export default function LibraryPage() {
         'exam_officer',
       ]}
     >
-      <LibraryContent />
+      {/* useSearchParams() requires a Suspense boundary or `next build` fails —
+          same convention as (public)/login/page.tsx and (auth)/exams/page.tsx. */}
+      <Suspense fallback={null}>
+        <LibraryContent />
+      </Suspense>
     </RoleGuard>
   )
 }
 
 function LibraryContent() {
   const { role }  = useAuthStore()
-  const [tab, setTab]               = useState<Tab>('catalog')
-  const [search, setSearch]         = useState('')
 
-  // R15 — initialise the active tab from ?tab= so LibraryDashboard's
-  // corrected quick actions (/library?tab=borrowings, ?tab=catalog) can
-  // deep-link — /library/issue and /library/return never existed as routes.
-  useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get('tab')
-    const valid: Tab[] = ['catalog', 'borrowings', 'digital', 'recommendations']
-    if (t && (valid as string[]).includes(t)) setTab(t as Tab)
-  }, [])
+  // R19 — the active tab is derived from ?tab= during render via Next's
+  // useSearchParams() (the codebase's established pattern — see
+  // (public)/login/page.tsx, (auth)/exams/page.tsx, (auth)/finances/page.tsx,
+  // (auth)/hr/page.tsx) instead of a useEffect that read
+  // window.location.search and called setTab post-mount. useSearchParams()
+  // is backed by the actual request URL on the server, so a deep-linked tab
+  // (/library?tab=borrowings, ?tab=catalog from LibraryDashboard's quick
+  // actions) now renders on first paint. Valid ids are read straight off
+  // the module-level TABS list instead of duplicating them in a second array.
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const validTabIds = TABS.map((t) => t.id) as string[]
+  const initialTab: Tab = tabParam && validTabIds.includes(tabParam) ? (tabParam as Tab) : 'catalog'
+
+  const [tab, setTab]               = useState<Tab>(initialTab)
+  const [search, setSearch]         = useState('')
   const [barcodeInput, setBarcodeInput] = useState('')
   const [scanResult, setScanResult] = useState<ApiBook | null>(null)
   const [scanError, setScanError]   = useState<string | null>(null)
@@ -294,7 +305,7 @@ function LibraryContent() {
                     type="button"
                     onClick={() => handleScan(barcodeInput)}
                     aria-label="Scan barcode"
-                    className="bg-brand-navy text-white px-3 py-2 rounded-xl text-sm min-h-[44px]"
+                    className="bg-brand-navy text-white px-3 py-2 rounded-xl text-sm min-h-11"
                   >
                     <Scan className="w-4 h-4" aria-hidden />
                   </button>
@@ -307,7 +318,7 @@ function LibraryContent() {
                       <button
                         type="button"
                         onClick={() => handleIssue(scanResult.id)}
-                        className="text-brand-teal font-semibold underline min-h-[44px]"
+                        className="text-brand-teal font-semibold underline min-h-11"
                       >
                         Issue this book
                       </button>
@@ -341,7 +352,7 @@ function LibraryContent() {
                           type="button"
                           disabled={b.availableCopies === 0}
                           onClick={() => handleIssue(b.id)}
-                          className="ml-auto text-xs font-semibold text-brand-teal underline disabled:opacity-40 min-h-[44px]"
+                          className="ml-auto text-xs font-semibold text-brand-teal underline disabled:opacity-40 min-h-11"
                         >
                           Issue
                         </button>
@@ -390,7 +401,7 @@ function LibraryContent() {
                             type="button"
                             disabled={b.availableCopies === 0}
                             onClick={() => handleIssue(b.id)}
-                            className="text-xs font-semibold text-brand-teal underline disabled:opacity-40 min-h-[44px]"
+                            className="text-xs font-semibold text-brand-teal underline disabled:opacity-40 min-h-11"
                           >
                             Issue
                           </button>
@@ -433,7 +444,7 @@ function LibraryContent() {
                       <button
                         type="button"
                         onClick={() => handleReturn(b.id)}
-                        className="flex items-center gap-1.5 text-brand-teal font-semibold underline min-h-[44px]"
+                        className="flex items-center gap-1.5 text-brand-teal font-semibold underline min-h-11"
                       >
                         <Undo2 className="w-3.5 h-3.5" aria-hidden /> Mark returned
                       </button>
@@ -447,22 +458,22 @@ function LibraryContent() {
           <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
             <h3 className="font-heading font-semibold text-sm text-body">Request a Fine Waiver</h3>
             <p className="text-xs text-muted">
-              Have an outstanding library fine you'd like reviewed? Submit the fine ID with your reason below.
+              Have an outstanding library fine you&apos;d like reviewed? Submit the fine ID with your reason below.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="waiver-fine-id" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Fine ID</label>
                 <input id="waiver-fine-id" value={waiverFineId} onChange={(e) => setWaiverFineId(e.target.value)}
-                  className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+                  className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
               </div>
               <div>
                 <label htmlFor="waiver-reason" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Reason</label>
                 <input id="waiver-reason" value={waiverReason} onChange={(e) => setWaiverReason(e.target.value)}
-                  className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+                  className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
               </div>
             </div>
             <button type="button" onClick={handleSubmitFineWaiver} disabled={createFineWaiver.isPending}
-              className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
+              className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
               {createFineWaiver.isPending ? 'Submitting…' : 'Submit Waiver Request'}
             </button>
             {workflowMessage && <p className="text-sm text-brand-teal">{workflowMessage}</p>}
@@ -479,11 +490,11 @@ function LibraryContent() {
                     <li key={w.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
                       <span>{w.reason} — MWK {w.amount}</span>
                       <div className="flex gap-3">
-                        <button type="button" onClick={() => approveFineWaiver.mutate(w.id)} aria-label="Approve waiver" className="text-brand-teal min-h-[44px] min-w-[44px] flex items-center justify-center"><Check className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => approveFineWaiver.mutate(w.id)} aria-label="Approve waiver" className="text-brand-teal min-h-11 min-w-11 flex items-center justify-center"><Check className="w-4 h-4" /></button>
                         <button type="button" onClick={() => {
                           const reason = window.prompt('Reason for rejecting this waiver request:')
                           if (reason) rejectFineWaiver.mutate({ id: w.id, reason })
-                        }} aria-label="Reject waiver" className="text-brand-coral min-h-[44px] min-w-[44px] flex items-center justify-center"><XIcon className="w-4 h-4" /></button>
+                        }} aria-label="Reject waiver" className="text-brand-coral min-h-11 min-w-11 flex items-center justify-center"><XIcon className="w-4 h-4" /></button>
                       </div>
                     </li>
                   ))}
@@ -519,7 +530,7 @@ function LibraryContent() {
                       type="button"
                       onClick={() => setViewingResource({ id: r.id, title: r.title })}
                       aria-label={`View ${r.title}`}
-                      className="p-2 hover:bg-page rounded-xl text-brand-teal shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      className="p-2 hover:bg-page rounded-xl text-brand-teal shrink-0 min-h-11 min-w-11 flex items-center justify-center"
                     >
                       <Eye className="w-4 h-4" aria-hidden />
                     </button>
@@ -547,16 +558,16 @@ function LibraryContent() {
                 <div>
                   <label htmlFor="rec-title" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Title</label>
                   <input id="rec-title" value={recTitle} onChange={(e) => setRecTitle(e.target.value)}
-                    className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+                    className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
                 </div>
                 <div>
                   <label htmlFor="rec-reason" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Why should the library acquire this?</label>
                   <input id="rec-reason" value={recReason} onChange={(e) => setRecReason(e.target.value)}
-                    className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+                    className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
                 </div>
               </div>
               <button type="button" onClick={handleSubmitRecommendation} disabled={createRecommendation.isPending}
-                className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
+                className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
                 {createRecommendation.isPending ? 'Submitting…' : 'Submit Recommendation'}
               </button>
               {workflowMessage && <p className="text-sm text-brand-teal">{workflowMessage}</p>}
@@ -577,11 +588,11 @@ function LibraryContent() {
                         <p className="text-xs text-muted">{r.reason}</p>
                       </div>
                       <div className="flex gap-3 shrink-0">
-                        <button type="button" onClick={() => approveRecommendation.mutate({ id: r.id })} aria-label="Approve recommendation" className="text-brand-teal min-h-[44px] min-w-[44px] flex items-center justify-center"><Check className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => approveRecommendation.mutate({ id: r.id })} aria-label="Approve recommendation" className="text-brand-teal min-h-11 min-w-11 flex items-center justify-center"><Check className="w-4 h-4" /></button>
                         <button type="button" onClick={() => {
                           const reason = window.prompt('Reason for rejecting this recommendation:')
                           if (reason) rejectRecommendation.mutate({ id: r.id, reason })
-                        }} aria-label="Reject recommendation" className="text-brand-coral min-h-[44px] min-w-[44px] flex items-center justify-center"><XIcon className="w-4 h-4" /></button>
+                        }} aria-label="Reject recommendation" className="text-brand-coral min-h-11 min-w-11 flex items-center justify-center"><XIcon className="w-4 h-4" /></button>
                       </div>
                     </li>
                   ))}

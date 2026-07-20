@@ -43,7 +43,6 @@ import { PlacementOutcomeForm } from '@/components/placements/PlacementOutcomeFo
 import { MotionBottomSheet } from '@/components/shared/MotionBottomSheet'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { Users, Sparkles, ShieldCheck, Loader2 } from 'lucide-react'
-import type { ApiUniversityPlacement } from '@shared/types/api'
 
 const FALLBACK_YEAR = '2025/2026'
 

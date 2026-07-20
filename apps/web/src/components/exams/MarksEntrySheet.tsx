@@ -48,7 +48,7 @@
  * [DEPENDS ON]: W/components/shared/ConfirmDialog.tsx (same phase)
  */
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useStudents } from '@/hooks/useStudents'
 import { useEnterMarks, useFinalizeMarks, useExamMarks } from '@/hooks/useExams'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -67,7 +67,11 @@ type MarkEntry = { mark: number | null; absent: boolean }
 
 export function MarksEntrySheet({ examId, classId, maxMark, onClose }: Props) {
   const { data: studentData, isLoading: studentsLoading } = useStudents({ classId, status: 'ACTIVE' })
-  const students = (studentData?.students ?? []) as ApiStudent[]
+  // R19 — memoized so `students` has a stable reference across renders
+  // (the `?? []` fallback previously produced a brand-new empty-array
+  // literal on every render while studentData was still loading, which is
+  // what made the effect below's dependency array unreliable).
+  const students = useMemo(() => (studentData?.students ?? []) as ApiStudent[], [studentData])
   const { data: savedMarks, isLoading: marksLoading } = useExamMarks(examId)
   const enterMarks    = useEnterMarks(examId)
   const finalizeMarks = useFinalizeMarks()
@@ -80,31 +84,41 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose }: Props) {
 
   // Seed `marks` once students and any previously-saved draft marks have
   // loaded. A student ID already present in local state (typed in this
-  // session, or seeded by a prior run of this effect) is preserved as-is
-  // rather than clobbered by a refetch; every student otherwise gets a
-  // real entry — never left as `undefined` — seeded from their saved
+  // session, or seeded by a prior run of this adjustment) is preserved
+  // as-is rather than clobbered by a refetch; every student otherwise gets
+  // a real entry — never left as `undefined` — seeded from their saved
   // draft mark if one exists, or the explicit "not yet entered" sentinel.
-  useEffect(() => {
-    if (studentsLoading || marksLoading || students.length === 0) return
-    setMarks((prev) => {
-      const next: Record<string, MarkEntry> = {}
-      for (const s of students) {
-        if (prev[s.id] !== undefined) {
-          next[s.id] = prev[s.id]!
-          continue
-        }
-        const saved = savedMarks?.find((m) => m.studentId === s.id)
-        next[s.id] = saved ? { mark: saved.mark, absent: saved.absent } : { mark: null, absent: false }
+  //
+  // This intentionally does NOT use a useEffect: `students`/`savedMarks`
+  // are reference-stable between renders until they genuinely change (the
+  // useMemo above, and TanStack Query's own structural sharing), so
+  // comparing against the previous render's references and adjusting state
+  // directly in the render body — React's own documented pattern for
+  // "reset state when a prop changes" — seeds `marks` one render sooner
+  // than an effect would, without ever calling setState from inside one.
+  const [prevStudents, setPrevStudents] = useState(students)
+  const [prevSavedMarks, setPrevSavedMarks] = useState(savedMarks)
+  const canSeed = !studentsLoading && !marksLoading && students.length > 0
+  if (canSeed && (students !== prevStudents || savedMarks !== prevSavedMarks)) {
+    setPrevStudents(students)
+    setPrevSavedMarks(savedMarks)
+    const next: Record<string, MarkEntry> = {}
+    for (const s of students) {
+      if (marks[s.id] !== undefined) {
+        next[s.id] = marks[s.id]!
+        continue
       }
-      return next
-    })
+      const saved = savedMarks?.find((m) => m.studentId === s.id)
+      next[s.id] = saved ? { mark: saved.mark, absent: saved.absent } : { mark: null, absent: false }
+    }
+    setMarks(next)
     setHydrated(true)
-  }, [students, savedMarks, studentsLoading, marksLoading])
+  }
 
   function setMark(studentId: string, val: string) {
     const n = val === '' ? null : Number(val)
     setMarks((p) => ({ ...p, [studentId]: { ...p[studentId]!, mark: n, absent: false } }))
-    setErrors((p) => { const { [studentId]: _removed, ...rest } = p; return rest })
+    setErrors((p) => Object.fromEntries(Object.entries(p).filter(([id]) => id !== studentId)))
   }
 
   function toggleAbsent(studentId: string) {

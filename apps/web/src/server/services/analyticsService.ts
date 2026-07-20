@@ -49,7 +49,7 @@
  */
 import 'server-only'
 import { prisma } from '@/lib/prisma'
-import type { ExpenseCategory } from '@prisma/client'
+import type { ExpenseCategory, ApplicationStatus } from '@prisma/client'
 import { subDays, subMonths, startOfDay, endOfDay, format, startOfWeek, endOfWeek, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfMonth, endOfMonth } from 'date-fns'
 import { getAttendanceSummaryForTerm, getTermDateRange } from '@/server/services/attendanceService'
 import { findUniversity } from '@shared/constants/universities'
@@ -569,12 +569,12 @@ export async function getHighRankSubjectComparison(
   const subjectBuckets: Record<string, { scores: number[]; passCount: number }> = {}
   for (const exam of exams) {
     const maxMark = Number(exam.maxMark)
-    if (!subjectBuckets[exam.subject]) subjectBuckets[exam.subject] = { scores: [], passCount: 0 }
+    const bucket = subjectBuckets[exam.subject] ?? (subjectBuckets[exam.subject] = { scores: [], passCount: 0 })
     for (const m of exam.marks) {
       if (!m.absent && m.mark !== null) {
         const score = (Number(m.mark) / maxMark) * 100
-        subjectBuckets[exam.subject].scores.push(score)
-        if (score >= 50) subjectBuckets[exam.subject].passCount += 1
+        bucket.scores.push(score)
+        if (score >= 50) bucket.passCount += 1
       }
     }
   }
@@ -835,8 +835,11 @@ export async function getFinanceOutstandingByClass(
         status: { in: ['UNPAID', 'PARTIAL', 'OVERDUE'] },
         balance: { gt: 0 },
       },
-      select: { studentId: true, balance: true },
-      include: { student: { select: { classId: true } } },
+      select: {
+        studentId: true,
+        balance:   true,
+        student:   { select: { classId: true } },
+      },
     }),
   ])
 
@@ -844,11 +847,11 @@ export async function getFinanceOutstandingByClass(
   const breakdown: Record<string, { outstanding: number; students: Set<string> }> = {}
 
   for (const inv of invoices) {
-    const classId = (inv as typeof inv & { student: { classId: string | null } }).student.classId
+    const classId = inv.student.classId
     if (!classId) continue
-    if (!breakdown[classId]) breakdown[classId] = { outstanding: 0, students: new Set() }
-    breakdown[classId].outstanding += Number(inv.balance)
-    breakdown[classId].students.add(inv.studentId)
+    const bucket = breakdown[classId] ?? (breakdown[classId] = { outstanding: 0, students: new Set() })
+    bucket.outstanding += Number(inv.balance)
+    bucket.students.add(inv.studentId)
   }
 
   return Object.entries(breakdown)
@@ -1175,7 +1178,7 @@ export async function getLowerRankApplicationsFunnel(): Promise<ApplicationFunne
   const statusMap = new Map(counts.map((c) => [c.status, c._count]))
   const total = counts.reduce((s, c) => s + c._count, 0)
 
-  const stages: { stage: string; status: string }[] = [
+  const stages: { stage: string; status: ApplicationStatus | '' }[] = [
     { stage: 'Total Applications', status: '' },
     { stage: 'Approved', status: 'APPROVED' },
     { stage: 'Awaiting Admission', status: 'AWAITING_ADMISSION' },
@@ -1184,7 +1187,7 @@ export async function getLowerRankApplicationsFunnel(): Promise<ApplicationFunne
   ]
 
   return stages.map(({ stage, status }) => {
-    const count = status === '' ? total : (statusMap.get(status as string) ?? 0)
+    const count = status === '' ? total : (statusMap.get(status) ?? 0)
     return { stage, count, pct: pct(count, total) }
   })
 }
@@ -1361,7 +1364,7 @@ export async function getAcademicMarksDistribution(
   for (const m of marks) {
     const pctScore = (Number(m.mark) / maxMark) * 100
     const idx = Math.min(9, Math.floor(pctScore / 10))
-    counts[idx] += 1
+    counts[idx] = (counts[idx] ?? 0) + 1
   }
 
   return buckets.map((bucket, i) => ({ bucket, count: counts[i] ?? 0 }))
@@ -1526,8 +1529,8 @@ export async function getManebSchoolStats(
 
   const byType: Record<string, typeof records> = {}
   for (const r of records) {
-    if (!byType[r.examType]) byType[r.examType] = []
-    byType[r.examType].push(r)
+    const bucket = byType[r.examType] ?? (byType[r.examType] = [])
+    bucket.push(r)
   }
 
   return Object.entries(byType).map(([examType, typeRecords]) => {

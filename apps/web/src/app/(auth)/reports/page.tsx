@@ -100,14 +100,14 @@ import {
 } from 'recharts'
 import type { PieLabelRenderProps } from 'recharts'
 import {
-  TrendingUp, TrendingDown, BookOpen, Users, DollarSign, ShieldCheck,
+  TrendingUp, BookOpen, Users, DollarSign, ShieldCheck,
   BarChart2, FileText, GraduationCap, Activity, AlertTriangle,
-  ArrowUpRight, ArrowDownRight, ChevronRight, Download,
+  ArrowUpRight, ArrowDownRight, Download,
 } from 'lucide-react'
 import type {
   ApiLoginTrendPoint, ApiCategoryBreakdown, ApiClassPerformanceStat,
-  ApiSubjectAverageStat, ApiTeacherEffectivenessRow, ApiEnrollmentTrendPoint,
-  ApiApplicationFunnelStage, ApiLibraryInventoryHealth, ApiTopBorrowedBook,
+  ApiTeacherEffectivenessRow, ApiEnrollmentTrendPoint,
+  ApiApplicationFunnelStage, ApiTopBorrowedBook,
   ApiStudentPerformancePoint, ApiStudentSubjectScore, ApiStudentFeeStatement,
   ApiManebSchoolStat, ApiCashFlowRow, ApiBudgetVsActualRow,
   ApiAssignmentCompletionRow, ApiTimeSeriesPoint,
@@ -205,9 +205,19 @@ function useExportable<T>(
   const { register, clear } = useContext(ExportContext)
 
   const columnsRef = useRef(columns)
-  columnsRef.current = columns
   const rowsRef = useRef(rows)
-  rowsRef.current = rows
+
+  // Refs are mirrors of the latest `columns`/`rows`, kept fresh for the
+  // `download` closure below without making either a dependency of the
+  // registration effect (see the two comments above for why: unstable
+  // `columns` identity and — deliberately, for symmetry — `rows` too).
+  // Mutating a ref must happen outside render, so this assignment lives in
+  // its own effect (no dependency array — it intentionally runs after every
+  // render) rather than directly in the function body.
+  useEffect(() => {
+    columnsRef.current = columns
+    rowsRef.current = rows
+  })
 
   const hasRows = (rows?.length ?? 0) > 0
 
@@ -2288,10 +2298,15 @@ function ReportsContent() {
   const year = settings?.[SETTING_KEYS.CURRENT_ACADEMIC_YEAR]
   const currentTerm = settings?.[SETTING_KEYS.CURRENT_TERM]
 
-  const [term, setTerm] = useState<number | null>(null)
-  useEffect(() => {
-    if (currentTerm !== undefined) setTerm((prev) => prev ?? currentTerm)
-  }, [currentTerm])
+  // R19 — `term` is derived, not seeded via an effect. `termOverride` is null
+  // until the user picks a term from the selector below; until then the
+  // rendered/effective term falls through to `currentTerm` once it loads.
+  // This preserves the original "seed once from currentTerm, never clobber a
+  // user's manual selection" behavior without calling setState from an
+  // effect: `termOverride ?? currentTerm ?? null` recomputes on every render
+  // instead of writing state as a side effect of `currentTerm` arriving.
+  const [termOverride, setTerm] = useState<number | null>(null)
+  const term = termOverride ?? currentTerm ?? null
 
   const [activeTab, setActiveTab] = useState(() => {
     const tabs = ROLE_TABS[role ?? 'student'] ?? []

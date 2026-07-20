@@ -114,10 +114,21 @@ export function Sidebar() {
       }
     }
 
-    // Set initial values immediately on mount (corrects SSR-safe defaults)
-    const isLarge = window.innerWidth >= LG_BREAKPOINT
-    setIsLgUp(isLarge)
-    setCollapsed(!isLarge) // desktop → expanded by default; tablet → collapsed
+    // Deferred via queueMicrotask rather than called directly: this initial
+    // correction intentionally differs from checkViewport's resize semantics
+    // (it forces BOTH directions — desktop too — not just collapse-on-tablet),
+    // so it can't simply reuse checkViewport(). Wrapping it in a microtask
+    // means its setState calls sit inside a deferred callback rather than
+    // running synchronously as part of this effect's own call frame — a
+    // microtask still resolves before the browser's next paint, so the
+    // SSR-safe defaults are corrected just as early (no visible flash), and
+    // the correction still lands strictly after hydration completes, which
+    // is what avoids a server/client markup mismatch here in the first place.
+    queueMicrotask(() => {
+      const isLarge = window.innerWidth >= LG_BREAKPOINT
+      setIsLgUp(isLarge)
+      setCollapsed(!isLarge) // desktop → expanded by default; tablet → collapsed
+    })
 
     window.addEventListener('resize', checkViewport)
     return () => window.removeEventListener('resize', checkViewport)

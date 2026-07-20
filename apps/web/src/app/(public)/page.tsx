@@ -45,11 +45,11 @@
  *   app-wide theme provider — see apps/web/src/components/providers/
  *   ThemeProvider.tsx)
  */
-'use client'
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useTheme } from 'next-themes'
+import { useHasMounted } from '@/hooks/useHasMounted'
 import { FaFacebook, FaTwitter, FaInstagram, FaYoutube, FaLinkedin } from 'react-icons/fa'
 import {
   Sun,
@@ -229,14 +229,10 @@ const services = [
 
 export default function LandingPage() {
   const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
+  const mounted = useHasMounted()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeSection, setActiveSection] = useState('')
-
-  // next-themes requires a mounted guard to avoid a hydration mismatch —
-  // the server doesn't know the visitor's stored theme preference yet.
-  useEffect(() => setMounted(true), [])
 
   // ── Live public data ────────────────────────────────────────────────────
   const { data: schoolInfo }     = usePublicSchoolInfo()
@@ -550,17 +546,17 @@ export default function LandingPage() {
             </div>
 
             {/* Right — visual */}
-            <div className="hero-visual relative hidden lg:flex items-center justify-center h-[540px]">
+            <div className="hero-visual relative hidden lg:flex items-center justify-center h-135">
               {/* Outer dashed rotating ring */}
-              <div className="absolute w-[440px] h-[440px] rounded-full border-2 border-dashed border-white/10 ring-spin-ccw" />
+              <div className="absolute w-110 h-110 rounded-full border-2 border-dashed border-white/10 ring-spin-ccw" />
 
               {/* Inner solid ring */}
-              <div className="absolute w-[340px] h-[340px] rounded-full border border-brand-teal/20" />
+              <div className="absolute w-85 h-85 rounded-full border border-brand-teal/20" />
 
               {/* Central illustration placeholder — no real hero-illustration.svg
                   asset exists yet; this is a clean, non-developer-facing
                   fallback rather than a broken <img> reference. */}
-              <div className="w-72 h-72 rounded-3xl bg-gradient-to-br from-brand-navy-mid to-brand-navy-light border border-white/10 flex flex-col items-center justify-center gap-3 shadow-2xl">
+              <div className="w-72 h-72 rounded-3xl bg-linear-to-br from-brand-navy-mid to-brand-navy-light border border-white/10 flex flex-col items-center justify-center gap-3 shadow-2xl">
                 <div className="w-16 h-16 rounded-2xl bg-brand-teal/20 border border-brand-teal/30 flex items-center justify-center">
                   <BookOpen className="w-8 h-8 text-brand-teal" aria-hidden />
                 </div>
@@ -570,7 +566,7 @@ export default function LandingPage() {
               </div>
 
               {/* Floating cards */}
-              <FloatCard className="top-4 left-0 min-w-[160px]" delay={0}>
+              <FloatCard className="top-4 left-0 min-w-40" delay={0}>
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-brand-teal/15 flex items-center justify-center">
                     <TrendingUp className="w-4 h-4 text-brand-teal" />
@@ -584,7 +580,7 @@ export default function LandingPage() {
                 </div>
               </FloatCard>
 
-              <FloatCard className="bottom-12 left-0 min-w-[148px]" delay={1.2}>
+              <FloatCard className="bottom-12 left-0 min-w-37" delay={1.2}>
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-brand-amber/15 flex items-center justify-center">
                     <Heart className="w-4 h-4 text-brand-amber" />
@@ -596,7 +592,7 @@ export default function LandingPage() {
                 </div>
               </FloatCard>
 
-              <FloatCard className="top-8 right-0 min-w-[168px]" delay={0.7}>
+              <FloatCard className="top-8 right-0 min-w-42" delay={0.7}>
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-brand-purple/15 flex items-center justify-center">
                     <Award className="w-4 h-4 text-brand-purple" />
@@ -610,7 +606,7 @@ export default function LandingPage() {
                 </div>
               </FloatCard>
 
-              <FloatCard className="bottom-8 right-2 min-w-[148px]" delay={1.8}>
+              <FloatCard className="bottom-8 right-2 min-w-37" delay={1.8}>
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-brand-coral/15 flex items-center justify-center">
                     <Star className="w-4 h-4 text-brand-coral" />
@@ -646,7 +642,7 @@ export default function LandingPage() {
                   yet; this is a clean, non-developer-facing fallback rather
                   than a broken <img> reference. */}
               <div className="relative">
-                <div className="aspect-[4/3] rounded-3xl bg-gradient-to-br from-brand-navy-light/20 to-brand-teal/10 border border-base flex items-center justify-center overflow-hidden">
+                <div className="aspect-4/3 rounded-3xl bg-linear-to-br from-brand-navy-light/20 to-brand-teal/10 border border-base flex items-center justify-center overflow-hidden">
                   <div className="text-center space-y-2">
                     <div className="w-16 h-16 rounded-2xl bg-brand-navy/10 border border-base flex items-center justify-center mx-auto">
                       <Users className="w-8 h-8 text-brand-navy/40" aria-hidden />
@@ -927,7 +923,7 @@ export default function LandingPage() {
                 <button
                   type="submit"
                   disabled={newsletterSubscribe.isPending}
-                  className="flex items-center justify-center gap-2 bg-brand-teal text-white px-6 py-2.5 rounded-xl font-heading font-semibold text-sm hover:bg-brand-teal-light transition-colors disabled:opacity-60 min-h-[44px]"
+                  className="flex items-center justify-center gap-2 bg-brand-teal text-white px-6 py-2.5 rounded-xl font-heading font-semibold text-sm hover:bg-brand-teal-light transition-colors disabled:opacity-60 min-h-11"
                 >
                   {newsletterSubscribe.isPending && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
                   Subscribe
@@ -1017,13 +1013,13 @@ export default function LandingPage() {
                 <img> references. */}
             <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
               {/* Large feature */}
-              <div className="col-span-2 row-span-2 aspect-square rounded-2xl bg-gradient-to-br from-brand-navy-light/20 to-brand-teal/10 border border-base flex items-center justify-center">
+              <div className="col-span-2 row-span-2 aspect-square rounded-2xl bg-linear-to-br from-brand-navy-light/20 to-brand-teal/10 border border-base flex items-center justify-center">
                 <ImageIcon className="w-10 h-10 text-brand-navy/20" aria-hidden />
               </div>
               {Array.from({ length: 7 }).map((_, i) => (
                 <div
                   key={i}
-                  className="aspect-square rounded-xl bg-gradient-to-br from-brand-navy/5 to-brand-teal/5 border border-base flex items-center justify-center"
+                  className="aspect-square rounded-xl bg-linear-to-br from-brand-navy/5 to-brand-teal/5 border border-base flex items-center justify-center"
                 >
                   <ImageIcon className="w-5 h-5 text-brand-navy/15" aria-hidden />
                 </div>

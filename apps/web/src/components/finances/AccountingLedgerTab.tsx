@@ -72,15 +72,15 @@ function IncomeStatementPanel() {
         <div>
           <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">From</label>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-            className="min-h-[44px] border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+            className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
         </div>
         <div>
           <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">To</label>
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-            className="min-h-[44px] border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+            className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
         </div>
         <button type="button" onClick={load} disabled={loading}
-          className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
+          className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
           {loading ? 'Loading…' : 'Generate'}
         </button>
       </div>
@@ -144,10 +144,14 @@ function IncomeStatementPanel() {
 
 function TrialBalancePanel() {
   const [rows, setRows]     = useState<TrialBalanceLine[]>([])
-  const [loading, setLoading] = useState(false)
+  // R19 — starts `true`, not `false`: the mount effect below always fetches
+  // immediately, so initializing to the loading state the very first render
+  // already knows it'll be in means the effect needs no setState of its own
+  // before starting the request (the `.then`/`.finally` continuations below
+  // are already correctly deferred, not flagged).
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
     apiFetch<TrialBalanceLine[]>('/finances/accounting/trial-balance')
       .then(setRows)
       .finally(() => setLoading(false))
@@ -222,20 +226,20 @@ function AccountLedgerPanel() {
         <div>
           <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Account Code</label>
           <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. 1000"
-            className="min-h-[44px] border border-base rounded-xl px-3 text-sm bg-page text-body w-28 focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+            className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body w-28 focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
         </div>
         <div>
           <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">From</label>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-            className="min-h-[44px] border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+            className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
         </div>
         <div>
           <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">To</label>
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-            className="min-h-[44px] border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+            className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
         </div>
         <button type="button" onClick={load} disabled={loading}
-          className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
+          className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
           {loading ? 'Loading…' : 'Load Ledger'}
         </button>
       </div>
@@ -260,7 +264,7 @@ function AccountLedgerPanel() {
                       {new Date(l.date).toLocaleDateString('en-GB')}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs">{l.reference}</td>
-                    <td className="px-4 py-3 text-muted max-w-[200px] truncate">{l.description}</td>
+                    <td className="px-4 py-3 text-muted max-w-50 truncate">{l.description}</td>
                     <td className="px-4 py-3 text-right tabular text-emerald-700">
                       {l.debit > 0 ? formatMWK(l.debit) : '—'}
                     </td>

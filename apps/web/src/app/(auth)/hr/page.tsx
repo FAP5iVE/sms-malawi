@@ -56,7 +56,8 @@
  * (payrollService.ts, hrService.ts).
  */
 
-import { useState, useEffect } from 'react'
+import { useState, Suspense } from 'react'
+import { useSearchParams }  from 'next/navigation'
 import { RoleGuard }        from '@/components/shared/RoleGuard'
 import { useAuthStore }     from '@/store/authStore'
 import { usePermissions }   from '@/hooks/usePermissions'
@@ -99,6 +100,8 @@ import type { ApiStaffProfile, ApiLeaveRequest, ApiContractAlert, ApiStaffLoan }
  */
 type Tab = 'directory' | 'leave' | 'loans' | 'alerts'
 
+const HR_TABS: Tab[] = ['directory', 'leave', 'loans', 'alerts']
+
 export default function HRPage() {
   return (
     <RoleGuard
@@ -113,7 +116,11 @@ export default function HRPage() {
         'exam_officer',
       ]}
     >
-      <HRContent />
+      {/* useSearchParams() requires a Suspense boundary or `next build` fails —
+          same convention as (public)/login/page.tsx and (auth)/exams/page.tsx. */}
+      <Suspense fallback={null}>
+        <HRContent />
+      </Suspense>
     </RoleGuard>
   )
 }
@@ -121,18 +128,23 @@ export default function HRPage() {
 function HRContent() {
   const { role }  = useAuthStore()
   const { can }   = usePermissions()
-  const [tab, setTab]         = useState<Tab>('loans')
+
+  // R19 — the active tab is derived from ?tab= during render via Next's
+  // useSearchParams() (the codebase's established pattern — see
+  // (public)/login/page.tsx, (auth)/exams/page.tsx, (auth)/finances/page.tsx)
+  // instead of a useEffect that read window.location.search and called
+  // setTab post-mount. useSearchParams() is backed by the actual request
+  // URL on the server, so a deep-linked tab (/hr?tab=leave, /hr?tab=directory
+  // from HRDashboard's quick actions) now renders on first paint. The
+  // staff-only tabs are still gated further down by the same isHR checks
+  // that gate their tab buttons.
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const initialTab: Tab = tabParam && (HR_TABS as string[]).includes(tabParam) ? (tabParam as Tab) : 'loans'
+
+  const [tab, setTab]         = useState<Tab>(initialTab)
   const [search, setSearch]   = useState('')
 
-  // R15 — initialise the active tab from ?tab= so HRDashboard's corrected
-  // quick actions (/hr?tab=leave, /hr?tab=directory) can deep-link. Runs
-  // once post-hydration; the staff-only tabs are gated further down by the
-  // same isHR checks that gate their tab buttons.
-  useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get('tab')
-    const valid: Tab[] = ['directory', 'leave', 'loans', 'alerts']
-    if (t && (valid as string[]).includes(t)) setTab(t as Tab)
-  }, [])
   const isHR         = ['admin', 'hr', 'high_rank'].includes(role ?? '')
   const canApplyLoan = can('hr.applyLoan')
 
@@ -277,7 +289,7 @@ function HRContent() {
                   type="button"
                   onClick={() => handleReview(req, 'APPROVED')}
                   disabled={reviewLeave.isPending}
-                  className="flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 min-h-[44px] disabled:opacity-60"
+                  className="flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 min-h-11 disabled:opacity-60"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> Approve
                 </button>
@@ -285,7 +297,7 @@ function HRContent() {
                   type="button"
                   onClick={() => handleReview(req, 'REJECTED')}
                   disabled={reviewLeave.isPending}
-                  className="flex items-center gap-1 text-xs bg-brand-coral/10 text-brand-coral border border-brand-coral/20 px-3 py-1.5 rounded-lg hover:bg-brand-coral/20 min-h-[44px] disabled:opacity-60"
+                  className="flex items-center gap-1 text-xs bg-brand-coral/10 text-brand-coral border border-brand-coral/20 px-3 py-1.5 rounded-lg hover:bg-brand-coral/20 min-h-11 disabled:opacity-60"
                 >
                   <XCircle className="w-3.5 h-3.5" /> Reject
                 </button>
@@ -305,7 +317,7 @@ function HRContent() {
                     type="button"
                     onClick={() => setConflictPanel(null)}
                     aria-label="Close"
-                    className="p-1.5 rounded-lg hover:bg-surface min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    className="p-1.5 rounded-lg hover:bg-surface min-h-11 min-w-11 flex items-center justify-center"
                   >
                     <X className="w-4 h-4 text-muted" />
                   </button>
@@ -448,7 +460,7 @@ function LoansTab({
               <button
                 type="button"
                 onClick={() => setShowRequestForm(true)}
-                className="text-xs font-semibold text-brand-teal hover:underline min-h-[44px]"
+                className="text-xs font-semibold text-brand-teal hover:underline min-h-11"
               >
                 New Request
               </button>
@@ -491,7 +503,7 @@ function LoansTab({
                 <button
                   type="button"
                   onClick={() => setShowRequestForm(false)}
-                  className="flex-1 border border-base rounded-lg py-2 text-sm min-h-[44px]"
+                  className="flex-1 border border-base rounded-lg py-2 text-sm min-h-11"
                 >
                   Cancel
                 </button>
@@ -499,7 +511,7 @@ function LoansTab({
                   type="button"
                   onClick={submitRequest}
                   disabled={requestLoan.isPending || !amount || !monthlyDeduction || reason.trim().length < 10}
-                  className="flex-1 bg-brand-teal text-white rounded-lg py-2 text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 min-h-[44px]"
+                  className="flex-1 bg-brand-teal text-white rounded-lg py-2 text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 min-h-11"
                 >
                   {requestLoan.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   Submit Request
@@ -590,7 +602,7 @@ function LoansTab({
                           type="button"
                           onClick={() => approveLoan.mutate(loan.id)}
                           disabled={approveLoan.isPending}
-                          className="text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 min-h-[44px] disabled:opacity-60"
+                          className="text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 min-h-11 disabled:opacity-60"
                         >
                           Approve
                         </button>
@@ -600,7 +612,7 @@ function LoansTab({
                           type="button"
                           onClick={() => disburseLoan.mutate(loan.id)}
                           disabled={disburseLoan.isPending}
-                          className="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-100 min-h-[44px] disabled:opacity-60"
+                          className="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-100 min-h-11 disabled:opacity-60"
                         >
                           Disburse
                         </button>
@@ -609,7 +621,7 @@ function LoansTab({
                         <button
                           type="button"
                           onClick={() => setRepayTargetId(loan.id)}
-                          className="text-xs bg-brand-teal/10 text-brand-teal border border-brand-teal/25 px-3 py-1.5 rounded-lg hover:bg-brand-teal/20 min-h-[44px]"
+                          className="text-xs bg-brand-teal/10 text-brand-teal border border-brand-teal/25 px-3 py-1.5 rounded-lg hover:bg-brand-teal/20 min-h-11"
                         >
                           Record Repayment
                         </button>
@@ -630,14 +642,14 @@ function LoansTab({
                         type="button"
                         onClick={submitRepayment}
                         disabled={recordRepayment.isPending || !repayAmount}
-                        className="bg-brand-teal text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-[44px]"
+                        className="bg-brand-teal text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
                       >
                         Save
                       </button>
                       <button
                         type="button"
                         onClick={() => { setRepayTargetId(null); setRepayAmount('') }}
-                        className="border border-base rounded-lg px-3 py-2 text-sm min-h-[44px]"
+                        className="border border-base rounded-lg px-3 py-2 text-sm min-h-11"
                       >
                         Cancel
                       </button>

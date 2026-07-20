@@ -111,11 +111,20 @@ export async function getTranscriptData(studentId: string): Promise<TranscriptDa
     }),
     prisma.termResult.findMany({
       where:   { studentId },
-      include: { class: { select: { name: true } } },
       orderBy: [{ academicYear: 'asc' }, { term: 'asc' }],
     }),
     settingsService.getIdentitySettings(),
   ])
+
+  // TermResult.classId is a bare scalar FK with no Prisma relation to Class
+  // (no @relation on either side in schema.prisma), so class names must be
+  // resolved via a manual, batched lookup rather than a Prisma `include`.
+  const classIds = [...new Set(termResults.map((tr) => tr.classId))]
+  const classes = await prisma.class.findMany({
+    where:  { id: { in: classIds } },
+    select: { id: true, name: true },
+  })
+  const classNameById = new Map(classes.map((c) => [c.id, c.name]))
 
   const records: TranscriptTermRecord[] = await Promise.all(
     termResults.map(async (tr) => {
@@ -141,7 +150,7 @@ export async function getTranscriptData(studentId: string): Promise<TranscriptDa
       return {
         academicYear:  tr.academicYear,
         term:          tr.term,
-        className:     tr.class?.name ?? '—',
+        className:     classNameById.get(tr.classId) ?? '—',
         subjects,
         termAverage:   Number(tr.average),
         classPosition: tr.classPosition,

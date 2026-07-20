@@ -57,7 +57,6 @@ import { ModeToggle }          from '@/components/shared/ModeToggle'
 import {
   reducedMotionVariants,
   reducedMotionTransition,
-  SPRING,
   DURATION,
   EASE,
 } from '@/lib/motion'
@@ -104,7 +103,7 @@ const SHEET_SPRING = {
   stiffness: 340,
   damping: 40,
   mass: 0.85,
-}
+} as const
 
 const SHEET_EXIT_TRANSITION = {
   duration: DURATION.fast,
@@ -147,6 +146,11 @@ export function MobileBottomNav() {
     duration: DURATION.normal,
     ease: EASE.out,
   })
+  // R19 — mirrors sheetExitTransition above: a separate, reduced-motion-aware
+  // transition for the backdrop's exit, applied via the `exit` prop's own
+  // nested `transition` field (see the fix below) rather than a nonexistent
+  // `exit` key inside the top-level `transition` prop.
+  const backdropExitTransition = reducedMotionTransition(motionEnabled, { duration: DURATION.fast })
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -193,7 +197,7 @@ export function MobileBottomNav() {
               aria-current={item.active ? 'page' : undefined}
               className={[
                 'relative flex-1 flex flex-col items-center justify-center',
-                'gap-0.5 pt-2 pb-1.5 min-h-[60px]',
+                'gap-0.5 pt-2 pb-1.5 min-h-15',
                 'transition-colors duration-150',
                 item.active ? 'text-brand-teal' : 'text-muted hover:text-body',
               ].join(' ')}
@@ -214,7 +218,7 @@ export function MobileBottomNav() {
                   <span
                     className="
                       absolute -top-1 -right-1.5
-                      min-w-[14px] h-3.5
+                      min-w-3.5 h-3.5
                       bg-brand-coral rounded-full
                       text-white text-[8px] font-heading font-bold
                       flex items-center justify-center px-0.5 leading-none
@@ -227,7 +231,7 @@ export function MobileBottomNav() {
               </span>
 
               {/* Short mobile label */}
-              <span className="text-[10px] font-medium leading-none truncate max-w-[56px] text-center">
+              <span className="text-[10px] font-medium leading-none truncate max-w-14 text-center">
                 {item.mobileLabel}
               </span>
             </Link>
@@ -243,7 +247,7 @@ export function MobileBottomNav() {
           aria-controls="mobile-more-sheet"
           className={[
             'relative flex-1 flex flex-col items-center justify-center',
-            'gap-0.5 pt-2 pb-1.5 min-h-[60px]',
+            'gap-0.5 pt-2 pb-1.5 min-h-15',
             'transition-colors duration-150',
             moreOpen ? 'text-brand-teal' : 'text-muted hover:text-body',
           ].join(' ')}
@@ -269,11 +273,11 @@ export function MobileBottomNav() {
               variants={backdropVariants}
               initial="hidden"
               animate="visible"
-              exit="exit"
-              transition={{
-                ...backdropTransition,
-                exit: { duration: DURATION.fast },
+              exit={{
+                ...BACKDROP_VARIANTS.exit,
+                transition: backdropExitTransition,
               }}
+              transition={backdropTransition}
               className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] md:hidden"
               onClick={closeMore}
               aria-hidden
@@ -354,7 +358,7 @@ export function MobileBottomNav() {
                             <span
                               className="
                                 absolute -top-1 -right-1.5
-                                min-w-[14px] h-3.5
+                                min-w-3.5 h-3.5
                                 bg-brand-coral rounded-full
                                 text-white text-[8px] font-heading font-bold
                                 flex items-center justify-center px-0.5 leading-none
@@ -429,7 +433,7 @@ export function MobileBottomNav() {
                   "
                   aria-label="Sign out"
                 >
-                  <LogOut className="w-[18px] h-[18px]" />
+                  <LogOut className="w-4.5 h-4.5" />
                 </button>
               </div>
             </motion.div>

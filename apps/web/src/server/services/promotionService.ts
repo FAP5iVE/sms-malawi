@@ -437,7 +437,7 @@ export async function commitPromotion(
   if (!run) throw new Error(`No promotion preview found for ${academicYear}. Run preview first.`)
   if (run.status === 'COMMITTED') throw new Error(`Promotion for ${academicYear} is already committed.`)
 
-  const log = run.log as StudentPromotionResult[]
+  const log = run.log as unknown as StudentPromotionResult[]
 
   const mutations = log.flatMap((entry) => {
     if (entry.outcome === 'SKIPPED_NO_RESULT' || !entry.currentClassId) return []

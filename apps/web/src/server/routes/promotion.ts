@@ -26,7 +26,7 @@ const YearParam = z.string().regex(/^\d{4}\/\d{4}$/, 'Format must be YYYY/YYYY')
 
 // ── GET /promotion/:year ─────────────────────────────────────────────────────
 promotionRouter.get('/:year', async (req, res) => {
-  const parse = YearParam.safeParse(decodeURIComponent(req.params.year!))
+  const parse = YearParam.safeParse(decodeURIComponent(String(req.params.year)))
   if (!parse.success) return res.status(400).json({ error: parse.error.issues[0]?.message })
 
   const run = await getPromotionRun(parse.data)
@@ -39,7 +39,7 @@ promotionRouter.post(
   '/:year/preview',
   requireRole(['admin', 'exam_officer']),
   async (req, res) => {
-    const parse = YearParam.safeParse(decodeURIComponent(req.params.year!))
+    const parse = YearParam.safeParse(decodeURIComponent(String(req.params.year)))
     if (!parse.success) return res.status(400).json({ error: parse.error.issues[0]?.message })
 
     const preview = await runPromotion(parse.data, req.user!.uid, true)
@@ -52,7 +52,7 @@ promotionRouter.post(
   '/:year/commit',
   requireRole(['admin', 'exam_officer']),
   async (req, res) => {
-    const parse = YearParam.safeParse(decodeURIComponent(req.params.year!))
+    const parse = YearParam.safeParse(decodeURIComponent(String(req.params.year)))
     if (!parse.success) return res.status(400).json({ error: parse.error.issues[0]?.message })
 
     const result = await commitPromotion(parse.data, req.user!.uid)

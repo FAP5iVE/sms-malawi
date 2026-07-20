@@ -12,7 +12,8 @@
  * [DEPENDS ON]: none
  */
 
-import { useState, useEffect } from 'react'
+import { useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { useUsers, useCreateUser, useUpdateUserRole, useToggleUserDisabled, useSendPasswordReset } from '@/hooks/useAdmin'
 import { useSystemHealth } from '@/hooks/useReports'
@@ -24,21 +25,29 @@ import type { CreateUserInput } from '@shared/schemas/admin'
 export default function UserManagementPage() {
   return (
     <RoleGuard allowed={['admin']}>
-      <UserManagementContent />
+      {/* useSearchParams() requires a Suspense boundary or `next build` fails —
+          same convention as (public)/login/page.tsx and (auth)/exams/page.tsx. */}
+      <Suspense fallback={null}>
+        <UserManagementContent />
+      </Suspense>
     </RoleGuard>
   )
 }
 
 function UserManagementContent() {
-  const [tab, setTab] = useState<'users'|'health'>('users')
-  const [showCreate, setShowCreate] = useState(false)
+  // R19 — the active tab is derived from ?tab= during render via Next's
+  // useSearchParams() (the codebase's established pattern — see
+  // (public)/login/page.tsx, (auth)/exams/page.tsx, (auth)/finances/page.tsx,
+  // (auth)/hr/page.tsx, (auth)/library/page.tsx) instead of a useEffect that
+  // read window.location.search and called setTab post-mount.
+  // ?tab=health deep-link support (AdminDashboard's System Health quick
+  // action) now renders correctly on first paint.
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const initialTab: 'users' | 'health' = tabParam === 'health' ? 'health' : 'users'
 
-  // R15 — ?tab=health deep-link support (AdminDashboard's System Health
-  // quick action). Runs once post-hydration.
-  useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get('tab')
-    if (t === 'users' || t === 'health') setTab(t)
-  }, [])
+  const [tab, setTab] = useState<'users'|'health'>(initialTab)
+  const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState<Partial<CreateUserInput>>({})
   const { data: usersData } = useUsers()
   const { data: health } = useSystemHealth()

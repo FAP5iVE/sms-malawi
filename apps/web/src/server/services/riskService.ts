@@ -113,13 +113,19 @@ export async function assessStudentRisk(
   // ── 1. Fee debt ────────────────────────────────────────────────────────────
   let feeDebtPct = 0
   try {
-    const feeData = await prisma.studentFee.aggregate({
+    // There is no StudentFee model — per-student fee balance lives on
+    // Invoice (totalAmount, paidAmount, and the already-precomputed
+    // balance = totalAmount - paidAmount). Aggregating `balance` directly
+    // rather than re-deriving it from totalAmount/paidAmount matches how
+    // the rest of the codebase (e.g. analyticsService.ts's
+    // getFinanceOutstandingByClass) treats the stored balance field as
+    // authoritative.
+    const feeData = await prisma.invoice.aggregate({
       where: { studentId, academicYear },
-      _sum:  { amount: true, paid: true },
+      _sum:  { totalAmount: true, balance: true },
     })
-    const feeTotal   = Number(feeData._sum.amount ?? 0)
-    const feePaid    = Number(feeData._sum.paid   ?? 0)
-    const feeBalance = feeTotal - feePaid
+    const feeTotal   = Number(feeData._sum.totalAmount ?? 0)
+    const feeBalance = Number(feeData._sum.balance ?? 0)
     feeDebtPct = feeTotal > 0 ? (feeBalance / feeTotal) * 100 : 0
 
     if (feeDebtPct > FEE_DEBT_HIGH) {
@@ -210,7 +216,8 @@ export async function assessStudentRisk(
 
     for (const m of marks) {
       const markNum = Number(m.mark ?? 0)
-      const pct     = m.exam.maxMark > 0 ? (markNum / m.exam.maxMark) * 100 : 0
+      const maxMark = Number(m.exam.maxMark)
+      const pct     = maxMark > 0 ? (markNum / maxMark) * 100 : 0
       if (pct < passMark) subjectFails++
     }
 

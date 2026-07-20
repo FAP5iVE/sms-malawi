@@ -228,7 +228,7 @@ function ClassDetailContent() {
             permission="class.markAttendance"
             fallback={
               <div className="bg-surface border border-base rounded-xl p-6 text-center text-sm text-muted">
-                Only this class's assigned teacher can mark attendance.
+                Only this class&apos;s assigned teacher can mark attendance.
               </div>
             }
           >

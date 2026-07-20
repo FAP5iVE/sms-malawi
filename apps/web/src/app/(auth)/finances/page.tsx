@@ -12,7 +12,8 @@
  * [DEPENDS ON]: none
  */
 
-import { useState, useEffect }   from 'react'
+import { useState, Suspense }    from 'react'
+import { useSearchParams }       from 'next/navigation'
 import { RoleGuard }             from '@/components/shared/RoleGuard'
 import { useAuthStore }          from '@/store/authStore'
 import { InvoicesTab }           from '@/components/finances/InvoicesTab'
@@ -39,14 +40,17 @@ type Tab =
 export default function FinancesPage() {
   return (
     <RoleGuard allowed={['admin', 'high_rank', 'finance', 'student']}>
-      <FinancesContent />
+      {/* useSearchParams() requires a Suspense boundary or `next build` fails —
+          same convention as (public)/login/page.tsx and (auth)/exams/page.tsx. */}
+      <Suspense fallback={null}>
+        <FinancesContent />
+      </Suspense>
     </RoleGuard>
   )
 }
 
 function FinancesContent() {
   const { role }   = useAuthStore()
-  const [activeTab, setActiveTab] = useState<Tab>('invoices')
   const YEAR = '2025/2026'
   const TERM = 1
 
@@ -69,15 +73,19 @@ function FinancesContent() {
     .filter((t) => t.show)
     .map(({ id, label }) => ({ id, label }))
 
-  // R15 — initialise the active tab from ?tab= so dashboard quick actions
-  // (Record Payment / Generate Receipt → /finances?tab=invoices etc.) can
-  // deep-link. Runs once post-hydration (no SSR mismatch) and only accepts
-  // a tab this role can actually see.
-  useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get('tab')
-    if (t && TABS.some((tab) => tab.id === t)) setActiveTab(t as Tab)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
-  }, [])
+  // R19 — the active tab is derived from ?tab= during render via Next's
+  // useSearchParams() (the codebase's established pattern — see
+  // (public)/login/page.tsx and (auth)/exams/page.tsx) instead of a
+  // useEffect that read window.location.search and called setActiveTab
+  // post-mount. useSearchParams() is backed by the actual request URL on
+  // the server, so the correct deep-linked tab (Record Payment / Generate
+  // Receipt → /finances?tab=invoices etc.) now renders on first paint,
+  // and only a tab this role can actually see is ever accepted.
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const initialTab: Tab = tabParam && TABS.some((tab) => tab.id === tabParam) ? (tabParam as Tab) : 'invoices'
+
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab)
 
   return (
     <div className="space-y-5">

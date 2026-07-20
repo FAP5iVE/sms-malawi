@@ -34,6 +34,7 @@
 import type { ApexOptions } from 'apexcharts'
 import { useTheme } from 'next-themes'
 import dynamic from 'next/dynamic'
+import type { ComponentType } from 'react'
 
 import { chartColorAt } from '@/lib/chartPalette'
 import type { ChartProps, ChartSeriesConfig, ChartType } from './types'
@@ -50,10 +51,25 @@ interface ApexComponentProps {
   height: number
 }
 
-const ReactApexChart = dynamic<ApexComponentProps>(() => import('react-apexcharts'), {
-  ssr: false,
-  loading: () => <div className="h-full w-full rounded-xl bg-page animate-pulse" />,
-})
+// react-apexcharts's own Props.type is a wider, optional union (14 chart
+// kinds, e.g. 'scatter' | 'heatmap' | 'treemap' | ...) than the
+// `ApexBaseType` this renderer restricts itself to — real chart types this
+// renderer never uses, plus `undefined` since the library leaves `type`
+// optional. Passing our narrower `ApexComponentProps` as `dynamic<P>()`'s
+// generic makes TypeScript try to structurally verify the *whole* resolved
+// component against it, which fails on that required-vs-optional,
+// narrower-vs-wider mismatch. The loader instead resolves to
+// `ComponentType<ApexComponentProps>` directly — asserting once, at this
+// single boundary, that every value ApexBaseType allows is a valid member
+// of the library's own wider `type` union (it is), and that this file only
+// ever calls `<ReactApexChart>` with our narrower shape (it does, below).
+const ReactApexChart = dynamic(
+  () => import('react-apexcharts').then((mod) => mod.default as unknown as ComponentType<ApexComponentProps>),
+  {
+    ssr: false,
+    loading: () => <div className="h-full w-full rounded-xl bg-page animate-pulse" />,
+  },
+)
 
 /** Map a `ChartType` to the ApexCharts base `chart.type`. */
 function apexBaseType(type: ChartType): ApexBaseType {

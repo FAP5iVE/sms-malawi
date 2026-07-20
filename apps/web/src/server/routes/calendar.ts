@@ -144,21 +144,30 @@ calendarRouter.get('/events',
     }
 
     // ── 3. Exams scheduled in the range ──
+    // No `status` filter: every Exam row already has a real, confirmed
+    // ExamStatus (SCHEDULED, IN_PROGRESS, MARKS_PENDING, MARKS_DRAFT,
+    // MARKS_FINAL, RESULTS_APPROVED, RESULTS_RELEASED — defaults to
+    // SCHEDULED on creation). There is no "not yet scheduled" draft state
+    // for an exam's own scheduling in this domain — MARKS_DRAFT is about
+    // the marks-entry progress *after* the exam has already happened, not
+    // whether the exam itself belongs on the calendar. The previous
+    // `status: { not: 'DRAFT' }` referenced a status value that has never
+    // existed in the ExamStatus enum.
     const exams = await prisma.exam.findMany({
       where: {
-        date:   { gte: rangeStart, lte: rangeEnd },
-        status: { not: 'DRAFT' },
+        date: { gte: rangeStart, lte: rangeEnd },
       },
-      select: { id: true, subject: true, date: true, startTime: true, endTime: true, type: true, venue: true },
+      select: { id: true, subject: true, date: true, timeStart: true, timeEnd: true, type: true, venue: true },
     })
     for (const exam of exams) {
       const dateStr = format(exam.date, 'yyyy-MM-dd')
+      const isManeb = exam.type === 'MANEB_JCE' || exam.type === 'MANEB_MSCE'
       events.push({
         id:       `exam-${exam.id}`,
-        title:    `${exam.type === 'MANEB' ? 'MANEB ' : ''}${exam.subject} Exam`,
-        start:    exam.startTime ? `${dateStr}T${exam.startTime}` : dateStr,
-        end:      exam.endTime   ? `${dateStr}T${exam.endTime}`   : undefined,
-        allDay:   !exam.startTime,
+        title:    `${isManeb ? 'MANEB ' : ''}${exam.subject} Exam`,
+        start:    exam.timeStart ? `${dateStr}T${exam.timeStart}` : dateStr,
+        end:      exam.timeEnd   ? `${dateStr}T${exam.timeEnd}`   : undefined,
+        allDay:   !exam.timeStart,
         color:    CALENDAR_COLORS.exam,
         category: 'exam',
         meta:     { examId: exam.id, venue: exam.venue ?? '' },

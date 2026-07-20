@@ -20,7 +20,7 @@
  */
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useClassAttendance, useMarkAttendance } from '@/hooks/useAttendance'
 import { CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
@@ -57,18 +57,30 @@ export function AttendanceSheet({ classId, students, date = new Date() }: Attend
   const [record, setRecord] = useState<AttendanceRecord>({})
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  // Seed local state from the fetched records whenever the server data
-  // changes (initial load, date change, or after a successful save's
-  // invalidation refetch) — unmarked students default to ABSENT, matching
-  // the previous Firestore-backed component's own default.
-  useEffect(() => {
+  // Re-seed local state whenever the server data actually changes (initial
+  // load, date change, or after a successful save's invalidation refetch) —
+  // unmarked students default to ABSENT, matching the previous
+  // Firestore-backed component's own default.
+  //
+  // This intentionally does NOT use a useEffect: `fetched`/`students` are
+  // reference-stable between renders until they genuinely change (TanStack
+  // Query's structural sharing, and the caller's own students array), so
+  // comparing against the previous render's references and adjusting state
+  // directly in the render body — React's own documented pattern for
+  // "reset state when a prop changes" — re-seeds `record` one render sooner
+  // than an effect would, without ever calling setState from inside one.
+  const [prevFetched, setPrevFetched] = useState(fetched)
+  const [prevStudents, setPrevStudents] = useState(students)
+  if (fetched !== prevFetched || students !== prevStudents) {
+    setPrevFetched(fetched)
+    setPrevStudents(students)
     const seeded: AttendanceRecord = {}
     for (const student of students) {
       const existing = fetched.find((r) => r.studentId === student.id)
       seeded[student.id] = existing?.status ?? 'ABSENT'
     }
     setRecord(seeded)
-  }, [fetched, students])
+  }
 
   function cycle(studentId: string) {
     setSaveError(null)
@@ -139,7 +151,7 @@ export function AttendanceSheet({ classId, students, date = new Date() }: Attend
               <button
                 onClick={() => cycle(student.id)}
                 aria-label={`${student.firstName} ${student.lastName}: ${label}. Tap to change.`}
-                className="flex items-center gap-1.5 text-sm font-medium transition-colors min-h-[44px]"
+                className="flex items-center gap-1.5 text-sm font-medium transition-colors min-h-11"
               >
                 <Icon className={`w-5 h-5 ${textCls}`} aria-hidden />
                 <span className={textCls}>{label}</span>

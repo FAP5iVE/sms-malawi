@@ -35,7 +35,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Cell,
 }                               from 'recharts'
 import { TrendingUp, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 import { apiFetch }             from '@/lib/api-client'
@@ -134,29 +133,51 @@ function SummaryCard({
 // FORECAST PANEL
 // ─────────────────────────────────────────────────────────────────────────────
 
+function buildForecastUrl(academicYear: string, forwardMonths: number): string {
+  return `/finances/forecast?academicYear=${encodeURIComponent(academicYear)}&forwardMonths=${forwardMonths}`
+}
+
 export function ForecastPanel() {
   const [academicYear, setAcademicYear] = useState('2025/2026')
   const [forwardMonths, setForwardMonths] = useState(3)
   const [report,   setReport]   = useState<ForecastReport | null>(null)
-  const [loading,  setLoading]  = useState(false)
+  // R19 — starts `true`, not `false`: the mount effect below always kicks
+  // off a fetch immediately, so initializing to the loading state the very
+  // first render already knows it'll be in avoids one wasted render
+  // (false → true → ...) and means the mount effect needs no setState call
+  // of its own before starting the request.
+  const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState<string | null>(null)
 
-  async function loadForecast() {
+  // User-triggered reload (the Refresh button). Setting `loading`/`error`
+  // synchronously here is fine — this runs inside a click handler, not an
+  // effect — giving immediate visual feedback before the fetch resolves.
+  function loadForecast() {
     setLoading(true)
     setError(null)
-    try {
-      const data = await apiFetch<ForecastReport>(
-        `/finances/forecast?academicYear=${encodeURIComponent(academicYear)}&forwardMonths=${forwardMonths}`,
-      )
-      setReport(data)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Forecast failed')
-    } finally {
-      setLoading(false)
-    }
+    apiFetch<ForecastReport>(buildForecastUrl(academicYear, forwardMonths))
+      .then((data) => setReport(data))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Forecast failed'))
+      .finally(() => setLoading(false))
   }
 
-  useEffect(() => { loadForecast() }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  // Mount-only fetch — the textbook-legitimate use of an effect (fetching
+  // data when a component mounts). Written as a .then/.catch/.finally
+  // promise chain rather than calling an async/await function: every
+  // setState call is then syntactically inside a callback the promise
+  // invokes later, a deferred continuation the linter (correctly)
+  // recognizes as never running synchronously within the effect body —
+  // vs. calling a named async function, which it can't statically prove
+  // is free of a pre-`await` setState without deeper control-flow analysis
+  // than this rule performs. `loading` already starts `true` (above), so
+  // no setState is needed before starting the request either.
+  useEffect(() => {
+    apiFetch<ForecastReport>(buildForecastUrl(academicYear, forwardMonths))
+      .then((data) => setReport(data))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Forecast failed'))
+      .finally(() => setLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only fetch; academicYear/forwardMonths changes are applied via the Refresh button (loadForecast), not automatically re-fetched
+  }, [])
 
   const chartData = report
     ? buildChartData(report.feeRevenue, report.expenses, report.netCashFlow)

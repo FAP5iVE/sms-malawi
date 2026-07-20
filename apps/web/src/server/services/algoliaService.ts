@@ -142,7 +142,14 @@ export async function deleteBook(bookId: string): Promise<void> {
 export async function bulkIndexStudents(records: AlgoliaStudent[]): Promise<void> {
   if (records.length === 0) return
   try {
-    await adminClient.saveObjects({ indexName: STUDENTS_INDEX, objects: records })
+    // AlgoliaStudent (and AlgoliaStaff / AlgoliaBook below) is a plain,
+    // JSON-serializable interface — string/number/null fields only, no
+    // methods or symbols. The Algolia v5 SDK's SaveObjectsOptions.objects
+    // requires an index signature (Record<string, unknown>[]), which a
+    // named-property interface never structurally satisfies regardless of
+    // its field types — a nominal-typing gap in the SDK's own types, not a
+    // real safety concern here, so the cast below is safe.
+    await adminClient.saveObjects({ indexName: STUDENTS_INDEX, objects: records as unknown as Record<string, unknown>[] })
   } catch (err) {
     console.error('[algoliaService] bulkIndexStudents failed', err)
   }
@@ -151,7 +158,8 @@ export async function bulkIndexStudents(records: AlgoliaStudent[]): Promise<void
 export async function bulkIndexStaff(records: AlgoliaStaff[]): Promise<void> {
   if (records.length === 0) return
   try {
-    await adminClient.saveObjects({ indexName: STAFF_INDEX, objects: records })
+    // See the comment on bulkIndexStudents above — same nominal-typing gap.
+    await adminClient.saveObjects({ indexName: STAFF_INDEX, objects: records as unknown as Record<string, unknown>[] })
   } catch (err) {
     console.error('[algoliaService] bulkIndexStaff failed', err)
   }
@@ -160,7 +168,8 @@ export async function bulkIndexStaff(records: AlgoliaStaff[]): Promise<void> {
 export async function bulkIndexBooks(records: AlgoliaBook[]): Promise<void> {
   if (records.length === 0) return
   try {
-    await adminClient.saveObjects({ indexName: BOOKS_INDEX, objects: records })
+    // See the comment on bulkIndexStudents above — same nominal-typing gap.
+    await adminClient.saveObjects({ indexName: BOOKS_INDEX, objects: records as unknown as Record<string, unknown>[] })
   } catch (err) {
     console.error('[algoliaService] bulkIndexBooks failed', err)
   }

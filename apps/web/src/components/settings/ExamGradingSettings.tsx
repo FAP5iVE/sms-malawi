@@ -102,7 +102,7 @@ function GradeScaleTable({
                   min={0} max={100}
                   value={row.minPercent}
                   onChange={(e) => onUpdate(row.id, 'minPercent', Number(e.target.value))}
-                  className="w-16 min-h-[36px] border border-base rounded-lg px-2 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                  className="w-16 min-h-9 border border-base rounded-lg px-2 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
                 />
               </td>
               <td className="px-3 py-2">
@@ -111,14 +111,14 @@ function GradeScaleTable({
                   min={0} max={100}
                   value={row.maxPercent}
                   onChange={(e) => onUpdate(row.id, 'maxPercent', Number(e.target.value))}
-                  className="w-16 min-h-[36px] border border-base rounded-lg px-2 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                  className="w-16 min-h-9 border border-base rounded-lg px-2 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
                 />
               </td>
               <td className="px-3 py-2">
                 <input
                   value={row.label ?? ''}
                   onChange={(e) => onUpdate(row.id, 'label', e.target.value)}
-                  className="w-28 min-h-[36px] border border-base rounded-lg px-2 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                  className="w-28 min-h-9 border border-base rounded-lg px-2 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
                 />
               </td>
               <td className="px-3 py-2.5">
@@ -147,15 +147,18 @@ export function ExamGradingSettings() {
   const [activeType,   setActiveType]   = useState<ExamTypeKey>('MSCE')
   const [promotionMin, setPromotionMin] = useState(35)
   const [promotionPasses, setPromotionPasses] = useState(4)
-  const [loading,      setLoading]      = useState(false)
+  const [loading,      setLoading]      = useState(true)
   const [saving,       setSaving]       = useState(false)
   const [saved,        setSaved]        = useState(false)
   const [resetting,    setResetting]    = useState(false)
   const [confirmResetOpen, setConfirmResetOpen] = useState(false)
   const [error,        setError]        = useState<string | null>(null)
 
+  // R19 — `loading` now starts `true` above (the effect below always fetches
+  // immediately on mount), so no setState is needed before starting the
+  // request — the `.then/.catch/.finally` chain that follows was already
+  // correctly deferred and never flagged.
   useEffect(() => {
-    setLoading(true)
     Promise.all([
       apiFetch<GradeRow[]>('/settings/grading-scales'),
       apiFetch<{ promotion_min_average: number; promotion_required_passes: number }>(
@@ -260,7 +263,7 @@ export function ExamGradingSettings() {
                 key={key}
                 type="button"
                 onClick={() => setActiveType(key)}
-                className={`px-3 py-2 rounded-xl text-xs font-heading font-semibold border transition-colors min-h-[36px] ${
+                className={`px-3 py-2 rounded-xl text-xs font-heading font-semibold border transition-colors min-h-9 ${
                   activeType === key
                     ? 'bg-brand-navy text-white border-brand-navy'
                     : 'bg-surface border-base text-muted hover:border-brand-navy/30 hover:text-body'
@@ -288,7 +291,7 @@ export function ExamGradingSettings() {
                   type="number" min={0} max={100}
                   value={promotionMin}
                   onChange={(e) => setPromotionMin(Number(e.target.value))}
-                  className="w-full min-h-[44px] border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                  className="w-full min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
                 />
               </div>
               <div>
@@ -299,7 +302,7 @@ export function ExamGradingSettings() {
                   type="number" min={0} max={20}
                   value={promotionPasses}
                   onChange={(e) => setPromotionPasses(Number(e.target.value))}
-                  className="w-full min-h-[44px] border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                  className="w-full min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
                 />
               </div>
             </div>
@@ -311,7 +314,7 @@ export function ExamGradingSettings() {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2"
+              className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2"
             >
               {saving
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
@@ -322,7 +325,7 @@ export function ExamGradingSettings() {
               type="button"
               onClick={() => setConfirmResetOpen(true)}
               disabled={resetting}
-              className="min-h-[44px] px-4 rounded-xl text-sm font-heading font-semibold border border-base text-muted hover:bg-page hover:text-body transition-colors disabled:opacity-60 flex items-center gap-2 ml-auto"
+              className="min-h-11 px-4 rounded-xl text-sm font-heading font-semibold border border-base text-muted hover:bg-page hover:text-body transition-colors disabled:opacity-60 flex items-center gap-2 ml-auto"
             >
               {resetting
                 ? <Loader2 className="w-4 h-4 animate-spin" />
