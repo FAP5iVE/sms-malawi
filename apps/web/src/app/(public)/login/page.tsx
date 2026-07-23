@@ -65,10 +65,13 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { role, initialized } = useAuthStore((s) => ({
-    role: s.role,
-    initialized: s.initialized,
-  }))
+  // NOTE: bare store destructure, no selector. An object-returning selector
+  // (`(s) => ({ role: s.role, initialized: s.initialized })`) allocates a new
+  // object every render, so useSyncExternalStore's getSnapshot never compares
+  // equal to the previous snapshot — React then re-renders forever
+  // ("Maximum update depth exceeded"). Matches every other useAuthStore
+  // consumer in this codebase.
+  const { role, initialized } = useAuthStore()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
