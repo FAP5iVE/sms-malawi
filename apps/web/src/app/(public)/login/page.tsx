@@ -83,6 +83,16 @@ function LoginForm() {
 
   const safeFrom = sanitizeRedirectTarget(searchParams.get('from'))
 
+  // Sign-in succeeded, AuthProvider finished initialising, but the account
+  // carries no `role` custom claim — AuthProvider's bounded retry has already
+  // given up and called setUser(user, null). Without this, the effect below
+  // simply returned on `!role` and `loading` stayed true forever (it is only
+  // cleared in handleLogin's catch block), so the button span indefinitely
+  // with no explanation. Derived during render — not assigned from an effect —
+  // so no setState-in-effect is introduced.
+  const noRoleAssigned = submitted && initialized && !role
+  const isBusy = loading && !noRoleAssigned
+
   // Once sign-in has been submitted and AuthProvider has resolved the
   // post-token role claim, redirect exactly once. Guarded by a ref so a
   // later, unrelated role change elsewhere in the app session can never
@@ -316,13 +326,27 @@ function LoginForm() {
                 </div>
               )}
 
+              {noRoleAssigned && !error && (
+                <div
+                  role="alert"
+                  className="text-sm text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3 flex items-start gap-2"
+                >
+                  <span className="mt-0.5 shrink-0">⚠</span>
+                  <span>
+                    Your sign-in worked, but this account has no role assigned yet, so
+                    there is nothing it can open. An administrator needs to set the
+                    account&rsquo;s role before you can continue.
+                  </span>
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={loading}
+                disabled={isBusy}
                 className="w-full bg-brand-navy text-white py-3 rounded-xl font-heading font-semibold text-sm hover:bg-brand-navy-mid transition-colors flex items-center justify-center gap-2 disabled:opacity-60 mt-2 shadow-sm"
               >
-                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {loading ? 'Signing in…' : 'Sign In'}
+                {isBusy && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isBusy ? 'Signing in…' : 'Sign In'}
               </button>
             </form>
 
