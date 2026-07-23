@@ -60,6 +60,7 @@ import { CreateStudentSchema }      from '@shared/schemas/student'
 import type { CreateStudentInput }  from '@shared/schemas/student'
 import type { ApiStudent }          from '@shared/types/api'
 import { useCreateStudent, useUpdateStudent, useStudent } from '@/hooks/useStudents'
+import { buildApiUrl }              from '@/lib/api-client'
 import { useMotionEnabled }         from '@/store/motionStore'
 import {
   SHEET_UP_VARIANTS,
@@ -346,7 +347,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     formData.append('photo', photoFile)
     const token = await getAuth().currentUser?.getIdToken()
     await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/students/${id}/photo`,
+      buildApiUrl(`/students/${id}/photo`),
       {
         method:  'POST',
         headers: { Authorization: `Bearer ${token ?? ''}` },

@@ -66,13 +66,48 @@ import { getAuth } from 'firebase/auth'
  *   normal call would resolve getAuth().currentUser, it would already be
  *   null. Every other caller omits this and keeps today's behavior exactly.
  */
+// ─── API BASE URL RESOLUTION ──────────────────────────────
+//
+// The API is served by this same Next.js app at /api/[[...slug]], so the
+// correct value for NEXT_PUBLIC_API_URL in every environment is EMPTY —
+// which yields a relative, same-origin URL. Both .env.local and .env.example
+// ship it empty for exactly that reason.
+//
+// Production incident (post-R19): NEXT_PUBLIC_API_URL had been set in the
+// Vercel dashboard to the production origin WITH a '/api' suffix. Because
+// buildApiUrl() appends '/api' itself, every request went to
+// '<origin>/api/api/public/...' — which matches no route — and, being an
+// absolute URL pointing at the production domain, was also cross-origin
+// whenever the app ran on a preview deployment, so the browser's preflight
+// was rejected by api-app.ts's (correctly strict) CORS allowlist.
+//
+// resolveApiBase() defensively strips a trailing slash and a trailing '/api'
+// so that misconfiguration can no longer produce a doubled path. Note this
+// only cures the doubled segment — an absolute base still makes preview
+// deployments cross-origin, so NEXT_PUBLIC_API_URL must be left unset.
+function resolveApiBase(): string {
+  const raw = (process.env.NEXT_PUBLIC_API_URL ?? '').trim()
+  if (!raw) return ''
+  return raw.replace(/\/+$/, '').replace(/\/api$/, '')
+}
+
+/**
+ * Builds a fully-qualified API URL from a route-relative path ('/students/1').
+ * The single place '/api' is prepended — used by apiFetch below and by the
+ * few call sites that must bypass apiFetch and issue a raw fetch() (file
+ * uploads / blob downloads), so no caller re-derives this string itself.
+ */
+export function buildApiUrl(path: string): string {
+  const suffix = path.startsWith('/') ? path : `/${path}`
+  return `${resolveApiBase()}/api${suffix}`
+}
+
 export async function apiFetch<T>(
   path: string,
   options?: RequestInit,
   tokenOverride?: string
 ): Promise<T> {
-  const base = process.env.NEXT_PUBLIC_API_URL ?? ''
-  const url = `${base}/api${path}`
+  const url = buildApiUrl(path)
 
   async function buildHeaders(forceRefresh = false): Promise<HeadersInit> {
     let token: string | undefined

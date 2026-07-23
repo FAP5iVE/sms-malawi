@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { getAuth } from 'firebase/auth'
 import { Download, Loader2 } from 'lucide-react'
+import { buildApiUrl } from '@/lib/api-client'
 
 interface ReportDef {
   type: string
@@ -32,7 +33,7 @@ export function ReportsExportPanel({ academicYear, term }: { academicYear: strin
     setLoading(type)
     try {
       const token = await getAuth().currentUser?.getIdToken()
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/finances/reports/export`, {
+      const res = await fetch(buildApiUrl('/finances/reports/export'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
