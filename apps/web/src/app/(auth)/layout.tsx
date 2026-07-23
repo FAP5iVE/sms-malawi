@@ -29,7 +29,6 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { AuthProvider }          from '@/components/providers/AuthProvider'
 import { Sidebar }               from '@/components/shared/Sidebar'
 import { PageHeader }            from '@/components/shared/PageHeader'
 import { MobileBottomNav }       from '@/components/shared/MobileBottomNav'
@@ -113,7 +112,13 @@ function PageTransitionWrapper({ children }: { children: React.ReactNode }) {
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AuthProvider>
+    // AuthProvider is no longer wrapped here — it is mounted once in the
+    // root layout (apps/web/src/app/layout.tsx) so that it also covers the
+    // (public) route group, whose /login page depends on its
+    // onIdTokenChanged listener to observe sign-in. Wrapping again here
+    // would mount a SECOND listener inside the authenticated tree,
+    // double-firing setUser() and the FCM token registration.
+    <>
       {/* Side-effect: starts inactivity logout timer after auth init */}
       <InactivityManager />
 
@@ -198,6 +203,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           it is not part of the flex layout and should not participate in it.
       */}
       <MobileBottomNav />
-    </AuthProvider>
+    </>
   )
 }
