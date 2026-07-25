@@ -213,28 +213,52 @@ async function unregisterFcmTokenFromServer(
  * onIdTokenChanged signed-out branch (unchanged) remains the single place
  * that happens, triggered by the signOut(auth) call below.
  */
+// Best-effort steps in logout() must never block sign-out indefinitely.
+// If the network is slow or a request hangs, we abandon the cleanup after
+// this many ms and proceed to signOut(auth) regardless. The FCM token is
+// still garbage-collected server-side by push.ts's removeInvalidTokens().
+const LOGOUT_CLEANUP_TIMEOUT_MS = 2000
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  return Promise.race([
+    promise,
+    new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms)),
+  ])
+}
+
 export async function logout(): Promise<void> {
   if (!auth) return // auth is null during SSR; never reached in browser
 
-  const user = getAuth().currentUser
-  if (user) {
-    let authToken: string | undefined
-    try {
-      authToken = await user.getIdToken()
-    } catch {
-      // Token fetch failed — proceed to sign-out anyway; the unregister
-      // call below will simply no-op via its own try/catch.
-      authToken = undefined
-    }
-
-    if (currentFcmToken) {
-      await unregisterFcmTokenFromServer(currentFcmToken, authToken)
+  try {
+    const user = getAuth().currentUser
+    if (user && currentFcmToken) {
+      // Capture a still-valid token and unregister the FCM token BEFORE
+      // sign-out — but bounded by a timeout so a slow token fetch or a hung
+      // unregister request can never delay the sign-out below.
+      const tokenToUnregister = currentFcmToken
+      await withTimeout(
+        (async () => {
+          let authToken: string | undefined
+          try {
+            authToken = await user.getIdToken()
+          } catch {
+            authToken = undefined
+          }
+          await unregisterFcmTokenFromServer(tokenToUnregister, authToken)
+        })(),
+        LOGOUT_CLEANUP_TIMEOUT_MS,
+      )
       currentFcmToken = null
       currentFcmTokenRegisteredAt = null
     }
+  } catch {
+    // Any failure in best-effort cleanup is swallowed — sign-out must
+    // still happen. The finally block below guarantees it.
+  } finally {
+    // The actual sign-out. Runs no matter what happened above, so a hung
+    // or failed cleanup can never leave the user stuck "logging out".
+    await signOut(auth)
   }
-
-  await signOut(auth)
 }
 
 // ─── PROVIDER ─────────────────────────────────────────────

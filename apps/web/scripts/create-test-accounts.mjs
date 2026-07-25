@@ -1,14 +1,15 @@
 /**
- * FILE: apps/functions/scripts/create-test-accounts.mjs
+ * FILE: apps/web/scripts/create-test-accounts.mjs
  *
- * Creates all 9 SMS Malawi test accounts in Firebase Auth
- * and sets the custom 'role' claim on each one.
+ * Creates all SMS Malawi test accounts (10 accounts across 9 roles) in
+ * Firebase Auth and sets (and verifies) the custom 'role' claim on each one.
  *
- * RUN: node apps/functions/scripts/create-test-accounts.mjs
+ * RUN (from project root sms-malawi/):
+ *   node apps/web/scripts/create-test-accounts.mjs
  *
  * Prerequisites:
- *   - apps/functions/service-account.json must exist
- *   - Run from the project root: sms-malawi/
+ *   - apps/web/service-account.json must exist (real Firebase Admin key)
+ *   - Writes to the project named in that key's project_id
  */
 import { initializeApp, cert } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
@@ -23,7 +24,8 @@ const serviceAccount = JSON.parse(readFileSync(join(__dirname, '../service-accou
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) })
 
 // ─── TEST ACCOUNTS ────────────────────────────────────────
-// All 9 roles. Change passwords before using in production.
+// 10 accounts across the 9 roles (two high_rank: principal + headteacher).
+// Change passwords before using in production.
 const TEST_ACCOUNTS = [
   {
     email: 'admin@sms.test',
@@ -36,6 +38,13 @@ const TEST_ACCOUNTS = [
     email: 'principal@sms.test',
     password: 'Principal@1234!',
     displayName: 'School Principal',
+    role: 'high_rank',
+    subtitle: 'Head Teacher',
+  },
+  {
+    email: 'headteacher@sms.test',
+    password: 'HeadTeacher@1234!',
+    displayName: 'Head Teacher',
     role: 'high_rank',
     subtitle: 'Head Teacher',
   },
@@ -119,24 +128,63 @@ async function createOrUpdate(account) {
     requiresPasswordChange: false, // set true for real users on first login
   })
 
-  console.log(`  🏷  Role set: ${role} (UID: ${user.uid})`)
+  // Verify the claim actually landed. setCustomUserClaims resolves before the
+  // claim is guaranteed readable, and a silent no-op here is precisely how an
+  // account ends up existing with NO role — which then loops forever in
+  // AuthProvider ("no role claim after 2 retries"). Read it back and confirm.
+  const check = await admin.auth().getUser(user.uid)
+  const written = check.customClaims?.role
+  if (written !== role) {
+    throw new Error(
+      `claim verification failed — expected role='${role}', ` + `read back '${written ?? '(none)'}'`
+    )
+  }
+
+  console.log(`  🏷  Role set & verified: ${role} (UID: ${user.uid})`)
   return user
 }
 
 async function main() {
   console.log('🚀 SMS Malawi — Creating test accounts...\n')
 
+  const succeeded = []
+  const failed = []
+
   for (const account of TEST_ACCOUNTS) {
     try {
       await createOrUpdate(account)
+      succeeded.push(account.email)
     } catch (err) {
       console.error(`  ✗ Failed for ${account.email}: ${err.message}`)
+      failed.push({ email: account.email, reason: err.message })
     }
   }
 
-  console.log('\n✅ Done! All test accounts created/updated.')
-  console.log('   Log in at http://localhost:3000/login with any of the accounts above.')
+  // Honest summary — never claim success when an account was skipped or its
+  // claim did not verify.
+  console.log('\n─────────────────────────────────────────────')
+  console.log(`  Succeeded: ${succeeded.length}/${TEST_ACCOUNTS.length}`)
+  if (failed.length > 0) {
+    console.log(`  Failed:    ${failed.length}/${TEST_ACCOUNTS.length}`)
+    for (const f of failed) console.log(`    ✗ ${f.email} — ${f.reason}`)
+    console.log('─────────────────────────────────────────────')
+    console.error(
+      '\n❌ Some accounts are incomplete. Those that failed have NO usable ' +
+        'role claim and will loop on login until this is resolved. Re-run after ' +
+        'fixing the cause above (network, quota, or credentials).'
+    )
+    process.exit(1)
+  }
+
+  console.log('─────────────────────────────────────────────')
+  console.log('\n✅ All test accounts created/updated and role claims verified.')
+  console.log('   Log in at http://localhost:3000/login with any account above.')
+  console.log('   NOTE: if an account was already signed in, sign out and back')
+  console.log('   in — custom claims only appear in a freshly minted ID token.')
   process.exit(0)
 }
 
-main().catch(console.error)
+main().catch((err) => {
+  console.error('\n❌ Fatal:', err.message)
+  process.exit(1)
+})
