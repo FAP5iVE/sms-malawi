@@ -76,6 +76,19 @@ applicationsRouter.get(
   }
 )
 
+// GET /applications/:id — single application for the applicant detail page.
+// Same permission gate as the list (application.view). 404 when not found.
+applicationsRouter.get(
+  '/:id',
+  verifyAuth,
+  requirePermission('application.view'),
+  async (req, res) => {
+    const app = await appService.getApplicationById(String(req.params.id))
+    if (!app) return res.status(404).json({ error: 'Application not found' })
+    return res.json(app)
+  }
+)
+
 // POST /applications — internal (staff-entered application, e.g. a walk-in)
 applicationsRouter.post(
   '/',

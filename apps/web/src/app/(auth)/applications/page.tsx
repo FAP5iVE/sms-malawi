@@ -28,6 +28,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import type { ApiApplication } from '@shared/types/api'
 import { ApplicationStatusSchema } from '@shared/schemas/student'
 import {
@@ -57,6 +58,7 @@ export default function ApplicationsPage() {
 }
 
 function ApplicationsContent() {
+  const router = useRouter()
   const [activeStatus, setActiveStatus] = useState<ApplicationStatusValue>('PENDING')
   const [page, setPage]                 = useState(1)
   const [actionError, setActionError]   = useState<string | null>(null)
@@ -233,6 +235,7 @@ function ApplicationsContent() {
           columns={columns}
           rowKey="id"
           mobileActions={mobileActions}
+          onRowClick={(row) => router.push(`/applications/${row.id}`)}
           pagination={{
             page,
             pages: data?.pages ?? 1,

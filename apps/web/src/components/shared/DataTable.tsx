@@ -169,6 +169,15 @@ export interface DataTableProps<T> {
    * applies (correct for full, non-paginated datasets).
    */
   onSort?: (column: string, direction: 'asc' | 'desc') => void
+  /**
+   * When supplied, the entire row (desktop table), desktop card, and mobile
+   * card become clickable/keyboard-activatable and call this with the row.
+   * Used to navigate to a detail view. Interactive controls inside the row
+   * (checkbox, sort headers, the mobile ⋯ actions button) stop propagation
+   * so they never trigger this. When omitted, rows are not clickable and
+   * behaviour is unchanged.
+   */
+  onRowClick?: (row: T) => void
 }
 
 type SortDir = 'asc' | 'desc' | null
@@ -432,6 +441,7 @@ interface MobileCardListProps<T> {
   emptyMessage: string
   mobileActions?: MobileAction<T>[]
   motionEnabled: boolean
+  onRowClick?: (row: T) => void
 }
 
 function MobileCardList<T extends object>({
@@ -442,6 +452,7 @@ function MobileCardList<T extends object>({
   emptyMessage,
   mobileActions,
   motionEnabled,
+  onRowClick,
 }: MobileCardListProps<T>) {
   const [activeRow, setActiveRow] = useState<T | null>(null)
 
@@ -502,12 +513,28 @@ function MobileCardList<T extends object>({
               key={id}
               variants={itemVariants}
               transition={itemTransition}
-              className="
-                bg-surface border border-base rounded-xl px-4 py-3
-                flex items-start justify-between gap-3
-                hover:shadow-sm transition-shadow
-              "
-              role="listitem"
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              onKeyDown={
+                onRowClick
+                  ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        onRowClick(row)
+                      }
+                    }
+                  : undefined
+              }
+              role={onRowClick ? 'button' : 'listitem'}
+              tabIndex={onRowClick ? 0 : undefined}
+              aria-label={onRowClick ? `View details for ${id}` : undefined}
+              className={[
+                'bg-surface border border-base rounded-xl px-4 py-3',
+                'flex items-start justify-between gap-3',
+                'hover:shadow-sm transition-shadow',
+                onRowClick
+                  ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal'
+                  : '',
+              ].join(' ')}
             >
               {/* Left: title + key-value pairs */}
               <div className="min-w-0 flex-1">
@@ -540,7 +567,10 @@ function MobileCardList<T extends object>({
               {mobileActions && mobileActions.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setActiveRow(row)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setActiveRow(row)
+                  }}
                   className="
                     shrink-0 p-1.5 rounded-lg
                     text-muted hover:text-body hover:bg-page
@@ -614,6 +644,7 @@ export function DataTable<T extends object>({
   columnVisibility,
   onColumnVisibilityChange,
   onSort,
+  onRowClick,
 }: DataTableProps<T>) {
   const motionEnabled = useMotionEnabled()
 
@@ -830,6 +861,7 @@ export function DataTable<T extends object>({
         emptyMessage={emptyMessage}
         mobileActions={mobileActions}
         motionEnabled={motionEnabled}
+        onRowClick={onRowClick}
       />
 
       {/* ════════════════════════════════════════════════════════════════════════
@@ -912,12 +944,31 @@ export function DataTable<T extends object>({
                       <motion.tr
                         key={id}
                         variants={trVariants}
+                        onClick={onRowClick ? () => onRowClick(row) : undefined}
+                        onKeyDown={
+                          onRowClick
+                            ? (e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  onRowClick(row)
+                                }
+                              }
+                            : undefined
+                        }
+                        tabIndex={onRowClick ? 0 : undefined}
+                        aria-label={onRowClick ? `View details for ${id}` : undefined}
                         className={[
                           'hover:bg-page transition-colors',
                           selected.includes(id) ? 'bg-brand-teal/5' : '',
+                          onRowClick
+                            ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-teal'
+                            : '',
                         ].join(' ')}
                       >
-                        <td className="px-4 py-3">
+                        <td
+                          className="px-4 py-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <input
                             type="checkbox"
                             aria-label={`Select row ${id}`}
@@ -969,7 +1020,26 @@ export function DataTable<T extends object>({
                 <motion.div
                   key={id}
                   variants={cardItemVariants}
-                  className="bg-surface border border-base rounded-xl p-4 hover:shadow-md transition-shadow"
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  onKeyDown={
+                    onRowClick
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            onRowClick(row)
+                          }
+                        }
+                      : undefined
+                  }
+                  role={onRowClick ? 'button' : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  aria-label={onRowClick ? `View details for ${id}` : undefined}
+                  className={[
+                    'bg-surface border border-base rounded-xl p-4 hover:shadow-md transition-shadow',
+                    onRowClick
+                      ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal'
+                      : '',
+                  ].join(' ')}
                 >
                   {columns.filter((col) => (columnVisibility ? columnVisibility[String(col.key)] !== false : true)).map((col) => (
                     <div

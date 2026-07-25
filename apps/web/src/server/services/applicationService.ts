@@ -115,6 +115,15 @@ const APPLICATIONS_DEFAULT_PAGE_SIZE = 20
 const APPLICATIONS_MAX_PAGE_SIZE     = 100
 
 /**
+ * Fetch a single application by id for the applicant detail page.
+ * Returns the raw Prisma row (same shape the list returns per-item) or
+ * null if not found — the route maps null to a 404.
+ */
+export async function getApplicationById(id: string) {
+  return prisma.application.findUnique({ where: { id } })
+}
+
+/**
  * R15 — real pagination. Previously returned every application matching
  * the status filter in one unbounded findMany; years of accumulated
  * applications would arrive in a single response. Returns the same

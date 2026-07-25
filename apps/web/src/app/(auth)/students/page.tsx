@@ -56,6 +56,7 @@ import type { DataColumn, MobileAction }          from '@/components/shared/Data
 import ConfirmDialog                              from '@/components/shared/ConfirmDialog'
 import { StudentRiskBadge }                       from '@/components/shared/StudentRiskBadge'
 import type { ApiStudent }                        from '@shared/types/api'
+import { useRouter }                              from 'next/navigation'
 
 type Student = ApiStudent
 
@@ -202,6 +203,7 @@ export default function StudentsPage() {
 }
 
 function StudentsContent() {
+  const router = useRouter()
   const [showForm,      setShowForm]      = useState(false)
   const [editStudentId, setEditStudentId] = useState<string | null>(null)
   const [status,        setStatus]        = useState('ACTIVE')
@@ -325,6 +327,7 @@ function StudentsContent() {
         }}
         rowKey="id"
         mobileActions={mobileActions}
+        onRowClick={(row) => router.push(`/students/${row.id}`)}
         onBulkArchive={(ids) => setPendingArchiveIds(ids)}
         onSort={(column, direction) => {
           setSortBy(column)

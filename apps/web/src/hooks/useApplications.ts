@@ -49,6 +49,19 @@ export function useApplications(status?: string, page = 1) {
   })
 }
 
+/**
+ * Single application for the applicant detail page. Consumes
+ * GET /applications/:id (added alongside this hook). Disabled until an id
+ * is available so it never fires with an empty path segment.
+ */
+export function useApplication(id: string) {
+  return useQuery({
+    queryKey: queryKeys.applications.detail(id),
+    queryFn: () => apiFetch<ApiApplication>(`/applications/${id}`),
+    enabled: Boolean(id),
+  })
+}
+
 export function useUpdateApplicationStatus() {
   const qc = useQueryClient()
   return useMutation({
