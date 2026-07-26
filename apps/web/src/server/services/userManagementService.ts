@@ -29,21 +29,29 @@
  *   is where jobTitle actually lives (confirmed in schema.prisma).
  *   AuthProvider.tsx has read idTokenResult.claims.subtitle since Phase 1A
  *   with no code path that ever populated it — this is that path.
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-07-26). createUser()
+ *   now writes the newly-minted Firebase Auth UID back onto the linked
+ *   StaffProfile.uid when data.staffId is supplied. Previously the two
+ *   identity records were never connected: the StaffProfile kept whatever
+ *   placeholder uid was typed at profile-creation time (CreateStaffSchema.uid
+ *   is free-text), while every self-service HR action resolves the caller by
+ *   their real Firebase UID (req.user.uid). The mismatch made
+ *   POST /hr/loans/request, POST /hr/leave/apply, and GET /hr/loans/mine all
+ *   fail with "Staff profile not found." for every staff member. A companion
+ *   one-off backfill (apps/web/scripts/backfill-staff-uids.mjs) re-links
+ *   staff accounts already created before this fix, matched by email.
  */
 import * as admin from 'firebase-admin'
 import { Resend } from 'resend'
 import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { clearTokensForUser } from '@/lib/push'
+import { generateTempPassword } from '@/lib/tempPassword'
 import type { CreateUserInput, NotificationPrefInput } from '@shared/schemas/admin'
 import type { UserRole } from '@shared/types/roles'
 
 function getAuth() { return admin.auth() }
-
-function generateTempPassword(): string {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$'
-  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-}
 
 // ─── CREATE USER ─────────────────────────────────────────
 export async function createUser(data: CreateUserInput, actorUid: string) {
@@ -72,6 +80,23 @@ export async function createUser(data: CreateUserInput, actorUid: string) {
       select: { jobTitle: true },
     })
     subtitle = staffProfile?.jobTitle ?? null
+
+    // Link the StaffProfile to the Firebase Auth account just created:
+    // write the real Auth UID onto StaffProfile.uid. Every self-service HR
+    // lookup resolves the caller's profile by req.user.uid (loan requests in
+    // hr.ts POST /loans/request, leave applications in POST /leave/apply, and
+    // GET /loans/mine). Without this write the profile keeps whatever
+    // placeholder uid was entered at profile-creation time — which never
+    // equals the Firebase Auth UID minted here — so every one of those
+    // actions fails with "Staff profile not found." updateMany (not update)
+    // is deliberate: a missing/stale staffId is a silent no-op instead of a
+    // throw, which would otherwise orphan the Auth account we already created
+    // above. userRecord.uid is freshly minted and globally unique, so this
+    // can never collide with the StaffProfile.uid @unique constraint.
+    await prisma.staffProfile.updateMany({
+      where: { id: data.staffId },
+      data:  { uid: userRecord.uid },
+    })
   }
 
   // 2. Set custom claims: role + requiresPasswordChange flag + subtitle

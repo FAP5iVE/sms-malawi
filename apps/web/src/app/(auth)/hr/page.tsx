@@ -74,6 +74,7 @@ import {
   useRecordLoanRepayment,
 }                           from '@/hooks/useHR'
 import { LeaveConflictWarning } from '@/components/hr/LeaveConflictWarning'
+import { StaffForm }           from '@/components/hr/StaffForm'
 import type { ConflictCheckResult } from '@/server/services/leaveConflictService'
 import {
   Users,
@@ -84,6 +85,7 @@ import {
   XCircle,
   Banknote,
   Loader2,
+  UserPlus,
   X,
 }                           from 'lucide-react'
 import { ModuleTabs }       from '@/components/shared/ModuleTabs'
@@ -144,9 +146,13 @@ function HRContent() {
 
   const [tab, setTab]         = useState<Tab>(initialTab)
   const [search, setSearch]   = useState('')
+  const [showStaffForm, setShowStaffForm] = useState(false)
 
   const isHR         = ['admin', 'hr', 'high_rank'].includes(role ?? '')
   const canApplyLoan = can('hr.applyLoan')
+  // Creating staff (which now provisions a login) maps to the backend's
+  // HR_ADMIN role gate on POST /hr — admin/hr/high_rank. Matches isHR.
+  const canCreateStaff = isHR
 
   const { data: staff = [],          isLoading: staffLoading } = useStaffDirectory({ search })
   const { data: leaveRequests = [] }                           = useLeaveRequests({ status: 'PENDING' })
@@ -208,16 +214,30 @@ function HRContent() {
       {/* ── Directory tab (admin/high_rank/hr only) ─────────────────────────── */}
       {tab === 'directory' && isHR && (
         <div className="space-y-3">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or employee number…"
-            className="
-              w-full max-w-sm border border-base rounded-xl
-              px-4 py-2.5 text-sm
-              focus:outline-none focus:ring-2 focus:ring-brand-teal/25
-            "
-          />
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or employee number…"
+              className="
+                flex-1 min-w-0 max-w-sm border border-base rounded-xl
+                px-4 py-2.5 text-sm
+                focus:outline-none focus:ring-2 focus:ring-brand-teal/25
+              "
+            />
+            {canCreateStaff && (
+              <button
+                type="button"
+                onClick={() => setShowStaffForm(true)}
+                className="shrink-0 inline-flex items-center gap-2 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+              >
+                <UserPlus className="w-4 h-4" aria-hidden />
+                Add Staff
+              </button>
+            )}
+          </div>
+
+          {showStaffForm && <StaffForm onClose={() => setShowStaffForm(false)} />}
 
           {staffLoading ? (
             <div className="space-y-2">

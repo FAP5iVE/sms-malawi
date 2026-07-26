@@ -39,7 +39,7 @@ type Tab =
 
 export default function FinancesPage() {
   return (
-    <RoleGuard allowed={['admin', 'high_rank', 'finance', 'student']}>
+    <RoleGuard allowed={['admin', 'high_rank', 'finance', 'student', 'hr']}>
       {/* useSearchParams() requires a Suspense boundary or `next build` fails —
           same convention as (public)/login/page.tsx and (auth)/exams/page.tsx. */}
       <Suspense fallback={null}>
@@ -54,21 +54,33 @@ function FinancesContent() {
   const YEAR = '2025/2026'
   const TERM = 1
 
-  const { data: summary, isLoading: summaryLoading } = useFinanceSummary(YEAR, TERM)
-
   const isStudent = role === 'student'
   const isFinance = role === 'finance' || role === 'admin'
+  // HR reaches this page for read-only payroll visibility only (it holds
+  // finance.viewPayrollRuns, not the finance-management permissions). high_rank
+  // retains its existing broader finance visibility, so scope this strictly to
+  // the 'hr' role: HR sees the Payroll tab and nothing else here.
+  const isHRPayrollViewer = role === 'hr'
+
+  // Don't fetch the finance summary for the HR payroll viewer — the summary is
+  // never rendered for them and GET /finances/summary would 403 (HR lacks it).
+  // useFinanceSummary is enabled-gated on both args being truthy, so passing an
+  // empty year disables the query without changing the hook's signature.
+  const { data: summary, isLoading: summaryLoading } = useFinanceSummary(
+    isHRPayrollViewer ? '' : YEAR,
+    isHRPayrollViewer ? 0 : TERM,
+  )
 
   // Build visible tab list — filtered by role, then mapped to clean TabItem shape
   // (strips the `show` field before passing to ModuleTabs for type safety)
   const TABS = [
-    { id: 'invoices'     as Tab, label: isStudent ? 'My Fees' : 'Invoices', show: true        },
-    { id: 'expenses'     as Tab, label: 'Expenses',                          show: isFinance    },
-    { id: 'payroll'      as Tab, label: 'Payroll',                           show: isFinance    },
-    { id: 'budget'       as Tab, label: 'Budget',                            show: !isStudent   },
-    { id: 'scholarships' as Tab, label: 'Scholarships',                      show: isFinance    },
-    { id: 'fines'        as Tab, label: 'Library Fines',                     show: isFinance    },
-    { id: 'reports'      as Tab, label: 'Reports',                           show: isFinance    },
+    { id: 'invoices'     as Tab, label: isStudent ? 'My Fees' : 'Invoices', show: !isHRPayrollViewer            },
+    { id: 'expenses'     as Tab, label: 'Expenses',                          show: isFinance                     },
+    { id: 'payroll'      as Tab, label: 'Payroll',                           show: isFinance || isHRPayrollViewer },
+    { id: 'budget'       as Tab, label: 'Budget',                            show: !isStudent && !isHRPayrollViewer },
+    { id: 'scholarships' as Tab, label: 'Scholarships',                      show: isFinance                     },
+    { id: 'fines'        as Tab, label: 'Library Fines',                     show: isFinance                     },
+    { id: 'reports'      as Tab, label: 'Reports',                           show: isFinance                     },
   ]
     .filter((t) => t.show)
     .map(({ id, label }) => ({ id, label }))
@@ -83,7 +95,10 @@ function FinancesContent() {
   // and only a tab this role can actually see is ever accepted.
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const initialTab: Tab = tabParam && TABS.some((tab) => tab.id === tabParam) ? (tabParam as Tab) : 'invoices'
+  // HR can only see the payroll tab, so its default (and any invalid ?tab=)
+  // resolves to 'payroll' rather than the invoices tab it can't open.
+  const fallbackTab: Tab = isHRPayrollViewer ? 'payroll' : 'invoices'
+  const initialTab: Tab = tabParam && TABS.some((tab) => tab.id === tabParam) ? (tabParam as Tab) : fallbackTab
 
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)
 
@@ -91,15 +106,15 @@ function FinancesContent() {
     <div className="space-y-5">
       <div>
         <h1 className="font-heading text-2xl font-bold text-brand-navy">
-          {isStudent ? 'My Fees & Payments' : 'Finances'}
+          {isStudent ? 'My Fees & Payments' : isHRPayrollViewer ? 'Payroll' : 'Finances'}
         </h1>
         <p className="text-sm text-muted mt-0.5">
-          Academic Year {YEAR} · Term {TERM}
+          {isHRPayrollViewer ? 'Payroll run history (view only)' : `Academic Year ${YEAR} · Term ${TERM}`}
         </p>
       </div>
 
-      {/* Summary stats — finance staff only */}
-      {!isStudent && (
+      {/* Summary stats — finance staff only (not students, not HR payroll viewers) */}
+      {!isStudent && !isHRPayrollViewer && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <SummaryCard
             label="Total Collected"

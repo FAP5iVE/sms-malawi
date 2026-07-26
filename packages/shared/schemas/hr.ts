@@ -17,7 +17,11 @@ import { z } from 'zod'
 import { USER_ROLES } from '../types/roles'
 
 export const CreateStaffSchema = z.object({
-  uid:            z.string().min(1),
+  // NOTE: no `uid` field. A staff member's Firebase Auth UID is minted
+  // server-side by hrService.createStaff() when it provisions their login,
+  // then written onto StaffProfile.uid. It is never supplied by the client —
+  // a client-provided uid was the original cause of the profile↔login
+  // mismatch that broke loan/leave self-service.
   employeeNo:     z.string().min(1),
   firstName:      z.string().min(1),
   lastName:       z.string().min(1),

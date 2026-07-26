@@ -55,10 +55,15 @@
  *   recordLoanRepayment() after each monthly run.
  */
 import 'server-only'
+import * as admin from 'firebase-admin'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { uploadFile, FILE_PREFIX } from '@/lib/storage'
+import { sendEmail } from '@/lib/email'
+import { generateTempPassword } from '@/lib/tempPassword'
 import { differenceInBusinessDays, isWeekend, addDays, startOfDay, endOfDay } from 'date-fns'
+
+function getAuth() { return admin.auth() }
 import type {
   CreateStaffInput, LeaveRequestInput, ReviewLeaveInput,
   LoanRequestInput, PerformanceNoteInput
@@ -105,25 +110,91 @@ export async function getStaffProfile(id: string) {
   })
 }
 
+// Creating a staff member now provisions their login end-to-end, mirroring
+// the student-conversion flow (studentService.ts): a Firebase Auth account is
+// created, the role/subtitle/requiresPasswordChange claims are set, the real
+// Auth UID is written onto StaffProfile.uid (so every self-service HR lookup
+// keyed on req.user.uid resolves), and a welcome email with a generated temp
+// password is sent. Previously this function created a bare StaffProfile row
+// with a form-supplied placeholder uid, no login, and no claims — which is
+// why a created staff member could neither sign in nor request a loan/leave.
+//
+// Ordering & failure handling (matches studentService's pattern): the Auth
+// account is created FIRST (we need its uid to store on the profile). If the
+// subsequent Prisma writes fail, the just-created Auth account is deleted so
+// we never leave an orphaned login with no profile behind it. The welcome
+// email is best-effort and sent LAST — a mail failure does not roll back a
+// successfully-created staff member (the admin/HR user still sees the temp
+// password in the create response and can relay it manually).
 export async function createStaff(data: CreateStaffInput, actorUid: string) {
-  const staff = await prisma.staffProfile.create({
-    data: {
-      ...data,
-      dateJoined: new Date(data.dateJoined),
-      contractExpiry: data.contractExpiry ? new Date(data.contractExpiry) : null,
-      phone: data.phone ?? null,
-      salaryStructureId: data.salaryStructureId ?? null,
-    },
+  const tempPassword = generateTempPassword()
+
+  // 1. Firebase Auth account. StaffProfile.email is @unique and Firebase
+  //    rejects a duplicate email, so a second account can't be created for
+  //    an email that already has one — the P2002/auth-error surfaces to the
+  //    caller via globalErrorHandler.
+  const authUser = await getAuth().createUser({
+    email:         data.email,
+    password:      tempPassword,
+    displayName:   `${data.firstName} ${data.lastName}`,
+    ...(data.phone ? { phoneNumber: data.phone } : {}),
+    emailVerified: false,
+    disabled:      false,
   })
-  // Initialise annual leave balance for the current year
-  const year = new Date().getFullYear()
-  await prisma.leaveBalance.createMany({
-    data: [
-      { staffId: staff.id, leaveType: 'ANNUAL',    totalDays: 21, year },
-      { staffId: staff.id, leaveType: 'SICK',      totalDays: 10, year },
-      { staffId: staff.id, leaveType: 'EMERGENCY', totalDays: 3,  year },
-    ],
+
+  // 2. Claims: role + subtitle (jobTitle) + first-login password change.
+  //    setCustomUserClaims replaces the whole claims object, which is fine
+  //    here since this is a brand-new account with no prior claims.
+  await getAuth().setCustomUserClaims(authUser.uid, {
+    role:                   data.role,
+    subtitle:               data.jobTitle,
+    requiresPasswordChange: true,
   })
+
+  // 3. Persist the profile (with the REAL Auth uid) + leave balances. If any
+  //    of this fails, roll back the Auth account so it isn't orphaned.
+  let staff: Awaited<ReturnType<typeof prisma.staffProfile.create>>
+  try {
+    staff = await prisma.staffProfile.create({
+      data: {
+        employeeNo:        data.employeeNo,
+        firstName:         data.firstName,
+        lastName:          data.lastName,
+        email:             data.email,
+        role:              data.role,
+        department:        data.department,
+        jobTitle:          data.jobTitle,
+        employmentType:    data.employmentType,
+        dateJoined:        new Date(data.dateJoined),
+        uid:               authUser.uid,   // the real Firebase Auth UID — not a form placeholder
+        contractExpiry:    data.contractExpiry ? new Date(data.contractExpiry) : null,
+        phone:             data.phone ?? null,
+        salaryStructureId: data.salaryStructureId ?? null,
+      },
+    })
+
+    // Initialise annual leave balance for the current year
+    const year = new Date().getFullYear()
+    await prisma.leaveBalance.createMany({
+      data: [
+        { staffId: staff.id, leaveType: 'ANNUAL',    totalDays: 21, year },
+        { staffId: staff.id, leaveType: 'SICK',      totalDays: 10, year },
+        { staffId: staff.id, leaveType: 'EMERGENCY', totalDays: 3,  year },
+      ],
+    })
+  } catch (dbErr) {
+    // Roll back the orphaned Auth account before rethrowing.
+    try {
+      await getAuth().deleteUser(authUser.uid)
+    } catch (rollbackErr) {
+      logger.error(
+        { rollbackErr, uid: authUser.uid, actorUid },
+        '[hrService.createStaff] failed to roll back orphaned Firebase account after DB error',
+      )
+    }
+    throw dbErr
+  }
+
   void algolia.indexStaff({
     objectID:   staff.id,
     uid:        staff.uid,
@@ -135,7 +206,33 @@ export async function createStaff(data: CreateStaffInput, actorUid: string) {
     status:     staff.status,
     email:      staff.email ?? null,
   })
-  return staff
+
+  // 4. Best-effort welcome email with the temp password. A failure here does
+  //    not undo the created staff member — it's logged and the temp password
+  //    is still returned to the caller for manual relay.
+  const emailResult = await sendEmail({
+    to:      data.email,
+    subject: 'Welcome to SMS Malawi — Your Login Details',
+    html: `<p>Dear ${data.firstName} ${data.lastName},</p>
+      <p>A staff account has been created for you on the School Management System.</p>
+      <p><strong>Email:</strong> ${data.email}<br>
+         <strong>Temporary Password:</strong> <code>${tempPassword}</code></p>
+      <p>You will be required to change your password on first login.</p>
+      <p><a href="${process.env.NEXT_PUBLIC_APP_URL ?? ''}/login">Login here</a></p>`,
+    tags: [{ name: 'type', value: 'staff-welcome' }],
+  })
+  if (!emailResult.ok) {
+    logger.warn(
+      { staffId: staff.id, email: data.email, actorUid, reason: emailResult.error },
+      '[hrService.createStaff] welcome email failed to send; temp password returned to caller for manual relay',
+    )
+  }
+
+  logger.info({ event: 'staff.created', staffId: staff.id, uid: staff.uid, role: staff.role, actorUid })
+
+  // Return the temp password so the create UI can display it to the HR/admin
+  // user as a fallback when email delivery is delayed or fails.
+  return { ...staff, tempPassword }
 }
 
 export async function uploadStaffPhoto(staffId: string, buffer: Buffer, filename: string): Promise<string> {
