@@ -17,6 +17,7 @@
  */
 'use client'
 import { useState } from 'react'
+import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateExamSchema } from '@shared/schemas/exam'
@@ -29,6 +30,13 @@ import type { ApiClass } from '@shared/types/api'
 import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
 import { EXAM_TYPES } from '@shared/constants/exams'
 
+// CreateExamSchema has defaulted fields (maxMark, weightPercent), so its INPUT
+// type (form values — those fields optional) differs from its OUTPUT type
+// (CreateExamInput — required). useForm is parameterised with both so the
+// resolver and the transformed submit handler line up, avoiding the
+// "two different Resolver types" mismatch.
+type ExamFormValues = z.input<typeof CreateExamSchema>
+
 interface Props { onClose: () => void; academicYear: string; term: number }
 
 const ic = 'w-full border border-base rounded-xl px-4 py-3 text-sm bg-surface text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal transition-all'
@@ -39,7 +47,7 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
   const createExam = useCreateExam()
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const { register, handleSubmit, formState: { errors } } = useForm<CreateExamInput>({
+  const { register, handleSubmit, formState: { errors } } = useForm<ExamFormValues, unknown, CreateExamInput>({
     resolver: zodResolver(CreateExamSchema),
     defaultValues: { academicYear, term, maxMark: 100, weightPercent: 100 },
   })
