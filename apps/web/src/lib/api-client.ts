@@ -498,6 +498,7 @@ export const queryKeys = {
     schoolInfo: () => ['public', 'school-info'] as const,
     manebStats: (year?: string) => ['public', 'maneb-stats', year ?? null] as const,
     announcements: (limit?: number) => ['public', 'announcements', limit ?? null] as const,
+    placementStats: (year?: string) => ['public', 'placement-stats', year ?? null] as const,
   },
 
   // ── Attendance (Postgres-backed, R6)

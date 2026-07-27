@@ -54,6 +54,17 @@ export interface PublicAnnouncement {
   eventDate: string | null
 }
 
+/** GET /public/placement-stats — real UniversityPlacement outcomes,
+ *  previously tracked but never exposed publicly (every /placements/*
+ *  route requires auth). "qualified" = MSCE leavers who reached the
+ *  placement process; "selected" = outcome PLACED or CONFIRMED. */
+export interface PublicPlacementStats {
+  year:          string
+  qualified:     number
+  selected:      number
+  selectionRate: number
+}
+
 // ─────────────────────────────────────────────────────────
 //  QUERIES
 // ─────────────────────────────────────────────────────────
@@ -82,6 +93,14 @@ export function usePublicAnnouncements(limit = 6) {
   })
 }
 
+export function usePublicPlacementStats(year?: string) {
+  return useQuery({
+    queryKey: queryKeys.public.placementStats(year),
+    queryFn:  () => apiFetch<PublicPlacementStats>(`/public/placement-stats${year ? `?year=${year}` : ''}`),
+    staleTime: STALE.SLOW,
+  })
+}
+
 // ─────────────────────────────────────────────────────────
 //  MUTATIONS
 // ─────────────────────────────────────────────────────────
@@ -90,6 +109,18 @@ export function useNewsletterSubscribe() {
   return useMutation({
     mutationFn: (data: { email: string; name?: string }) =>
       apiFetch<{ message: string }>('/public/newsletter/subscribe', {
+        method: 'POST',
+        body:   JSON.stringify(data),
+      }),
+  })
+}
+
+/** POST /public/contact — see public.ts's route comment for why this exists;
+ *  the "Send us a message" form had no backend at all before this. */
+export function useContactForm() {
+  return useMutation({
+    mutationFn: (data: { name: string; email: string; subject: string; message: string }) =>
+      apiFetch<{ message: string }>('/public/contact', {
         method: 'POST',
         body:   JSON.stringify(data),
       }),

@@ -234,6 +234,18 @@ function StudentsContent() {
   const archive             = useArchiveStudent()
   const { can }             = usePermissions()
 
+  // [PRODUCTION FIX 2026-07-27] Fee balance and risk level were shown to
+  // every role that could reach this page (including library and HR, who
+  // hold neither student.viewFeeStatus nor the new student.viewRiskStatus).
+  // COLUMNS is filtered per-viewer here rather than gated inside each
+  // column's own render(), so the columns disappear entirely for roles
+  // without access instead of rendering an empty/placeholder cell.
+  const visibleColumns = COLUMNS.filter((col) => {
+    if (col.key === 'feeBalance') return can('student.viewFeeStatus')
+    if (col.key === 'riskLevel')  return can('student.viewRiskStatus')
+    return true
+  })
+
   function handleArchive(id: string) {
     setActionError(null)
     archive.mutate(id, {
@@ -354,7 +366,7 @@ function StudentsContent() {
       <DataTable<Student>
         data={data?.students ?? []}
         isLoading={isLoading}
-        columns={COLUMNS}
+        columns={visibleColumns}
         quickFilters={QUICK_FILTERS}
         activeQuickFilter={status}
         onQuickFilter={(v) => {

@@ -218,3 +218,77 @@ publicRouter.get('/newsletter/unsubscribe', async (req, res) => {
 
   res.json({ message: 'You have been unsubscribed from the SMS Malawi newsletter.' })
 })
+
+// ─── PUBLIC CONTACT FORM ──────────────────────────────────────────────────────
+// POST /public/contact
+// [PRODUCTION FIX 2026-07-28] The landing page's "Send us a message" form had
+// no backend at all — in both the previous design and the redesign, the form
+// was pure decoration (no onSubmit, no state binding). This gives it a real
+// destination: the message is emailed to the school's own contact address
+// (SETTING_KEYS.SCHOOL_EMAIL, the same address shown elsewhere on this page),
+// with Reply-To set to the visitor so the office can reply directly.
+
+const ContactMessageSchema = z.object({
+  name:    z.string().min(1, 'Name is required').max(150),
+  email:   z.string().email('Enter a valid email address'),
+  subject: z.string().min(1, 'Subject is required').max(200),
+  message: z.string().min(1, 'Message is required').max(5000),
+})
+
+publicRouter.post('/contact', async (req, res) => {
+  const parsed = ContactMessageSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Please check the form for errors.' })
+  }
+  const { name, email, subject, message } = parsed.data
+
+  const settings = await settingsService.getPublicSettings()
+  const schoolEmail = settings[SETTING_KEYS.SCHOOL_EMAIL] ?? 'info@school.edu.mw'
+
+  const emailResult = await sendEmail({
+    to:      schoolEmail,
+    replyTo: email,
+    subject: `[Website enquiry] ${subject}`,
+    html: `<p><strong>From:</strong> ${name} (${email})</p>
+      <p><strong>Subject:</strong> ${subject}</p>
+      <p><strong>Message:</strong></p>
+      <p>${message.replace(/\n/g, '<br />')}</p>`,
+    tags: [{ name: 'type', value: 'public-contact' }],
+  })
+
+  if (!emailResult.ok) {
+    return res.status(502).json({ error: 'Failed to send your message. Please try again or contact us by phone.' })
+  }
+
+  res.status(201).json({ message: 'Thank you — the admissions office will respond within two working days.' })
+})
+
+// ─── PUBLIC PLACEMENT STATISTICS ──────────────────────────────────────────────
+// GET /public/placement-stats?year=2025/2026
+// [PRODUCTION FIX 2026-07-28] University placement outcomes were tracked
+// (placementService.ts / UniversityPlacement) but every route in placements.ts
+// requires auth — nothing was ever exposed publicly for the landing page's
+// "University Placement" performance card. Mirrors /public/maneb-stats'
+// pattern exactly: same default academic year, same aggregate-and-round shape.
+// "Qualified" = MSCE leavers who reached the placement process (one
+// UniversityPlacement row is created per certified MSCE record); "selected"
+// = those whose placement outcome is PLACED or CONFIRMED.
+
+publicRouter.get('/placement-stats', async (req, res) => {
+  const year = String(req.query.year ?? '2025/2026')
+
+  const placements = await prisma.universityPlacement.findMany({
+    where:  { manebRecord: { academicYear: year } },
+    select: { status: true },
+  })
+
+  const qualified = placements.length
+  const selected = placements.filter((p) => p.status === 'PLACED' || p.status === 'CONFIRMED').length
+
+  res.json({
+    year,
+    qualified,
+    selected,
+    selectionRate: qualified > 0 ? Math.round((selected / qualified) * 100) : 0,
+  })
+})
