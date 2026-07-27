@@ -49,8 +49,8 @@
  */
 
 import { useState, useEffect }      from 'react'
+import { z }                        from 'zod'
 import { useForm }                  from 'react-hook-form'
-import type { Resolver }            from 'react-hook-form'
 import { zodResolver }              from '@hookform/resolvers/zod'
 import { AnimatePresence, motion }  from 'framer-motion'
 import { Check, ChevronLeft, ChevronRight, Loader2, User, X, AlertCircle } from 'lucide-react'
@@ -58,6 +58,13 @@ import Image                        from 'next/image'
 import { getAuth }                  from 'firebase/auth'
 import { CreateStudentSchema }      from '@shared/schemas/student'
 import type { CreateStudentInput }  from '@shared/schemas/student'
+
+// CreateStudentSchema has defaulted/required transforms (nationality default,
+// email) so its INPUT type differs from CreateStudentInput (the output). useForm
+// is parameterised with both to keep the resolver and submit handler aligned —
+// this replaces the previous `as Resolver<>` cast, which silently bypassed the
+// type check (and hid exactly this kind of input/output mismatch).
+type StudentFormValues = z.input<typeof CreateStudentSchema>
 import type { ApiStudent }          from '@shared/types/api'
 import { useCreateStudent, useUpdateStudent, useStudent } from '@/hooks/useStudents'
 import { buildApiUrl }              from '@/lib/api-client'
@@ -249,7 +256,7 @@ function PhotoUpload({ preview, onChange, compact = false }: PhotoUploadProps) {
 // regex both expect.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function mapStudentToFormValues(s: ApiStudent): Partial<CreateStudentInput> {
+function mapStudentToFormValues(s: ApiStudent): Partial<StudentFormValues> {
   return {
     firstName:        s.firstName,
     lastName:         s.lastName,
@@ -304,9 +311,9 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     formState: { errors },
     trigger,
     reset,
-  } = useForm<CreateStudentInput>({
-    resolver: zodResolver(CreateStudentSchema) as Resolver<CreateStudentInput>,
-    defaultValues: { nationality: 'Malawian' } as Partial<CreateStudentInput>,
+  } = useForm<StudentFormValues, unknown, CreateStudentInput>({
+    resolver: zodResolver(CreateStudentSchema),
+    defaultValues: { nationality: 'Malawian' },
   })
 
   // Populate the form once the existing student record resolves (edit mode only)
@@ -329,7 +336,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   }
 
   async function handleNext() {
-    const fields = [...STEP_FIELDS[currentStep]!] as Array<keyof CreateStudentInput>
+    const fields = [...STEP_FIELDS[currentStep]!] as Array<keyof StudentFormValues>
     const valid  = await trigger(fields)
     if (!valid) return
     setDirection(1)
@@ -382,6 +389,22 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
         },
       })
     }
+  }
+
+  // Runs when handleSubmit's validation fails. Previously a client-side
+  // validation failure produced no visible response at all (the submit handler
+  // simply never fired). Now it always surfaces a message, and on mobile it
+  // jumps to the first step that contains an invalid field so the user can see
+  // and fix it.
+  function onInvalid(formErrors: typeof errors) {
+    const firstStep = STEP_FIELDS.findIndex((stepFields) =>
+      stepFields.some((f) => formErrors[f as keyof typeof formErrors]),
+    )
+    if (firstStep >= 0 && firstStep !== currentStep) {
+      setDirection(firstStep > currentStep ? 1 : -1)
+      setCurrentStep(firstStep)
+    }
+    setSubmitError('Please complete the highlighted required fields before submitting.')
   }
 
   // ── Shared section props ────────────────────────────────────────────────────
@@ -487,7 +510,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
 
               {/* Scrollable step content */}
               <form
-                onSubmit={handleSubmit(onSubmit)}
+                onSubmit={handleSubmit(onSubmit, onInvalid)}
                 className="flex-1 overflow-y-auto flex flex-col"
               >
                 {/* Photo upload — Step 1 only */}
@@ -633,7 +656,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
 
             {/* Scrollable form body */}
             <form
-              onSubmit={handleSubmit(onSubmit)}
+              onSubmit={handleSubmit(onSubmit, onInvalid)}
               className="flex-1 overflow-y-auto flex flex-col"
             >
               {/* Photo upload row */}

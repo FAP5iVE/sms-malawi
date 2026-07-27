@@ -55,11 +55,12 @@ import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { AttendanceSheet } from '@/components/classes/AttendanceSheet'
 import AssignmentForm from '@/components/classes/AssignmentForm'
+import { TimetableSlotForm } from '@/components/classes/TimetableSlotForm'
 import { DataTable } from '@/components/shared/DataTable'
 import type { DataColumn } from '@/components/shared/DataTable'
 import { ModuleTabs } from '@/components/shared/ModuleTabs'
 import type { TabItem } from '@/components/shared/ModuleTabs'
-import { ArrowLeft, Users, ClipboardCheck, Clock, BookOpen, Hourglass } from 'lucide-react'
+import { ArrowLeft, Users, ClipboardCheck, Clock, BookOpen, Hourglass, Plus } from 'lucide-react'
 
 type Tab = 'roster' | 'attendance' | 'timetable' | 'assignments'
 
@@ -99,6 +100,7 @@ function ClassDetailContent() {
   const { data: slots = [] } = useClassTimetable(id, term)
   const [activeTab, setActiveTab] = useState<Tab>('roster')
   const [showAssignmentForm, setShowAssignmentForm] = useState(false)
+  const [showSlotForm, setShowSlotForm] = useState(false)
   // classService.getClass()'s Prisma `include` already returns assignments —
   // no second request needed once the Assignments tab is opened.
   const assignments = cls?.assignments ?? []
@@ -239,8 +241,18 @@ function ClassDetailContent() {
 
       {activeTab === 'timetable' && (
         <div className="space-y-3">
-          <div className="flex items-center justify-end">
-            <label className="flex items-center gap-2 text-sm text-muted">
+          <div className="flex items-center justify-between gap-3">
+            <RoleGuard allowed={['admin', 'high_rank', 'exam_officer']}>
+              <button
+                type="button"
+                onClick={() => setShowSlotForm(true)}
+                className="inline-flex items-center gap-2 bg-brand-teal text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+              >
+                <Plus className="w-4 h-4" aria-hidden />
+                Add Slot
+              </button>
+            </RoleGuard>
+            <label className="flex items-center gap-2 text-sm text-muted ml-auto">
               Term
               <select
                 value={term}
@@ -253,6 +265,16 @@ function ClassDetailContent() {
               </select>
             </label>
           </div>
+
+          {showSlotForm && (
+            <TimetableSlotForm
+              classId={id}
+              academicYear={cls.academicYear}
+              term={term}
+              onClose={() => setShowSlotForm(false)}
+            />
+          )}
+
           <DataTable<ApiTimetableSlot>
             data={slots}
             isLoading={false}

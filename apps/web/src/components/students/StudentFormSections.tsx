@@ -41,11 +41,17 @@
  */
 
 import type { UseFormRegister, FieldErrors }  from 'react-hook-form'
-import type { CreateStudentInput }            from '@shared/schemas/student'
+import { z }                                  from 'zod'
+import { CreateStudentSchema }                from '@shared/schemas/student'
 import { SexSchema, StudentStatusSchema }     from '@shared/schemas/student'
 import { MALAWI_DISTRICTS }                   from '@shared/constants/malawi'
 import { getCountriesForForm } from '@shared/constants/countries'
 import { useClasses }                         from '@/hooks/useClasses'
+
+// The form is driven by the schema INPUT type (defaulted fields optional), so
+// register/errors must be typed on it — not on CreateStudentInput (the output),
+// whose required `nationality` would clash with the form's optional one.
+type StudentFormValues = z.input<typeof CreateStudentSchema>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED STYLE CONSTANT
@@ -72,13 +78,16 @@ export const inputCls =
 // errors from showing on fields the user hasn't reached yet.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const STEP_FIELDS: ReadonlyArray<ReadonlyArray<keyof CreateStudentInput>> = [
+export const STEP_FIELDS: ReadonlyArray<ReadonlyArray<keyof StudentFormValues>> = [
   // Step 1 — Personal
   ['firstName', 'lastName', 'dateOfBirth', 'sex', 'nationality', 'district'],
   // Step 2 — Academic
   ['classId', 'status'],
-  // Step 3 — Contact
-  ['phone', 'village', 'address'],
+  // Step 3 — Contact + Guardian (email is the login identifier; guardian
+  // fields are required by CreateStudentSchema — omitting them here was what
+  // let the final submit fail silently, since handleSubmit blocked on unshown
+  // required fields with no visible error).
+  ['email', 'phone', 'village', 'address', 'guardianName', 'guardianRelation', 'guardianPhone'],
 ] as const
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,8 +153,8 @@ export function FieldDivider({ title }: { title: string }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface SectionProps {
-  register: UseFormRegister<CreateStudentInput>
-  errors: FieldErrors<CreateStudentInput>
+  register: UseFormRegister<StudentFormValues>
+  errors: FieldErrors<StudentFormValues>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -270,6 +279,25 @@ export function ContactSection({ register, errors }: SectionProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
 
+      {/* Email — login identifier; spans full width */}
+      <Field
+        label="Email Address"
+        error={errors.email?.message}
+        required
+        className="col-span-full"
+      >
+        <input
+          {...register('email')}
+          type="email"
+          className={inputCls}
+          placeholder="student@example.com"
+          autoComplete="email"
+        />
+        <p className="text-xs text-muted mt-1">
+          The student signs in with this email. A temporary password is emailed here and must be changed on first login.
+        </p>
+      </Field>
+
       {/* Phone */}
       <Field label="Phone Number" error={errors.phone?.message}>
         <input
@@ -301,6 +329,42 @@ export function ContactSection({ register, errors }: SectionProps) {
           className={`${inputCls} resize-none`}
           rows={3}
           placeholder="Postal or physical address"
+        />
+      </Field>
+
+      <FieldDivider title="Guardian / Next of Kin" />
+
+      {/* Guardian name */}
+      <Field label="Guardian Full Name" error={errors.guardianName?.message} required>
+        <input
+          {...register('guardianName')}
+          className={inputCls}
+          placeholder="Guardian full name"
+        />
+      </Field>
+
+      {/* Guardian relationship */}
+      <Field label="Relationship" error={errors.guardianRelation?.message} required>
+        <input
+          {...register('guardianRelation')}
+          className={inputCls}
+          placeholder="e.g. Mother, Father, Uncle"
+        />
+      </Field>
+
+      {/* Guardian phone — spans full width */}
+      <Field
+        label="Guardian Phone Number"
+        error={errors.guardianPhone?.message}
+        required
+        className="col-span-full"
+      >
+        <input
+          {...register('guardianPhone')}
+          type="tel"
+          className={inputCls}
+          placeholder="+265 999 000 000"
+          autoComplete="tel"
         />
       </Field>
     </div>

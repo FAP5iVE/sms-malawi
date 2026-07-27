@@ -77,10 +77,10 @@ export function useUpdateApplicationStatus() {
 export function useConvertToStudent() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, classId }: { id: string; classId?: string }) =>
+    mutationFn: ({ id, classId, createLoginAccount }: { id: string; classId?: string; createLoginAccount?: boolean }) =>
       apiFetch<ApiConvertApplicationResult>(`/applications/${id}/convert`, {
         method: 'POST',
-        body: JSON.stringify({ classId }),
+        body: JSON.stringify({ classId, createLoginAccount }),
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.applications.all() })

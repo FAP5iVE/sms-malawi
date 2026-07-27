@@ -46,6 +46,8 @@ import {
 } from '@prisma/client'
 import type { UserRole } from '@shared/types/roles'
 import * as algolia from '@/server/services/algoliaService'
+import { sendEmail } from '@/lib/email'
+import { generateTempPassword } from '@/lib/tempPassword'
 
 // ─────────────────────────────────────────────────────────
 //  REGISTRATION NUMBER GENERATOR
@@ -532,6 +534,73 @@ export async function getByFirebaseUid(
 //  CREATE
 // ─────────────────────────────────────────────────────────
 
+/**
+ * Provision a student's login end-to-end — the single, universal credential
+ * pattern shared by direct create() and application conversion (and mirroring
+ * hrService.createStaff for staff). Creates a Firebase Auth account with an
+ * auto-generated temporary password, sets the student claims
+ * (requiresPasswordChange: true forces a reset on first login), and emails the
+ * password to the student's personal email. The caller is responsible for
+ * writing the returned uid onto the Student row and for deleting the account
+ * (rollbackAuthAccount) if the subsequent DB write fails.
+ *
+ * No password is ever supplied by a human — consistency across staff and
+ * students means the system generates it, emails it, and forces a reset.
+ */
+export async function provisionStudentAuthAccount(params: {
+  email:       string
+  displayName: string
+}): Promise<{ firebaseUid: string; tempPassword: string }> {
+  const tempPassword = generateTempPassword()
+
+  const fbUser = await admin.auth().createUser({
+    email:         params.email,
+    password:      tempPassword,
+    displayName:   params.displayName,
+    emailVerified: false,
+    disabled:      false,
+  })
+
+  await admin.auth().setCustomUserClaims(fbUser.uid, {
+    role:                   'student',
+    subtitle:               'Student',
+    requiresPasswordChange: true,
+  })
+
+  // Best-effort welcome email with the generated password. A mail failure is
+  // logged but does not fail account creation — the temp password is returned
+  // to the caller so it can be surfaced for manual relay.
+  const emailResult = await sendEmail({
+    to:      params.email,
+    subject: 'Welcome to SMS Malawi — Your Student Login Details',
+    html: `<p>Dear ${params.displayName},</p>
+      <p>A student account has been created for you on the School Management System.</p>
+      <p><strong>Email:</strong> ${params.email}<br>
+         <strong>Temporary Password:</strong> <code>${tempPassword}</code></p>
+      <p>You will be required to change your password on first login.</p>
+      <p><a href="${process.env.NEXT_PUBLIC_APP_URL ?? ''}/login">Login here</a></p>`,
+    tags: [{ name: 'type', value: 'student-welcome' }],
+  })
+  if (!emailResult.ok) {
+    logger.warn(
+      { email: params.email, reason: emailResult.error },
+      '[studentService] student welcome email failed to send; temp password returned to caller for manual relay',
+    )
+  }
+
+  logger.info({ firebaseUid: fbUser.uid, email: params.email }, '[studentService] Firebase account provisioned for student')
+  return { firebaseUid: fbUser.uid, tempPassword }
+}
+
+/** Delete an orphaned student Auth account after a failed DB write. */
+async function rollbackAuthAccount(uid: string, context: Record<string, unknown>): Promise<void> {
+  try {
+    await admin.auth().deleteUser(uid)
+  } catch (rollbackErr) {
+    logger.error({ ...context, rollbackErr, uid }, '[studentService] failed to roll back orphaned Firebase account')
+  }
+}
+
 export async function create(
   input:       CreateStudentInput,
   actorUid:    string,
@@ -549,6 +618,21 @@ export async function create(
         { status: 409 }
       )
     }
+  }
+
+  // Universal credential flow: when a personal email is provided and no
+  // firebaseUid was passed in, provision the login here — auto-generated
+  // password, student claims, welcome email — mirroring the staff flow. The
+  // resulting uid is written onto the Student row via input.firebaseUid below.
+  // If the DB write then fails, the just-created Auth account is rolled back.
+  let provisionedUid: string | null = null
+  if (!input.firebaseUid && input.email) {
+    const provisioned = await provisionStudentAuthAccount({
+      email:       input.email,
+      displayName: `${input.firstName} ${input.lastName}`,
+    })
+    provisionedUid   = provisioned.firebaseUid
+    input.firebaseUid = provisioned.firebaseUid
   }
 
   let student: { id: string } | undefined
@@ -584,7 +668,11 @@ export async function create(
       })
       break
     } catch (err) {
-      if (!isUniqueConstraintError(err)) throw err
+      if (!isUniqueConstraintError(err)) {
+        // Roll back a just-provisioned Auth account on a non-retryable failure.
+        if (provisionedUid) await rollbackAuthAccount(provisionedUid, { where: 'create', email: input.email })
+        throw err
+      }
       lastErr = err
       logger.warn(
         { event: 'studentService.registrationNo_collision', attempt: attempt + 1, registrationNo },
@@ -594,6 +682,7 @@ export async function create(
   }
 
   if (!student) {
+    if (provisionedUid) await rollbackAuthAccount(provisionedUid, { where: 'create.exhausted', email: input.email })
     throw lastErr instanceof Error
       ? lastErr
       : new Error('Failed to generate a unique registration number after multiple attempts.')
@@ -886,11 +975,14 @@ export interface ConvertApplicationInput {
   classId?:        string
   actorUid:        string
   actorRole:       UserRole
-  /** If provided, a Firebase account is created and linked immediately. */
-  createFirebaseAccount?: {
-    email:    string
-    password: string
-  }
+  /**
+   * When true, a Firebase login is provisioned using the applicant's own
+   * email (Application.email) with a system-generated password that is emailed
+   * to them — the universal credential pattern. No password is supplied by a
+   * human. If the applicant has no email on file, conversion fails with a clear
+   * message so the email can be added first.
+   */
+  createLoginAccount?: boolean
 }
 
 export interface ConvertApplicationResult {
@@ -915,7 +1007,7 @@ export interface ConvertApplicationResult {
 export async function createFromApplication(
   input: ConvertApplicationInput
 ): Promise<ConvertApplicationResult> {
-  const { applicationId, classId, actorUid, actorRole, createFirebaseAccount } = input
+  const { applicationId, classId, actorUid, actorRole, createLoginAccount } = input
 
   // ── 1. Fetch application
   const app = await prisma.application.findUnique({
@@ -944,29 +1036,20 @@ export async function createFromApplication(
   let firebaseUid:  string | null = null
   let tempPassword: string | null = null
 
-  if (createFirebaseAccount) {
-    try {
-      const fbUser = await admin.auth().createUser({
-        email:         createFirebaseAccount.email,
-        password:      createFirebaseAccount.password,
-        displayName:   `${app.firstName} ${app.lastName}`,
-        emailVerified: false,
-        disabled:      false,
-      })
-      firebaseUid  = fbUser.uid
-      tempPassword = createFirebaseAccount.password
-
-      // Set custom claims immediately — role and password change flag
-      await admin.auth().setCustomUserClaims(firebaseUid, {
-        role:                  'student',
-        subtitle:              'Student',
-        requiresPasswordChange: true,
-      })
-
-      logger.info(
-        { firebaseUid, email: createFirebaseAccount.email },
-        '[studentService] Firebase account created for student'
+  if (createLoginAccount) {
+    if (!app.email) {
+      throw Object.assign(
+        new Error('This applicant has no email on file, so a login cannot be created. Add an email to the application first.'),
+        { status: 400 }
       )
+    }
+    try {
+      const provisioned = await provisionStudentAuthAccount({
+        email:       app.email,
+        displayName: `${app.firstName} ${app.lastName}`,
+      })
+      firebaseUid  = provisioned.firebaseUid
+      tempPassword = provisioned.tempPassword
     } catch (fbErr) {
       logger.error({ fbErr, applicationId }, '[studentService] Firebase account creation failed')
       throw Object.assign(
@@ -1001,7 +1084,7 @@ export async function createFromApplication(
             village:         app.village,
             address:         null,
             phone:           null,
-            email:           createFirebaseAccount?.email ?? null,
+            email:           app.email ?? null,
             guardianName:    app.guardianName,
             guardianPhone:   app.guardianPhone,
             guardianRelation:app.guardianRelation,
@@ -1060,7 +1143,7 @@ export async function createFromApplication(
         registrationNo,
         firebaseUid:    firebaseUid,
         classId:        classId ?? null,
-        firebaseCreated:Boolean(createFirebaseAccount),
+        firebaseCreated:Boolean(createLoginAccount),
       },
     },
   })

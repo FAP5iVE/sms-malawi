@@ -18,7 +18,7 @@
  * [DEPENDS ON]: W/lib/api-client.ts
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { CreateClassInput, UpdateClassInput, CreateAssignmentInput } from '@shared/schemas/student'
+import type { CreateClassInput, UpdateClassInput, CreateAssignmentInput, CreateTimetableSlotInput } from '@shared/schemas/student'
 import type { ApiClass, ApiTimetableSlot, ApiAssignment } from '@shared/types/api'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 
@@ -85,6 +85,28 @@ export function useArchiveClass() {
     },
     onError: (err) => {
       console.error('[useArchiveClass] Archive failed:', err)
+    },
+  })
+}
+
+export function useCreateTimetableSlot() {
+  const qc = useQueryClient()
+  return useMutation({
+    // POST /classes/:id/timetable — gated server-side to admin/high_rank/exam_officer.
+    // classId travels in the URL; the body carries the rest of the slot.
+    mutationFn: ({ classId, ...data }: { classId: string } & CreateTimetableSlotInput) =>
+      apiFetch<ApiTimetableSlot>(`/classes/${classId}/timetable`, {
+        method: 'POST',
+        body:   JSON.stringify(data),
+      }),
+    onSuccess: (_data, variables) => {
+      // useClassTimetable keys on (classId, undefined, term); a partial key
+      // invalidates every term view for this class so the new slot shows up.
+      qc.invalidateQueries({ queryKey: queryKeys.classes.timetable(variables.classId) })
+      qc.invalidateQueries({ queryKey: queryKeys.classes.detail(variables.classId) })
+    },
+    onError: (err) => {
+      console.error('[useCreateTimetableSlot] Failed to create timetable slot:', err)
     },
   })
 }

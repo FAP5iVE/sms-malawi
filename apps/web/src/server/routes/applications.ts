@@ -145,9 +145,9 @@ applicationsRouter.post(
   requirePermission('application.convertToStudent'),
   async (req, res) => {
     const id = String(req.params.id)
-    const { classId, createFirebaseAccount } = req.body as {
-      classId?: string
-      createFirebaseAccount?: { email: string; password: string }
+    const { classId, createLoginAccount } = req.body as {
+      classId?:            string
+      createLoginAccount?: boolean
     }
 
     const result = await studentService.createFromApplication({
@@ -155,7 +155,7 @@ applicationsRouter.post(
       classId,
       actorUid:  req.user!.uid,
       actorRole: req.user!.role,
-      createFirebaseAccount,
+      createLoginAccount,
     })
 
     return res.status(201).json({

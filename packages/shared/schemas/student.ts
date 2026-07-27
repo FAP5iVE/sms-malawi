@@ -46,6 +46,10 @@ export const CreateStudentSchema = z.object({
   village: z.string().optional(),
   address: z.string().optional(),
   phone: z.string().optional(),
+  // Personal email is the login identifier: the system creates a Firebase
+  // account, emails a generated temporary password, and forces a reset on
+  // first login (the universal credential flow, matching staff).
+  email: z.string().email('Enter a valid email').min(1, 'Email required'),
   guardianName: z.string().min(1, 'Guardian name required'),
   guardianPhone: z.string().min(10, 'Valid guardian phone required'),
   guardianRelation: z.string().min(1, 'Relationship required'),

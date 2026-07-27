@@ -199,9 +199,9 @@ studentsRouter.post(
     } = req.body as studentService.CreateStudentInput
 
     if (!firstName || !lastName || !dateOfBirth || !sex || !nationality ||
-        !district || !guardianName || !guardianPhone || !guardianRelation) {
+        !district || !email || !guardianName || !guardianPhone || !guardianRelation) {
       res.status(400).json({
-        error: 'firstName, lastName, dateOfBirth, sex, nationality, district, guardianName, guardianPhone, and guardianRelation are required.',
+        error: 'firstName, lastName, dateOfBirth, sex, nationality, district, email, guardianName, guardianPhone, and guardianRelation are required.',
       })
       return
     }
@@ -430,21 +430,10 @@ studentsRouter.post(
 
     const {
       classId,
-      createFirebaseAccount,
+      createLoginAccount,
     } = req.body as {
-      classId?:              string
-      createFirebaseAccount?: { email: string; password: string }
-    }
-
-    if (createFirebaseAccount) {
-      if (!createFirebaseAccount.email || !createFirebaseAccount.password) {
-        res.status(400).json({ error: 'email and password are required when creating a Firebase account.' })
-        return
-      }
-      if (createFirebaseAccount.password.length < 8) {
-        res.status(400).json({ error: 'Password must be at least 8 characters.' })
-        return
-      }
+      classId?:            string
+      createLoginAccount?: boolean
     }
 
     const result = await studentService.createFromApplication({
@@ -452,7 +441,7 @@ studentsRouter.post(
       classId,
       actorUid:  user.uid,
       actorRole: user.role,
-      createFirebaseAccount,
+      createLoginAccount,
     })
 
     // Never return the temp password in the response body —

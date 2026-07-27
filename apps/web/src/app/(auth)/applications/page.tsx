@@ -79,8 +79,12 @@ function ApplicationsContent() {
 
   function handleConvert(id: string) {
     setActionError(null)
+    // Universal credential flow: admitting an applicant provisions their login
+    // from the email on their application — a generated password is emailed and
+    // must be reset on first sign-in. If the applicant has no email on file the
+    // backend returns a clear 400, surfaced below.
     convert(
-      { id },
+      { id, createLoginAccount: true },
       {
         onError: (err) => setActionError(err instanceof Error ? err.message : 'Failed to admit applicant as student.'),
       }
