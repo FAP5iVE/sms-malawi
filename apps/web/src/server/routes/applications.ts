@@ -52,7 +52,7 @@ applicationsRouter.post('/public', createRateLimiter('auth'), async (req, res) =
     if (err instanceof Error && (err as Error & { code?: string }).code === 'DUPLICATE_APPLICATION') {
       return res.status(409).json({
         error: 'DUPLICATE',
-        message: 'An application with the same name and date of birth already exists and is being reviewed.',
+        message: 'An application for this applicant (same name, date of birth and guardian contact) already exists and is being reviewed.',
       })
     }
     console.error('Public application error:', err)

@@ -168,22 +168,22 @@ export async function listApplications(
 
 export async function createPublicApplication(data: ApplicationInput) {
   // ── Duplicate detection ──────────────────────────────────────────────────
-  // Block re-submission if a non-denied application already exists matching
-  // either (a) the same first name + surname + date of birth combination, or
-  // (b) the same guardian phone, or (c) the same guardian email — any one of
-  // these is treated as a strong enough signal of a duplicate submission.
+  // Only block a genuine re-submission of the SAME applicant. A match requires
+  // ALL of: identical first name + surname + date of birth AND the same
+  // guardian phone AND the same guardian email. This distinguishes:
+  //   • Siblings (different name/DOB, shared guardian) → allowed to apply.
+  //   • Two unrelated applicants who happen to share a name + DOB but have
+  //     different guardians → both allowed; guardian contact tells them apart.
+  // Only a full match on applicant identity *and* guardian contact is treated
+  // as the same application being submitted twice.
   const existing = await prisma.application.findFirst({
     where: {
-      status: { not: 'DENIED' },
-      OR: [
-        {
-          firstName:   { equals: data.firstName, mode: 'insensitive' },
-          lastName:    { equals: data.surname,   mode: 'insensitive' },
-          dateOfBirth: new Date(data.dateOfBirth),
-        },
-        { guardianPhone: data.guardianPhone },
-        ...(data.guardianEmail ? [{ guardianEmail: data.guardianEmail }] : []),
-      ],
+      status:        { not: 'DENIED' },
+      firstName:     { equals: data.firstName, mode: 'insensitive' },
+      lastName:      { equals: data.surname,   mode: 'insensitive' },
+      dateOfBirth:   new Date(data.dateOfBirth),
+      guardianPhone: data.guardianPhone,
+      ...(data.guardianEmail ? { guardianEmail: data.guardianEmail } : {}),
     },
     select: { id: true, status: true },
   })

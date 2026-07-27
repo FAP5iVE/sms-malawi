@@ -136,7 +136,7 @@ export default function ApplyPage() {
 
   const STEP_FIELDS: (keyof ApplicationInput)[][] = [
     ['firstName', 'surname', 'dateOfBirth', 'sex', 'nationality'],
-    ['address', 'countryCode', 'phone'],
+    ['address', 'countryCode', 'phone', 'email'],
     ['classApplying', 'academicYear'],
     ['guardianName', 'guardianRelationship', 'guardianCountryCode', 'guardianPhone'],
     [],
@@ -448,13 +448,13 @@ export default function ApplyPage() {
                   <Field
                     label="Email Address"
                     error={errors.email?.message}
-                    hint="Optional — for application updates"
+                    hint="Required — your student login and password will be sent here once admitted"
                     className="col-span-full"
                   >
                     <input
                       {...register('email')}
                       type="email"
-                      className={`${inputCls} ${inputBase}`}
+                      className={`${inputCls} ${errors.email ? inputError : inputBase}`}
                       placeholder="applicant@example.com"
                     />
                   </Field>

@@ -47,6 +47,7 @@
 import { useState }                               from 'react'
 import { Archive, Pencil, UserPlus }              from 'lucide-react'
 import { useStudents, useArchiveStudent }          from '@/hooks/useStudents'
+import { useClasses }                             from '@/hooks/useClasses'
 import { usePermissions }                         from '@/hooks/usePermissions'
 import { RoleGuard }                              from '@/components/shared/RoleGuard'
 import { PermissionGuard }                        from '@/components/shared/PermissionGuard'
@@ -115,7 +116,7 @@ const COLUMNS: DataColumn<Student>[] = [
   },
   {
     key:      'class',
-    label:    'Form',
+    label:    'Class',
     sortable: false,
     // Visible on tablet + desktop; hidden on mobile (card shows it as key-value)
     priority: 'important',
@@ -216,11 +217,16 @@ function StudentsContent() {
   const [pendingArchiveIds, setPendingArchiveIds] = useState<string[] | null>(null)
   // R19 — free-text search, wired to useStudents()'s existing `search` filter
   const [search, setSearch] = useState('')
+  // Class filter — useStudents + GET /students already support classId; this
+  // adds the UI control. Empty string = all classes.
+  const [classId, setClassId] = useState('')
+
+  const { data: classes = [] } = useClasses()
 
   const { data, isLoading } = useStudents(
     sortBy && sortDir
-      ? { status, page, sortBy, sortDir, search: search || undefined }
-      : { status, page, search: search || undefined },
+      ? { status, page, sortBy, sortDir, search: search || undefined, classId: classId || undefined }
+      : { status, page, search: search || undefined, classId: classId || undefined },
   )
   const archive             = useArchiveStudent()
   const { can }             = usePermissions()
@@ -269,16 +275,30 @@ function StudentsContent() {
         </div>
 
         {/* R19 — server-backed search (GET /students already supports `search`) */}
-        <div className="w-full sm:w-72">
-          <label htmlFor="student-search" className="sr-only">Search students</label>
-          <input
-            id="student-search"
-            type="search"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            placeholder="Search by name or registration no…"
-            className="w-full min-h-[44px] border border-base rounded-xl px-4 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-          />
+        <div className="flex w-full sm:w-auto gap-2">
+          <div className="flex-1 sm:w-72">
+            <label htmlFor="student-search" className="sr-only">Search students</label>
+            <input
+              id="student-search"
+              type="search"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+              placeholder="Search by name or registration no…"
+              className="w-full min-h-[44px] border border-base rounded-xl px-4 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+            />
+          </div>
+          <div className="w-40 sm:w-48">
+            <label htmlFor="student-class-filter" className="sr-only">Filter by class</label>
+            <select
+              id="student-class-filter"
+              value={classId}
+              onChange={(e) => { setClassId(e.target.value); setPage(1) }}
+              className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+            >
+              <option value="">All classes</option>
+              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
         </div>
 
         {/* Add Student — min-h-[44px] enforced for C5 touch target */}

@@ -45,6 +45,7 @@ import { z }                                  from 'zod'
 import { CreateStudentSchema }                from '@shared/schemas/student'
 import { SexSchema, StudentStatusSchema }     from '@shared/schemas/student'
 import { MALAWI_DISTRICTS }                   from '@shared/constants/malawi'
+import { GUARDIAN_RELATIONSHIPS }             from '@shared/constants/admissions'
 import { getCountriesForForm } from '@shared/constants/countries'
 import { useClasses }                         from '@/hooks/useClasses'
 
@@ -345,11 +346,10 @@ export function ContactSection({ register, errors }: SectionProps) {
 
       {/* Guardian relationship */}
       <Field label="Relationship" error={errors.guardianRelation?.message} required>
-        <input
-          {...register('guardianRelation')}
-          className={inputCls}
-          placeholder="e.g. Mother, Father, Uncle"
-        />
+        <select {...register('guardianRelation')} className={inputCls} defaultValue="">
+          <option value="" disabled>Select relationship…</option>
+          {GUARDIAN_RELATIONSHIPS.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
       </Field>
 
       {/* Guardian phone — spans full width */}

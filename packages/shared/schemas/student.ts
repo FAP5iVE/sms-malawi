@@ -104,7 +104,7 @@ export const ApplicationSchema = z.object({
   address: z.string().min(5, 'Address is required'),
   countryCode: z.string().min(1, 'Select country code'),
   phone: z.string().min(7, 'Phone number is required'),
-  email: z.string().email('Enter a valid email').optional().or(z.literal('')),
+  email: z.string().email('Enter a valid email').min(1, 'Email is required'),
   classApplying: z.enum(['Form 1', 'Form 2', 'Form 3', 'Form 4'], {
     required_error: 'Please select the form',
   }),
