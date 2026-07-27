@@ -79,6 +79,12 @@ export type Permission =
   | 'student.viewFeeStatus'          // See fee status on student record
   | 'student.viewLibraryStatus'      // See library borrowing status on student record
   | 'student.viewAttendance'         // See attendance records for any student
+  // [PRODUCTION FIX 2026-07-27] Risk level blends fee-debt %, attendance %,
+  // and academic performance (see riskService.ts) — a sensitive pastoral
+  // signal that previously had no gate at all, so every role that could
+  // reach the student list (including library and HR) saw it. Distinct
+  // from viewFeeStatus since risk is broader than just money owed.
+  | 'student.viewRiskStatus'         // See computed risk level on student record
 
   // ── CLASS ────────────────────────────────────────────
   | 'class.view'                     // View class data
@@ -357,6 +363,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'student.viewFeeStatus',
     'student.viewLibraryStatus',
     'student.viewAttendance',
+    'student.viewRiskStatus',
 
     // Classes — oversight only
     'class.view',
@@ -465,6 +472,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'student.viewFeeStatus',
     'student.viewLibraryStatus',
     'student.viewAttendance',
+    'student.viewRiskStatus',
 
     // Classes — full management
     'class.view',
@@ -888,6 +896,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Students — view only (no editing)
     'student.view',
     'student.viewAttendance',
+    'student.viewRiskStatus',
     'student.printProfile',
 
     // Classes — teaching-specific operations
@@ -1065,6 +1074,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Students — view only (for mark entry context)
     'student.view',
     'student.viewAttendance',
+    'student.viewRiskStatus',
 
     // Classes — view and analytics
     'class.view',

@@ -55,10 +55,20 @@ const RISK_CONFIG: Record<RiskLevel, {
   MEDIUM: {
     label:     'Medium Risk',
     icon:      AlertCircle,
-    badge:     'bg-brand-amber/10 text-brand-amber border-brand-amber/30',
-    dot:       'bg-brand-amber',
-    card:      'border-brand-amber/25 bg-brand-amber/8',
-    cardTitle: 'text-brand-amber',
+    // [PRODUCTION FIX 2026-07-27] Was the one risk level using the custom
+    // brand-amber CSS variable with an opacity modifier (bg-brand-amber/10)
+    // and no dark: override at all — unlike HIGH/LOW/NONE, which all use
+    // literal Tailwind palette colours (red-50/blue-50/emerald-50) with
+    // explicit dark: variants. A CSS-custom-property colour combined with
+    // Tailwind's opacity-modifier syntax is exactly the setup that can
+    // silently fail to adapt in dark mode, rendering as a stuck-light
+    // (near-white) pill with unreadable text once the page goes dark.
+    // Switched to the same literal-palette + explicit dark: pattern that
+    // already works correctly for every other risk level.
+    badge:     'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/25 dark:text-amber-400 dark:border-amber-800/50',
+    dot:       'bg-amber-500',
+    card:      'border-amber-200 bg-amber-50/50 dark:border-amber-800/40 dark:bg-amber-950/15',
+    cardTitle: 'text-amber-700 dark:text-amber-400',
   },
   LOW: {
     label:     'Low Risk',

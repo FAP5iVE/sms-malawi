@@ -109,7 +109,9 @@ function CreateEventDialog({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [startDate, setStartDate] = useState('')
+  const [startTime, setStartTime] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [endTime, setEndTime] = useState('')
   const [category, setCategory] = useState<CalendarEventCategory>('term')
   const [fieldError, setFieldError] = useState<string | null>(null)
 
@@ -117,16 +119,20 @@ function CreateEventDialog({ onClose }: { onClose: () => void }) {
     e.preventDefault()
     setFieldError(null)
 
-    // <input type="datetime-local"> yields "YYYY-MM-DDTHH:mm" (no
-    // timezone) — not a valid ISO 8601 datetime string on its own, which
-    // CreateCalendarEventSchema (shared with the server route) requires.
-    // Converting via `new Date(...)` before validating is what lets the
-    // same strict schema be reused client- and server-side.
+    // Start/End are now collected as separate date + time inputs (see
+    // render below) rather than a single native <input type="datetime-local">
+    // — recombined here into the same "YYYY-MM-DDTHH:mm" shape that control
+    // used to produce, so the existing new Date(...).toISOString() /
+    // CreateCalendarEventSchema validation below needs no other changes.
+    // Time defaults to midnight when left blank (an all-day-style event).
+    const startDateTime = startDate ? `${startDate}T${startTime || '00:00'}` : ''
+    const endDateTime = endDate ? `${endDate}T${endTime || '00:00'}` : ''
+
     const parsed = CreateCalendarEventSchema.safeParse({
       title,
       description: description || undefined,
-      startDate: startDate ? new Date(startDate).toISOString() : '',
-      endDate: endDate ? new Date(endDate).toISOString() : undefined,
+      startDate: startDateTime ? new Date(startDateTime).toISOString() : '',
+      endDate: endDateTime ? new Date(endDateTime).toISOString() : undefined,
       category,
     })
     if (!parsed.success) {
@@ -177,31 +183,82 @@ function CreateEventDialog({ onClose }: { onClose: () => void }) {
               className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page resize-none min-h-[44px] focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="event-start" className="text-xs font-medium text-muted mb-1 block">
-                Start
-              </label>
-              <input
-                id="event-start"
-                type="datetime-local"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                required
-                className="w-full border border-base rounded-xl px-3 py-2.5 text-sm bg-page min-h-[44px] focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-              />
-            </div>
-            <div>
-              <label htmlFor="event-end" className="text-xs font-medium text-muted mb-1 block">
-                End (optional)
-              </label>
-              <input
-                id="event-end"
-                type="datetime-local"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full border border-base rounded-xl px-3 py-2.5 text-sm bg-page min-h-[44px] focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-              />
+          {/* Schedule — visually distinct panel so start/end read as a
+              connected time range rather than two generic form fields.
+              Date and time are separate native inputs per side (rather than
+              one cramped <input type="datetime-local">), each labelled with
+              an icon so the field's purpose is legible at a glance. */}
+          <div className="rounded-xl border border-base bg-page p-4 space-y-3">
+            <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider">
+              Schedule
+            </p>
+
+            <div className="flex gap-3 items-start">
+              <div className="flex flex-col items-center pt-2.5 shrink-0 w-5">
+                <span className="w-2 h-2 rounded-full bg-brand-teal" />
+                <span className="w-px flex-1 min-h-[28px] bg-base my-1" />
+                <span className="w-2 h-2 rounded-full border-2 border-muted" />
+              </div>
+
+              <div className="flex-1 space-y-3">
+                <div>
+                  <label htmlFor="event-start-date" className="text-xs font-medium text-muted mb-1 block">
+                    Start
+                  </label>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <div className="relative">
+                      <Calendar className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                      <input
+                        id="event-start-date"
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        required
+                        className="w-full border border-base rounded-xl pl-9 pr-3 py-2.5 text-sm bg-surface min-h-[44px] focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                      />
+                    </div>
+                    <div className="relative">
+                      <Clock className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                      <input
+                        aria-label="Start time"
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        className="w-32 border border-base rounded-xl pl-9 pr-3 py-2.5 text-sm bg-surface min-h-[44px] focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="event-end-date" className="text-xs font-medium text-muted mb-1 block">
+                    End <span className="text-muted/70 font-normal">(optional)</span>
+                  </label>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <div className="relative">
+                      <Calendar className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                      <input
+                        id="event-end-date"
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        min={startDate || undefined}
+                        className="w-full border border-base rounded-xl pl-9 pr-3 py-2.5 text-sm bg-surface min-h-[44px] focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                      />
+                    </div>
+                    <div className="relative">
+                      <Clock className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                      <input
+                        aria-label="End time"
+                        type="time"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                        className="w-32 border border-base rounded-xl pl-9 pr-3 py-2.5 text-sm bg-surface min-h-[44px] focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <div>
