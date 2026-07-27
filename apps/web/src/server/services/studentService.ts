@@ -39,6 +39,7 @@ import { prisma }        from '@/lib/prisma'
 import { logger }        from '@/lib/logger'
 import * as auditService from '@/server/services/auditService'
 import * as admin        from 'firebase-admin'
+import { getAdminApp }   from '@/lib/verifyAuth'
 import {
   Prisma,
   type StudentStatus,
@@ -553,7 +554,11 @@ export async function provisionStudentAuthAccount(params: {
 }): Promise<{ firebaseUid: string; tempPassword: string }> {
   const tempPassword = generateTempPassword()
 
-  const fbUser = await admin.auth().createUser({
+  // Use the canonical Admin initializer so this works regardless of whether
+  // other admin code has run first in the request lifecycle.
+  const auth = admin.auth(getAdminApp())
+
+  const fbUser = await auth.createUser({
     email:         params.email,
     password:      tempPassword,
     displayName:   params.displayName,
@@ -561,31 +566,35 @@ export async function provisionStudentAuthAccount(params: {
     disabled:      false,
   })
 
-  await admin.auth().setCustomUserClaims(fbUser.uid, {
+  await auth.setCustomUserClaims(fbUser.uid, {
     role:                   'student',
     subtitle:               'Student',
     requiresPasswordChange: true,
   })
 
-  // Best-effort welcome email with the generated password. A mail failure is
-  // logged but does not fail account creation — the temp password is returned
-  // to the caller so it can be surfaced for manual relay.
-  const emailResult = await sendEmail({
-    to:      params.email,
-    subject: 'Welcome to SMS Malawi — Your Student Login Details',
-    html: `<p>Dear ${params.displayName},</p>
-      <p>A student account has been created for you on the School Management System.</p>
-      <p><strong>Email:</strong> ${params.email}<br>
-         <strong>Temporary Password:</strong> <code>${tempPassword}</code></p>
-      <p>You will be required to change your password on first login.</p>
-      <p><a href="${process.env.NEXT_PUBLIC_APP_URL ?? ''}/login">Login here</a></p>`,
-    tags: [{ name: 'type', value: 'student-welcome' }],
-  })
-  if (!emailResult.ok) {
-    logger.warn(
-      { email: params.email, reason: emailResult.error },
-      '[studentService] student welcome email failed to send; temp password returned to caller for manual relay',
-    )
+  // Best-effort welcome email with the generated password. Wrapped so a mail
+  // failure (or unexpected throw from the mail layer) can never abort account
+  // creation — the temp password is returned to the caller for manual relay.
+  try {
+    const emailResult = await sendEmail({
+      to:      params.email,
+      subject: 'Welcome to SMS Malawi — Your Student Login Details',
+      html: `<p>Dear ${params.displayName},</p>
+        <p>A student account has been created for you on the School Management System.</p>
+        <p><strong>Email:</strong> ${params.email}<br>
+           <strong>Temporary Password:</strong> <code>${tempPassword}</code></p>
+        <p>You will be required to change your password on first login.</p>
+        <p><a href="${process.env.NEXT_PUBLIC_APP_URL ?? ''}/login">Login here</a></p>`,
+      tags: [{ name: 'type', value: 'student-welcome' }],
+    })
+    if (!emailResult.ok) {
+      logger.warn(
+        { email: params.email, reason: emailResult.error },
+        '[studentService] student welcome email failed to send; temp password returned to caller for manual relay',
+      )
+    }
+  } catch (mailErr) {
+    logger.warn({ email: params.email, mailErr }, '[studentService] student welcome email threw; continuing')
   }
 
   logger.info({ firebaseUid: fbUser.uid, email: params.email }, '[studentService] Firebase account provisioned for student')
