@@ -75,10 +75,11 @@ import * as notificationService from '@/server/services/notificationService'
   
 // ─── STAFF PROFILES ─────────────────────────────────────
 export async function listStaff(filters: {
-  department?: string; status?: string; search?: string
+  department?: string; jobTitle?: string; status?: string; search?: string
 } = {}) {
   const where:  Prisma.StaffProfileWhereInput = {}
   if (filters.department) where.department = filters.department
+  if (filters.jobTitle) where.jobTitle = filters.jobTitle
   if (filters.status) where.status = filters.status as 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED' | 'TERMINATED'
   if (filters.search) {
     where.OR = [

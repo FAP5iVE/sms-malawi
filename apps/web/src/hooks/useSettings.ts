@@ -28,6 +28,7 @@ import type {
   CategoryGroupedSettings,
   SchoolIdentitySettings,
   SettingRow,
+  DepartmentTitles,
 } from '@shared/types/settings'
 
 // ─────────────────────────────────────────────────────────
@@ -467,5 +468,27 @@ export function useFinanceSettings() {
     },
     enabled: initialized && canAccess,
     staleTime: 30 * 60 * 1000,
+  })
+}
+// ─────────────────────────────────────────────────────────
+//  DEPARTMENT / JOB TITLE TAXONOMY (production fix, 2026-07-27)
+//  Read-only, shared, cached access to SETTING_KEYS.HR_DEPARTMENT_TITLES
+//  for StaffForm's cascading department→title selects and the staff
+//  directory's department/title filters. The write side lives in
+//  HRDepartmentsSettings.tsx (a one-shot load/save form that doesn't
+//  need TanStack's cross-component cache, so it fetches directly).
+// ─────────────────────────────────────────────────────────
+
+/** isPublic: true on this key — any authenticated staff role can read it
+ *  (staff creation may be triggered by non-admin HR flows); only
+ *  admin/hr/high_rank can write, via HRDepartmentsSettings.tsx. */
+export function useDepartmentTitles() {
+  return useQuery({
+    queryKey: ['settings', 'category', 'hr-departments'],
+    queryFn: async () => {
+      const res = await apiFetch<{ departmentTitles: DepartmentTitles }>('/settings/hr')
+      return res.departmentTitles ?? {}
+    },
+    staleTime: 30 * 60 * 1000, // department/title lists change rarely
   })
 }

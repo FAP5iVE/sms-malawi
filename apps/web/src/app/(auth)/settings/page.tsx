@@ -54,6 +54,7 @@ import {
   LayoutList,
   CalendarDays, 
   Search,
+  Building2,
 }                               from 'lucide-react'
 import { useAuthStore }         from '@/store/authStore'
 import { ProfileSettings }      from '@/components/settings/ProfileSettings'
@@ -62,6 +63,7 @@ import { AcademicPolicySettings } from '@/components/settings/AcademicPolicySett
 import { ExamGradingSettings }  from '@/components/settings/ExamGradingSettings'
 import { FinanceSettings }      from '@/components/settings/FinanceSettings'
 import { LibrarySettings }      from '@/components/settings/LibrarySettings'
+import { HRDepartmentsSettings } from '@/components/settings/HRDepartmentsSettings'
 import { ClassroomSettings }    from '@/components/settings/ClassroomSettings'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import type { UserRole }        from '@shared/types/roles'
@@ -81,6 +83,7 @@ type SectionId =
   | 'exam-grading'
   | 'finance'
   | 'library'
+  | 'hr-departments'
   | 'classroom'
   | 'notifications'
 
@@ -141,6 +144,12 @@ const SECTIONS: Section[] = [
     roles: ['admin', 'library'],
   },
   {
+    id:    'hr-departments',
+    label: 'Departments & Titles',
+    icon:  Building2,
+    roles: ['admin', 'hr', 'high_rank'],
+  },
+  {
     id:    'classroom',
     label: 'Classroom Preferences',
     icon:  LayoutList,
@@ -166,6 +175,7 @@ function SectionContent({ sectionId }: { sectionId: SectionId }) {
     case 'exam-grading':     return <ExamGradingSettings />
     case 'finance':          return <FinanceSettings />
     case 'library':          return <LibrarySettings />
+    case 'hr-departments':   return <HRDepartmentsSettings />
     case 'classroom':        return <ClassroomSettings />
     case 'notifications':    return <NotificationSettings />
     case 'holidays':         return <HolidaysManager />

@@ -34,6 +34,7 @@ import type { CreateStaffInput } from '@shared/schemas/hr'
 type StaffFormValues = z.input<typeof CreateStaffSchema>
 import { USER_ROLES, ROLE_LABELS } from '@shared/types/roles'
 import { useCreateStaff } from '@/hooks/useHR'
+import { useDepartmentTitles } from '@/hooks/useSettings'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, AlertTriangle, CheckCircle2, Copy } from 'lucide-react'
 
@@ -67,11 +68,31 @@ export function StaffForm({ onClose }: Props) {
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<StaffFormValues, unknown, CreateStaffInput>({
     resolver: zodResolver(CreateStaffSchema),
     defaultValues: { employmentType: 'FULL_TIME' },
   })
+
+  // [PRODUCTION FIX 2026-07-27] Department/title are now selected from the
+  // admin/hr/high_rank-editable taxonomy (Settings → Departments & Titles)
+  // instead of free text — see useDepartmentTitles(). selectedDept drives
+  // which titles the second select offers; changing department clears a
+  // title that no longer belongs to it rather than silently submitting a
+  // mismatched pair.
+  const { data: departmentTitles = {}, isLoading: deptLoading } = useDepartmentTitles()
+  const departments = Object.keys(departmentTitles).sort()
+  const selectedDept = watch('department')
+  const titlesForDept = selectedDept ? (departmentTitles[selectedDept] ?? []) : []
+
+  function handleDepartmentChange() {
+    // register('department')'s own onChange already updates that field;
+    // this only clears jobTitle when it no longer belongs to the newly
+    // selected department.
+    setValue('jobTitle', '', { shouldValidate: false })
+  }
 
   function onSubmit(data: CreateStaffInput) {
     setSubmitError(null)
@@ -219,12 +240,37 @@ export function StaffForm({ onClose }: Props) {
                 </div>
                 <div>
                   <label className={lbl} htmlFor="sf-department">Department</label>
-                  <input id="sf-department" {...register('department')} className={ic} placeholder="e.g. Sciences" />
+                  <select
+                    id="sf-department"
+                    {...register('department', { onChange: handleDepartmentChange })}
+                    className={ic}
+                    disabled={deptLoading}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>{deptLoading ? 'Loading…' : 'Select department…'}</option>
+                    {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
                   {errors.department && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.department.message}</p>}
+                  {!deptLoading && departments.length === 0 && (
+                    <p className="text-xs text-muted mt-1">
+                      No departments defined yet — set them up under Settings → Departments &amp; Titles.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className={lbl} htmlFor="sf-jobTitle">Job title</label>
-                  <input id="sf-jobTitle" {...register('jobTitle')} className={ic} placeholder="e.g. Biology Teacher" />
+                  <select
+                    id="sf-jobTitle"
+                    {...register('jobTitle')}
+                    className={ic}
+                    disabled={!selectedDept || titlesForDept.length === 0}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>
+                      {!selectedDept ? 'Select a department first…' : titlesForDept.length === 0 ? 'No titles for this department' : 'Select job title…'}
+                    </option>
+                    {titlesForDept.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
                   {errors.jobTitle && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.jobTitle.message}</p>}
                 </div>
                 <div>

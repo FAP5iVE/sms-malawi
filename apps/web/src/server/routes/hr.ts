@@ -66,8 +66,8 @@ const REVIEWERS = ['admin', 'hr', 'high_rank'] as const
 // ── STAFF DIRECTORY (admin/hr/high_rank only — hr.viewAnyProfile's real grant) ──
 hrRouter.get('/', verifyAuth, requireRole([...REVIEWERS]),
   async (req, res) => {
-    const { department, status, search } = req.query as Record<string, string>
-    const staff = await hrService.listStaff({ department, status, search })
+    const { department, jobTitle, status, search } = req.query as Record<string, string>
+    const staff = await hrService.listStaff({ department, jobTitle, status, search })
     return res.json(staff)
   })
 

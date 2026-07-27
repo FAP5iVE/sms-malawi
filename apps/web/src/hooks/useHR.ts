@@ -24,7 +24,7 @@ import type { ApiStaffLoan, ApiLeaveRequest } from '@shared/types/api'
 import type { ConflictCheckResult } from '@/server/services/leaveConflictService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 
-export function useStaffDirectory(filters: { department?: string; status?: string; search?: string } = {}) {
+export function useStaffDirectory(filters: { department?: string; jobTitle?: string; status?: string; search?: string } = {}) {
   const params = new URLSearchParams()
   Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v) })
   return useQuery({

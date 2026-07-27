@@ -49,6 +49,19 @@ export interface PayeBracket {
  */
 export type InstallmentOption = 2 | 3 | 4
 
+/**
+ * [PRODUCTION FIX 2026-07-27] The school's canonical department → job-title
+ * taxonomy. Replaces free-text department/jobTitle inputs on staff creation
+ * (which let every staff member spell their own department differently,
+ * silently breaking any department-scoped rollup such as Finance's
+ * per-department budget) with a single admin/hr/high_rank-editable source
+ * of truth. Keys are department names; each value is the list of job
+ * titles available within that department, in display order.
+ */
+export interface DepartmentTitles {
+  [departmentName: string]: string[]
+}
+
 // ─────────────────────────────────────────────────────────
 //  SETTING KEYS
 //  Single source of truth for all key string literals.
@@ -128,6 +141,9 @@ export const SETTING_KEYS = {
 
   // ── HR — contract management
   HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS: 'hr_contract_expiry_lookahead_days',
+
+  // ── HR — department & job title taxonomy (production fix, 2026-07-27)
+  HR_DEPARTMENT_TITLES:           'hr_department_titles',
 
   // ── Security — session
   SESSION_TIMEOUT_STUDENT_MINS:   'session_timeout_student_mins',
@@ -241,6 +257,7 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.HR_STUDY_LEAVE_DAYS]:         number
   readonly [SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS]:     number
   readonly [SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS]: number  // days
+  readonly [SETTING_KEYS.HR_DEPARTMENT_TITLES]: DepartmentTitles
 
   // ── Security
   readonly [SETTING_KEYS.SESSION_TIMEOUT_STUDENT_MINS]: number
@@ -652,6 +669,23 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     isPublic: false,
     description: 'How many days ahead of a contract end date a staff contract counts as "expiring soon" in HR reports and alerts.',
     defaultValue: 60,
+  },
+
+  [SETTING_KEYS.HR_DEPARTMENT_TITLES]: {
+    key: SETTING_KEYS.HR_DEPARTMENT_TITLES,
+    category: SETTING_CATEGORIES.HR,
+    isPublic: true, // every staff-creation form (HR and admin) needs to read this
+    description: 'Department → job-title taxonomy used by the staff creation form and staff directory filters. Edit under Settings → Departments & Titles.',
+    defaultValue: {
+      'Sciences':        ['Biology Teacher', 'Chemistry Teacher', 'Physics Teacher', 'Laboratory Technician'],
+      'Mathematics':      ['Mathematics Teacher'],
+      'Languages':        ['English Teacher', 'Chichewa Teacher', 'French Teacher'],
+      'Humanities':       ['History Teacher', 'Geography Teacher', 'Religious Education Teacher'],
+      'Physical Education': ['Physical Education Teacher', 'Sports Coordinator'],
+      'Administration':  ['Head Teacher', 'Deputy Head Teacher', 'Registrar', 'Bursar', 'Clerk', 'Secretary'],
+      'Library':          ['Librarian', 'Library Assistant'],
+      'Support Staff':   ['Groundskeeper', 'Security Guard', 'Cleaner', 'Driver'],
+    },
   },
 
   // ── Security

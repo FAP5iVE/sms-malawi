@@ -40,6 +40,7 @@
  *   PATCH      /settings/grading-scales/:id — Admin, High Rank: update single row
  *   POST       /settings/grading-scales/reset — Admin: reset all to MANEB defaults
  *   GET/PATCH  /settings/finance            — Admin, Finance: fee / payroll preferences
+ *   GET/PATCH  /settings/hr                 — Admin, HR, High Rank: department/job-title taxonomy
  *   GET/PATCH  /settings/library            — Admin, Library: borrowing / fine rules
  *   GET/PATCH  /settings/classroom          — Academic: classroom preferences (per-user)
  *   GET/PATCH  /settings/notifications      — All: per-user push/email toggles
@@ -64,7 +65,7 @@ import {
 }                            from '@/server/services/gradeService'
 import * as settingsService  from '@/server/services/settingsService'
 import { SETTING_KEYS, SETTING_META } from '@shared/types/settings'
-import type { SettingKey }   from '@shared/types/settings'
+import type { SettingKey, DepartmentTitles } from '@shared/types/settings'
 import { logger }            from '@/lib/logger'
 
 export const settingsRouter = Router()
@@ -266,6 +267,35 @@ settingsRouter
         .filter(([k]) => FINANCE_KEYS.includes(k)),
     )
     await writeSettings(allowed, req.user!.uid)
+    return res.json({ ok: true })
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HR SETTINGS  (admin | hr | high_rank) — production fix, 2026-07-27
+// ─────────────────────────────────────────────────────────────────────────────
+// Department -> job-title taxonomy. Goes through settingsService.get()/set()
+// directly (not the readSettings/writeSettings string-map helpers above) —
+// this value is a real JSON object (Record<department, title[]>), not a flat
+// scalar, and settingsService.set() carries its own Zod validation
+// (SETTING_VALUE_SCHEMAS) which the generic helpers don't apply.
+settingsRouter
+  .route('/hr')
+  .get(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
+    const departmentTitles = await settingsService.get(SETTING_KEYS.HR_DEPARTMENT_TITLES)
+    return res.json({ departmentTitles })
+  })
+  .patch(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
+    const { departmentTitles } = req.body as { departmentTitles?: unknown }
+    if (!departmentTitles || typeof departmentTitles !== 'object') {
+      return res.status(400).json({ error: 'departmentTitles is required.' })
+    }
+    try {
+      await settingsService.set(SETTING_KEYS.HR_DEPARTMENT_TITLES, departmentTitles as DepartmentTitles, req.user!.uid)
+    } catch (err) {
+      const status = (err as { status?: number })?.status ?? 400
+      const message = err instanceof Error ? err.message : 'Invalid department/title data.'
+      return res.status(status).json({ error: message })
+    }
     return res.json({ ok: true })
   })
 

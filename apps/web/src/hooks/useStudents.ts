@@ -38,6 +38,11 @@ export function useStudents(
   filters: {
     status?:  string
     classId?: string
+    // [PRODUCTION FIX 2026-07-27] Both already existed and worked server-side
+    // (GET /students, studentService.list) — this hook just never passed
+    // them through, so the UI had no way to use them.
+    sex?:     'MALE' | 'FEMALE'
+    form?:    number
     page?:    number
     search?:  string
     sortBy?:  string
@@ -47,6 +52,8 @@ export function useStudents(
   const params = new URLSearchParams()
   if (filters.status) params.set('status', filters.status)
   if (filters.classId) params.set('classId', filters.classId)
+  if (filters.sex) params.set('sex', filters.sex)
+  if (filters.form) params.set('form', String(filters.form))
   if (filters.page) params.set('page', String(filters.page))
   if (filters.search) params.set('search', filters.search)
   if (filters.sortBy && filters.sortDir) {

@@ -219,6 +219,17 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
   [SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS]:
     positiveIntSchema('Contract expiry lookahead days').max(365),
 
+  // [PRODUCTION FIX 2026-07-27] Department name -> non-empty list of job
+  // titles. Both department names and title names must be non-blank after
+  // trimming — this is the single source of truth for staff-creation
+  // dropdowns, so a blank entry would silently become an unselectable or
+  // confusing option there.
+  [SETTING_KEYS.HR_DEPARTMENT_TITLES]:
+    z.record(
+      z.string().trim().min(1, 'Department name cannot be blank'),
+      z.array(z.string().trim().min(1, 'Job title cannot be blank')),
+    ),
+
   // ── Security
   [SETTING_KEYS.SESSION_TIMEOUT_STUDENT_MINS]:
     positiveIntSchema('Student session timeout').max(480),

@@ -390,6 +390,13 @@ export function PendingActionsPanel({
   const [reviewTarget,  setReviewTarget]  = useState<PendingActionRow | null>(null)
   const [reviewMode,    setReviewMode]    = useState<'approve' | 'reject' | null>(null)
   const [page,          setPage]          = useState(1)
+  // [PRODUCTION FIX 2026-07-27] action/dateFrom/dateTo already worked
+  // server-side (usePendingActions already threads them through) — nothing
+  // in the panel exposed controls for them. Full view only; the compact
+  // dashboard widget stays as a quick-glance list.
+  const [actionFilter,  setActionFilter]  = useState('')
+  const [dateFrom,      setDateFrom]      = useState('')
+  const [dateTo,        setDateTo]        = useState('')
 
   const statusFilter = compact
     ? 'PENDING'
@@ -400,6 +407,9 @@ export function PendingActionsPanel({
   const { data, isLoading, isError, refetch, isFetching } = usePendingActions({
     status:     statusFilter as 'PENDING' | 'ALL',
     entityType: entityType,
+    action:     !compact && actionFilter ? actionFilter : undefined,
+    dateFrom:   !compact && dateFrom ? dateFrom : undefined,
+    dateTo:     !compact && dateTo ? dateTo : undefined,
     page,
     pageSize:   compact ? compactLimit : 25,
   })
@@ -580,6 +590,51 @@ export function PendingActionsPanel({
                 <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* ── Filters (full view only) */}
+        {!compact && (
+          <div className="flex flex-wrap items-end gap-2 mb-4">
+            <div>
+              <label htmlFor="pa-action-filter" className="block text-[11px] text-muted-foreground mb-1">Action</label>
+              <input
+                id="pa-action-filter"
+                value={actionFilter}
+                onChange={(e) => { setActionFilter(e.target.value); setPage(1) }}
+                placeholder="e.g. STUDENT_ARCHIVED"
+                className="h-9 text-xs border border-base rounded-lg px-3 bg-surface w-44"
+              />
+            </div>
+            <div>
+              <label htmlFor="pa-date-from" className="block text-[11px] text-muted-foreground mb-1">From</label>
+              <input
+                id="pa-date-from"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
+                className="h-9 text-xs border border-base rounded-lg px-3 bg-surface"
+              />
+            </div>
+            <div>
+              <label htmlFor="pa-date-to" className="block text-[11px] text-muted-foreground mb-1">To</label>
+              <input
+                id="pa-date-to"
+                type="date"
+                value={dateTo}
+                onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
+                className="h-9 text-xs border border-base rounded-lg px-3 bg-surface"
+              />
+            </div>
+            {(actionFilter || dateFrom || dateTo) && (
+              <button
+                type="button"
+                onClick={() => { setActionFilter(''); setDateFrom(''); setDateTo(''); setPage(1) }}
+                className="h-9 text-xs text-muted-foreground hover:text-body underline"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         )}
 

@@ -75,6 +75,7 @@ import {
 import { DigitalResourceViewer } from '@/components/library/DigitalResourceViewer'
 import { BookOpen, Scan, FileText, AlertTriangle, Eye, Check, X as XIcon, Undo2 } from 'lucide-react'
 import { ModuleTabs }        from '@/components/shared/ModuleTabs'
+import { MALAWI_SUBJECTS }   from '@shared/constants/malawi'
 import type {
   ApiBook,
   ApiBorrowing,
@@ -140,6 +141,14 @@ function LibraryContent() {
 
   const [tab, setTab]               = useState<Tab>(initialTab)
   const [search, setSearch]         = useState('')
+  // [PRODUCTION FIX 2026-07-27] category/available (catalog) and
+  // type/form/subject (digital resources) all already worked server-side —
+  // useBooks()/useDigitalResources() just never had callers passing them.
+  const [categoryFilter, setCategoryFilter]   = useState('')
+  const [availableOnly, setAvailableOnly]     = useState(false)
+  const [digitalTypeFilter, setDigitalTypeFilter] = useState('')
+  const [digitalFormFilter, setDigitalFormFilter] = useState('')
+  const [digitalSubjectFilter, setDigitalSubjectFilter] = useState('')
   const [barcodeInput, setBarcodeInput] = useState('')
   const [scanResult, setScanResult] = useState<ApiBook | null>(null)
   const [scanError, setScanError]   = useState<string | null>(null)
@@ -154,9 +163,17 @@ function LibraryContent() {
   const isLibStaff = ['admin', 'library'].includes(role ?? '')
 
   const { data: stats }             = useLibraryStats()
-  const { data: books = [],  isLoading } = useBooks({ search })
+  const { data: books = [],  isLoading } = useBooks({
+    search,
+    category:  categoryFilter || undefined,
+    available: availableOnly || undefined,
+  })
   const { data: overdue = [] }      = useBorrowings({ overdue: true })
-  const { data: digitalResources = [] } = useDigitalResources()
+  const { data: digitalResources = [] } = useDigitalResources({
+    type:    digitalTypeFilter || undefined,
+    form:    digitalFormFilter ? Number(digitalFormFilter) : undefined,
+    subject: digitalSubjectFilter || undefined,
+  })
   const { data: recommendations = [] }  = useRecommendations('PENDING')
   const { data: fineWaivers = [] }      = useFineWaivers('PENDING')
 
@@ -289,6 +306,29 @@ function LibraryContent() {
                 className="border border-base rounded-xl px-4 py-2.5 text-sm w-full focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
               />
             </div>
+            <div className="w-40">
+              <label htmlFor="library-category" className="sr-only">Filter by category</label>
+              <select
+                id="library-category"
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="border border-base rounded-xl px-3 py-2.5 text-sm w-full bg-surface focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              >
+                <option value="">All categories</option>
+                {['TEXTBOOK', 'REFERENCE', 'FICTION', 'NONFICTION', 'SCIENCE', 'MATHEMATICS', 'HUMANITIES', 'PAST_PAPER', 'OTHER'].map((c) => (
+                  <option key={c} value={c}>{c.charAt(0) + c.slice(1).toLowerCase().replace('_', ' ')}</option>
+                ))}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-body px-1 min-h-[44px] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={availableOnly}
+                onChange={(e) => setAvailableOnly(e.target.checked)}
+                className="w-4 h-4 accent-brand-teal"
+              />
+              Available now
+            </label>
             {isLibStaff && (
               <div className="flex flex-col gap-1.5">
                 <div className="flex gap-2">
@@ -508,7 +548,44 @@ function LibraryContent() {
       {/* ── Digital library tab ────────────────────────────────────────────── */}
       {tab === 'digital' && (
         <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={digitalTypeFilter}
+              onChange={(e) => setDigitalTypeFilter(e.target.value)}
+              className="border border-base rounded-xl px-3 py-2 text-sm bg-surface min-h-[44px]"
+              aria-label="Filter by resource type"
+            >
+              <option value="">All types</option>
+              <option value="EBOOK">eBook</option>
+              <option value="PAST_PAPER">Past Paper</option>
+              <option value="REFERENCE">Reference</option>
+              <option value="STUDY_GUIDE">Study Guide</option>
+            </select>
+            <select
+              value={digitalFormFilter}
+              onChange={(e) => setDigitalFormFilter(e.target.value)}
+              className="border border-base rounded-xl px-3 py-2 text-sm bg-surface min-h-[44px]"
+              aria-label="Filter by form"
+            >
+              <option value="">All forms</option>
+              {[1, 2, 3, 4].map((f) => <option key={f} value={f}>Form {f}</option>)}
+            </select>
+            <select
+              value={digitalSubjectFilter}
+              onChange={(e) => setDigitalSubjectFilter(e.target.value)}
+              className="border border-base rounded-xl px-3 py-2 text-sm bg-surface min-h-[44px]"
+              aria-label="Filter by subject"
+            >
+              <option value="">All subjects</option>
+              {MALAWI_SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {(digitalResources as ApiDigitalResource[]).length === 0 && (
+              <div className="col-span-full text-center py-16 text-muted text-sm border border-base rounded-xl">
+                No digital resources match these filters.
+              </div>
+            )}
             {(digitalResources as ApiDigitalResource[]).map((r) => (
               <div key={r.id} className="bg-surface border border-base rounded-xl p-4">
                 <div className="flex items-start justify-between gap-3">

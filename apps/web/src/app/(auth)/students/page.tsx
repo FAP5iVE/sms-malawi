@@ -220,13 +220,16 @@ function StudentsContent() {
   // Class filter — useStudents + GET /students already support classId; this
   // adds the UI control. Empty string = all classes.
   const [classId, setClassId] = useState('')
+  // [PRODUCTION FIX 2026-07-27] Gender filter — GET /students already
+  // supported `sex`, the UI just never surfaced it.
+  const [sex, setSex] = useState<'' | 'MALE' | 'FEMALE'>('')
 
   const { data: classes = [] } = useClasses()
 
   const { data, isLoading } = useStudents(
     sortBy && sortDir
-      ? { status, page, sortBy, sortDir, search: search || undefined, classId: classId || undefined }
-      : { status, page, search: search || undefined, classId: classId || undefined },
+      ? { status, page, sortBy, sortDir, search: search || undefined, classId: classId || undefined, sex: sex || undefined }
+      : { status, page, search: search || undefined, classId: classId || undefined, sex: sex || undefined },
   )
   const archive             = useArchiveStudent()
   const { can }             = usePermissions()
@@ -297,6 +300,19 @@ function StudentsContent() {
             >
               <option value="">All classes</option>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="w-32 sm:w-40">
+            <label htmlFor="student-sex-filter" className="sr-only">Filter by gender</label>
+            <select
+              id="student-sex-filter"
+              value={sex}
+              onChange={(e) => { setSex(e.target.value as '' | 'MALE' | 'FEMALE'); setPage(1) }}
+              className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+            >
+              <option value="">All genders</option>
+              <option value="MALE">Male</option>
+              <option value="FEMALE">Female</option>
             </select>
           </div>
         </div>

@@ -73,6 +73,7 @@ import {
   useDisburseLoan,
   useRecordLoanRepayment,
 }                           from '@/hooks/useHR'
+import { useDepartmentTitles } from '@/hooks/useSettings'
 import { LeaveConflictWarning } from '@/components/hr/LeaveConflictWarning'
 import { StaffForm }           from '@/components/hr/StaffForm'
 import type { ConflictCheckResult } from '@/server/services/leaveConflictService'
@@ -86,11 +87,14 @@ import {
   Banknote,
   Loader2,
   UserPlus,
+  Wallet,
+  FileDown,
   X,
 }                           from 'lucide-react'
 import { ModuleTabs }       from '@/components/shared/ModuleTabs'
 import { formatMWK }        from '@shared/constants/malawi'
-import type { ApiStaffProfile, ApiLeaveRequest, ApiContractAlert, ApiStaffLoan } from '@shared/types/api'
+import { useMyPayslips, useMySalaryStructure, downloadPayslip } from '@/hooks/usePayroll'
+import type { ApiStaffProfile, ApiLeaveRequest, ApiContractAlert, ApiStaffLoan, ApiPayslip, ApiSalaryStructure } from '@shared/types/api'
 
 /*
  * [CHANGE TYPE]: TARGETED EDIT
@@ -100,9 +104,9 @@ import type { ApiStaffProfile, ApiLeaveRequest, ApiContractAlert, ApiStaffLoan }
  *   HRDashboard's corrected quick actions can deep-link — /hr/leave and
  *   /hr/staff/new never existed as routes.
  */
-type Tab = 'directory' | 'leave' | 'loans' | 'alerts'
+type Tab = 'directory' | 'leave' | 'loans' | 'mypay' | 'alerts'
 
-const HR_TABS: Tab[] = ['directory', 'leave', 'loans', 'alerts']
+const HR_TABS: Tab[] = ['directory', 'leave', 'loans', 'mypay', 'alerts']
 
 export default function HRPage() {
   return (
@@ -146,6 +150,13 @@ function HRContent() {
 
   const [tab, setTab]         = useState<Tab>(initialTab)
   const [search, setSearch]   = useState('')
+  // [PRODUCTION FIX 2026-07-27] Department/title directory filters, sourced
+  // from the same admin/hr/high_rank-editable taxonomy StaffForm now uses.
+  const [deptFilter, setDeptFilter]   = useState('')
+  const [titleFilter, setTitleFilter] = useState('')
+  const { data: departmentTitles = {} } = useDepartmentTitles()
+  const filterDepartments = Object.keys(departmentTitles).sort()
+  const filterTitles = deptFilter ? (departmentTitles[deptFilter] ?? []) : []
   const [showStaffForm, setShowStaffForm] = useState(false)
 
   const isHR         = ['admin', 'hr', 'high_rank'].includes(role ?? '')
@@ -154,15 +165,27 @@ function HRContent() {
   // HR_ADMIN role gate on POST /hr — admin/hr/high_rank. Matches isHR.
   const canCreateStaff = isHR
 
-  const { data: staff = [],          isLoading: staffLoading } = useStaffDirectory({ search })
-  const { data: leaveRequests = [] }                           = useLeaveRequests({ status: 'PENDING' })
+  const { data: staff = [],          isLoading: staffLoading } = useStaffDirectory({
+    search,
+    department: deptFilter || undefined,
+    jobTitle:   titleFilter || undefined,
+  })
+  // [PRODUCTION FIX 2026-07-27] The Leave Requests tab previously hardcoded
+  // status: 'PENDING' with no way to see approved/rejected history. Split
+  // into two calls: leaveRequests (filterable, drives the visible list) and
+  // pendingLeaveCount (always PENDING, drives the tab badge) — so switching
+  // the filter away from Pending doesn't make the badge lie about how many
+  // requests are actually awaiting review.
+  const [leaveStatusFilter, setLeaveStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | ''>('PENDING')
+  const { data: leaveRequests = [] }                           = useLeaveRequests({ status: leaveStatusFilter || undefined })
+  const { data: pendingLeaveForBadge = [] }                    = useLeaveRequests({ status: 'PENDING' })
   const [alertDays, setAlertDays]                              = useState(60)
   const { data: contracts = [] }                               = useContractAlerts(alertDays)
   const reviewLeave = useReviewLeave()
 
   const [conflictPanel, setConflictPanel] = useState<{ staffName: string; result: ConflictCheckResult } | null>(null)
 
-  const pendingLeave     = (leaveRequests as ApiLeaveRequest[]).length
+  const pendingLeave     = (pendingLeaveForBadge as ApiLeaveRequest[]).length
   const expiringContracts = (contracts   as ApiContractAlert[]).length
 
   function handleReview(req: ApiLeaveRequest, status: 'APPROVED' | 'REJECTED') {
@@ -190,8 +213,9 @@ function HRContent() {
     { id: 'directory' as Tab, label: 'Staff Directory', icon: Users },
     { id: 'leave'     as Tab, label: 'Leave Requests',  icon: Calendar,      badge: pendingLeave      },
     { id: 'loans'     as Tab, label: 'Loans',           icon: CreditCard                              },
+    { id: 'mypay'     as Tab, label: 'My Pay',          icon: Wallet                                  },
     { id: 'alerts'    as Tab, label: 'Contract Alerts', icon: AlertTriangle, badge: expiringContracts },
-  ].filter((t) => t.id === 'loans' || isHR)
+  ].filter((t) => t.id === 'loans' || t.id === 'mypay' || isHR)
 
   return (
     <div className="space-y-5">
@@ -215,16 +239,37 @@ function HRContent() {
       {tab === 'directory' && isHR && (
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or employee number…"
-              className="
-                flex-1 min-w-0 max-w-sm border border-base rounded-xl
-                px-4 py-2.5 text-sm
-                focus:outline-none focus:ring-2 focus:ring-brand-teal/25
-              "
-            />
+            <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name or employee number…"
+                className="
+                  flex-1 min-w-0 max-w-sm border border-base rounded-xl
+                  px-4 py-2.5 text-sm
+                  focus:outline-none focus:ring-2 focus:ring-brand-teal/25
+                "
+              />
+              <select
+                value={deptFilter}
+                onChange={(e) => { setDeptFilter(e.target.value); setTitleFilter('') }}
+                className="border border-base rounded-xl px-3 py-2.5 text-sm bg-surface min-h-[44px]"
+                aria-label="Filter by department"
+              >
+                <option value="">All departments</option>
+                {filterDepartments.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <select
+                value={titleFilter}
+                onChange={(e) => setTitleFilter(e.target.value)}
+                disabled={!deptFilter}
+                className="border border-base rounded-xl px-3 py-2.5 text-sm bg-surface min-h-[44px] disabled:opacity-50"
+                aria-label="Filter by job title"
+              >
+                <option value="">All titles</option>
+                {filterTitles.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
             {canCreateStaff && (
               <button
                 type="button"
@@ -283,9 +328,22 @@ function HRContent() {
       {/* ── Leave requests tab ─────────────────────────────────────────────── */}
       {tab === 'leave' && isHR && (
         <div className="space-y-3">
+          <div className="flex items-center justify-end">
+            <select
+              value={leaveStatusFilter}
+              onChange={(e) => setLeaveStatusFilter(e.target.value as typeof leaveStatusFilter)}
+              className="border border-base rounded-lg px-3 py-2 text-sm bg-surface min-h-[36px]"
+              aria-label="Filter leave requests by status"
+            >
+              <option value="PENDING">Pending</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="">All statuses</option>
+            </select>
+          </div>
           {(leaveRequests as ApiLeaveRequest[]).length === 0 && (
             <div className="text-center py-16 text-muted text-sm border border-base rounded-xl">
-              No pending leave requests.
+              No {leaveStatusFilter ? leaveStatusFilter.toLowerCase() : ''} leave requests.
             </div>
           )}
           {(leaveRequests as ApiLeaveRequest[]).map((req) => (
@@ -304,24 +362,34 @@ function HRContent() {
                 </p>
                 <p className="text-xs text-muted mt-1">{req.reason}</p>
               </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleReview(req, 'APPROVED')}
-                  disabled={reviewLeave.isPending}
-                  className="flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 min-h-11 disabled:opacity-60"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Approve
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleReview(req, 'REJECTED')}
-                  disabled={reviewLeave.isPending}
-                  className="flex items-center gap-1 text-xs bg-brand-coral/10 text-brand-coral border border-brand-coral/20 px-3 py-1.5 rounded-lg hover:bg-brand-coral/20 min-h-11 disabled:opacity-60"
-                >
-                  <XCircle className="w-3.5 h-3.5" /> Reject
-                </button>
-              </div>
+              {req.status === 'PENDING' ? (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleReview(req, 'APPROVED')}
+                    disabled={reviewLeave.isPending}
+                    className="flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 min-h-11 disabled:opacity-60"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleReview(req, 'REJECTED')}
+                    disabled={reviewLeave.isPending}
+                    className="flex items-center gap-1 text-xs bg-brand-coral/10 text-brand-coral border border-brand-coral/20 px-3 py-1.5 rounded-lg hover:bg-brand-coral/20 min-h-11 disabled:opacity-60"
+                  >
+                    <XCircle className="w-3.5 h-3.5" /> Reject
+                  </button>
+                </div>
+              ) : (
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border shrink-0 ${
+                  req.status === 'APPROVED'
+                    ? 'bg-green-50 text-green-700 border-green-200'
+                    : 'bg-brand-coral/10 text-brand-coral border-brand-coral/20'
+                }`}>
+                  {req.status}
+                </span>
+              )}
             </div>
           ))}
 
@@ -353,6 +421,12 @@ function HRContent() {
       {tab === 'loans' && (
         <LoansTab canApplyLoan={canApplyLoan} isHR={isHR} role={role} />
       )}
+
+      {/* ── My Pay tab (production fix, 2026-07-27) ─────────────────────────
+          Self-service salary structure + payslip history. Visible to every
+          staff role, same pattern as the Loans tab — this is a personal view,
+          not a management one, so it is never gated behind isHR. */}
+      {tab === 'mypay' && <MyPayTab />}
 
       {/* ── Contract alerts tab ────────────────────────────────────────────── */}
       {tab === 'alerts' && isHR && (
@@ -435,8 +509,13 @@ function LoansTab({
   const [reason, setReason]                    = useState('')
   const [repayTargetId, setRepayTargetId]      = useState<string | null>(null)
   const [repayAmount, setRepayAmount]          = useState('')
+  // [PRODUCTION FIX 2026-07-27] Manage Loan Requests previously fetched
+  // every loan regardless of status in one flat list — useLoans() already
+  // supported a status filter server-side, it just had no caller passing
+  // one. '' = all statuses.
+  const [loanStatusFilter, setLoanStatusFilter] = useState<'' | ApiStaffLoan['status']>('')
 
-  const { data: loans = [], isLoading } = useLoans()
+  const { data: loans = [], isLoading } = useLoans(loanStatusFilter || undefined)
   const { data: myLoans = [], isLoading: myLoansLoading } = useMyLoans()
   const requestLoan    = useRequestLoan()
   const approveLoan    = useApproveLoan()
@@ -589,7 +668,23 @@ function LoansTab({
       {/* Manage Loan Requests */}
       {canManage && (
         <div>
-          <h2 className="font-heading font-semibold text-body mb-3">Manage Loan Requests</h2>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h2 className="font-heading font-semibold text-body">Manage Loan Requests</h2>
+            <select
+              value={loanStatusFilter}
+              onChange={(e) => setLoanStatusFilter(e.target.value as '' | ApiStaffLoan['status'])}
+              className="border border-base rounded-lg px-3 py-2 text-sm bg-surface min-h-[36px]"
+              aria-label="Filter loans by status"
+            >
+              <option value="">All statuses</option>
+              <option value="PENDING">Pending</option>
+              <option value="APPROVED">Approved</option>
+              <option value="DISBURSED">Disbursed</option>
+              <option value="REPAYING">Repaying</option>
+              <option value="SETTLED">Settled</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+          </div>
           {isLoading ? (
             <div className="space-y-2">
               {[1, 2].map((i) => <div key={i} className="h-20 rounded-xl bg-surface animate-pulse" />)}
@@ -687,6 +782,130 @@ function LoansTab({
           You do not have access to loan management.
         </div>
       )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MY PAY TAB (production fix, 2026-07-27)
+// ─────────────────────────────────────────────────────────────────────────────
+// Self-service: the caller's own current salary structure (base pay,
+// allowances, outstanding loan balance/deduction) and payslip history with
+// PDF download. Both were previously unreachable from the UI — see the
+// hooks in W/hooks/usePayroll.ts for the "existed but never wired up" detail.
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+function MyPayTab() {
+  const { data: salary, isLoading: salaryLoading }     = useMySalaryStructure()
+  const { data: payslips = [], isLoading: payslipsLoading } = useMyPayslips()
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+
+  const s = salary as ApiSalaryStructure | null | undefined
+
+  async function handleDownload(id: string) {
+    setDownloadError(null)
+    setDownloadingId(id)
+    try {
+      await downloadPayslip(id)
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : 'Failed to open payslip.')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* My Salary */}
+      <div>
+        <h2 className="font-heading font-semibold text-body mb-3 flex items-center gap-2">
+          <Wallet className="w-4 h-4 text-brand-teal" aria-hidden />
+          My Salary
+        </h2>
+        {salaryLoading ? (
+          <div className="h-24 rounded-xl bg-surface animate-pulse" />
+        ) : !s ? (
+          <div className="text-center py-10 text-muted text-sm border border-base rounded-xl">
+            Your salary structure hasn&apos;t been set up yet. Contact HR if this seems wrong.
+          </div>
+        ) : (
+          <div className="bg-surface border border-base rounded-xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-muted uppercase tracking-wider">Base Salary</p>
+              <p className="text-lg font-semibold text-body mt-0.5">{formatMWK(s.baseSalary)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted uppercase tracking-wider">Allowances</p>
+              <p className="text-lg font-semibold text-body mt-0.5">{formatMWK(s.allowances)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted uppercase tracking-wider">Loan Balance</p>
+              <p className={`text-lg font-semibold mt-0.5 ${s.loanBalance > 0 ? 'text-brand-coral' : 'text-body'}`}>
+                {formatMWK(s.loanBalance)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted uppercase tracking-wider">Monthly Deduction</p>
+              <p className="text-lg font-semibold text-body mt-0.5">{formatMWK(s.monthlyLoanDeduction)}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* My Payslips */}
+      <div>
+        <h2 className="font-heading font-semibold text-body mb-3">My Payslips</h2>
+        {downloadError && (
+          <p role="alert" className="text-xs text-brand-coral mb-2">{downloadError}</p>
+        )}
+        {payslipsLoading ? (
+          <div className="space-y-2">
+            {[1, 2].map((i) => <div key={i} className="h-20 rounded-xl bg-surface animate-pulse" />)}
+          </div>
+        ) : (payslips as ApiPayslip[]).length === 0 ? (
+          <div className="text-center py-16 text-muted text-sm border border-base rounded-xl">
+            No payslips yet — these appear after your first payroll run.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {(payslips as ApiPayslip[]).map((p) => (
+              <div
+                key={p.id}
+                className="bg-surface border border-base rounded-xl p-4 flex items-center justify-between gap-4 flex-wrap"
+              >
+                <div>
+                  <p className="font-semibold text-body">
+                    {p.payrollRun ? `${MONTH_NAMES[p.payrollRun.month - 1]} ${p.payrollRun.year}` : 'Payslip'}
+                  </p>
+                  <p className="text-xs text-muted mt-1">
+                    Gross {formatMWK(p.grossSalary)} · PAYE {formatMWK(p.paye)} · Pension {formatMWK(p.pension)}
+                    {p.loanDeduction > 0 && <> · Loan {formatMWK(p.loanDeduction)}</>}
+                  </p>
+                  <p className="text-sm font-semibold text-brand-teal mt-1">
+                    Net: {formatMWK(p.netSalary)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDownload(p.id)}
+                  disabled={downloadingId === p.id}
+                  className="shrink-0 inline-flex items-center gap-2 border border-base rounded-lg px-3 py-2 text-xs font-semibold hover:bg-page disabled:opacity-60 min-h-11"
+                >
+                  {downloadingId === p.id
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
+                    : <FileDown className="w-3.5 h-3.5" aria-hidden />}
+                  Download PDF
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
