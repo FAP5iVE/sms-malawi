@@ -211,6 +211,19 @@ export interface ApiExpense {
   incurredAt: string
   /** Appwrite file ID, set once a receipt has been uploaded — R9. */
   receiptKey?: string | null
+  /** [PRODUCTION FIX 2026-07-27] null on an APPROVED expense = an unpaid
+   *  vendor/company debt (posted to ledger 2000 Accounts Payable). Set at
+   *  approval (paid immediately) or later via PATCH .../mark-paid. */
+  paidAt?: string | null
+  paidByUid?: string | null
+}
+
+/** GET /finances/debts */
+export interface ApiDebtsSummary {
+  vendorDebts: ApiExpense[]
+  totalVendorDebt: number
+  staffLoans: ApiStaffLoan[]
+  totalStaffLoanBalance: number
 }
 
 export interface ApiPayrollRun {
@@ -241,6 +254,21 @@ export interface ApiPayslip {
   loanDeduction: number
   netSalary: number
   payslipUrl?: string // signed URL from R2
+  /** Present on GET /payroll/my-payslips (payrollService.getStaffPayslips's
+   *  include); absent on a specific run's embedded payslips array, which is
+   *  already scoped to one run. */
+  payrollRun?: { month: number; year: number }
+}
+
+/** GET /payroll/my-salary — self-service current salary structure. */
+export interface ApiSalaryStructure {
+  id:                   string
+  staffUid:             string
+  baseSalary:           number
+  allowances:           number
+  loanBalance:           number
+  monthlyLoanDeduction: number
+  updatedAt:            string
 }
 
 export interface ApiLibraryFine {

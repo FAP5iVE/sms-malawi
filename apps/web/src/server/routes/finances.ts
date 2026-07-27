@@ -328,9 +328,21 @@ financesRouter.patch(
   verifyAuth,
   requireRole(['admin', 'high_rank']),
   async (req, res) => {
+    // [PRODUCTION FIX 2026-07-27] paidImmediately decides which ledger
+    // account the approval posts against: Cash (already paid) or Accounts
+    // Payable (owed — a vendor/company debt, cleared later via mark-paid).
+    // Defaults to true so any caller that doesn't yet send this field keeps
+    // today's behaviour (approval = paid) rather than silently starting to
+    // create payables it never intended.
+    const paidImmediately = req.body?.paidImmediately !== false
     const expense = await prisma.expense.update({
       where: { id: String(req.params.id) },
-      data: { status: 'APPROVED', approvedByUid: req.user!.uid, approvedAt: new Date() },
+      data: {
+        status: 'APPROVED',
+        approvedByUid: req.user!.uid,
+        approvedAt: new Date(),
+        ...(paidImmediately ? { paidAt: new Date(), paidByUid: req.user!.uid } : {}),
+      },
     })
     await budgetService.updateBudgetSpent(expense.category, expense.academicYear, Number(expense.amount))
     // [R9] Reconnect approved expenses to the double-entry ledger — Phase
@@ -345,10 +357,15 @@ financesRouter.patch(
         description: `Expense approved — ${expense.description} (${expense.category})`,
         entryDate: new Date(),
         actorUid: req.user!.uid,
-        lines: [
-          { accountCode, debit: Number(expense.amount), description: expense.description },
-          { accountCode: '1000', credit: Number(expense.amount), description: 'Cash paid for expense' },
-        ],
+        lines: paidImmediately
+          ? [
+              { accountCode, debit: Number(expense.amount), description: expense.description },
+              { accountCode: '1000', credit: Number(expense.amount), description: 'Cash paid for expense' },
+            ]
+          : [
+              { accountCode, debit: Number(expense.amount), description: expense.description },
+              { accountCode: '2000', credit: Number(expense.amount), description: `Owed — ${expense.description}` },
+            ],
       })
       await accountingService.postEntry(entryId, req.user!.uid)
     } catch (err) {
@@ -357,6 +374,67 @@ financesRouter.patch(
     res.json(expense)
   }
 )
+
+// [PRODUCTION FIX 2026-07-27] Clears a vendor/company debt — an expense
+// that was approved with paidImmediately=false (posted to 2000 Accounts
+// Payable, still unpaid). Posts the offsetting entry (DR 2000 / CR 1000)
+// and stamps paidAt so it drops out of the debts list.
+financesRouter.patch(
+  '/expenses/:id/mark-paid',
+  verifyAuth,
+  requireRole(['admin', 'finance']),
+  async (req, res) => {
+    const expense = await prisma.expense.findUniqueOrThrow({ where: { id: String(req.params.id) } })
+    if (expense.status !== 'APPROVED') {
+      return res.status(400).json({ error: 'Only approved expenses can be marked as paid.' })
+    }
+    if (expense.paidAt) {
+      return res.status(400).json({ error: 'This expense is already marked as paid.' })
+    }
+    const updated = await prisma.expense.update({
+      where: { id: expense.id },
+      data: { paidAt: new Date(), paidByUid: req.user!.uid },
+    })
+    try {
+      const entryId = await accountingService.createJournalEntry({
+        reference: `EXP-PAY-${expense.id.slice(-8).toUpperCase()}`,
+        description: `Payable settled — ${expense.description}`,
+        entryDate: new Date(),
+        actorUid: req.user!.uid,
+        lines: [
+          { accountCode: '2000', debit: Number(expense.amount), description: 'Clear payable' },
+          { accountCode: '1000', credit: Number(expense.amount), description: 'Cash paid' },
+        ],
+      })
+      await accountingService.postEntry(entryId, req.user!.uid)
+    } catch (err) {
+      logger.error({ event: 'accounting.expense_markpaid_posting_failed', expenseId: expense.id, err })
+    }
+    res.json(updated)
+  }
+)
+
+// [PRODUCTION FIX 2026-07-27] Debts overview — approved-but-unpaid expenses
+// (vendor/company debts, mirrors ledger account 2000's balance) alongside
+// a staff-loan summary. Staff loan MANAGEMENT stays on the HR page's Loans
+// tab (already fully built) — this only reads a summary so Finance has
+// visibility without duplicating that UI.
+financesRouter.get('/debts', verifyAuth, requireRole([...FINANCE_ROLES]), async (_req, res) => {
+  const [vendorDebts, staffLoans] = await Promise.all([
+    prisma.expense.findMany({
+      where: { status: 'APPROVED', paidAt: null },
+      orderBy: { approvedAt: 'asc' },
+    }),
+    prisma.staffLoan.findMany({
+      where: { status: { in: ['DISBURSED', 'REPAYING'] } },
+      orderBy: { createdAt: 'desc' },
+      include: { staff: { select: { firstName: true, lastName: true, employeeNo: true } } },
+    }),
+  ])
+  const totalVendorDebt = vendorDebts.reduce((sum, e) => sum + Number(e.amount), 0)
+  const totalStaffLoanBalance = staffLoans.reduce((sum, l) => sum + Number(l.balance), 0)
+  res.json({ vendorDebts, totalVendorDebt, staffLoans, totalStaffLoanBalance })
+})
 
 // [R9] NEW — expense rejection, the workflow's second outcome. Gated on
 // the now-real finance.rejectExpense permission (previously granted to

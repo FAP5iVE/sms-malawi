@@ -11,7 +11,7 @@
  */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { ApiFinanceSummary, ApiInvoice, ApiExpense, ApiScholarship } from '@shared/types/api'
+import type { ApiFinanceSummary, ApiInvoice, ApiExpense, ApiScholarship, ApiDebtsSummary } from '@shared/types/api'
 import type { RecordPaymentInput, CreateExpenseInput } from '@shared/schemas/finance'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 
@@ -132,12 +132,41 @@ export function useViewExpenseReceipt() {
   })
 }
 
+// [PRODUCTION FIX 2026-07-27] paidImmediately decides which ledger account
+// the approval posts against — see finances.ts's approve route. Defaults to
+// true (existing behaviour: approval = paid) when omitted.
 export function useApproveExpense() {
   const qc = useQueryClient()
   return useMutation({
+    mutationFn: ({ expenseId, paidImmediately = true }: { expenseId: string; paidImmediately?: boolean }) =>
+      apiFetch<ApiExpense>(`/finances/expenses/${expenseId}/approve`, {
+        method: 'PATCH',
+        body:   JSON.stringify({ paidImmediately }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.finances.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.finances.debts() })
+    },
+  })
+}
+
+// Clears a vendor/company debt previously approved with paidImmediately=false.
+export function useMarkExpensePaid() {
+  const qc = useQueryClient()
+  return useMutation({
     mutationFn: (expenseId: string) =>
-      apiFetch<ApiExpense>(`/finances/expenses/${expenseId}/approve`, { method: 'PATCH' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
+      apiFetch<ApiExpense>(`/finances/expenses/${expenseId}/mark-paid`, { method: 'PATCH' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.finances.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.finances.debts() })
+    },
+  })
+}
+
+export function useDebts() {
+  return useQuery({
+    queryKey: queryKeys.finances.debts(),
+    queryFn:  () => apiFetch<ApiDebtsSummary>('/finances/debts'),
   })
 }
 

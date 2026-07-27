@@ -240,15 +240,28 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
                     {e.status === 'PENDING' && (
                       <div className="flex items-center gap-2 justify-end">
                         {canApprove && (
-                          <button
-                            onClick={() => approveExpense(e.id)}
-                            disabled={isApproving}
-                            className="flex items-center gap-1 text-xs text-emerald-700 hover:underline font-medium min-h-[44px]"
-                            type="button"
-                            aria-label={`Approve expense ${e.description}`}
-                          >
-                            <Check className="w-3.5 h-3.5" /> Approve
-                          </button>
+                          <>
+                            <button
+                              onClick={() => approveExpense({ expenseId: e.id, paidImmediately: true })}
+                              disabled={isApproving}
+                              className="flex items-center gap-1 text-xs text-emerald-700 hover:underline font-medium min-h-[44px]"
+                              type="button"
+                              aria-label={`Approve expense ${e.description} as paid`}
+                              title="Approve — already paid in cash"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Approve (Paid)
+                            </button>
+                            <button
+                              onClick={() => approveExpense({ expenseId: e.id, paidImmediately: false })}
+                              disabled={isApproving}
+                              className="flex items-center gap-1 text-xs text-brand-amber hover:underline font-medium min-h-[44px]"
+                              type="button"
+                              aria-label={`Approve expense ${e.description} as owed`}
+                              title="Approve — owed to vendor, not yet paid (tracked as a debt)"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Approve (Owed)
+                            </button>
+                          </>
                         )}
                         {canReject && (
                           <button

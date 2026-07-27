@@ -183,7 +183,7 @@ export async function getSignedViewUrl(fileId: string): Promise<string> {
   // Since Appwrite free tier doesn't support JWT-scoped URLs out of the box,
   // we proxy the download through our own API route (see /api/files/[fileId]/route.ts).
   // This function returns our internal proxy URL, not a direct Appwrite URL.
-  const proxyBase = process.env.NEXT_PUBLIC_APP_URL ?? 'https://smsmalawi.edu.mw'
+  const proxyBase = process.env.NEXT_PUBLIC_APP_URL ?? 'https://malawiedustack.eu.org'
   return `${proxyBase}/api/files/${encodeURIComponent(fileId)}?ttl=${SIGNED_URL_TTL_SECONDS}`
 }
 

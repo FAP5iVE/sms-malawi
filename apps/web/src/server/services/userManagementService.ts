@@ -43,11 +43,11 @@
  *   staff accounts already created before this fix, matched by email.
  */
 import * as admin from 'firebase-admin'
-import { Resend } from 'resend'
 import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { clearTokensForUser } from '@/lib/push'
 import { generateTempPassword } from '@/lib/tempPassword'
+import { sendEmail } from '@/lib/email'
 import type { CreateUserInput, NotificationPrefInput } from '@shared/schemas/admin'
 import type { UserRole } from '@shared/types/roles'
 
@@ -105,19 +105,29 @@ export async function createUser(data: CreateUserInput, actorUid: string) {
     requiresPasswordChange: true,
     subtitle,
   })
-  // 3. Send welcome email with temp password via Resend
-  const resend = new Resend(process.env.RESEND_API_KEY)
-  await resend.emails.send({
-    from:    'noreply@school.edu.mw',
-    to:      [data.email],
+  // 3. Send welcome email with temp password via the email.ts singleton.
+  //    `from` is deliberately omitted — the singleton applies
+  //    EMAIL_FROM_ADDRESS/EMAIL_FROM_NAME from env (FROM_ADDRESS/FROM_NAME in
+  //    lib/email.ts), so this never hardcodes a domain again. Same for the
+  //    login link, which now reads NEXT_PUBLIC_APP_URL instead of a literal
+  //    Vercel preview URL.
+  const emailResult = await sendEmail({
+    to:      data.email,
     subject: 'Welcome to SMS Malawi — Your Login Details',
     html: `<p>Dear ${data.displayName},</p>
       <p>Your account has been created on the School Management System.</p>
       <p><strong>Email:</strong> ${data.email}<br>
          <strong>Temporary Password:</strong> <code>${tempPassword}</code></p>
       <p>You will be required to change your password on first login.</p>
-      <p><a href="https://sms-malawi.vercel.app/login">Login here</a></p>`,
+      <p><a href="${process.env.NEXT_PUBLIC_APP_URL ?? ''}/login">Login here</a></p>`,
+    tags: [{ name: 'type', value: 'user-welcome' }],
   })
+  if (!emailResult.ok) {
+    logger.warn(
+      { uid: userRecord.uid, email: data.email, reason: emailResult.error },
+      '[userManagementService.createUser] welcome email failed to send; temp password still returned to caller',
+    )
+  }
   logger.info({ event: 'user.created', uid: userRecord.uid, role: data.role, subtitle, actorUid })
   return { uid: userRecord.uid, email: data.email, role: data.role, subtitle }
 }
@@ -186,13 +196,21 @@ export async function sendPasswordReset(uid: string) {
   const user = await getAuth().getUser(uid)
   if (!user.email) throw new Error('User has no email address.')
   const link = await getAuth().generatePasswordResetLink(user.email)
-  const resend = new Resend(process.env.RESEND_API_KEY)
-  await resend.emails.send({
-    from:    'noreply@school.edu.mw',
-    to:      [user.email],
+  // `from` deliberately omitted — see createUser() above; the email.ts
+  // singleton supplies it from EMAIL_FROM_ADDRESS/EMAIL_FROM_NAME.
+  const emailResult = await sendEmail({
+    to:      user.email,
     subject: 'Password Reset — SMS Malawi',
     html:    `<p>Click <a href="${link}">here</a> to reset your password. This link expires in 1 hour.</p>`,
+    tags: [{ name: 'type', value: 'password-reset' }],
   })
+  if (!emailResult.ok) {
+    logger.warn(
+      { uid, email: user.email, reason: emailResult.error },
+      '[userManagementService.sendPasswordReset] reset email failed to send',
+    )
+    throw new Error('Failed to send password reset email.')
+  }
 }
 
 // ─── NOTIFICATION PREFERENCES ────────────────────────────

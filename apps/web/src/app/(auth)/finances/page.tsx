@@ -24,6 +24,9 @@ import { useFinanceSummary }     from '@/hooks/useFinances'
 import { ScholarshipTab }        from '@/components/finances/ScholarshipTab'
 import { ReportsExportPanel }    from '@/components/finances/ReportsExportPanel'
 import { LibraryFinesTab }       from '@/components/finances/LibraryFinesTab'
+import { ForecastPanel }         from '@/components/finances/ForecastPanel'
+import { AccountingLedgerTab }   from '@/components/finances/AccountingLedgerTab'
+import { DebtsLoansTab }         from '@/components/finances/DebtsLoansTab'
 import { formatMWK }             from '@shared/constants/malawi'
 import { Banknote, TrendingDown, TrendingUp, PieChart } from 'lucide-react'
 import { ModuleTabs }            from '@/components/shared/ModuleTabs'
@@ -36,6 +39,9 @@ type Tab =
   | 'scholarships'
   | 'fines'
   | 'reports'
+  | 'forecast'
+  | 'ledger'
+  | 'debts'
 
 export default function FinancesPage() {
   return (
@@ -80,6 +86,14 @@ function FinancesContent() {
     { id: 'budget'       as Tab, label: 'Budget',                            show: !isStudent && !isHRPayrollViewer },
     { id: 'scholarships' as Tab, label: 'Scholarships',                      show: isFinance                     },
     { id: 'fines'        as Tab, label: 'Library Fines',                     show: isFinance                     },
+    // [PRODUCTION FIX 2026-07-27] Forecast and Ledger were fully-built,
+    // orphaned components (ForecastPanel.tsx / AccountingLedgerTab.tsx) —
+    // real backend routes, zero UI wiring. Debts & Loans is new. All three
+    // gated the same as Expenses/Scholarships/Fines — finance-management
+    // only, not students, not the HR read-only payroll viewer.
+    { id: 'forecast'     as Tab, label: 'Forecast',                          show: isFinance                     },
+    { id: 'debts'        as Tab, label: 'Debts & Loans',                     show: isFinance                     },
+    { id: 'ledger'       as Tab, label: 'Ledger',                            show: isFinance                     },
     { id: 'reports'      as Tab, label: 'Reports',                           show: isFinance                     },
   ]
     .filter((t) => t.show)
@@ -163,6 +177,9 @@ function FinancesContent() {
       {activeTab === 'budget'       && <BudgetTab        academicYear={YEAR} />}
       {activeTab === 'scholarships' && <ScholarshipTab   academicYear={YEAR} />}
       {activeTab === 'fines'        && <LibraryFinesTab />}
+      {activeTab === 'forecast'     && <ForecastPanel />}
+      {activeTab === 'debts'        && <DebtsLoansTab />}
+      {activeTab === 'ledger'       && <AccountingLedgerTab />}
       {activeTab === 'reports'      && <ReportsExportPanel academicYear={YEAR} term={TERM} />}
     </div>
   )

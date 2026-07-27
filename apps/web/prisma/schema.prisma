@@ -366,6 +366,18 @@ model Expense {
   recordedByUid String
   incurredAt   DateTime
   createdAt    DateTime        @default(now())
+  // [PRODUCTION FIX 2026-07-27] Vendor/company debt tracking. An APPROVED
+  // expense with paidAt = null is money the school owes but has not yet
+  // paid — posted to the ledger's 2000 Accounts Payable account instead of
+  // 1000 Cash at approval time (see PATCH /finances/expenses/:id/approve's
+  // paidImmediately flag). paidAt is set either immediately (paid-in-cash
+  // approval) or later via PATCH /finances/expenses/:id/mark-paid, which
+  // clears the payable with a DR 2000 / CR 1000 entry. Both nullable so
+  // existing rows (created before this fix) read as "unpaid" by default
+  // rather than requiring a backfill — a conservative default for a
+  // money-owed field.
+  paidAt       DateTime?
+  paidByUid    String?
 
   @@index([academicYear, term])
   @@index([category])

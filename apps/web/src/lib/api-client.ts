@@ -250,6 +250,7 @@ export const queryKeys = {
       ['finances', 'scholarships', filters ?? {}] as const,
     installment: (invoiceId: string) =>
       ['finances', 'installment', invoiceId] as const,
+    debts: () => ['finances', 'debts'] as const,
     libraryFines: (filters?: Record<string, unknown>) =>
       ['finances', 'library-fines', filters ?? {}] as const,
     forecast: (academicYear: string, forwardMonths: number) =>
