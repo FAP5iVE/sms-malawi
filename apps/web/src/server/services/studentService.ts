@@ -558,13 +558,36 @@ export async function provisionStudentAuthAccount(params: {
   // other admin code has run first in the request lifecycle.
   const auth = admin.auth(getAdminApp())
 
-  const fbUser = await auth.createUser({
-    email:         params.email,
-    password:      tempPassword,
-    displayName:   params.displayName,
-    emailVerified: false,
-    disabled:      false,
-  })
+  let fbUser
+  try {
+    fbUser = await auth.createUser({
+      email:         params.email,
+      password:      tempPassword,
+      displayName:   params.displayName,
+      emailVerified: false,
+      disabled:      false,
+    })
+  } catch (err: unknown) {
+    // Surface Firebase auth failures as clean, actionable client errors rather
+    // than a generic 500. The most common in practice is a duplicate email —
+    // an account already exists for this address (e.g. from an earlier attempt).
+    const code = (err as { errorInfo?: { code?: string }; code?: string })?.errorInfo?.code
+      ?? (err as { code?: string })?.code
+    if (code === 'auth/email-already-exists') {
+      throw Object.assign(
+        new Error(`An account already exists for ${params.email}. Use a different email, or delete the existing Firebase account first.`),
+        { status: 409 },
+      )
+    }
+    if (code === 'auth/invalid-email') {
+      throw Object.assign(new Error(`"${params.email}" is not a valid email address.`), { status: 400 })
+    }
+    logger.error({ err, email: params.email }, '[studentService] Firebase createUser failed')
+    throw Object.assign(
+      new Error('Failed to create the login account for this student.'),
+      { status: 502 },
+    )
+  }
 
   await auth.setCustomUserClaims(fbUser.uid, {
     role:                   'student',
