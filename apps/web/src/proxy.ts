@@ -58,6 +58,8 @@ const PUBLIC_PATHS = [
   '/apply',
   '/forgot-password',
   '/change-password',
+  '/privacy',
+  '/terms',
   '/',           // landing page
 ] as const
 

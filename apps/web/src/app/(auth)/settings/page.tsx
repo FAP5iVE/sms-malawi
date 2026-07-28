@@ -64,6 +64,7 @@ import { ExamGradingSettings }  from '@/components/settings/ExamGradingSettings'
 import { FinanceSettings }      from '@/components/settings/FinanceSettings'
 import { LibrarySettings }      from '@/components/settings/LibrarySettings'
 import { HRDepartmentsSettings } from '@/components/settings/HRDepartmentsSettings'
+import { SchoolIdentitySettings } from '@/components/settings/SchoolIdentitySettings'
 import { ClassroomSettings }    from '@/components/settings/ClassroomSettings'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import type { UserRole }        from '@shared/types/roles'
@@ -84,6 +85,7 @@ type SectionId =
   | 'finance'
   | 'library'
   | 'hr-departments'
+  | 'school-identity'
   | 'classroom'
   | 'notifications'
 
@@ -150,6 +152,12 @@ const SECTIONS: Section[] = [
     roles: ['admin', 'hr', 'high_rank'],
   },
   {
+    id:    'school-identity',
+    label: 'School Identity',
+    icon:  GraduationCap,
+    roles: ['admin', 'hr', 'high_rank'],
+  },
+  {
     id:    'classroom',
     label: 'Classroom Preferences',
     icon:  LayoutList,
@@ -176,6 +184,7 @@ function SectionContent({ sectionId }: { sectionId: SectionId }) {
     case 'finance':          return <FinanceSettings />
     case 'library':          return <LibrarySettings />
     case 'hr-departments':   return <HRDepartmentsSettings />
+    case 'school-identity':  return <SchoolIdentitySettings />
     case 'classroom':        return <ClassroomSettings />
     case 'notifications':    return <NotificationSettings />
     case 'holidays':         return <HolidaysManager />

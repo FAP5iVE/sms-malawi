@@ -46,6 +46,7 @@ import { SETTING_KEYS }      from '@shared/types/settings'
 import { COLLECTIONS }       from '@shared/constants/storage'
 import { getSchoolBranding } from '@/server/services/notificationService'
 import { renderNewsletterConfirm } from '@/server/templates/emails/newsletter-confirm'
+import { getPublicViewUrl } from '@/lib/storage'
 
 export const publicRouter = Router()
 
@@ -60,6 +61,9 @@ publicRouter.get('/school-info', async (_req, res) => {
   res.json({
     schoolName:  settings[SETTING_KEYS.SCHOOL_NAME]           ?? 'SMS Malawi',
     slogan:      settings[SETTING_KEYS.SCHOOL_SLOGAN]         ?? 'Where Minds Ignite & Futures Begin.',
+    // [PRODUCTION FIX 2026-07-28] Previously hardcoded in page.tsx.
+    systemTagline: settings[SETTING_KEYS.SCHOOL_SYSTEM_TAGLINE] ?? 'Secondary School Management System',
+    heroSubtitle:  settings[SETTING_KEYS.SCHOOL_HERO_SUBTITLE]  ?? 'Excellence in Education — from Form 1 through MSCE.',
     founded:     settings[SETTING_KEYS.SCHOOL_FOUNDED_YEAR]   ?? 1979,
     address:     settings[SETTING_KEYS.SCHOOL_ADDRESS]        ?? 'P.O. Box 123, Blantyre, Malawi',
     phone:       settings[SETTING_KEYS.SCHOOL_PHONE]          ?? '+265 999 123 456',
@@ -78,13 +82,23 @@ publicRouter.get('/school-info', async (_req, res) => {
 publicRouter.get('/maneb-stats', async (req, res) => {
   const year = String(req.query.year ?? '2025/2026')
 
-  const records = await prisma.manebRecord.findMany({
-    where:  { academicYear: year },
-    select: { examType: true, overallGrade: true },
-  })
+  const [records, enrolledStudents] = await Promise.all([
+    prisma.manebRecord.findMany({
+      where:  { academicYear: year },
+      select: { examType: true, overallGrade: true },
+    }),
+    // [PRODUCTION FIX 2026-07-28] "Learners enrolled" on the public
+    // Performance section previously had no live source and was replaced
+    // with a "Total MANEB candidates" substitute. This is the real number
+    // — a live count, not sensitive (just a total), safe to expose
+    // publicly. Computed unconditionally (not inside the records.length
+    // check below) so it still shows even in a year with no MANEB
+    // records published yet.
+    prisma.student.count({ where: { status: 'ACTIVE' } }),
+  ])
 
   if (records.length === 0) {
-    return res.json({ year, stats: [] })
+    return res.json({ year, stats: [], enrolledStudents })
   }
 
   const byType: Record<string, { total: number; passed: number }> = {}
@@ -103,6 +117,7 @@ publicRouter.get('/maneb-stats', async (req, res) => {
 
   res.json({
     year,
+    enrolledStudents,
     stats: Object.entries(byType).map(([examType, b]) => ({
       examType,
       total:    b.total,
@@ -117,32 +132,54 @@ publicRouter.get('/maneb-stats', async (req, res) => {
 // Returns recent published announcements for the landing page news section.
 
 publicRouter.get('/announcements', async (req, res) => {
-  const limit = Math.min(Number(req.query.limit ?? 6), 12)
-  const snap = await admin.firestore()
+  // [PRODUCTION FIX 2026-07-28] page/pageSize added for a real "browse all
+  // news/announcements" page (previously every caller was capped at 12,
+  // fine for a homepage teaser strip but not for actually browsing the
+  // full archive). Homepage callers are unaffected — they just don't pass
+  // `page`, so page defaults to 1 and behaviour is unchanged for them.
+  const pageSize = Math.min(Number(req.query.limit ?? 6), 100)
+  const page = Math.max(1, Number(req.query.page ?? 1))
+  // [PRODUCTION FIX 2026-07-28] Was filtering on targetAll, which conflates
+  // "addressed to everyone inside the school" with "safe to publish on the
+  // public marketing site" — an internal all-staff notice could leak here
+  // with no way to opt out. publicWebsite is a distinct, explicit opt-in
+  // (see announcementService.ts's CreateAnnouncementInput comment).
+  const baseQuery = admin.firestore()
     .collection(COLLECTIONS.ANNOUNCEMENTS)
     .where('status', '==', 'PUBLISHED')
-    .where('targetAll', '==', true)
+    .where('publicWebsite', '==', true)
     .orderBy('createdAt', 'desc')
-    .limit(limit)
-    .get()
 
-  const announcements = snap.docs.map((d) => {
-    const data = d.data() as {
-      title: string
-      body: string
-      eventDate?: string | null
-      createdAt: FirebaseFirestore.Timestamp
-    }
-    return {
-      id: d.id,
-      title: data.title,
-      body: data.body,
-      eventDate: data.eventDate ?? null,
-      createdAt: data.createdAt.toDate(),
-    }
-  })
+  const [snap, countSnap] = await Promise.all([
+    baseQuery.offset((page - 1) * pageSize).limit(pageSize).get(),
+    baseQuery.count().get(),
+  ])
 
-  res.json(announcements)
+  const announcements = await Promise.all(
+    snap.docs.map(async (d) => {
+      const data = d.data() as {
+        title: string
+        body: string
+        eventDate?: string | null
+        imageKey?: string | null
+        createdAt: FirebaseFirestore.Timestamp
+      }
+      return {
+        id: d.id,
+        title: data.title,
+        body: data.body,
+        eventDate: data.eventDate ?? null,
+        // [PRODUCTION FIX 2026-07-28] Resolve to a real, directly-usable
+        // view URL here (same getPublicViewUrl() pattern as /public/gallery)
+        // rather than handing back the raw Appwrite file ID and leaving the
+        // frontend with no way to turn it into an <img src>.
+        imageUrl: data.imageKey ? await getPublicViewUrl('', data.imageKey) : null,
+        createdAt: data.createdAt.toDate(),
+      }
+    }),
+  )
+
+  res.json({ announcements, total: countSnap.data().count, page, pageSize })
 })
 
 // ─── NEWSLETTER SUBSCRIBE ─────────────────────────────────────────────────────
@@ -291,4 +328,67 @@ publicRouter.get('/placement-stats', async (req, res) => {
     selected,
     selectionRate: qualified > 0 ? Math.round((selected / qualified) * 100) : 0,
   })
+})
+
+// ─── PUBLIC GALLERY ────────────────────────────────────────────────────────
+// GET /public/gallery?limit=5&page=1
+// [PRODUCTION FIX 2026-07-28] "Life at our school" had no live source at
+// all (permanent placeholder icons). Real photos, managed via
+// gallery.ts (admin/high_rank upload), served here as direct Appwrite view
+// URLs — getPublicViewUrl() is the storage layer's existing, documented
+// pattern for public assets, same one used for the school logo.
+
+publicRouter.get('/gallery', async (req, res) => {
+  const pageSize = Math.min(Number(req.query.limit ?? 5), 60)
+  const page = Math.max(1, Number(req.query.page ?? 1))
+
+  const [rows, total] = await Promise.all([
+    prisma.galleryPhoto.findMany({
+      orderBy: [{ displayOrder: 'asc' }, { createdAt: 'desc' }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.galleryPhoto.count(),
+  ])
+
+  const photos = await Promise.all(
+    rows.map(async (p) => ({
+      id: p.id,
+      url: await getPublicViewUrl('', p.fileKey),
+      caption: p.caption,
+      category: p.category,
+    })),
+  )
+
+  res.json({ photos, total, page, pageSize })
+})
+
+// ─── PUBLIC LEADERSHIP TEAM ────────────────────────────────────────────────
+// GET /public/leadership
+// [PRODUCTION FIX 2026-07-28] For the Discover -> Leadership page. Reads
+// SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM (admin/hr/high_rank-curated — see
+// that key's comment for why this isn't real StaffProfile data).
+
+publicRouter.get('/leadership', async (_req, res) => {
+  const settings = await settingsService.getPublicSettings()
+  const team = settings[SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM] ?? []
+  res.json({ team })
+})
+
+// ─── PUBLIC FEE STRUCTURE ──────────────────────────────────────────────────
+// GET /public/fee-structure?year=2025/2026
+// [PRODUCTION FIX 2026-07-28] For the Admissions page's fee section — real
+// FeeStructure rows (name + amount) rather than fabricated figures.
+// Deliberately narrow: only school-wide items (classId null, term null),
+// since a public page can't sensibly show every class/term-specific
+// variant — those belong in the real application/enrolment flow.
+
+publicRouter.get('/fee-structure', async (req, res) => {
+  const year = String(req.query.year ?? '2025/2026')
+  const items = await prisma.feeStructure.findMany({
+    where: { academicYear: year, classId: null, term: null, isActive: true },
+    select: { name: true, amount: true },
+    orderBy: { name: 'asc' },
+  })
+  res.json({ year, items: items.map((i) => ({ name: i.name, amount: Number(i.amount) })) })
 })

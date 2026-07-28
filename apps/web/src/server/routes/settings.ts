@@ -300,6 +300,63 @@ settingsRouter
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SCHOOL IDENTITY SETTINGS  (admin | hr | high_rank) — production fix, 2026-07-28
+// ─────────────────────────────────────────────────────────────────────────────
+// [PRODUCTION FIX 2026-07-28] SCHOOL_NAME/SLOGAN/VISION/MISSION/etc. were all
+// real, publicly-read SETTING_KEYS with sensible defaults — but genuinely no
+// route or UI anywhere ever let an admin change them. This is the missing
+// write path. Scalar string fields go through the generic readSettings/
+// writeSettings helpers; coreValues and leadershipTeam are real JSON
+// arrays and go through settingsService.get/set directly (typed, with its
+// own Zod validation), same split as the /hr route above.
+
+const SCHOOL_SCALAR_KEYS = [
+  SETTING_KEYS.SCHOOL_NAME,
+  SETTING_KEYS.SCHOOL_SLOGAN,
+  SETTING_KEYS.SCHOOL_SYSTEM_TAGLINE,
+  SETTING_KEYS.SCHOOL_HERO_SUBTITLE,
+  SETTING_KEYS.SCHOOL_VISION,
+  SETTING_KEYS.SCHOOL_MISSION,
+  SETTING_KEYS.SCHOOL_ADDRESS,
+  SETTING_KEYS.SCHOOL_PHONE,
+  SETTING_KEYS.SCHOOL_EMAIL,
+]
+
+settingsRouter
+  .route('/school')
+  .get(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
+    const [scalars, coreValues, leadershipTeam] = await Promise.all([
+      readSettings(SCHOOL_SCALAR_KEYS),
+      settingsService.get(SETTING_KEYS.SCHOOL_CORE_VALUES),
+      settingsService.get(SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM),
+    ])
+    return res.json({ ...scalars, coreValues, leadershipTeam })
+  })
+  .patch(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
+    const body = req.body as Record<string, unknown>
+    const scalarUpdates = Object.fromEntries(
+      Object.entries(body as Record<string, string>)
+        .filter(([k]) => SCHOOL_SCALAR_KEYS.includes(k as never)),
+    )
+    if (Object.keys(scalarUpdates).length > 0) {
+      await writeSettings(scalarUpdates, req.user!.uid)
+    }
+    try {
+      if (body.coreValues !== undefined) {
+        await settingsService.set(SETTING_KEYS.SCHOOL_CORE_VALUES, body.coreValues as never, req.user!.uid)
+      }
+      if (body.leadershipTeam !== undefined) {
+        await settingsService.set(SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM, body.leadershipTeam as never, req.user!.uid)
+      }
+    } catch (err) {
+      const status = (err as { status?: number })?.status ?? 400
+      const message = err instanceof Error ? err.message : 'Invalid school identity data.'
+      return res.status(status).json({ error: message })
+    }
+    return res.json({ ok: true })
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
 // LIBRARY SETTINGS  (admin | library)
 // ─────────────────────────────────────────────────────────────────────────────
 

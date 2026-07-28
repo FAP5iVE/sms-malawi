@@ -23,6 +23,10 @@ import { STALE } from '@/components/providers/QueryProvider'
 export interface PublicSchoolInfo {
   schoolName:  string
   slogan:      string
+  /** [PRODUCTION FIX 2026-07-28] Previously hardcoded strings in page.tsx —
+   *  now admin/hr/high_rank-editable via Settings, same pattern as schoolName. */
+  systemTagline: string
+  heroSubtitle:  string
   founded:     number
   address:     string
   phone:       string
@@ -43,6 +47,8 @@ export interface PublicManebStat {
 export interface PublicManebStats {
   year:  string
   stats: PublicManebStat[]
+  /** Real, live ACTIVE student count — see public.ts's route comment. */
+  enrolledStudents: number
 }
 
 export interface PublicAnnouncement {
@@ -52,6 +58,10 @@ export interface PublicAnnouncement {
   category:  string | null
   createdAt: string
   eventDate: string | null
+  /** Direct, ready-to-use view URL — resolved server-side via
+   *  getPublicViewUrl(), not a raw Appwrite file ID. Present only if a
+   *  cover image was attached when the announcement was written. */
+  imageUrl:  string | null
 }
 
 /** GET /public/placement-stats — real UniversityPlacement outcomes,
@@ -63,6 +73,16 @@ export interface PublicPlacementStats {
   qualified:     number
   selected:      number
   selectionRate: number
+}
+
+/** GET /public/announcements — paginated. Homepage teaser callers omit
+ *  `page` (defaults to 1); the dedicated /news, /announcements and /events
+ *  pages pass page/limit to browse the full archive. */
+export interface PublicAnnouncementsPage {
+  announcements: PublicAnnouncement[]
+  total:         number
+  page:          number
+  pageSize:      number
 }
 
 // ─────────────────────────────────────────────────────────
@@ -85,10 +105,10 @@ export function usePublicManebStats(year?: string) {
   })
 }
 
-export function usePublicAnnouncements(limit = 6) {
+export function usePublicAnnouncements(limit = 6, page = 1) {
   return useQuery({
-    queryKey: queryKeys.public.announcements(limit),
-    queryFn:  () => apiFetch<PublicAnnouncement[]>(`/public/announcements?limit=${limit}`),
+    queryKey: [...queryKeys.public.announcements(limit), page] as const,
+    queryFn:  () => apiFetch<PublicAnnouncementsPage>(`/public/announcements?limit=${limit}&page=${page}`),
     staleTime: STALE.MEDIUM,
   })
 }
@@ -97,6 +117,56 @@ export function usePublicPlacementStats(year?: string) {
   return useQuery({
     queryKey: queryKeys.public.placementStats(year),
     queryFn:  () => apiFetch<PublicPlacementStats>(`/public/placement-stats${year ? `?year=${year}` : ''}`),
+    staleTime: STALE.SLOW,
+  })
+}
+
+export interface PublicGalleryPhoto {
+  id:       string
+  url:      string
+  caption:  string | null
+  category: string | null
+}
+export interface PublicGalleryPage {
+  photos:   PublicGalleryPhoto[]
+  total:    number
+  page:     number
+  pageSize: number
+}
+
+/** GET /public/gallery — real gallery photos (GalleryPhoto table, files in
+ *  Appwrite under FILE_PREFIX.SCHOOL_GALLERY). Homepage passes limit=5;
+ *  the /gallery page paginates through everything. */
+export function usePublicGallery(limit = 5, page = 1) {
+  return useQuery({
+    queryKey: ['public', 'gallery', limit, page] as const,
+    queryFn:  () => apiFetch<PublicGalleryPage>(`/public/gallery?limit=${limit}&page=${page}`),
+    staleTime: STALE.MEDIUM,
+  })
+}
+
+export interface PublicLeadershipMember {
+  name:     string
+  title:    string
+  bio?:     string
+  photoKey?: string
+  order?:   number
+}
+
+export function usePublicLeadership() {
+  return useQuery({
+    queryKey: ['public', 'leadership'] as const,
+    queryFn:  () => apiFetch<{ team: PublicLeadershipMember[] }>('/public/leadership'),
+    staleTime: STALE.SLOW,
+  })
+}
+
+export interface PublicFeeItem { name: string; amount: number }
+
+export function usePublicFeeStructure(year?: string) {
+  return useQuery({
+    queryKey: ['public', 'fee-structure', year] as const,
+    queryFn:  () => apiFetch<{ year: string; items: PublicFeeItem[] }>(`/public/fee-structure${year ? `?year=${year}` : ''}`),
     staleTime: STALE.SLOW,
   })
 }

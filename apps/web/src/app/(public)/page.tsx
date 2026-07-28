@@ -71,6 +71,7 @@ import {
   usePublicManebStats,
   usePublicPlacementStats,
   usePublicAnnouncements,
+  usePublicGallery,
   useNewsletterSubscribe,
   useContactForm,
 } from '@/hooks/usePublic'
@@ -124,11 +125,13 @@ export default function LandingPage() {
   // 12 is the backend's own max (Math.min(limit, 12) in public.ts) — pull
   // the full allowance once and slice client-side for the rail/news/
   // advertisements/events sections rather than four separate network calls.
-  const { data: announcements = [], isLoading: announcementsLoading } = usePublicAnnouncements(12)
+  const { data: announcementsPage, isLoading: announcementsLoading } = usePublicAnnouncements(12)
+  const announcements = announcementsPage?.announcements ?? []
+  const { data: galleryPage, isLoading: galleryLoading } = usePublicGallery(5)
+  const galleryPhotos = galleryPage?.photos ?? []
 
   const currentYearNum = new Date().getFullYear()
   const yearsOfExcellence = schoolInfo ? currentYearNum - schoolInfo.founded : null
-  const overallCandidates = manebStats?.stats.reduce((sum, s) => sum + s.total, 0) ?? 0
 
   // Real split: eventDate present -> Events; absent -> News/Advertisements/rail.
   // See file header note 2 — there is only one real announcements feed.
@@ -143,6 +146,16 @@ export default function LandingPage() {
     ? undatedAnnouncements.slice(4, 8)
     : undatedAnnouncements.slice(0, 4)
   const eventItems = datedAnnouncements.slice(0, 3)
+
+  // Live client-side search over everything already fetched — see the
+  // header search flyout's comment for why this isn't backed by a real
+  // search service.
+  const searchResults = searchQuery.trim().length >= 2
+    ? announcements.filter((a) =>
+        a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.body.toLowerCase().includes(searchQuery.toLowerCase()),
+      ).slice(0, 6)
+    : []
 
   // ── Newsletter (single email — see file header note 6) ─────────────────
   const [newsletterEmail, setNewsletterEmail] = useState('')
@@ -252,7 +265,7 @@ export default function LandingPage() {
                   {schoolInfo?.schoolName?.toUpperCase() ?? 'SMS MALAWI'}
                 </div>
                 <div className={`text-[11px] tracking-wide transition-colors ${scrolled ? 'text-muted' : 'text-white/60'}`}>
-                  Secondary School Management System
+                  {schoolInfo?.systemTagline ?? 'Secondary School Management System'}
                 </div>
               </div>
             </button>
@@ -318,25 +331,52 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Search flyout */}
+          {/* Search flyout — [PRODUCTION FIX 2026-07-28] real client-side
+              filter over the already-fetched announcements (title/body
+              substring match). There is no search backend anywhere in the
+              system (no Algolia wiring, no full-text endpoint) for public
+              content, so this is scoped to what's actually loaded rather
+              than either a decorative no-op or new backend infrastructure. */}
           {searchOpen && (
             <div className="border-t border-base bg-surface">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex items-center gap-3">
-                <Search className="w-4.5 h-4.5 text-muted shrink-0" aria-hidden />
-                <input
-                  autoFocus
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search announcements, results, programmes…"
-                  className="flex-1 bg-transparent outline-none text-base text-body placeholder:text-muted"
-                />
-                <button
-                  onClick={() => setSearchOpen(false)}
-                  aria-label="Close search"
-                  className="w-8 h-8 rounded-lg bg-page text-muted hover:text-body flex items-center justify-center shrink-0"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+                <div className="flex items-center gap-3">
+                  <Search className="w-4.5 h-4.5 text-muted shrink-0" aria-hidden />
+                  <input
+                    autoFocus
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search announcements, results, programmes…"
+                    className="flex-1 bg-transparent outline-none text-base text-body placeholder:text-muted"
+                  />
+                  <button
+                    onClick={() => { setSearchOpen(false); setSearchQuery('') }}
+                    aria-label="Close search"
+                    className="w-8 h-8 rounded-lg bg-page text-muted hover:text-body flex items-center justify-center shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {searchQuery.trim().length >= 2 && (
+                  <div className="mt-4 border-t border-base pt-4">
+                    {searchResults.length === 0 ? (
+                      <p className="text-sm text-muted">No announcements match &quot;{searchQuery}&quot;.</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {searchResults.map((a) => (
+                          <button
+                            key={a.id}
+                            onClick={() => { scrollTo(a.eventDate ? 'events' : 'news'); setSearchQuery('') }}
+                            className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-page transition-colors flex items-center justify-between gap-4"
+                          >
+                            <span className="text-sm font-heading font-semibold text-body line-clamp-1">{a.title}</span>
+                            <span className="text-xs text-muted shrink-0">{a.eventDate ? 'Event' : 'News'}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -349,7 +389,7 @@ export default function LandingPage() {
                   {
                     title: 'Academics',
                     links: [
-                      { label: 'Curriculum & Subjects', anchor: 'academics' },
+                      { label: 'Curriculum & Subjects', href: '/academics#curriculum' },
                       { label: 'MANEB Performance', anchor: 'performance' },
                       { label: 'Timetable', href: '/login' },
                       { label: 'Library', href: '/login' },
@@ -358,19 +398,19 @@ export default function LandingPage() {
                   {
                     title: 'Admissions',
                     links: [
-                      { label: 'How to Apply', href: '/apply' },
-                      { label: 'Entry Requirements', href: '/apply' },
-                      { label: 'Fees Structure', href: '/apply' },
-                      { label: 'Scholarships', anchor: 'contact' },
+                      { label: 'How to Apply', href: '/admissions#how-to-apply' },
+                      { label: 'Entry Requirements', href: '/admissions#entry-requirements' },
+                      { label: 'Fees Structure', href: '/admissions#fees' },
+                      { label: 'Scholarships', href: '/admissions#scholarships' },
                     ],
                   },
                   {
                     title: 'Current Students',
                     links: [
                       { label: 'Login Portal (Students & Staff)', href: '/login' },
-                      { label: 'Student Life', anchor: 'discover' },
-                      { label: 'Facilities', anchor: 'gallery' },
-                      { label: 'Gallery', anchor: 'gallery' },
+                      { label: 'Student Life', href: '/student-life' },
+                      { label: 'Facilities', href: '/academics#facilities' },
+                      { label: 'Gallery', href: '/gallery' },
                     ],
                   },
                   {
@@ -425,10 +465,10 @@ export default function LandingPage() {
                 Welcome to {schoolInfo?.schoolName ?? 'SMS Malawi'}
               </h1>
               <p className="font-heading font-semibold text-xl text-white/80 mb-1.5">
-                Secondary School Management System
+                {schoolInfo?.systemTagline ?? 'Secondary School Management System'}
               </p>
               <p className="text-lg text-white/55 max-w-xl leading-relaxed mb-8">
-                {schoolInfo?.slogan ?? 'Where Minds Ignite and Futures Begin'} — from Form 1 through MSCE.
+                {schoolInfo?.heroSubtitle ?? 'Excellence in Education — from Form 1 through MSCE.'}
               </p>
               <div className="flex gap-3 flex-wrap">
                 <button
@@ -462,9 +502,9 @@ export default function LandingPage() {
               <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal-light mb-1.5">
                 Announcements
               </div>
-              <button onClick={() => scrollTo('news')} className="text-[13px] text-white/50 hover:text-white transition-colors">
+              <Link href="/news" className="text-[13px] text-white/50 hover:text-white transition-colors">
                 View all →
-              </button>
+              </Link>
             </div>
             <div className="grid sm:grid-cols-2 gap-5">
               {railItems.length === 0 ? (
@@ -493,12 +533,12 @@ export default function LandingPage() {
               <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white">
                 Latest News
               </h2>
-              <button
-                onClick={() => scrollTo('news')}
+              <Link
+                href="/news"
                 className="inline-flex items-center gap-2 border border-base text-body px-4.5 py-2.5 rounded-full font-heading font-bold text-[13px] hover:border-brand-teal hover:text-brand-teal transition-colors"
               >
                 All News →
-              </button>
+              </Link>
             </div>
 
             {announcementsLoading ? (
@@ -520,9 +560,9 @@ export default function LandingPage() {
                   </h3>
                   <div className="font-mono text-[11.5px] text-muted mb-3">{formatRelativeDate(newsItems[0]!.createdAt)}</div>
                   <p className="text-[15.5px] leading-relaxed text-muted mb-4 line-clamp-4">{newsItems[0]!.body}</p>
-                  <button onClick={() => scrollTo('news')} className="font-heading font-bold text-[13.5px] text-brand-teal hover:underline">
+                  <Link href="/news" className="font-heading font-bold text-[13.5px] text-brand-teal hover:underline">
                     Read more →
-                  </button>
+                  </Link>
                 </article>
 
                 {/* Secondary list */}
@@ -535,9 +575,9 @@ export default function LandingPage() {
                           {a.title}
                         </h4>
                         <div className="font-mono text-[11px] text-muted mb-2">{formatRelativeDate(a.createdAt)}</div>
-                        <button onClick={() => scrollTo('news')} className="font-heading font-bold text-xs text-brand-teal hover:underline">
+                        <Link href="/news" className="font-heading font-bold text-xs text-brand-teal hover:underline">
                           Read more →
-                        </button>
+                        </Link>
                       </div>
                     </article>
                   ))}
@@ -559,26 +599,26 @@ export default function LandingPage() {
               <p className="text-[14.5px] text-muted leading-relaxed mb-5">
                 Calls for applications, intake notices and examination circulars, published as they are issued.
               </p>
-              <button
-                onClick={() => scrollTo('news')}
+              <Link
+                href="/news"
                 className="inline-flex items-center gap-2 border border-base bg-surface text-body px-4.5 py-2.5 rounded-full font-heading font-bold text-[13px] hover:border-brand-teal hover:text-brand-teal transition-colors"
               >
                 More Announcements →
-              </button>
+              </Link>
             </div>
             <div className="flex flex-col">
               {adItems.length === 0 ? (
                 <p className="text-sm text-muted py-5">No circulars published yet.</p>
               ) : (
                 adItems.map((a, i) => (
-                  <button
+                  <Link
                     key={a.id}
-                    onClick={() => scrollTo('news')}
+                    href="/news"
                     className={`flex items-baseline justify-between gap-6 py-5 text-left text-body hover:text-brand-teal transition-colors ${i < adItems.length - 1 ? 'border-b border-base' : ''}`}
                   >
                     <span className="font-heading font-semibold text-base sm:text-[16.5px] leading-snug">{a.title}</span>
                     <span className="font-mono text-[11.5px] text-muted whitespace-nowrap shrink-0">{formatRelativeDate(a.createdAt)}</span>
-                  </button>
+                  </Link>
                 ))
               )}
             </div>
@@ -601,92 +641,103 @@ export default function LandingPage() {
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {[
-                { title: 'Leadership', desc: 'A head teacher and board committed to transparent, forward-thinking school governance.', anchor: 'about', tint: 'from-brand-navy-light/40 to-brand-navy' },
-                { title: 'Academics', desc: 'A rigorous curriculum aligned to MANEB standards for both JCE and MSCE candidates.', anchor: 'academics', tint: 'from-brand-teal/70 to-brand-navy' },
-                { title: 'Student Life', desc: 'Sport, drama, choir, debate and community service alongside a full boarding programme.', anchor: 'discover', tint: 'from-brand-purple/70 to-brand-navy' },
-                { title: 'Admissions', desc: 'Everything a prospective family needs — entry requirements, fees and application steps.', href: '/apply', tint: 'from-brand-amber/70 to-brand-navy' },
+                { title: 'Leadership', desc: 'A head teacher and board committed to transparent, forward-thinking school governance.', href: '/leadership', tint: 'from-brand-navy-light/40 to-brand-navy' },
+                { title: 'Academics', desc: 'A rigorous curriculum aligned to MANEB standards for both JCE and MSCE candidates.', href: '/academics', tint: 'from-brand-teal/70 to-brand-navy' },
+                { title: 'Student Life', desc: 'Sport, drama, choir, debate and community service alongside a full boarding programme.', href: '/student-life', tint: 'from-brand-purple/70 to-brand-navy' },
+                { title: 'Admissions', desc: 'Everything a prospective family needs — entry requirements, fees and application steps.', href: '/admissions', tint: 'from-brand-amber/70 to-brand-navy' },
               ].map((card) => (
-                card.href ? (
-                  <Link
-                    key={card.title}
-                    href={card.href}
-                    className={`block text-left rounded-2xl overflow-hidden relative min-h-[290px] card-hover bg-linear-to-b ${card.tint}`}
-                  >
-                    <div className="absolute inset-0 bg-linear-to-b from-black/5 to-black/70" />
-                    <div className="relative p-6 flex flex-col justify-end h-[290px] box-border">
-                      <h3 className="font-heading font-bold text-lg text-white mb-2">{card.title}</h3>
-                      <p className="text-[13.5px] leading-relaxed text-white/65">{card.desc}</p>
-                    </div>
-                  </Link>
-                ) : (
-                  <button
-                    key={card.title}
-                    type="button"
-                    onClick={() => scrollTo(card.anchor!)}
-                    className={`block text-left rounded-2xl overflow-hidden relative min-h-[290px] card-hover bg-linear-to-b ${card.tint}`}
-                  >
-                    <div className="absolute inset-0 bg-linear-to-b from-black/5 to-black/70" />
-                    <div className="relative p-6 flex flex-col justify-end h-[290px] box-border">
-                      <h3 className="font-heading font-bold text-lg text-white mb-2">{card.title}</h3>
-                      <p className="text-[13.5px] leading-relaxed text-white/65">{card.desc}</p>
-                    </div>
-                  </button>
-                )
+                <Link
+                  key={card.title}
+                  href={card.href}
+                  className={`block text-left rounded-2xl overflow-hidden relative min-h-[290px] card-hover bg-linear-to-b ${card.tint}`}
+                >
+                  <div className="absolute inset-0 bg-linear-to-b from-black/5 to-black/70" />
+                  <div className="relative p-6 flex flex-col justify-end h-[290px] box-border">
+                    <h3 className="font-heading font-bold text-lg text-white mb-2">{card.title}</h3>
+                    <p className="text-[13.5px] leading-relaxed text-white/65">{card.desc}</p>
+                  </div>
+                </Link>
               ))}
             </div>
 
-            {/* Mission, Vision & Core Values — real Settings-backed fields */}
+            {/* Mission, Vision & Core Values — real Settings-backed fields.
+                [PRODUCTION FIX 2026-07-28] Merged into a single flat card
+                (was three separate cards); core values render as a plain
+                list, not pills. */}
             {(schoolInfo?.mission || schoolInfo?.vision || (schoolInfo?.coreValues?.length ?? 0) > 0) && (
-              <div className="mt-14 grid md:grid-cols-2 gap-6">
+              <div className="mt-14 bg-page border border-base rounded-2xl p-8 sm:p-10 grid sm:grid-cols-2 gap-8">
                 {schoolInfo?.mission && (
-                  <div className="bg-page border border-base rounded-2xl p-7">
-                    <div className="w-11 h-11 rounded-xl bg-brand-teal/10 flex items-center justify-center mb-4">
-                      <Target className="w-5.5 h-5.5 text-brand-teal" />
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <Target className="w-5 h-5 text-brand-teal shrink-0" />
+                      <h4 className="font-heading font-bold text-lg text-brand-teal">Our Mission</h4>
                     </div>
-                    <h4 className="font-heading font-bold text-lg text-brand-teal mb-2.5">Our Mission</h4>
                     <p className="text-sm text-muted leading-relaxed">{schoolInfo.mission}</p>
                   </div>
                 )}
                 {schoolInfo?.vision && (
-                  <div className="bg-page border border-base rounded-2xl p-7">
-                    <div className="w-11 h-11 rounded-xl bg-brand-purple/10 flex items-center justify-center mb-4">
-                      <Compass className="w-5.5 h-5.5 text-brand-purple" />
+                  <div>
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <Compass className="w-5 h-5 text-brand-purple shrink-0" />
+                      <h4 className="font-heading font-bold text-lg text-brand-purple">Our Vision</h4>
                     </div>
-                    <h4 className="font-heading font-bold text-lg text-brand-purple mb-2.5">Our Vision</h4>
                     <p className="text-sm text-muted leading-relaxed">{schoolInfo.vision}</p>
                   </div>
                 )}
                 {schoolInfo?.coreValues && schoolInfo.coreValues.length > 0 && (
-                  <div className="md:col-span-2 bg-page border border-base rounded-2xl p-7">
-                    <div className="flex items-center gap-2.5 mb-4">
-                      <Sparkles className="w-5 h-5 text-brand-amber" />
+                  <div className="sm:col-span-2 pt-2 border-t border-base">
+                    <div className="flex items-center gap-2.5 mb-3 mt-6">
+                      <Sparkles className="w-5 h-5 text-brand-amber shrink-0" />
                       <h4 className="font-heading font-bold text-lg text-brand-navy dark:text-white">Our Core Values</h4>
                     </div>
-                    <div className="flex flex-wrap gap-2.5">
+                    <ul className="grid sm:grid-cols-2 gap-x-8 gap-y-2">
                       {schoolInfo.coreValues.map((v) => (
-                        <span key={v} className="text-sm font-heading font-semibold bg-surface border border-base rounded-full px-4 py-2 text-body">
+                        <li key={v} className="text-sm text-body flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-brand-amber shrink-0" aria-hidden />
                           {v}
-                        </span>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Gallery strip — no real photo assets exist yet */}
+            {/* [PRODUCTION FIX 2026-07-28] Gallery strip now fetches real
+                photos (usePublicGallery, GalleryPhoto table + Appwrite
+                FILE_PREFIX.SCHOOL_GALLERY) instead of the permanent
+                placeholder. Shows a plain "no photos yet" note if the
+                gallery is empty, rather than staged filler. */}
             <div id="gallery" className="mt-12 pt-9 border-t border-base">
               <div className="flex items-baseline justify-between mb-4.5">
                 <h3 className="font-heading font-bold text-xl tracking-tight text-brand-navy dark:text-white">
                   Life at our school
                 </h3>
-                <span className="font-heading font-bold text-[13px] text-brand-teal">Photos coming soon</span>
+                <Link href="/gallery" className="font-heading font-bold text-[13px] text-brand-teal hover:underline">
+                  View our gallery →
+                </Link>
               </div>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                {['Assembly', 'Laboratory', 'Library', 'Sports Day', 'Boarding'].map((label) => (
-                  <ImagePlaceholder key={label} label={label} className="h-32 rounded-xl" />
-                ))}
-              </div>
+              {galleryLoading ? (
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                  {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-32 rounded-xl bg-page animate-pulse" />)}
+                </div>
+              ) : galleryPhotos.length === 0 ? (
+                <div className="text-center py-10 text-muted text-sm border border-base rounded-xl">
+                  No photos have been added to the gallery yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                  {galleryPhotos.map((p) => (
+                    // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL, not a local/remote-pattern asset
+                    <img
+                      key={p.id}
+                      src={p.url}
+                      alt={p.caption ?? p.category ?? 'School photo'}
+                      className="h-32 w-full object-cover rounded-xl border border-base"
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -719,69 +770,87 @@ export default function LandingPage() {
               </a>
             </div>
 
-            {manebStats && manebStats.stats.length > 0 ? (
-              <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/10 border border-white/10 rounded-2xl overflow-hidden mb-6">
-                  {[
-                    ...manebStats.stats.map((s) => ({ value: `${s.passRate}%`, label: `${s.examType} pass rate` })),
-                    { value: overallCandidates.toLocaleString(), label: 'Total MANEB candidates' },
-                    { value: yearsOfExcellence != null ? `${yearsOfExcellence}+` : '—', label: 'Years of excellence' },
-                  ].map((s) => (
-                    <div key={s.label} className="bg-brand-navy p-7">
-                      <div className="font-heading font-extrabold text-[44px] leading-none tracking-tight">{s.value}</div>
-                      <div className="text-[13.5px] text-white/50 mt-2">{s.label}</div>
-                    </div>
-                  ))}
-                </div>
+            {/* [PRODUCTION FIX 2026-07-28] Fixed 4-slot grid — MSCE pass
+                rate / JCE pass rate / Learners enrolled / Years of
+                excellence — matching the redesign exactly. Previously this
+                whole section (grid + detail cards) vanished entirely
+                whenever no MANEB records existed for the year, and the
+                grid generically mapped over whatever exam types existed
+                rather than fixed MSCE/JCE slots, silently dropping
+                "Learners enrolled" for a substitute. Each slot now always
+                renders its header; only the value falls back to a short
+                "Data unavailable" note when that specific figure isn't
+                published yet. */}
+            {(() => {
+              const msce = manebStats?.stats.find((s) => s.examType === 'MSCE')
+              const jce  = manebStats?.stats.find((s) => s.examType === 'JCE')
+              return (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/10 border border-white/10 rounded-2xl overflow-hidden mb-6">
+                    {[
+                      { value: msce ? `${msce.passRate}%` : null, label: 'MSCE pass rate' },
+                      { value: jce ? `${jce.passRate}%` : null, label: 'JCE pass rate' },
+                      { value: manebStats ? manebStats.enrolledStudents.toLocaleString() : null, label: 'Learners enrolled' },
+                      { value: yearsOfExcellence != null ? `${yearsOfExcellence}+` : null, label: 'Years of excellence' },
+                    ].map((s) => (
+                      <div key={s.label} className="bg-brand-navy p-7">
+                        {s.value != null ? (
+                          <div className="font-heading font-extrabold text-[44px] leading-none tracking-tight">{s.value}</div>
+                        ) : (
+                          <div className="font-heading font-semibold text-sm text-white/35 h-[44px] flex items-center">Data unavailable</div>
+                        )}
+                        <div className="text-[13.5px] text-white/50 mt-2">{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
 
-                <div className="grid md:grid-cols-3 gap-5">
-                  {manebStats.stats.map((s) => (
-                    <div key={s.examType} className="bg-white/5 border border-white/10 rounded-2xl p-6">
-                      <div className="flex items-center justify-between mb-4.5">
-                        <h4 className="font-heading font-bold text-sm">{s.examType}</h4>
-                        <span className="font-mono text-[11.5px] text-brand-teal-light">{manebStats.year}</span>
+                  <div className="grid md:grid-cols-3 gap-5">
+                    {[
+                      { key: 'MSCE', stat: msce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: msce ? `${msce.passed} passed / ${msce.total} total` : null, rate: msce?.passRate },
+                      { key: 'JCE', stat: jce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: jce ? `${jce.passed} passed / ${jce.total} total` : null, rate: jce?.passRate },
+                      {
+                        key: 'University Placement',
+                        stat: placementStats && placementStats.qualified > 0 ? placementStats : undefined,
+                        rateLabel: 'Selection rate',
+                        totalLabel: 'MSCE leavers',
+                        totalText: placementStats && placementStats.qualified > 0
+                          ? `${placementStats.selected} selected / ${placementStats.qualified} qualified`
+                          : null,
+                        rate: placementStats && placementStats.qualified > 0 ? placementStats.selectionRate : undefined,
+                      },
+                    ].map((card) => (
+                      <div key={card.key} className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                        <div className="flex items-center justify-between mb-4.5">
+                          <h4 className="font-heading font-bold text-sm">{card.key}</h4>
+                          {card.stat && (
+                            <span className="font-mono text-[11.5px] text-brand-teal-light">
+                              {manebStats?.year ?? placementStats?.year}
+                            </span>
+                          )}
+                        </div>
+                        {card.stat ? (
+                          <>
+                            <div className="flex justify-between text-xs mb-2">
+                              <span className="text-white/50">{card.rateLabel}</span>
+                              <span className="font-heading font-bold">{card.rate}%</span>
+                            </div>
+                            <div className="h-1.75 bg-white/10 rounded-full overflow-hidden mb-3.5">
+                              <div className="h-full bg-brand-teal rounded-full" style={{ width: `${card.rate}%` }} />
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-white/50">{card.totalLabel}</span>
+                              <span className="text-white/75 font-semibold">{card.totalText}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="py-4 text-center text-sm text-white/35">Data unavailable</div>
+                        )}
                       </div>
-                      <div className="flex justify-between text-xs mb-2">
-                        <span className="text-white/50">Pass rate</span>
-                        <span className="font-heading font-bold">{s.passRate}%</span>
-                      </div>
-                      <div className="h-1.75 bg-white/10 rounded-full overflow-hidden mb-3.5">
-                        <div className="h-full bg-brand-teal rounded-full" style={{ width: `${s.passRate}%` }} />
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-white/50">Candidates</span>
-                        <span className="text-white/75 font-semibold">{s.passed} passed / {s.total} total</span>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* University Placement — real usePublicPlacementStats() */}
-                  {placementStats && placementStats.qualified > 0 && (
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-                      <div className="flex items-center justify-between mb-4.5">
-                        <h4 className="font-heading font-bold text-sm">University Placement</h4>
-                        <span className="font-mono text-[11.5px] text-brand-teal-light">{placementStats.year}</span>
-                      </div>
-                      <div className="flex justify-between text-xs mb-2">
-                        <span className="text-white/50">Selection rate</span>
-                        <span className="font-heading font-bold">{placementStats.selectionRate}%</span>
-                      </div>
-                      <div className="h-1.75 bg-white/10 rounded-full overflow-hidden mb-3.5">
-                        <div className="h-full bg-brand-teal rounded-full" style={{ width: `${placementStats.selectionRate}%` }} />
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-white/50">MSCE leavers</span>
-                        <span className="text-white/75 font-semibold">{placementStats.selected} selected / {placementStats.qualified} qualified</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-14 text-white/50 text-sm">
-                MANEB results for this academic year have not been published yet.
-              </div>
-            )}
+                    ))}
+                  </div>
+                </>
+              )
+            })()}
           </div>
         </section>
 
@@ -794,12 +863,12 @@ export default function LandingPage() {
               <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white">
                 Events
               </h2>
-              <button
-                onClick={() => scrollTo('events')}
+              <Link
+                href="/events"
                 className="inline-flex items-center gap-2 border border-base text-body px-4.5 py-2.5 rounded-full font-heading font-bold text-[13px] hover:border-brand-teal hover:text-brand-teal transition-colors"
               >
                 All events →
-              </button>
+              </Link>
             </div>
 
             {eventItems.length === 0 ? (
@@ -823,9 +892,9 @@ export default function LandingPage() {
                           {ev.title}
                         </h3>
                         <p className="text-[13.5px] text-muted mb-3.5 line-clamp-2">{ev.body}</p>
-                        <button onClick={() => scrollTo('events')} className="font-heading font-bold text-xs text-brand-teal hover:underline">
+                        <Link href="/events" className="font-heading font-bold text-xs text-brand-teal hover:underline">
                           Read more →
-                        </button>
+                        </Link>
                       </div>
                     </article>
                   )
@@ -924,23 +993,29 @@ export default function LandingPage() {
                 Contact Us
               </h2>
 
-              <div className="bg-surface border border-base rounded-2xl overflow-hidden">
-                <div className="grid grid-cols-2">
+              {/* [PRODUCTION FIX 2026-07-28] Was a cramped 2x2 grid making
+                  the whole card too tall. Postal Address/Phone/Email now
+                  stack vertically in one left-hand box; Office Hours moves
+                  in with the message form on the right, as specified. */}
+              <div className="bg-surface border border-base rounded-2xl overflow-hidden grid sm:grid-cols-2">
+                <div className="flex flex-col divide-y divide-base border-b sm:border-b-0 sm:border-r border-base">
                   {[
                     { label: 'Postal Address', value: schoolInfo?.address ?? '—' },
                     { label: 'Phone', value: schoolInfo?.phone ?? '—' },
                     { label: 'Email', value: schoolInfo?.email ?? '—' },
-                    { label: 'Office Hours', value: 'Mon – Fri: 07:30 – 16:30' },
-                  ].map((f, i) => (
-                    <div
-                      key={f.label}
-                      className={`p-5.5 ${i % 2 === 0 ? 'border-r border-base' : ''} ${i < 2 ? 'border-b border-base' : ''}`}
-                    >
+                  ].map((f) => (
+                    <div key={f.label} className="p-5.5">
                       <div className="font-heading font-bold text-[12.5px] text-brand-navy dark:text-white mb-1.5">{f.label}</div>
                       <div className="text-sm text-muted leading-relaxed">{f.value}</div>
                     </div>
                   ))}
                 </div>
+
+                <div>
+                  <div className="p-5.5 border-b border-base">
+                    <div className="font-heading font-bold text-[12.5px] text-brand-navy dark:text-white mb-1.5">Office Hours</div>
+                    <div className="text-sm text-muted leading-relaxed">Mon – Fri: 07:30 – 16:30</div>
+                  </div>
 
                 <form onSubmit={handleContactSubmit} className="p-6">
                   <div className="font-heading font-bold text-[15px] text-brand-navy dark:text-white mb-4">
@@ -996,7 +1071,27 @@ export default function LandingPage() {
                     </p>
                   )}
                 </form>
+                </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ══════════════════════════════════════════════════════════════
+            MAP & DIRECTIONS — [PRODUCTION FIX 2026-07-28]
+        ══════════════════════════════════════════════════════════════ */}
+        <section id="map" className="bg-surface pb-20 sm:pb-24">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="rounded-2xl overflow-hidden border border-base h-[380px]">
+              <iframe
+                title="School location on Google Maps"
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                src={`https://www.google.com/maps?q=${encodeURIComponent(schoolInfo?.address ?? 'Blantyre, Malawi')}&output=embed`}
+              />
             </div>
           </div>
         </section>
@@ -1004,7 +1099,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════════
             FOOTER
         ══════════════════════════════════════════════════════════════ */}
-        <footer className="relative bg-[#0B1D33] dark:bg-[#081522] text-white pt-16 overflow-hidden">
+        <footer className="relative bg-[#0B1D33] dark:bg-[#081522] text-white pt-16 overflow-hidden rounded-t-[2.5rem]">
           <svg preserveAspectRatio="xMidYMid slice" viewBox="10 10 80 80" aria-hidden className="absolute inset-0 w-full h-full blur-[14px] opacity-[0.07] pointer-events-none">
             <path fill="#D98A0B" className="blob-med" style={{ transformOrigin: '13px 25px' }} d="M37-5C25.1-14.7,5.7-19.1-9.2-10-28.5,1.8-32.7,31.1-19.8,49c15.5,21.5,52.6,22,67.2,2.3C59.4,35,53.7,8.5,37-5Z" />
             <path fill="#24507F" className="blob-slower" style={{ transformOrigin: '13px 25px' }} d="M20.6,4.1C11.6,1.5-1.9,2.5-8,11.2-16.3,23.1-8.2,45.6,7.4,50S42.1,38.9,41,24.5C40.2,14.1,29.4,6.6,20.6,4.1Z" />
@@ -1035,11 +1130,11 @@ export default function LandingPage() {
                 {
                   title: 'Academics',
                   links: [
-                    { label: 'Curriculum', anchor: 'academics' },
+                    { label: 'Curriculum', href: '/academics#curriculum' },
                     { label: 'MANEB Performance', anchor: 'performance' },
                     { label: 'Timetable', href: '/login' },
                     { label: 'Library', href: '/login' },
-                    { label: 'Facilities', anchor: 'gallery' },
+                    { label: 'Facilities', href: '/academics#facilities' },
                   ],
                 },
                 {
@@ -1047,30 +1142,30 @@ export default function LandingPage() {
                   links: [
                     { label: 'Login Portal (Students & Staff)', href: '/login' },
                     { label: 'Change Password', href: '/change-password' },
-                    { label: 'Student Life', anchor: 'discover' },
-                    { label: 'Gallery', anchor: 'gallery' },
+                    { label: 'Student Life', href: '/student-life' },
+                    { label: 'Gallery', href: '/gallery' },
                   ],
                 },
                 {
                   title: 'Prospective Students',
                   links: [
-                    { label: 'How to Apply', href: '/apply' },
-                    { label: 'Entry Requirements', href: '/apply' },
-                    { label: 'Fees Structure', href: '/apply' },
-                    { label: 'Scholarships', anchor: 'contact' },
+                    { label: 'How to Apply', href: '/admissions#how-to-apply' },
+                    { label: 'Entry Requirements', href: '/admissions#entry-requirements' },
+                    { label: 'Fees Structure', href: '/admissions#fees' },
+                    { label: 'Scholarships', href: '/admissions#scholarships' },
                   ],
                 },
                 {
                   title: 'Get in Touch',
                   links: [
-                    { label: 'Map & Directions', anchor: 'contact' },
+                    { label: 'Map & Directions', anchor: 'map' },
                     { label: 'News & Announcements', anchor: 'news' },
                     { label: 'MANEB Portal', href: 'https://maneb.mw', external: true },
                   ],
                 },
               ].map((col) => (
                 <div key={col.title}>
-                  <h4 className="font-heading font-bold text-[13px] mb-4">{col.title}</h4>
+                  <h4 className="font-heading font-bold text-[13px] mb-4 text-brand-teal-light">{col.title}</h4>
                   <div className="flex flex-col gap-2.75 text-[13.5px]">
                     {col.links.map((l) =>
                       'external' in l && l.external ? (
@@ -1092,28 +1187,36 @@ export default function LandingPage() {
               ))}
             </div>
 
+            {/* [PRODUCTION FIX 2026-07-28] Social icons now get their own
+                row (were crammed onto the same line as the copyright
+                notice). The space that opens up next to Privacy/Terms
+                below now credits the system builder instead. */}
+            <div className="py-5 flex justify-center sm:justify-end border-b border-white/10">
+              <div className="flex gap-2.5">
+                {[
+                  { Icon: FaFacebook, label: 'Facebook' },
+                  { Icon: FaTwitter, label: 'Twitter' },
+                  { Icon: FaInstagram, label: 'Instagram' },
+                  { Icon: FaYoutube, label: 'YouTube' },
+                  { Icon: FaLinkedin, label: 'LinkedIn' },
+                ].map(({ Icon, label }) => (
+                  <button
+                    key={label}
+                    aria-label={label}
+                    className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/15 flex items-center justify-center transition-colors"
+                  >
+                    <Icon className="w-3.5 h-3.5 text-white/50 hover:text-white transition-colors" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="py-5.5 flex flex-col sm:flex-row items-center justify-between gap-4">
               <p className="text-[12.5px] text-white/35">
                 © {currentYearNum} {schoolInfo?.schoolName ?? 'SMS Malawi'}. All rights reserved.
               </p>
               <div className="flex items-center gap-5">
-                <div className="flex gap-2.5">
-                  {[
-                    { Icon: FaFacebook, label: 'Facebook' },
-                    { Icon: FaTwitter, label: 'Twitter' },
-                    { Icon: FaInstagram, label: 'Instagram' },
-                    { Icon: FaYoutube, label: 'YouTube' },
-                    { Icon: FaLinkedin, label: 'LinkedIn' },
-                  ].map(({ Icon, label }) => (
-                    <button
-                      key={label}
-                      aria-label={label}
-                      className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/15 flex items-center justify-center transition-colors"
-                    >
-                      <Icon className="w-3.5 h-3.5 text-white/50 hover:text-white transition-colors" />
-                    </button>
-                  ))}
-                </div>
+                <p className="text-[12.5px] text-white/30">The system designed by 5ive Stack Labs</p>
                 <div className="flex gap-4.5 text-[12.5px]">
                   <Link href="/privacy" className="text-white/35 hover:text-white transition-colors">Privacy Policy</Link>
                   <Link href="/terms" className="text-white/35 hover:text-white transition-colors">Terms of Use</Link>

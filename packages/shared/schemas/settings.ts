@@ -115,6 +115,18 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
     z.string().min(2, 'School name must be at least 2 characters').max(200),
   [SETTING_KEYS.SCHOOL_SLOGAN]:
     z.string().max(300),
+  [SETTING_KEYS.SCHOOL_SYSTEM_TAGLINE]:
+    z.string().max(150),
+  [SETTING_KEYS.SCHOOL_HERO_SUBTITLE]:
+    z.string().max(300),
+  [SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM]:
+    z.array(z.object({
+      name:     z.string().min(1, 'Name is required').max(150),
+      title:    z.string().min(1, 'Title is required').max(150),
+      bio:      z.string().max(1000).optional(),
+      photoKey: z.string().optional(),
+      order:    z.number().optional(),
+    })).max(30),
   [SETTING_KEYS.SCHOOL_VISION]:
     z.string().max(1000),
   [SETTING_KEYS.SCHOOL_MISSION]:

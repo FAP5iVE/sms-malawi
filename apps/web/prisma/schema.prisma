@@ -832,6 +832,26 @@ enum ManebStatus   {
 
 // ─── HR MODULE ────────────────────────────────────────────
 
+// [PRODUCTION FIX 2026-07-28] Real gallery storage — "Life at our school" on
+// the public landing page previously had no live source at all (placeholder
+// icon blocks only). Files themselves live in Appwrite under
+// FILE_PREFIX.SCHOOL_GALLERY (public.ts's file-storage skill/pattern); this
+// table is just the ordered, captioned index of which files are the gallery,
+// with a caption/category and simple ordering for the homepage's 5-photo
+// preview vs the full /gallery page.
+model GalleryPhoto {
+  id           String   @id @default(cuid())
+  fileKey      String   @unique // Appwrite file ID, FILE_PREFIX.SCHOOL_GALLERY
+  caption      String?
+  category     String?  // free-text, e.g. "Assembly", "Sports Day" — mirrors the design's labelled tiles
+  displayOrder Int      @default(0)
+  uploadedByUid String
+  createdAt    DateTime @default(now())
+
+  @@index([displayOrder])
+  @@map("gallery_photos")
+}
+
 model StaffProfile {
   id                  String         @id @default(cuid())
   uid                 String         @unique   // Firebase Auth UID

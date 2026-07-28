@@ -71,6 +71,12 @@ export const FILE_PREFIX = {
   ASSIGNMENT_SUBMISSION: 'assignment_submission',
   FINANCIAL_REPORT: 'financial_report',
   DIGITAL_RESOURCE: 'digital_resource',
+  // [PRODUCTION FIX 2026-07-28] Public landing-page assets — served via
+  // getPublicViewUrl() (direct Appwrite view URL, no signed-proxy/role
+  // check), same pattern already documented there for the school logo.
+  // Never put anything sensitive under these two prefixes.
+  ANNOUNCEMENT_IMAGE: 'announcement_image',
+  SCHOOL_GALLERY:     'school_gallery',
 } as const
 
 export type FilePrefix = typeof FILE_PREFIX[keyof typeof FILE_PREFIX]
@@ -96,6 +102,12 @@ const READ_ROLES: Record<FilePrefix, string[]> = {
   assignment_submission: ['admin', 'high_rank', 'academic', '__self'],
   financial_report: ['admin', 'finance', 'high_rank'],
   digital_resource: ['admin', 'high_rank', 'finance', 'library', 'academic', 'hr', 'exam_officer', 'student'],
+  // Public assets — every internal role may view them too (used by any
+  // future admin gallery/announcement management screen); the actual
+  // public landing page never goes through this map at all, it calls
+  // getPublicViewUrl() directly.
+  announcement_image: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
+  school_gallery:     ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
 }
 
 export function canReadFile(fileId: string, userRole: string, userUid: string, ownerUid?: string): boolean {

@@ -37,7 +37,8 @@ import { db } from '@/lib/firebase'
 import { useAuthStore } from '@/store/authStore'
 import { AnnouncementSchema } from '@shared/schemas/announcement'
 import { COLLECTIONS } from '@shared/constants/storage'
-import { X, Loader2 } from 'lucide-react'
+import { apiFetch } from '@/lib/api-client'
+import { X, Loader2, ImagePlus } from 'lucide-react'
 import { USER_ROLES } from '@shared/types/roles'
 
 interface Props {
@@ -50,6 +51,12 @@ export function AnnouncementForm({ onClose }: Props) {
   const [body, setBody] = useState('')
   const [targetAll, setTargetAll] = useState(true)
   const [targetRoles, setTargetRoles] = useState<string[]>([])
+  // [PRODUCTION FIX 2026-07-28] publicWebsite is a separate opt-in from
+  // targetAll — see announcementService.ts's CreateAnnouncementInput
+  // comment for why these must not be conflated.
+  const [publicWebsite, setPublicWebsite] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -59,14 +66,36 @@ export function AnnouncementForm({ onClose }: Props) {
   const canPublishDirectly = role === 'high_rank'
   const status = canPublishDirectly ? 'PUBLISHED' : 'PENDING_APPROVAL'
 
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null
+    setImageFile(file)
+    setImagePreview(file ? URL.createObjectURL(file) : null)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const parsed = AnnouncementSchema.safeParse({ title, body, targetAll, targetRoles, status })
+    setError(null)
+    const parsed = AnnouncementSchema.safeParse({ title, body, targetAll, targetRoles, status, publicWebsite })
     if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Validation error')
     setLoading(true)
     try {
+      // Upload the cover image first (if any) — AnnouncementForm writes
+      // straight to Firestore below, not through POST /announcements, so
+      // the image has to go through its own small endpoint (POST
+      // /announcements/image) to reach Appwrite and get a fileId back.
+      let imageKey: string | undefined
+      if (imageFile) {
+        const fd = new FormData()
+        fd.append('file', imageFile)
+        const uploaded = await apiFetch<{ imageKey: string }>('/announcements/image', {
+          method: 'POST',
+          body: fd,
+        })
+        imageKey = uploaded.imageKey
+      }
       await addDoc(collection(db!, COLLECTIONS.ANNOUNCEMENTS), {
         ...parsed.data,
+        imageKey: imageKey ?? null,
         createdByUid: user?.uid,
         createdAt: serverTimestamp(),
       })
@@ -147,6 +176,52 @@ export function AnnouncementForm({ onClose }: Props) {
                     {r.replace('_', ' ')}
                   </label>
                 ))}
+              </div>
+            )}
+          </div>
+          {/* [PRODUCTION FIX 2026-07-28] Public website opt-in — independent
+              of "Send to everyone" above, which only controls internal
+              visibility. */}
+          <div className="border-t border-base pt-4">
+            <label className="flex items-center gap-2 text-sm mb-1">
+              <input
+                type="checkbox"
+                checked={publicWebsite}
+                onChange={(e) => setPublicWebsite(e.target.checked)}
+                className="accent-brand-teal"
+              />
+              Publish to public website
+            </label>
+            <p className="text-xs text-muted mb-3">
+              Shows on the public landing page (News, Events, or Academic Advertisements). Separate from
+              &quot;Send to everyone&quot; above — that only controls who inside the school sees it.
+            </p>
+
+            {publicWebsite && (
+              <div>
+                <label className="block text-sm font-medium text-body mb-1.5">
+                  Cover image <span className="text-muted font-normal">(optional)</span>
+                </label>
+                {imagePreview ? (
+                  <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview, not a remote asset */}
+                    <img src={imagePreview} alt="Selected cover" className="w-full h-32 object-cover rounded-xl border border-base" />
+                    <button
+                      type="button"
+                      onClick={() => { setImageFile(null); setImagePreview(null) }}
+                      className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
+                      aria-label="Remove image"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-base rounded-xl h-24 cursor-pointer hover:border-brand-teal transition-colors text-muted">
+                    <ImagePlus className="w-5 h-5" aria-hidden />
+                    <span className="text-xs">Add a cover image</span>
+                    <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                  </label>
+                )}
               </div>
             )}
           </div>

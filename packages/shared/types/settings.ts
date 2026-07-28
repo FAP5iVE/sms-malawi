@@ -62,6 +62,17 @@ export interface DepartmentTitles {
   [departmentName: string]: string[]
 }
 
+/** One entry in SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM — deliberately minimal,
+ *  public-safe fields only. See that key's comment for why this is a
+ *  curated list rather than real StaffProfile records. */
+export interface LeadershipMember {
+  name:     string
+  title:    string
+  bio?:     string
+  photoKey?: string // Appwrite file ID, FILE_PREFIX.STAFF_PHOTO or a public one
+  order?:   number
+}
+
 // ─────────────────────────────────────────────────────────
 //  SETTING KEYS
 //  Single source of truth for all key string literals.
@@ -90,6 +101,19 @@ export const SETTING_KEYS = {
   SCHOOL_PHONE:                   'school_phone',
   SCHOOL_EMAIL:                   'school_email',
   SCHOOL_WEBSITE:                 'school_website',
+  // [PRODUCTION FIX 2026-07-28] Public landing-page hero copy — the
+  // sub-headline under the school name ("Secondary School Management
+  // System") and the tagline beneath it ("Excellence in Education — from
+  // Form 1 through MSCE.") were hardcoded strings in page.tsx. Same
+  // admin/hr/high_rank-editable pattern as SCHOOL_NAME.
+  SCHOOL_SYSTEM_TAGLINE:          'school_system_tagline',
+  SCHOOL_HERO_SUBTITLE:           'school_hero_subtitle',
+  // Public leadership/management team listing for the Discover ->
+  // Leadership page. A deliberately minimal admin-curated list (name,
+  // title, bio, optional photo) rather than exposing real StaffProfile
+  // records publicly, which would leak internal HR data never meant to be
+  // public (employee numbers, department, contact details, etc).
+  SCHOOL_LEADERSHIP_TEAM:         'school_leadership_team',
   SCHOOL_FOUNDED_YEAR:            'school_founded_year',
   SCHOOL_LOGO_URL:                'school_logo_url',
 
@@ -200,6 +224,9 @@ export interface SettingValueMap {
   // ── School identity
   readonly [SETTING_KEYS.SCHOOL_NAME]:           string
   readonly [SETTING_KEYS.SCHOOL_SLOGAN]:         string
+  readonly [SETTING_KEYS.SCHOOL_SYSTEM_TAGLINE]: string
+  readonly [SETTING_KEYS.SCHOOL_HERO_SUBTITLE]:  string
+  readonly [SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM]: LeadershipMember[]
   readonly [SETTING_KEYS.SCHOOL_VISION]:         string
   readonly [SETTING_KEYS.SCHOOL_MISSION]:        string
   readonly [SETTING_KEYS.SCHOOL_CORE_VALUES]:    string[]   // list of short value statements
@@ -361,6 +388,27 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     isPublic: true,
     description: 'School motto or slogan displayed on the landing page.',
     defaultValue: 'Excellence in Education',
+  },
+  [SETTING_KEYS.SCHOOL_SYSTEM_TAGLINE]: {
+    key: SETTING_KEYS.SCHOOL_SYSTEM_TAGLINE,
+    category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
+    isPublic: true,
+    description: 'Sub-headline shown under the school name in the site header and hero (e.g. "Secondary School Management System").',
+    defaultValue: 'Secondary School Management System',
+  },
+  [SETTING_KEYS.SCHOOL_HERO_SUBTITLE]: {
+    key: SETTING_KEYS.SCHOOL_HERO_SUBTITLE,
+    category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
+    isPublic: true,
+    description: 'The tagline shown beneath the hero headline on the landing page (e.g. "Excellence in Education — from Form 1 through MSCE.").',
+    defaultValue: 'Excellence in Education — from Form 1 through MSCE.',
+  },
+  [SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM]: {
+    key: SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM,
+    category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
+    isPublic: true,
+    description: 'Public leadership/management team listing shown on the Discover -> Leadership page.',
+    defaultValue: [],
   },
   [SETTING_KEYS.SCHOOL_VISION]: {
     key: SETTING_KEYS.SCHOOL_VISION,

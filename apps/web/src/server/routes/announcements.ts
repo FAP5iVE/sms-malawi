@@ -47,6 +47,7 @@
 import 'server-only'
 
 import { Router } from 'express'
+import multer from 'multer'
 import * as admin from 'firebase-admin'
 import { verifyAuth } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
@@ -54,8 +55,37 @@ import { hasPermission } from '@shared/types/permissions'
 import { COLLECTIONS } from '@shared/constants/storage'
 import { AnnouncementSchema } from '@shared/schemas/announcement'
 import * as announcementService from '@/server/services/announcementService'
+import { uploadFile, FILE_PREFIX } from '@/lib/storage'
 
 export const announcementsRouter = Router()
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }) // 8MB
+
+// POST /announcements/image — uploads a cover image ahead of the Firestore
+// write. AnnouncementForm.tsx writes the announcement document directly to
+// Firestore from the client (see its own header comment) rather than
+// through POST /, so this is a small standalone endpoint the form calls
+// first to get back a fileId to include in that write. Gated on the same
+// permission as creating an announcement at all — no separate elevated
+// permission needed to attach an image to your own announcement.
+announcementsRouter.post(
+  '/image',
+  verifyAuth,
+  requireAnyPermission(['announcement.create', 'announcement.createWithApproval']),
+  upload.single('file'),
+  async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
+    if (!req.file.mimetype.startsWith('image/')) {
+      return res.status(400).json({ error: 'Only image files are allowed.' })
+    }
+    const uploaded = await uploadFile(
+      FILE_PREFIX.ANNOUNCEMENT_IMAGE,
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype,
+    )
+    res.status(201).json({ imageKey: uploaded.fileId })
+  },
+)
 
 // POST /announcements — create. high_rank publishes directly;
 // finance/library/lower_rank/academic/hr/exam_officer/student create a
@@ -90,6 +120,8 @@ announcementsRouter.post(
           targetClassId: parsed.data.targetClassId,
           scheduledFor,
           eventDate: parsed.data.eventDate,
+          publicWebsite: parsed.data.publicWebsite,
+          imageKey: parsed.data.imageKey,
           createdByUid: user.uid,
           createdByRole: user.role,
         },

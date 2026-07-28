@@ -73,6 +73,20 @@ export interface CreateAnnouncementInput {
   eventDate?: string
   createdByUid: string
   createdByRole: string
+  // [PRODUCTION FIX 2026-07-28] publicWebsite is deliberately independent
+  // from targetAll. targetAll/targetRoles govern INTERNAL audience — who
+  // sees the announcement inside the app. Before this field existed, the
+  // public landing page's /public/announcements filtered on targetAll,
+  // which meant "addressed to everyone in the school" silently doubled as
+  // "safe to publish on the public marketing site" — two different
+  // decisions that were never actually the same one. A staff-only internal
+  // notice marked targetAll (e.g. "all staff meeting") could leak publicly
+  // with no way to opt out. Submitter now explicitly opts an announcement
+  // into public visibility.
+  publicWebsite?: boolean
+  // Appwrite file ID (FILE_PREFIX.ANNOUNCEMENT_IMAGE) — optional cover
+  // image, primarily for the public News section.
+  imageKey?: string
 }
 
 // ─── AUDIENCE RESOLUTION ──────────────────────────────────
@@ -200,6 +214,8 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
     targetClassId: data.targetClassId ?? null,
     scheduledFor: data.scheduledFor ?? null,
     eventDate: data.eventDate ?? null,
+    publicWebsite: data.publicWebsite ?? false,
+    imageKey: data.imageKey ?? null,
     createdByUid: data.createdByUid,
     createdByRole: data.createdByRole,
     status,
