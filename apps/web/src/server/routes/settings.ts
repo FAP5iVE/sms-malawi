@@ -320,17 +320,29 @@ const SCHOOL_SCALAR_KEYS = [
   SETTING_KEYS.SCHOOL_ADDRESS,
   SETTING_KEYS.SCHOOL_PHONE,
   SETTING_KEYS.SCHOOL_EMAIL,
+  SETTING_KEYS.SOCIAL_FACEBOOK_URL,
+  SETTING_KEYS.SOCIAL_TWITTER_URL,
+  SETTING_KEYS.SOCIAL_INSTAGRAM_URL,
+  SETTING_KEYS.SOCIAL_YOUTUBE_URL,
+  SETTING_KEYS.SOCIAL_LINKEDIN_URL,
 ]
 
 settingsRouter
   .route('/school')
   .get(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
-    const [scalars, coreValues, leadershipTeam] = await Promise.all([
+    const [scalars, coreValues, leadershipTeam, foundedYear] = await Promise.all([
       readSettings(SCHOOL_SCALAR_KEYS),
       settingsService.get(SETTING_KEYS.SCHOOL_CORE_VALUES),
       settingsService.get(SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM),
+      // [PRODUCTION FIX 2026-07-28] The "Years of excellence" figure on the
+      // landing page is genuinely computed live from this setting — but the
+      // setting itself had no write path anywhere, so in practice it was
+      // stuck at its default forever. A number, so it goes through the
+      // typed settingsService (like coreValues/leadershipTeam) rather than
+      // the generic string-only readSettings/writeSettings helpers.
+      settingsService.get(SETTING_KEYS.SCHOOL_FOUNDED_YEAR),
     ])
-    return res.json({ ...scalars, coreValues, leadershipTeam })
+    return res.json({ ...scalars, coreValues, leadershipTeam, foundedYear })
   })
   .patch(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
     const body = req.body as Record<string, unknown>
@@ -347,6 +359,9 @@ settingsRouter
       }
       if (body.leadershipTeam !== undefined) {
         await settingsService.set(SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM, body.leadershipTeam as never, req.user!.uid)
+      }
+      if (body.foundedYear !== undefined) {
+        await settingsService.set(SETTING_KEYS.SCHOOL_FOUNDED_YEAR, Number(body.foundedYear) as never, req.user!.uid)
       }
     } catch (err) {
       const status = (err as { status?: number })?.status ?? 400

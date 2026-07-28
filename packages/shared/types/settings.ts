@@ -114,6 +114,15 @@ export const SETTING_KEYS = {
   // records publicly, which would leak internal HR data never meant to be
   // public (employee numbers, department, contact details, etc).
   SCHOOL_LEADERSHIP_TEAM:         'school_leadership_team',
+  // [PRODUCTION FIX 2026-07-28] Footer social icons previously linked
+  // nowhere (decorative buttons, no href) in both the old page and the
+  // redesign. Real, admin/hr/high_rank-editable URLs, each optional — an
+  // icon with no URL set simply doesn't render as a link.
+  SOCIAL_FACEBOOK_URL:            'social_facebook_url',
+  SOCIAL_TWITTER_URL:             'social_twitter_url',
+  SOCIAL_INSTAGRAM_URL:           'social_instagram_url',
+  SOCIAL_YOUTUBE_URL:             'social_youtube_url',
+  SOCIAL_LINKEDIN_URL:            'social_linkedin_url',
   SCHOOL_FOUNDED_YEAR:            'school_founded_year',
   SCHOOL_LOGO_URL:                'school_logo_url',
 
@@ -227,6 +236,11 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.SCHOOL_SYSTEM_TAGLINE]: string
   readonly [SETTING_KEYS.SCHOOL_HERO_SUBTITLE]:  string
   readonly [SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM]: LeadershipMember[]
+  readonly [SETTING_KEYS.SOCIAL_FACEBOOK_URL]:  string
+  readonly [SETTING_KEYS.SOCIAL_TWITTER_URL]:   string
+  readonly [SETTING_KEYS.SOCIAL_INSTAGRAM_URL]: string
+  readonly [SETTING_KEYS.SOCIAL_YOUTUBE_URL]:   string
+  readonly [SETTING_KEYS.SOCIAL_LINKEDIN_URL]:  string
   readonly [SETTING_KEYS.SCHOOL_VISION]:         string
   readonly [SETTING_KEYS.SCHOOL_MISSION]:        string
   readonly [SETTING_KEYS.SCHOOL_CORE_VALUES]:    string[]   // list of short value statements
@@ -409,6 +423,41 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     isPublic: true,
     description: 'Public leadership/management team listing shown on the Discover -> Leadership page.',
     defaultValue: [],
+  },
+  [SETTING_KEYS.SOCIAL_FACEBOOK_URL]: {
+    key: SETTING_KEYS.SOCIAL_FACEBOOK_URL,
+    category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
+    isPublic: true,
+    description: 'Facebook page URL for the footer social icon. Leave blank to hide the icon.',
+    defaultValue: '',
+  },
+  [SETTING_KEYS.SOCIAL_TWITTER_URL]: {
+    key: SETTING_KEYS.SOCIAL_TWITTER_URL,
+    category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
+    isPublic: true,
+    description: 'Twitter/X profile URL for the footer social icon. Leave blank to hide the icon.',
+    defaultValue: '',
+  },
+  [SETTING_KEYS.SOCIAL_INSTAGRAM_URL]: {
+    key: SETTING_KEYS.SOCIAL_INSTAGRAM_URL,
+    category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
+    isPublic: true,
+    description: 'Instagram profile URL for the footer social icon. Leave blank to hide the icon.',
+    defaultValue: '',
+  },
+  [SETTING_KEYS.SOCIAL_YOUTUBE_URL]: {
+    key: SETTING_KEYS.SOCIAL_YOUTUBE_URL,
+    category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
+    isPublic: true,
+    description: 'YouTube channel URL for the footer social icon. Leave blank to hide the icon.',
+    defaultValue: '',
+  },
+  [SETTING_KEYS.SOCIAL_LINKEDIN_URL]: {
+    key: SETTING_KEYS.SOCIAL_LINKEDIN_URL,
+    category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
+    isPublic: true,
+    description: 'LinkedIn page URL for the footer social icon. Leave blank to hide the icon.',
+    defaultValue: '',
   },
   [SETTING_KEYS.SCHOOL_VISION]: {
     key: SETTING_KEYS.SCHOOL_VISION,

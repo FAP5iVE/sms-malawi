@@ -127,6 +127,13 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
       photoKey: z.string().optional(),
       order:    z.number().optional(),
     })).max(30),
+  // Empty string is deliberately valid here (hides the footer icon) — only
+  // a non-empty value must actually be a well-formed URL.
+  [SETTING_KEYS.SOCIAL_FACEBOOK_URL]:  z.string().url().or(z.literal('')),
+  [SETTING_KEYS.SOCIAL_TWITTER_URL]:   z.string().url().or(z.literal('')),
+  [SETTING_KEYS.SOCIAL_INSTAGRAM_URL]: z.string().url().or(z.literal('')),
+  [SETTING_KEYS.SOCIAL_YOUTUBE_URL]:   z.string().url().or(z.literal('')),
+  [SETTING_KEYS.SOCIAL_LINKEDIN_URL]:  z.string().url().or(z.literal('')),
   [SETTING_KEYS.SCHOOL_VISION]:
     z.string().max(1000),
   [SETTING_KEYS.SCHOOL_MISSION]:

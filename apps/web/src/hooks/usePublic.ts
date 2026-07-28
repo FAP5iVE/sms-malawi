@@ -35,6 +35,15 @@ export interface PublicSchoolInfo {
   mission:     string
   coreValues:  string[]
   currentYear: string
+  /** [PRODUCTION FIX 2026-07-28] Footer social icons — real URLs, editable
+   *  under Settings -> School Identity. null = hide that icon. */
+  social: {
+    facebook:  string | null
+    twitter:   string | null
+    instagram: string | null
+    youtube:   string | null
+    linkedin:  string | null
+  }
 }
 
 export interface PublicManebStat {

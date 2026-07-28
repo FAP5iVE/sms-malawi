@@ -34,8 +34,14 @@ interface SchoolIdentityData {
   school_address?: string
   school_phone?: string
   school_email?: string
+  social_facebook_url?: string
+  social_twitter_url?: string
+  social_instagram_url?: string
+  social_youtube_url?: string
+  social_linkedin_url?: string
   coreValues: string[]
   leadershipTeam: LeadershipMember[]
+  foundedYear?: number
 }
 
 const inputCls =
@@ -192,6 +198,49 @@ export function SchoolIdentitySettings() {
         <div>
           <label className={label}>Email</label>
           <input value={data.school_email ?? ''} onChange={(e) => setField('school_email', e.target.value)} className={inputCls} placeholder="info@school.edu.mw" />
+        </div>
+      </div>
+
+      {/* [PRODUCTION FIX 2026-07-28] Founded Year — the landing page's
+          "Years of excellence" stat is genuinely computed live from this,
+          but until now there was nowhere to actually set it. */}
+      <div className="max-w-xs">
+        <label className={label}>Founded Year</label>
+        <input
+          type="number"
+          value={data.foundedYear ?? ''}
+          onChange={(e) => setField('foundedYear', e.target.value ? Number(e.target.value) : undefined)}
+          className={inputCls}
+          placeholder="1979"
+        />
+        <p className="text-xs text-muted mt-1.5">Drives the &quot;Years of excellence&quot; figure on the landing page.</p>
+      </div>
+
+      {/* [PRODUCTION FIX 2026-07-28] Social media — footer icons were
+          decorative with no real links in both the old page and the
+          redesign. Any left blank simply won't render as a link. */}
+      <div>
+        <label className={label}>Social Media Links</label>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {([
+            ['social_facebook_url', 'Facebook', 'https://facebook.com/yourschool'],
+            ['social_twitter_url', 'Twitter / X', 'https://x.com/yourschool'],
+            ['social_instagram_url', 'Instagram', 'https://instagram.com/yourschool'],
+            ['social_youtube_url', 'YouTube', 'https://youtube.com/@yourschool'],
+            ['social_linkedin_url', 'LinkedIn', 'https://linkedin.com/company/yourschool'],
+          ] as const).map(([key, name, placeholder]) => (
+            <div key={key}>
+              <label htmlFor={key} className="text-xs text-muted mb-1 block">{name}</label>
+              <input
+                id={key}
+                type="url"
+                value={data[key] ?? ''}
+                onChange={(e) => setField(key, e.target.value)}
+                className={inputCls}
+                placeholder={placeholder}
+              />
+            </div>
+          ))}
         </div>
       </div>
 

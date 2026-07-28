@@ -60,6 +60,20 @@ const PUBLIC_PATHS = [
   '/change-password',
   '/privacy',
   '/terms',
+  // [PRODUCTION FIX 2026-07-28] All seven of the landing-page redesign's new
+  // pages were built without ever being added here — same class of bug as
+  // /privacy and /terms earlier: none of them have a page-level auth check,
+  // but the edge proxy defaulted every unlisted path to "requires login",
+  // so every public link on the landing page (News, Events, Gallery,
+  // Leadership, Academics, Student Life, Admissions) actually redirected
+  // anonymous visitors to /login. This is the fix.
+  '/news',
+  '/events',
+  '/gallery',
+  '/leadership',
+  '/academics',
+  '/student-life',
+  '/admissions',
   '/',           // landing page
 ] as const
 

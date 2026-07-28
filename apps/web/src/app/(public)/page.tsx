@@ -147,14 +147,42 @@ export default function LandingPage() {
     : undatedAnnouncements.slice(0, 4)
   const eventItems = datedAnnouncements.slice(0, 3)
 
-  // Live client-side search over everything already fetched — see the
-  // header search flyout's comment for why this isn't backed by a real
-  // search service.
+  // [PRODUCTION FIX 2026-07-28] Search previously only matched announcements
+  // — the new static pages (Academics, Admissions, Student Life, Leadership,
+  // Gallery) were invisible to it. There's still no real search backend
+  // (see the header flyout's comment), so this stays a client-side filter,
+  // just widened to a static index of every real page/section that exists
+  // on the site, searched alongside the live announcements.
+  const SEARCHABLE_PAGES = [
+    { title: 'Academics — Curriculum', href: '/academics#curriculum', keywords: 'academics curriculum subjects JCE MSCE form syllabus' },
+    { title: 'Academics — MANEB Standards', href: '/academics', keywords: 'maneb standards grading exam board' },
+    { title: 'Academics — Facilities', href: '/academics#facilities', keywords: 'facilities laboratory library computer classroom' },
+    { title: 'Admissions — How to Apply', href: '/admissions#how-to-apply', keywords: 'apply admission enrol enrolment steps' },
+    { title: 'Admissions — Entry Requirements', href: '/admissions#entry-requirements', keywords: 'entry requirements pslce jce transcript' },
+    { title: 'Admissions — Fees Structure', href: '/admissions#fees', keywords: 'fees tuition boarding cost pay price' },
+    { title: 'Admissions — Scholarships', href: '/admissions#scholarships', keywords: 'scholarship bursary financial aid' },
+    { title: 'Student Life — Clubs & Societies', href: '/student-life', keywords: 'clubs societies innovation debate drama choir' },
+    { title: 'Student Life — Wellness & Support', href: '/student-life', keywords: 'wellness support pastoral care wellbeing' },
+    { title: 'Student Life — Sports', href: '/student-life', keywords: 'sport football netball athletics extracurricular' },
+    { title: 'Student Life — Boarding', href: '/student-life', keywords: 'boarding dormitory residential accommodation' },
+    { title: 'School Leadership', href: '/leadership', keywords: 'leadership head teacher management board' },
+    { title: 'School Gallery', href: '/gallery', keywords: 'gallery photos pictures images' },
+    { title: 'Performance & MANEB Results', href: '/#performance', keywords: 'performance results pass rate msce jce placement university' },
+    { title: 'Contact & Location', href: '/#contact', keywords: 'contact phone email address map directions' },
+  ]
+
   const searchResults = searchQuery.trim().length >= 2
-    ? announcements.filter((a) =>
-        a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.body.toLowerCase().includes(searchQuery.toLowerCase()),
-      ).slice(0, 6)
+    ? [
+        ...announcements
+          .filter((a) =>
+            a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            a.body.toLowerCase().includes(searchQuery.toLowerCase()),
+          )
+          .map((a) => ({ kind: 'announcement' as const, title: a.title, href: a.eventDate ? '/events' : '/news', tag: a.eventDate ? 'Event' : 'News' })),
+        ...SEARCHABLE_PAGES
+          .filter((p) => `${p.title} ${p.keywords}`.toLowerCase().includes(searchQuery.toLowerCase()))
+          .map((p) => ({ kind: 'page' as const, title: p.title, href: p.href, tag: 'Page' })),
+      ].slice(0, 8)
     : []
 
   // ── Newsletter (single email — see file header note 6) ─────────────────
@@ -247,7 +275,7 @@ export default function LandingPage() {
           ref={headerRef}
           className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${
             scrolled
-              ? 'bg-surface/95 backdrop-blur-md border-base shadow-sm'
+              ? 'bg-surface border-base shadow-md'
               : 'bg-transparent border-white/15'
           }`}
         >
@@ -360,18 +388,19 @@ export default function LandingPage() {
                 {searchQuery.trim().length >= 2 && (
                   <div className="mt-4 border-t border-base pt-4">
                     {searchResults.length === 0 ? (
-                      <p className="text-sm text-muted">No announcements match &quot;{searchQuery}&quot;.</p>
+                      <p className="text-sm text-muted">Nothing matches &quot;{searchQuery}&quot;.</p>
                     ) : (
                       <div className="space-y-1">
-                        {searchResults.map((a) => (
-                          <button
-                            key={a.id}
-                            onClick={() => { scrollTo(a.eventDate ? 'events' : 'news'); setSearchQuery('') }}
+                        {searchResults.map((r) => (
+                          <Link
+                            key={`${r.kind}-${r.title}`}
+                            href={r.href}
+                            onClick={() => { setSearchOpen(false); setSearchQuery('') }}
                             className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-page transition-colors flex items-center justify-between gap-4"
                           >
-                            <span className="text-sm font-heading font-semibold text-body line-clamp-1">{a.title}</span>
-                            <span className="text-xs text-muted shrink-0">{a.eventDate ? 'Event' : 'News'}</span>
-                          </button>
+                            <span className="text-sm font-heading font-semibold text-body line-clamp-1">{r.title}</span>
+                            <span className="text-xs text-muted shrink-0">{r.tag}</span>
+                          </Link>
                         ))}
                       </div>
                     )}
@@ -496,7 +525,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════════
             ANNOUNCEMENT RAIL — latest 2 undated announcements
         ══════════════════════════════════════════════════════════════ */}
-        <section className="bg-[#0B1D33] dark:bg-[#081522]">
+        <section className="bg-brand-navy">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 grid md:grid-cols-[200px_1fr] gap-8 items-center">
             <div>
               <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal-light mb-1.5">
@@ -804,10 +833,13 @@ export default function LandingPage() {
                     ))}
                   </div>
 
-                  <div className="grid md:grid-cols-3 gap-5">
+                  {/* [PRODUCTION FIX 2026-07-28] Was three separate
+                      side-by-side cards; now one unified card with MSCE,
+                      JCE, and University Placement as internal rows. */}
+                  <div className="bg-white/5 border border-white/10 rounded-2xl divide-y divide-white/10">
                     {[
-                      { key: 'MSCE', stat: msce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: msce ? `${msce.passed} passed / ${msce.total} total` : null, rate: msce?.passRate },
-                      { key: 'JCE', stat: jce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: jce ? `${jce.passed} passed / ${jce.total} total` : null, rate: jce?.passRate },
+                      { key: 'MSCE', stat: msce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: msce ? `${msce.passed} passed / ${msce.total} total` : null, rate: msce?.passRate, year: manebStats?.year },
+                      { key: 'JCE', stat: jce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: jce ? `${jce.passed} passed / ${jce.total} total` : null, rate: jce?.passRate, year: manebStats?.year },
                       {
                         key: 'University Placement',
                         stat: placementStats && placementStats.qualified > 0 ? placementStats : undefined,
@@ -817,14 +849,15 @@ export default function LandingPage() {
                           ? `${placementStats.selected} selected / ${placementStats.qualified} qualified`
                           : null,
                         rate: placementStats && placementStats.qualified > 0 ? placementStats.selectionRate : undefined,
+                        year: placementStats?.year,
                       },
                     ].map((card) => (
-                      <div key={card.key} className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                      <div key={card.key} className="p-6">
                         <div className="flex items-center justify-between mb-4.5">
                           <h4 className="font-heading font-bold text-sm">{card.key}</h4>
                           {card.stat && (
                             <span className="font-mono text-[11.5px] text-brand-teal-light">
-                              {manebStats?.year ?? placementStats?.year}
+                              {card.year}
                             </span>
                           )}
                         </div>
@@ -941,7 +974,10 @@ export default function LandingPage() {
             STAY CONNECTED — newsletter + contact
         ══════════════════════════════════════════════════════════════ */}
         <section id="contact" className="bg-page py-20 sm:py-24 border-b border-base">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-16">
+          {/* [PRODUCTION FIX 2026-07-28] Map moved in here as a third
+              column, beside Contact Us (was a separate full-width section
+              stacked below everything). */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-3 gap-10 lg:gap-8">
             {/* Newsletter */}
             <div>
               <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal mb-2.5">
@@ -993,29 +1029,32 @@ export default function LandingPage() {
                 Contact Us
               </h2>
 
-              {/* [PRODUCTION FIX 2026-07-28] Was a cramped 2x2 grid making
-                  the whole card too tall. Postal Address/Phone/Email now
-                  stack vertically in one left-hand box; Office Hours moves
-                  in with the message form on the right, as specified. */}
-              <div className="bg-surface border border-base rounded-2xl overflow-hidden grid sm:grid-cols-2">
-                <div className="flex flex-col divide-y divide-base border-b sm:border-b-0 sm:border-r border-base">
-                  {[
-                    { label: 'Postal Address', value: schoolInfo?.address ?? '—' },
-                    { label: 'Phone', value: schoolInfo?.phone ?? '—' },
-                    { label: 'Email', value: schoolInfo?.email ?? '—' },
-                  ].map((f) => (
-                    <div key={f.label} className="p-5.5">
-                      <div className="font-heading font-bold text-[12.5px] text-brand-navy dark:text-white mb-1.5">{f.label}</div>
-                      <div className="text-sm text-muted leading-relaxed">{f.value}</div>
+              {/* [PRODUCTION FIX 2026-07-28] Address/Phone/Email combined
+                  into one compact box (was three separately-spaced blocks).
+                  Office Hours sits beside it; Send Message now spans full
+                  width below both, instead of being squeezed into the
+                  Office Hours column. */}
+              <div className="bg-surface border border-base rounded-2xl overflow-hidden">
+                <div className="grid sm:grid-cols-2 border-b border-base">
+                  <div className="p-5 border-b sm:border-b-0 sm:border-r border-base">
+                    <div className="font-heading font-bold text-[11px] uppercase tracking-wider text-brand-teal mb-2">
+                      Postal Address
                     </div>
-                  ))}
-                </div>
-
-                <div>
-                  <div className="p-5.5 border-b border-base">
-                    <div className="font-heading font-bold text-[12.5px] text-brand-navy dark:text-white mb-1.5">Office Hours</div>
-                    <div className="text-sm text-muted leading-relaxed">Mon – Fri: 07:30 – 16:30</div>
+                    <p className="text-sm text-body mb-3 leading-relaxed">{schoolInfo?.address ?? '—'}</p>
+                    <p className="text-sm text-muted leading-snug">
+                      <span className="font-semibold text-body">Phone:</span> {schoolInfo?.phone ?? '—'}
+                    </p>
+                    <p className="text-sm text-muted leading-snug">
+                      <span className="font-semibold text-body">Email:</span> {schoolInfo?.email ?? '—'}
+                    </p>
                   </div>
+                  <div className="p-5">
+                    <div className="font-heading font-bold text-[11px] uppercase tracking-wider text-brand-teal mb-2">
+                      Office Hours
+                    </div>
+                    <p className="text-sm text-body">Mon – Fri: 07:30 – 16:30</p>
+                  </div>
+                </div>
 
                 <form onSubmit={handleContactSubmit} className="p-6">
                   <div className="font-heading font-bold text-[15px] text-brand-navy dark:text-white mb-4">
@@ -1071,27 +1110,30 @@ export default function LandingPage() {
                     </p>
                   )}
                 </form>
-                </div>
               </div>
             </div>
-          </div>
-        </section>
 
-        {/* ══════════════════════════════════════════════════════════════
-            MAP & DIRECTIONS — [PRODUCTION FIX 2026-07-28]
-        ══════════════════════════════════════════════════════════════ */}
-        <section id="map" className="bg-surface pb-20 sm:pb-24">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="rounded-2xl overflow-hidden border border-base h-[380px]">
-              <iframe
-                title="School location on Google Maps"
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                src={`https://www.google.com/maps?q=${encodeURIComponent(schoolInfo?.address ?? 'Blantyre, Malawi')}&output=embed`}
-              />
+            {/* Map — [PRODUCTION FIX 2026-07-28] now beside Contact Us,
+                inside the Stay Connected section, not a separate section
+                stacked below everything. */}
+            <div>
+              <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal mb-2.5">
+                Find us
+              </div>
+              <h2 className="font-heading font-extrabold text-[34px] tracking-tight text-brand-navy dark:text-white mb-5.5">
+                Map &amp; Directions
+              </h2>
+              <div id="map" className="rounded-2xl overflow-hidden border border-base h-[380px] scroll-mt-24">
+                <iframe
+                  title="School location on Google Maps"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src={`https://www.google.com/maps?q=${encodeURIComponent(schoolInfo?.address ?? 'Blantyre, Malawi')}&output=embed`}
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -1099,7 +1141,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════════
             FOOTER
         ══════════════════════════════════════════════════════════════ */}
-        <footer className="relative bg-[#0B1D33] dark:bg-[#081522] text-white pt-16 overflow-hidden rounded-t-[2.5rem]">
+        <footer className="relative bg-brand-navy text-white pt-16 overflow-hidden rounded-t-[2.5rem]">
           <svg preserveAspectRatio="xMidYMid slice" viewBox="10 10 80 80" aria-hidden className="absolute inset-0 w-full h-full blur-[14px] opacity-[0.07] pointer-events-none">
             <path fill="#D98A0B" className="blob-med" style={{ transformOrigin: '13px 25px' }} d="M37-5C25.1-14.7,5.7-19.1-9.2-10-28.5,1.8-32.7,31.1-19.8,49c15.5,21.5,52.6,22,67.2,2.3C59.4,35,53.7,8.5,37-5Z" />
             <path fill="#24507F" className="blob-slower" style={{ transformOrigin: '13px 25px' }} d="M20.6,4.1C11.6,1.5-1.9,2.5-8,11.2-16.3,23.1-8.2,45.6,7.4,50S42.1,38.9,41,24.5C40.2,14.1,29.4,6.6,20.6,4.1Z" />
@@ -1194,20 +1236,29 @@ export default function LandingPage() {
             <div className="py-5 flex justify-center sm:justify-end border-b border-white/10">
               <div className="flex gap-2.5">
                 {[
-                  { Icon: FaFacebook, label: 'Facebook' },
-                  { Icon: FaTwitter, label: 'Twitter' },
-                  { Icon: FaInstagram, label: 'Instagram' },
-                  { Icon: FaYoutube, label: 'YouTube' },
-                  { Icon: FaLinkedin, label: 'LinkedIn' },
-                ].map(({ Icon, label }) => (
-                  <button
-                    key={label}
-                    aria-label={label}
-                    className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/15 flex items-center justify-center transition-colors"
-                  >
-                    <Icon className="w-3.5 h-3.5 text-white/50 hover:text-white transition-colors" />
-                  </button>
-                ))}
+                  { Icon: FaFacebook, label: 'Facebook', url: schoolInfo?.social.facebook },
+                  { Icon: FaTwitter, label: 'Twitter', url: schoolInfo?.social.twitter },
+                  { Icon: FaInstagram, label: 'Instagram', url: schoolInfo?.social.instagram },
+                  { Icon: FaYoutube, label: 'YouTube', url: schoolInfo?.social.youtube },
+                  { Icon: FaLinkedin, label: 'LinkedIn', url: schoolInfo?.social.linkedin },
+                ]
+                  // [PRODUCTION FIX 2026-07-28] Real URLs now, editable
+                  // under Settings -> School Identity. An icon with no URL
+                  // set simply doesn't render, rather than being a dead
+                  // decorative button.
+                  .filter((s) => s.url)
+                  .map(({ Icon, label, url }) => (
+                    <a
+                      key={label}
+                      href={url!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={label}
+                      className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/15 flex items-center justify-center transition-colors"
+                    >
+                      <Icon className="w-3.5 h-3.5 text-white/50 hover:text-white transition-colors" />
+                    </a>
+                  ))}
               </div>
             </div>
 

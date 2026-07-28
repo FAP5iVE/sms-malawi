@@ -72,6 +72,15 @@ publicRouter.get('/school-info', async (_req, res) => {
     mission:     settings[SETTING_KEYS.SCHOOL_MISSION]        ?? '',
     coreValues:  settings[SETTING_KEYS.SCHOOL_CORE_VALUES]    ?? [],
     currentYear: settings[SETTING_KEYS.CURRENT_ACADEMIC_YEAR] ?? '2025/2026',
+    // [PRODUCTION FIX 2026-07-28] Footer social icons — real URLs now,
+    // editable under Settings -> School Identity. Empty string = hide icon.
+    social: {
+      facebook:  settings[SETTING_KEYS.SOCIAL_FACEBOOK_URL]  || null,
+      twitter:   settings[SETTING_KEYS.SOCIAL_TWITTER_URL]   || null,
+      instagram: settings[SETTING_KEYS.SOCIAL_INSTAGRAM_URL] || null,
+      youtube:   settings[SETTING_KEYS.SOCIAL_YOUTUBE_URL]   || null,
+      linkedin:  settings[SETTING_KEYS.SOCIAL_LINKEDIN_URL]  || null,
+    },
   })
 })
 
