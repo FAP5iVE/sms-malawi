@@ -135,6 +135,19 @@ export async function createUser(data: CreateUserInput, actorUid: string) {
 // ─── LIST USERS ──────────────────────────────────────────
 export async function listUsers(pageToken?: string) {
   const result = await getAuth().listUsers(100, pageToken)
+  const uids = result.users.map((u) => u.uid)
+
+  // [PRODUCTION FIX 2026-07-28] User Management previously showed only raw
+  // Firebase Auth fields — no employment/registration number, even though
+  // that's exactly the kind of identifier an admin filters/sorts by. Batch
+  // join against StaffProfile/Student by uid rather than N+1 queries.
+  const [staff, students] = await Promise.all([
+    prisma.staffProfile.findMany({ where: { uid: { in: uids } }, select: { uid: true, employeeNo: true } }),
+    prisma.student.findMany({ where: { firebaseUid: { in: uids } }, select: { firebaseUid: true, registrationNo: true } }),
+  ])
+  const employeeNoByUid = new Map(staff.map((s) => [s.uid, s.employeeNo]))
+  const registrationNoByUid = new Map(students.filter((s) => s.firebaseUid).map((s) => [s.firebaseUid as string, s.registrationNo]))
+
   return {
     users: result.users.map((u) => ({
       uid:         u.uid,
@@ -145,6 +158,8 @@ export async function listUsers(pageToken?: string) {
       disabled:    u.disabled,
       createdAt:   u.metadata.creationTime,
       lastSignIn:  u.metadata.lastSignInTime,
+      employeeNo:     employeeNoByUid.get(u.uid) ?? null,
+      registrationNo: registrationNoByUid.get(u.uid) ?? null,
     })),
     pageToken: result.pageToken,
   }

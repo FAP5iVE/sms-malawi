@@ -129,9 +129,17 @@ async function writeUserSettings(
 // SYSTEM CONFIG  (admin only)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// [PRODUCTION FIX 2026-07-28] Was 'school_name', 'school_motto',
+// 'school_address', 'school_phone', 'school_email', 'current_term',
+// 'current_year', 'next_term_date', 'session_timeout_hr' — a confirmed
+// duplicate of the dedicated School Identity panel (same school_name/
+// address/phone/email keys, editable from two different forms) PLUS a
+// dead field (school_motto, which nothing ever reads — the real slogan
+// field is school_slogan) PLUS a broken one (current_year wrote to a key
+// nobody reads; the real key is current_academic_year, SETTING_KEYS.
+// CURRENT_ACADEMIC_YEAR). Calendar fields moved to Academic Policy below,
+// using the corrected key name. Only genuinely system-level config remains.
 const SYSTEM_KEYS = [
-  'school_name', 'school_motto', 'school_address', 'school_phone',
-  'school_email', 'current_term', 'current_year', 'next_term_date',
   'session_timeout_hr',
 ]
 
@@ -154,10 +162,15 @@ settingsRouter
 // ACADEMIC POLICY  (admin | high_rank)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// [PRODUCTION FIX 2026-07-28] current_academic_year (corrected — was
+// current_year, a dead key nobody read), current_term, and next_term_date
+// moved here from System Configuration, where they didn't semantically
+// belong (this IS academic policy, not system config).
 const ACADEMIC_KEYS = [
   'term1_start', 'term1_end', 'term2_start', 'term2_end',
   'term3_start', 'term3_end', 'min_attendance_pct',
   'report_card_comment_required', 'ca_weight_pct', 'exam_weight_pct',
+  'current_academic_year', 'current_term', 'next_term_date',
 ]
 
 settingsRouter

@@ -118,7 +118,7 @@ export default function AcademicsPage() {
             </div>
           )}
           <a
-            href="https://maneb.mw"
+            href="https://www.maneb.edu.mw/"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-sm text-brand-teal hover:underline font-semibold"

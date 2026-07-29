@@ -12,6 +12,13 @@ import { apiFetch }            from '@/lib/api-client'
 const inputCls = 'w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25'
 
 interface AcademicPolicy {
+  // [PRODUCTION FIX 2026-07-28] Moved here from System Configuration, where
+  // they didn't semantically belong. current_academic_year is the
+  // corrected key name — the old System Config field wrote to current_year,
+  // a key nothing else in the system ever read.
+  current_academic_year: string
+  current_term:          string
+  next_term_date:        string
   term1_start:            string
   term1_end:              string
   term2_start:            string
@@ -26,6 +33,9 @@ interface AcademicPolicy {
 
 export function AcademicPolicySettings() {
   const [policy,  setPolicy]  = useState<AcademicPolicy>({
+    current_academic_year: '2025/2026',
+    current_term:          '1',
+    next_term_date:        '',
     term1_start:            '',
     term1_end:              '',
     term2_start:            '',
@@ -77,6 +87,32 @@ export function AcademicPolicySettings() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
+        {/* [PRODUCTION FIX 2026-07-28] Current Term & Year — moved from
+            System Configuration, and the year field now writes to the
+            correct key (current_academic_year) instead of the dead
+            current_year key the old form used. */}
+        <div className="pb-5 border-b border-base">
+          <h3 className="font-heading font-semibold text-sm text-body mb-4">Current Term &amp; Year</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Current Academic Year</label>
+              <input value={policy.current_academic_year} onChange={(e) => set('current_academic_year', e.target.value)} className={inputCls} placeholder="2025/2026" />
+            </div>
+            <div>
+              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Current Term</label>
+              <select value={policy.current_term} onChange={(e) => set('current_term', e.target.value)} className={inputCls}>
+                <option value="1">Term 1</option>
+                <option value="2">Term 2</option>
+                <option value="3">Term 3</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Next Term Start Date</label>
+              <input type="date" value={policy.next_term_date} onChange={(e) => set('next_term_date', e.target.value)} className={inputCls} />
+            </div>
+          </div>
+        </div>
+
         {/* Term Dates */}
         <div className="pb-5 border-b border-base">
           <h3 className="font-heading font-semibold text-sm text-body mb-4">Term Calendar Dates</h3>

@@ -790,7 +790,7 @@ export default function LandingPage() {
                 </p>
               </div>
               <a
-                href="https://maneb.mw"
+                href="https://www.maneb.edu.mw/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 border border-white/25 text-white px-5 py-2.75 rounded-full font-heading font-bold text-[13px] hover:bg-white/10 transition-colors whitespace-nowrap"
@@ -836,7 +836,7 @@ export default function LandingPage() {
                   {/* [PRODUCTION FIX 2026-07-28] Was three separate
                       side-by-side cards; now one unified card with MSCE,
                       JCE, and University Placement as internal rows. */}
-                  <div className="bg-white/5 border border-white/10 rounded-2xl divide-y divide-white/10">
+                  <div className="bg-white/5 border border-white/10 rounded-2xl grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/10">
                     {[
                       { key: 'MSCE', stat: msce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: msce ? `${msce.passed} passed / ${msce.total} total` : null, rate: msce?.passRate, year: manebStats?.year },
                       { key: 'JCE', stat: jce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: jce ? `${jce.passed} passed / ${jce.total} total` : null, rate: jce?.passRate, year: manebStats?.year },
@@ -974,10 +974,12 @@ export default function LandingPage() {
             STAY CONNECTED — newsletter + contact
         ══════════════════════════════════════════════════════════════ */}
         <section id="contact" className="bg-page py-20 sm:py-24 border-b border-base">
-          {/* [PRODUCTION FIX 2026-07-28] Map moved in here as a third
-              column, beside Contact Us (was a separate full-width section
-              stacked below everything). */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-3 gap-10 lg:gap-8">
+          {/* [PRODUCTION FIX 2026-07-28] Two columns: left = Newsletter
+              with Map stacked directly below it; right = the full Contact
+              Us card, same height as the left column. Confirmed against
+              a hand sketch before implementing (previous attempt used
+              three equal columns, which wasn't what was asked for). */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-10 lg:gap-16">
             {/* Newsletter */}
             <div>
               <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal mb-2.5">
@@ -1018,6 +1020,28 @@ export default function LandingPage() {
                   {newsletterMsg.text}
                 </p>
               )}
+
+              {/* Map — stacked directly below Newsletter in the same
+                  left-hand column, per the confirmed sketch. */}
+              <div className="mt-10">
+                <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal mb-2.5">
+                  Find us
+                </div>
+                <h3 className="font-heading font-extrabold text-2xl tracking-tight text-brand-navy dark:text-white mb-4">
+                  Map &amp; Directions
+                </h3>
+                <div id="map" className="rounded-2xl overflow-hidden border border-base h-[300px] scroll-mt-24">
+                  <iframe
+                    title="School location on Google Maps"
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    src={`https://www.google.com/maps?q=${encodeURIComponent(schoolInfo?.address ?? 'Blantyre, Malawi')}&output=embed`}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Contact info + form */}
@@ -1112,29 +1136,6 @@ export default function LandingPage() {
                 </form>
               </div>
             </div>
-
-            {/* Map — [PRODUCTION FIX 2026-07-28] now beside Contact Us,
-                inside the Stay Connected section, not a separate section
-                stacked below everything. */}
-            <div>
-              <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal mb-2.5">
-                Find us
-              </div>
-              <h2 className="font-heading font-extrabold text-[34px] tracking-tight text-brand-navy dark:text-white mb-5.5">
-                Map &amp; Directions
-              </h2>
-              <div id="map" className="rounded-2xl overflow-hidden border border-base h-[380px] scroll-mt-24">
-                <iframe
-                  title="School location on Google Maps"
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  src={`https://www.google.com/maps?q=${encodeURIComponent(schoolInfo?.address ?? 'Blantyre, Malawi')}&output=embed`}
-                />
-              </div>
-            </div>
           </div>
         </section>
 
@@ -1202,7 +1203,7 @@ export default function LandingPage() {
                   links: [
                     { label: 'Map & Directions', anchor: 'map' },
                     { label: 'News & Announcements', anchor: 'news' },
-                    { label: 'MANEB Portal', href: 'https://maneb.mw', external: true },
+                    { label: 'MANEB Portal', href: 'https://www.maneb.edu.mw/', external: true },
                   ],
                 },
               ].map((col) => (

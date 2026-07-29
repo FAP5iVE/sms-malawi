@@ -842,6 +842,11 @@ export interface ApiFirebaseUser {
   disabled:               boolean
   requiresPasswordChange: boolean
   lastSignIn?:            string
+  /** [PRODUCTION FIX 2026-07-28] Joined from StaffProfile/Student by uid —
+   *  null when the account has neither (e.g. admin/hr with no staff
+   *  record yet, or the account isn't linked to a student). */
+  employeeNo?:     string | null
+  registrationNo?: string | null
 }
 
 export interface ApiUserListResponse {
