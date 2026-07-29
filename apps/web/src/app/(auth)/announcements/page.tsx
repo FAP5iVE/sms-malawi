@@ -57,13 +57,22 @@ export default function AnnouncementsPage() {
   )
 }
 
-function PublishedList({ announcements, isLoading }: { announcements: ReturnType<typeof useAnnouncements>['announcements']; isLoading: boolean }) {
+function PublishedList({ announcements, isLoading, error }: { announcements: ReturnType<typeof useAnnouncements>['announcements']; isLoading: boolean; error?: string | null }) {
   if (isLoading) {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
           <div key={i} className="h-24 rounded-xl bg-surface animate-pulse" />
         ))}
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-brand-coral">
+        <Bell className="w-10 h-10 mb-3 opacity-40" aria-hidden="true" />
+        <p className="text-sm">{error}</p>
       </div>
     )
   }
@@ -181,7 +190,7 @@ function PendingApprovalList() {
 }
 
 function AnnouncementsContent() {
-  const { announcements, loading: isLoading } = useAnnouncements()
+  const { announcements, loading: isLoading, error: announcementsError } = useAnnouncements()
   const { role } = useAuthStore()
   const { can } = usePermissions()
   const [showForm, setShowForm] = useState(false)
@@ -214,14 +223,14 @@ function AnnouncementsContent() {
             <TabsTrigger value="pending">Pending Approval</TabsTrigger>
           </TabsList>
           <TabsContent value="published" className="mt-4">
-            <PublishedList announcements={announcements} isLoading={isLoading} />
+            <PublishedList announcements={announcements} isLoading={isLoading} error={announcementsError} />
           </TabsContent>
           <TabsContent value="pending" className="mt-4">
             <PendingApprovalList />
           </TabsContent>
         </Tabs>
       ) : (
-        <PublishedList announcements={announcements} isLoading={isLoading} />
+        <PublishedList announcements={announcements} isLoading={isLoading} error={announcementsError} />
       )}
 
       {/* Form modal */}

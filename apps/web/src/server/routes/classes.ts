@@ -43,6 +43,7 @@ import * as classService         from '@/server/services/classService'
 import * as pendingActionService from '@/server/services/pendingActionService'
 import * as settingsService      from '@/server/services/settingsService'
 import { SETTING_KEYS }          from '@shared/types/settings'
+import { prisma }                from '@/lib/prisma'
 import { assignmentsRouter }     from './assignments'
 
 export const classesRouter = Router()
@@ -134,6 +135,37 @@ classesRouter.delete('/:id', requirePermission('class.softDelete'), async (req, 
 
   const cls = await classService.archiveClass(id, user.uid, user.role)
   return res.json(cls)
+})
+
+// GET /classes/my-timetable/today
+// [PRODUCTION FIX 2026-07-28] Teacher dashboard's "Today's Timetable" was a
+// permanent PlaceholderWidget ("wired in R17" — never happened). Only a
+// per-class timetable route existed (GET /:id/timetable); nothing let a
+// teacher see their own schedule across every class they teach today.
+// Self-scoped by teacherUid — no special permission needed beyond being a
+// signed-in staff member. Weekends resolve to no slots (Weekday enum only
+// has Monday–Friday) rather than an error.
+classesRouter.get('/my-timetable/today', verifyAuth, async (req, res) => {
+  const ISO_TO_WEEKDAY: Record<number, string> = {
+    1: 'MONDAY', 2: 'TUESDAY', 3: 'WEDNESDAY', 4: 'THURSDAY', 5: 'FRIDAY',
+  }
+  const today = ISO_TO_WEEKDAY[new Date().getDay()]
+  if (!today) return res.json([]) // Saturday/Sunday
+
+  const academicYear = await settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
+  const term = await settingsService.get(SETTING_KEYS.CURRENT_TERM)
+
+  const slots = await prisma.timetableSlot.findMany({
+    where: {
+      teacherUid: req.user!.uid,
+      day: today as never,
+      academicYear,
+      term: Number(term),
+    },
+    include: { class: { select: { name: true } } },
+    orderBy: { periodStart: 'asc' },
+  })
+  res.json(slots)
 })
 
 // GET /classes/:id/timetable

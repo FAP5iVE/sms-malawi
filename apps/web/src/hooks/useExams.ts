@@ -139,6 +139,20 @@ export function useBulkCreateManebRecords(academicYear: string) {
   })
 }
 
+// [PRODUCTION FIX 2026-07-28] POST /exams/maneb (individual) already
+// existed and worked — only the bulk hook existed on the frontend, so the
+// only entry path anyone actually had was bulk import, even for a single
+// candidate.
+export function useCreateManebRecord(academicYear: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: CreateManebRecordInput) =>
+      apiFetch<ApiManebRecord>('/exams/maneb', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.exams.manebRecords({ academicYear }) }),
+    onError:   (err) => console.error('Failed to create MANEB record', err),
+  })
+}
+
 export interface ReportCardGenerationResult {
   studentId:      string
   registrationNo: string

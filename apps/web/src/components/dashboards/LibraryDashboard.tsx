@@ -37,11 +37,10 @@ import {
 } from 'lucide-react'
 import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
-import { PlaceholderWidget } from '@/components/shared/PlaceholderWidget'
 import { ChartCard } from '@/components/shared/ChartCard'
 import { Chart } from '@/components/shared/chart'
 import type { ChartDataPoint } from '@/components/shared/chart'
-import { useLibraryStats } from '@/hooks/useLibrary'
+import { useLibraryStats, useOverdueByClass } from '@/hooks/useLibrary'
 import { useLibraryBorrowingTrend } from '@/hooks/useAnalytics'
 import type { QuickAction } from '@/components/shared/QuickActions'
 
@@ -82,6 +81,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 export function LibraryDashboard() {
   const { data: stats, isLoading } = useLibraryStats()
   const { data: borrowTrend = [], isLoading: trendLoading } = useLibraryBorrowingTrend(12)
+  const { data: overdueByClass = [], isLoading: overdueLoading } = useOverdueByClass()
 
   const borrowData: ChartDataPoint[] = borrowTrend.map((p) => ({
     x: p.label,
@@ -99,6 +99,7 @@ export function LibraryDashboard() {
           trendLabel="in catalog"
           iconColor="bg-brand-navy/8"
           iconText="text-brand-navy"
+          href="/library"
         />
         <StatCard
           label="Currently Borrowed"
@@ -108,6 +109,7 @@ export function LibraryDashboard() {
           trendLabel="checked out"
           iconColor="bg-brand-teal/10"
           iconText="text-brand-teal"
+          href="/library?tab=borrowings"
         />
         <StatCard
           label="Overdue Books"
@@ -117,6 +119,7 @@ export function LibraryDashboard() {
           trendLabel="past due"
           iconColor="bg-brand-coral/10"
           iconText="text-brand-coral"
+          href="/library?tab=borrowings"
         />
         <StatCard
           label="Pending Fines"
@@ -126,6 +129,7 @@ export function LibraryDashboard() {
           trendLabel="unpaid"
           iconColor="bg-brand-amber/10"
           iconText="text-brand-amber"
+          href="/library?tab=reports"
         />
       </StatCardGrid>
       <QuickActions actions={QUICK_ACTIONS} />
@@ -145,11 +149,32 @@ export function LibraryDashboard() {
             ariaLabel="Weekly book-borrowing activity over the last 12 weeks"
           />
         </ChartCard>
-        <PlaceholderWidget
-          title="Overdue Students"
-          sub="List by class"
-          h="h-32 md:h-40"
-        />
+        {/* [PRODUCTION FIX 2026-07-29] Was a permanent PlaceholderWidget
+            stub, deferred during the librarian console build and never
+            actually closed out. Real data via getOverdueByClass(). */}
+        <div className="bg-surface border border-base rounded-xl p-4 h-32 md:h-40 flex flex-col">
+          <p className="font-heading font-semibold text-sm text-brand-navy mb-2">Overdue Students</p>
+          {overdueLoading ? (
+            <div className="space-y-1.5 flex-1">
+              {[1, 2].map((i) => <div key={i} className="h-6 rounded-lg bg-page animate-pulse" />)}
+            </div>
+          ) : overdueByClass.length === 0 ? (
+            <p className="text-sm text-muted flex-1 flex items-center justify-center text-center">
+              No overdue books right now.
+            </p>
+          ) : (
+            <div className="space-y-2 overflow-y-auto flex-1">
+              {overdueByClass.map((c) => (
+                <div key={c.className}>
+                  <p className="text-xs font-heading font-semibold text-muted uppercase">{c.className} · {c.students.length}</p>
+                  {c.students.slice(0, 3).map((s, i) => (
+                    <p key={i} className="text-xs text-body truncate">{s.studentName} — {s.bookTitle}</p>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

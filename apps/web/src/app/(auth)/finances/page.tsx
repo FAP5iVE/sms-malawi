@@ -20,6 +20,7 @@ import { InvoicesTab }           from '@/components/finances/InvoicesTab'
 import { ExpensesTab }           from '@/components/finances/ExpensesTab'
 import { PayrollTab }            from '@/components/finances/PayrollTab'
 import { BudgetTab }             from '@/components/finances/BudgetTab'
+import { FeeStructureTab }       from '@/components/finances/FeeStructureTab'
 import { useFinanceSummary }     from '@/hooks/useFinances'
 import { ScholarshipTab }        from '@/components/finances/ScholarshipTab'
 import { ReportsExportPanel }    from '@/components/finances/ReportsExportPanel'
@@ -36,6 +37,7 @@ type Tab =
   | 'expenses'
   | 'payroll'
   | 'budget'
+  | 'feeStructure'
   | 'scholarships'
   | 'fines'
   | 'reports'
@@ -47,11 +49,31 @@ export default function FinancesPage() {
   return (
     <RoleGuard allowed={['admin', 'high_rank', 'finance', 'student', 'hr']}>
       {/* useSearchParams() requires a Suspense boundary or `next build` fails —
-          same convention as (public)/login/page.tsx and (auth)/exams/page.tsx. */}
-      <Suspense fallback={null}>
+          same convention as (public)/login/page.tsx and (auth)/exams/page.tsx.
+          [PRODUCTION FIX 2026-07-28] fallback was `null` — a literal blank
+          screen with no loading indicator and no error during any
+          suspension, matching the reported "blank, no error" symptom
+          exactly. useSearchParams() inside Suspense is a known Next.js App
+          Router trip-hazard for intermittent re-suspension on client-side
+          navigation; a real skeleton doesn't fix the underlying navigation
+          quirk by itself, but it turns "looks completely broken" into
+          "visibly loading," and gives a diagnosable state if it recurs. */}
+      <Suspense fallback={<FinancesLoadingSkeleton />}>
         <FinancesContent />
       </Suspense>
     </RoleGuard>
+  )
+}
+
+function FinancesLoadingSkeleton() {
+  return (
+    <div className="space-y-5" role="status" aria-label="Loading finances">
+      <div className="h-8 w-40 rounded-lg bg-surface animate-pulse" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => <div key={i} className="h-20 rounded-xl bg-surface animate-pulse" />)}
+      </div>
+      <div className="h-64 rounded-xl bg-surface animate-pulse" />
+    </div>
   )
 }
 
@@ -84,6 +106,7 @@ function FinancesContent() {
     { id: 'expenses'     as Tab, label: 'Expenses',                          show: isFinance                     },
     { id: 'payroll'      as Tab, label: 'Payroll',                           show: isFinance || isHRPayrollViewer },
     { id: 'budget'       as Tab, label: 'Budget',                            show: !isStudent && !isHRPayrollViewer },
+    { id: 'feeStructure' as Tab, label: 'Fee Structure',                     show: isFinance                     },
     { id: 'scholarships' as Tab, label: 'Scholarships',                      show: isFinance                     },
     { id: 'fines'        as Tab, label: 'Library Fines',                     show: isFinance                     },
     // [PRODUCTION FIX 2026-07-27] Forecast and Ledger were fully-built,
@@ -115,6 +138,26 @@ function FinancesContent() {
   const initialTab: Tab = tabParam && TABS.some((tab) => tab.id === tabParam) ? (tabParam as Tab) : fallbackTab
 
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)
+
+  // [PRODUCTION FIX 2026-07-28, revised] useState(initialTab) only
+  // captures its value on first mount — deep-linking to a different tab
+  // (e.g. clicking a quick action for /finances?tab=budget while already
+  // on /finances?tab=invoices) never updated activeTab, since the
+  // component doesn't remount for a client-side navigation that only
+  // changes the query string.
+  // First attempt used useEffect + setState, which react-hooks/
+  // set-state-in-effect correctly flags — that causes an extra, avoidable
+  // cascading render. This is React's own recommended pattern instead:
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-state-based-on-a-prop-change
+  // — adjust state directly during render (guarded so it only runs when
+  // tabParam has actually changed since the last render), not in an effect.
+  const [prevTabParam, setPrevTabParam] = useState(tabParam)
+  if (tabParam !== prevTabParam) {
+    setPrevTabParam(tabParam)
+    if (tabParam && TABS.some((t) => t.id === tabParam)) {
+      setActiveTab(tabParam as Tab)
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -175,6 +218,7 @@ function FinancesContent() {
       {activeTab === 'expenses'     && <ExpensesTab      academicYear={YEAR} term={TERM} />}
       {activeTab === 'payroll'      && <PayrollTab />}
       {activeTab === 'budget'       && <BudgetTab        academicYear={YEAR} />}
+      {activeTab === 'feeStructure' && <FeeStructureTab  academicYear={YEAR} />}
       {activeTab === 'scholarships' && <ScholarshipTab   academicYear={YEAR} />}
       {activeTab === 'fines'        && <LibraryFinesTab />}
       {activeTab === 'forecast'     && <ForecastPanel />}

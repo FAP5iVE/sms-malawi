@@ -272,14 +272,46 @@ const FINANCE_KEYS = [
 settingsRouter
   .route('/finance')
   .get(requireRole(['admin', 'finance']), async (req, res) => {
-    return res.json(await readSettings(FINANCE_KEYS))
+    const [scalars, payeBrackets, pensionPercent, loanInterestRate] = await Promise.all([
+      readSettings(FINANCE_KEYS),
+      settingsService.get(SETTING_KEYS.FINANCE_PAYE_BRACKETS),
+      settingsService.get(SETTING_KEYS.FINANCE_PENSION_PERCENT),
+      // [PRODUCTION FIX 2026-07-28] PAYE brackets and pension percent were
+      // real settings, correctly READ by payrollService.ts, but never
+      // exposed through this route at all — confirmed FINANCE_KEYS never
+      // included either key. Loan interest rate is a genuinely new
+      // setting (nothing like it existed anywhere before). All three go
+      // through the typed settingsService (not the generic string-only
+      // readSettings/writeSettings helpers) since payeBrackets is a real
+      // JSON array, matching the pattern already used for /settings/school.
+      settingsService.get(SETTING_KEYS.STAFF_LOAN_INTEREST_RATE),
+    ])
+    return res.json({ ...scalars, payeBrackets, pensionPercent, loanInterestRate })
   })
   .patch(requireRole(['admin', 'finance']), async (req, res) => {
+    const body = req.body as Record<string, unknown>
     const allowed = Object.fromEntries(
-      Object.entries(req.body as Record<string, string>)
+      Object.entries(body as Record<string, string>)
         .filter(([k]) => FINANCE_KEYS.includes(k)),
     )
-    await writeSettings(allowed, req.user!.uid)
+    if (Object.keys(allowed).length > 0) {
+      await writeSettings(allowed, req.user!.uid)
+    }
+    try {
+      if (body.payeBrackets !== undefined) {
+        await settingsService.set(SETTING_KEYS.FINANCE_PAYE_BRACKETS, body.payeBrackets as never, req.user!.uid)
+      }
+      if (body.pensionPercent !== undefined) {
+        await settingsService.set(SETTING_KEYS.FINANCE_PENSION_PERCENT, Number(body.pensionPercent) as never, req.user!.uid)
+      }
+      if (body.loanInterestRate !== undefined) {
+        await settingsService.set(SETTING_KEYS.STAFF_LOAN_INTEREST_RATE, Number(body.loanInterestRate) as never, req.user!.uid)
+      }
+    } catch (err) {
+      const status = (err as { status?: number })?.status ?? 400
+      const message = err instanceof Error ? err.message : 'Invalid finance settings data.'
+      return res.status(status).json({ error: message })
+    }
     return res.json({ ok: true })
   })
 

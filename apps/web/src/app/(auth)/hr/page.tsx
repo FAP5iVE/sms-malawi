@@ -64,6 +64,7 @@ import { usePermissions }   from '@/hooks/usePermissions'
 import {
   useStaffDirectory,
   useLeaveRequests,
+  useApplyForLeave,
   useContractAlerts,
   useReviewLeave,
   useRequestLoan,
@@ -124,7 +125,7 @@ export default function HRPage() {
     >
       {/* useSearchParams() requires a Suspense boundary or `next build` fails —
           same convention as (public)/login/page.tsx and (auth)/exams/page.tsx. */}
-      <Suspense fallback={null}>
+      <Suspense fallback={<div className="p-6 space-y-3"><div className="h-8 w-40 rounded-lg bg-surface animate-pulse" /><div className="h-48 rounded-xl bg-surface animate-pulse" /></div>}>
         <HRContent />
       </Suspense>
     </RoleGuard>
@@ -132,7 +133,7 @@ export default function HRPage() {
 }
 
 function HRContent() {
-  const { role }  = useAuthStore()
+  const { role, user }  = useAuthStore()
   const { can }   = usePermissions()
 
   // R19 — the active tab is derived from ?tab= during render via Next's
@@ -179,6 +180,28 @@ function HRContent() {
   const [leaveStatusFilter, setLeaveStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | ''>('PENDING')
   const { data: leaveRequests = [] }                           = useLeaveRequests({ status: leaveStatusFilter || undefined })
   const { data: pendingLeaveForBadge = [] }                    = useLeaveRequests({ status: 'PENDING' })
+  // [PRODUCTION FIX 2026-07-28] Self-service leave request — mirrors the
+  // loans tab's existing my-loans / apply-for-loan pattern exactly.
+  const { data: myLeaveRequests = [] } = useLeaveRequests({ staffId: user?.uid })
+  const applyForLeave = useApplyForLeave()
+  const [showLeaveForm, setShowLeaveForm] = useState(false)
+  const [leaveType, setLeaveType]         = useState('ANNUAL')
+  const [leaveStartDate, setLeaveStartDate] = useState('')
+  const [leaveEndDate, setLeaveEndDate]     = useState('')
+  const [leaveReason, setLeaveReason]       = useState('')
+
+  function submitLeaveRequest() {
+    if (!leaveStartDate || !leaveEndDate || leaveReason.trim().length < 10) return
+    applyForLeave.mutate(
+      { leaveType, startDate: leaveStartDate, endDate: leaveEndDate, reason: leaveReason.trim() },
+      {
+        onSuccess: () => {
+          setShowLeaveForm(false)
+          setLeaveStartDate(''); setLeaveEndDate(''); setLeaveReason('')
+        },
+      },
+    )
+  }
   const [alertDays, setAlertDays]                              = useState(60)
   const { data: contracts = [] }                               = useContractAlerts(alertDays)
   const reviewLeave = useReviewLeave()
@@ -215,7 +238,12 @@ function HRContent() {
     { id: 'loans'     as Tab, label: 'Loans',           icon: CreditCard                              },
     { id: 'mypay'     as Tab, label: 'My Pay',          icon: Wallet                                  },
     { id: 'alerts'    as Tab, label: 'Contract Alerts', icon: AlertTriangle, badge: expiringContracts },
-  ].filter((t) => t.id === 'loans' || t.id === 'mypay' || isHR)
+  // [PRODUCTION FIX 2026-07-28] leave was HR-only, meaning no staff member
+  // could even see the tab to submit a leave request — useApplyForLeave()
+  // existed and worked, it just had zero UI consumers. Now visible to
+  // everyone, same pattern as loans/mypay: self-service apply for anyone,
+  // full manage/approve view for HR only (gated inside LeaveTab itself).
+  ].filter((t) => t.id === 'loans' || t.id === 'mypay' || t.id === 'leave' || isHR)
 
   return (
     <div className="space-y-5">
@@ -326,7 +354,95 @@ function HRContent() {
       )}
 
       {/* ── Leave requests tab ─────────────────────────────────────────────── */}
-      {tab === 'leave' && isHR && (
+      {tab === 'leave' && (
+        <div className="space-y-6">
+          {/* Self-service — visible to everyone, mirrors the Loans tab's
+              apply-for-loan pattern. */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-heading font-semibold text-body">My Leave</h2>
+              <button
+                type="button"
+                onClick={() => setShowLeaveForm((v) => !v)}
+                className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+              >
+                {showLeaveForm ? 'Cancel' : 'Request Leave'}
+              </button>
+            </div>
+
+            {showLeaveForm && (
+              <div className="border border-base rounded-xl p-4 mb-4 space-y-3 bg-surface">
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div>
+                    <label htmlFor="leave-type" className="text-xs text-muted mb-1 block">Leave type</label>
+                    <select
+                      id="leave-type"
+                      value={leaveType}
+                      onChange={(e) => setLeaveType(e.target.value)}
+                      className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+                    >
+                      {['ANNUAL', 'SICK', 'MATERNITY', 'PATERNITY', 'STUDY', 'UNPAID', 'EMERGENCY'].map((t) => (
+                        <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="leave-start" className="text-xs text-muted mb-1 block">Start date</label>
+                    <input id="leave-start" type="date" value={leaveStartDate} onChange={(e) => setLeaveStartDate(e.target.value)}
+                      className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+                  </div>
+                  <div>
+                    <label htmlFor="leave-end" className="text-xs text-muted mb-1 block">End date</label>
+                    <input id="leave-end" type="date" value={leaveEndDate} onChange={(e) => setLeaveEndDate(e.target.value)} min={leaveStartDate || undefined}
+                      className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="leave-reason" className="text-xs text-muted mb-1 block">Reason (at least 10 characters)</label>
+                  <textarea id="leave-reason" rows={2} value={leaveReason} onChange={(e) => setLeaveReason(e.target.value)}
+                    className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page" />
+                </div>
+                <button
+                  type="button"
+                  onClick={submitLeaveRequest}
+                  disabled={applyForLeave.isPending}
+                  className="bg-brand-navy text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
+                >
+                  {applyForLeave.isPending ? 'Submitting…' : 'Submit Request'}
+                </button>
+                {applyForLeave.isError && (
+                  <p className="text-sm text-brand-coral">
+                    {applyForLeave.error instanceof Error ? applyForLeave.error.message : 'Failed to submit leave request.'}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {(myLeaveRequests as ApiLeaveRequest[]).length === 0 ? (
+              <p className="text-sm text-muted">You haven&apos;t requested any leave yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {(myLeaveRequests as ApiLeaveRequest[]).map((req) => (
+                  <div key={req.id} className="flex items-center justify-between border border-base rounded-lg px-4 py-2.5 bg-surface">
+                    <div>
+                      <p className="text-sm font-medium text-body">{req.leaveType} · {req.days} day(s)</p>
+                      <p className="text-xs text-muted">{new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()}</p>
+                    </div>
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                      req.status === 'APPROVED' ? 'bg-green-50 text-green-700 border-green-200'
+                        : req.status === 'REJECTED' ? 'bg-brand-coral/10 text-brand-coral border-brand-coral/20'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      {req.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Manage — HR only, unchanged from before */}
+          {isHR && (
         <div className="space-y-3">
           <div className="flex items-center justify-end">
             <select
@@ -413,6 +529,8 @@ function HRContent() {
                 <LeaveConflictWarning result={conflictPanel.result} />
               </div>
             </div>
+          )}
+        </div>
           )}
         </div>
       )}

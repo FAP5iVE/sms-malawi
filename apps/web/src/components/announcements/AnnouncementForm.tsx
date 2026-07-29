@@ -75,6 +75,19 @@ export function AnnouncementForm({ onClose }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    // [PRODUCTION FIX 2026-07-28] createdByUid: user?.uid silently became
+    // `undefined` if the auth store hadn't finished hydrating `user` yet
+    // (role can populate slightly ahead of user in some timing cases) —
+    // and Firestore's addDoc() throws on ANY field whose value is
+    // `undefined`. Combined with the bare `catch {}` below (which discarded
+    // the real error entirely), this produced exactly the reported symptom:
+    // a generic failure with no way to tell what actually went wrong.
+    // Guarding here turns that into a clear, specific message instead of a
+    // Firestore SDK exception.
+    if (!user?.uid) {
+      setError('You must be signed in to post an announcement. Please refresh and try again.')
+      return
+    }
     const parsed = AnnouncementSchema.safeParse({ title, body, targetAll, targetRoles, status, publicWebsite })
     if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Validation error')
     setLoading(true)
@@ -96,12 +109,17 @@ export function AnnouncementForm({ onClose }: Props) {
       await addDoc(collection(db!, COLLECTIONS.ANNOUNCEMENTS), {
         ...parsed.data,
         imageKey: imageKey ?? null,
-        createdByUid: user?.uid,
+        createdByUid: user.uid,
         createdAt: serverTimestamp(),
       })
       onClose()
-    } catch {
-      setError('Failed to post announcement. Please try again.')
+    } catch (err) {
+      // Was a bare `catch {}` that discarded the real error completely —
+      // logged now so it's visible in devtools, and the message itself is
+      // shown when it's an Error (rather than always the same generic
+      // string regardless of cause).
+      console.error('Failed to post announcement:', err)
+      setError(err instanceof Error ? err.message : 'Failed to post announcement. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -109,8 +127,14 @@ export function AnnouncementForm({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-surface rounded-2xl w-full max-w-lg shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-base">
+      {/* [PRODUCTION FIX 2026-07-28] Had no height cap and no scroll — once
+          the image preview pushed content taller than the viewport, the
+          submit button (and even the close button, since both live inside
+          this same unconstrained container) went off-screen with no way to
+          reach them. Capped height + scrollable body; header is sticky so
+          the close button stays reachable no matter how far you've scrolled. */}
+      <div className="bg-surface rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy">New Announcement</h2>
           <button
             onClick={onClose}

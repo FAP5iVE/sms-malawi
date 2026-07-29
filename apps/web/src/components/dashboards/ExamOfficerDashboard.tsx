@@ -37,9 +37,9 @@ import {
   Settings,
   BarChart3,
 } from 'lucide-react'
+import Link from 'next/link'
 import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
-import { PlaceholderWidget } from '@/components/shared/PlaceholderWidget'
 import { useExams } from '@/hooks/useExams'
 import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
 import {
@@ -115,6 +115,7 @@ export function ExamOfficerDashboard() {
           trendLabel="scheduled"
           iconColor="bg-brand-teal/10"
           iconText="text-brand-teal"
+          href="/exams?tab=exams"
         />
         <StatCard
           label="Marks Pending Entry"
@@ -124,6 +125,7 @@ export function ExamOfficerDashboard() {
           trendLabel="to enter"
           iconColor="bg-brand-amber/10"
           iconText="text-brand-amber"
+          href="/exams?tab=exams"
         />
         <StatCard
           label="Results to Release"
@@ -133,6 +135,7 @@ export function ExamOfficerDashboard() {
           trendLabel="approved, awaiting"
           iconColor="bg-blue-50"
           iconText="text-blue-600"
+          href="/exams?tab=release"
         />
         <StatCard
           label="Results Released"
@@ -142,20 +145,69 @@ export function ExamOfficerDashboard() {
           trendLabel={term ? `Term ${term}` : 'this term'}
           iconColor="bg-emerald-50"
           iconText="text-emerald-600"
+          href="/exams?tab=release"
         />
       </StatCardGrid>
       <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-4">
-        <PlaceholderWidget
-          title="Exam Schedule This Week"
-          sub="Timetable view — wired in R17"
-          h="h-40 md:h-56"
-        />
-        <PlaceholderWidget
-          title="Results Release Queue"
-          sub="Pending authorization — wired in R17"
-          h="h-40 md:h-56"
-        />
+        {/* [PRODUCTION FIX 2026-07-28] Was a permanent PlaceholderWidget
+            skeleton ("wired in R17" — never happened). exams is already
+            fetched on this dashboard for the stat cards above; both lists
+            below just reuse the same examFilters predicates instead of
+            fetching anything new. */}
+        <div className="bg-surface border border-base rounded-xl p-5">
+          <h3 className="font-heading font-semibold text-body mb-1">Exam Schedule This Week</h3>
+          <p className="text-xs text-muted mb-4">Exams scheduled in the next 7 days</p>
+          {isLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => <div key={i} className="h-10 rounded-lg bg-page animate-pulse" />)}
+            </div>
+          ) : examsInNextSevenDays(exams).length === 0 ? (
+            <p className="text-sm text-muted py-6 text-center">No exams scheduled this week.</p>
+          ) : (
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {examsInNextSevenDays(exams).map((ex) => (
+                <Link
+                  key={ex.id}
+                  href="/exams?tab=exams"
+                  className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-page transition-colors"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-body">{ex.subject} — {ex.className ?? ex.classId}</p>
+                    <p className="text-xs text-muted">{new Date(ex.date).toLocaleDateString('en-MW', { weekday: 'short', day: 'numeric', month: 'short' })} · {ex.timeStart}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-surface border border-base rounded-xl p-5">
+          <h3 className="font-heading font-semibold text-body mb-1">Results Release Queue</h3>
+          <p className="text-xs text-muted mb-4">Approved results awaiting release</p>
+          {isLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => <div key={i} className="h-10 rounded-lg bg-page animate-pulse" />)}
+            </div>
+          ) : examsAwaitingRelease(exams).length === 0 ? (
+            <p className="text-sm text-muted py-6 text-center">Nothing waiting on release.</p>
+          ) : (
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {examsAwaitingRelease(exams).map((ex) => (
+                <Link
+                  key={ex.id}
+                  href="/exams?tab=release"
+                  className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-page transition-colors"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-body">{ex.subject} — {ex.className ?? ex.classId}</p>
+                    <p className="text-xs text-muted">{ex.title}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

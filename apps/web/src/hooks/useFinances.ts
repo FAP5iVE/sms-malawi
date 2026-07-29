@@ -12,7 +12,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ApiFinanceSummary, ApiInvoice, ApiExpense, ApiScholarship, ApiDebtsSummary } from '@shared/types/api'
-import type { RecordPaymentInput, CreateExpenseInput } from '@shared/schemas/finance'
+import type { RecordPaymentInput, CreateExpenseInput, CreateBudgetInput, CreateFeeStructureInput } from '@shared/schemas/finance'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 
 export function useFinanceSummary(academicYear: string, term: number) {
@@ -191,6 +191,45 @@ export function useBudgetVsActual(academicYear: string) {
         spent: number
         remaining: number
       }>>(`/finances/budget?academicYear=${academicYear}`),
+  })
+}
+
+/** POST /finances/budget — the service function already existed and
+ *  worked (budgetService.createBudget); there was no route calling it and
+ *  no hook, so the Budget tab had no way to create a budget at all. */
+export function useCreateBudget() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: CreateBudgetInput) =>
+      apiFetch('/finances/budget', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
+  })
+}
+
+/** GET /finances/fee-structures — [PRODUCTION FIX 2026-07-28] Both routes
+ *  already existed and worked; there was no frontend hook or UI consuming
+ *  either at all — confirmed zero callers anywhere. */
+export interface ApiFeeStructure {
+  id: string
+  name: string
+  amount: number
+  classId: string | null
+  academicYear: string
+  term: number | null
+  isActive: boolean
+}
+export function useFeeStructures(academicYear: string) {
+  return useQuery({
+    queryKey: ['finances', 'fee-structures', academicYear] as const,
+    queryFn: () => apiFetch<ApiFeeStructure[]>(`/finances/fee-structures?academicYear=${academicYear}`),
+  })
+}
+export function useCreateFeeStructure() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: CreateFeeStructureInput) =>
+      apiFetch('/finances/fee-structures', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['finances', 'fee-structures'] }),
   })
 }
 

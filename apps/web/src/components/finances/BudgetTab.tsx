@@ -1,14 +1,55 @@
 'use client'
 
-import { useBudgetVsActual } from '@/hooks/useFinances'
+import { useState } from 'react'
+import { useBudgetVsActual, useCreateBudget } from '@/hooks/useFinances'
+import { useDepartmentTitles } from '@/hooks/useSettings'
 import { formatMWK } from '@shared/constants/malawi'
+import { Plus, Loader2 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 // ApexCharts must be dynamically imported — it's not SSR-compatible
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
 
+const EXPENSE_CATEGORIES = ['SALARIES', 'UTILITIES', 'MAINTENANCE', 'PROCUREMENT', 'LIBRARY', 'TRANSPORT', 'MISCELLANEOUS']
+
 export function BudgetTab({ academicYear }: { academicYear: string }) {
   const { data: budget = [], isLoading } = useBudgetVsActual(academicYear)
+  const createBudget = useCreateBudget()
+  // [PRODUCTION FIX 2026-07-28] Budget.department was free-text with no
+  // create UI at all (confirmed: CreateBudgetSchema/createBudget had zero
+  // callers). Now that a create form exists, department is a real select
+  // sourced from the same admin-editable taxonomy HR staff creation uses
+  // (useDepartmentTitles) — not another free-text field that could drift
+  // from what departments actually exist.
+  const { data: departmentTitles = {} } = useDepartmentTitles()
+  const departments = Object.keys(departmentTitles).sort()
+
+  const [showForm, setShowForm] = useState(false)
+  const [term, setTerm] = useState('')
+  const [department, setDepartment] = useState('')
+  const [category, setCategory] = useState('')
+  const [allocatedAmount, setAllocatedAmount] = useState('')
+  const [description, setDescription] = useState('')
+
+  function submitBudget() {
+    if (!department || !category || !allocatedAmount || Number(allocatedAmount) <= 0) return
+    createBudget.mutate(
+      {
+        academicYear,
+        term: term ? Number(term) : undefined,
+        department,
+        category: category as never,
+        allocated: Number(allocatedAmount),
+        description: description.trim() || undefined,
+      },
+      {
+        onSuccess: () => {
+          setShowForm(false)
+          setTerm(''); setDepartment(''); setCategory(''); setAllocatedAmount(''); setDescription('')
+        },
+      },
+    )
+  }
 
   const categories = budget.map((b) => b.category)
   const allocated = budget.map((b) => b.allocated)
@@ -37,6 +78,102 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
 
   return (
     <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h2 className="font-heading font-semibold text-body">Budget vs Actual — {academicYear}</h2>
+        <button
+          type="button"
+          onClick={() => setShowForm((v) => !v)}
+          className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+        >
+          <Plus className="w-4 h-4" /> {showForm ? 'Cancel' : 'Create Budget'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="budget-department" className="text-xs text-muted mb-1 block">Department</label>
+              <select
+                id="budget-department"
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+              >
+                <option value="" disabled>Select department…</option>
+                {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+              {departments.length === 0 && (
+                <p className="text-xs text-muted mt-1">
+                  No departments defined yet — set them up under Settings → Departments &amp; Titles.
+                </p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="budget-category" className="text-xs text-muted mb-1 block">Expense category</label>
+              <select
+                id="budget-category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+              >
+                <option value="" disabled>Select category…</option>
+                {EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c.charAt(0) + c.slice(1).toLowerCase()}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="budget-allocated" className="text-xs text-muted mb-1 block">Allocated amount (MWK)</label>
+              <input
+                id="budget-allocated"
+                type="number"
+                min="1"
+                value={allocatedAmount}
+                onChange={(e) => setAllocatedAmount(e.target.value)}
+                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+              />
+            </div>
+            <div>
+              <label htmlFor="budget-term" className="text-xs text-muted mb-1 block">Term <span className="text-muted/70">(optional — leave blank for the full year)</span></label>
+              <select
+                id="budget-term"
+                value={term}
+                onChange={(e) => setTerm(e.target.value)}
+                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+              >
+                <option value="">Full year</option>
+                <option value="1">Term 1</option>
+                <option value="2">Term 2</option>
+                <option value="3">Term 3</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="budget-description" className="text-xs text-muted mb-1 block">Description <span className="text-muted/70">(optional)</span></label>
+            <textarea
+              id="budget-description"
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={submitBudget}
+            disabled={createBudget.isPending || !department || !category || !allocatedAmount}
+            className="inline-flex items-center gap-2 bg-brand-navy text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
+          >
+            {createBudget.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {createBudget.isPending ? 'Creating…' : 'Save Budget'}
+          </button>
+          {createBudget.isError && (
+            <p className="text-sm text-brand-coral">
+              {createBudget.error instanceof Error ? createBudget.error.message : 'Failed to create budget.'}
+            </p>
+          )}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="skeleton h-64 rounded-xl" />
       ) : budget.length === 0 ? (

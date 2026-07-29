@@ -78,6 +78,7 @@ import {
   CreateScholarshipSchema,
   CreateInstallmentPlanSchema,
   CreateLibraryFineSchema,
+  CreateBudgetSchema,
 } from '@shared/schemas/finance'
 import { Prisma, InvoiceStatus, FineStatus } from '@prisma/client'
 import * as feeService from '@/server/services/feeService'
@@ -497,6 +498,19 @@ financesRouter.get('/budget', verifyAuth, requireRole([...FINANCE_ROLES, 'high_r
   res.json(data)
 })
 
+// [PRODUCTION FIX 2026-07-28] budgetService.createBudget() already existed
+// and worked — there was simply no route calling it, so the Budget tab had
+// no way to create a budget at all (confirmed: CreateBudgetSchema and the
+// service function had zero callers anywhere).
+financesRouter.post('/budget', verifyAuth, requireRole([...FINANCE_ROLES]), async (req, res) => {
+  const parsed = CreateBudgetSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Invalid budget data.' })
+  }
+  const budget = await budgetService.createBudget(parsed.data, req.user!.uid)
+  res.status(201).json(budget)
+})
+
 // ── ACCOUNTING LEDGER
 // [R9] NEW — AccountingLedgerTab.tsx (Phase D6, confirmed already
 // correctly built) has always called these three paths, and
@@ -795,5 +809,71 @@ financesRouter.post(
     }
     const downloadUrl = await generateFinancialReport(type as ReportType, academicYear, Number(term))
     res.json({ downloadUrl })
+  }
+)
+
+// ── REPORTS — IN-SYSTEM VIEW
+// [PRODUCTION FIX 2026-07-28] ReportsExportPanel.tsx only ever offered
+// .xlsx export — no way to actually look at the data without downloading
+// and opening a spreadsheet. Mirrors the exact same Prisma queries
+// reportExportService.ts's four build*Sheet() functions already use, just
+// returning JSON instead of writing into a workbook — same source of
+// truth, two presentations.
+financesRouter.get(
+  '/reports/data',
+  verifyAuth,
+  requireRole(['admin', 'finance', 'high_rank']),
+  async (req, res) => {
+    const { type, academicYear = '2025/2026', term = '1' } = req.query as {
+      type: string
+      academicYear: string
+      term: string
+    }
+    if (!VALID_REPORT_TYPES.includes(type as ReportType)) {
+      return res.status(400).json({ error: `type must be one of: ${VALID_REPORT_TYPES.join(', ')}` })
+    }
+    const yearNum = Number(term)
+
+    if (type === 'fee_collection') {
+      const invoices = await prisma.invoice.findMany({
+        where: { academicYear, term: yearNum },
+        orderBy: { status: 'asc' },
+      })
+      return res.json(invoices.map((inv) => ({
+        studentId: inv.studentId, academicYear: inv.academicYear, term: inv.term,
+        total: Number(inv.totalAmount), paid: Number(inv.paidAmount), balance: Number(inv.balance),
+        status: inv.status, dueDate: inv.dueDate,
+      })))
+    }
+    if (type === 'outstanding_balances') {
+      const overdue = await prisma.invoice.findMany({
+        where: { academicYear, term: yearNum, status: { in: ['UNPAID', 'PARTIAL', 'OVERDUE'] } },
+        orderBy: { balance: 'desc' },
+      })
+      return res.json(overdue.map((inv) => ({
+        studentId: inv.studentId, term: inv.term, balance: Number(inv.balance),
+        status: inv.status, dueDate: inv.dueDate,
+      })))
+    }
+    if (type === 'expense_breakdown') {
+      const expenses = await prisma.expense.findMany({
+        where: { academicYear, term: yearNum },
+        orderBy: [{ category: 'asc' }, { incurredAt: 'desc' }],
+      })
+      return res.json(expenses.map((e) => ({
+        category: e.category, description: e.description, amount: Number(e.amount),
+        date: e.incurredAt, status: e.status,
+      })))
+    }
+    // payroll_summary — uses calendar year, not academicYear/term
+    const runs = await prisma.payrollRun.findMany({
+      where: { year: Number(academicYear.slice(0, 4)) },
+      orderBy: { month: 'asc' },
+    })
+    return res.json(runs.map((r) => ({
+      month: new Date(r.year, r.month - 1).toLocaleString('en', { month: 'long' }),
+      totalGross: Number(r.totalGross), totalNet: Number(r.totalNet),
+      status: r.status, runDate: r.completedAt,
+    })))
   }
 )

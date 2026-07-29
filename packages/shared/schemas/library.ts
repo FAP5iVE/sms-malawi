@@ -26,6 +26,11 @@ export const CreateBookSchema = z.object({
   barcode:       z.string().optional(),
 })
 
+// [PRODUCTION FIX 2026-07-28] Catalog management had create + list, but no
+// way to edit or archive an existing book anywhere — neither a schema, a
+// service function, nor a route existed for it.
+export const UpdateBookSchema = CreateBookSchema.partial()
+
 export const IssueBorrowingSchema = z.object({
   bookId:       z.string().min(1),
   studentId:    z.string().min(1).optional(),
@@ -85,6 +90,7 @@ export const RejectFineWaiverSchema = z.object({
 })
 
 export type CreateBookInput             = z.infer<typeof CreateBookSchema>
+export type UpdateBookInput             = z.infer<typeof UpdateBookSchema>
 export type IssueBorrowingInput         = z.infer<typeof IssueBorrowingSchema>
 export type ReturnBorrowingInput        = z.infer<typeof ReturnBorrowingSchema>
 export type CreateDigitalResourceInput  = z.infer<typeof CreateDigitalResourceSchema>

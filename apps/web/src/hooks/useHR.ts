@@ -23,6 +23,7 @@ import type { CreateStaffInput, LeaveRequestInput, ReviewLeaveInput, LoanRequest
 import type { ApiStaffLoan, ApiLeaveRequest } from '@shared/types/api'
 import type { ConflictCheckResult } from '@/server/services/leaveConflictService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
+import { STALE } from '@/components/providers/QueryProvider'
 
 export function useStaffDirectory(filters: { department?: string; jobTitle?: string; status?: string; search?: string } = {}) {
   const params = new URLSearchParams()
@@ -55,6 +56,10 @@ export function useLeaveRequests(filters: { staffId?: string; status?: string } 
   return useQuery({
     queryKey: queryKeys.hr.leaveRequests(filters),
     queryFn: () => apiFetch(`/hr/leave/requests?${params}`),
+    // Same fix and same reasoning as useLoans() above — a submission in
+    // one session doesn't invalidate another already-open session's cache.
+    staleTime: STALE.REALTIME,
+    refetchInterval: STALE.REALTIME,
   })
 }
 
@@ -98,6 +103,15 @@ export function useLoans(status?: ApiStaffLoan['status']) {
   return useQuery({
     queryKey: queryKeys.hr.loans({ status }),
     queryFn: () => apiFetch<ApiStaffLoan[]>(`/hr/loans?${params}`),
+    // [PRODUCTION FIX 2026-07-28] A loan submitted by one user in their own
+    // session doesn't invalidate another (HR's) already-open session's
+    // cache — invalidateQueries only affects the submitter's own client.
+    // Traced creation, the staff relation, and invalidation and all were
+    // structurally correct; this closes the actual gap — HR's queue was
+    // relying entirely on a fresh page load/remount to ever refetch.
+    // Short staleTime + background polling keeps it current without one.
+    staleTime: STALE.REALTIME,
+    refetchInterval: STALE.REALTIME,
   })
 }
 

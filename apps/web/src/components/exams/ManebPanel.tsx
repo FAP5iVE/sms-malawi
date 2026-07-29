@@ -19,7 +19,7 @@
  */
 'use client'
 import { useState } from 'react'
-import { useManebRecords, useBulkCreateManebRecords } from '@/hooks/useExams'
+import { useManebRecords, useBulkCreateManebRecords, useCreateManebRecord } from '@/hooks/useExams'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useAuthStore } from '@/store/authStore'
 import { ExternalLink, GraduationCap, Plus, Trash2, Upload, Loader2 } from 'lucide-react'
@@ -51,6 +51,14 @@ export function ManebPanel({ academicYear }: Props) {
   const [showBulk, setShowBulk] = useState(false)
   const [rows, setRows] = useState<BulkRow[]>([emptyRow()])
   const [feedback, setFeedback] = useState<string | null>(null)
+  // [PRODUCTION FIX 2026-07-28] Individual entry — reuses the exact same
+  // BulkRow shape and grade-editing logic as bulk entry (one row instead
+  // of many), submitted through the real POST /exams/maneb route that
+  // already existed but had no frontend hook at all.
+  const [showIndividual, setShowIndividual] = useState(false)
+  const [individualRow, setIndividualRow] = useState<BulkRow>(emptyRow())
+  const [individualFeedback, setIndividualFeedback] = useState<string | null>(null)
+  const createRecord = useCreateManebRecord(academicYear)
 
   const { data: records = [], isLoading } = useManebRecords(academicYear)
   const bulkCreate = useBulkCreateManebRecords(academicYear)
@@ -137,12 +145,18 @@ export function ManebPanel({ academicYear }: Props) {
         </div>
         <div className="flex items-center gap-3">
           {canManage && (
+            <button onClick={() => setShowIndividual((v) => !v)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-navy text-brand-navy text-sm font-semibold hover:bg-brand-navy/5">
+              {showIndividual ? 'Close individual entry' : 'Individual entry'}
+            </button>
+          )}
+          {canManage && (
             <button onClick={() => setShowBulk((v) => !v)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-navy text-white text-sm font-semibold">
               <Upload className="w-4 h-4" /> {showBulk ? 'Close bulk entry' : 'Bulk entry'}
             </button>
           )}
-          <a href="https://maneb.mw" target="_blank" rel="noopener noreferrer"
+          <a href="https://www.maneb.edu.mw/" target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-sm text-brand-teal hover:underline">
             <ExternalLink className="w-3.5 h-3.5" /> MANEB Portal
           </a>
@@ -157,9 +171,80 @@ export function ManebPanel({ academicYear }: Props) {
             ? 'MSCE (Form 3 & 4): Grade 1 (80–100%) through Grade 9 (0–24%). Pass = Grade 1–6 (35%+).'
             : 'JCE (Form 1 & 2): Grade A (80–100%) through Grade F (0–34%). Pass = A–E (35%+).'}
           {' '}Verify at{' '}
-          <a href="https://maneb.mw" target="_blank" rel="noopener noreferrer" className="underline">maneb.mw</a>.
+          <a href="https://www.maneb.edu.mw/" target="_blank" rel="noopener noreferrer" className="underline">maneb.edu.mw</a>.
         </span>
       </div>
+
+      {showIndividual && canManage && (
+        <div className="border border-base rounded-xl p-4 space-y-3">
+          <p className="text-sm font-heading font-semibold">Individual {examType} entry — {academicYear}</p>
+          <p className="text-xs text-muted">
+            For a single candidate. Grades are entered per subject; leave a subject blank if the candidate did not
+            sit it. Saved with status - Results received.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <input className={fieldClass} placeholder="Candidate no." value={individualRow.candidateNo} onChange={(e) => setIndividualRow((p) => ({ ...p, candidateNo: e.target.value }))} />
+            <input className={fieldClass} placeholder="Student ID" value={individualRow.studentId} onChange={(e) => setIndividualRow((p) => ({ ...p, studentId: e.target.value }))} />
+            <input className={fieldClass} placeholder="Centre no." value={individualRow.centerNo} onChange={(e) => setIndividualRow((p) => ({ ...p, centerNo: e.target.value }))} />
+            <input className={fieldClass} placeholder="Centre name" value={individualRow.centerName} onChange={(e) => setIndividualRow((p) => ({ ...p, centerName: e.target.value }))} />
+          </div>
+          <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+            {QUICK_SUBJECTS.map((subject) => (
+              <div key={subject}>
+                <label className="block text-[10px] text-muted mb-0.5 truncate" title={subject}>{subject}</label>
+                <input
+                  className={fieldClass}
+                  placeholder={examType === 'MSCE' ? '1–9' : 'A–F'}
+                  value={individualRow.grades[subject] ?? ''}
+                  onChange={(e) => setIndividualRow((p) => ({ ...p, grades: { ...p.grades, [subject]: e.target.value } }))}
+                />
+              </div>
+            ))}
+          </div>
+          {individualFeedback && <p className="text-sm text-brand-coral">{individualFeedback}</p>}
+          <button
+            onClick={() => {
+              setIndividualFeedback(null)
+              if (!individualRow.candidateNo.trim() || !individualRow.studentId.trim() || !individualRow.centerNo.trim() || !individualRow.centerName.trim()) {
+                setIndividualFeedback('Candidate number, student, centre number and centre name are all required.')
+                return
+              }
+              const grades: Record<string, string> = {}
+              for (const [subject, grade] of Object.entries(individualRow.grades)) {
+                if (grade.trim()) grades[subject] = grade.trim()
+              }
+              if (Object.keys(grades).length === 0) {
+                setIndividualFeedback('Enter at least one subject grade.')
+                return
+              }
+              createRecord.mutate(
+                {
+                  studentId: individualRow.studentId.trim(),
+                  examType,
+                  candidateNo: individualRow.candidateNo.trim(),
+                  centerNo: individualRow.centerNo.trim(),
+                  centerName: individualRow.centerName.trim(),
+                  academicYear,
+                  subjectGrades: grades,
+                  status: 'RESULTS_RECEIVED',
+                },
+                {
+                  onSuccess: () => {
+                    setIndividualFeedback(null)
+                    setIndividualRow(emptyRow())
+                    setShowIndividual(false)
+                  },
+                  onError: (err) => setIndividualFeedback(err instanceof Error ? err.message : 'Failed to save record.'),
+                },
+              )
+            }}
+            disabled={createRecord.isPending}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-navy text-white text-sm font-semibold disabled:opacity-60"
+          >
+            {createRecord.isPending ? 'Saving…' : 'Save Record'}
+          </button>
+        </div>
+      )}
 
       {showBulk && canManage && (
         <div className="border border-base rounded-xl p-4 space-y-3">

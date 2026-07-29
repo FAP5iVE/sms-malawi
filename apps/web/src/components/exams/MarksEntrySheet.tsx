@@ -61,11 +61,17 @@ interface Props {
   classId: string
   maxMark: number
   onClose: () => void
+  // [PRODUCTION FIX 2026-07-28] Exam officers held exam.viewDraftMarks
+  // (the real backend permission) but had no way to actually review marks
+  // before clicking Approve — only teachers entering their own marks ever
+  // opened this sheet. Reused rather than building a separate review
+  // component: same data, same layout, just non-editable when true.
+  readOnly?: boolean
 }
 
 type MarkEntry = { mark: number | null; absent: boolean }
 
-export function MarksEntrySheet({ examId, classId, maxMark, onClose }: Props) {
+export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = false }: Props) {
   const { data: studentData, isLoading: studentsLoading } = useStudents({ classId, status: 'ACTIVE' })
   // R19 — memoized so `students` has a stable reference across renders
   // (the `?? []` fallback previously produced a brand-new empty-array
@@ -204,7 +210,7 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose }: Props) {
                         <input
                           type="number" min={0} max={maxMark}
                           value={marks[student.id]?.mark ?? ''}
-                          disabled={marks[student.id]?.absent}
+                          disabled={marks[student.id]?.absent || readOnly}
                           onChange={(e) => setMark(student.id, e.target.value)}
                           aria-label={`Mark for ${student.firstName} ${student.lastName}`}
                           className={`w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/25 ${
@@ -223,6 +229,7 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose }: Props) {
                           className="accent-brand-amber w-4 h-4"
                           checked={marks[student.id]?.absent ?? false}
                           onChange={() => toggleAbsent(student.id)}
+                          disabled={readOnly}
                           aria-label={`Mark ${student.firstName} ${student.lastName} as absent`}
                         />
                       </td>
@@ -233,7 +240,10 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose }: Props) {
             )}
           </div>
           <div className="px-6 py-4 border-t border-base flex items-center justify-between gap-3 shrink-0">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-base rounded-xl hover:bg-page">Cancel</button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-base rounded-xl hover:bg-page">
+              {readOnly ? 'Close' : 'Cancel'}
+            </button>
+            {!readOnly && (
             <div className="flex gap-3">
               <button onClick={saveDraft} disabled={enterMarks.isPending || !hydrated}
                 className="flex items-center gap-2 px-4 py-2 text-sm border border-base rounded-xl hover:bg-page disabled:opacity-60">
@@ -246,6 +256,7 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose }: Props) {
                 Finalize Marks
               </button>
             </div>
+            )}
           </div>
 
           {/* R15 — confirmation before the irreversible finalize */}

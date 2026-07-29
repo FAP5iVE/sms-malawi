@@ -39,7 +39,12 @@ export interface ApiLibraryStats {
   digitalCount:      number
 }
 
-export function useBooks(filters: { category?: string; search?: string; available?: boolean } = {}) {
+export function useBooks(filters: {
+  category?: string; search?: string; available?: boolean
+  publisher?: string; year?: number
+  sortBy?: 'title' | 'author' | 'publishedYear' | 'availableCopies'
+  sortDir?: 'asc' | 'desc'
+} = {}) {
   const params = new URLSearchParams()
   Object.entries(filters).forEach(([k, v]) => { if (v !== undefined) params.set(k, String(v)) })
   return useQuery({
@@ -192,5 +197,67 @@ export function useRejectFineWaiver() {
       apiFetch(`/library/fine-waivers/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.fineWaivers() }),
     onError: (err) => { console.error('[useRejectFineWaiver] failed', err) },
+  })
+}
+
+// [PRODUCTION FIX 2026-07-28] Catalog editing/archiving, catalog report
+// stats (most-borrowed/most-read/category breakdown), and fines listing/
+// clearing — all real backend capability added this pass, previously
+// missing entirely (not just missing a UI).
+
+export function useUpdateBook() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      apiFetch(`/library/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.books() }),
+  })
+}
+
+export function useArchiveBook() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiFetch(`/library/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.books() }),
+  })
+}
+
+export function useCatalogReportStats() {
+  return useQuery({
+    queryKey: ['library', 'reports', 'catalog'] as const,
+    queryFn: () => apiFetch<{
+      mostBorrowed: { book?: { id: string; title: string; author: string }; borrowCount: number }[]
+      mostRead: { resource?: { id: string; title: string; type: string }; viewCount: number }[]
+      byCategory: { category: string; titleCount: number; copyCount: number }[]
+    }>('/library/reports/catalog'),
+  })
+}
+
+export function useFines(status?: string) {
+  const params = status ? `?status=${encodeURIComponent(status)}` : ''
+  return useQuery({
+    queryKey: ['library', 'fines', status ?? null] as const,
+    queryFn: () => apiFetch<Array<{
+      id: string; bookTitle: string; amount: number; reason: string; status: string
+      borrowerName: string; createdAt: string
+    }>>(`/library/fines${params}`),
+  })
+}
+
+export function useClearFine() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiFetch(`/library/fines/${id}/clear`, { method: 'PATCH', body: JSON.stringify({}) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['library', 'fines'] }),
+  })
+}
+
+export function useOverdueByClass() {
+  return useQuery({
+    queryKey: ['library', 'reports', 'overdue-by-class'] as const,
+    queryFn: () => apiFetch<{
+      className: string
+      students: { studentName: string; bookTitle: string; dueDate: string }[]
+    }[]>('/library/reports/overdue-by-class'),
   })
 }

@@ -46,6 +46,7 @@ import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import {
   CreateBookSchema,
+  UpdateBookSchema,
   IssueBorrowingSchema,
   ReturnBorrowingSchema,
   CreateDigitalResourceSchema,
@@ -66,18 +67,45 @@ const LIB_STAFF = ['admin', 'library'] as const
 // ── CATALOG (static/collection routes first) ──
 libraryRouter.get('/', verifyAuth, requirePermission('library.viewCatalog'),
   async (req, res) => {
-    const { category, search, available } = req.query as Record<string, string>
-    return res.json(await libService.listBooks({ category, search, available: available === 'true' }))
+    const { category, search, available, publisher, year, sortBy, sortDir } = req.query as Record<string, string>
+    return res.json(await libService.listBooks({
+      category, search, available: available === 'true',
+      publisher, year: year ? Number(year) : undefined,
+      sortBy: sortBy as never, sortDir: sortDir as never,
+    }))
   })
 
 libraryRouter.get('/stats', verifyAuth, requireRole([...LIB_STAFF, 'high_rank']),
   async (_req, res) => {return res.json(await libService.getLibraryStats())})
+
+// [PRODUCTION FIX 2026-07-28] Most-borrowed/most-read/category breakdown —
+// requested for librarian reports, never computed anywhere before.
+libraryRouter.get('/reports/catalog', verifyAuth, requireRole([...LIB_STAFF, 'high_rank']),
+  async (_req, res) => {return res.json(await libService.getCatalogReportStats())})
+
+libraryRouter.get('/reports/overdue-by-class', verifyAuth, requireRole([...LIB_STAFF, 'high_rank']),
+  async (_req, res) => {return res.json(await libService.getOverdueByClass())})
 
 libraryRouter.get('/barcode/:barcode', verifyAuth, requireRole([...LIB_STAFF]),
   async (req, res) => {
     const book = await libService.findBookByBarcode(String(req.params.barcode))
     if (!book) return res.status(404).json({ error: 'Book not found for this barcode.' })
     return res.json(book)
+  })
+
+// [PRODUCTION FIX 2026-07-28] Fines were created automatically but had no
+// listing route at all — only the separate waiver-request workflow
+// existed. library.clearFine already existed as a real permission with
+// nothing implementing it.
+libraryRouter.get('/fines', verifyAuth, requireAnyPermission(['library.viewInventoryReports', 'library.clearFine']),
+  async (req, res) => {
+    const { status } = req.query as Record<string, string>
+    return res.json(await libService.listFines(status))
+  })
+
+libraryRouter.patch('/fines/:id/clear', verifyAuth, requirePermission('library.clearFine'),
+  async (req, res) => {
+    return res.json(await libService.clearFine(String(req.params.id), req.user!.uid))
   })
 
 // ── BORROWING ──
@@ -231,4 +259,18 @@ libraryRouter.post('/', verifyAuth, requirePermission('library.manageCatalog'),
     const parsed = CreateBookSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     return res.status(201).json(await libService.createBook(parsed.data, req.user!.uid))
+  })
+
+// [PRODUCTION FIX 2026-07-28] No edit or archive path existed for an
+// existing catalog entry at all — create + list only.
+libraryRouter.patch('/:id', verifyAuth, requirePermission('library.manageCatalog'),
+  async (req, res) => {
+    const parsed = UpdateBookSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    return res.json(await libService.updateBook(String(req.params.id), parsed.data))
+  })
+
+libraryRouter.delete('/:id', verifyAuth, requirePermission('library.manageCatalog'),
+  async (req, res) => {
+    return res.json(await libService.archiveBook(String(req.params.id)))
   })

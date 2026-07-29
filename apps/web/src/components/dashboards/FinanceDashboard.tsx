@@ -100,6 +100,7 @@ export function FinanceDashboard() {
           trendLabel={term ? `Term ${term}` : 'this term'}
           iconColor="bg-emerald-50"
           iconText="text-emerald-600"
+          href="/finances?tab=invoices"
         />
         <StatCard
           label="Outstanding Fees"
@@ -109,6 +110,7 @@ export function FinanceDashboard() {
           trendLabel="unpaid"
           iconColor="bg-brand-coral/10"
           iconText="text-brand-coral"
+          href="/finances?tab=invoices"
         />
         <StatCard
           label="Total Expenses"
@@ -118,6 +120,7 @@ export function FinanceDashboard() {
           trendLabel="approved"
           iconColor="bg-brand-teal/10"
           iconText="text-brand-teal"
+          href="/finances?tab=expenses"
         />
         <StatCard
           label="Collection Rate"

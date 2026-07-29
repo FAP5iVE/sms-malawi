@@ -41,6 +41,9 @@ import type { GenerateInvoiceInput, RecordPaymentInput } from '@shared/schemas/f
 import { generateReceipt } from '@/server/services/receiptService'
 import * as accountingService from '@/server/services/accountingService'
 import { resolveStudentFromUid } from '@/server/services/studentService'
+import { getSchoolBranding } from '@/server/services/notificationService'
+import * as settingsService from '@/server/services/settingsService'
+import { SETTING_KEYS } from '@shared/types/settings'
 
 export async function checkBalanceGate(
   studentId: string,
@@ -198,6 +201,10 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
   let receiptKey: string | undefined
   try {
     if (student) {
+      const [branding, receiptPrefix] = await Promise.all([
+        getSchoolBranding(),
+        settingsService.get(SETTING_KEYS.RECEIPT_PREFIX),
+      ])
       receiptKey = await generateReceipt(
         payment.id,
         { id: invoice.id, studentId: invoice.studentId, academicYear: invoice.academicYear, term: invoice.term },
@@ -207,7 +214,14 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
           reference: payment.reference ?? null,
           recordedAt: payment.paidAt,    // Prisma field is paidAt, not recordedAt
         },
-        { firstName: student.firstName, lastName: student.lastName, registrationNo: student.registrationNo }
+        { firstName: student.firstName, lastName: student.lastName, registrationNo: student.registrationNo },
+        {
+          schoolName: branding.schoolName,
+          schoolAddress: branding.schoolAddress,
+          schoolPhone: branding.schoolPhone,
+          schoolEmail: branding.schoolEmail,
+        },
+        receiptPrefix,
       )
       await prisma.payment.update({ where: { id: payment.id }, data: { receiptKey } })
     }

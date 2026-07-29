@@ -198,6 +198,10 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
     percentSchema('Pension percent'),
   [SETTING_KEYS.FINANCE_PAYE_BRACKETS]:
     payeBracketsSchema,
+  [SETTING_KEYS.STAFF_LOAN_INTEREST_RATE]:
+    percentSchema('Staff loan interest rate'),
+  [SETTING_KEYS.RECEIPT_PREFIX]:
+    z.string().min(1).max(10),
 
   // ── Library
   [SETTING_KEYS.LIBRARY_LOAN_PERIOD_STUDENT]:

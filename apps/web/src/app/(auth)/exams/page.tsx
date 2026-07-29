@@ -151,6 +151,11 @@ function ExamsPageInner() {
   const [selectedClassId, setSelectedClassId] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [marksExamId, setMarksExamId] = useState<string | null>(null)
+  // [PRODUCTION FIX 2026-07-28] Separate from marksExamId (teacher entry)
+  // — exam officers reviewing before approval reuse the same sheet in
+  // read-only mode, but need their own state so opening one doesn't
+  // interfere with the other.
+  const [reviewExamId, setReviewExamId] = useState<string | null>(null)
   const [computing, setComputing] = useState(false)
   const [computeResult, setComputeResult] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
 
@@ -177,6 +182,7 @@ function ExamsPageInner() {
   )
   const exams = (examsData ?? []) as ApiExam[]
   const marksExam = marksExamId ? exams.find((e) => e.id === marksExamId) : undefined
+  const reviewExam = reviewExamId ? exams.find((e) => e.id === reviewExamId) : undefined
 
   const approveResults = useApproveResults()
   const releaseResults = useReleaseResults()
@@ -378,6 +384,14 @@ function ExamsPageInner() {
                                 )}
                               {canApprove && exam.status === 'MARKS_FINAL' && (
                                 <button
+                                  onClick={() => setReviewExamId(exam.id)}
+                                  className="text-xs text-brand-teal hover:underline flex items-center gap-1"
+                                >
+                                  Review Marks <ChevronRight className="w-3 h-3" />
+                                </button>
+                              )}
+                              {canApprove && exam.status === 'MARKS_FINAL' && (
+                                <button
                                   onClick={() => approveResults.mutate(exam.id)}
                                   disabled={approveResults.isPending}
                                   className="text-xs text-brand-navy hover:underline"
@@ -425,17 +439,37 @@ function ExamsPageInner() {
 
           {/* ── RESULTS RELEASE TAB ── */}
           {tab === 'release' && (
-            selectedClassId ? (
-              <ResultsReleaseWorkflow
-                classId={selectedClassId}
-                academicYear={academicYear}
-                term={term}
-              />
-            ) : (
-              <div className="text-center py-16 text-muted text-sm border border-base rounded-2xl">
-                Select a class from the Exams tab to review its results release status.
-              </div>
-            )
+            <div className="space-y-4">
+              {/* [PRODUCTION FIX 2026-07-28] Previously required selecting
+                  a class from the Exams tab first — if nothing was already
+                  selected, this tab showed just a passive instruction with
+                  no way to act, looking exactly like missing UI even
+                  though ResultsReleaseWorkflow's real release buttons were
+                  there all along, just unreachable. Now has its own
+                  selector, same shared selectedClassId state. */}
+              <select
+                value={selectedClassId}
+                onChange={(e) => setSelectedClassId(e.target.value)}
+                aria-label="Select class to review for release"
+                className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none"
+              >
+                <option value="">Select a class…</option>
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              {selectedClassId ? (
+                <ResultsReleaseWorkflow
+                  classId={selectedClassId}
+                  academicYear={academicYear}
+                  term={term}
+                />
+              ) : (
+                <div className="text-center py-16 text-muted text-sm border border-base rounded-2xl">
+                  Select a class above to review its results release status.
+                </div>
+              )}
+            </div>
           )}
 
           {/* ── MY RESULTS TAB (students only) ──
@@ -469,6 +503,15 @@ function ExamsPageInner() {
             onClose={() => setMarksExamId(null)}
           />
         )}
+        {reviewExamId && reviewExam && (
+          <MarksEntrySheet
+            examId={reviewExamId}
+            classId={reviewExam.classId}
+            maxMark={reviewExam.maxMark ?? 100}
+            onClose={() => setReviewExamId(null)}
+            readOnly
+          />
+        )}
       </div>
     </RoleGuard>
   )
@@ -478,7 +521,7 @@ function ExamsPageInner() {
 // same convention as (public)/login/page.tsx.
 export default function ExamsPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<div className="p-6 space-y-3"><div className="h-8 w-40 rounded-lg bg-surface animate-pulse" /><div className="h-48 rounded-xl bg-surface animate-pulse" /></div>}>
       <ExamsPageInner />
     </Suspense>
   )

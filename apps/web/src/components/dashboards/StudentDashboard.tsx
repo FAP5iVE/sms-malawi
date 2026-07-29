@@ -163,6 +163,7 @@ export function StudentDashboard() {
           trendLabel="outstanding"
           iconColor="bg-brand-amber/10"
           iconText="text-brand-amber"
+          href="/finances?tab=invoices"
         />
         <StatCard
           label="Upcoming Exams"

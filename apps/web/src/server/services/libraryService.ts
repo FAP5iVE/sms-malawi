@@ -64,13 +64,21 @@ import * as settingsService from '@/server/services/settingsService'
 import { SETTING_KEYS } from '@shared/types/settings'
 
 // ─── CATALOG ─────────────────────────────────────────────
+// [PRODUCTION FIX 2026-07-28] Was category/search/available only, with a
+// hardcoded orderBy — the librarian console needs real sort control
+// (title/author/year/availableCopies) plus publisher and year filters.
 export async function listBooks(filters: {
   category?: string; search?: string; available?: boolean
+  publisher?: string; year?: number
+  sortBy?: 'title' | 'author' | 'publishedYear' | 'availableCopies'
+  sortDir?: 'asc' | 'desc'
 } = {}) {
   return prisma.book.findMany({
     where: {
       ...(filters.category  ? { category: filters.category as never } : {}),
       ...(filters.available ? { availableCopies: { gt: 0 } } : {}),
+      ...(filters.publisher ? { publisher: { contains: filters.publisher, mode: 'insensitive' } } : {}),
+      ...(filters.year      ? { publishedYear: filters.year } : {}),
       ...(filters.search    ? {
         OR: [
           { title:  { contains: filters.search, mode: 'insensitive' } },
@@ -79,7 +87,7 @@ export async function listBooks(filters: {
         ]
       } : {}),
     },
-    orderBy: { title: 'asc' },
+    orderBy: { [filters.sortBy ?? 'title']: filters.sortDir ?? 'asc' },
   })
 }
 
@@ -87,6 +95,56 @@ export async function getBook(id: string) {
   return prisma.book.findUniqueOrThrow({
     where: { id },
     include: { borrowings: { where: { status: 'ACTIVE' }, orderBy: { issuedAt: 'desc' } } },
+  })
+}
+
+// [PRODUCTION FIX 2026-07-28] Catalog management had create + list but no
+// edit/archive path at all — confirmed missing at schema, service, and
+// route layers.
+export async function updateBook(id: string, data: import('@shared/schemas/library').UpdateBookInput) {
+  return prisma.book.update({ where: { id }, data })
+}
+
+/** "Archive" reduces totalCopies/availableCopies to 0 rather than a hard
+ *  delete — a book with borrowing history can't be deleted without
+ *  orphaning those records, and the catalog convention elsewhere in this
+ *  codebase is soft-removal, not destructive delete. */
+export async function archiveBook(id: string) {
+  return prisma.book.update({ where: { id }, data: { totalCopies: 0, availableCopies: 0 } })
+}
+
+// [PRODUCTION FIX 2026-07-28] LibraryFine rows were created automatically
+// on an overdue return, and library.clearFine already existed as a real
+// permission — but there was no way to actually LIST fines (only the
+// separate waiver-request workflow existed) and no way to clear/mark one
+// paid at all. studentId/staffId are plain string FKs with no declared
+// relation on this model (documented in the model's own comments), so
+// names are batch-resolved rather than joined.
+export async function listFines(status?: string) {
+  const fines = await prisma.libraryFine.findMany({
+    where: status ? { status: status as never } : {},
+    orderBy: { createdAt: 'desc' },
+  })
+  const studentIds = fines.filter((f) => f.studentId).map((f) => f.studentId as string)
+  const staffIds = fines.filter((f) => f.staffId).map((f) => f.staffId as string)
+  const [students, staff] = await Promise.all([
+    studentIds.length ? prisma.student.findMany({ where: { id: { in: studentIds } }, select: { id: true, firstName: true, lastName: true } }) : [],
+    staffIds.length ? prisma.staffProfile.findMany({ where: { id: { in: staffIds } }, select: { id: true, firstName: true, lastName: true } }) : [],
+  ])
+  const studentById = new Map(students.map((s) => [s.id, `${s.firstName} ${s.lastName}`]))
+  const staffById = new Map(staff.map((s) => [s.id, `${s.firstName} ${s.lastName}`]))
+
+  return fines.map((f) => ({
+    ...f,
+    borrowerName: f.studentId ? studentById.get(f.studentId) ?? 'Unknown student'
+      : f.staffId ? staffById.get(f.staffId) ?? 'Unknown staff' : 'Unknown',
+  }))
+}
+
+export async function clearFine(id: string, actorUid: string) {
+  return prisma.libraryFine.update({
+    where: { id },
+    data: { status: 'PAID', paidAt: new Date(), clearedByUid: actorUid },
   })
 }
 
@@ -301,6 +359,38 @@ export async function getDigitalResourceViewUrl(resourceId: string, actorRole: s
 }
 
 // ─── LIBRARY REPORTS ─────────────────────────────────────
+// [PRODUCTION FIX 2026-07-29] "Overdue Students List by class" on the
+// library dashboard was a permanent PlaceholderWidget stub (same class of
+// bug as ISSUE-03/12/29 elsewhere this session) — deferred to the
+// librarian console build and never actually closed out. Borrowing.student
+// is a real declared relation, so this is a direct include, not a
+// workaround for a missing one.
+export async function getOverdueByClass() {
+  const overdue = await prisma.borrowing.findMany({
+    where: { status: 'OVERDUE', borrowerType: 'STUDENT', studentId: { not: null } },
+    include: {
+      student: { select: { firstName: true, lastName: true, class: { select: { name: true } } } },
+      book: { select: { title: true } },
+    },
+    orderBy: { dueDate: 'asc' },
+  })
+
+  const byClass = new Map<string, { studentName: string; bookTitle: string; dueDate: Date }[]>()
+  for (const b of overdue) {
+    if (!b.student) continue
+    const className = b.student.class?.name ?? 'Unknown Class'
+    if (!byClass.has(className)) byClass.set(className, [])
+    byClass.get(className)!.push({
+      studentName: `${b.student.firstName} ${b.student.lastName}`,
+      bookTitle: b.book.title,
+      dueDate: b.dueDate,
+    })
+  }
+  return [...byClass.entries()]
+    .map(([className, students]) => ({ className, students }))
+    .sort((a, b) => a.className.localeCompare(b.className))
+}
+
 export async function getLibraryStats() {
   const [totalBooks, activeBorrowings, overdueBorrowings, pendingFines, digitalCount] = await prisma.$transaction([
     prisma.book.aggregate({ _sum: { totalCopies: true } }),
@@ -310,4 +400,52 @@ export async function getLibraryStats() {
     prisma.digitalResource.count({ where: { approved: true } }),
   ])
   return { totalBooks: totalBooks._sum.totalCopies ?? 0, activeBorrowings, overdueBorrowings, pendingFines, digitalCount }
+}
+
+// [PRODUCTION FIX 2026-07-28] Most-borrowed book, most-read digital
+// resource, and a catalog category breakdown were all reported/requested
+// but never computed anywhere. Borrowing/DigitalResourceView both already
+// track exactly what's needed — this is real aggregation over real
+// history, not a new tracking mechanism.
+export async function getCatalogReportStats() {
+  const [mostBorrowedRaw, mostReadRaw, categoryBreakdown] = await Promise.all([
+    prisma.borrowing.groupBy({
+      by: ['bookId'],
+      _count: { bookId: true },
+      orderBy: { _count: { bookId: 'desc' } },
+      take: 10,
+    }),
+    prisma.digitalResourceView.groupBy({
+      by: ['resourceId'],
+      _count: { resourceId: true },
+      orderBy: { _count: { resourceId: 'desc' } },
+      take: 10,
+    }),
+    prisma.book.groupBy({
+      by: ['category'],
+      _count: { category: true },
+      _sum: { totalCopies: true },
+    }),
+  ])
+
+  const [books, resources] = await Promise.all([
+    prisma.book.findMany({ where: { id: { in: mostBorrowedRaw.map((r) => r.bookId) } }, select: { id: true, title: true, author: true } }),
+    prisma.digitalResource.findMany({ where: { id: { in: mostReadRaw.map((r) => r.resourceId) } }, select: { id: true, title: true, type: true } }),
+  ])
+  const bookById = new Map(books.map((b) => [b.id, b]))
+  const resourceById = new Map(resources.map((r) => [r.id, r]))
+
+  return {
+    mostBorrowed: mostBorrowedRaw
+      .map((r) => ({ book: bookById.get(r.bookId), borrowCount: r._count.bookId }))
+      .filter((r) => r.book),
+    mostRead: mostReadRaw
+      .map((r) => ({ resource: resourceById.get(r.resourceId), viewCount: r._count.resourceId }))
+      .filter((r) => r.resource),
+    byCategory: categoryBreakdown.map((c) => ({
+      category: c.category,
+      titleCount: c._count.category,
+      copyCount: c._sum.totalCopies ?? 0,
+    })),
+  }
 }

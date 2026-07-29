@@ -37,6 +37,7 @@ export function useAnnouncements() {
   const { role } = useAuthStore()
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!role) return
@@ -48,18 +49,33 @@ export function useAnnouncements() {
       orderBy('createdAt', 'desc')
     )
 
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const docs = snap.docs
-        .map((d) => ({ id: d.id, ...(d.data() as Omit<Announcement, 'id'>) }))
-        .filter((a) => a.targetAll || (a.targetRoles && a.targetRoles.includes(role)))
-      setAnnouncements(docs)
-      setLoading(false)
-    })
+    // [PRODUCTION FIX 2026-07-28] onSnapshot had no error callback at all —
+    // if the query failed for any reason (missing composite index, a
+    // security-rule denial, etc.), the success callback simply never fired:
+    // loading stayed true forever and nothing was ever shown to the user,
+    // with no way to tell a slow load from a silently broken one. Added the
+    // error callback so a failure resolves loading and surfaces a message
+    // instead of spinning indefinitely.
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        const docs = snap.docs
+          .map((d) => ({ id: d.id, ...(d.data() as Omit<Announcement, 'id'>) }))
+          .filter((a) => a.targetAll || (a.targetRoles && a.targetRoles.includes(role)))
+        setAnnouncements(docs)
+        setLoading(false)
+        setError(null)
+      },
+      (err) => {
+        setError(err.message || 'Failed to load announcements.')
+        setLoading(false)
+      },
+    )
 
     return unsubscribe
   }, [role])
 
-  return { announcements, loading }
+  return { announcements, loading, error }
 }
 
 /**
@@ -72,6 +88,7 @@ export function useAnnouncements() {
 export function usePendingAnnouncements() {
   const [pending, setPending] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const q = query(
@@ -80,13 +97,23 @@ export function usePendingAnnouncements() {
       orderBy('createdAt', 'desc')
     )
 
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setPending(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Announcement, 'id'>) })))
-      setLoading(false)
-    })
+    // Same missing-error-callback bug as useAnnouncements() above — fixed
+    // the same way.
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        setPending(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Announcement, 'id'>) })))
+        setLoading(false)
+        setError(null)
+      },
+      (err) => {
+        setError(err.message || 'Failed to load pending announcements.')
+        setLoading(false)
+      },
+    )
 
     return unsubscribe
   }, [])
 
-  return { pending, loading }
+  return { pending, loading, error }
 }

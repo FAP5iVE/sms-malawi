@@ -99,6 +99,7 @@ import { healthRouter }        from '@/server/routes/health'
 import { hrRouter }            from '@/server/routes/hr'
 import { libraryRouter }       from '@/server/routes/library'
 import { galleryRouter }       from '@/server/routes/gallery'
+import { authRouter }          from '@/server/routes/auth'
 import { settingsRouter }      from '@/server/routes/settings'
 import { auditRouter }         from '@/server/routes/audit'
 import { pendingActionsRouter }from '@/server/routes/pendingActions'
@@ -226,6 +227,7 @@ export function createApiApp() {
   app.use('/hr',              hrRouter)
   app.use('/library',         libraryRouter)
   app.use('/gallery',         galleryRouter)
+  app.use('/auth',            authRouter)
   app.use('/analytics',       analyticsRouter)
   app.use('/search',          searchRouter)
   app.use('/calendar',        calendarRouter)

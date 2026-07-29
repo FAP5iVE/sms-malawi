@@ -1,4 +1,3 @@
-
 /*
  * apps/web/src/server/services/receiptService.ts
  *
@@ -68,11 +67,20 @@ export async function generateReceipt(
   paymentId: string,
   invoice: { id: string; studentId: string; academicYear: string; term: number },
   payment: { amount: number; method: string; reference?: string | null; recordedAt: Date },
-  student: { firstName: string; lastName: string; registrationNo: string }
+  student: { firstName: string; lastName: string; registrationNo: string },
+  // [PRODUCTION FIX 2026-07-28] The receipt header showed only the literal
+  // text "Payment Receipt" — no school name or address at all — and the
+  // receipt number ignored the real, already-editable receipt_prefix
+  // setting entirely (it was just the payment ID's first 8 characters).
+  // Both real gaps, now closed: branding is the school's real identity
+  // (getSchoolBranding(), same helper notificationService.ts already
+  // uses), receiptPrefix is SETTING_KEYS receipt_prefix.
+  branding: { schoolName: string; schoolAddress: string; schoolPhone: string; schoolEmail: string },
+  receiptPrefix: string,
 ): Promise<string> {
   const browser = await launchBrowser()
   const page = await browser.newPage()
-  await page.setContent(buildReceiptHtml({ paymentId, invoice, payment, student }), {
+  await page.setContent(buildReceiptHtml({ paymentId, invoice, payment, student, branding, receiptPrefix }), {
     waitUntil: 'load',   // 'networkidle0' removed in puppeteer-core v24
   })
   const pdfBuffer = Buffer.from(await page.pdf({ format: 'A4', printBackground: true }))
@@ -117,11 +125,16 @@ function buildReceiptHtml(d: {
   invoice: { id: string; studentId: string; academicYear: string; term: number }
   payment: { amount: number; method: string; reference?: string | null; recordedAt: Date }
   student: { firstName: string; lastName: string; registrationNo: string }
+  branding: { schoolName: string; schoolAddress: string; schoolPhone: string; schoolEmail: string }
+  receiptPrefix: string
 }): string {
+  const receiptNo = `${d.receiptPrefix}-${d.paymentId.slice(0, 8).toUpperCase()}`
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
   <style>
     body{font-family:Arial,sans-serif;color:#1A2535;padding:40px;}
     .header{background:#0F2744;color:white;padding:20px;border-radius:8px 8px 0 0;text-align:center;}
+    .header h2{margin:0 0 4px 0;}
+    .header .school-info{font-size:12px;color:#B7C4D6;}
     .body{padding:24px;border:1px solid #DDE4EC;border-top:none;border-radius:0 0 8px 8px;}
     table{width:100%;border-collapse:collapse;margin-top:16px;}
     td{padding:8px;border-bottom:1px solid #EEE;font-size:13px;}
@@ -129,11 +142,15 @@ function buildReceiptHtml(d: {
     .amount{font-size:24px;font-weight:700;color:#0E8A6A;margin:16px 0;}
   </style></head>
   <body>
-    <div class="header"><h2 style="margin:0">Payment Receipt</h2></div>
+    <div class="header">
+      <h2>${d.branding.schoolName}</h2>
+      <div class="school-info">${d.branding.schoolAddress} · ${d.branding.schoolPhone} · ${d.branding.schoolEmail}</div>
+      <div class="school-info" style="margin-top:8px;font-size:14px;color:white;">Payment Receipt</div>
+    </div>
     <div class="body">
       <p class="amount">${formatMWK(d.payment.amount)}</p>
       <table>
-        <tr><td>Receipt No</td><td>${d.paymentId.slice(0, 8).toUpperCase()}</td></tr>
+        <tr><td>Receipt No</td><td>${receiptNo}</td></tr>
         <tr><td>Student</td><td>${d.student.firstName} ${d.student.lastName}</td></tr>
         <tr><td>Reg No</td><td>${d.student.registrationNo}</td></tr>
         <tr><td>Academic Year</td><td>${d.invoice.academicYear}</td></tr>

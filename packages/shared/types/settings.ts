@@ -153,6 +153,17 @@ export const SETTING_KEYS = {
   FINANCE_PAYROLL_RUN_DAY:        'finance_payroll_run_day',
   FINANCE_PENSION_PERCENT:        'finance_pension_percent',
   FINANCE_PAYE_BRACKETS:          'finance_paye_brackets',
+  // [PRODUCTION FIX 2026-07-28] No interest rate concept existed anywhere
+  // in the loan system at all — staff loans were effectively interest-free
+  // by omission, with no setting, no UI, and no calculation using one.
+  STAFF_LOAN_INTEREST_RATE:       'staff_loan_interest_rate',
+  // [PRODUCTION FIX 2026-07-28] receipt_prefix already existed as a raw
+  // string in the generic /settings/finance route whitelist (editable,
+  // with a real UI field) — but was never actually used when generating a
+  // real receipt, and had no typed SETTING_KEYS entry at all. Same raw
+  // key value, so existing saved data keeps working; this just gives it a
+  // typed accessor for receiptService.ts to actually read.
+  RECEIPT_PREFIX:                 'receipt_prefix',
 
   // ── Library
   LIBRARY_LOAN_PERIOD_STUDENT:    'library_loan_period_student',
@@ -279,6 +290,8 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.FINANCE_PAYROLL_RUN_DAY]:   number        // 1–28
   readonly [SETTING_KEYS.FINANCE_PENSION_PERCENT]:   number        // percentage
   readonly [SETTING_KEYS.FINANCE_PAYE_BRACKETS]:     PayeBracket[]
+  readonly [SETTING_KEYS.STAFF_LOAN_INTEREST_RATE]:  number // annual percentage
+  readonly [SETTING_KEYS.RECEIPT_PREFIX]:            string
 
   // ── Library
   readonly [SETTING_KEYS.LIBRARY_LOAN_PERIOD_STUDENT]:  number  // days
@@ -657,6 +670,20 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     isPublic: false,
     description: 'PAYE income tax brackets. Each bracket defines a monthly income range and tax rate. Verify with MRA annually.',
     defaultValue: DEFAULT_PAYE_BRACKETS.brackets,
+  },
+  [SETTING_KEYS.STAFF_LOAN_INTEREST_RATE]: {
+    key: SETTING_KEYS.STAFF_LOAN_INTEREST_RATE,
+    category: SETTING_CATEGORIES.FINANCE,
+    isPublic: false,
+    description: 'Annual interest rate (%) applied to new staff loans. 0 = interest-free.',
+    defaultValue: 0,
+  },
+  [SETTING_KEYS.RECEIPT_PREFIX]: {
+    key: SETTING_KEYS.RECEIPT_PREFIX,
+    category: SETTING_CATEGORIES.FINANCE,
+    isPublic: false,
+    description: 'Prefix prepended to every generated payment receipt number.',
+    defaultValue: 'RCP',
   },
 
   // ── Library

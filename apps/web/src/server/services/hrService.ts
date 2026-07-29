@@ -72,6 +72,8 @@ import type { LeaveType, Prisma} from '@prisma/client'
 import * as algolia from '@/server/services/algoliaService'
 import { checkLeaveConflicts, type ConflictCheckResult } from '@/server/services/leaveConflictService'
 import * as notificationService from '@/server/services/notificationService'
+import * as settingsService from '@/server/services/settingsService'
+import { SETTING_KEYS } from '@shared/types/settings'
   
 // ─── STAFF PROFILES ─────────────────────────────────────
 export async function listStaff(filters: {
@@ -402,8 +404,18 @@ export async function requestLoan(staffId: string, data: LoanRequestInput) {
   })
   if (existing) throw new Error('You already have an active loan. Settle it before applying for a new one.')
 
+  // [PRODUCTION FIX 2026-07-28] No interest rate concept existed anywhere —
+  // loans were interest-free by omission, not by design decision. Flat
+  // (simple, non-compounding) interest applied once at request time:
+  // `amount` stays the pure disbursed principal for records/reporting;
+  // `balance` (what repayments actually pay down) reflects principal +
+  // interest. Rate of 0 (the setting's default) reproduces the previous
+  // interest-free behaviour exactly.
+  const interestRate = await settingsService.get(SETTING_KEYS.STAFF_LOAN_INTEREST_RATE)
+  const balance = data.amount + (data.amount * interestRate) / 100
+
   return prisma.staffLoan.create({
-    data: { staffId, amount: data.amount, monthlyDeduction: data.monthlyDeduction, balance: data.amount, reason: data.reason },
+    data: { staffId, amount: data.amount, monthlyDeduction: data.monthlyDeduction, balance, reason: data.reason },
   })
 }
 

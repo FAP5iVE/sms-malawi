@@ -33,6 +33,7 @@ import {
   BarChart3,
   ClipboardList,
   Settings,
+  Megaphone,
 } from 'lucide-react'
 import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
@@ -50,6 +51,19 @@ import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
 import type { ApiStaffProfile } from '@shared/types/api'
 
 const QUICK_ACTIONS: QuickAction[] = [
+  {
+    // [PRODUCTION FIX 2026-07-28] High Rank already held announcement.create
+    // in the permission matrix and the /announcements page's canCreate gate
+    // (role !== 'admin') already allowed it — but nothing on this dashboard
+    // ever pointed there, so the only path was knowing to find it in the
+    // sidebar. Approving publications and authoring announcements are
+    // separate abilities; this makes the second one actually discoverable.
+    label: 'Make Announcement',
+    href: '/announcements',
+    icon: Megaphone,
+    color: 'bg-brand-coral/10',
+    text: 'text-brand-coral',
+  },
   {
     label: 'School Reports',
     href: '/reports',

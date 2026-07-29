@@ -34,7 +34,7 @@ export default function UserManagementPage() {
     <RoleGuard allowed={['admin']}>
       {/* useSearchParams() requires a Suspense boundary or `next build` fails —
           same convention as (public)/login/page.tsx and (auth)/exams/page.tsx. */}
-      <Suspense fallback={null}>
+      <Suspense fallback={<div className="p-6 space-y-3"><div className="h-8 w-40 rounded-lg bg-surface animate-pulse" /><div className="h-48 rounded-xl bg-surface animate-pulse" /></div>}>
         <UserManagementContent />
       </Suspense>
     </RoleGuard>

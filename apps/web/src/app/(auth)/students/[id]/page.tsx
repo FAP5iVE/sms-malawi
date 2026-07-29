@@ -41,6 +41,7 @@ import { StudentForm } from '@/components/students/StudentForm'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
 import { PrintableReportCard } from '@/components/shared/PrintableReportCard'
 import { formatMWK } from '@shared/constants/malawi'
+import { usePermissions } from '@/hooks/usePermissions'
 import { ArrowLeft, Pencil, Printer, FileText, Loader2, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 
@@ -67,6 +68,7 @@ function ProfileContent() {
   const { id } = useParams<{ id: string }>()
   const { data: student, isLoading } = useStudent(id)
   const [editing, setEditing] = useState(false)
+  const { can } = usePermissions()
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({ contentRef: printRef })
 
@@ -141,65 +143,83 @@ function ProfileContent() {
       </div>
 
       <div ref={printRef}>
-        <div className="grid md:grid-cols-2 gap-4">
-          {/* Personal details card */}
-          <div className="bg-surface border border-base rounded-xl p-5 space-y-3">
-            <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted">
-              Personal Details
-            </p>
-            {[
-              ['Date of Birth', new Date(student.dateOfBirth).toLocaleDateString()],
-              ['Sex', student.sex],
-              ['Nationality', student.nationality],
-              ['District', student.district],
-              ['Village', student.village ?? '—'],
-              ['Phone', student.phone ?? '—'],
-            ].map(([label, value]) => (
-              <div key={label} className="flex justify-between text-sm">
-                <span className="text-muted">{label}</span>
-                <span className="font-medium">{value}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Guardian + status card */}
-          <div className="bg-surface border border-base rounded-xl p-5 space-y-3">
-            <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted">
-              Guardian & Status
-            </p>
-            {[
-              ['Guardian', student.guardianName],
-              ['Relation', student.guardianRelation],
-              ['Guardian Phone', student.guardianPhone],
-              ['Class', student.class?.name ?? '—'],
-              ['Status', student.status],
-            ].map(([label, value]) => (
-              <div key={label} className="flex justify-between text-sm">
-                <span className="text-muted">{label}</span>
-                <span className="font-medium">{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Fee balance + risk card */}
-        <div className="bg-surface border border-base rounded-xl p-5 mt-4">
-          <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-            Fee Status
-          </p>
-          <div className="grid sm:grid-cols-2 gap-4">
+        {/* [PRODUCTION FIX 2026-07-28] Was three separate bordered/rounded
+            cards (Personal Details, Guardian & Status, Fee Status) — merged
+            into one unified section on a solid background, with section
+            headers/dividers doing the visual organization instead of
+            separate card chrome. Fee/risk data is now also gated behind
+            student.viewFeeStatus / student.viewRiskStatus, matching the
+            same permission check the student list page already applies —
+            this detail page had no such gate before, showing financial and
+            risk data to every role that could reach it. */}
+        <div className="bg-surface rounded-xl p-5 sm:p-6 divide-y divide-base">
+          <div className="grid sm:grid-cols-2 gap-x-8 gap-y-5 pb-5">
             <div>
-              <p className="text-xs text-muted mb-1">Outstanding Balance</p>
-              <p
-                className={`text-lg font-heading font-bold ${
-                  (student.feeBalance ?? 0) > 0 ? 'text-brand-coral' : 'text-brand-teal'
-                }`}
-              >
-                {formatMWK(student.feeBalance ?? 0)}
+              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
+                Personal Details
               </p>
+              <div className="space-y-2.5">
+                {[
+                  ['Date of Birth', new Date(student.dateOfBirth).toLocaleDateString()],
+                  ['Sex', student.sex],
+                  ['Nationality', student.nationality],
+                  ['District', student.district],
+                  ['Village', student.village ?? '—'],
+                  ['Phone', student.phone ?? '—'],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between text-sm">
+                    <span className="text-muted">{label}</span>
+                    <span className="font-medium text-body">{value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <StudentRiskBadge riskLevel={student.riskLevel ?? 'NONE'} variant="card" />
+
+            <div>
+              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
+                Guardian &amp; Status
+              </p>
+              <div className="space-y-2.5">
+                {[
+                  ['Guardian', student.guardianName],
+                  ['Relation', student.guardianRelation],
+                  ['Guardian Phone', student.guardianPhone],
+                  ['Class', student.class?.name ?? '—'],
+                  ['Status', student.status],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between text-sm">
+                    <span className="text-muted">{label}</span>
+                    <span className="font-medium text-body">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
+
+          {(can('student.viewFeeStatus') || can('student.viewRiskStatus')) && (
+            <div className="pt-5">
+              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
+                Fee Status
+              </p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {can('student.viewFeeStatus') && (
+                  <div>
+                    <p className="text-xs text-muted mb-1">Outstanding Balance</p>
+                    <p
+                      className={`text-lg font-heading font-bold ${
+                        (student.feeBalance ?? 0) > 0 ? 'text-brand-coral' : 'text-brand-teal'
+                      }`}
+                    >
+                      {formatMWK(student.feeBalance ?? 0)}
+                    </p>
+                  </div>
+                )}
+                {can('student.viewRiskStatus') && (
+                  <StudentRiskBadge riskLevel={student.riskLevel ?? 'NONE'} variant="card" />
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

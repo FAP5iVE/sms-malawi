@@ -24,6 +24,7 @@ import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { signInWithEmailAndPassword } from 'firebase/auth'
+import { apiFetch } from '@/lib/api-client'
 import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/authStore'
 import {
@@ -56,7 +57,7 @@ function sanitizeRedirectTarget(from: string | null): string | null {
 // logic lives in LoginForm.
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<div className="p-6 space-y-3"><div className="h-8 w-40 rounded-lg bg-surface animate-pulse" /><div className="h-48 rounded-xl bg-surface animate-pulse" /></div>}>
       <LoginForm />
     </Suspense>
   )
@@ -116,6 +117,11 @@ function LoginForm() {
       // Do not set cookies or navigate here — AuthProvider's onIdTokenChanged
       // listener owns both, and the useEffect above navigates once it has.
       setSubmitted(true)
+      // [PRODUCTION FIX 2026-07-28] The admin dashboard's login-trend graph
+      // has always queried AuditLog for LOGIN_SUCCESS/LOGIN_FAILED rows —
+      // nothing ever wrote them. Fire-and-forget: a logging hiccup must
+      // never block or delay the actual login.
+      apiFetch('/auth/log-login-success', { method: 'POST' }).catch(() => {})
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
       if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
@@ -125,6 +131,7 @@ function LoginForm() {
       } else {
         setError('Something went wrong. Please try again.')
       }
+      apiFetch('/auth/log-login-failed', { method: 'POST', body: JSON.stringify({ email }) }).catch(() => {})
       setLoading(false)
     }
   }

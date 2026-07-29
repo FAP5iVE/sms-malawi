@@ -25,6 +25,7 @@
  */
 
 import { motion } from 'framer-motion'
+import Link from 'next/link'
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { useMotionEnabled } from '@/store/motionStore'
 import {
@@ -84,6 +85,14 @@ interface StatCardProps {
   index?: number
   /** Additional class names applied to the outer wrapper */
   className?: string
+  /**
+   * [PRODUCTION FIX 2026-07-28] When set, the whole card navigates here on
+   * click — the stat cards across several dashboards (library, exams, …)
+   * showed live counts with nowhere to actually go look at what they
+   * counted. Optional and backwards compatible: cards without href behave
+   * exactly as before (cursor-default, no navigation).
+   */
+  href?: string
 }
 
 interface StatCardGridProps {
@@ -136,6 +145,7 @@ export function StatCard({
   subLabel,
   index,
   className,
+  href,
 }: StatCardProps) {
   const motionEnabled = useMotionEnabled()
 
@@ -195,14 +205,14 @@ export function StatCard({
       }
     : {}
 
-  return (
+  const card = (
     <motion.div
       variants={cardVariants}
       initial="hidden"
       animate="visible"
       className={cn(
         'bg-surface border border-base rounded-xl p-5 flex flex-col gap-3',
-        'cursor-default',
+        href ? 'cursor-pointer hover:border-brand-teal/40 transition-colors' : 'cursor-default',
         className
       )}
       {...hoverProps}
@@ -238,4 +248,6 @@ export function StatCard({
       </div>
     </motion.div>
   )
+
+  return href ? <Link href={href} aria-label={label}>{card}</Link> : card
 }

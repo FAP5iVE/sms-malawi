@@ -466,6 +466,8 @@ export interface ApiBook {
   author: string
   isbn?: string
   category: string
+  publisher?: string
+  publishedYear?: number
   totalCopies: number
   availableCopies: number
   barcode?: string

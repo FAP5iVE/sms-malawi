@@ -71,11 +71,17 @@ import {
   useCreateFineWaiver,
   useApproveFineWaiver,
   useRejectFineWaiver,
+  useUpdateBook,
+  useArchiveBook,
+  useCreateBook,
+  useCatalogReportStats,
+  useFines,
+  useClearFine,
 }                            from '@/hooks/useLibrary'
 import { DigitalResourceViewer } from '@/components/library/DigitalResourceViewer'
-import { BookOpen, Scan, FileText, AlertTriangle, Eye, Check, X as XIcon, Undo2 } from 'lucide-react'
+import { BookOpen, Scan, FileText, AlertTriangle, Eye, Check, X as XIcon, Undo2, Pencil, Archive, ArrowUpDown, Users2 } from 'lucide-react'
 import { ModuleTabs }        from '@/components/shared/ModuleTabs'
-import { MALAWI_SUBJECTS }   from '@shared/constants/malawi'
+import { MALAWI_SUBJECTS, formatMWK } from '@shared/constants/malawi'
 import type {
   ApiBook,
   ApiBorrowing,
@@ -90,13 +96,18 @@ import type {
  * [PURPOSE]: Initialises the active tab from ?tab= (post-hydration) so
  *   LibraryDashboard's corrected quick actions can deep-link.
  */
-type Tab = 'catalog' | 'borrowings' | 'digital' | 'recommendations'
+type Tab = 'catalog' | 'borrowings' | 'digital' | 'recommendations' | 'reports'
 
 const TABS = [
   { id: 'catalog'         as Tab, label: 'Book Catalog',      icon: BookOpen  },
   { id: 'borrowings'      as Tab, label: 'Borrowings',        icon: Scan      },
   { id: 'digital'         as Tab, label: 'Digital Library',   icon: FileText  },
   { id: 'recommendations' as Tab, label: 'Recommendations',   icon: Check     },
+  // [PRODUCTION FIX 2026-07-28] Genuinely distinct librarian surface —
+  // most-borrowed/most-read/category stats and fines management, gated
+  // separately below (librarian/admin/high_rank only), not shown as just
+  // another generic tab to every role.
+  { id: 'reports'         as Tab, label: 'Reports & Fines',   icon: Users2    },
 ]
 
 export default function LibraryPage() {
@@ -114,11 +125,199 @@ export default function LibraryPage() {
       ]}
     >
       {/* useSearchParams() requires a Suspense boundary or `next build` fails —
-          same convention as (public)/login/page.tsx and (auth)/exams/page.tsx. */}
-      <Suspense fallback={null}>
+          same convention as (public)/login/page.tsx and (auth)/exams/page.tsx.
+          [PRODUCTION FIX 2026-07-28] fallback was `null` — same bug found
+          and fixed in finances/page.tsx (a blank screen with no loading
+          indicator during any suspension). */}
+      <Suspense fallback={<div className="space-y-4"><div className="h-8 w-48 rounded-lg bg-surface animate-pulse" /><div className="h-64 rounded-xl bg-surface animate-pulse" /></div>}>
         <LibraryContent />
       </Suspense>
     </RoleGuard>
+  )
+}
+
+// [PRODUCTION FIX 2026-07-28] Declared at module scope, not inside
+// LibraryContent's render body — a component defined during render creates
+// a fresh definition (and resets any internal state) on every render; same
+// class of bug found and fixed for SortHeader in user-management/page.tsx
+// earlier this session.
+function BookRow({
+  book: b, isLibStaff, onIssue, onEdit,
+}: {
+  book: ApiBook
+  isLibStaff: boolean
+  onIssue: (bookId: string) => void
+  onEdit: (book: ApiBook) => void
+}) {
+  return (
+    <tr className="hover:bg-page">
+      <td className="px-4 py-3 font-medium">{b.title}</td>
+      <td className="px-4 py-3 text-muted">{b.author}</td>
+      <td className="px-4 py-3">
+        <span className="text-xs bg-base rounded px-2 py-0.5">{b.category}</span>
+      </td>
+      <td className="px-4 py-3 text-muted text-xs">{b.publisher ?? '—'}</td>
+      <td className="px-4 py-3 text-muted text-xs">{b.publishedYear ?? '—'}</td>
+      <td className="px-4 py-3 text-center">{b.totalCopies}</td>
+      <td className="px-4 py-3 text-center">
+        <span className={`font-semibold ${b.availableCopies === 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>
+          {b.availableCopies}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex items-center justify-end gap-3">
+          <PermissionGuard permission="library.issueBook">
+            <button
+              type="button"
+              disabled={b.availableCopies === 0}
+              onClick={() => onIssue(b.id)}
+              className="text-xs font-semibold text-brand-teal underline disabled:opacity-40 min-h-11"
+            >
+              Issue
+            </button>
+          </PermissionGuard>
+          {isLibStaff && (
+            <button type="button" onClick={() => onEdit(b)} aria-label={`Edit ${b.title}`} className="text-muted hover:text-body min-h-11 min-w-11 flex items-center justify-center">
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+// [PRODUCTION FIX 2026-07-28] Catalog management had create + list only —
+// no way to edit or archive an existing entry anywhere. One modal handles
+// both create (book=null) and edit (book set), since the form fields are
+// identical either way; Archive lives here as a confirm-gated "danger
+// zone" action rather than a bare row button that could be clicked by
+// accident.
+function BookFormModal({
+  book, onClose,
+}: {
+  book: ApiBook | null
+  onClose: () => void
+}) {
+  const createBook  = useCreateBook()
+  const updateBook  = useUpdateBook()
+  const archiveBook = useArchiveBook()
+  const [confirmArchive, setConfirmArchive] = useState(false)
+
+  const [title, setTitle]     = useState(book?.title ?? '')
+  const [author, setAuthor]   = useState(book?.author ?? '')
+  const [isbn, setIsbn]       = useState(book?.isbn ?? '')
+  const [category, setCategory] = useState(book?.category ?? 'TEXTBOOK')
+  const [publisher, setPublisher] = useState(book?.publisher ?? '')
+  const [publishedYear, setPublishedYear] = useState(book?.publishedYear?.toString() ?? '')
+  const [totalCopies, setTotalCopies] = useState(book?.totalCopies?.toString() ?? '1')
+  const [barcode, setBarcode] = useState(book?.barcode ?? '')
+
+  const pending = createBook.isPending || updateBook.isPending || archiveBook.isPending
+  const error = createBook.error ?? updateBook.error ?? archiveBook.error
+
+  function handleSave() {
+    if (!title.trim() || !author.trim()) return
+    const data = {
+      title: title.trim(),
+      author: author.trim(),
+      isbn: isbn.trim() || undefined,
+      category: category as never,
+      publisher: publisher.trim() || undefined,
+      publishedYear: publishedYear ? Number(publishedYear) : undefined,
+      totalCopies: Number(totalCopies) || 1,
+      barcode: barcode.trim() || undefined,
+    }
+    if (book) {
+      updateBook.mutate({ id: book.id, data }, { onSuccess: onClose })
+    } else {
+      createBook.mutate(data, { onSuccess: onClose })
+    }
+  }
+
+  function handleArchive() {
+    if (!book) return
+    archiveBook.mutate(book.id, { onSuccess: onClose })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
+        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
+          <h2 className="font-heading font-bold text-brand-navy">{book ? 'Edit Book' : 'Add Book'}</h2>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
+            <XIcon className="w-4 h-4 text-muted" />
+          </button>
+        </div>
+        <div className="p-6 space-y-3">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="book-title" className="text-xs text-muted mb-1 block">Title</label>
+              <input id="book-title" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+            </div>
+            <div>
+              <label htmlFor="book-author" className="text-xs text-muted mb-1 block">Author</label>
+              <input id="book-author" value={author} onChange={(e) => setAuthor(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+            </div>
+            <div>
+              <label htmlFor="book-isbn" className="text-xs text-muted mb-1 block">ISBN <span className="text-muted/70">(unique — best identifier for issue/return)</span></label>
+              <input id="book-isbn" value={isbn} onChange={(e) => setIsbn(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+            </div>
+            <div>
+              <label htmlFor="book-category" className="text-xs text-muted mb-1 block">Category</label>
+              <select id="book-category" value={category} onChange={(e) => setCategory(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11">
+                {['TEXTBOOK', 'REFERENCE', 'FICTION', 'NONFICTION', 'SCIENCE', 'MATHEMATICS', 'HUMANITIES', 'PAST_PAPER', 'OTHER'].map((c) => (
+                  <option key={c} value={c}>{c.charAt(0) + c.slice(1).toLowerCase().replace('_', ' ')}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="book-publisher" className="text-xs text-muted mb-1 block">Publisher</label>
+              <input id="book-publisher" value={publisher} onChange={(e) => setPublisher(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+            </div>
+            <div>
+              <label htmlFor="book-year" className="text-xs text-muted mb-1 block">Published Year</label>
+              <input id="book-year" type="number" value={publishedYear} onChange={(e) => setPublishedYear(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+            </div>
+            <div>
+              <label htmlFor="book-copies" className="text-xs text-muted mb-1 block">Total Copies</label>
+              <input id="book-copies" type="number" min="1" value={totalCopies} onChange={(e) => setTotalCopies(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+            </div>
+            <div>
+              <label htmlFor="book-barcode" className="text-xs text-muted mb-1 block">Barcode <span className="text-muted/70">(optional)</span></label>
+              <input id="book-barcode" value={barcode} onChange={(e) => setBarcode(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={pending || !title.trim() || !author.trim()}
+            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+          >
+            {pending ? 'Saving…' : book ? 'Save Changes' : 'Add to Catalog'}
+          </button>
+          {error && <p className="text-sm text-brand-coral">{error instanceof Error ? error.message : 'Something went wrong.'}</p>}
+
+          {book && (
+            <div className="pt-4 mt-2 border-t border-base">
+              {confirmArchive ? (
+                <div className="flex items-center gap-3">
+                  <p className="text-xs text-muted flex-1">Archive this book? It will be removed from the searchable catalog (copies set to 0).</p>
+                  <button type="button" onClick={handleArchive} disabled={pending} className="text-xs font-semibold text-brand-coral hover:underline shrink-0">Confirm</button>
+                  <button type="button" onClick={() => setConfirmArchive(false)} className="text-xs text-muted hover:underline shrink-0">Cancel</button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setConfirmArchive(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-coral hover:underline">
+                  <Archive className="w-3.5 h-3.5" /> Archive this book
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -146,6 +345,17 @@ function LibraryContent() {
   // useBooks()/useDigitalResources() just never had callers passing them.
   const [categoryFilter, setCategoryFilter]   = useState('')
   const [availableOnly, setAvailableOnly]     = useState(false)
+  // [PRODUCTION FIX 2026-07-28] Sort/publisher/year filters and group-by
+  // all already worked server-side (or work purely client-side for
+  // grouping) — the catalog tab only ever offered category + search +
+  // available-only.
+  const [publisherFilter, setPublisherFilter] = useState('')
+  const [yearFilter, setYearFilter]           = useState('')
+  const [sortBy, setSortBy]                   = useState<'title' | 'author' | 'publishedYear' | 'availableCopies'>('title')
+  const [sortDir, setSortDir]                 = useState<'asc' | 'desc'>('asc')
+  const [groupBy, setGroupBy]                 = useState<'' | 'category' | 'publisher'>('')
+  const [editingBook, setEditingBook]         = useState<ApiBook | null>(null)
+  const [showAddBook, setShowAddBook]         = useState(false)
   const [digitalTypeFilter, setDigitalTypeFilter] = useState('')
   const [digitalFormFilter, setDigitalFormFilter] = useState('')
   const [digitalSubjectFilter, setDigitalSubjectFilter] = useState('')
@@ -167,7 +377,30 @@ function LibraryContent() {
     search,
     category:  categoryFilter || undefined,
     available: availableOnly || undefined,
+    publisher: publisherFilter || undefined,
+    year:      yearFilter ? Number(yearFilter) : undefined,
+    sortBy,
+    sortDir,
   })
+  const { data: catalogReport } = useCatalogReportStats()
+  const [fineStatusFilter, setFineStatusFilter] = useState<'' | 'PENDING' | 'PAID' | 'WAIVED'>('PENDING')
+  const { data: fines = [] } = useFines(fineStatusFilter || undefined)
+  const clearFine = useClearFine()
+
+  // Client-side grouping — the backend already returns the right sort
+  // order; grouping is purely a display concern on top of it.
+  const groupedBooks = groupBy
+    ? (() => {
+        const map = new Map<string, ApiBook[]>()
+        for (const b of books as ApiBook[]) {
+          const key = groupBy === 'category' ? b.category : (b.publisher || 'Unknown Publisher')
+          if (!map.has(key)) map.set(key, [])
+          map.get(key)!.push(b)
+        }
+        return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
+      })()
+    : null
+
   const { data: overdue = [] }      = useBorrowings({ overdue: true })
   const { data: digitalResources = [] } = useDigitalResources({
     type:    digitalTypeFilter || undefined,
@@ -285,7 +518,7 @@ function LibraryContent() {
 
       {/* Mobile-scrollable tab navigation — C7 */}
       <ModuleTabs<Tab>
-        tabs={TABS}
+        tabs={TABS.filter((t) => t.id !== 'reports' || isLibStaff)}
         active={tab}
         onChange={setTab}
         variant="underline"
@@ -329,6 +562,74 @@ function LibraryContent() {
               />
               Available now
             </label>
+            {/* [PRODUCTION FIX 2026-07-28] Publisher/year filters, sort
+                control, and group-by — the catalog only ever offered
+                category + search + available-only before this. */}
+            <div className="w-36">
+              <label htmlFor="library-publisher" className="sr-only">Filter by publisher</label>
+              <input
+                id="library-publisher"
+                value={publisherFilter}
+                onChange={(e) => setPublisherFilter(e.target.value)}
+                placeholder="Publisher…"
+                className="border border-base rounded-xl px-3 py-2.5 text-sm w-full bg-surface focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              />
+            </div>
+            <div className="w-28">
+              <label htmlFor="library-year" className="sr-only">Filter by publication year</label>
+              <input
+                id="library-year"
+                type="number"
+                value={yearFilter}
+                onChange={(e) => setYearFilter(e.target.value)}
+                placeholder="Year…"
+                className="border border-base rounded-xl px-3 py-2.5 text-sm w-full bg-surface focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label htmlFor="library-sort" className="sr-only">Sort by</label>
+              <select
+                id="library-sort"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="border border-base rounded-xl px-3 py-2.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              >
+                <option value="title">Sort: Title</option>
+                <option value="author">Sort: Author</option>
+                <option value="publishedYear">Sort: Year</option>
+                <option value="availableCopies">Sort: Availability</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                aria-label={`Sort direction: ${sortDir === 'asc' ? 'ascending' : 'descending'}`}
+                className="border border-base rounded-xl p-2.5 bg-surface hover:bg-page min-h-[44px]"
+              >
+                <ArrowUpDown className={`w-4 h-4 ${sortDir === 'desc' ? 'text-brand-teal' : 'text-muted'}`} />
+              </button>
+            </div>
+            <div className="w-40">
+              <label htmlFor="library-groupby" className="sr-only">Group by</label>
+              <select
+                id="library-groupby"
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value as typeof groupBy)}
+                className="border border-base rounded-xl px-3 py-2.5 text-sm w-full bg-surface focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              >
+                <option value="">No grouping</option>
+                <option value="category">Group by category</option>
+                <option value="publisher">Group by publisher</option>
+              </select>
+            </div>
+            {isLibStaff && (
+              <button
+                type="button"
+                onClick={() => setShowAddBook(true)}
+                className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-[44px]"
+              >
+                <BookOpen className="w-4 h-4" aria-hidden /> Add Book
+              </button>
+            )}
             {isLibStaff && (
               <div className="flex flex-col gap-1.5">
                 <div className="flex gap-2">
@@ -397,6 +698,11 @@ function LibraryContent() {
                           Issue
                         </button>
                       </PermissionGuard>
+                      {isLibStaff && (
+                        <button type="button" onClick={() => setEditingBook(b)} aria-label={`Edit ${b.title}`} className="text-muted hover:text-body min-h-11 min-w-11 flex items-center justify-center">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -406,7 +712,7 @@ function LibraryContent() {
               <table className="w-full text-sm border-collapse hidden md:table">
                 <thead>
                   <tr className="bg-page border-b border-base">
-                    {['Title', 'Author', 'Category', 'Copies', 'Available', ''].map((h) => (
+                    {['Title', 'Author', 'Category', 'Publisher', 'Year', 'Copies', 'Available', ''].map((h) => (
                       <th
                         key={h}
                         scope="col"
@@ -417,39 +723,22 @@ function LibraryContent() {
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-base">
-                  {(books as ApiBook[]).map((b) => (
-                    <tr key={b.id} className="hover:bg-page">
-                      <td className="px-4 py-3 font-medium">{b.title}</td>
-                      <td className="px-4 py-3 text-muted">{b.author}</td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs bg-base rounded px-2 py-0.5">{b.category}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center">{b.totalCopies}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`font-semibold ${
-                            b.availableCopies === 0 ? 'text-brand-coral' : 'text-brand-teal'
-                          }`}
-                        >
-                          {b.availableCopies}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <PermissionGuard permission="library.issueBook">
-                          <button
-                            type="button"
-                            disabled={b.availableCopies === 0}
-                            onClick={() => handleIssue(b.id)}
-                            className="text-xs font-semibold text-brand-teal underline disabled:opacity-40 min-h-11"
-                          >
-                            Issue
-                          </button>
-                        </PermissionGuard>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
+                {groupedBooks ? (
+                  groupedBooks.map(([groupName, groupBooks]) => (
+                    <tbody key={groupName} className="divide-y divide-base">
+                      <tr className="bg-page/70">
+                        <td colSpan={8} className="px-4 py-2 text-xs font-heading font-bold text-brand-teal uppercase tracking-wider">
+                          {groupName} · {groupBooks.length}
+                        </td>
+                      </tr>
+                      {groupBooks.map((b) => <BookRow key={b.id} book={b} isLibStaff={isLibStaff} onIssue={handleIssue} onEdit={setEditingBook} />)}
+                    </tbody>
+                  ))
+                ) : (
+                  <tbody className="divide-y divide-base">
+                    {(books as ApiBook[]).map((b) => <BookRow key={b.id} book={b} isLibStaff={isLibStaff} onIssue={handleIssue} onEdit={setEditingBook} />)}
+                  </tbody>
+                )}
               </table>
 
               {(books as ApiBook[]).length === 0 && (
@@ -678,6 +967,125 @@ function LibraryContent() {
             </div>
           </PermissionGuard>
         </div>
+      )}
+
+      {/* ── Reports & Fines tab (library staff only) ────────────────────────
+          [PRODUCTION FIX 2026-07-28] Most-borrowed/most-read/category
+          breakdown and fines management both had zero UI anywhere — the
+          former had no backend either until this pass; fines were created
+          automatically but had no listing/clearing surface at all. */}
+      {tab === 'reports' && isLibStaff && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="font-heading font-semibold text-body mb-3">Most Borrowed Books</h2>
+            {!catalogReport || catalogReport.mostBorrowed.length === 0 ? (
+              <p className="text-sm text-muted">No borrowing history yet.</p>
+            ) : (
+              <div className="bg-surface rounded-xl divide-y divide-base">
+                {catalogReport.mostBorrowed.map((r, i) => (
+                  <div key={r.book?.id ?? i} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                    <div>
+                      <span className="text-muted mr-2">{i + 1}.</span>
+                      <span className="font-medium text-body">{r.book?.title}</span>
+                      <span className="text-muted ml-1.5">— {r.book?.author}</span>
+                    </div>
+                    <span className="font-heading font-semibold text-brand-teal">{r.borrowCount}×</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h2 className="font-heading font-semibold text-body mb-3">Most Read (Digital)</h2>
+            {!catalogReport || catalogReport.mostRead.length === 0 ? (
+              <p className="text-sm text-muted">No digital resource views yet.</p>
+            ) : (
+              <div className="bg-surface rounded-xl divide-y divide-base">
+                {catalogReport.mostRead.map((r, i) => (
+                  <div key={r.resource?.id ?? i} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                    <div>
+                      <span className="text-muted mr-2">{i + 1}.</span>
+                      <span className="font-medium text-body">{r.resource?.title}</span>
+                      <span className="text-muted ml-1.5">— {r.resource?.type}</span>
+                    </div>
+                    <span className="font-heading font-semibold text-brand-teal">{r.viewCount} views</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h2 className="font-heading font-semibold text-body mb-3">Catalog by Category</h2>
+            {!catalogReport || catalogReport.byCategory.length === 0 ? (
+              <p className="text-sm text-muted">No books in the catalog yet.</p>
+            ) : (
+              <div className="grid sm:grid-cols-3 gap-3">
+                {catalogReport.byCategory.map((c) => (
+                  <div key={c.category} className="bg-surface rounded-xl p-4">
+                    <p className="font-heading font-semibold text-sm text-body">{c.category}</p>
+                    <p className="text-xs text-muted mt-1">{c.titleCount} titles · {c.copyCount} copies</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-heading font-semibold text-body">Library Fines</h2>
+              <select
+                value={fineStatusFilter}
+                onChange={(e) => setFineStatusFilter(e.target.value as typeof fineStatusFilter)}
+                className="border border-base rounded-lg px-3 py-1.5 text-sm bg-surface min-h-[36px]"
+                aria-label="Filter fines by status"
+              >
+                <option value="PENDING">Pending</option>
+                <option value="PAID">Paid</option>
+                <option value="WAIVED">Waived</option>
+                <option value="">All statuses</option>
+              </select>
+            </div>
+            {fines.length === 0 ? (
+              <p className="text-sm text-muted">No {fineStatusFilter ? fineStatusFilter.toLowerCase() : ''} fines.</p>
+            ) : (
+              <div className="bg-surface rounded-xl divide-y divide-base">
+                {fines.map((f) => (
+                  <div key={f.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                    <div>
+                      <p className="font-medium text-body">{f.borrowerName} — {f.bookTitle}</p>
+                      <p className="text-xs text-muted">{f.reason} · {formatMWK(f.amount)}</p>
+                    </div>
+                    {f.status === 'PENDING' ? (
+                      <PermissionGuard permission="library.clearFine">
+                        <button
+                          type="button"
+                          onClick={() => clearFine.mutate(f.id)}
+                          disabled={clearFine.isPending}
+                          className="text-xs font-semibold text-brand-teal hover:underline disabled:opacity-50"
+                        >
+                          Mark Paid
+                        </button>
+                      </PermissionGuard>
+                    ) : (
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${f.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-brand-teal/10 text-brand-teal'}`}>
+                        {f.status}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {(showAddBook || editingBook) && (
+        <BookFormModal
+          book={editingBook}
+          onClose={() => { setShowAddBook(false); setEditingBook(null) }}
+        />
       )}
 
       {viewingResource && (
