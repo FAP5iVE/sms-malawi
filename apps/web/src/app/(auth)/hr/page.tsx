@@ -61,6 +61,7 @@ import { useSearchParams }  from 'next/navigation'
 import { RoleGuard }        from '@/components/shared/RoleGuard'
 import { useAuthStore }     from '@/store/authStore'
 import { usePermissions }   from '@/hooks/usePermissions'
+import type { LeaveRequestInput } from '@shared/schemas/hr'
 import {
   useStaffDirectory,
   useLeaveRequests,
@@ -185,7 +186,7 @@ function HRContent() {
   const { data: myLeaveRequests = [] } = useLeaveRequests({ staffId: user?.uid })
   const applyForLeave = useApplyForLeave()
   const [showLeaveForm, setShowLeaveForm] = useState(false)
-  const [leaveType, setLeaveType]         = useState('ANNUAL')
+  const [leaveType, setLeaveType]         = useState<LeaveRequestInput['leaveType']>('ANNUAL')
   const [leaveStartDate, setLeaveStartDate] = useState('')
   const [leaveEndDate, setLeaveEndDate]     = useState('')
   const [leaveReason, setLeaveReason]       = useState('')
@@ -378,7 +379,7 @@ function HRContent() {
                     <select
                       id="leave-type"
                       value={leaveType}
-                      onChange={(e) => setLeaveType(e.target.value)}
+                      onChange={(e) => setLeaveType(e.target.value as LeaveRequestInput['leaveType'])}
                       className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
                     >
                       {['ANNUAL', 'SICK', 'MATERNITY', 'PATERNITY', 'STUDY', 'UNPAID', 'EMERGENCY'].map((t) => (

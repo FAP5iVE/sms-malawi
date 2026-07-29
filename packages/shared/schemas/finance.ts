@@ -110,6 +110,7 @@ export const CreateLibraryFineSchema = z.object({
 export type RecordPaymentInput = z.infer<typeof RecordPaymentSchema>
 export type GenerateInvoiceInput = z.infer<typeof GenerateInvoiceSchema>
 export type CreateExpenseInput = z.infer<typeof CreateExpenseSchema>
+export type CreateFeeStructureInput = z.infer<typeof CreateFeeStructureSchema>
 export type CreateScholarshipInput = z.infer<typeof CreateScholarshipSchema>
 export type CreateBudgetInput = z.infer<typeof CreateBudgetSchema>
 export type CreateInstallmentPlanInput = z.infer<typeof CreateInstallmentPlanSchema>
