@@ -126,7 +126,7 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
 }
 
 function PendingApprovalList() {
-  const { pending, loading } = usePendingAnnouncements()
+  const { pending, loading, error: feedError } = usePendingAnnouncements()
   const queryClient = useQueryClient()
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -150,6 +150,17 @@ function PendingApprovalList() {
         {[1, 2].map((i) => (
           <div key={i} className="h-24 rounded-xl bg-surface animate-pulse" />
         ))}
+      </div>
+    )
+  }
+
+  // [FE-007] Previously fell through to the empty state below, masking a
+  // real fetch/permission failure as "nothing to approve."
+  if (feedError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-brand-coral">
+        <Check className="w-10 h-10 mb-3 opacity-40" aria-hidden="true" />
+        <p className="text-sm">{feedError}</p>
       </div>
     )
   }

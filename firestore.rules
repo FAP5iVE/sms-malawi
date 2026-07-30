@@ -85,7 +85,7 @@ service cloud.firestore {
 
     /** Returns true if the announcement targets the current user's role or all users. */
     function announcementTargetsMe(data) {
-      return data.targetRoles.hasAny([role()]) || data.targetAll == true;
+      return data.get('targetRoles', []).hasAny([role()]) || data.get('targetAll', false) == true;
     }
 
     /** Returns true if the announcement is in a visible published state. */
