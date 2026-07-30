@@ -617,12 +617,12 @@ export function PageHeader() {
               is shown at all if they fail, rather than a fake year. */}
           {periodLoading ? (
             <span
-              className="h-6 w-36 rounded-full bg-page animate-pulse"
+              className="h-4 w-32 rounded bg-page animate-pulse"
               role="status"
               aria-label="Loading academic term"
             />
           ) : academicYear && term ? (
-            <span className="text-xs font-semibold font-heading bg-brand-teal/10 text-brand-teal border border-brand-teal/20 px-3 py-1 rounded-full">
+            <span className="text-sm font-semibold font-heading text-body">
               Term {term} — {academicYear}
             </span>
           ) : (

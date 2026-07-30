@@ -31,15 +31,16 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sidebar }               from '@/components/shared/Sidebar'
-import { PageHeader }            from '@/components/shared/PageHeader'
-import { MobileBottomNav }       from '@/components/shared/MobileBottomNav'
-import { useInactivityTimer }    from '@/hooks/useInactivityTimer'
-import { useMotionEnabled }      from '@/store/motionStore'
-import { PAGE_VARIANTS }         from '@/lib/motion'
-import { useCallback }                           from 'react'
-import { logout }                                from '@/components/providers/AuthProvider'
-import { InactivityWarningDialog }               from '@/components/shared/InactivityWarningDialog'
+import { Sidebar } from '@/components/shared/Sidebar'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
+import { useInactivityTimer } from '@/hooks/useInactivityTimer'
+import { useMotionEnabled } from '@/store/motionStore'
+import { PAGE_VARIANTS } from '@/lib/motion'
+import { useCallback } from 'react'
+import { logout } from '@/components/providers/AuthProvider'
+import { InactivityWarningDialog } from '@/components/shared/InactivityWarningDialog'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INACTIVITY WATCHER
@@ -48,8 +49,8 @@ import { InactivityWarningDialog }               from '@/components/shared/Inact
 // ─────────────────────────────────────────────────────────────────────────────
 
 function InactivityManager() {
-  const router                         = useRouter()
-  const { showWarning, keepAlive }     = useInactivityTimer()
+  const router = useRouter()
+  const { showWarning, keepAlive } = useInactivityTimer()
 
   const handleLogout = useCallback(async () => {
     // R2: delegate to AuthProvider's shared logout() — it sequences the FCM
@@ -62,12 +63,7 @@ function InactivityManager() {
 
   if (!showWarning) return null
 
-  return (
-    <InactivityWarningDialog
-      onKeepAlive={keepAlive}
-      onLogout={handleLogout}
-    />
-  )
+  return <InactivityWarningDialog onKeepAlive={keepAlive} onLogout={handleLogout} />
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -85,7 +81,7 @@ function InactivityManager() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function PageTransitionWrapper({ children }: { children: React.ReactNode }) {
-  const pathname      = usePathname()
+  const pathname = usePathname()
   const motionEnabled = useMotionEnabled()
 
   if (!motionEnabled) {
@@ -135,7 +131,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           2. Main column  — always fills remaining width
       */}
       <div className="flex h-dvh overflow-hidden bg-page">
-
         {/* ── Sidebar wrapper ─────────────────────────────────────────────
           `hidden`    → display:none below md (Sidebar not rendered visually)
           `md:flex`   → flex container from md up (Sidebar is a flex child;
@@ -156,7 +151,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           The column is itself a flex column: PageHeader (fixed height) + main (flex-1).
         ────────────────────────────────────────────────────────────────── */}
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-
           {/*
             PageHeader — Phase C2 will add a mobile variant.
             For C1 the existing PageHeader renders across all breakpoints.
@@ -168,35 +162,28 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
             Padding strategy:
               Mobile (< md):
-                p-4          → 1rem on all sides (tighter on small screens)
-                pb-[calc(5rem+var(--sab))] → 5rem (80px) base clearance for the
-                               fixed MobileBottomNav's ~60px bar, PLUS the same
-                               env(safe-area-inset-bottom) inset MobileBottomNav
-                               itself pads with (--sab custom property, set below).
-                               A flat 80px alone under-clears on any device whose
-                               gesture-bar/home-indicator safe-area inset pushes the
-                               real nav height past 80px (most current Android
-                               phones and notch-less-home-button iPhones) — the
-                               last scrollable content ends up hidden behind the
-                               nav, unreachable by scrolling. [FE-001]
+                p-4              → 1rem on all sides (tighter on small screens)
+                main-scroll-pad  → clears MobileBottomNav's real height via a
+                                   plain CSS class in globals.css (env()/calc(),
+                                   no inline style, no Tailwind arbitrary value —
+                                   the earlier inline-custom-property version
+                                   broke the authenticated shell at runtime and
+                                   was reverted). [FE-001]
 
               Desktop (md+):
-                md:p-6       → 1.5rem on all sides (standard dashboard spacing)
-                md:pb-6      → overrides the mobile calc(), resetting bottom to
-                               1.5rem — no fixed bottom bar exists at this
-                               breakpoint (Sidebar replaces MobileBottomNav here).
+                md:p-6           → 1.5rem on all sides (standard dashboard spacing)
+                                   main-scroll-pad's own media query resets its
+                                   bottom padding to 1.5rem here — no fixed bottom
+                                   bar exists at this breakpoint.
 
             `overflow-y-auto` — scrolling is on this container, not the body.
             `relative`        — establishes stacking context for PageTransitionWrapper.
             `h-dvh` fallback  — the parent already constrains height via overflow-hidden.
           */}
-          <main
-            className="flex-1 overflow-y-auto p-4 pb-[calc(5rem+var(--sab))] md:p-6 md:pb-6 relative"
-            style={{ '--sab': 'env(safe-area-inset-bottom, 0px)' } as React.CSSProperties}
-          >
-            <PageTransitionWrapper>
-              {children}
-            </PageTransitionWrapper>
+          <main className="flex-1 overflow-y-auto p-4 main-scroll-pad md:p-6 relative">
+            <ErrorBoundary>
+              <PageTransitionWrapper>{children}</PageTransitionWrapper>
+            </ErrorBoundary>
           </main>
         </div>
       </div>

@@ -453,15 +453,15 @@ export function useStudentFeeStatement(studentId: string) {
 }
 
 /** [R14 — NEW endpoint] report.viewOwnAttendance. */
-export function useOwnAttendance(studentId: string, academicYear: string, term: number) {
+export function useOwnAttendance(studentId: string, academicYear?: string, term?: number) {
   return useQuery({
     queryKey: queryKeys.analytics.studentAttendance(studentId, academicYear, term),
     queryFn: () =>
       apiFetch<ApiOwnAttendanceSummary>(
         `/analytics/student/attendance${qs({
           studentId: studentId || undefined,
-          academicYear,
-          term,
+          academicYear: academicYear || undefined,
+          term: term || undefined,
         })}`,
       ),
     staleTime: STALE.FAST,

@@ -429,8 +429,8 @@ export const queryKeys = {
       ['analytics', 'student', 'subject-breakdown', studentId, year, term] as const,
     studentFeeStatement: (studentId: string) =>
       ['analytics', 'student', 'fee-statement', studentId] as const,
-    studentAttendance: (studentId: string, year: string, term: number) =>
-      ['analytics', 'student', 'attendance', studentId, year, term] as const,
+    studentAttendance: (studentId: string, year?: string, term?: number) =>
+      ['analytics', 'student', 'attendance', studentId, year ?? null, term ?? null] as const,
 
     maneb: () => ['analytics', 'maneb'] as const,
     manebSchoolStats: (year: string) => ['analytics', 'maneb', 'school-stats', year] as const,

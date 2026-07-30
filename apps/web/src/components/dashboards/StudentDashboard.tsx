@@ -118,8 +118,8 @@ export function StudentDashboard() {
   // unblocked by R6's Postgres Attendance model.
   const { data: attendance, isLoading: attendanceLoading } = useOwnAttendance(
     me?.id ?? '',
-    academicYear ?? '',
-    term ?? 0,
+    academicYear,
+    term,
   )
   const attendanceData: ChartDataPoint[] = attendance
     ? [
