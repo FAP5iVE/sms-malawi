@@ -90,9 +90,9 @@ service cloud.firestore {
 
     /** Returns true if the announcement is in a visible published state. */
     function isAnnouncementPublished(data) {
-      return data.status == 'APPROVED'
-        && (data.scheduledAt == null || data.scheduledAt <= request.time)
-        && (data.expiresAt   == null || data.expiresAt   >  request.time);
+      return data.status == 'PUBLISHED'
+        && (data.get('scheduledAt', null) == null || data.get('scheduledAt', null) <= request.time)
+        && (data.get('expiresAt', null)   == null || data.get('expiresAt', null)   >  request.time);
     }
 
     // ── ATTENDANCE ────────────────────────────────────────
@@ -138,7 +138,7 @@ service cloud.firestore {
     //     targetRoles:  string[],
     //     targetAll:    boolean,
     //     classId:      string | null,
-    //     status:       'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ARCHIVED',
+    //     status:       'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'SCHEDULED' | 'REJECTED' | 'ARCHIVED',
     //     scheduledAt:  Timestamp | null,
     //     expiresAt:    Timestamp | null,
     //     requiresAck:  boolean,
@@ -146,12 +146,12 @@ service cloud.firestore {
     //     updatedAt:    Timestamp,
     //   }
     //
-    // Read logic:   Approved + targeted announcements visible to all authenticated users.
+    // Read logic:   Published/scheduled + targeted announcements visible to all authenticated users.
     //               Drafts and pending-approval visible only to the author and admin/high_rank.
-    // Write logic:  Staff can create (as DRAFT or PENDING_APPROVAL).
-    //               Admin/high_rank can approve, reject, archive.
-    //               Authors can edit their own DRAFT announcements only.
-    //               Students can create class-scoped announcements (status = PENDING_APPROVAL).
+    // Write logic:  All real writes go through the backend (announcementService.ts, Admin SDK —
+    //               not subject to these rules): POST /announcements, PATCH /:id/approve. The
+    //               rules below are defense-in-depth only, kept correct in case a client-side
+    //               write path is ever added back.
 
     match /announcements/{announcementId} {
       allow read: if isAuth() && (
@@ -163,11 +163,12 @@ service cloud.firestore {
         || isHighRankOrAdmin()
       );
 
-      // Staff can create announcements (DRAFT or PENDING_APPROVAL).
+      // Staff can create announcements (DRAFT, PENDING_APPROVAL, PUBLISHED, or SCHEDULED —
+      // matching announcementService.createAnnouncement()'s real status resolution).
       // Students can submit class-scoped announcements (must be PENDING_APPROVAL).
       allow create: if isAuth()
         && (
-          (isStaff() && request.resource.data.status in ['DRAFT', 'PENDING_APPROVAL', 'APPROVED'])
+          (isStaff() && request.resource.data.status in ['DRAFT', 'PENDING_APPROVAL', 'PUBLISHED', 'SCHEDULED'])
           || (isStudent()
               && request.resource.data.status == 'PENDING_APPROVAL'
               && request.resource.data.classId != null

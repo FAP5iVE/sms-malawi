@@ -1,42 +1,37 @@
 /*
  * apps/web/src/components/announcements/AnnouncementForm.tsx
  *
- * [CHANGE TYPE]: TARGETED EDIT (two independent fixes)
- * [R-PHASE]: R13 — Announcements, Timetable & Calendar Domain
- * [PURPOSE]:
- *   1. Highest-priority single-character fix in this phase: the Firestore
- *      collection reference was the literal string 'ANNOUNCEMENTS'
- *      (uppercase) while every reader in the codebase
- *      (useAnnouncements.ts, announcementService.ts) queries the real,
- *      lowercase COLLECTIONS.ANNOUNCEMENTS ('announcements') — every
- *      announcement ever submitted through this form wrote into a
- *      collection nothing reads, with the submitter shown a false
- *      success state (onClose() fires unconditionally on a successful
- *      addDoc(), regardless of which collection it landed in).
- *   2. canPublishDirectly: was `role === 'admin' || role === 'high_rank'`.
- *      Checked against the real permission matrix
- *      (S/types/permissions.ts): admin holds none of
- *      announcement.create/createWithApproval/publishDirect — zero
- *      formal basis for direct publish. high_rank is the only role
- *      holding both announcement.create AND announcement.publishDirect
- *      together, so it is the only role that should skip the approval
- *      queue. (student — along with finance, library, lower_rank,
- *      academic, hr, exam_officer — holds announcement.createWithApproval
- *      only, so it correctly stays on the approval path here; the
- *      separate, currently-broken gate that excludes student from the
- *      create button entirely lives in announcements/page.tsx's
- *      canCreate, fixed in the same phase.)
- * [DEPENDS ON]: @shared/constants/malawi (COLLECTIONS.ANNOUNCEMENTS),
+ * [CHANGE TYPE]: MAJOR REWRITE
+ * [PURPOSE]: [FE-005/BE-003] This form wrote the announcement document
+ *   directly to Firestore from the client (addDoc) — exactly the bug this
+ *   file's own prior header comment described as already fixed by the real
+ *   POST /announcements route (announcementService.createAnnouncement(),
+ *   fully built, permission-checked server-side), except the form was never
+ *   actually migrated to call it. The direct client write is why every
+ *   submit failed with "Missing or insufficient permissions": Firestore's
+ *   security rules require status 'APPROVED' to create/read an
+ *   announcement, but this form (and every other layer of the app —
+ *   announcementService.ts, public.ts, calendar.ts, useAnnouncements.ts)
+ *   uses 'PUBLISHED'/'SCHEDULED'/'PENDING_APPROVAL' — firestore.rules was
+ *   the sole, stale outlier never updated to match. Posting through the
+ *   backend sidesteps that mismatch entirely (Admin SDK writes are not
+ *   subject to Firestore security rules) and fixes a real authorization
+ *   gap too: publish-vs-approval was decided client-side from a hardcoded
+ *   role === 'high_rank' check instead of the real
+ *   announcement.publishDirect permission, which the server now enforces.
+ *   The image upload already correctly went through the backend and is
+ *   unchanged.
+ * [DEPENDS ON]: W/server/routes/announcements.ts (POST /), W/hooks/
+ *   usePermissions.ts, @shared/constants/malawi (COLLECTIONS.ANNOUNCEMENTS
+ *   — no longer used here, kept for reference in useAnnouncements.ts),
  *   @shared/schemas/announcement (AnnouncementSchema — relocated this
  *   phase from @shared/schemas/student)
  */
 'use client'
 import { useState } from 'react'
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
 import { useAuthStore } from '@/store/authStore'
+import { usePermissions } from '@/hooks/usePermissions'
 import { AnnouncementSchema } from '@shared/schemas/announcement'
-import { COLLECTIONS } from '@shared/constants/storage'
 import { apiFetch } from '@/lib/api-client'
 import { X, Loader2, ImagePlus } from 'lucide-react'
 import { USER_ROLES } from '@shared/types/roles'
@@ -46,7 +41,8 @@ interface Props {
 }
 
 export function AnnouncementForm({ onClose }: Props) {
-  const { user, role } = useAuthStore()
+  const { user } = useAuthStore()
+  const { can } = usePermissions()
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [targetAll, setTargetAll] = useState(true)
@@ -60,11 +56,11 @@ export function AnnouncementForm({ onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Only high_rank holds both announcement.create AND announcement.publishDirect —
-  // every other role that can submit at all holds announcement.createWithApproval
-  // only, and must go through the approval queue.
-  const canPublishDirectly = role === 'high_rank'
-  const status = canPublishDirectly ? 'PUBLISHED' : 'PENDING_APPROVAL'
+  // Display-only — the server independently re-derives this from the real
+  // announcement.publishDirect permission (announcements.ts's POST /
+  // route) and is the actual authority. This only decides which message
+  // and button label to show before submitting.
+  const canPublishDirectly = can('announcement.publishDirect')
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null
@@ -75,27 +71,16 @@ export function AnnouncementForm({ onClose }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    // [PRODUCTION FIX 2026-07-28] createdByUid: user?.uid silently became
-    // `undefined` if the auth store hadn't finished hydrating `user` yet
-    // (role can populate slightly ahead of user in some timing cases) —
-    // and Firestore's addDoc() throws on ANY field whose value is
-    // `undefined`. Combined with the bare `catch {}` below (which discarded
-    // the real error entirely), this produced exactly the reported symptom:
-    // a generic failure with no way to tell what actually went wrong.
-    // Guarding here turns that into a clear, specific message instead of a
-    // Firestore SDK exception.
     if (!user?.uid) {
       setError('You must be signed in to post an announcement. Please refresh and try again.')
       return
     }
-    const parsed = AnnouncementSchema.safeParse({ title, body, targetAll, targetRoles, status, publicWebsite })
+    const parsed = AnnouncementSchema.safeParse({ title, body, targetAll, targetRoles, publicWebsite })
     if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Validation error')
     setLoading(true)
     try {
-      // Upload the cover image first (if any) — AnnouncementForm writes
-      // straight to Firestore below, not through POST /announcements, so
-      // the image has to go through its own small endpoint (POST
-      // /announcements/image) to reach Appwrite and get a fileId back.
+      // Upload the cover image first (if any) to get back a fileId to
+      // include in the announcement create call below.
       let imageKey: string | undefined
       if (imageFile) {
         const fd = new FormData()
@@ -106,18 +91,19 @@ export function AnnouncementForm({ onClose }: Props) {
         })
         imageKey = uploaded.imageKey
       }
-      await addDoc(collection(db!, COLLECTIONS.ANNOUNCEMENTS), {
-        ...parsed.data,
-        imageKey: imageKey ?? null,
-        createdByUid: user.uid,
-        createdAt: serverTimestamp(),
+      await apiFetch<{ id: string; status: string }>('/announcements', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: parsed.data.title,
+          body: parsed.data.body,
+          targetAll: parsed.data.targetAll,
+          targetRoles: parsed.data.targetRoles,
+          publicWebsite: parsed.data.publicWebsite,
+          imageKey,
+        }),
       })
       onClose()
     } catch (err) {
-      // Was a bare `catch {}` that discarded the real error completely —
-      // logged now so it's visible in devtools, and the message itself is
-      // shown when it's an Error (rather than always the same generic
-      // string regardless of cause).
       console.error('Failed to post announcement:', err)
       setError(err instanceof Error ? err.message : 'Failed to post announcement. Please try again.')
     } finally {
