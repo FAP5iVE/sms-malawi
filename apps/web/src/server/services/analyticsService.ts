@@ -1449,19 +1449,21 @@ export async function getStudentSubjectBreakdown(
 
   if (!result?.subjectResults) return []
 
-  const raw = result.subjectResults as Record<string, { score: number; grade: string; maxMark: number }>[]
-  if (!Array.isArray(raw)) return []
+  // The only writer, examService.ts's computeTermResults(), stores this as a
+  // flat object keyed by subject: { [subject]: { average, grade, pass } } —
+  // average already normalized to a 0-100 percentage. This previously read
+  // it as an array of { score, maxMark } objects (a shape nothing writes),
+  // so Array.isArray() below always failed and this endpoint always
+  // returned [] silently.
+  const raw = result.subjectResults as Record<string, { average: number; grade: string; pass: boolean }>
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return []
 
-  return raw.map((entry) => {
-    const subject = Object.keys(entry)[0] ?? 'Unknown'
-    const data = entry[subject]
-    return {
-      subject,
-      score: data?.score ?? 0,
-      grade: data?.grade ?? '—',
-      maxMark: data?.maxMark ?? 100,
-    }
-  })
+  return Object.entries(raw).map(([subject, data]) => ({
+    subject,
+    score:   data?.average ?? 0,
+    grade:   data?.grade ?? '—',
+    maxMark: 100,
+  }))
 }
 
 /**

@@ -1,18 +1,26 @@
 'use client'
 import { useState } from 'react'
 import { useStudentResults, useGenerateReportCard } from '@/hooks/useExams'
+import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
 import { AlertTriangle, FileDown, TrendingUp } from 'lucide-react'
 import type { ApiTermResult } from '@shared/types/api'
 
 interface Props { studentId: string }
 
+/** Renders a percentage value, or an em dash if it isn't a real number yet
+ *  (e.g. a subject with no marks recorded for this term). Prevents the
+ *  confirmed crash from calling .toFixed() on an undefined/null average. */
+function pct(value: number | null | undefined): string {
+  return typeof value === 'number' && !Number.isNaN(value) ? `${value.toFixed(1)}%` : '—'
+}
+
 export function StudentResultsView({ studentId }: Props) {
-  const [academicYear] = useState('2025/2026')
+  const { academicYear, isLoading: periodLoading } = useCurrentAcademicPeriod()
   const [term, setTerm] = useState(1)
-  const { data: result, isLoading, error } = useStudentResults(studentId, academicYear, term)
+  const { data: result, isLoading, error } = useStudentResults(studentId, academicYear ?? '', term)
   const generateCard = useGenerateReportCard()
 
-  if (isLoading) return <div className="animate-pulse h-40 rounded-xl bg-surface" />
+  if (isLoading || periodLoading) return <div className="animate-pulse h-40 rounded-xl bg-surface" />
 
   // Fee gate error — shown when API returns 403
   if (error) {
@@ -58,7 +66,7 @@ export function StudentResultsView({ studentId }: Props) {
           ))}
         </div>
         <button
-          onClick={() => generateCard.mutate({ studentId, academicYear, term }, {
+          onClick={() => generateCard.mutate({ studentId, academicYear: academicYear ?? '', term }, {
             onSuccess: (d) => window.open(d.url, '_blank'),
           })}
           disabled={generateCard.isPending}
@@ -71,7 +79,7 @@ export function StudentResultsView({ studentId }: Props) {
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Average',  value: `${Number(r.average).toFixed(1)}%` },
+          { label: 'Average',  value: pct(r.average) },
           { label: 'Grade',    value: r.grade },
           { label: 'Position', value: r.position ? `#${r.position}` : '—' },
         ].map(({ label, value }) => (
@@ -104,13 +112,13 @@ export function StudentResultsView({ studentId }: Props) {
             {Object.entries(subjects).map(([subject, data]) => (
               <tr key={subject} className="hover:bg-page">
                 <td className="px-4 py-3 font-medium">{subject}</td>
-                <td className="px-4 py-3">{data.average.toFixed(1)}%</td>
-                <td className="px-4 py-3 font-bold text-brand-navy">{data.grade}</td>
+                <td className="px-4 py-3">{pct(data?.average)}</td>
+                <td className="px-4 py-3 font-bold text-brand-navy">{data?.grade ?? '—'}</td>
                 <td className="px-4 py-3">
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                    data.pass ? 'bg-green-100 text-green-700' : 'bg-brand-coral/10 text-brand-coral'
+                    data?.pass ? 'bg-green-100 text-green-700' : 'bg-brand-coral/10 text-brand-coral'
                   }`}>
-                    {data.pass ? 'Pass' : 'Fail'}
+                    {data?.pass ? 'Pass' : 'Fail'}
                   </span>
                 </td>
               </tr>
