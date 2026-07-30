@@ -94,13 +94,6 @@
       "collectionGroup": "sessions",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "lastActiveAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "sessions",
-      "queryScope": "COLLECTION",
-      "fields": [
         { "fieldPath": "role",         "order": "ASCENDING"  },
         { "fieldPath": "lastActiveAt", "order": "DESCENDING" }
       ]
