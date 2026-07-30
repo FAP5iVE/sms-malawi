@@ -224,7 +224,13 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
   })
 
   if (status === 'PUBLISHED') {
-    await notifyAudience(ref.id, {
+    // [BE-005] Not awaited — see this function's own note above. The
+    // Firestore write above is what the client is actually waiting to
+    // confirm; notification fan-out is best-effort background work that
+    // must not hold the HTTP response open, especially for a large
+    // targetAll audience (notifyAudience() never rejects — it has its own
+    // internal try/catch).
+    void notifyAudience(ref.id, {
       title: data.title,
       body: data.body,
       targetAll: data.targetAll ?? false,
@@ -254,7 +260,8 @@ export async function publishAnnouncement(id: string, approvedByUid: string) {
     updatedAt: Timestamp.now(),
   })
 
-  await notifyAudience(id, {
+  // [BE-005] Not awaited — same reasoning as createAnnouncement() above.
+  void notifyAudience(id, {
     title: existing.title as string,
     body: existing.body as string,
     targetAll: (existing.targetAll as boolean | undefined) ?? false,
