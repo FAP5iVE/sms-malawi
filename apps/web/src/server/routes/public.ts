@@ -36,7 +36,8 @@
  *   @shared/constants/malawi (COLLECTIONS.ANNOUNCEMENTS)
  */
 import { Router }          from 'express'
-import * as admin          from 'firebase-admin'
+import { getFirestore }    from 'firebase-admin/firestore'
+import { getAdminApp }     from '@/lib/verifyAuth'
 import { prisma }          from '@/lib/prisma'
 import { sendEmail }       from '@/lib/email'
 import { randomBytes }     from 'crypto'
@@ -153,7 +154,7 @@ publicRouter.get('/announcements', async (req, res) => {
   // public marketing site" — an internal all-staff notice could leak here
   // with no way to opt out. publicWebsite is a distinct, explicit opt-in
   // (see announcementService.ts's CreateAnnouncementInput comment).
-  const baseQuery = admin.firestore()
+  const baseQuery = getFirestore(getAdminApp())
     .collection(COLLECTIONS.ANNOUNCEMENTS)
     .where('status', '==', 'PUBLISHED')
     .where('publicWebsite', '==', true)
