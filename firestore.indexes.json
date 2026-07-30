@@ -169,14 +169,6 @@
       "collectionGroup": "security_events",
       "fieldPath":       "userAgent",
       "indexes": []
-    },
-    {
-      "collectionGroup": "user_fcm_tokens",
-      "fieldPath":       "__name__",
-      "indexes": [
-        { "order": "ASCENDING",  "queryScope": "COLLECTION" },
-        { "order": "DESCENDING", "queryScope": "COLLECTION" }
-      ]
     }
   ]
 }
