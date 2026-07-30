@@ -29,11 +29,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAnnouncements, usePendingAnnouncements } from '@/hooks/useAnnouncements'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { AnnouncementForm } from '@/components/announcements/AnnouncementForm'
-import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Bell, PlusCircle, Megaphone, Check, Loader2 } from 'lucide-react'
+import { Bell, PlusCircle, Megaphone, Check, Loader2, CalendarDays } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,7 +91,15 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
         <div key={a.id} className="bg-surface border border-base rounded-2xl p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="font-heading font-semibold text-body">{a.title}</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-heading font-semibold text-body">{a.title}</h3>
+                {a.eventDate && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-heading font-bold px-2 py-0.5 rounded-full bg-brand-navy/10 text-brand-navy">
+                    <CalendarDays className="w-3 h-3" aria-hidden />
+                    {new Date(a.eventDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-muted mt-1 leading-relaxed">{a.body}</p>
             </div>
             <span
@@ -191,28 +198,35 @@ function PendingApprovalList() {
 
 function AnnouncementsContent() {
   const { announcements, loading: isLoading, error: announcementsError } = useAnnouncements()
-  const { role } = useAuthStore()
   const { can } = usePermissions()
-  const [showForm, setShowForm] = useState(false)
+  const [formMode, setFormMode] = useState<'announcement' | 'event' | null>(null)
 
-  const canCreate = role !== 'admin'
+  const canCreate = can('announcement.create') || can('announcement.createWithApproval')
   const canApprove = can('announcement.approvePublish')
 
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <Megaphone className="w-5 h-5 text-brand-teal" aria-hidden="true" />
           <h1 className="font-heading font-bold text-xl text-brand-navy">Announcements</h1>
         </div>
         {canCreate && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 bg-brand-teal text-white px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-brand-teal-light transition-colors min-h-[44px]"
-          >
-            <PlusCircle className="w-4 h-4" aria-hidden="true" /> New Announcement
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFormMode('event')}
+              className="flex items-center gap-2 border border-base text-body px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-page transition-colors min-h-[44px]"
+            >
+              <CalendarDays className="w-4 h-4" aria-hidden="true" /> New Event
+            </button>
+            <button
+              onClick={() => setFormMode('announcement')}
+              className="flex items-center gap-2 bg-brand-teal text-white px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-brand-teal-light transition-colors min-h-[44px]"
+            >
+              <PlusCircle className="w-4 h-4" aria-hidden="true" /> New Announcement
+            </button>
+          </div>
         )}
       </div>
 
@@ -234,7 +248,7 @@ function AnnouncementsContent() {
       )}
 
       {/* Form modal */}
-      {showForm && <AnnouncementForm onClose={() => setShowForm(false)} />}
+      {formMode && <AnnouncementForm mode={formMode} onClose={() => setFormMode(null)} />}
     </div>
   )
 }

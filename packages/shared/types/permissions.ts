@@ -373,8 +373,11 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Applications — oversight
     'application.view',
 
-    // Announcements — moderation
+    // Announcements — full: publish directly, view, approve/deny (same
+    // authority as high_rank per the intended workflow) [SEC-001]
     'announcement.view',
+    'announcement.create',
+    'announcement.publishDirect',
     'announcement.approvePublish',
     'announcement.deleteAny',
 
@@ -838,9 +841,12 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'application.view',
     'application.review',
 
-    // Announcements — own only, pending approval
+    // Announcements — own submissions go to approval; also holds
+    // approval authority per the intended workflow (approved by admin
+    // or lower_rank staff) [SEC-001]
     'announcement.view',
     'announcement.createWithApproval',
+    'announcement.approvePublish',
     'announcement.editOwn',
     'announcement.deleteOwn',
 

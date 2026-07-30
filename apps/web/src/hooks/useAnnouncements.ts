@@ -28,6 +28,8 @@ export interface Announcement {
   status: string
   targetAll?: boolean
   targetRoles?: string[]
+  eventDate?: string | null
+  publicWebsite?: boolean
   createdByUid: string
   createdAt: Timestamp
 }

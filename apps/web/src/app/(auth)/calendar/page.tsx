@@ -144,8 +144,14 @@ function CreateEventDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-surface rounded-2xl w-full max-w-md shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-base">
+      {/* [UX-003] Had no height cap and no scroll — on a shorter viewport
+          the footer buttons (Cancel/Create) could be pushed off-screen
+          with no way to reach them. Capped height + scrollable body;
+          header is sticky so the close button stays reachable no matter
+          how far you've scrolled — matches AnnouncementForm.tsx's own
+          established fix for the identical defect. */}
+      <div className="bg-surface rounded-2xl w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy">New Calendar Event</h2>
           <button
             onClick={onClose}
