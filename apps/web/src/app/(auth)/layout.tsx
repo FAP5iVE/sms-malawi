@@ -6,18 +6,20 @@
  * Authenticated shell layout with full mobile-first responsive architecture.
  *
  * Breakpoint strategy:
- *   < lg (1024px): Mobile shell — PageHeader (top) + scrollable main + MobileBottomNav (fixed bottom)
- *   lg+  (1024px): Desktop shell — Sidebar (left) + PageHeader + scrollable main
+ *   < md (768px): Mobile shell — PageHeader (top) + scrollable main + MobileBottomNav (fixed bottom)
+ *   md+  (768px): Desktop shell — Sidebar (left, collapsed rail md–lg, full width lg+) + PageHeader + scrollable main
  *
  * Implementation approach (single React tree, CSS-controlled visibility):
  *   • One set of children — rendered once in a single <main>.
- *   • Sidebar is wrapped in `hidden lg:flex shrink-0` → hidden on mobile, flex on desktop.
- *   • MobileBottomNav is `fixed` and carries its own `lg:hidden` on its root <nav>.
- *     When its <nav> ancestor has `display: none` (via lg:hidden), the fixed element
+ *   • Sidebar is wrapped in `hidden md:flex shrink-0` → hidden on mobile, flex from md up.
+ *   • MobileBottomNav is `fixed` and carries its own `md:hidden` on its root <nav>.
+ *     When its <nav> ancestor has `display: none` (via md:hidden), the fixed element
  *     is also hidden — standard CSS behaviour for `display: none` parent → all
  *     descendants are removed from the rendered tree including fixed children.
- *   • Main content `pb-20` (80px) on mobile clears the fixed 60px bottom nav bar
- *     with a comfortable 20px breathing room. On desktop, `lg:pb-6` resets to 24px.
+ *   • Main content reserves dynamic bottom clearance on mobile — see the `<main>`
+ *     padding comment below (Rule FE-001 fix) — clearing MobileBottomNav's real,
+ *     safe-area-inclusive height rather than a flat px value. On desktop, `md:pb-6`
+ *     resets to 24px since no fixed bottom bar exists at that breakpoint.
  *
  * Phase B8 AnimatePresence page transitions are fully preserved.
  *
@@ -129,14 +131,15 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         the address bar is visible. Falls back to `vh` in older browsers via Tailwind.
 
         The flex row contains:
-          1. Sidebar wrapper — `hidden lg:flex` collapses it on mobile
+          1. Sidebar wrapper — `hidden md:flex` collapses it on mobile
           2. Main column  — always fills remaining width
       */}
       <div className="flex h-dvh overflow-hidden bg-page">
 
         {/* ── Sidebar wrapper ─────────────────────────────────────────────
-          `hidden`    → display:none below lg (Sidebar not rendered visually)
-          `lg:flex`   → flex container above lg (Sidebar is a flex child)
+          `hidden`    → display:none below md (Sidebar not rendered visually)
+          `md:flex`   → flex container from md up (Sidebar is a flex child;
+                        collapsed rail md–lg via `md:w-12`, full width `lg:w-auto`)
           `shrink-0`  → prevents the sidebar from shrinking on resize edge cases
 
           Since Sidebar uses motion.aside with its own width management, the
@@ -164,21 +167,33 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             Scrollable page content area.
 
             Padding strategy:
-              Mobile (< lg):
+              Mobile (< md):
                 p-4          → 1rem on all sides (tighter on small screens)
-                pb-20        → 5rem bottom padding clears the 60px fixed bottom nav
-                               with 20px breathing room (sufficient for all devices
-                               including those with iOS home indicator)
+                pb-[calc(5rem+var(--sab))] → 5rem (80px) base clearance for the
+                               fixed MobileBottomNav's ~60px bar, PLUS the same
+                               env(safe-area-inset-bottom) inset MobileBottomNav
+                               itself pads with (--sab custom property, set below).
+                               A flat 80px alone under-clears on any device whose
+                               gesture-bar/home-indicator safe-area inset pushes the
+                               real nav height past 80px (most current Android
+                               phones and notch-less-home-button iPhones) — the
+                               last scrollable content ends up hidden behind the
+                               nav, unreachable by scrolling. [FE-001]
 
-              Desktop (lg+):
-                lg:p-6       → 1.5rem on all sides (standard dashboard spacing)
-                lg:pb-6      → overrides pb-20, resetting bottom to 1.5rem
+              Desktop (md+):
+                md:p-6       → 1.5rem on all sides (standard dashboard spacing)
+                md:pb-6      → overrides the mobile calc(), resetting bottom to
+                               1.5rem — no fixed bottom bar exists at this
+                               breakpoint (Sidebar replaces MobileBottomNav here).
 
             `overflow-y-auto` — scrolling is on this container, not the body.
             `relative`        — establishes stacking context for PageTransitionWrapper.
             `h-dvh` fallback  — the parent already constrains height via overflow-hidden.
           */}
-          <main className="flex-1 overflow-y-auto p-4 pb-20 md:p-6 md:pb-6 relative">
+          <main
+            className="flex-1 overflow-y-auto p-4 pb-[calc(5rem+var(--sab))] md:p-6 md:pb-6 relative"
+            style={{ '--sab': 'env(safe-area-inset-bottom, 0px)' } as React.CSSProperties}
+          >
             <PageTransitionWrapper>
               {children}
             </PageTransitionWrapper>
@@ -190,8 +205,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         MobileBottomNav — rendered outside the flex shell so that its fixed
         positioning is relative to the viewport, not constrained by a flex container.
 
-        MobileBottomNav carries its own `lg:hidden` class on its root <nav> element.
-        On desktop (lg+), the <nav> has `display: none` which — per CSS spec —
+        MobileBottomNav carries its own `md:hidden` class on its root <nav> element.
+        On desktop (md+), the <nav> has `display: none` which — per CSS spec —
         removes all descendants from the render tree including fixed-position children.
         The "More" sheet overlay (also inside MobileBottomNav) uses AnimatePresence
         and won't render at all until the user opens it, so there's zero desktop cost.

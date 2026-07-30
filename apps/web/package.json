@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "backfill-attendance": "tsx scripts/backfill-attendance.ts",
+    "seed:full": "node scripts/seed-full.mjs --confirm",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test": "vitest run",

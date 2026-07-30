@@ -278,6 +278,13 @@ export function MotionBottomSheet({
             onDragEnd={handleDragEnd}
             style={{
               y: motionEnabled ? dragY : undefined,
+              // Safe area for iOS home indicator / Android gesture bar (FE-002).
+              // `pb-safe` was never a real utility — undefined in globals.css and
+              // not a Tailwind v4 built-in — so it silently matched nothing and
+              // this sheet's bottom edge got zero safe-area clearance. Matches
+              // the same env(safe-area-inset-bottom) pattern already used
+              // correctly in MobileBottomNav/AssignmentForm/StudentForm.
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             }}
             className={cn(
               // Positioning
@@ -288,8 +295,6 @@ export function MotionBottomSheet({
               'rounded-t-3xl border-t border-base',
               // Shadow
               'shadow-2xl',
-              // Safe area for iOS home indicator
-              'pb-safe',
               className
             )}
           >

@@ -1,0 +1,56 @@
+════════════════════════════════════════════════════════════╗
+║  LOGIN CREDENTIALS                                         ║
+╚════════════════════════════════════════════════════════════╝
+
+All staff password:    Staff@2026!
+All student password:  Student@2026!
+
+STAFF ACCOUNTS
+──────────────────────────────────────────────────────────────────────────────
+ROLE          EMAIL                                   NAME
+──────────────────────────────────────────────────────────────────────────────
+academic      teacher05@chikondi.edu.mw               Gift Simbeye               form 1A class Teacher
+academic      teacher03@chikondi.edu.mw               Dalitso Sakala             form 2A class Teacher
+academic      teacher04@chikondi.edu.mw               Ndaziona Kanyenda          form 3A class Teacher
+academic      teacher01@chikondi.edu.mw               Blessings Mbewe            form 4A class Teacher
+academic      teacher02@chikondi.edu.mw               Faith Chikwanda
+academic      teacher13@chikondi.edu.mw               Dalitso Mbewe
+academic      teacher11@chikondi.edu.mw               Blessings Simbeye
+academic      teacher12@chikondi.edu.mw               Faith Mwale
+academic      teacher06@chikondi.edu.mw               Linda Mwale
+academic      teacher07@chikondi.edu.mw               Samuel Mbewe
+academic      teacher09@chikondi.edu.mw               Chatonda Sakala
+academic      teacher10@chikondi.edu.mw               Mwayi Kanyenda
+academic      teacher08@chikondi.edu.mw               Memory Chikwanda
+academic      teacher14@chikondi.edu.mw               Ndaziona Chikwanda
+admin         admin@chikondi.edu.mw                   System Administrator
+exam_officer  examsclerk@chikondi.edu.mw              Ruth Tembo
+exam_officer  exams@chikondi.edu.mw                   Emmanuel Zulu
+finance       feesclerk@chikondi.edu.mw               Mercy Gondwe
+finance       accountant@chikondi.edu.mw              Joseph Nyirenda
+finance       finance@chikondi.edu.mw                 Esther Phiri
+high_rank     deputy@chikondi.edu.mw                  Patrick Banda
+high_rank     head@chikondi.edu.mw                    Grace Mwale
+hr            hrofficer@chikondi.edu.mw               Tadala Mbewe
+hr            hr@chikondi.edu.mw                      Daniel Chirwa
+library       librarian@chikondi.edu.mw               Chisomo Kamanga
+library       libassist@chikondi.edu.mw               Yankho Msiska
+lower_rank    groundsman@chikondi.edu.mw              Isaac Lungu
+lower_rank    security@chikondi.edu.mw                Frank Kaunda
+lower_rank    secretary@chikondi.edu.mw               Linda Ngwira
+lower_rank    registrar@chikondi.edu.mw               Alice Mhango
+lower_rank    cook@chikondi.edu.mw                    Joyce Chimombo
+lower_rank    driver@chikondi.edu.mw                  Andrew Sakala
+lower_rank    cleaner@chikondi.edu.mw                 Memory Mataka
+
+STUDENT ACCOUNTS
+──────────────────────────────────────────────────────────────────────────────
+160 student accounts, pattern:  f<FORM>s<NN>@student.chikondi.edu.mw
+  Form 1: f1s01 … f1s40      Form 3: f3s01 … f3s40
+  Form 2: f2s01 … f2s40      Form 4: f4s01 … f4s40
+
+  Examples:
+    f1s002@student.chikondi.edu.mw           Ndaziona Kanyenda
+    f2s008@student.chikondi.edu.mw           Grace Chimombo
+    f3s008@student.chikondi.edu.mw           Chifundo Zulu
+    f4s007@student.chikondi.edu.mw           Peter Sakala
