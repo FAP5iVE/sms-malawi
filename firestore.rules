@@ -83,18 +83,6 @@ service cloud.firestore {
       return isAuth() && role() == 'student';
     }
 
-    /** Returns true if the announcement targets the current user's role or all users. */
-    function announcementTargetsMe(data) {
-      return data.get('targetRoles', []).hasAny([role()]) || data.get('targetAll', false) == true;
-    }
-
-    /** Returns true if the announcement is in a visible published state. */
-    function isAnnouncementPublished(data) {
-      return data.get('status', '') == 'PUBLISHED'
-        && (data.get('scheduledAt', null) == null || data.get('scheduledAt', null) <= request.time)
-        && (data.get('expiresAt', null)   == null || data.get('expiresAt', null)   >  request.time);
-    }
-
     // ── ATTENDANCE ────────────────────────────────────────
     // Collection path: attendance/{classId}/records/{date}
     //
@@ -130,67 +118,26 @@ service cloud.firestore {
     // ── ANNOUNCEMENTS ─────────────────────────────────────
     // Collection path: announcements/{announcementId}
     //
-    // Document shape:
-    //   {
-    //     title:        string,
-    //     body:         string (may contain HTML from a rich text editor),
-    //     createdByUid: string,
-    //     targetRoles:  string[],
-    //     targetAll:    boolean,
-    //     classId:      string | null,
-    //     status:       'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'SCHEDULED' | 'REJECTED' | 'ARCHIVED',
-    //     scheduledAt:  Timestamp | null,
-    //     expiresAt:    Timestamp | null,
-    //     requiresAck:  boolean,
-    //     createdAt:    Timestamp,
-    //     updatedAt:    Timestamp,
-    //   }
+    // ⚠ SERVER-ONLY COLLECTION — DENY ALL CLIENT ACCESS ⚠  [N2]
     //
-    // Read logic:   Published/scheduled + targeted announcements visible to all authenticated users.
-    //               Drafts and pending-approval visible only to the author and admin/high_rank.
-    // Write logic:  All real writes go through the backend (announcementService.ts, Admin SDK —
-    //               not subject to these rules): POST /announcements, PATCH /:id/approve. The
-    //               rules below are defense-in-depth only, kept correct in case a client-side
-    //               write path is ever added back.
+    // As of the N2 remediation, both reads and writes go exclusively through
+    // the backend (Admin SDK, which is NOT subject to these rules):
+    //   • Reads:   GET /announcements, GET /announcements/pending
+    //              (permission-gated in Express: announcement.view /
+    //              announcement.approvePublish)
+    //   • Writes:  POST /announcements, PATCH /:id, PATCH /:id/approve,
+    //              DELETE /:id
+    //
+    // The client no longer reads Firestore directly (useAnnouncements.ts is
+    // now a TanStack Query hook over the routes above). Denying all client
+    // access here removes the entire class of outage where a status-vocabulary
+    // drift or a single malformed document caused a blanket permission-denied
+    // on the client read path, and means announcement visibility is governed
+    // by the same permission system as every other domain rather than by a
+    // hand-maintained parallel copy of the matrix in this file.
 
     match /announcements/{announcementId} {
-      allow read: if isAuth() && (
-        // Admin and high_rank can read all announcements for moderation —
-        // checked first: a pure role check with no dependency on this
-        // document's field shape, so it can't be tripped up by malformed
-        // historical data the way the field-dependent checks below can.
-        isHighRankOrAdmin()
-        // Author can always read their own announcements regardless of status
-        || resource.data.get('createdByUid', '') == uid()
-        // Published and targeted at the current user
-        || (isAnnouncementPublished(resource.data) && announcementTargetsMe(resource.data))
-      );
-
-      // Staff can create announcements (DRAFT, PENDING_APPROVAL, PUBLISHED, or SCHEDULED —
-      // matching announcementService.createAnnouncement()'s real status resolution).
-      // Students can submit class-scoped announcements (must be PENDING_APPROVAL).
-      allow create: if isAuth()
-        && (
-          (isStaff() && request.resource.data.status in ['DRAFT', 'PENDING_APPROVAL', 'PUBLISHED', 'SCHEDULED'])
-          || (isStudent()
-              && request.resource.data.status == 'PENDING_APPROVAL'
-              && request.resource.data.classId != null
-              && request.resource.data.targetAll == false)
-        )
-        && request.resource.data.createdByUid == uid();
-
-      // Authors can edit their own DRAFT announcements.
-      // Admin/high_rank can change status (approve, reject, archive).
-      allow update: if isAuth() && (
-        isHighRankOrAdmin()
-        || (resource.data.createdByUid == uid()
-            && resource.data.status == 'DRAFT'
-            && request.resource.data.status in ['DRAFT', 'PENDING_APPROVAL'])
-      );
-
-      // Only admin can permanently delete announcements.
-      // Others should set status = 'ARCHIVED' instead.
-      allow delete: if isAdmin();
+      allow read, write: if false;
     }
 
     // ── NOTIFICATIONS (PER-USER FEED) ─────────────────────

@@ -1,7 +1,5 @@
 import 'server-only'
 
-import * as admin from 'firebase-admin'
-import type { App } from 'firebase-admin/app'
 import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore'
 import { getMessaging } from 'firebase-admin/messaging'
 import type {
@@ -10,25 +8,15 @@ import type {
   BatchResponse,
   TopicMessage,
 } from 'firebase-admin/messaging'
+import { getAdminApp } from '@/lib/verifyAuth'
 import { logger } from '@/lib/logger'
 
 // ─────────────────────────────────────────────────────────
 //  ADMIN APP SINGLETON
-//  Reuses the same Firebase Admin app as verifyAuth.ts.
-//  admin.apps[0] is populated on first use by either module.
+//  [N7] Uses the single canonical getAdminApp() from verifyAuth.ts rather
+//  than a second local copy — one Firebase Admin init path for the whole
+//  app (see sms-erp-backend Rule 4; same dedup as studentService.ts).
 // ─────────────────────────────────────────────────────────
-
-function getAdminApp(): App {
-  if (admin.apps.length > 0) return admin.app()
-
-  return admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId:   process.env.FIREBASE_PROJECT_ID!,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
-      privateKey:  (process.env.FIREBASE_PRIVATE_KEY ?? '').replace(/\\n/g, '\n'),
-    }),
-  })
-}
 
 // ─────────────────────────────────────────────────────────
 //  FIRESTORE TOKEN STORE

@@ -35,16 +35,59 @@
 
 /* global firebase, clients */
 
+// ─── STATE ────────────────────────────────────────────────
+// Declared before the push handler below, which reads firebaseInitialised.
+let messagingInstance  = null
+let firebaseInitialised = false
+
+// ─── TOP-LEVEL PUSH HANDLER (registered at initial evaluation) ──────────
+// [N7] Chrome requires the 'push' handler to be added during the service
+// worker's INITIAL evaluation, not lazily inside a later 'message' event
+// handler. Firebase's onBackgroundMessage() (called inside the
+// FIREBASE_CONFIG message handler below) registers its own 'push' listener
+// lazily, which produced the console warnings:
+//   "Event handler of 'push' event must be added on the initial evaluation
+//    of worker script."
+// Registering this handler up-front clears those warnings AND makes
+// background notifications display even before the FIREBASE_CONFIG handshake
+// completes. It renders standard FCM `notification`-shaped payloads directly.
+// onBackgroundMessage (below) is retained for data-only messages and any
+// richer post-init handling; to avoid double-display, this handler no-ops
+// when Firebase has initialised (onBackgroundMessage then owns display).
+self.addEventListener('push', (event) => {
+  if (firebaseInitialised) return // onBackgroundMessage handles it once initialised
+  if (!event.data) return
+
+  let payload
+  try {
+    payload = event.data.json()
+  } catch {
+    return
+  }
+
+  const notification = payload.notification ?? {}
+  const data = payload.data ?? {}
+  const title = notification.title ?? 'SMS Malawi'
+  const body = notification.body ?? ''
+  const clickAction = data.clickAction ?? '/dashboard'
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: notification.icon ?? '/favicon.ico',
+      badge: '/favicon.ico',
+      tag: data.tag ?? undefined,
+      data: { clickAction, ...data },
+      requireInteraction: false,
+    }),
+  )
+})
+
 // ─── FIREBASE SDK (via CDN importScripts) ─────────────────
 // Using Firebase v10.14.1 compat library — stable, broadly supported,
 // compatible with the project's firebase npm package for FCM protocols.
 importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js')
-
-// ─── STATE ────────────────────────────────────────────────
-
-let messagingInstance  = null
-let firebaseInitialised = false
 
 // ─── FIREBASE INITIALISATION VIA MESSAGE ─────────────────
 // The main thread sends { type: 'FIREBASE_CONFIG', config } after registering

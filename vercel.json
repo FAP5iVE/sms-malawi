@@ -10,7 +10,8 @@
     { "path": "/api/cron/risk-detection",  "schedule": "0 2 * * 1" },
     { "path": "/api/cron/contract-alerts", "schedule": "0 7 * * *" },
     { "path": "/api/cron/installment-check","schedule": "0 5 * * *" },
-    { "path": "/api/cron/late-penalties",  "schedule": "0 4 * * *" }
+    { "path": "/api/cron/late-penalties",  "schedule": "0 4 * * *" },
+    { "path": "/api/cron/scheduled-announcements", "schedule": "0 * * * *" }
   ],
   "headers": [
     {

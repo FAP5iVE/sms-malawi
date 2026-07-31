@@ -1,25 +1,31 @@
 /*
  * apps/web/src/hooks/useAnnouncements.ts
  *
- * [CHANGE TYPE]: TARGETED EDIT
- * [R-PHASE]: R13 — Announcements, Timetable & Calendar Domain
- * [PURPOSE]: Added usePendingAnnouncements() — a real-time listener over
- *   status === 'PENDING_APPROVAL' documents, following the exact same
- *   onSnapshot pattern as the existing useAnnouncements() — for the new
- *   "Pending Approval" tab/view (announcements/page.tsx, same phase).
- *   Before this phase, no approver (admin/high_rank/academic) had any UI
- *   surface to discover what was awaiting their action:
- *   useAnnouncements()'s query has always filtered to
- *   status === 'PUBLISHED' only.
- * [DEPENDS ON]: none
+ * [CHANGE TYPE]: MAJOR REWRITE
+ * [PHASE]: N2 — Fix the read gate (AUDIT §6 Option 1)
+ * [PURPOSE]: Previously read Firestore directly from the client via
+ *   onSnapshot, which meant every read was evaluated against
+ *   firestore.rules — a hand-maintained parallel copy of the permission
+ *   matrix. That design was the single largest source of outages this
+ *   cycle: any status-vocabulary drift or a single malformed document
+ *   (missing an accessed field) failed the whole list query with a
+ *   blanket "Missing or insufficient permissions", and every fix required
+ *   a separate `firebase deploy --only firestore:rules` decoupled from the
+ *   app deploy.
+ *
+ *   Now reads go through the backend (GET /announcements, GET
+ *   /announcements/pending) like every other domain: permission-gated in
+ *   Express, visibility resolved server-side, data returned already
+ *   role-filtered with createdAt normalized to an ISO string. The client
+ *   uses TanStack Query (refetch-on-focus + short staleTime) instead of a
+ *   realtime listener — announcements are not chat; near-real-time is
+ *   ample and matches the rest of the app.
+ * [DEPENDS ON]: W/lib/api-client (apiFetch, queryKeys)
  */
 'use client'
 
-import { useEffect, useState } from 'react'
-import { collection, query, where, orderBy, onSnapshot, type Timestamp } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
-import { useAuthStore } from '@/store/authStore'
-import { COLLECTIONS } from '@shared/constants/storage'
+import { useQuery } from '@tanstack/react-query'
+import { apiFetch, queryKeys } from '@/lib/api-client'
 
 export interface Announcement {
   id: string
@@ -30,92 +36,48 @@ export interface Announcement {
   targetRoles?: string[]
   eventDate?: string | null
   publicWebsite?: boolean
+  imageKey?: string | null
   createdByUid: string
-  createdAt: Timestamp
+  createdByRole?: string | null
+  /** ISO string (normalized server-side; no Firestore Timestamp on the client). */
+  createdAt: string | null
 }
 
-// Real-time listener for published announcements visible to the current role
+interface AnnouncementsResponse {
+  announcements: Announcement[]
+}
+
+/** PUBLISHED announcements visible to the current user (server-resolved). */
 export function useAnnouncements() {
-  const { role } = useAuthStore()
-  const [announcements, setAnnouncements] = useState<Announcement[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const query = useQuery({
+    queryKey: queryKeys.announcements.list(),
+    queryFn: () => apiFetch<AnnouncementsResponse>('/announcements'),
+    staleTime: 30_000,
+  })
 
-  useEffect(() => {
-    if (!role) return
-
-    // Listen to published announcements that target this role or all users
-    const q = query(
-      collection(db!, COLLECTIONS.ANNOUNCEMENTS),
-      where('status', '==', 'PUBLISHED'),
-      orderBy('createdAt', 'desc')
-    )
-
-    // [PRODUCTION FIX 2026-07-28] onSnapshot had no error callback at all —
-    // if the query failed for any reason (missing composite index, a
-    // security-rule denial, etc.), the success callback simply never fired:
-    // loading stayed true forever and nothing was ever shown to the user,
-    // with no way to tell a slow load from a silently broken one. Added the
-    // error callback so a failure resolves loading and surfaces a message
-    // instead of spinning indefinitely.
-    const unsubscribe = onSnapshot(
-      q,
-      (snap) => {
-        const docs = snap.docs
-          .map((d) => ({ id: d.id, ...(d.data() as Omit<Announcement, 'id'>) }))
-          .filter((a) => a.targetAll || (a.targetRoles && a.targetRoles.includes(role)))
-        setAnnouncements(docs)
-        setLoading(false)
-        setError(null)
-      },
-      (err) => {
-        setError(err.message || 'Failed to load announcements.')
-        setLoading(false)
-      },
-    )
-
-    return unsubscribe
-  }, [role])
-
-  return { announcements, loading, error }
+  return {
+    announcements: query.data?.announcements ?? [],
+    loading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
+  }
 }
 
 /**
- * Real-time listener for announcements awaiting approval. Intended for
- * the three roles holding announcement.approvePublish (admin/high_rank/
- * academic) — the page rendering this tab is expected to gate visibility
- * with PermissionGuard, so no role filtering happens here beyond the
- * status query itself.
+ * PENDING_APPROVAL announcements — for the approver Pending tab. The route
+ * is gated by announcement.approvePublish, so non-approvers receive 403;
+ * the page is expected to only mount this for approvers (it renders the tab
+ * behind the same permission), but the server is the real authority.
  */
 export function usePendingAnnouncements() {
-  const [pending, setPending] = useState<Announcement[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const query = useQuery({
+    queryKey: queryKeys.announcements.pending(),
+    queryFn: () => apiFetch<AnnouncementsResponse>('/announcements/pending'),
+    staleTime: 30_000,
+  })
 
-  useEffect(() => {
-    const q = query(
-      collection(db!, COLLECTIONS.ANNOUNCEMENTS),
-      where('status', '==', 'PENDING_APPROVAL'),
-      orderBy('createdAt', 'desc')
-    )
-
-    // Same missing-error-callback bug as useAnnouncements() above — fixed
-    // the same way.
-    const unsubscribe = onSnapshot(
-      q,
-      (snap) => {
-        setPending(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Announcement, 'id'>) })))
-        setLoading(false)
-        setError(null)
-      },
-      (err) => {
-        setError(err.message || 'Failed to load pending announcements.')
-        setLoading(false)
-      },
-    )
-
-    return unsubscribe
-  }, [])
-
-  return { pending, loading, error }
+  return {
+    pending: query.data?.announcements ?? [],
+    loading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
+  }
 }

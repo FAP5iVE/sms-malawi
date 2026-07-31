@@ -9,9 +9,65 @@ import {
   getTokensForUser,
   subscribeUserToDefaultTopics,
 } from '@/lib/push'
+import * as notificationFeedService from '@/server/services/notificationFeedService'
 import { logger }         from '@/lib/logger'
 
 export const notificationsRouter = Router()
+
+// ─── GET /notifications/feed ─────────────────────────────
+// [N4] The real per-user in-app notification feed. Reads the
+// notifications/{uid}/items collection server-side (Admin SDK) and returns
+// items + unreadCount. Replaces useNotificationFeed.ts's re-read of
+// announcements. Any authenticated role; a user only ever sees their own feed.
+notificationsRouter.get(
+  '/feed',
+  verifyAuth,
+  async (req, res) => {
+    const uid = req.user!.uid
+    try {
+      const result = await notificationFeedService.listFeed(uid)
+      res.status(200).json(result)
+    } catch (err) {
+      logger.error({ err, uid }, '[notifications] Failed to list feed')
+      res.status(500).json({ error: 'Failed to load notifications.' })
+    }
+  }
+)
+
+// ─── PATCH /notifications/feed/read-all ──────────────────
+// Marks every unread item read. Declared before /feed/:id/read so 'read-all'
+// isn't captured as an :id.
+notificationsRouter.patch(
+  '/feed/read-all',
+  verifyAuth,
+  async (req, res) => {
+    const uid = req.user!.uid
+    try {
+      const count = await notificationFeedService.markAllRead(uid)
+      res.status(200).json({ ok: true, marked: count })
+    } catch (err) {
+      logger.error({ err, uid }, '[notifications] Failed to mark all read')
+      res.status(500).json({ error: 'Failed to update notifications.' })
+    }
+  }
+)
+
+// ─── PATCH /notifications/feed/:id/read ──────────────────
+notificationsRouter.patch(
+  '/feed/:id/read',
+  verifyAuth,
+  async (req, res) => {
+    const uid = req.user!.uid
+    const { id } = req.params as { id: string }
+    try {
+      await notificationFeedService.markRead(uid, id)
+      res.status(200).json({ ok: true })
+    } catch (err) {
+      logger.error({ err, uid, id }, '[notifications] Failed to mark read')
+      res.status(500).json({ error: 'Failed to update notification.' })
+    }
+  }
+)
 
 // ─── REQUEST SCHEMAS ─────────────────────────────────────
 

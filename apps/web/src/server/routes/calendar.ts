@@ -57,8 +57,8 @@
 import 'server-only'
 
 import { Router }      from 'express'
-import * as admin      from 'firebase-admin'
-import { verifyAuth }  from '@/lib/verifyAuth'
+import { getFirestore }  from 'firebase-admin/firestore'
+import { verifyAuth, getAdminApp }  from '@/lib/verifyAuth'
 import { requirePermission } from '@/server/middleware/verifyPermission'
 import { prisma }      from '@/lib/prisma'
 import { logger }      from '@/lib/logger'
@@ -301,7 +301,7 @@ calendarRouter.get('/events',
     // ── 8. Announcements with an event date, published and in range ──
     //      Firestore-native — Announcements have no Prisma model with a
     //      real write path (see this file's header comment).
-    const announcementsSnap = await admin.firestore()
+    const announcementsSnap = await getFirestore(getAdminApp())
       .collection(COLLECTIONS.ANNOUNCEMENTS)
       .where('status', '==', 'PUBLISHED')
       .get()

@@ -342,7 +342,13 @@ export const queryKeys = {
     all: () => ['announcements'] as const,
     list: (filters?: Record<string, unknown>) =>
       ['announcements', 'list', filters ?? {}] as const,
+    pending: () => ['announcements', 'pending'] as const,
     detail: (id: string) => ['announcements', 'detail', id] as const,
+  },
+
+  // ── Notification feed (N4)
+  notifications: {
+    feed: () => ['notifications', 'feed'] as const,
   },
 
   // ── Timetable

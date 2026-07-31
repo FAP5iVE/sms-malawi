@@ -66,7 +66,7 @@ const LEGEND_ITEMS: { category: CalendarEventCategory; label: string }[] = [
   { category: 'timetable', label: 'Timetable' },
   { category: 'lab_booking', label: 'Lab Bookings' },
   { category: 'leave', label: 'Leave' },
-  { category: 'announcement', label: 'Events' },
+  { category: 'announcement', label: 'Announcements' },
   { category: 'assignment', label: 'Assignments' },
 ]
 

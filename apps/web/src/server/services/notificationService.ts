@@ -11,6 +11,7 @@ import {
   type PushNotificationPayload,
 } from '@/lib/push'
 import { getIdentitySettings } from '@/server/services/settingsService'
+import * as notificationFeedService from '@/server/services/notificationFeedService'
 import type { SchoolBranding } from '@/server/templates/emails/base'
 
 import { renderFeeReminder, type FeeReminderData } from '@/server/templates/emails/fee-reminder'
@@ -218,6 +219,17 @@ export async function sendFeeReminder(params: FeeReminderParams): Promise<Notifi
     result.smsSent = attemptSms(params.guardianPhone, smsBody, 'fee_reminder')
   }
 
+  // ── In-app feed [N4]
+  if (params.studentUid) {
+    await notificationFeedService.pushToFeed(params.studentUid, {
+      title: 'Fee Reminder',
+      body: `Outstanding balance of ${params.data.currency} ${params.data.balanceAmount.toFixed(2)} due ${params.data.dueDate.toLocaleDateString()}.`,
+      type: 'WARNING',
+      category: 'fee_reminder',
+      actionUrl: '/finances',
+    })
+  }
+
   return result
 }
 
@@ -275,6 +287,17 @@ export async function sendResultRelease(params: ResultReleaseParams): Promise<No
   if (prefs.smsResultRelease && params.to) {
     const smsBody = `${school.schoolName}: Term ${params.data.term} results for ${params.data.studentName} are now available. Log in to view: ${school.loginUrl}`
     result.smsSent = attemptSms(params.to, smsBody, 'result_release')
+  }
+
+  // ── In-app feed [N4]
+  if (params.studentUid) {
+    await notificationFeedService.pushToFeed(params.studentUid, {
+      title: 'Results Released',
+      body: `Your Term ${params.data.term} ${params.data.academicYear} results are now available.`,
+      type: 'SUCCESS',
+      category: 'result_release',
+      actionUrl: '/exams',
+    })
   }
 
   return result

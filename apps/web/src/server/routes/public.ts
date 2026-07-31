@@ -1,3 +1,4 @@
+
 /**
  * [CHANGE TYPE]: TARGETED EDIT
  * [FILE]: apps/web/src/server/routes/public.ts
@@ -190,6 +191,53 @@ publicRouter.get('/announcements', async (req, res) => {
   )
 
   res.json({ announcements, total: countSnap.data().count, page, pageSize })
+})
+
+// ─── PUBLIC EVENTS ────────────────────────────────────────────────────────────
+// GET /public/events?limit=20&page=1
+// [N6] Returns published, public-website announcements that have an eventDate,
+// ordered by eventDate. Previously the public Events page fetched a page of
+// /public/announcements and filtered eventDate CLIENT-SIDE — so a page of 20
+// announcements could contain zero events, `total` counted all announcements
+// (not events), and some events were unreachable. Filtering server-side with
+// a correct count fixes pagination. orderBy('eventDate') inherently excludes
+// documents that don't have the field set.
+publicRouter.get('/events', async (req, res) => {
+  const pageSize = Math.min(Number(req.query.limit ?? 20), 100)
+  const page = Math.max(1, Number(req.query.page ?? 1))
+
+  const baseQuery = getFirestore(getAdminApp())
+    .collection(COLLECTIONS.ANNOUNCEMENTS)
+    .where('status', '==', 'PUBLISHED')
+    .where('publicWebsite', '==', true)
+    .orderBy('eventDate', 'asc')
+
+  const [snap, countSnap] = await Promise.all([
+    baseQuery.offset((page - 1) * pageSize).limit(pageSize).get(),
+    baseQuery.count().get(),
+  ])
+
+  const events = await Promise.all(
+    snap.docs.map(async (d) => {
+      const data = d.data() as {
+        title: string
+        body: string
+        eventDate?: string | null
+        imageKey?: string | null
+        createdAt: FirebaseFirestore.Timestamp
+      }
+      return {
+        id: d.id,
+        title: data.title,
+        body: data.body,
+        eventDate: data.eventDate ?? null,
+        imageUrl: data.imageKey ? await getPublicViewUrl('', data.imageKey) : null,
+        createdAt: data.createdAt.toDate(),
+      }
+    }),
+  )
+
+  res.json({ events, total: countSnap.data().count, page, pageSize })
 })
 
 // ─── NEWSLETTER SUBSCRIBE ─────────────────────────────────────────────────────
@@ -402,3 +450,10 @@ publicRouter.get('/fee-structure', async (req, res) => {
   })
   res.json({ year, items: items.map((i) => ({ name: i.name, amount: Number(i.amount) })) })
 })
+
+
+
+
+
+
+

@@ -2,28 +2,29 @@
 
 /**
  * apps/web/src/app/(public)/events/page.tsx
- * [CHANGE TYPE]: NEW FILE (production fix, 2026-07-28)
- * [PURPOSE]: Full events archive. The landing page's Events "All events"
- *   button links here — announcements with an eventDate set, from the same
- *   real usePublicAnnouncements() feed News/Announcements pulls from.
- * [DEPENDS ON]: usePublicAnnouncements (GET /public/announcements)
+ * [CHANGE TYPE]: TARGETED EDIT
+ * [PHASE]: N6 — Event disambiguation + public pagination fix (AUDIT Finding H)
+ * [PURPOSE]: Was fetching a page of /public/announcements and filtering
+ *   eventDate CLIENT-SIDE — so a page of 20 announcements could contain zero
+ *   events, `total` counted all announcements (breaking page count), and some
+ *   events were unreachable. Now reads the dedicated /public/events route
+ *   (usePublicEvents), which filters by eventDate server-side, orders by
+ *   eventDate, and returns a correct total.
+ * [DEPENDS ON]: usePublicEvents (GET /public/events)
  */
 
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, CalendarDays } from 'lucide-react'
-import { usePublicAnnouncements } from '@/hooks/usePublic'
+import { usePublicEvents } from '@/hooks/usePublic'
 
 const PAGE_SIZE = 20
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
 export default function EventsPage() {
   const [page, setPage] = useState(1)
-  const { data, isLoading } = usePublicAnnouncements(PAGE_SIZE, page)
-  const allItems = data?.announcements ?? []
-  const events = allItems
-    .filter((a) => a.eventDate)
-    .sort((a, b) => new Date(a.eventDate!).getTime() - new Date(b.eventDate!).getTime())
+  const { data, isLoading } = usePublicEvents(PAGE_SIZE, page)
+  const events = data?.events ?? []
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1
 
   return (

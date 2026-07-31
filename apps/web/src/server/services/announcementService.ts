@@ -55,6 +55,7 @@ import type { StaffRole } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import * as notificationService from '@/server/services/notificationService'
+import * as notificationFeedService from '@/server/services/notificationFeedService'
 import { deriveAudience } from '@shared/schemas/announcement'
 import { COLLECTIONS } from '@shared/constants/storage'
 import { STAFF_ROLES } from '@shared/types/roles'
@@ -168,9 +169,29 @@ async function notifyAudience(announcementId: string, payload: NotifyPayload): P
 
     if (recipients.emails.length === 0 && recipients.uids.length === 0) return
 
+    // [N5] Pick a broadcast FCM topic when one cleanly covers the audience,
+    // so push is a single topic publish instead of N sequential per-uid
+    // sends. These are the same topics users are subscribed to on login
+    // (push.ts subscribeUserToDefaultTopics). When no single topic matches
+    // (e.g. a multi-role targeted send), topic stays undefined and
+    // sendAnnouncementNotification falls back to the per-uid loop. Email is
+    // always per-recipient regardless of push mechanism.
+    let topic: string | undefined
+    if (payload.targetClassId) {
+      topic = `announcements_class_${payload.targetClassId}`
+    } else if (payload.targetAll) {
+      topic = 'announcements_all'
+    } else if (payload.targetRoles.length === 1) {
+      if (payload.targetRoles[0] === 'student') topic = 'announcements_students'
+      // Note: 'announcements_staff' covers ALL staff, so it's only correct
+      // for a genuine all-staff send, not a single specific staff role —
+      // hence no topic for a lone non-student role; per-uid handles it.
+    }
+
     await notificationService.sendAnnouncementNotification({
       emails: recipients.emails,
-      uids: recipients.uids,
+      uids: topic ? undefined : recipients.uids,
+      topic,
       data: {
         title: payload.title,
         body: payload.body,
@@ -181,6 +202,17 @@ async function notifyAudience(announcementId: string, payload: NotifyPayload): P
         announcementId,
         eventDate: payload.eventDate ? new Date(payload.eventDate) : undefined,
       },
+    })
+
+    // [N4] Drop a durable in-app feed item for each recipient so the bell
+    // shows real, per-user notifications (not a re-read of the announcement
+    // list). Best-effort — pushToManyFeeds swallows its own errors.
+    await notificationFeedService.pushToManyFeeds(recipients.uids, {
+      title: payload.title,
+      body: payload.body,
+      type: 'INFO',
+      category: 'announcement',
+      actionUrl: '/announcements',
     })
   } catch (err) {
     logger.error({ err, announcementId }, 'Failed to send announcement notification')
@@ -275,9 +307,86 @@ export async function publishAnnouncement(id: string, approvedByUid: string) {
 }
 
 /**
- * List announcements, newest first, with real cursor-based pagination —
- * previously a hardcoded limit(50) with no way to reach anything older.
+ * Reject/deny a PENDING_APPROVAL announcement. Sets status REJECTED with the
+ * rejecter's uid and an optional reason. Does not notify the wider audience
+ * (it was never published); best-effort notifies the author so they know it
+ * was declined. [N3]
  */
+export async function rejectAnnouncement(id: string, rejectedByUid: string, reason?: string) {
+  const db = getFirestore(getAdminApp())
+  const snap = await db.collection(COLLECTIONS.ANNOUNCEMENTS).doc(id).get()
+  if (!snap.exists) {
+    throw Object.assign(new Error('Announcement not found.'), { status: 404 })
+  }
+  const existing = snap.data() as DocumentData
+  if (existing.status !== 'PENDING_APPROVAL') {
+    throw Object.assign(
+      new Error('Only announcements awaiting approval can be rejected.'),
+      { status: 409 },
+    )
+  }
+
+  await db.collection(COLLECTIONS.ANNOUNCEMENTS).doc(id).update({
+    status: 'REJECTED',
+    rejectedByUid,
+    rejectionReason: reason ?? null,
+    rejectedAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  })
+
+  return { id, status: 'REJECTED' }
+}
+
+/**
+ * Promote every SCHEDULED announcement whose scheduledFor has passed to
+ * PUBLISHED, firing notifyAudience for each. Called periodically by the
+ * scheduled-announcements cron. Returns the count promoted. [N5]
+ *
+ * scheduledFor is stored as an ISO string (announcementService writes it as
+ * data.scheduledFor). We query SCHEDULED and compare in-process rather than
+ * with a Firestore range query, because scheduledFor is a string field and a
+ * string range query would need its own composite index and lexicographic
+ * ISO ordering; the SCHEDULED set is small (future-dated announcements only).
+ */
+export async function promoteDueScheduled(): Promise<{ promoted: number }> {
+  const db = getFirestore(getAdminApp())
+  const snap = await db
+    .collection(COLLECTIONS.ANNOUNCEMENTS)
+    .where('status', '==', 'SCHEDULED')
+    .get()
+
+  const now = Date.now()
+  let promoted = 0
+
+  for (const doc of snap.docs) {
+    const data = doc.data() as DocumentData
+    const scheduledForRaw = data.scheduledFor as string | null | undefined
+    if (!scheduledForRaw) continue
+    const dueMs = new Date(scheduledForRaw).getTime()
+    if (!Number.isFinite(dueMs) || dueMs > now) continue
+
+    await doc.ref.update({
+      status: 'PUBLISHED',
+      publishedAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    })
+
+    // Fire-and-forget the fan-out — same posture as createAnnouncement.
+    void notifyAudience(doc.id, {
+      title: data.title as string,
+      body: data.body as string,
+      targetAll: (data.targetAll as boolean | undefined) ?? false,
+      targetRoles: (data.targetRoles as string[] | undefined) ?? [],
+      targetClassId: data.targetClassId as string | null | undefined,
+      eventDate: data.eventDate as string | null | undefined,
+      createdByUid: data.createdByUid as string,
+    })
+    promoted++
+  }
+
+  return { promoted }
+}
+
 export async function listAnnouncements(options?: {
   status?: string
   pageSize?: number
@@ -302,4 +411,96 @@ export async function listAnnouncements(options?: {
     announcements: docs.map((d) => ({ id: d.id, ...d.data() })),
     hasMore,
   }
+}
+
+// ─── SERVER-SIDE VIEWER READS (N2) ─────────────────────────
+// These replace the client's direct Firestore onSnapshot reads
+// (useAnnouncements / usePendingAnnouncements). Moving reads behind Express
+// means visibility is governed by the same permission system as every other
+// domain — not by a hand-maintained parallel copy in firestore.rules — which
+// removes the entire class of "rules/data-shape mismatch = blanket
+// permission-denied" outage. See AUDIT §6 Option 1.
+
+/** Shape returned to the client — createdAt normalized to an ISO string so
+ *  the client never depends on Firestore Timestamp internals. */
+export interface ViewerAnnouncement {
+  id: string
+  title: string
+  body: string
+  status: string
+  targetAll: boolean
+  targetRoles: string[]
+  eventDate: string | null
+  publicWebsite: boolean
+  imageKey: string | null
+  createdByUid: string
+  createdByRole: string | null
+  createdAt: string | null
+}
+
+/** Coerce a stored createdAt (Firestore Timestamp | string | null) to ISO. */
+function toIso(value: unknown): string | null {
+  if (!value) return null
+  if (value instanceof Timestamp) return value.toDate().toISOString()
+  if (typeof value === 'string') return value
+  // Firestore may hand back a {_seconds,_nanoseconds}-like object across SDK
+  // boundaries — guard defensively rather than throwing.
+  const maybe = value as { toDate?: () => Date }
+  if (typeof maybe.toDate === 'function') return maybe.toDate().toISOString()
+  return null
+}
+
+function mapViewer(id: string, data: DocumentData): ViewerAnnouncement {
+  return {
+    id,
+    title: (data.title as string) ?? '',
+    body: (data.body as string) ?? '',
+    status: (data.status as string) ?? '',
+    targetAll: (data.targetAll as boolean | undefined) ?? false,
+    targetRoles: (data.targetRoles as string[] | undefined) ?? [],
+    eventDate: (data.eventDate as string | null | undefined) ?? null,
+    publicWebsite: (data.publicWebsite as boolean | undefined) ?? false,
+    imageKey: (data.imageKey as string | null | undefined) ?? null,
+    createdByUid: (data.createdByUid as string) ?? '',
+    createdByRole: (data.createdByRole as string | null | undefined) ?? null,
+    createdAt: toIso(data.createdAt),
+  }
+}
+
+/**
+ * PUBLISHED announcements visible to `viewer`. A viewer sees an announcement
+ * when it targets everyone (targetAll), targets their role, or they authored
+ * it. Filtering happens in-process (not in the Firestore query) because
+ * targetRoles is an array and every role-combination would otherwise need its
+ * own composite index — the same reason the old client listener filtered
+ * client-side, but now done on the trusted server.
+ */
+export async function listForViewer(viewer: { uid: string; role: string }): Promise<ViewerAnnouncement[]> {
+  const snap = await getFirestore(getAdminApp())
+    .collection(COLLECTIONS.ANNOUNCEMENTS)
+    .where('status', '==', 'PUBLISHED')
+    .orderBy('createdAt', 'desc')
+    .limit(200)
+    .get()
+
+  return snap.docs
+    .map((d) => mapViewer(d.id, d.data()))
+    .filter(
+      (a) =>
+        a.targetAll ||
+        a.targetRoles.includes(viewer.role) ||
+        a.createdByUid === viewer.uid,
+    )
+}
+
+/** PENDING_APPROVAL announcements — for approvers' Pending tab. */
+export async function listPending(): Promise<ViewerAnnouncement[]> {
+  const snap = await getFirestore(getAdminApp())
+    .collection(COLLECTIONS.ANNOUNCEMENTS)
+    .where('status', '==', 'PENDING_APPROVAL')
+    .orderBy('createdAt', 'desc')
+    .limit(200)
+    .get()
+
+  return snap.docs.map((d) => mapViewer(d.id, d.data()))
 }

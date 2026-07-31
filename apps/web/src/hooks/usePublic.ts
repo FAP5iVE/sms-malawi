@@ -94,6 +94,16 @@ export interface PublicAnnouncementsPage {
   pageSize:      number
 }
 
+/** GET /public/events — [N6] server-side eventDate-filtered, ordered by
+ *  eventDate ascending, with a correct total (fixes the old client-side
+ *  filter that broke pagination). */
+export interface PublicEventsPage {
+  events:   PublicAnnouncement[]
+  total:    number
+  page:     number
+  pageSize: number
+}
+
 // ─────────────────────────────────────────────────────────
 //  QUERIES
 // ─────────────────────────────────────────────────────────
@@ -118,6 +128,15 @@ export function usePublicAnnouncements(limit = 6, page = 1) {
   return useQuery({
     queryKey: [...queryKeys.public.announcements(limit), page] as const,
     queryFn:  () => apiFetch<PublicAnnouncementsPage>(`/public/announcements?limit=${limit}&page=${page}`),
+    staleTime: STALE.MEDIUM,
+  })
+}
+
+/** [N6] Public events — server-side filtered by eventDate with correct total. */
+export function usePublicEvents(limit = 20, page = 1) {
+  return useQuery({
+    queryKey: ['public', 'events', limit, page] as const,
+    queryFn:  () => apiFetch<PublicEventsPage>(`/public/events?limit=${limit}&page=${page}`),
     staleTime: STALE.MEDIUM,
   })
 }

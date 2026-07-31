@@ -48,8 +48,8 @@ import 'server-only'
 
 import { Router } from 'express'
 import multer from 'multer'
-import * as admin from 'firebase-admin'
-import { verifyAuth } from '@/lib/verifyAuth'
+import { getFirestore, FieldValue } from 'firebase-admin/firestore'
+import { verifyAuth, getAdminApp } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import { hasPermission } from '@shared/types/permissions'
 import { COLLECTIONS } from '@shared/constants/storage'
@@ -59,6 +59,48 @@ import { uploadFile, FILE_PREFIX } from '@/lib/storage'
 
 export const announcementsRouter = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }) // 8MB
+
+// GET /announcements — PUBLISHED announcements visible to the caller's role.
+// [N2] Replaces useAnnouncements.ts's direct client Firestore read. Gated by
+// announcement.view (every role holds it); per-item visibility (targetAll /
+// targetRoles / own-authored) is resolved server-side in the service.
+announcementsRouter.get(
+  '/',
+  verifyAuth,
+  requirePermission('announcement.view'),
+  async (req, res) => {
+    const { user } = req
+    if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+    try {
+      const announcements = await announcementService.listForViewer({ uid: user.uid, role: user.role })
+      return res.json({ announcements })
+    } catch (err: unknown) {
+      const e = err as Error
+      return res.status(500).json({ error: e.message })
+    }
+  }
+)
+
+// GET /announcements/pending — PENDING_APPROVAL queue for approvers.
+// [N2] Replaces usePendingAnnouncements.ts's direct client Firestore read.
+// Gated by announcement.approvePublish, so only approvers
+// (admin/high_rank/lower_rank/academic) can reach it — this also fixes the
+// firestore.rules gap where academic/lower_rank approvers could not read
+// pending items they didn't author.
+announcementsRouter.get(
+  '/pending',
+  verifyAuth,
+  requirePermission('announcement.approvePublish'),
+  async (_req, res) => {
+    try {
+      const announcements = await announcementService.listPending()
+      return res.json({ announcements })
+    } catch (err: unknown) {
+      const e = err as Error
+      return res.status(500).json({ error: e.message })
+    }
+  }
+)
 
 // POST /announcements/image — uploads a cover image ahead of the Firestore
 // write. AnnouncementForm.tsx writes the announcement document directly to
@@ -145,7 +187,7 @@ announcementsRouter.patch(
     const { user } = req
     if (!user) return res.status(401).json({ error: 'Not authenticated.' })
 
-    const ref = admin.firestore().collection(COLLECTIONS.ANNOUNCEMENTS).doc(id)
+    const ref = getFirestore(getAdminApp()).collection(COLLECTIONS.ANNOUNCEMENTS).doc(id)
     const snap = await ref.get()
     if (!snap.exists) return res.status(404).json({ error: 'Announcement not found.' })
     if (snap.data()?.createdByUid !== user.uid) {
@@ -157,7 +199,7 @@ announcementsRouter.patch(
 
     await ref.update({
       ...parsed.data,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     })
     return res.json({ success: true })
   }
@@ -183,14 +225,49 @@ announcementsRouter.patch(
   }
 )
 
-// DELETE /announcements/:id
+// PATCH /announcements/:id/reject — deny a pending announcement. [N3]
+announcementsRouter.patch(
+  '/:id/reject',
+  verifyAuth,
+  requirePermission('announcement.reject'),
+  async (req, res) => {
+    const { id } = req.params as { id: string }
+    const { user } = req
+    if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.slice(0, 500) : undefined
+    try {
+      const result = await announcementService.rejectAnnouncement(id, user.uid, reason)
+      return res.json(result)
+    } catch (err: unknown) {
+      const e = err as Error & { status?: number }
+      return res.status(e.status ?? 400).json({ error: e.message })
+    }
+  }
+)
+
+// DELETE /announcements/:id — deleteAny (any announcement) OR deleteOwn
+// (author's own). [N3] Previously required deleteAny only, so an author
+// could never withdraw their own announcement.
 announcementsRouter.delete(
   '/:id',
   verifyAuth,
-  requirePermission('announcement.deleteAny'),
+  requireAnyPermission(['announcement.deleteAny', 'announcement.deleteOwn']),
   async (req, res) => {
     const { id } = req.params as { id: string }
-    await admin.firestore().collection(COLLECTIONS.ANNOUNCEMENTS).doc(id).delete()
+    const { user } = req
+    if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+
+    const ref = getFirestore(getAdminApp()).collection(COLLECTIONS.ANNOUNCEMENTS).doc(id)
+    const snap = await ref.get()
+    if (!snap.exists) return res.status(404).json({ error: 'Announcement not found.' })
+
+    // deleteAny may delete anything; otherwise the caller must be the author.
+    const canDeleteAny = hasPermission(user.role, 'announcement.deleteAny')
+    if (!canDeleteAny && snap.data()?.createdByUid !== user.uid) {
+      return res.status(403).json({ error: 'You can only delete your own announcements.' })
+    }
+
+    await ref.delete()
     return res.json({ success: true })
   }
 )

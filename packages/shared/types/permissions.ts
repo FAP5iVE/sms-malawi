@@ -120,6 +120,7 @@ export type Permission =
   | 'announcement.deleteAny'         // Delete any announcement
   | 'announcement.approvePublish'    // Approve pending announcements from others
   | 'announcement.publishDirect'     // Publish without approval workflow
+  | 'announcement.reject'            // Reject/deny a pending announcement
   | 'announcement.schedule'          // Schedule an announcement for future publish
 
   // ── CALENDAR ─────────────────────────────────────────
@@ -374,11 +375,14 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'application.view',
 
     // Announcements — full: publish directly, view, approve/deny (same
-    // authority as high_rank per the intended workflow) [SEC-001]
+    // authority as high_rank per the intended workflow) [SEC-001][N3]
     'announcement.view',
     'announcement.create',
     'announcement.publishDirect',
     'announcement.approvePublish',
+    'announcement.reject',
+    'announcement.editOwn',
+    'announcement.deleteOwn',
     'announcement.deleteAny',
 
     // Calendar — full
@@ -502,6 +506,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'announcement.deleteOwn',
     'announcement.deleteAny',
     'announcement.approvePublish',
+    'announcement.reject',
     'announcement.publishDirect',
     'announcement.schedule',
 
@@ -843,10 +848,11 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
 
     // Announcements — own submissions go to approval; also holds
     // approval authority per the intended workflow (approved by admin
-    // or lower_rank staff) [SEC-001]
+    // or lower_rank staff) [SEC-001][N3]
     'announcement.view',
     'announcement.createWithApproval',
     'announcement.approvePublish',
+    'announcement.reject',
     'announcement.editOwn',
     'announcement.deleteOwn',
 
@@ -922,6 +928,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'announcement.editOwn',
     'announcement.deleteOwn',
     'announcement.approvePublish',  // Can approve/deny student announcements to their class
+    'announcement.reject',
 
     // Calendar
     'calendar.view',
@@ -1183,6 +1190,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'announcement.view',
     'announcement.createWithApproval',
     'announcement.editOwn',
+    'announcement.deleteOwn',
 
     // Calendar — view only
     'calendar.view',

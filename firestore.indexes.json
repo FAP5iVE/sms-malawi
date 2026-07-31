@@ -21,6 +21,15 @@
       "collectionGroup": "announcements",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "status",        "order": "ASCENDING" },
+        { "fieldPath": "publicWebsite", "order": "ASCENDING" },
+        { "fieldPath": "eventDate",     "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "announcements",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "status",      "order": "ASCENDING" },
         { "fieldPath": "scheduledAt", "order": "ASCENDING" }
       ]

@@ -1359,6 +1359,15 @@ model NewsletterSubscriber {
 // approval, S/schemas/student.ts's AnnouncementSchema reconciliation) is
 // its own dedicated roadmap phase and is not built out here — this model
 // only covers the two read-only call sites that already exist.
+// ─── Announcement (DEPRECATED — DO NOT USE) ───────────────
+// [N1] Live announcements are stored in FIRESTORE (collection
+// `announcements`), not here. Nothing in the application reads or writes
+// this Prisma table — the read path is useAnnouncements.ts (client) and
+// announcementService.ts / public.ts (server), all Firestore. This model
+// is retained only to avoid a destructive migration on an existing
+// database; it holds no live data and must not be seeded or queried.
+// Safe to drop in a future dedicated migration once confirmed unused in
+// any external tooling.
 model Announcement {
   id             String    @id @default(cuid())
   title          String
