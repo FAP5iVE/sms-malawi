@@ -60,6 +60,7 @@ import { hasPermission } from '@shared/types/permissions'
 import { SETTING_KEYS } from '@shared/types/settings'
 import * as analytics from '@/server/services/analyticsService'
 import * as settingsService from '@/server/services/settingsService'
+import { resolveStudentFromUid } from '@/server/services/studentService'
 
 export const analyticsRouter = Router()
 
@@ -121,8 +122,27 @@ function positiveInt(raw: unknown, fallback: number): number {
  * Returns null and sends the response itself when the request cannot be
  * resolved, so the handler can simply `return`.
  */
-function resolveStudentId(req: Request, res: Response): string | null {
-  if (req.user!.role === 'student') return req.user!.uid
+// [PRODUCTION FIX 2026-07-31] For the student-role branch, this returned
+// req.user!.uid (the Firebase UID) directly — but Attendance.studentId,
+// like every other student-scoped foreign key in this schema, references
+// Student.id (the Prisma cuid), a genuinely different value from
+// firebaseUid (Student model: id vs firebaseUid are separate fields).
+// Every one of this function's four callers below (performance-trend,
+// subject-breakdown, fee-statement, attendance) was querying with the
+// wrong identifier for every student in the system — always returning
+// empty results, never an error, so it looked like "no data yet" rather
+// than a bug. Now resolves through the same resolveStudentFromUid() helper
+// studentService.ts already uses for this exact uid → Student.id lookup
+// elsewhere (e.g. feeService.ts's payment recording path).
+async function resolveStudentId(req: Request, res: Response): Promise<string | null> {
+  if (req.user!.role === 'student') {
+    const student = await resolveStudentFromUid(req.user!.uid)
+    if (!student) {
+      res.status(404).json({ error: 'No student record is linked to this account.' })
+      return null
+    }
+    return student.id
+  }
 
   const studentId = typeof req.query.studentId === 'string' ? req.query.studentId : undefined
   if (!studentId) {
@@ -380,7 +400,7 @@ analyticsRouter.get('/academic/marks-distribution',
 analyticsRouter.get('/student/performance-trend',
   verifyAuth, requireAnyPermission(OWN_PERFORMANCE),
   async (req, res) => {
-    const studentId = resolveStudentId(req, res)
+    const studentId = await resolveStudentId(req, res)
     if (studentId === null) return
     res.json(await analytics.getStudentPerformanceTrend(studentId))
   })
@@ -388,7 +408,7 @@ analyticsRouter.get('/student/performance-trend',
 analyticsRouter.get('/student/subject-breakdown',
   verifyAuth, requireAnyPermission(OWN_PERFORMANCE),
   async (req, res) => {
-    const studentId = resolveStudentId(req, res)
+    const studentId = await resolveStudentId(req, res)
     if (studentId === null) return
     const { academicYear, term } = await resolvePeriod(req)
     res.json(await analytics.getStudentSubjectBreakdown(studentId, academicYear, term))
@@ -397,7 +417,7 @@ analyticsRouter.get('/student/subject-breakdown',
 analyticsRouter.get('/student/fee-statement',
   verifyAuth, requireAnyPermission(OWN_FEE_STATEMENT),
   async (req, res) => {
-    const studentId = resolveStudentId(req, res)
+    const studentId = await resolveStudentId(req, res)
     if (studentId === null) return
     res.json(await analytics.getStudentFeeStatement(studentId))
   })
@@ -407,7 +427,7 @@ analyticsRouter.get('/student/fee-statement',
 analyticsRouter.get('/student/attendance',
   verifyAuth, requireAnyPermission(OWN_ATTENDANCE),
   async (req, res) => {
-    const studentId = resolveStudentId(req, res)
+    const studentId = await resolveStudentId(req, res)
     if (studentId === null) return
     const { academicYear, term } = await resolvePeriod(req)
     res.json(await analytics.getOwnAttendanceSummary(studentId, academicYear, term))

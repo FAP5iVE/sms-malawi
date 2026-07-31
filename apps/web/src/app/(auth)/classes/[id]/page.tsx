@@ -52,7 +52,6 @@ import { useAuthStore } from '@/store/authStore'
 import type { ApiTimetableSlot } from '@shared/types/api'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
-import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { AttendanceSheet } from '@/components/classes/AttendanceSheet'
 import AssignmentForm from '@/components/classes/AssignmentForm'
 import { TimetableSlotForm } from '@/components/classes/TimetableSlotForm'
@@ -95,7 +94,7 @@ interface RosterStudent {
 function ClassDetailContent() {
   const { id } = useParams<{ id: string }>()
   const { data: cls, isLoading } = useClass(id)
-  const { role } = useAuthStore()
+  const { role, user } = useAuthStore()
   const [term, setTerm] = useState(1)
   const { data: slots = [] } = useClassTimetable(id, term)
   const [activeTab, setActiveTab] = useState<Tab>('roster')
@@ -108,6 +107,23 @@ function ClassDetailContent() {
   const canViewStudentProfile = role
     ? (STUDENT_PROFILE_VIEWER_ROLES as readonly string[]).includes(role)
     : false
+
+  // [PRODUCTION FIX 2026-07-31] Full attendance audit — the frontend only
+  // ever checked the broad class.markAttendance role permission, which
+  // every 'academic' user holds regardless of which class they actually
+  // teach. The backend already enforces real per-class ownership
+  // (attendance.ts's requireClassOwnership) and correctly 403s anyone who
+  // isn't cls.teacherId — but nothing here checked that first, so a
+  // teacher opening a class they don't teach saw the full marking UI
+  // render, then hit an unhandled backend error the moment it tried to
+  // load. Checking ownership here means the UI can react appropriately
+  // instead of surfacing that as a raw error.
+  const isAssignedTeacher = role === 'academic' && cls?.teacherId === user?.uid
+  // Other staff who hold class.viewAnalytics (school-wide oversight, not a
+  // per-class teaching relationship) — see attendance for the day,
+  // read-only, rather than either an error or a wall.
+  const canViewAttendanceReadOnly =
+    !isAssignedTeacher && (['admin', 'high_rank', 'exam_officer', 'lower_rank'].includes(role ?? '') || role === 'academic')
 
   if (isLoading) {
     return (
@@ -124,11 +140,17 @@ function ClassDetailContent() {
 
   const TABS: TabItem<Tab>[] = [
     { id: 'roster', label: 'Students', icon: Users },
-    { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
+    ...(role !== 'student' ? [{ id: 'attendance' as Tab, label: 'Attendance', icon: ClipboardCheck }] : []),
     { id: 'timetable', label: 'Timetable', icon: Clock },
     { id: 'assignments', label: 'Assignments', icon: BookOpen, badge: assignments.length },
   ]
 
+  // [PRODUCTION FIX 2026-07-31] Full attendance/classes audit finding: this
+  // table had zero role-based column filtering — every viewer, including
+  // students, saw classmates' registration numbers, sex, and risk level (a
+  // sensitive attribute). Students now see names only; every staff role
+  // that could already reach this tab keeps exactly what it had before.
+  const isStudent = role === 'student'
   const rosterColumns: DataColumn<RosterStudent>[] = [
     {
       key: 'firstName',
@@ -136,25 +158,27 @@ function ClassDetailContent() {
       priority: 'critical',
       render: (s) => `${s.firstName} ${s.lastName}`,
     },
-    { key: 'registrationNo', label: 'Reg No', priority: 'important' },
-    { key: 'sex', label: 'Sex', priority: 'optional' },
-    {
-      key: 'riskLevel',
-      label: 'Risk',
-      priority: 'optional',
-      render: (s) => <StudentRiskBadge riskLevel={s.riskLevel ?? 'NONE'} variant="dot" />,
-    },
-    {
-      key: 'profile',
-      label: '',
-      priority: 'important',
-      render: (s) =>
-        canViewStudentProfile ? (
-          <Link href={`/students/${s.id}`} className="text-brand-teal text-xs font-medium hover:underline">
-            Profile
-          </Link>
-        ) : null,
-    },
+    ...(isStudent ? [] : [
+      { key: 'registrationNo', label: 'Reg No', priority: 'important' as const },
+      { key: 'sex', label: 'Sex', priority: 'optional' as const },
+      {
+        key: 'riskLevel',
+        label: 'Risk',
+        priority: 'optional' as const,
+        render: (s: RosterStudent) => <StudentRiskBadge riskLevel={s.riskLevel ?? 'NONE'} variant="dot" />,
+      },
+      {
+        key: 'profile',
+        label: '',
+        priority: 'important' as const,
+        render: (s: RosterStudent) =>
+          canViewStudentProfile ? (
+            <Link href={`/students/${s.id}`} className="text-brand-teal text-xs font-medium hover:underline">
+              Profile
+            </Link>
+          ) : null,
+      },
+    ]),
   ]
 
   const timetableColumns: DataColumn<ApiTimetableSlot>[] = [
@@ -226,16 +250,15 @@ function ClassDetailContent() {
 
       {activeTab === 'attendance' && (
         <div className="space-y-3">
-          <PermissionGuard
-            permission="class.markAttendance"
-            fallback={
-              <div className="bg-surface border border-base rounded-xl p-6 text-center text-sm text-muted">
-                Only this class&apos;s assigned teacher can mark attendance.
-              </div>
-            }
-          >
+          {isAssignedTeacher ? (
             <AttendanceSheet classId={id} students={cls.students ?? []} />
-          </PermissionGuard>
+          ) : canViewAttendanceReadOnly ? (
+            <AttendanceSheet classId={id} students={cls.students ?? []} readOnly />
+          ) : (
+            <div className="bg-surface rounded-xl p-6 text-center text-sm text-muted">
+              Only this class&apos;s assigned teacher can mark attendance.
+            </div>
+          )}
         </div>
       )}
 

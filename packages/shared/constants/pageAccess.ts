@@ -36,6 +36,10 @@ export const PAGE_ACCESS: Record<string, readonly UserRole[]> = {
   '/dashboard': ALL_ROLES,
   '/students': ALL_STAFF,
   '/classes': ['admin', 'high_rank', 'lower_rank', 'academic', 'exam_officer', 'student'],
+  // [PRODUCTION FIX 2026-07-31] Students previously had no dedicated place
+  // to see their own attendance at all — the class detail page's
+  // Attendance tab was a teacher marking tool with no student-facing mode.
+  '/attendance': ['student'],
   '/exams': ['admin', 'high_rank', 'lower_rank', 'academic', 'exam_officer', 'student'],
   '/timetable': ALL_ROLES,
   '/finances': ['admin', 'high_rank', 'finance', 'student', 'hr'],

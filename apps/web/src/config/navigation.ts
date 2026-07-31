@@ -44,6 +44,7 @@ import {
   BarChart2,
   Award,
   ClipboardList,
+  ClipboardCheck,
   ShieldCheck,
   Settings,
 } from 'lucide-react'
@@ -145,6 +146,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href:        '/classes',
     icon:        BookOpen,
     roles:       rolesFor('/classes'),
+  },
+  {
+    label:       'My Attendance',
+    mobileLabel: 'Attendance',
+    href:        '/attendance',
+    icon:        ClipboardCheck,
+    roles:       rolesFor('/attendance'),
   },
   {
     label:       'Exams',
