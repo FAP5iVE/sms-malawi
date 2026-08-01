@@ -156,6 +156,9 @@ function ExamsPageInner() {
   // read-only mode, but need their own state so opening one doesn't
   // interfere with the other.
   const [reviewExamId, setReviewExamId] = useState<string | null>(null)
+  // ET-1 / ET-2: exam-tab drill-downs — scheduled exam detail, released marks list.
+  const [detailExamId, setDetailExamId] = useState<string | null>(null)
+  const [viewMarksExamId, setViewMarksExamId] = useState<string | null>(null)
   const [computing, setComputing] = useState(false)
   const [computeResult, setComputeResult] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
 
@@ -183,6 +186,8 @@ function ExamsPageInner() {
   const exams = (examsData ?? []) as ApiExam[]
   const marksExam = marksExamId ? exams.find((e) => e.id === marksExamId) : undefined
   const reviewExam = reviewExamId ? exams.find((e) => e.id === reviewExamId) : undefined
+  const detailExam = detailExamId ? exams.find((e) => e.id === detailExamId) : undefined
+  const viewMarksExam = viewMarksExamId ? exams.find((e) => e.id === viewMarksExamId) : undefined
 
   const approveResults = useApproveResults()
   const releaseResults = useReleaseResults()
@@ -193,6 +198,7 @@ function ExamsPageInner() {
   const canApprove         = can('exam.approveResults')
   const canRelease         = can('exam.authorizeRelease')
   const canEnterMarks      = can('exam.enterOwnClassMarks')
+  const canCorrect         = can('exam.correctMarksInReview')
 
   async function handleCompute() {
     if (!selectedClassId) return
@@ -347,8 +353,15 @@ function ExamsPageInner() {
                       {exams.map((exam) => (
                         <tr key={exam.id} className="hover:bg-page">
                           <td className="px-5 py-3">
-                            <p className="font-medium text-body">{exam.title}</p>
-                            <p className="text-xs text-muted">{exam.type.replace(/_/g, ' ')}</p>
+                            <button
+                              type="button"
+                              onClick={() => exam.status === 'RESULTS_RELEASED' ? setViewMarksExamId(exam.id) : setDetailExamId(exam.id)}
+                              className="text-left hover:underline"
+                              title={exam.status === 'RESULTS_RELEASED' ? 'View released marks' : 'View exam details'}
+                            >
+                              <p className="font-medium text-body">{exam.title}</p>
+                              <p className="text-xs text-muted">{exam.type.replace(/_/g, ' ')}</p>
+                            </button>
                           </td>
                           <td className="px-5 py-3 text-muted">{exam.subject}</td>
                           <td className="px-5 py-3 text-muted">
@@ -382,12 +395,12 @@ function ExamsPageInner() {
                                     Enter Marks <ChevronRight className="w-3 h-3" />
                                   </button>
                                 )}
-                              {canApprove && exam.status === 'MARKS_FINAL' && (
+                              {(canApprove || canCorrect) && (exam.status === 'MARKS_FINAL' || exam.status === 'RESULTS_APPROVED') && (
                                 <button
                                   onClick={() => setReviewExamId(exam.id)}
                                   className="text-xs text-brand-teal hover:underline flex items-center gap-1"
                                 >
-                                  Review Marks <ChevronRight className="w-3 h-3" />
+                                  {canCorrect ? 'Review / Correct' : 'Review Marks'} <ChevronRight className="w-3 h-3" />
                                 </button>
                               )}
                               {canApprove && exam.status === 'MARKS_FINAL' && (
@@ -509,8 +522,57 @@ function ExamsPageInner() {
             classId={reviewExam.classId}
             maxMark={reviewExam.maxMark ?? 100}
             onClose={() => setReviewExamId(null)}
+            correctionMode={canCorrect}
+            readOnly={!canCorrect}
+          />
+        )}
+
+        {/* ET-2: released exam — read-only marks list */}
+        {viewMarksExamId && viewMarksExam && (
+          <MarksEntrySheet
+            examId={viewMarksExamId}
+            classId={viewMarksExam.classId}
+            maxMark={viewMarksExam.maxMark ?? 100}
+            onClose={() => setViewMarksExamId(null)}
             readOnly
           />
+        )}
+
+        {/* ET-1: exam detail */}
+        {detailExamId && detailExam && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="Exam details">
+            <div className="absolute inset-0" onClick={() => setDetailExamId(null)} />
+            <div className="relative z-10 w-full max-w-lg bg-surface rounded-2xl shadow-xl overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-base">
+                <div>
+                  <h2 className="font-heading font-bold text-brand-navy">{detailExam.title}</h2>
+                  <p className="text-xs text-muted mt-0.5">{detailExam.type.replace(/_/g, ' ')} · {detailExam.status.replace(/_/g, ' ')}</p>
+                </div>
+                <button type="button" onClick={() => setDetailExamId(null)} aria-label="Close" className="p-2 hover:bg-page rounded-xl">
+                  <ChevronRight className="w-4 h-4 text-muted rotate-90" />
+                </button>
+              </div>
+              <dl className="px-6 py-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                {[
+                  ['Subject', detailExam.subject],
+                  ['Class', detailExam.className ?? detailExam.classId],
+                  ['Date', new Date(detailExam.date).toLocaleDateString('en-MW', { day: '2-digit', month: 'short', year: 'numeric' })],
+                  ['Time', `${detailExam.timeStart} – ${detailExam.timeEnd}`],
+                  ['Venue', detailExam.venue],
+                  ['Max mark', String(detailExam.maxMark)],
+                  ['Weight', `${detailExam.weightPercent}%`],
+                  ['Term', `Term ${detailExam.term} · ${detailExam.academicYear}`],
+                  ['Students', detailExam.totalStudents != null ? String(detailExam.totalStudents) : '—'],
+                  ['Marks entered', detailExam.marksEntered != null ? String(detailExam.marksEntered) : '—'],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-[11px] uppercase tracking-wide text-muted">{label}</dt>
+                    <dd className="text-body font-medium">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </div>
         )}
       </div>
     </RoleGuard>

@@ -224,6 +224,7 @@ export const queryKeys = {
     timetable: (id: string, year?: string, term?: number) =>
       ['classes', id, 'timetable', year, term] as const,
     assignments: (id: string) => ['classes', id, 'assignments'] as const,
+    subjectAssignmentsMine: (academicYear?: string) => ['classes', 'subject-assignments', 'mine', academicYear ?? null] as const,
     analytics: (id: string) => ['classes', id, 'analytics'] as const,
     labBookings: (id: string) => ['classes', id, 'lab-bookings'] as const,
   },

@@ -1,4 +1,3 @@
-
 /**
  * [CHANGE TYPE]: TARGETED EDIT
  * [FILE]: apps/web/src/server/routes/public.ts
@@ -40,6 +39,7 @@ import { Router }          from 'express'
 import { getFirestore }    from 'firebase-admin/firestore'
 import { getAdminApp }     from '@/lib/verifyAuth'
 import { prisma }          from '@/lib/prisma'
+import { isPassingClassification } from '@/server/services/gradeService'
 import { sendEmail }       from '@/lib/email'
 import { randomBytes }     from 'crypto'
 import { z }               from 'zod'
@@ -121,7 +121,9 @@ publicRouter.get('/maneb-stats', async (req, res) => {
     // only a captured local binding narrows and stays narrowed.
     const entry = byType[r.examType] ?? (byType[r.examType] = { total: 0, passed: 0 })
     entry.total += 1
-    if (r.overallGrade && !['F', 'U', 'X'].includes(r.overallGrade)) {
+    // GR-1: overallGrade is now a computed classification — a record passes
+    // unless it is Fail/Incomplete (single grading authority, all scales).
+    if (isPassingClassification(r.overallGrade)) {
       entry.passed += 1
     }
   }
@@ -450,10 +452,3 @@ publicRouter.get('/fee-structure', async (req, res) => {
   })
   res.json({ year, items: items.map((i) => ({ name: i.name, amount: Number(i.amount) })) })
 })
-
-
-
-
-
-
-

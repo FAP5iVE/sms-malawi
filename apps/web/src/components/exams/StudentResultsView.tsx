@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { useStudentResults, useGenerateReportCard } from '@/hooks/useExams'
+import { useStudentResults, useGenerateMyReportCard } from '@/hooks/useExams'
 import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
 import { AlertTriangle, FileDown, TrendingUp } from 'lucide-react'
 import type { ApiTermResult } from '@shared/types/api'
@@ -18,7 +18,7 @@ export function StudentResultsView({ studentId }: Props) {
   const { academicYear, isLoading: periodLoading } = useCurrentAcademicPeriod()
   const [term, setTerm] = useState(1)
   const { data: result, isLoading, error } = useStudentResults(studentId, academicYear ?? '', term)
-  const generateCard = useGenerateReportCard()
+  const generateCard = useGenerateMyReportCard()
 
   if (isLoading || periodLoading) return <div className="animate-pulse h-40 rounded-xl bg-surface" />
 
@@ -66,8 +66,8 @@ export function StudentResultsView({ studentId }: Props) {
           ))}
         </div>
         <button
-          onClick={() => generateCard.mutate({ studentId, academicYear: academicYear ?? '', term }, {
-            onSuccess: (d) => window.open(d.url, '_blank'),
+          onClick={() => generateCard.mutate({ academicYear: academicYear ?? '', term }, {
+            onSuccess: (d) => { if (d.url) window.open(d.url, '_blank') },
           })}
           disabled={generateCard.isPending}
           className="flex items-center gap-1.5 text-sm border border-base px-3 py-1.5 rounded-xl hover:bg-page transition-colors disabled:opacity-60"
@@ -90,13 +90,33 @@ export function StudentResultsView({ studentId }: Props) {
         ))}
       </div>
 
+      {/* SR-2: class benchmark — own vs class, no other students named */}
+      {(r.classAverage != null || r.classSize != null) && (
+        <div className="flex items-center gap-4 flex-wrap text-xs text-muted bg-page border border-base rounded-xl px-4 py-3">
+          {r.classAverage != null && (
+            <span>Class average: <strong className="text-body">{pct(r.classAverage)}</strong></span>
+          )}
+          {r.position != null && r.classSize != null && (
+            <span>Your position: <strong className="text-body">#{r.position} of {r.classSize}</strong></span>
+          )}
+          <span className="text-[11px] italic">Benchmarks compare you to your class without naming other students.</span>
+        </div>
+      )}
+
       <div className={`rounded-xl px-4 py-3 text-sm font-semibold flex items-center gap-2 ${
         r.passStatus
           ? 'bg-green-50 text-green-700 border border-green-200'
           : 'bg-brand-coral/8 text-brand-coral border border-brand-coral/20'
       }`}>
         <TrendingUp className="w-4 h-4" />
-        {r.passStatus ? '✓ Pass and Proceed to Next Class' : '✗ Repeat Class — Did Not Meet Promotion Criteria'}
+        {r.passStatus
+          ? `✓ Passed Term ${term}`
+          : `✗ Below the pass mark this term`}
+        {term === 3 && (
+          <span className="ml-2 font-normal text-xs text-muted">
+            Promotion to the next class is decided after all Term 3 results are released.
+          </span>
+        )}
       </div>
 
       <div className="border border-base rounded-xl overflow-hidden">

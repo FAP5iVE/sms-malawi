@@ -349,3 +349,96 @@ export async function getPassMarkThreshold(
   const lowestPass = table.filter((g) => g.pass).at(-1)
   return lowestPass?.minPercent ?? 35
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GR-1: MANEB AGGREGATE (MSCE/JCE points)
+// The MSCE/JCE aggregate is the SUM of the grade-POINTS of the best six
+// subjects, English compulsory — NOT a most-frequent or single overall grade.
+// A grade's point value is its 1-based rank on the scale (MSCE 1–9 → 1..9;
+// JCE A–F → 1..5), sourced from the same DB-backed grading scale calcGrade()
+// uses. Lower is better: six grade-1s = 6 points (the best possible).
+// Certificate pass requires English to pass AND all six counted subjects to
+// pass; otherwise the overall classification is Fail regardless of average.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ManebAggregate {
+  /** Sum of best-6 grade points (incl. English); null if English missing or <6 subjects. */
+  points:          number | null
+  /** points / 6; null when points is null. */
+  average:         number | null
+  /** Overall classification label (scale label, or 'Fail'/'Incomplete'). */
+  classification:  string
+  /** Certificate-level pass (English passes AND all six counted subjects pass). */
+  pass:            boolean
+  subjectsCounted: number
+  englishIncluded: boolean
+}
+
+function isEnglishSubject(subject: string): boolean {
+  return /english/i.test(subject)
+}
+
+export async function computeManebAggregate(
+  examType:      'JCE' | 'MSCE',
+  subjectGrades: Record<string, string>,
+): Promise<ManebAggregate> {
+  const scales = await loadScales()
+  const table  = scales.get(examType) ?? []   // ordered by displayOrder asc
+
+  const pointOf = (grade: string): number | null => {
+    const idx = table.findIndex((g) => g.grade === grade)
+    return idx === -1 ? null : idx + 1
+  }
+  const passOf = (grade: string): boolean => table.find((g) => g.grade === grade)?.pass ?? false
+
+  const entries      = Object.entries(subjectGrades)
+  const englishEntry = entries.find(([subject]) => isEnglishSubject(subject))
+  const others       = entries.filter(([subject]) => !isEnglishSubject(subject))
+
+  const englishPoints   = englishEntry ? pointOf(englishEntry[1]) : null
+  const englishIncluded = englishPoints !== null
+
+  // Best five of the remaining subjects (lowest points first).
+  const rankedOthers = others
+    .map(([, g]) => ({ grade: g, p: pointOf(g) }))
+    .filter((x): x is { grade: string; p: number } => x.p !== null)
+    .sort((a, b) => a.p - b.p)
+    .slice(0, 5)
+
+  const subjectsCounted = (englishIncluded ? 1 : 0) + rankedOthers.length
+
+  // A valid aggregate needs six subjects INCLUDING English.
+  if (!englishIncluded || subjectsCounted < 6) {
+    return { points: null, average: null, classification: 'Incomplete', pass: false, subjectsCounted, englishIncluded }
+  }
+
+  const points  = (englishPoints as number) + rankedOthers.reduce((sum, x) => sum + x.p, 0)
+  const average = points / 6
+
+  // Certificate pass: English + all six counted subjects pass.
+  const englishPass = englishEntry ? passOf(englishEntry[1]) : false
+  const allPass     = englishPass && rankedOthers.every((x) => passOf(x.grade))
+
+  // Classification from the per-subject tier applied to the rounded average
+  // grade — reuses the scale's own labels (admin-configurable). If the
+  // certificate rule fails, the overall classification is Fail regardless.
+  const avgPosition   = Math.min(Math.max(Math.round(average), 1), table.length)
+  const avgLabel      = table[avgPosition - 1]?.label ?? 'Fail'
+  const classification = allPass ? avgLabel : 'Fail'
+
+  return { points, average, classification, pass: allPass, subjectsCounted: 6, englishIncluded }
+}
+
+/** The set of passing grade strings for an exam type (subject-level pass
+ *  detection for MANEB analytics — one scale load, membership test after). */
+export async function getPassingGrades(examType: ExamTypeKey): Promise<Set<string>> {
+  const scales = await loadScales()
+  return new Set((scales.get(examType) ?? []).filter((g) => g.pass).map((g) => g.grade))
+}
+
+/** Whether an overall MANEB classification label counts as a pass. */
+export function isPassingClassification(label: string | null | undefined): boolean {
+  if (!label) return false
+  const l = label.trim().toLowerCase()
+  return l !== 'fail' && l !== 'incomplete'
+}

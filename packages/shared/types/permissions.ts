@@ -274,6 +274,7 @@ export type Permission =
   | 'exam.enterOwnClassMarks'        // Enter marks for own assigned class / subject
   | 'exam.unlockMarks'               // Unlock finalized marks for re-entry (admin)
   | 'exam.finalizeMarks'             // Submit marks as final (teacher)
+  | 'exam.correctMarksInReview'      // Officer/high-rank correct individual marks during review (RW-1)
   | 'exam.approveResults'            // Exam officer approval stage of results release
   | 'exam.authorizeRelease'          // High-rank final authorization to release results
   | 'exam.viewReleasedResults'       // View results once officially released
@@ -369,6 +370,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Classes — oversight only
     'class.view',
     'class.approvePendingAction',
+    'class.assignSubject',   // manage subject-teacher assignments (class structure, not results)
     'class.viewAnalytics',
 
     // Applications — oversight
@@ -421,9 +423,15 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'hr.viewAnyProfile',
     'hr.viewHRReports',
 
-    // Exams — technical maintenance and audit visibility only
-    'exam.unlockMarks',
+    // Exams — view / oversight / export only; NO result-editing capability
+    // (AC-1: admin sees everything, edits nothing). exam.unlockMarks removed
+    // — it rewinds released results (a substantive edit) and now belongs to
+    // exam_officer / high_rank.
+    'exam.view',
+    'exam.viewReleasedResults',
+    'exam.viewDraftMarks',
     'exam.viewAllResults',
+    'exam.generateReportCard',
     'exam.viewExamAuditLog',
     'exam.viewClassAnalytics',
     'exam.viewSchoolAnalytics',
@@ -601,6 +609,8 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'exam.view',
     'exam.create',
     'exam.edit',
+    'exam.unlockMarks',
+    'exam.correctMarksInReview',
     'exam.authorizeRelease',
     'exam.viewReleasedResults',
     'exam.viewAllResults',
@@ -1092,6 +1102,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Classes — view and analytics
     'class.view',
     'class.viewAnalytics',
+    'class.assignSubject',
 
     // Announcements — own only, pending approval
     'announcement.view',
@@ -1141,6 +1152,8 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'exam.delete',
     'exam.viewDraftMarks',
     'exam.approveResults',
+    'exam.unlockMarks',
+    'exam.correctMarksInReview',
     'exam.computeResults',
     'exam.viewReleasedResults',
     'exam.viewAllResults',

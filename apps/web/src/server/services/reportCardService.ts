@@ -162,10 +162,14 @@ export async function getReportCardData(
     remarks: s.pass ? 'Pass' : 'Below pass mark',
   }))
 
-  // Promotion status from annual result
-  const promoted = annualResult?.promoted
-  const promotionStatus: 'PASS_AND_PROCEED' | 'REPEAT' =
-    promoted === true ? 'PASS_AND_PROCEED' : 'REPEAT'
+  // PR-1: promotion is an ANNUAL determination — shown only on the Term 3
+  // card once a promotion run has been COMMITTED (annualResult exists).
+  // Terms 1–2, and Term 3 before commit, carry NO promotion status (null),
+  // so a report card never claims "Pass and Proceed" before promotion runs.
+  const promotionStatus: 'PASS_AND_PROCEED' | 'REPEAT' | null =
+    term === 3 && annualResult
+      ? (annualResult.promoted ? 'PASS_AND_PROCEED' : 'REPEAT')
+      : null
 
   const nextForm = student.class ? student.class.form + 1 : null
   const nextClass = nextForm && nextForm <= 4 ? `Form ${nextForm}` : undefined
@@ -393,25 +397,27 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   text(`Signature: _____________`, ML + CW / 2 + 1.5, y + commentH - 2)
   y += commentH + 4
 
-  // ── 6. Promotion status ────────────────────────────────────────────────────
-  const pass = data.promotionStatus === 'PASS_AND_PROCEED'
-  if (pass) {
-    setFill(240, 253, 244)
-    setDraw(21, 128, 61)
-  } else {
-    setFill(254, 242, 242)
-    setDraw(220, 38, 38)
+  // ── 6. Promotion status (annual — only once committed at Term 3) ───────────
+  if (data.promotionStatus) {
+    const pass = data.promotionStatus === 'PASS_AND_PROCEED'
+    if (pass) {
+      setFill(240, 253, 244)
+      setDraw(21, 128, 61)
+    } else {
+      setFill(254, 242, 242)
+      setDraw(220, 38, 38)
+    }
+    doc.setLineWidth(0.6)
+    doc.rect(ML, y, CW, 10, 'FD')
+    doc.setLineWidth(0.2)
+    setFont(10, 'bold')
+    setColor(pass ? 21 : 220, pass ? 128 : 38, pass ? 61 : 38)
+    const promoText = pass
+      ? `PASS AND PROCEED${data.nextClass ? ` TO ${data.nextClass.toUpperCase()}` : ''}`
+      : `REPEAT ${data.student.className.toUpperCase()}`
+    text(promoText, ML + 3, y + 7)
+    y += 10 + 4
   }
-  doc.setLineWidth(0.6)
-  doc.rect(ML, y, CW, 10, 'FD')
-  doc.setLineWidth(0.2)
-  setFont(10, 'bold')
-  setColor(pass ? 21 : 220, pass ? 128 : 38, pass ? 61 : 38)
-  const promoText = pass
-    ? `PASS AND PROCEED${data.nextClass ? ` TO ${data.nextClass.toUpperCase()}` : ''}`
-    : `REPEAT ${data.student.className.toUpperCase()}`
-  text(promoText, ML + 3, y + 7)
-  y += 10 + 4
 
   // ── 7. Footer ─────────────────────────────────────────────────────────────
   setDraw(180, 180, 180)

@@ -155,6 +155,17 @@ export const CreateTimetableSlotSchema = z.object({
   term: z.number().int().min(1).max(3),
 })
 
+// ─── CLASS SUBJECT ASSIGNMENT ────────────────────────────
+// Canonical subject-teacher assignment (backs ClassSubjectAssignment). The
+// single authority for exam/marks ownership: a teacher may schedule/enter/
+// finalize an exam only for the (classId, subject) pairs assigned here.
+export const CreateSubjectAssignmentSchema = z.object({
+  classId: z.string().min(1),
+  subject: z.string().min(1),
+  teacherUid: z.string().min(1),
+  academicYear: z.string().regex(/^\d{4}\/\d{4}$/, 'Format: 2025/2026'),
+})
+
 // ─── ASSIGNMENT ──────────────────────────────────────────
 export const CreateAssignmentSchema = z.object({
   title: z.string().min(3, 'Title is required').max(200),
@@ -188,6 +199,7 @@ export type UpdateStudentInput = z.infer<typeof UpdateStudentSchema>
 export type CreateClassInput = z.infer<typeof CreateClassSchema>
 export type UpdateClassInput = z.infer<typeof UpdateClassSchema>
 export type CreateTimetableSlotInput = z.infer<typeof CreateTimetableSlotSchema>
+export type CreateSubjectAssignmentInput = z.infer<typeof CreateSubjectAssignmentSchema>
 export type CreateAssignmentInput = z.infer<typeof CreateAssignmentSchema>
 export type SubmitAssignmentInput = z.infer<typeof SubmitAssignmentSchema>
 export type MarkAttendanceInput = z.infer<typeof MarkAttendanceSchema>

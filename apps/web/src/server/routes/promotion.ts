@@ -17,8 +17,10 @@ import {
   runPromotion,
   commitPromotion,
   getPromotionRun,
+  getPromotionEligibility,
 }                             from '@/server/services/promotionService'
 import { requireRole }        from '@/lib/verifyAuth'
+import { requirePermission }  from '@/server/middleware/verifyPermission'
 
 export const promotionRouter = Router()
 
@@ -34,10 +36,22 @@ promotionRouter.get('/:year', async (req, res) => {
   return res.json(run)
 })
 
+// ── GET /promotion/:year/eligibility ─────────────────────────────────────────
+// PR-2: whether a promotion run is currently allowed (Term 3 + all Term 3
+// end-of-term results released) — lets the UI disable the run/commit controls
+// and explain why. Readable by the same roles the router mount allows.
+promotionRouter.get('/:year/eligibility', async (req, res) => {
+  const parse = YearParam.safeParse(decodeURIComponent(String(req.params.year)))
+  if (!parse.success) return res.status(400).json({ error: parse.error.issues[0]?.message })
+  return res.json(await getPromotionEligibility(parse.data))
+})
+
 // ── POST /promotion/:year/preview ────────────────────────────────────────────
 promotionRouter.post(
   '/:year/preview',
-  requireRole(['admin', 'exam_officer']),
+  // AC-1: a preview is read-only (dry run) — admin may view it. high_rank
+  // added for parity with the router mount + exam.runPromotionEngine holders.
+  requireRole(['admin', 'exam_officer', 'high_rank']),
   async (req, res) => {
     const parse = YearParam.safeParse(decodeURIComponent(String(req.params.year)))
     if (!parse.success) return res.status(400).json({ error: parse.error.issues[0]?.message })
@@ -50,7 +64,9 @@ promotionRouter.post(
 // ── POST /promotion/:year/commit ─────────────────────────────────────────────
 promotionRouter.post(
   '/:year/commit',
-  requireRole(['admin', 'exam_officer']),
+  // AC-1: committing promotion writes results (promotes students) — NOT an
+  // admin action. Gated on exam.runPromotionEngine (high_rank + exam_officer).
+  requirePermission('exam.runPromotionEngine'),
   async (req, res) => {
     const parse = YearParam.safeParse(decodeURIComponent(String(req.params.year)))
     if (!parse.success) return res.status(400).json({ error: parse.error.issues[0]?.message })

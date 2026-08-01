@@ -56,6 +56,8 @@ import {
   ChevronRight,
   AlertTriangle,
   Users,
+  Trophy,
+  X,
 }                                         from 'lucide-react'
 import { useMotionEnabled }               from '@/store/motionStore'
 import { usePermissions }                 from '@/hooks/usePermissions'
@@ -92,6 +94,13 @@ interface ExamSummary {
   totalStudents:    number
   feeBlockedCount:  number
   marksEntered:     number
+}
+
+interface FeeBlockedStudent {
+  studentId:      string
+  name:           string
+  registrationNo: string
+  balance:        number
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -183,9 +192,10 @@ interface ExamRowProps {
   loading:   boolean
   canApprove: boolean
   canRelease: boolean
+  onShowFeeBlocked: () => void
 }
 
-function ExamRow({ exam, onAction, loading, canApprove, canRelease }: ExamRowProps) {
+function ExamRow({ exam, onAction, loading, canApprove, canRelease, onShowFeeBlocked }: ExamRowProps) {
   const step = STATUS_CONFIG[exam.status].step
   const showApproveBtn = canApprove && exam.status === 'MARKS_FINAL'
   const showReleaseBtn = canRelease && exam.status === 'RESULTS_APPROVED'
@@ -241,10 +251,11 @@ function ExamRow({ exam, onAction, loading, canApprove, canRelease }: ExamRowPro
           {showReleaseBtn && (
             <>
               {exam.feeBlockedCount > 0 && (
-                <div className="flex items-center gap-1.5 text-xs text-brand-amber bg-brand-amber/10 border border-brand-amber/25 px-3 py-2 rounded-xl">
+                <button type="button" onClick={onShowFeeBlocked}
+                  className="flex items-center gap-1.5 text-xs text-brand-amber bg-brand-amber/10 border border-brand-amber/25 px-3 py-2 rounded-xl hover:bg-brand-amber/15 transition-colors">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                  {exam.feeBlockedCount} students will not see results until fees are cleared.
-                </div>
+                  {exam.feeBlockedCount} students will not see results until fees are cleared. View list
+                </button>
               )}
               <button
                 type="button"
@@ -263,9 +274,12 @@ function ExamRow({ exam, onAction, loading, canApprove, canRelease }: ExamRowPro
       )}
 
       {exam.status === 'RESULTS_RELEASED' && (
-        <p className="text-xs text-emerald-600 flex items-center gap-1.5">
+        <p className="text-xs text-emerald-600 flex items-center gap-1.5 flex-wrap">
           <CheckCircle2 className="w-3.5 h-3.5" />
-          Results are live. {exam.feeBlockedCount > 0 ? `${exam.feeBlockedCount} student(s) blocked by unpaid fees.` : 'All students can view results.'}
+          Results are live.{' '}
+          {exam.feeBlockedCount > 0
+            ? <button type="button" onClick={onShowFeeBlocked} className="text-brand-amber underline hover:no-underline">{exam.feeBlockedCount} student(s) blocked by unpaid fees — view list</button>
+            : 'All students can view results.'}
         </p>
       )}
     </div>
@@ -299,6 +313,10 @@ export function ResultsReleaseWorkflow({
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [error,      setError]      = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<ExamStatus | 'ALL'>('ALL')
+  const [feeBlocked,   setFeeBlocked]   = useState<FeeBlockedStudent[] | null>(null)
+  const [feeLoading,   setFeeLoading]   = useState(false)
+  const [releasing,    setReleasing]    = useState(false)
+  const [releaseNote,  setReleaseNote]  = useState<string | null>(null)
 
   const fetchExams = useCallback(async () => {
     setFetchLoading(true)
@@ -331,6 +349,45 @@ export function ResultsReleaseWorkflow({
       setActionLoading(null)
     }
   }, [fetchExams])
+
+  // RW-2: fetch which students are fee-blocked for this class + term.
+  const openFeeBlocked = useCallback(async () => {
+    setFeeLoading(true)
+    setFeeBlocked([])
+    try {
+      const data = await apiFetch<FeeBlockedStudent[]>(
+        `/exams/fee-blocked?classId=${classId}&academicYear=${encodeURIComponent(academicYear)}&term=${term}`,
+      )
+      setFeeBlocked(data)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load fee-blocked students')
+      setFeeBlocked(null)
+    } finally {
+      setFeeLoading(false)
+    }
+  }, [classId, academicYear, term])
+
+  // RW-4 + RW-5: release ALL end-of-term results for the term in unison, then
+  // post the combined top-10 announcement. School-wide, not per class.
+  const handleReleaseTerm = useCallback(async () => {
+    setReleasing(true)
+    setError(null)
+    setReleaseNote(null)
+    try {
+      const res = await apiFetch<{ released: number; announced: boolean }>(
+        '/exams/release-term', { method: 'POST', body: JSON.stringify({ academicYear, term }) },
+      )
+      setReleaseNote(
+        `Released ${res.released} end-of-term exam(s) in unison.` +
+        (res.announced ? ' Top-10 performers announced to the school.' : ''),
+      )
+      await fetchExams()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to release term results')
+    } finally {
+      setReleasing(false)
+    }
+  }, [academicYear, term, fetchExams])
 
   const filteredExams = filterStatus === 'ALL'
     ? exams
@@ -366,6 +423,35 @@ export function ResultsReleaseWorkflow({
           {fetched ? 'Refresh' : 'Load Exams'}
         </button>
       </div>
+
+      {/* RW-4/RW-5: release all end-of-term results in unison + top-10 announcement */}
+      {canRelease && (
+        <div className="flex items-center justify-between gap-3 flex-wrap bg-brand-navy/5 border border-brand-navy/15 rounded-xl px-4 py-3">
+          <div className="flex items-start gap-2">
+            <Trophy className="w-4 h-4 text-brand-navy shrink-0 mt-0.5" aria-hidden />
+            <p className="text-xs text-body">
+              Release <strong>all Form 1–4 end-of-term results</strong> for Term {term} together. Only
+              works once every end-of-term exam is approved; posts one school-wide top-10 announcement.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleReleaseTerm}
+            disabled={releasing}
+            className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-teal text-white hover:bg-brand-teal/90 transition-colors disabled:opacity-60 shrink-0"
+          >
+            {releasing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trophy className="w-4 h-4" />}
+            Release End-of-Term (in unison)
+          </button>
+        </div>
+      )}
+
+      {releaseNote && (
+        <div role="status" className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-700 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          {releaseNote}
+        </div>
+      )}
 
       {/* Error */}
       {error && (
@@ -426,6 +512,7 @@ export function ResultsReleaseWorkflow({
                   loading={actionLoading === exam.id}
                   canApprove={canApprove}
                   canRelease={canRelease}
+                  onShowFeeBlocked={openFeeBlocked}
                 />
               </motion.div>
             ))
@@ -438,6 +525,48 @@ export function ResultsReleaseWorkflow({
           Click Load Exams to view the release pipeline for this class and term.
         </div>
       )}
+
+      {/* RW-2: fee-blocked students modal */}
+      <AnimatePresence>
+        {feeBlocked !== null && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            role="dialog" aria-modal="true" aria-label="Fee-blocked students"
+          >
+            <div className="absolute inset-0" onClick={() => setFeeBlocked(null)} />
+            <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-base">
+                <h3 className="font-heading font-bold text-brand-navy flex items-center gap-2">
+                  <Users className="w-4 h-4" /> Fee-blocked students
+                </h3>
+                <button type="button" onClick={() => setFeeBlocked(null)} aria-label="Close" className="p-2 hover:bg-page rounded-xl">
+                  <X className="w-4 h-4 text-muted" />
+                </button>
+              </div>
+              <div className="max-h-[60vh] overflow-y-auto p-2">
+                {feeLoading ? (
+                  <div className="py-10 text-center text-sm text-muted">Loading…</div>
+                ) : feeBlocked.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-muted">No fee-blocked students for this class and term.</div>
+                ) : (
+                  <ul className="divide-y divide-base">
+                    {feeBlocked.map((st) => (
+                      <li key={st.studentId} className="flex items-center justify-between gap-3 px-3 py-3">
+                        <div>
+                          <p className="text-sm font-medium text-body">{st.name}</p>
+                          <p className="text-xs text-muted font-mono">{st.registrationNo}</p>
+                        </div>
+                        <span className="text-sm font-semibold text-brand-coral tabular">MWK {st.balance.toLocaleString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -106,6 +106,16 @@ export interface ApiClass {
   assignments?: ApiAssignment[]
 }
 
+/** Response shape of GET /classes/:id/subject-assignments and
+ *  GET /classes/subject-assignments/mine (ClassSubjectAssignment rows). */
+export interface ApiSubjectAssignment {
+  id: string
+  classId: string
+  subject: string
+  teacherUid: string
+  academicYear: string
+}
+
 /** Response shape of GET /attendance/class/:classId and GET /attendance/student/:studentId */
 export interface ApiAttendanceRecord {
   id: string
@@ -393,6 +403,30 @@ export interface ApiTermResult {
   headComment: string | null
   reportCardKey: string | null
   releasedAt: string | null
+  classAverage: number | null
+  classSize: number | null
+}
+
+export interface ApiRankedStudent {
+  studentId:      string
+  name:           string
+  registrationNo: string
+  classId:        string
+  className:      string
+  value:          number
+  position:       number
+}
+
+export interface ApiExamAnalytics {
+  metric:            'overall' | 'subject'
+  subject:           string | null
+  total:             number
+  classAverage:      number | null
+  passRate:          number | null
+  atRiskCount:       number
+  gradeDistribution: { grade: string; count: number }[]
+  top:               ApiRankedStudent[]
+  bottom:            ApiRankedStudent[]
 }
 
 export interface ApiManebRecord {
@@ -405,6 +439,9 @@ export interface ApiManebRecord {
   academicYear: string
   subjectGrades: Record<string, string>
   overallGrade: string | null
+  aggregatePoints: number | null
+  studentName: string | null
+  registrationNo: string | null
   status: 'REGISTERED' | 'SITTING' | 'RESULTS_RECEIVED' | 'CERTIFIED'
 }
 export interface ApiStaffProfile {

@@ -25,12 +25,12 @@ import { useAuthStore } from '@/store/authStore'
 import { ExternalLink, GraduationCap, Plus, Trash2, Upload, Loader2 } from 'lucide-react'
 import type { ApiManebRecord } from '@shared/types/api'
 import type { CreateManebRecordInput } from '@shared/schemas/exam'
+import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
 
 interface Props { academicYear: string }
 
 // Six core MSCE/JCE subjects offered as quick grade inputs; staff can leave
 // any blank. Grade strings are validated server-side via CreateManebRecordSchema.
-const QUICK_SUBJECTS = ['English', 'Mathematics', 'Biology', 'Physical Science', 'Chemistry', 'Physics'] as const
 
 interface BulkRow {
   candidateNo: string
@@ -189,7 +189,7 @@ export function ManebPanel({ academicYear }: Props) {
             <input className={fieldClass} placeholder="Centre name" value={individualRow.centerName} onChange={(e) => setIndividualRow((p) => ({ ...p, centerName: e.target.value }))} />
           </div>
           <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-            {QUICK_SUBJECTS.map((subject) => (
+            {MALAWI_SUBJECTS.map((subject) => (
               <div key={subject}>
                 <label className="block text-[10px] text-muted mb-0.5 truncate" title={subject}>{subject}</label>
                 <input
@@ -273,7 +273,7 @@ export function ManebPanel({ academicYear }: Props) {
                   <input className={fieldClass} placeholder="Centre name" value={r.centerName} onChange={(e) => updateRow(i, { centerName: e.target.value })} />
                 </div>
                 <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-                  {QUICK_SUBJECTS.map((subject) => (
+                  {MALAWI_SUBJECTS.map((subject) => (
                     <div key={subject}>
                       <label className="block text-[10px] text-muted mb-0.5 truncate" title={subject}>{subject}</label>
                       <input
@@ -328,7 +328,10 @@ export function ManebPanel({ academicYear }: Props) {
               {filtered.map((r) => (
                 <tr key={r.id} className="hover:bg-page">
                   <td className="px-4 py-3 font-mono text-xs">{r.candidateNo}</td>
-                  <td className="px-4 py-3">{r.studentId}</td>
+                  <td className="px-4 py-3">
+                    <span className="font-medium text-body">{r.studentName ?? r.studentId}</span>
+                    {r.registrationNo && <span className="block text-xs text-muted font-mono">{r.registrationNo}</span>}
+                  </td>
                   <td className="px-4 py-3 text-muted text-xs">{r.centerNo} – {r.centerName}</td>
                   <td className="px-4 py-3 text-xs">
                     {Object.entries(r.subjectGrades).map(([subj, grade]) => (
@@ -337,7 +340,10 @@ export function ManebPanel({ academicYear }: Props) {
                       </span>
                     ))}
                   </td>
-                  <td className="px-4 py-3 font-bold text-brand-navy">{r.overallGrade ?? '—'}</td>
+                  <td className="px-4 py-3 font-bold text-brand-navy">
+                    {r.overallGrade ?? '—'}
+                    {r.aggregatePoints != null && <span className="ml-1 text-xs font-normal text-muted">({r.aggregatePoints} pts)</span>}
+                  </td>
                   <td className="px-4 py-3">
                     <span className="text-xs bg-brand-teal/15 text-brand-teal px-2 py-0.5 rounded-full">{r.status}</span>
                   </td>

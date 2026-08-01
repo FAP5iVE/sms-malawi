@@ -83,15 +83,41 @@ import 'server-only'
 import { prisma }           from '@/lib/prisma'
 import { logger }           from '@/lib/logger'
 import { checkBalanceGate } from '@/server/services/feeService'
-import { calcGrade }        from '@/server/services/gradeService'
+import { calcGrade, computeManebAggregate } from '@/server/services/gradeService'
 import { getManebExamType } from '@shared/constants/malawi'
-import type { CreateExamInput, BulkMarkEntryInput, CreateManebRecordInput } from '@shared/schemas/exam'
+import * as classService    from '@/server/services/classService'
+import * as auditService    from '@/server/services/auditService'
+import * as announcementService from '@/server/services/announcementService'
+import type { UserRole }    from '@shared/types/roles'
+import type { CreateExamInput, UpdateExamInput, BulkMarkEntryInput, CreateManebRecordInput } from '@shared/schemas/exam'
 import type { Decimal } from '@prisma/client/runtime/library'
-import type { ExamStatus } from '@prisma/client'
+import { Prisma, type ExamStatus } from '@prisma/client'
 
 function toNumber(v: Decimal | number | null | undefined): number {
   if (v === null || v === undefined) return 0
   return typeof v === 'number' ? v : Number(v)
+}
+
+// ─── EXAM ACTOR + SUBJECT-OWNERSHIP GUARD (AC-2..AC-6) ───
+// Every mutating/oversight entry point now takes the acting user's uid AND
+// role. admin / high_rank / exam_officer oversee every class and subject and
+// are not subject-scoped; a teacher (academic) may act on an exam only for
+// the (classId, subject) pairs assigned to them in ClassSubjectAssignment.
+export type ExamActor = { uid: string; role: UserRole }
+
+const OVERSIGHT_ROLES: readonly UserRole[] = ['admin', 'high_rank', 'exam_officer']
+
+async function assertOwnsSubject(
+  actor: ExamActor, classId: string, subject: string, academicYear: string,
+): Promise<void> {
+  if (OVERSIGHT_ROLES.includes(actor.role)) return
+  const owns = await classService.isTeacherAssignedToSubject(actor.uid, classId, subject, academicYear)
+  if (!owns) {
+    throw Object.assign(
+      new Error(`You are not assigned to teach ${subject} in this class, so you cannot manage its exams or marks.`),
+      { status: 403 },
+    )
+  }
 }
 
 // ─── CREATE EXAM ─────────────────────────────────────────
@@ -104,7 +130,7 @@ function toNumber(v: Decimal | number | null | undefined): number {
 // form/term — creating one here would let MANEB marks flow through
 // ExamMark/computeTermResults(), the exact parallel-grading-path this
 // phase closes.
-export async function createExam(data: CreateExamInput, actorUid: string) {
+export async function createExam(data: CreateExamInput, actor: ExamActor) {
   if (data.type === 'MANEB_JCE' || data.type === 'MANEB_MSCE') {
     throw new Error(
       `${data.type === 'MANEB_JCE' ? 'JCE' : 'MSCE'} results come from MANEB, not internal marks entry. Record them via the MANEB panel (createManebRecord) once MANEB releases results.`
@@ -119,11 +145,20 @@ export async function createExam(data: CreateExamInput, actorUid: string) {
     )
   }
 
+  // AC-4: a teacher may schedule an exam only for a (class, subject) they are
+  // assigned to; oversight roles bypass. (MANEB guards above run first.)
+  await assertOwnsSubject(actor, data.classId, data.subject, data.academicYear)
+
   const exam = await prisma.exam.create({
-    data: { ...data, date: new Date(data.date), createdByUid: actorUid },
+    data: { ...data, date: new Date(data.date), createdByUid: actor.uid },
     include: { class: { select: { name: true, form: true } } },
   })
-  logger.info({ event: 'exam.create', examId: exam.id, actorUid })
+  await auditService.log({
+    action: 'exam.created', entityType: 'Exam', entityId: exam.id,
+    actorUid: actor.uid, actorRole: actor.role,
+    metadata: { after: { classId: exam.classId, subject: exam.subject, type: exam.type, term: exam.term } },
+  })
+  logger.info({ event: 'exam.create', examId: exam.id, actorUid: actor.uid })
   return exam
 }
 
@@ -139,13 +174,19 @@ export async function createExam(data: CreateExamInput, actorUid: string) {
 // these to render its per-exam release-readiness summary; the underlying
 // joins were straightforward additions to a query that already had to
 // touch Class and ExamMark.
-export async function listExams(classId: string | undefined, academicYear: string, term: number) {
+export async function listExams(classId: string | undefined, academicYear: string, term: number, actor: ExamActor) {
+  const where: Prisma.ExamWhereInput = { academicYear, term, ...(classId ? { classId } : {}) }
+
+  // AC-3: a student sees only their OWN class's RESULTS_RELEASED exams.
+  if (actor.role === 'student') {
+    const me = await prisma.student.findFirst({ where: { firebaseUid: actor.uid }, select: { classId: true } })
+    if (!me?.classId) return []
+    where.classId = me.classId
+    where.status = 'RESULTS_RELEASED'
+  }
+
   const exams = await prisma.exam.findMany({
-    where: {
-      ...(classId ? { classId } : {}),
-      academicYear,
-      term,
-    },
+    where,
     include: {
       class: { select: { name: true } },
       _count: { select: { marks: true } },
@@ -153,8 +194,17 @@ export async function listExams(classId: string | undefined, academicYear: strin
     orderBy: { date: 'asc' },
   })
 
+  // AC-3/AC-6: a teacher sees exams for their assigned (class, subject) pairs,
+  // plus any RESULTS_RELEASED exam school-wide (post-release they may view all
+  // classes' results). Oversight roles see everything.
+  let visible = exams
+  if (actor.role === 'academic') {
+    const assigned = await classService.getTeacherSubjectAssignments(actor.uid, academicYear)
+    visible = exams.filter((e) => assigned.has(`${e.classId}|${e.subject}`) || e.status === 'RESULTS_RELEASED')
+  }
+
   return Promise.all(
-    exams.map(async (exam) => {
+    visible.map(async (exam) => {
       const [totalStudents, feeBlockedCount] = await Promise.all([
         prisma.student.count({ where: { classId: exam.classId, status: 'ACTIVE' } }),
         prisma.invoice.count({
@@ -177,6 +227,102 @@ export async function listExams(classId: string | undefined, academicYear: strin
   )
 }
 
+// ─── UPDATE / DELETE EXAM ────────────────────────────────
+// Editing an exam once its results are finalized/approved/released is
+// blocked (marks/results already derive from it). Editing is subject-
+// ownership-scoped, and any change to classId/subject/term/type re-runs the
+// MANEB guard so an exam cannot be mutated into a national MANEB slot (or a
+// MANEB_* type) that createExam() would have rejected. Deleting is likewise
+// blocked once marks exist or results are locked.
+const EXAM_EDIT_LOCKED_STATUSES: ExamStatus[] = ['MARKS_FINAL', 'RESULTS_APPROVED', 'RESULTS_RELEASED']
+
+export async function updateExam(id: string, data: UpdateExamInput, actor: ExamActor) {
+  const existing = await prisma.exam.findUniqueOrThrow({
+    where:  { id },
+    select: { classId: true, subject: true, academicYear: true, term: true, status: true, type: true },
+  })
+
+  if (EXAM_EDIT_LOCKED_STATUSES.includes(existing.status)) {
+    throw Object.assign(
+      new Error('This exam\u2019s results are finalized and it can no longer be edited.'),
+      { status: 409 },
+    )
+  }
+
+  // Ownership on the current (class, subject).
+  await assertOwnsSubject(actor, existing.classId, existing.subject, existing.academicYear)
+
+  const nextClassId = data.classId ?? existing.classId
+  const nextSubject = data.subject ?? existing.subject
+  const nextYear    = data.academicYear ?? existing.academicYear
+  const nextTerm    = data.term ?? existing.term
+  const nextType    = data.type ?? existing.type
+
+  // Moving to a different (class, subject) requires ownership of the target too.
+  if (nextClassId !== existing.classId || nextSubject !== existing.subject) {
+    await assertOwnsSubject(actor, nextClassId, nextSubject, nextYear)
+  }
+
+  // MANEB re-guard.
+  if (nextType === 'MANEB_JCE' || nextType === 'MANEB_MSCE') {
+    throw new Error(`${nextType === 'MANEB_JCE' ? 'JCE' : 'MSCE'} results come from MANEB, not internal marks entry — record them via the MANEB panel.`)
+  }
+  const targetClass = await prisma.class.findUniqueOrThrow({ where: { id: nextClassId }, select: { form: true } })
+  const manebType = getManebExamType(targetClass.form, nextTerm)
+  if (manebType && nextType === 'END_TERM') {
+    throw new Error(`Form ${targetClass.form} Term ${nextTerm} is the national ${manebType} examination, administered by MANEB — the school does not set an internal end-of-term exam for this slot.`)
+  }
+
+  const exam = await prisma.exam.update({
+    where: { id },
+    data: {
+      ...(data.type          !== undefined ? { type: data.type }                   : {}),
+      ...(data.subject       !== undefined ? { subject: data.subject }             : {}),
+      ...(data.classId       !== undefined ? { classId: data.classId }             : {}),
+      ...(data.title         !== undefined ? { title: data.title }                 : {}),
+      ...(data.date          !== undefined ? { date: new Date(data.date) }         : {}),
+      ...(data.timeStart     !== undefined ? { timeStart: data.timeStart }         : {}),
+      ...(data.timeEnd       !== undefined ? { timeEnd: data.timeEnd }             : {}),
+      ...(data.venue         !== undefined ? { venue: data.venue }                 : {}),
+      ...(data.maxMark       !== undefined ? { maxMark: data.maxMark }             : {}),
+      ...(data.weightPercent !== undefined ? { weightPercent: data.weightPercent } : {}),
+      ...(data.academicYear  !== undefined ? { academicYear: data.academicYear }   : {}),
+      ...(data.term          !== undefined ? { term: data.term }                   : {}),
+    },
+  })
+  await auditService.log({
+    action: 'exam.updated', entityType: 'Exam', entityId: id,
+    actorUid: actor.uid, actorRole: actor.role,
+    metadata: { before: { classId: existing.classId, subject: existing.subject, term: existing.term, type: existing.type }, after: { classId: exam.classId, subject: exam.subject, term: exam.term, type: exam.type } },
+  })
+  logger.info({ event: 'exam.edited', examId: id, actorUid: actor.uid })
+  return exam
+}
+
+export async function deleteExam(id: string, actor: ExamActor) {
+  const existing = await prisma.exam.findUniqueOrThrow({
+    where:  { id },
+    select: { classId: true, subject: true, academicYear: true, status: true, _count: { select: { marks: true } } },
+  })
+
+  if (EXAM_EDIT_LOCKED_STATUSES.includes(existing.status) || existing._count.marks > 0) {
+    throw Object.assign(
+      new Error('This exam has marks or released results and cannot be deleted.'),
+      { status: 409 },
+    )
+  }
+
+  await assertOwnsSubject(actor, existing.classId, existing.subject, existing.academicYear)
+  await prisma.exam.delete({ where: { id } })
+  await auditService.log({
+    action: 'exam.deleted', entityType: 'Exam', entityId: id,
+    actorUid: actor.uid, actorRole: actor.role,
+    metadata: { before: { classId: existing.classId, subject: existing.subject } },
+  })
+  logger.info({ event: 'exam.deleted', examId: id, actorUid: actor.uid })
+  return { success: true }
+}
+
 // ─── ENTER MARKS (bulk upsert) ────────────────────────────
 
 // Only these statuses may advance to MARKS_DRAFT as a result of marks
@@ -184,9 +330,27 @@ export async function listExams(classId: string | undefined, academicYear: strin
 // beyond) is never regressed by a later enterMarks() call.
 const ADVANCEABLE_TO_MARKS_DRAFT: ExamStatus[] = ['SCHEDULED', 'IN_PROGRESS', 'MARKS_PENDING']
 
-export async function enterMarks(data: BulkMarkEntryInput, actorUid: string) {
+// Once marks are finalized (MARKS_FINAL and beyond) they are locked — a
+// teacher can view but not re-enter them (AC-5). Correcting a finalized mark
+// is a review-stage action for exam_officer/high_rank (a later phase), not a
+// silent re-entry through this path.
+const MARKS_LOCKED_STATUSES: ExamStatus[] = ['MARKS_FINAL', 'RESULTS_APPROVED', 'RESULTS_RELEASED']
+
+export async function enterMarks(data: BulkMarkEntryInput, actor: ExamActor) {
   const { entries, isDraft } = data
   const exam = await prisma.exam.findUniqueOrThrow({ where: { id: entries[0]!.examId } })
+
+  // AC-2: only the assigned subject teacher (or an oversight role) may enter.
+  await assertOwnsSubject(actor, exam.classId, exam.subject, exam.academicYear)
+
+  // AC-5: no edits after marks are finalized.
+  if (MARKS_LOCKED_STATUSES.includes(exam.status)) {
+    throw Object.assign(
+      new Error('Marks for this exam are finalized and can no longer be edited.'),
+      { status: 409 },
+    )
+  }
+
   const max = toNumber(exam.maxMark)
   for (const e of entries) {
     if (e.mark !== undefined && e.mark > max)
@@ -196,8 +360,8 @@ export async function enterMarks(data: BulkMarkEntryInput, actorUid: string) {
     entries.map((e) =>
       prisma.examMark.upsert({
         where: { examId_studentId: { examId: e.examId, studentId: e.studentId } },
-        create: { ...e, mark: e.mark ?? null, comment: e.comment ?? null, enteredByUid: actorUid, isDraft },
-        update: { mark: e.mark ?? null, absent: e.absent ?? false, comment: e.comment ?? null, isDraft, enteredByUid: actorUid },
+        create: { ...e, mark: e.mark ?? null, comment: e.comment ?? null, enteredByUid: actor.uid, isDraft },
+        update: { mark: e.mark ?? null, absent: e.absent ?? false, comment: e.comment ?? null, isDraft, enteredByUid: actor.uid },
       })
     )
   )
@@ -206,12 +370,18 @@ export async function enterMarks(data: BulkMarkEntryInput, actorUid: string) {
     await prisma.exam.update({ where: { id: exam.id }, data: { status: 'MARKS_DRAFT' } })
   }
 
-  logger.info({ event: 'marks.enter', examId: entries[0]!.examId, count: entries.length, isDraft, actorUid })
+  logger.info({ event: 'marks.enter', examId: entries[0]!.examId, count: entries.length, isDraft, actorUid: actor.uid })
   return upserted
 }
 
 // ─── READ MARKS (draft-restore for MarksEntrySheet.tsx) ──
-export async function getMarksForExam(examId: string) {
+// AC-3: reading an exam's marks is subject-ownership-scoped — a teacher may
+// read back only marks for exams they are assigned to; oversight roles bypass.
+export async function getMarksForExam(examId: string, actor: ExamActor) {
+  const exam = await prisma.exam.findUniqueOrThrow({
+    where: { id: examId }, select: { classId: true, subject: true, academicYear: true },
+  })
+  await assertOwnsSubject(actor, exam.classId, exam.subject, exam.academicYear)
   return prisma.examMark.findMany({
     where: { examId },
     orderBy: { studentId: 'asc' },
@@ -219,11 +389,14 @@ export async function getMarksForExam(examId: string) {
 }
 
 // ─── FINALIZE MARKS ──────────────────────────────────────
-export async function finalizeMarks(examId: string, actorUid: string) {
+export async function finalizeMarks(examId: string, actor: ExamActor) {
   const exam = await prisma.exam.findUniqueOrThrow({
     where: { id: examId },
     include: { class: { include: { students: { where: { status: 'ACTIVE' } } } } },
   })
+
+  // AC-5: only the assigned subject teacher (or an oversight role) may finalize.
+  await assertOwnsSubject(actor, exam.classId, exam.subject, exam.academicYear)
 
   const marks = await prisma.examMark.findMany({
     where:  { examId },
@@ -243,28 +416,55 @@ export async function finalizeMarks(examId: string, actorUid: string) {
 
   await prisma.examMark.updateMany({ where: { examId }, data: { isDraft: false, finalizedAt: new Date() } })
   await prisma.exam.update({ where: { id: examId }, data: { status: 'MARKS_FINAL' } })
-  logger.info({ event: 'marks.finalized', examId, actorUid })
+  await auditService.log({
+    action: 'exam.marks_finalized', entityType: 'Exam', entityId: examId,
+    actorUid: actor.uid, actorRole: actor.role,
+    metadata: { context: { classId: exam.classId, subject: exam.subject } },
+  })
+  logger.info({ event: 'marks.finalized', examId, actorUid: actor.uid })
   return { finalized: true, examId }
 }
 
-export async function approveResults(examId: string, actorUid: string) {
+export async function approveResults(examId: string, actor: ExamActor) {
   const exam = await prisma.exam.findUniqueOrThrow({ where: { id: examId } })
   if (exam.status !== 'MARKS_FINAL') throw new Error('Marks must be finalized before approval.')
   await prisma.exam.update({ where: { id: examId }, data: { status: 'RESULTS_APPROVED' } })
-  logger.info({ event: 'results.approved', examId, actorUid })
+  await auditService.log({
+    action: 'exam.results_approved', entityType: 'Exam', entityId: examId,
+    actorUid: actor.uid, actorRole: actor.role,
+    metadata: { context: { classId: exam.classId, subject: exam.subject } },
+  })
+  logger.info({ event: 'results.approved', examId, actorUid: actor.uid })
 }
 
-export async function releaseResults(examId: string, actorUid: string) {
+export async function releaseResults(examId: string, actor: ExamActor) {
   const exam = await prisma.exam.findUniqueOrThrow({ where: { id: examId } })
   if (exam.status !== 'RESULTS_APPROVED') throw new Error('Results must be approved before release.')
   await prisma.exam.update({ where: { id: examId }, data: { status: 'RESULTS_RELEASED' } })
-  logger.info({ event: 'results.released', examId, actorUid })
+  await auditService.log({
+    action: 'exam.results_released', entityType: 'Exam', entityId: examId,
+    actorUid: actor.uid, actorRole: actor.role,
+    metadata: { context: { classId: exam.classId, subject: exam.subject, term: exam.term } },
+  })
+  logger.info({ event: 'results.released', examId, actorUid: actor.uid })
 }
 
-export async function unlockMarks(examId: string, actorUid: string) {
+// Rewinds a finalized/approved/released exam back to MARKS_PENDING and flips
+// its marks to draft — a substantive results edit. AC-1: NOT an admin action;
+// gated on exam.unlockMarks (exam_officer / high_rank) at the route. Always
+// audited as a high-severity result mutation.
+export async function unlockMarks(examId: string, actor: ExamActor) {
+  const before = await prisma.exam.findUniqueOrThrow({
+    where: { id: examId }, select: { status: true, classId: true, subject: true },
+  })
   await prisma.exam.update({ where: { id: examId }, data: { status: 'MARKS_PENDING' } })
   await prisma.examMark.updateMany({ where: { examId }, data: { isDraft: true } })
-  logger.info({ event: 'marks.unlocked', examId, actorUid })
+  await auditService.log({
+    action: 'exam.marks_unlocked', entityType: 'Exam', entityId: examId,
+    actorUid: actor.uid, actorRole: actor.role,
+    metadata: { before: { status: before.status }, context: { classId: before.classId, subject: before.subject } },
+  })
+  logger.info({ event: 'marks.unlocked', examId, fromStatus: before.status, actorUid: actor.uid })
 }
 
 // ─── GET STUDENT RESULTS — FEE GATE ENFORCED ─────────────
@@ -276,7 +476,21 @@ export async function getStudentResults(studentId: string, academicYear: string,
     err.status = 403
     throw err
   }
-  return prisma.termResult.findFirst({ where: { studentId, academicYear, term } })
+  const termResult = await prisma.termResult.findFirst({ where: { studentId, academicYear, term } })
+  if (!termResult) return null
+
+  // SR-2: class benchmark (no other students' names) — the class average and
+  // size for this student's own class + term, so the results view can show
+  // "your average vs class average" and "position of N".
+  const siblings = await prisma.termResult.findMany({
+    where:  { classId: termResult.classId, academicYear, term },
+    select: { average: true },
+  })
+  const classSize = siblings.length
+  const classAverage = classSize > 0
+    ? Math.round((siblings.reduce((sum, r) => sum + toNumber(r.average), 0) / classSize) * 100) / 100
+    : null
+  return { ...termResult, classAverage, classSize }
 }
 
 // ─── COMPUTE TERM RESULTS ────────────────────────────────
@@ -343,21 +557,59 @@ export async function computeTermResults(classId: string, academicYear: string, 
 }
 
 // ─── MANEB ────────────────────────────────────────────────
-export async function createManebRecord(data: CreateManebRecordInput, actorUid: string) {
+export async function createManebRecord(data: CreateManebRecordInput, actor: ExamActor) {
+  // Integrity: the studentId must resolve to a real Student — a typo'd id
+  // would otherwise create an orphan MANEB record.
+  const student = await prisma.student.findUnique({ where: { id: data.studentId }, select: { id: true } })
+  if (!student) {
+    throw Object.assign(new Error(`No student found for id ${data.studentId}.`), { status: 400 })
+  }
+
+  // GR-1: overallGrade / aggregatePoints are computed server-side from the
+  // subject grades (sum of best-6 points incl. English) — the client-supplied
+  // overallGrade is ignored so it can never diverge from the real aggregate.
+  const { overallGrade: _ignoredClientOverall, ...rest } = data
+  void _ignoredClientOverall
+  const aggregate = await computeManebAggregate(data.examType, data.subjectGrades)
+
   const record = await prisma.manebRecord.create({
     data: {
-      ...data,
-      overallGrade: data.overallGrade ?? null,
+      ...rest,
+      overallGrade:    aggregate.classification,
+      aggregatePoints: aggregate.points,
     },
   })
-  logger.info({ event: 'maneb.record.create', recordId: record.id, actorUid })
+  await auditService.log({
+    action: 'maneb.record_created', entityType: 'ManebRecord', entityId: record.id,
+    actorUid: actor.uid, actorRole: actor.role,
+    metadata: { after: { studentId: record.studentId, examType: record.examType, candidateNo: record.candidateNo } },
+  })
+  logger.info({ event: 'maneb.record.create', recordId: record.id, actorUid: actor.uid })
   return record
 }
 
 export async function listManebRecords(academicYear: string, examType?: 'JCE' | 'MSCE') {
-  return prisma.manebRecord.findMany({
+  const records = await prisma.manebRecord.findMany({
     where: { academicYear, ...(examType ? { examType } : {}) },
     orderBy: { candidateNo: 'asc' },
+  })
+  // MN-2: ManebRecord.studentId is a plain FK (no declared relation) — resolve
+  // names with one batch lookup so the UI shows the student's name, not the raw id.
+  const studentIds = Array.from(new Set(records.map((r) => r.studentId)))
+  const students = studentIds.length
+    ? await prisma.student.findMany({
+        where:  { id: { in: studentIds } },
+        select: { id: true, firstName: true, lastName: true, registrationNo: true },
+      })
+    : []
+  const byId = new Map(students.map((s) => [s.id, s]))
+  return records.map((r) => {
+    const st = byId.get(r.studentId)
+    return {
+      ...r,
+      studentName:    st ? `${st.firstName} ${st.lastName}` : null,
+      registrationNo: st?.registrationNo ?? null,
+    }
   })
 }
 
@@ -371,7 +623,7 @@ export async function listManebRecords(academicYear: string, examType?: 'JCE' | 
  * records and a per-row error list for the caller to surface. This does NOT
  * introduce a second MANEB write path — it is a batching wrapper only.
  */
-export async function bulkCreateManebRecords(rows: CreateManebRecordInput[], actorUid: string) {
+export async function bulkCreateManebRecords(rows: CreateManebRecordInput[], actor: ExamActor) {
   const created: Awaited<ReturnType<typeof createManebRecord>>[] = []
   const errors: Array<{ index: number; candidateNo: string; error: string }> = []
 
@@ -379,7 +631,7 @@ export async function bulkCreateManebRecords(rows: CreateManebRecordInput[], act
     const row = rows[i]
     if (!row) continue
     try {
-      created.push(await createManebRecord(row, actorUid))
+      created.push(await createManebRecord(row, actor))
     } catch (err) {
       errors.push({
         index: i,
@@ -389,8 +641,37 @@ export async function bulkCreateManebRecords(rows: CreateManebRecordInput[], act
     }
   }
 
-  logger.info({ event: 'maneb.record.bulk_create', created: created.length, failed: errors.length, actorUid })
+  logger.info({ event: 'maneb.record.bulk_create', created: created.length, failed: errors.length, actorUid: actor.uid })
   return { created, errors }
+}
+
+// ─── GR-1: RECOMPUTE MANEB AGGREGATES (existing records) ─
+// Recomputes overallGrade + aggregatePoints from stored subjectGrades for
+// every MANEB record in a year — used once after the GR-1 rollout so records
+// created before server-side computation get correct aggregates. New records
+// are already computed on create/import.
+export async function recomputeManebAggregates(academicYear: string, actor: ExamActor): Promise<{ updated: number }> {
+  const records = await prisma.manebRecord.findMany({
+    where:  { academicYear },
+    select: { id: true, examType: true, subjectGrades: true },
+  })
+  let updated = 0
+  for (const r of records) {
+    const grades = (r.subjectGrades as Record<string, string> | null) ?? {}
+    const aggregate = await computeManebAggregate(r.examType as 'JCE' | 'MSCE', grades)
+    await prisma.manebRecord.update({
+      where: { id: r.id },
+      data:  { overallGrade: aggregate.classification, aggregatePoints: aggregate.points },
+    })
+    updated += 1
+  }
+  await auditService.log({
+    action: 'maneb.aggregates_recomputed', entityType: 'ManebRecord', entityId: academicYear,
+    actorUid: actor.uid, actorRole: actor.role,
+    metadata: { context: { academicYear, updated } },
+  })
+  logger.info({ event: 'maneb.recompute', academicYear, updated, actorUid: actor.uid })
+  return { updated }
 }
 
 // ─── ANALYTICS ───────────────────────────────────────────
@@ -407,4 +688,297 @@ export async function getClassAnalytics(classId: string, academicYear: string, t
     classAverage: Math.round(classAvg * 100) / 100,
     top10: top10.map((r) => ({ studentId: r.studentId, average: toNumber(r.average), grade: r.grade, position: r.position })),
   }
+}
+
+// ─────────────────────────────────────────────────────────
+//  P4 — RELEASE WORKFLOW (RW-1, RW-2, RW-4, RW-5)
+// ─────────────────────────────────────────────────────────
+
+// RW-2: which students in a class are fee-blocked for a term (the identities
+// behind ResultsReleaseWorkflow's "N student(s) blocked by unpaid fees" count).
+// Matches the same invoice-balance rule listExams uses for the count.
+export async function listFeeBlockedStudents(classId: string, academicYear: string, term: number) {
+  const invoices = await prisma.invoice.findMany({
+    where: {
+      academicYear, term,
+      balance: { gt: 0 },
+      student: { classId, status: 'ACTIVE' },
+    },
+    select: {
+      balance: true,
+      student: { select: { id: true, firstName: true, lastName: true, registrationNo: true } },
+    },
+  })
+
+  const byStudent = new Map<string, { studentId: string; name: string; registrationNo: string; balance: number }>()
+  for (const inv of invoices) {
+    const st = inv.student
+    const prev = byStudent.get(st.id) ?? { studentId: st.id, name: `${st.firstName} ${st.lastName}`, registrationNo: st.registrationNo, balance: 0 }
+    prev.balance += toNumber(inv.balance)
+    byStudent.set(st.id, prev)
+  }
+  return Array.from(byStudent.values()).sort((a, b) => b.balance - a.balance)
+}
+
+// RW-1: exam_officer / high_rank correct individual marks DURING REVIEW, after
+// the teacher has finalized and before release. Permitted only while the exam is
+// in the review window (MARKS_FINAL or RESULTS_APPROVED); marks stay final
+// (isDraft: false). Gated at the route on exam.correctMarksInReview (oversight
+// roles only — no subject-ownership requirement, and NOT admin). Fully audited.
+const REVIEW_EDITABLE_STATUSES: ExamStatus[] = ['MARKS_FINAL', 'RESULTS_APPROVED']
+
+export async function correctMarksInReview(
+  examId: string,
+  entries: BulkMarkEntryInput['entries'],
+  actor: ExamActor,
+) {
+  const exam = await prisma.exam.findUniqueOrThrow({ where: { id: examId } })
+  if (!REVIEW_EDITABLE_STATUSES.includes(exam.status)) {
+    throw Object.assign(
+      new Error('Marks can only be corrected while an exam is under review (finalized or approved, before release).'),
+      { status: 409 },
+    )
+  }
+  const max = toNumber(exam.maxMark)
+  for (const e of entries) {
+    if (e.mark !== undefined && e.mark > max) throw new Error(`Mark ${e.mark} exceeds maximum ${max} for exam ${exam.title}`)
+  }
+
+  const updated = await prisma.$transaction(
+    entries.map((e) =>
+      prisma.examMark.update({
+        where: { examId_studentId: { examId, studentId: e.studentId } },
+        data:  { mark: e.mark ?? null, absent: e.absent ?? false, comment: e.comment ?? null, isDraft: false, enteredByUid: actor.uid },
+      })
+    ),
+  )
+  await auditService.log({
+    action: 'exam.marks_corrected_in_review', entityType: 'Exam', entityId: examId,
+    actorUid: actor.uid, actorRole: actor.role,
+    metadata: { context: { classId: exam.classId, subject: exam.subject, count: entries.length } },
+  })
+  logger.info({ event: 'marks.corrected_in_review', examId, count: entries.length, actorUid: actor.uid })
+  return updated
+}
+
+// RW-5 helper: per-class top-N performers for a term, from computed TermResults.
+// Names included (staff-facing announcement); no marks are exposed by callers
+// that build the public top-10 announcement — they use names + position only.
+export interface ClassTopPerformers {
+  classId: string
+  className: string
+  form: number
+  students: { studentId: string; name: string; average: number; position: number }[]
+}
+
+export async function getTopPerformersByClass(
+  academicYear: string, term: number, limit = 10,
+): Promise<ClassTopPerformers[]> {
+  const results = await prisma.termResult.findMany({
+    where:   { academicYear, term },
+    orderBy: { average: 'desc' },
+    select:  { studentId: true, classId: true, average: true, classPosition: true, position: true },
+  })
+  if (results.length === 0) return []
+
+  const classIds = Array.from(new Set(results.map((r) => r.classId)))
+  const studentIds = results.map((r) => r.studentId)
+  const [classes, students] = await Promise.all([
+    prisma.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true, form: true } }),
+    prisma.student.findMany({ where: { id: { in: studentIds } }, select: { id: true, firstName: true, lastName: true } }),
+  ])
+  const classById = new Map(classes.map((c) => [c.id, c]))
+  const nameById = new Map(students.map((s) => [s.id, `${s.firstName} ${s.lastName}`]))
+
+  const byClass = new Map<string, ClassTopPerformers>()
+  for (const r of results) {
+    const cls = classById.get(r.classId)
+    if (!cls) continue
+    let bucket = byClass.get(r.classId)
+    if (!bucket) { bucket = { classId: r.classId, className: cls.name, form: cls.form, students: [] }; byClass.set(r.classId, bucket) }
+    if (bucket.students.length < limit) {
+      bucket.students.push({
+        studentId: r.studentId,
+        name:      nameById.get(r.studentId) ?? '—',
+        average:   toNumber(r.average),
+        position:  r.classPosition || r.position || bucket.students.length + 1,
+      })
+    }
+  }
+  return Array.from(byClass.values()).sort((a, b) => a.form - b.form || a.className.localeCompare(b.className))
+}
+
+// RW-4 + RW-5: release ALL end-of-term exams for a term "in unison" — only once
+// every end-of-term exam is approved (all classes reviewed) — then post ONE
+// combined top-10 announcement (names only, no marks) across all classes.
+export async function releaseTermEndResults(academicYear: string, term: number, actor: ExamActor) {
+  const endTermExams = await prisma.exam.findMany({
+    where:  { academicYear, term, type: 'END_TERM' },
+    select: { id: true, status: true, classId: true },
+  })
+  if (endTermExams.length === 0) {
+    throw Object.assign(new Error(`No end-of-term exams exist for Term ${term}.`), { status: 409 })
+  }
+
+  // RW-4: nothing may be released until every end-of-term exam is at least
+  // approved (reviewed). This enforces the "all classes in unison" rule.
+  const notReady = endTermExams.filter((e) => e.status !== 'RESULTS_APPROVED' && e.status !== 'RESULTS_RELEASED')
+  if (notReady.length > 0) {
+    throw Object.assign(
+      new Error(`${notReady.length} end-of-term exam(s) are not yet approved. All classes must submit and have results reviewed before releasing in unison.`),
+      { status: 409 },
+    )
+  }
+
+  const toRelease = endTermExams.filter((e) => e.status === 'RESULTS_APPROVED')
+  if (toRelease.length > 0) {
+    await prisma.$transaction(
+      toRelease.map((e) => prisma.exam.update({ where: { id: e.id }, data: { status: 'RESULTS_RELEASED' } })),
+    )
+  }
+  await auditService.log({
+    action: 'exam.term_results_released', entityType: 'Exam', entityId: `${academicYear}:T${term}`,
+    actorUid: actor.uid, actorRole: actor.role,
+    metadata: { context: { academicYear, term, released: toRelease.length } },
+  })
+
+  // RW-5: compose one combined top-10 announcement (names only, no marks).
+  let announced = false
+  let announcementId: string | null = null
+  const topByClass = await getTopPerformersByClass(academicYear, term, 10)
+  const withStudents = topByClass.filter((c) => c.students.length > 0)
+  if (withStudents.length > 0) {
+    const bodyLines: string[] = [`Congratulations to our Term ${term} top performers (${academicYear}):`, '']
+    for (const cls of withStudents) {
+      bodyLines.push(`${cls.className} (Form ${cls.form})`)
+      cls.students.forEach((st, i) => bodyLines.push(`${i + 1}. ${st.name}`))
+      bodyLines.push('')
+    }
+    const created = await announcementService.createAnnouncement({
+      title:         `Term ${term} Top Performers — ${academicYear}`,
+      body:          bodyLines.join('\n').trim(),
+      targetAll:     true,
+      createdByUid:  actor.uid,
+      createdByRole: actor.role,
+      publicWebsite: false,
+    }, true)
+    announced = true
+    announcementId = (created as { id?: string } | null)?.id ?? null
+  }
+
+  logger.info({ event: 'exam.term_released', academicYear, term, released: toRelease.length, announced, actorUid: actor.uid })
+  return { released: toRelease.length, announced, announcementId }
+}
+
+// ─────────────────────────────────────────────────────────
+//  P7 — ANALYTICS (AN-1 top/bottom + AN-3 summary)
+// ─────────────────────────────────────────────────────────
+
+export interface RankedStudent {
+  studentId:      string
+  name:           string
+  registrationNo: string
+  classId:        string
+  className:      string
+  value:          number
+  position:       number
+}
+
+export interface ExamAnalyticsResult {
+  metric:            'overall' | 'subject'
+  subject:           string | null
+  total:             number
+  classAverage:      number | null
+  passRate:          number | null
+  atRiskCount:       number
+  gradeDistribution: { grade: string; count: number }[]
+  top:               RankedStudent[]
+  bottom:            RankedStudent[]
+}
+
+// AN-1 (top/bottom-10, filters, tie-safe) + AN-3 (pass rate, grade distribution,
+// at-risk). Oversight roles see any class; a teacher is scoped to classes they
+// teach (class-teacher-of-that-class). Ranking is deterministic: value desc then
+// name — so ties never reorder between calls.
+export async function getExamAnalytics(
+  academicYear: string,
+  term: number,
+  opts: { classId?: string; subject?: string; limit?: number },
+  actor: ExamActor,
+): Promise<ExamAnalyticsResult> {
+  const limit = Math.min(Math.max(opts.limit ?? 10, 1), 50)
+
+  // Scope: non-oversight (teacher) may only view a class they teach.
+  if (!OVERSIGHT_ROLES.includes(actor.role)) {
+    if (!opts.classId) {
+      throw Object.assign(new Error('Select a class you teach to view its analytics.'), { status: 403 })
+    }
+    const assignments = await classService.getTeacherSubjectAssignments(actor.uid, academicYear)
+    const teachesClass = Array.from(assignments).some((key) => key.startsWith(`${opts.classId}|`))
+    if (!teachesClass) {
+      throw Object.assign(new Error('You can only view analytics for classes you teach.'), { status: 403 })
+    }
+  }
+
+  const results = await prisma.termResult.findMany({
+    where:  { academicYear, term, ...(opts.classId ? { classId: opts.classId } : {}) },
+    select: { studentId: true, classId: true, average: true, grade: true, passStatus: true, subjectResults: true },
+  })
+
+  // Value per student: subject average when a subject filter is set, else overall.
+  const rows = results
+    .map((r) => {
+      let value: number | null
+      if (opts.subject) {
+        const sr = r.subjectResults as Record<string, { average: number; grade: string; pass: boolean }> | null
+        const cell = sr ? sr[opts.subject] : undefined
+        value = cell ? Number(cell.average) : null
+      } else {
+        value = toNumber(r.average)
+      }
+      return { studentId: r.studentId, classId: r.classId, grade: r.grade, passStatus: r.passStatus, value }
+    })
+    .filter((r): r is { studentId: string; classId: string; grade: string; passStatus: boolean; value: number } => r.value !== null)
+
+  const total = rows.length
+  if (total === 0) {
+    return { metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null, total: 0, classAverage: null, passRate: null, atRiskCount: 0, gradeDistribution: [], top: [], bottom: [] }
+  }
+
+  // AN-3 summary.
+  const classAverage = Math.round((rows.reduce((sum, r) => sum + r.value, 0) / total) * 100) / 100
+  const passRate     = Math.round((rows.filter((r) => r.passStatus).length / total) * 100)
+  const atRiskCount  = rows.filter((r) => !r.passStatus).length
+  const gradeMap = new Map<string, number>()
+  for (const r of rows) gradeMap.set(r.grade, (gradeMap.get(r.grade) ?? 0) + 1)
+  const gradeDistribution = Array.from(gradeMap.entries())
+    .map(([grade, count]) => ({ grade, count }))
+    .sort((a, b) => a.grade.localeCompare(b.grade))
+
+  // Resolve names + class names (staff-facing lists).
+  const studentIds = rows.map((r) => r.studentId)
+  const classIds   = Array.from(new Set(rows.map((r) => r.classId)))
+  const [students, classes] = await Promise.all([
+    prisma.student.findMany({ where: { id: { in: studentIds } }, select: { id: true, firstName: true, lastName: true, registrationNo: true } }),
+    prisma.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true } }),
+  ])
+  const nameById = new Map(students.map((s) => [s.id, `${s.firstName} ${s.lastName}`]))
+  const regById  = new Map(students.map((s) => [s.id, s.registrationNo]))
+  const clsById  = new Map(classes.map((c) => [c.id, c.name]))
+
+  const enriched = rows.map((r) => ({
+    studentId:      r.studentId,
+    name:           nameById.get(r.studentId) ?? '—',
+    registrationNo: regById.get(r.studentId) ?? '',
+    classId:        r.classId,
+    className:      clsById.get(r.classId) ?? '—',
+    value:          Math.round(r.value * 100) / 100,
+  }))
+
+  const byBest  = [...enriched].sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
+  const byWorst = [...enriched].sort((a, b) => a.value - b.value || a.name.localeCompare(b.name))
+  const top     = byBest.slice(0, limit).map((r, i) => ({ ...r, position: i + 1 }))
+  const bottom  = byWorst.slice(0, limit).map((r, i) => ({ ...r, position: i + 1 }))
+
+  return { metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null, total, classAverage, passRate, atRiskCount, gradeDistribution, top, bottom }
 }

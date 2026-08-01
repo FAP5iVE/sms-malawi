@@ -124,7 +124,7 @@ export interface ReportCardData {
   headTeacherComment:     string
 
   // Outcome
-  promotionStatus: 'PASS_AND_PROCEED' | 'REPEAT'
+  promotionStatus: 'PASS_AND_PROCEED' | 'REPEAT' | null   // null = no promotion determination yet (Terms 1–2, or Term 3 pre-commit)
   nextClass?:      string     // e.g. "Form 3A"
 
   // Admin
@@ -509,7 +509,8 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
         </tbody>
       </table>
 
-      {/* ── 6. PROMOTION STATUS ──────────────────────────────────────────── */}
+      {/* ── 6. PROMOTION STATUS (annual — only once committed at Term 3) ── */}
+      {data.promotionStatus && (
       <div
         style={{
           border: `2pt solid ${data.promotionStatus === 'PASS_AND_PROCEED' ? '#15803d' : '#dc2626'}`,
@@ -542,6 +543,7 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
           <div>Position: {ordinal(data.classPosition)} / {data.classTotal}</div>
         </div>
       </div>
+      )}
 
       {/* ── 7. FOOTER ────────────────────────────────────────────────────── */}
       <div

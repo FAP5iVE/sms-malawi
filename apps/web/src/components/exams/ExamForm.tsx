@@ -1,19 +1,21 @@
 /**
- * [CHANGE TYPE]: TARGETED EDIT
+ * [CHANGE TYPE]: MAJOR REWRITE (adds assignment-scoped class/subject pickers
+ *   and exam-type filtering; the field layout, validation, and error
+ *   surfacing are otherwise unchanged from the R7 version).
  * [FILE]: apps/web/src/components/exams/ExamForm.tsx
- * [R-PHASE]: R7 — Academics III: Exam Pipeline Repair & Grading Engine
- *   Unification
- * [PURPOSE]: EXAM_TYPES centralization deferred to R15 — not otherwise
- *   touched by this phase's own change list. Consequential fix: onSubmit()
- *   previously discarded a failed createExam.mutate() silently — no
- *   onError handler existed at all. This phase's examService.ts now
- *   genuinely rejects certain submissions (an END_TERM exam for Form 2/
- *   Form 4's MANEB national term, or a MANEB_JCE/MANEB_MSCE exam type
- *   created through this internal form at all — MANEB results belong in
- *   ManebRecord, never here), so a silent failure would leave the user
- *   with no feedback and an open form that appears to have done nothing.
- *   Added minimal inline error surfacing for exactly this case.
- * [DEPENDS ON]: none
+ * [MAINT 2026-08 — Exam Module P1: Teacher scoping (AC-4)]:
+ *   A teacher (academic) may schedule an exam only for a (class, subject)
+ *   they are assigned to. The class dropdown is now limited to the teacher's
+ *   assigned classes and the subject dropdown to the subjects they teach in
+ *   the selected class (via useMySubjectAssignments → GET /classes/subject-
+ *   assignments/mine). Oversight roles (admin/high_rank/exam_officer) still
+ *   see every class and subject. The Type dropdown no longer offers the two
+ *   MANEB_* values (never schedulable internally — they route to the MANEB
+ *   panel) and hides END_TERM when the chosen class+term is a national MANEB
+ *   sitting (isManebNationalTerm) — mirroring examService.createExam()'s own
+ *   server-side guards so the form never offers a submission the API rejects.
+ * [DEPENDS ON]: @/hooks/useClasses (useMySubjectAssignments), @/store/authStore,
+ *   @shared/constants/malawi (MALAWI_SUBJECTS, isManebNationalTerm)
  */
 'use client'
 import { useState } from 'react'
@@ -23,11 +25,12 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateExamSchema } from '@shared/schemas/exam'
 import type { CreateExamInput } from '@shared/schemas/exam'
 import { useCreateExam } from '@/hooks/useExams'
-import { useClasses } from '@/hooks/useClasses'
+import { useClasses, useMySubjectAssignments } from '@/hooks/useClasses'
+import { useAuthStore } from '@/store/authStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, AlertTriangle } from 'lucide-react'
 import type { ApiClass } from '@shared/types/api'
-import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
+import { MALAWI_SUBJECTS, isManebNationalTerm } from '@shared/constants/malawi'
 import { EXAM_TYPES } from '@shared/constants/exams'
 
 // CreateExamSchema has defaulted fields (maxMark, weightPercent), so its INPUT
@@ -42,14 +45,44 @@ interface Props { onClose: () => void; academicYear: string; term: number }
 const ic = 'w-full border border-base rounded-xl px-4 py-3 text-sm bg-surface text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal transition-all'
 
 export function ExamForm({ onClose, academicYear, term }: Props) {
+  const { role } = useAuthStore()
+  const isTeacher = role === 'academic'
+
   const { data: classesData } = useClasses(academicYear)
   const classes = (classesData ?? []) as ApiClass[]
+  const { data: assignmentsData } = useMySubjectAssignments(isTeacher ? academicYear : undefined)
+  const assignments = assignmentsData ?? []
+
   const createExam = useCreateExam()
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const { register, handleSubmit, formState: { errors } } = useForm<ExamFormValues, unknown, CreateExamInput>({
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<ExamFormValues, unknown, CreateExamInput>({
     resolver: zodResolver(CreateExamSchema),
     defaultValues: { academicYear, term, maxMark: 100, weightPercent: 100 },
+  })
+
+  const selectedClassId = watch('classId')
+
+  // AC-4: teachers pick only from their assigned classes/subjects.
+  const assignedClassIds = new Set(assignments.map((a) => a.classId))
+  const subjectsByClass = assignments.reduce<Record<string, string[]>>((acc, a) => {
+    ;(acc[a.classId] ??= []).push(a.subject)
+    return acc
+  }, {})
+
+  const availableClasses = isTeacher ? classes.filter((c) => assignedClassIds.has(c.id)) : classes
+  const availableSubjects: readonly string[] = isTeacher
+    ? (selectedClassId ? (subjectsByClass[selectedClassId] ?? []) : [])
+    : MALAWI_SUBJECTS
+
+  // Never offer a MANEB_* type through the internal scheduler; hide END_TERM
+  // when the chosen class+term is a national MANEB sitting.
+  const selectedClass = classes.find((c) => c.id === selectedClassId)
+  const manebSlot = selectedClass ? isManebNationalTerm(selectedClass.form, term) : false
+  const availableTypes = EXAM_TYPES.filter((t) => {
+    if (t.value === 'MANEB_JCE' || t.value === 'MANEB_MSCE') return false
+    if (manebSlot && t.value === 'END_TERM') return false
+    return true
   })
 
   function onSubmit(data: CreateExamInput) {
@@ -85,23 +118,27 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
               <div>
                 <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Type</label>
                 <select {...register('type')} className={ic} aria-label="Exam type">
-                  {EXAM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  {availableTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Class</label>
                 <select {...register('classId')} className={ic} aria-label="Class">
-                  <option value="">Select class…</option>
-                  {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  <option value="">Select class\u2026</option>
+                  {availableClasses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 {errors.classId && <p className="text-xs text-brand-coral mt-1">{errors.classId.message}</p>}
+                {isTeacher && availableClasses.length === 0 && (
+                  <p className="text-xs text-muted mt-1">You have no subject assignments for {academicYear}.</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Subject</label>
-                <select {...register('subject')} className={ic} aria-label="Subject">
-                  <option value="">Select subject…</option>
-                  {MALAWI_SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+                <select {...register('subject')} className={ic} aria-label="Subject" disabled={isTeacher && !selectedClassId}>
+                  <option value="">{isTeacher && !selectedClassId ? 'Select a class first\u2026' : 'Select subject\u2026'}</option>
+                  {availableSubjects.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
+                {errors.subject && <p className="text-xs text-brand-coral mt-1">{errors.subject.message}</p>}
               </div>
               <div>
                 <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Date</label>

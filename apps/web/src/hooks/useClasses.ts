@@ -19,7 +19,7 @@
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { CreateClassInput, UpdateClassInput, CreateAssignmentInput, CreateTimetableSlotInput } from '@shared/schemas/student'
-import type { ApiClass, ApiTimetableSlot, ApiAssignment } from '@shared/types/api'
+import type { ApiClass, ApiTimetableSlot, ApiAssignment, ApiSubjectAssignment } from '@shared/types/api'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 
 export function useClasses(academicYear?: string, includeArchived?: boolean) {
@@ -47,6 +47,21 @@ export function useClassTimetable(classId: string, term: number) {
     queryKey: queryKeys.classes.timetable(classId, undefined, term),
     queryFn: () => apiFetch<ApiTimetableSlot[]>(`/classes/${classId}/timetable?term=${term}`),
     enabled: !!classId,
+  })
+}
+
+// The signed-in teacher's own subject-teacher assignments for a year —
+// backs subject/class scoping in the exam scheduling form (AC-4).
+export function useMySubjectAssignments(academicYear?: string) {
+  return useQuery({
+    queryKey: queryKeys.classes.subjectAssignmentsMine(academicYear),
+    queryFn: () =>
+      apiFetch<ApiSubjectAssignment[]>(
+        academicYear
+          ? `/classes/subject-assignments/mine?academicYear=${encodeURIComponent(academicYear)}`
+          : '/classes/subject-assignments/mine',
+      ),
+    enabled: !!academicYear,
   })
 }
 

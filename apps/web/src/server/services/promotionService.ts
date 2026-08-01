@@ -266,11 +266,52 @@ function evaluateMSCEStyleRule(subjects: SubjectOutcome[]): { passes: boolean; r
 // RUN PROMOTION (preview or commit)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PR-2: PROMOTION ELIGIBILITY GATE
+// A promotion run (preview or commit) is only valid in Term 3, once every
+// Term 3 end-of-term exam has been RESULTS_RELEASED. In Terms 1–2, or while
+// any Term 3 end-of-term result is still unreleased, promotion is blocked and
+// the reason is surfaced so the UI can disable the control and explain why.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PromotionEligibility {
+  eligible:        boolean
+  term:            number
+  reason:          string | null
+  endTermTotal:    number
+  endTermReleased: number
+}
+
+export async function getPromotionEligibility(academicYear: string): Promise<PromotionEligibility> {
+  const term = Number(await settingsService.get(SETTING_KEYS.CURRENT_TERM))
+  const [endTermTotal, endTermReleased] = await Promise.all([
+    prisma.exam.count({ where: { academicYear, term: 3, type: 'END_TERM' } }),
+    prisma.exam.count({ where: { academicYear, term: 3, type: 'END_TERM', status: 'RESULTS_RELEASED' } }),
+  ])
+
+  let reason: string | null = null
+  if (term !== 3) {
+    reason = 'Promotion can only run in Term 3.'
+  } else if (endTermTotal === 0) {
+    reason = 'No Term 3 end-of-term exams exist yet.'
+  } else if (endTermReleased < endTermTotal) {
+    reason = `${endTermTotal - endTermReleased} Term 3 end-of-term exam(s) are not yet released.`
+  }
+
+  const eligible = term === 3 && endTermTotal > 0 && endTermReleased === endTermTotal
+  return { eligible, term, reason, endTermTotal, endTermReleased }
+}
+
 export async function runPromotion(
   academicYear: string,
   actorUid:     string,
   preview       = true,
 ): Promise<PromotionPreview> {
+  const eligibility = await getPromotionEligibility(academicYear)
+  if (!eligibility.eligible) {
+    throw Object.assign(new Error(eligibility.reason ?? 'Promotion is not currently available.'), { status: 409 })
+  }
+
   const { minAverage, minPasses } = await getPromotionThresholds()
 
   const students = await prisma.student.findMany({
@@ -433,6 +474,11 @@ export async function commitPromotion(
   academicYear: string,
   actorUid:     string,
 ): Promise<{ committed: number }> {
+  const eligibility = await getPromotionEligibility(academicYear)
+  if (!eligibility.eligible) {
+    throw Object.assign(new Error(eligibility.reason ?? 'Promotion is not currently available.'), { status: 409 })
+  }
+
   const run = await prisma.promotionRun.findUnique({ where: { academicYear } })
   if (!run) throw new Error(`No promotion preview found for ${academicYear}. Run preview first.`)
   if (run.status === 'COMMITTED') throw new Error(`Promotion for ${academicYear} is already committed.`)

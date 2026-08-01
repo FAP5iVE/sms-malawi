@@ -40,6 +40,15 @@
  *   or Form 4 Term 3 (the JCE/MSCE national sittings — see
  *   @shared/constants/malawi's MANEB_NATIONAL_FORM_TERM), directing the
  *   caller to timetable type "MANEB" instead.
+ * [MAINT 2026-08 — Exam Module P0]: Added ClassSubjectAssignment CRUD +
+ *   ownership helpers. ClassSubjectAssignment is the canonical subject-
+ *   teacher assignment backing exam/marks ownership (AC-2..AC-6):
+ *   getTeacherSubjectAssignments() returns the (classId|subject) set a
+ *   teacher owns for a year — reading ClassSubjectAssignment, falling back
+ *   to distinct TimetableSlot rows only when a teacher has no explicit
+ *   assignments yet (non-breaking transition; the explicit table becomes
+ *   authoritative once populated, via createSubjectAssignment or the
+ *   backfillSubjectAssignmentsFromTimetable one-time migration helper).
  * [DEPENDS ON]: apps/web/src/server/services/auditService.ts,
  *   @shared/schemas/student (UpdateClassInput), @shared/constants/malawi
  *   (getManebExamType)
@@ -324,4 +333,195 @@ export async function approveTimetableSlot(
   })
 
   return slot
+}
+
+// ─────────────────────────────────────────────────────────
+//  CLASS SUBJECT ASSIGNMENT  (subject-teacher ownership authority)
+//  Backs AC-2..AC-6: a teacher may schedule / enter / finalize an exam
+//  only for the (classId, subject) pairs assigned to them here.
+// ─────────────────────────────────────────────────────────
+
+/**
+ * The set of `${classId}|${subject}` pairs a teacher is assigned to for a
+ * given year. Reads the canonical ClassSubjectAssignment table; if the
+ * teacher has NO explicit assignment rows for the year, falls back to the
+ * distinct (classId, subject) pairs they are the teacherUid for in
+ * TimetableSlot — a read-only transition bridge so scoping is correct
+ * before the school has populated assignments (or run the backfill). Once
+ * any explicit assignment exists for the teacher/year, that table is
+ * authoritative and the fallback is not consulted.
+ */
+export async function getTeacherSubjectAssignments(
+  teacherUid:   string,
+  academicYear: string,
+): Promise<Set<string>> {
+  const rows = await prisma.classSubjectAssignment.findMany({
+    where:  { teacherUid, academicYear },
+    select: { classId: true, subject: true },
+  })
+
+  if (rows.length > 0) {
+    return new Set(rows.map((r) => `${r.classId}|${r.subject}`))
+  }
+
+  // Transition fallback — derive from scheduling rows, read-only.
+  const slots = await prisma.timetableSlot.findMany({
+    where:  { teacherUid, academicYear },
+    select: { classId: true, subject: true },
+  })
+  return new Set(slots.map((sl) => `${sl.classId}|${sl.subject}`))
+}
+
+/** Whether a teacher is assigned to a specific (class, subject) for a year. */
+export async function isTeacherAssignedToSubject(
+  teacherUid:   string,
+  classId:      string,
+  subject:      string,
+  academicYear: string,
+): Promise<boolean> {
+  const assignments = await getTeacherSubjectAssignments(teacherUid, academicYear)
+  return assignments.has(`${classId}|${subject}`)
+}
+
+/** All subject-teacher assignments for a class in a year. */
+export async function listSubjectAssignments(classId: string, academicYear: string) {
+  return prisma.classSubjectAssignment.findMany({
+    where:   { classId, academicYear },
+    orderBy: { subject: 'asc' },
+  })
+}
+
+/** All subject-teacher assignments a teacher holds for a year. */
+export async function listTeacherSubjectAssignments(teacherUid: string, academicYear: string) {
+  return prisma.classSubjectAssignment.findMany({
+    where:   { teacherUid, academicYear },
+    orderBy: [{ classId: 'asc' }, { subject: 'asc' }],
+  })
+}
+
+/**
+ * Assign a teacher to a subject in a class for a year. The teacherUid must
+ * resolve to a real staff account (same identity-boundary check createClass
+ * uses). Unique on (classId, subject, academicYear) — one teacher per
+ * subject per class per year.
+ */
+export async function createSubjectAssignment(
+  data: {
+    classId:      string
+    subject:      string
+    teacherUid:   string
+    academicYear: string
+  },
+  actorUid:  string,
+  actorRole: UserRole,
+) {
+  await assertTeacherExists(data.teacherUid)
+
+  // Confirm the class exists (and the year lines up) before assigning.
+  await prisma.class.findUniqueOrThrow({ where: { id: data.classId }, select: { id: true } })
+
+  try {
+    const assignment = await prisma.classSubjectAssignment.create({
+      data: {
+        classId:      data.classId,
+        subject:      data.subject,
+        teacherUid:   data.teacherUid,
+        academicYear: data.academicYear,
+        createdByUid: actorUid,
+      },
+    })
+
+    await auditService.log({
+      action:     'class.subject_assigned',
+      entityType: 'ClassSubjectAssignment',
+      entityId:   assignment.id,
+      actorUid,
+      actorRole,
+      metadata:   { after: { classId: assignment.classId, subject: assignment.subject, teacherUid: assignment.teacherUid } },
+    })
+
+    return assignment
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      throw Object.assign(
+        new Error(`${data.subject} is already assigned to a teacher in this class for ${data.academicYear}.`),
+        { status: 409 },
+      )
+    }
+    throw err
+  }
+}
+
+/** Remove a subject-teacher assignment. */
+export async function deleteSubjectAssignment(
+  id:        string,
+  actorUid:  string,
+  actorRole: UserRole,
+) {
+  const existing = await prisma.classSubjectAssignment.findUniqueOrThrow({
+    where:  { id },
+    select: { classId: true, subject: true, teacherUid: true },
+  })
+
+  await prisma.classSubjectAssignment.delete({ where: { id } })
+
+  await auditService.log({
+    action:     'class.subject_unassigned',
+    entityType: 'ClassSubjectAssignment',
+    entityId:   id,
+    actorUid,
+    actorRole,
+    metadata:   { before: existing },
+  })
+
+  return { success: true }
+}
+
+/**
+ * One-time migration helper: create ClassSubjectAssignment rows from the
+ * distinct (classId, subject, teacherUid) triples already present in
+ * TimetableSlot for the year. Idempotent — skips triples that already have
+ * an assignment (createMany skipDuplicates on the unique key). Returns the
+ * number of assignments created.
+ */
+export async function backfillSubjectAssignmentsFromTimetable(
+  academicYear: string,
+  actorUid:     string,
+  actorRole:    UserRole,
+): Promise<{ created: number }> {
+  const slots = await prisma.timetableSlot.findMany({
+    where:  { academicYear },
+    select: { classId: true, subject: true, teacherUid: true },
+  })
+
+  // Deduplicate to one row per (classId, subject) — the assignment unique key.
+  const seen = new Map<string, { classId: string; subject: string; teacherUid: string }>()
+  for (const sl of slots) {
+    const key = `${sl.classId}|${sl.subject}`
+    if (!seen.has(key)) seen.set(key, { classId: sl.classId, subject: sl.subject, teacherUid: sl.teacherUid })
+  }
+
+  if (seen.size === 0) return { created: 0 }
+
+  const result = await prisma.classSubjectAssignment.createMany({
+    data: Array.from(seen.values()).map((v) => ({
+      classId:      v.classId,
+      subject:      v.subject,
+      teacherUid:   v.teacherUid,
+      academicYear,
+      createdByUid: actorUid,
+    })),
+    skipDuplicates: true,
+  })
+
+  await auditService.log({
+    action:     'class.subject_assignments_backfilled',
+    entityType: 'ClassSubjectAssignment',
+    entityId:   academicYear,
+    actorUid,
+    actorRole,
+    metadata:   { context: { academicYear, created: result.count } },
+  })
+
+  return { created: result.count }
 }

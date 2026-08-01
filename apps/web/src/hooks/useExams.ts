@@ -21,7 +21,7 @@
  */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { ApiExam, ApiExamMark, ApiTermResult, ApiManebRecord } from '@shared/types/api'
+import type { ApiExam, ApiExamMark, ApiTermResult, ApiManebRecord, ApiExamAnalytics } from '@shared/types/api'
 import type { CreateExamInput, BulkMarkEntryInput, CreateManebRecordInput } from '@shared/schemas/exam'
 import type { ReportCardData } from '@/components/shared/PrintableReportCard'
 import { apiFetch, queryKeys } from '@/lib/api-client'
@@ -57,6 +57,21 @@ export function useEnterMarks(examId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.exams.all() })
       qc.invalidateQueries({ queryKey: queryKeys.exams.marks(examId) })
     },
+  })
+}
+
+// RW-1: exam_officer / high_rank correct individual marks during review
+// (finalized/approved, pre-release) via POST /exams/:id/correct-marks.
+export function useCorrectMarks(examId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: BulkMarkEntryInput) =>
+      apiFetch<unknown[]>(`/exams/${examId}/correct-marks`, { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.exams.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.exams.marks(examId) })
+    },
+    onError: (err) => console.error('[useCorrectMarks] Correction failed:', err),
   })
 }
 
@@ -98,6 +113,23 @@ export function useStudentResults(studentId: string, academicYear: string, term:
     queryFn:  () => apiFetch<ApiTermResult | null>(`/exams/results/${studentId}?academicYear=${academicYear}&term=${term}`),
     enabled:  !!studentId,
     retry:    false, // never retry 403 fee gate
+  })
+}
+
+// AN-1 (top/bottom, filters, tie-safe) + AN-3 (pass rate, grade distribution,
+// at-risk). Oversight sees any class; teachers are scoped server-side.
+export function useExamAnalytics(
+  academicYear: string, term: number,
+  opts: { classId?: string; subject?: string; limit?: number } = {},
+) {
+  const params = new URLSearchParams({ academicYear, term: String(term) })
+  if (opts.classId) params.set('classId', opts.classId)
+  if (opts.subject) params.set('subject', opts.subject)
+  if (opts.limit)   params.set('limit', String(opts.limit))
+  return useQuery({
+    queryKey: ['exams', 'analytics', 'top-bottom', academicYear, term, opts.classId ?? '', opts.subject ?? '', opts.limit ?? 10],
+    queryFn:  () => apiFetch<ApiExamAnalytics>(`/exams/analytics/top-bottom?${params.toString()}`),
+    enabled:  !!academicYear && !!term,
   })
 }
 
@@ -160,6 +192,17 @@ export interface ReportCardGenerationResult {
   fileId?:        string
   url?:           string
   error?:         string
+}
+
+// SR-3: a student generates + downloads their OWN report card.
+export function useGenerateMyReportCard() {
+  return useMutation({
+    mutationFn: (vars: { academicYear: string; term: number }) =>
+      apiFetch<ReportCardGenerationResult>('/exams/report-card/mine', {
+        method: 'POST', body: JSON.stringify(vars),
+      }),
+    onError: (err) => console.error('[useGenerateMyReportCard] failed:', err),
+  })
 }
 
 export function useGenerateReportCard() {

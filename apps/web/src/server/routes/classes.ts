@@ -38,7 +38,7 @@
 import { Router } from 'express'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission } from '@/server/middleware/verifyPermission'
-import { CreateClassSchema, UpdateClassSchema, CreateTimetableSlotSchema } from '@shared/schemas/student'
+import { CreateClassSchema, UpdateClassSchema, CreateTimetableSlotSchema, CreateSubjectAssignmentSchema } from '@shared/schemas/student'
 import * as classService         from '@/server/services/classService'
 import * as pendingActionService from '@/server/services/pendingActionService'
 import * as settingsService      from '@/server/services/settingsService'
@@ -135,6 +135,63 @@ classesRouter.delete('/:id', requirePermission('class.softDelete'), async (req, 
 
   const cls = await classService.archiveClass(id, user.uid, user.role)
   return res.json(cls)
+})
+
+
+// ─── CLASS SUBJECT ASSIGNMENTS ───────────────────────────
+// Canonical subject-teacher assignment management (backs exam/marks
+// ownership). Two-segment paths keep these clear of GET/DELETE /:id.
+
+// GET /classes/subject-assignments/mine — the signed-in teacher's own
+// assignments for a year (self-scoped; any staff member may read their own).
+classesRouter.get('/subject-assignments/mine', verifyAuth, async (req, res) => {
+  const { user } = req
+  if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+  const academicYear = typeof req.query.academicYear === 'string'
+    ? req.query.academicYear
+    : await settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
+  return res.json(await classService.listTeacherSubjectAssignments(user.uid, academicYear))
+})
+
+// GET /classes/:id/subject-assignments — all subject-teacher assignments
+// for a class in a year.
+classesRouter.get('/:id/subject-assignments', requirePermission('class.view'), async (req, res) => {
+  const classId = String(req.params.id)
+  const academicYear = typeof req.query.academicYear === 'string'
+    ? req.query.academicYear
+    : await settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
+  return res.json(await classService.listSubjectAssignments(classId, academicYear))
+})
+
+// POST /classes/subject-assignments — assign a teacher to a subject in a class.
+classesRouter.post('/subject-assignments', requirePermission('class.assignSubject'), async (req, res) => {
+  const parsed = CreateSubjectAssignmentSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+  const { user } = req
+  if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+  const assignment = await classService.createSubjectAssignment(parsed.data, user.uid, user.role)
+  return res.status(201).json(assignment)
+})
+
+// POST /classes/subject-assignments/backfill — one-time migration seeding
+// assignments from existing TimetableSlot rows for a year.
+classesRouter.post('/subject-assignments/backfill', requirePermission('class.assignSubject'), async (req, res) => {
+  const { user } = req
+  if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+  const academicYear = typeof req.body?.academicYear === 'string'
+    ? req.body.academicYear
+    : await settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
+  const result = await classService.backfillSubjectAssignmentsFromTimetable(academicYear, user.uid, user.role)
+  return res.json(result)
+})
+
+// DELETE /classes/subject-assignments/:assignmentId — remove an assignment.
+classesRouter.delete('/subject-assignments/:assignmentId', requirePermission('class.assignSubject'), async (req, res) => {
+  const id = String(req.params.assignmentId)
+  const { user } = req
+  if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+  const result = await classService.deleteSubjectAssignment(id, user.uid, user.role)
+  return res.json(result)
 })
 
 // GET /classes/my-timetable/today

@@ -72,6 +72,7 @@ model Class {
   labBookings LabBooking[]
   timetable   TimetableSlot[]
   exams       Exam[]
+  subjectAssignments ClassSubjectAssignment[]
   attendanceRecords Attendance[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -246,6 +247,32 @@ enum TimetableType {
   MANEB
   LAB
 }
+
+// ─── CLASS SUBJECT ASSIGNMENT ─────────────────────────────
+// Canonical "teacher T teaches subject S in class C for year Y" record —
+// the single authority for exam/marks ownership (AC-2/3/4/5/6). Distinct
+// from Class.teacherId (the form teacher) and from TimetableSlot (a
+// scheduling row): a teacher is authorised to schedule/enter/finalize an
+// exam only for the (classId, subject) pairs they hold here. teacherUid is
+// a Firebase UID (no Prisma FK across the identity boundary — same
+// convention as Class.teacherId / Exam.createdByUid).
+model ClassSubjectAssignment {
+  id           String   @id @default(cuid())
+  classId      String
+  class        Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject      String
+  teacherUid   String
+  academicYear String
+  createdByUid String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([classId, subject, academicYear])
+  @@index([teacherUid, academicYear])
+  @@index([classId, academicYear])
+  @@map("class_subject_assignments")
+}
+
 
 // ─── AUDIT LOG ───────────────────────────────────────────
 model AuditLog {
@@ -809,7 +836,8 @@ model ManebRecord {
   centerName    String
   academicYear  String
   subjectGrades Json
-  overallGrade  String?
+  overallGrade  String?       // GR-1: MSCE/JCE aggregate classification (Distinction/Credit/Pass/Fail/Incomplete)
+  aggregatePoints Int?          // GR-1: sum of best-6 subject grade-points incl. English (6 = six grade-1s)
   status        ManebStatus   @default(REGISTERED)
   universityPlacement UniversityPlacement?   // R18 — placement derived from this MSCE record
   createdAt     DateTime      @default(now())

@@ -35,10 +35,9 @@
  *   GET  /promotion/:year          → existing PromotionRun
  */
 
-import { useState, useCallback }       from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { AnimatePresence, motion }     from 'framer-motion'
 import {
-  ChevronRight,
   CheckCircle2,
   XCircle,
   Clock,
@@ -59,7 +58,7 @@ import {
   DURATION,
   EASE,
 }                                      from '@/lib/motion'
-import type { PromotionPreview, StudentPromotionResult, PromotionOutcome } from '@/server/services/promotionService'
+import type { PromotionPreview, StudentPromotionResult, PromotionOutcome, PromotionEligibility } from '@/server/services/promotionService'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -180,11 +179,27 @@ export function PromotionEngine() {
   const [committing,   setCommitting]   = useState(false)
   const [error,        setError]        = useState<string | null>(null)
   const [showConfirm,  setShowConfirm]  = useState(false)
+  const [eligibility,  setEligibility]  = useState<PromotionEligibility | null>(null)
   const [filterOutcome, setFilterOutcome] = useState<PromotionOutcome | 'ALL'>('ALL')
   const [search,       setSearch]       = useState('')
 
   const effectiveAcademicYear = academicYear || schoolInfo?.currentYear || ''
   const canCommit = role === 'admin' || role === 'exam_officer'
+
+  // PR-2: promotion is only runnable in Term 3 once all Term 3 end-of-term
+  // results are released. Fetch eligibility so the controls can disable and
+  // explain why (the server enforces the same rule regardless).
+  useEffect(() => {
+    if (!effectiveAcademicYear) return
+    let cancelled = false
+    const encoded = encodeURIComponent(effectiveAcademicYear)
+    apiFetch<PromotionEligibility>(`/promotion/${encoded}/eligibility`)
+      .then((e) => { if (!cancelled) setEligibility(e) })
+      .catch(() => { if (!cancelled) setEligibility(null) })
+    return () => { cancelled = true }
+  }, [effectiveAcademicYear])
+
+  const blockedReason = eligibility && !eligibility.eligible ? eligibility.reason : null
 
   // ── API calls ─────────────────────────────────────────────────────────────
 
@@ -265,7 +280,8 @@ export function PromotionEngine() {
         <button
           type="button"
           onClick={handlePreview}
-          disabled={loading || committed}
+          disabled={loading || committed || Boolean(blockedReason)}
+          title={blockedReason ?? undefined}
           className="flex items-center gap-2 min-h-[44px] px-6 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60"
         >
           {loading
@@ -273,7 +289,7 @@ export function PromotionEngine() {
             : <><PlayCircle className="w-4 h-4" /> Run Preview</>}
         </button>
 
-        {preview && canCommit && !committed && (
+        {preview && canCommit && !committed && (eligibility?.eligible ?? true) && (
           <button
             type="button"
             onClick={() => setShowConfirm(true)}
@@ -292,6 +308,14 @@ export function PromotionEngine() {
         )}
       </div>
 
+      {/* PR-2 eligibility notice */}
+      {blockedReason && (
+        <div role="status" className="flex items-start gap-2 bg-brand-amber/8 border border-brand-amber/20 rounded-xl px-4 py-3 text-sm text-body">
+          <Lock className="w-4 h-4 shrink-0 mt-0.5 text-brand-amber" aria-hidden />
+          <span>Promotion is locked: {blockedReason}</span>
+        </div>
+      )}
+
       {/* Error */}
       {error && (
         <div className="bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-brand-coral">
@@ -307,7 +331,7 @@ export function PromotionEngine() {
             { label: 'Repeating',     value: preview.repeated,       color: 'text-brand-coral',  bg: 'bg-brand-coral/10', outcome: 'REPEATED' as PromotionOutcome },
             { label: 'Await MANEB',   value: preview.awaitingManeb,  color: 'text-brand-amber',  bg: 'bg-brand-amber/10', outcome: 'AWAITING_MANEB' as PromotionOutcome },
             { label: 'Skipped',       value: preview.skipped,        color: 'text-muted',         bg: 'bg-page', outcome: 'SKIPPED_NO_RESULT' as PromotionOutcome },
-          ].map(({ label, value, color, bg, outcome }) => (
+          ].map(({ label, value, color, outcome }) => (
             <button
               key={label}
               type="button"

@@ -52,6 +52,7 @@ import { prisma } from '@/lib/prisma'
 import type { ExpenseCategory, ApplicationStatus } from '@prisma/client'
 import { subDays, subMonths, startOfDay, endOfDay, format, startOfWeek, endOfWeek, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfMonth, endOfMonth } from 'date-fns'
 import { getAttendanceSummaryForTerm, getTermDateRange } from '@/server/services/attendanceService'
+import { getPassingGrades, isPassingClassification, type ExamTypeKey } from '@/server/services/gradeService'
 import { findUniversity } from '@shared/constants/universities'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -172,6 +173,7 @@ export interface ManebResultSummary {
   studentId: string
   examType: string
   overallGrade: string | null
+  aggregatePoints: number | null
   subjectGrades: ManebSubjectResult[]
   status: string
 }
@@ -181,6 +183,7 @@ export interface ManebSchoolStat {
   total: number
   passCount: number
   passRate: number
+  distinctionCount: number
   gradeDistribution: CategoryBreakdown[]
   subjectAverages: { subject: string; passCount: number; total: number; passRate: number }[]
 }
@@ -1535,14 +1538,17 @@ export async function getManebSchoolStats(
     bucket.push(r)
   }
 
-  return Object.entries(byType).map(([examType, typeRecords]) => {
+  return Promise.all(Object.entries(byType).map(async ([examType, typeRecords]) => {
+    const passingGrades = await getPassingGrades(examType as ExamTypeKey)
     const gradeMap: Record<string, number> = {}
     let passCount = 0
+    let distinctionCount = 0
 
     for (const r of typeRecords) {
-      const g = r.overallGrade ?? 'U'
+      const g = r.overallGrade ?? 'Incomplete'
       gradeMap[g] = (gradeMap[g] ?? 0) + 1
-      if (['A', 'B', 'C', 'D', 'E'].includes(g)) passCount += 1
+      if (isPassingClassification(r.overallGrade)) passCount += 1
+      if ((r.overallGrade ?? '').trim().toLowerCase() === 'distinction') distinctionCount += 1
     }
 
     const total = typeRecords.length
@@ -1560,7 +1566,7 @@ export async function getManebSchoolStats(
       for (const [subject, grade] of Object.entries(sgs)) {
         if (!subjectBuckets[subject]) subjectBuckets[subject] = { pass: 0, total: 0 }
         subjectBuckets[subject].total += 1
-        if (['A', 'B', 'C', 'D', 'E'].includes(grade)) subjectBuckets[subject].pass += 1
+        if (passingGrades.has(grade)) subjectBuckets[subject].pass += 1
       }
     }
 
@@ -1578,10 +1584,11 @@ export async function getManebSchoolStats(
       total,
       passCount,
       passRate: pct(passCount, total),
+      distinctionCount,
       gradeDistribution,
       subjectAverages,
     }
-  })
+  }))
 }
 
 /**
@@ -1601,6 +1608,7 @@ export async function getManebCandidateList(
       candidateNo: true,
       examType: true,
       overallGrade: true,
+      aggregatePoints: true,
       subjectGrades: true,
       status: true,
     },
@@ -1617,6 +1625,7 @@ export async function getManebCandidateList(
       studentId: r.studentId,
       examType: r.examType,
       overallGrade: r.overallGrade,
+      aggregatePoints: r.aggregatePoints,
       subjectGrades,
       status: r.status,
     }

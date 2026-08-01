@@ -50,7 +50,7 @@
 'use client'
 import { useState, useMemo } from 'react'
 import { useStudents } from '@/hooks/useStudents'
-import { useEnterMarks, useFinalizeMarks, useExamMarks } from '@/hooks/useExams'
+import { useEnterMarks, useFinalizeMarks, useExamMarks, useCorrectMarks } from '@/hooks/useExams'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, Lock, Save, AlertTriangle } from 'lucide-react'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -67,11 +67,16 @@ interface Props {
   // opened this sheet. Reused rather than building a separate review
   // component: same data, same layout, just non-editable when true.
   readOnly?: boolean
+  // RW-1: when true, exam_officer/high_rank may EDIT individual marks during
+  // review (finalized/approved, pre-release) and save via /correct-marks —
+  // distinct from the teacher's draft/finalize flow. Requires the
+  // exam.correctMarksInReview permission (enforced server-side).
+  correctionMode?: boolean
 }
 
 type MarkEntry = { mark: number | null; absent: boolean }
 
-export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = false }: Props) {
+export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = false, correctionMode = false }: Props) {
   const { data: studentData, isLoading: studentsLoading } = useStudents({ classId, status: 'ACTIVE' })
   // R19 — memoized so `students` has a stable reference across renders
   // (the `?? []` fallback previously produced a brand-new empty-array
@@ -81,6 +86,10 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
   const { data: savedMarks, isLoading: marksLoading } = useExamMarks(examId)
   const enterMarks    = useEnterMarks(examId)
   const finalizeMarks = useFinalizeMarks()
+  const correctMarks  = useCorrectMarks(examId)
+  // Inputs are editable for the teacher entry flow (not readOnly) OR when an
+  // oversight reviewer is in correctionMode.
+  const editable = correctionMode || !readOnly
 
   const [marks, setMarks] = useState<Record<string, MarkEntry>>({})
   const [hydrated, setHydrated] = useState(false)
@@ -165,6 +174,16 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
     })
   }
 
+  // RW-1: save reviewer corrections to individual marks (marks stay final).
+  function saveCorrections() {
+    const entries = students.map((s) => ({
+      examId, studentId: s.id,
+      mark:   marks[s.id]?.mark ?? undefined,
+      absent: marks[s.id]?.absent ?? false,
+    }))
+    correctMarks.mutate({ entries, isDraft: false }, { onSuccess: onClose })
+  }
+
   const loading = studentsLoading || marksLoading
 
   return (
@@ -176,7 +195,7 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
           initial={{ scale: 0.96, y: 12 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 30 }}>
           <div className="flex items-center justify-between px-6 py-4 border-b border-base shrink-0">
             <div>
-              <h2 className="font-heading font-bold text-brand-navy">Enter Marks</h2>
+              <h2 className="font-heading font-bold text-brand-navy">{correctionMode ? 'Correct Marks (Review)' : 'Enter Marks'}</h2>
               <p className="text-xs text-muted mt-0.5">
                 {loading ? 'Loading…' : `${students.length} students · out of ${maxMark}`}
               </p>
@@ -210,7 +229,7 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
                         <input
                           type="number" min={0} max={maxMark}
                           value={marks[student.id]?.mark ?? ''}
-                          disabled={marks[student.id]?.absent || readOnly}
+                          disabled={marks[student.id]?.absent || !editable}
                           onChange={(e) => setMark(student.id, e.target.value)}
                           aria-label={`Mark for ${student.firstName} ${student.lastName}`}
                           className={`w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/25 ${
@@ -229,7 +248,7 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
                           className="accent-brand-amber w-4 h-4"
                           checked={marks[student.id]?.absent ?? false}
                           onChange={() => toggleAbsent(student.id)}
-                          disabled={readOnly}
+                          disabled={!editable}
                           aria-label={`Mark ${student.firstName} ${student.lastName} as absent`}
                         />
                       </td>
@@ -241,9 +260,15 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
           </div>
           <div className="px-6 py-4 border-t border-base flex items-center justify-between gap-3 shrink-0">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-base rounded-xl hover:bg-page">
-              {readOnly ? 'Close' : 'Cancel'}
+              {readOnly && !correctionMode ? 'Close' : 'Cancel'}
             </button>
-            {!readOnly && (
+            {correctionMode ? (
+              <button type="button" onClick={saveCorrections} disabled={correctMarks.isPending || !hydrated}
+                className="flex items-center gap-2 px-5 py-2 text-sm bg-brand-teal text-white rounded-xl font-semibold disabled:opacity-60 hover:bg-brand-teal/90">
+                {correctMarks.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Save Corrections
+              </button>
+            ) : !readOnly ? (
             <div className="flex gap-3">
               <button onClick={saveDraft} disabled={enterMarks.isPending || !hydrated}
                 className="flex items-center gap-2 px-4 py-2 text-sm border border-base rounded-xl hover:bg-page disabled:opacity-60">
@@ -256,7 +281,7 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
                 Finalize Marks
               </button>
             </div>
-            )}
+            ) : null}
           </div>
 
           {/* R15 — confirmation before the irreversible finalize */}
