@@ -530,6 +530,26 @@ settingsRouter
 // a declared SettingKey, and those keys never contain a ':' prefix.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /settings/public — every isPublic setting's value in one object.
+//
+// usePublicSettings() (W/hooks/useSettings.ts) reads this to learn the school's
+// CURRENT_ACADEMIC_YEAR + CURRENT_TERM (both isPublic), which the Reports page
+// and other period-scoped screens gate on (periodReady). This route MUST be
+// registered BEFORE the '/:key' catch-all below — otherwise Express parses
+// 'public' as a setting key, isDeclaredKey('public') fails, and the request
+// 404s. That 404 leaves the client's `year` undefined, so every NON-admin
+// Reports view falls through to the "academic year is not configured" empty
+// state — i.e. the whole tab looks dead for most roles. Only isPublic values
+// are ever returned, so this is readable by any authenticated user.
+// ─────────────────────────────────────────────────────────────────────────────
+settingsRouter.get('/public', async (_req, res) => {
+  const publicKeys = (Object.keys(SETTING_META) as SettingKey[])
+    .filter((k) => SETTING_META[k].isPublic)
+  const values = await settingsService.getMany(publicKeys)
+  return res.json(values)
+})
+
 settingsRouter.get('/:key', async (req, res) => {
   const rawKey = String(req.params['key'] ?? '')
 

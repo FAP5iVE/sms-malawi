@@ -81,7 +81,7 @@ export const inputCls =
 
 export const STEP_FIELDS: ReadonlyArray<ReadonlyArray<keyof StudentFormValues>> = [
   // Step 1 — Personal
-  ['firstName', 'lastName', 'dateOfBirth', 'sex', 'nationality', 'district'],
+  ['firstName', 'lastName', 'otherNames', 'dateOfBirth', 'sex', 'nationality', 'district'],
   // Step 2 — Academic
   ['classId', 'status'],
   // Step 3 — Contact + Guardian (email is the login identifier; guardian
@@ -184,6 +184,16 @@ export function PersonalSection({ register, errors }: SectionProps) {
           className={inputCls}
           placeholder="Family name"
           autoComplete="family-name"
+        />
+      </Field>
+      {/* Other names (middle names) — optional. The Student model carries this
+          and applications capture it; it was previously never editable here. */}
+      <Field label="Other Names" error={errors.otherNames?.message}>
+        <input
+          {...register('otherNames')}
+          className={inputCls}
+          placeholder="Middle name(s), if any"
+          autoComplete="additional-name"
         />
       </Field>
 

@@ -260,6 +260,7 @@ function mapStudentToFormValues(s: ApiStudent): Partial<StudentFormValues> {
   return {
     firstName:        s.firstName,
     lastName:         s.lastName,
+    otherNames:       s.otherNames,
     dateOfBirth:      s.dateOfBirth.slice(0, 10),
     sex:              s.sex,
     nationality:      s.nationality,

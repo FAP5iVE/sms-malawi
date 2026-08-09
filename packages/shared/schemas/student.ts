@@ -39,6 +39,7 @@ export const SexSchema = z.enum(['MALE', 'FEMALE'])
 export const CreateStudentSchema = z.object({
   firstName: z.string().min(1, 'First name required').max(100),
   lastName: z.string().min(1, 'Last name required').max(100),
+  otherNames: z.string().max(100).optional(),
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD format'),
   sex: SexSchema,
   nationality: z.string().min(1).default('Malawian'),

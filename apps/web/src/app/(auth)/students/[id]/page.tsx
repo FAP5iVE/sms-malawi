@@ -102,7 +102,7 @@ function ProfileContent() {
           <ArrowLeft className="w-4 h-4 text-muted" />
         </Link>
         <h1 className="font-heading text-xl font-bold text-brand-navy">
-          {student.firstName} {student.lastName}
+          {student.firstName} {student.otherNames ? `${student.otherNames} ` : ''}{student.lastName}
         </h1>
         <span className="ml-auto font-mono text-xs text-muted bg-page px-2 py-1 rounded border border-base">
           {student.registrationNo}
@@ -165,7 +165,9 @@ function ProfileContent() {
                   ['Nationality', student.nationality],
                   ['District', student.district],
                   ['Village', student.village ?? '—'],
+                  ['Address', student.address ?? '—'],
                   ['Phone', student.phone ?? '—'],
+                  ['Email', student.email ?? '—'],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between text-sm">
                     <span className="text-muted">{label}</span>

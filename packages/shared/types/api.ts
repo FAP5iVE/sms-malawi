@@ -38,12 +38,14 @@ export interface ApiStudent {
   registrationNo: string
   firstName: string
   lastName: string
+  otherNames?: string
   dateOfBirth: string
   sex: 'MALE' | 'FEMALE'
   nationality: string
   district: string
   village?: string
   address?: string
+  email?: string
   phone?: string
   guardianName: string
   guardianPhone: string
