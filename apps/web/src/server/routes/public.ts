@@ -49,6 +49,7 @@ import { COLLECTIONS }       from '@shared/constants/storage'
 import { getSchoolBranding } from '@/server/services/notificationService'
 import { renderNewsletterConfirm } from '@/server/templates/emails/newsletter-confirm'
 import { getPublicViewUrl } from '@/lib/storage'
+import * as placementService from '@/server/services/placementService'
 
 export const publicRouter = Router()
 
@@ -370,6 +371,16 @@ publicRouter.post('/contact', async (req, res) => {
 // "Qualified" = MSCE leavers who reached the placement process (one
 // UniversityPlacement row is created per certified MSCE record); "selected"
 // = those whose placement outcome is PLACED or CONFIRMED.
+
+// GET /public/placements — the actual NCHE selection list: student name,
+// university, programme, status. This IS public information (results are
+// published), so it's deliberately unauthenticated — but only VERIFIED
+// outcomes are ever returned; a pending student self-claim never appears here.
+publicRouter.get('/placements', async (req, res) => {
+  const academicYear = typeof req.query.year === 'string' ? req.query.year : undefined
+  const list = await placementService.listPublicPlacements({ academicYear })
+  return res.json(list)
+})
 
 publicRouter.get('/placement-stats', async (req, res) => {
   const year = String(req.query.year ?? '2025/2026')

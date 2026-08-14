@@ -37,6 +37,7 @@ import {
   computeEligibility,
   generateRecommendations,
 } from '@/server/services/placementMatchingService'
+import type { ProgramRecommendation } from '@/server/services/placementMatchingService'
 import {
   UNIVERSITIES,
   findUniversity,
@@ -90,6 +91,45 @@ export async function getPlacementById(id: string) {
   return prisma.universityPlacement.findUnique({
     where: { id },
     include: placementInclude,
+  })
+}
+
+// PUBLIC listing — this IS public information (NCHE selection results are
+// published), so it deliberately carries NO auth. Only VERIFIED placements
+// with an actual outcome are returned — never a pending student self-claim,
+// and never anyone still NOT_STARTED/awaiting eligibility. Field set is
+// minimal (name + where + what programme), no exam grades, no internal ids.
+export async function listPublicPlacements(opts: { academicYear?: string } = {}) {
+  const rows = await prisma.universityPlacement.findMany({
+    where: {
+      isVerified: true,
+      status: { in: ['PLACED', 'CONFIRMED'] },
+      ...(opts.academicYear ? { manebRecord: { academicYear: opts.academicYear } } : {}),
+    },
+    select: {
+      status: true,
+      placedUniversityId: true,
+      placedProgrammeId: true,
+      placedUniversityName: true,
+      placedProgrammeName: true,
+      student: { select: { firstName: true, lastName: true, otherNames: true, registrationNo: true } },
+      manebRecord: { select: { academicYear: true } },
+    },
+    orderBy: [{ placedUniversityId: 'asc' }, { student: { lastName: 'asc' } }],
+  })
+
+  return rows.map((r) => {
+    const catalogueUni = r.placedUniversityId ? findUniversity(r.placedUniversityId) : undefined
+    const catalogueProg = r.placedUniversityId && r.placedProgrammeId
+      ? findProgram(r.placedUniversityId, r.placedProgrammeId) : undefined
+    return {
+      studentName:    `${r.student.firstName} ${r.student.otherNames ? r.student.otherNames + ' ' : ''}${r.student.lastName}`,
+      registrationNo: r.student.registrationNo,
+      university:     catalogueUni?.name ?? r.placedUniversityName ?? '\u2014',
+      programme:      catalogueProg?.name ?? r.placedProgrammeName ?? '\u2014',
+      status:         r.status,
+      academicYear:   r.manebRecord.academicYear,
+    }
   })
 }
 
@@ -478,6 +518,12 @@ export async function recordOutcome(
     assertCataloguePairResolves(input.placedUniversityId!, input.placedProgrammeId!)
   }
 
+  // Trusted staff data-entry (admin / high_rank / lower_rank) is authoritative
+  // and appears immediately, exactly like a MANEB import. A STUDENT self-report
+  // stays UNVERIFIED until an approver confirms it — a student can wrongly claim
+  // a place, so their entry is pending-approval by design.
+  const staffWrite = actorRole === 'admin' || actorRole === 'high_rank' || actorRole === 'lower_rank'
+
   const updated = await prisma.universityPlacement.update({
     where: { id: placementId },
     data: {
@@ -488,10 +534,10 @@ export async function recordOutcome(
       placedProgrammeName: input.status === 'NOT_PLACED' ? null : (isCatalogue ? null : input.placedProgrammeName ?? null),
       notes: input.notes ?? null,
       recordedByUid: actorUid,
-      // Recording a fresh outcome invalidates any prior verification.
-      isVerified: false,
-      verifiedByUid: null,
-      verifiedAt: null,
+      // Staff writes are self-verified; a student self-report is pending approval.
+      isVerified:    staffWrite,
+      verifiedByUid: staffWrite ? actorUid : null,
+      verifiedAt:    staffWrite ? new Date() : null,
     },
     include: placementInclude,
   })
@@ -573,4 +619,56 @@ export async function verifyOutcome(
 /** The full catalogue, for the UI's university/programme selectors. */
 export function getCatalogue() {
   return UNIVERSITIES
+}
+
+// ─────────────────────────────────────────────────────────
+//  ADVISORY QUALIFICATION CHECKER (self-service, pre-placement)
+// ─────────────────────────────────────────────────────────
+// Pure calculator over MANUALLY-entered MSCE grades — it never reads the
+// student's internal exam marks or their ManebRecord. Before results a student
+// types their expected/mock grades; after results they type their real MSCE
+// grades. Either way the engine only ever sees the numbers the student gave it,
+// which is precisely the "ignore internal exams, use MSCE" rule.
+export interface AdvisoryResponse {
+  top:          ProgramRecommendation[]
+  chosen?:      (ProgramRecommendation & { rank: number })[]
+  subjectsUsed: number
+}
+
+export function advise(
+  grades: Record<string, number>,
+  chosen?: { universityId: string; programmeId: string }[],
+  limit = 10,
+): AdvisoryResponse {
+  const programs = getAllPrograms().map(({ university, program }) => ({
+    universityId:   university.id,
+    universityName: university.name,
+    program,
+  }))
+  const top = generateRecommendations(grades, programs).slice(0, limit)
+
+  let chosenResults: (ProgramRecommendation & { rank: number })[] | undefined
+  if (chosen && chosen.length > 0) {
+    chosenResults = chosen.map((ref, i) => {
+      const program = findProgram(ref.universityId, ref.programmeId)
+      const university = findUniversity(ref.universityId)
+      if (!program || !university) {
+        return {
+          universityId: ref.universityId, universityName: '\u2014',
+          programmeId: ref.programmeId, programmeName: 'Unknown programme',
+          eligible: false, meetsCutOff: null,
+          missingSubjects: ['Programme not found in the catalogue'], score: 0, rank: i + 1,
+        }
+      }
+      const r = computeEligibility(grades, program)
+      return {
+        universityId: university.id, universityName: university.name,
+        programmeId: program.id, programmeName: program.name,
+        eligible: r.eligible, meetsCutOff: r.meetsCutOff,
+        missingSubjects: r.missingSubjects, score: r.score, rank: i + 1,
+      }
+    })
+  }
+
+  return { top, chosen: chosenResults, subjectsUsed: Object.keys(grades).length }
 }

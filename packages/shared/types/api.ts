@@ -960,6 +960,27 @@ export interface ApiPlacementResponse {
   recommendations: ApiPlacementRecommendation[]
 }
 
+// Self-service qualification checker (pre-placement advisory).
+export interface ApiAdvisoryChosenResult extends ApiPlacementRecommendation {
+  rank: number
+}
+
+export interface ApiAdvisoryResponse {
+  top:          ApiPlacementRecommendation[]
+  chosen?:      ApiAdvisoryChosenResult[]
+  subjectsUsed: number
+}
+
+// Public NCHE-selection listing (no auth) — name + where + what only.
+export interface ApiPublicPlacement {
+  studentName:    string
+  registrationNo: string
+  university:     string
+  programme:      string
+  status:         string
+  academicYear:   string
+}
+
 export interface ApiPlacementEligibleStudent {
   studentId:      string
   registrationNo: string

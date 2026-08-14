@@ -506,6 +506,7 @@ export const queryKeys = {
     manebStats: (year?: string) => ['public', 'maneb-stats', year ?? null] as const,
     announcements: (limit?: number) => ['public', 'announcements', limit ?? null] as const,
     placementStats: (year?: string) => ['public', 'placement-stats', year ?? null] as const,
+    placements: (year?: string) => ['public', 'placements', year ?? null] as const,
   },
 
   // ── Attendance (Postgres-backed, R6)

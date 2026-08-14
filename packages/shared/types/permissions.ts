@@ -469,6 +469,9 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Placement — advisory view + analytics (R18)
     'placement.view',
     'placement.viewAnalytics',
+    'placement.manage',
+    'placement.recordOutcome',
+    'placement.verifyOutcome',
   ]),
 
   // ── HIGH_RANK ─────────────────────────────────────────
@@ -909,6 +912,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Placement — advisory view + analytics (R18)
     'placement.view',
     'placement.viewAnalytics',
+    'placement.recordOutcome',
   ]),
 
   // ── ACADEMIC ──────────────────────────────────────────
@@ -1180,8 +1184,6 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Placement — manage + record outcomes; verification is high_rank only (R18)
     'placement.view',
     'placement.viewAnalytics',
-    'placement.manage',
-    'placement.recordOutcome',
   ]),
 
   // ── STUDENT ───────────────────────────────────────────

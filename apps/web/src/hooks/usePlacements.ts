@@ -17,9 +17,10 @@ import type {
   ApiPlacementEligibleStudent,
   ApiPlacementAnalytics,
   ApiPlacementBatchResult,
+  ApiAdvisoryResponse,
 } from '@shared/types/api'
 import type { University } from '@shared/constants/universities'
-import type { SetChoicesInput, RecordOutcomeInput, VerifyOutcomeInput } from '@shared/schemas/placement'
+import type { SetChoicesInput, RecordOutcomeInput, VerifyOutcomeInput, AdvisoryCheckInput } from '@shared/schemas/placement'
 
 // ── Reads ────────────────────────────────────────────────
 
@@ -56,6 +57,7 @@ export function usePlacementCatalogue() {
     staleTime: 1000 * 60 * 60, // catalogue is a static constants file
   })
 }
+
 
 /** Form 4 / certified-MSCE students eligible to be placed for a year. */
 export function usePlacementEligible(academicYear: string | undefined) {
@@ -98,6 +100,16 @@ export function useRecordMyOutcome() {
       apiFetch<ApiUniversityPlacement>('/placements/me/outcome', { method: 'PATCH', body: JSON.stringify(input) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.placements.me() }),
     onError:   (err) => console.error('Failed to record placement outcome', err),
+  })
+}
+
+/** Self-service qualification checker — pure calculator, never mutates the
+    student's real placement record. Locked server-side after PLACED/CONFIRMED. */
+export function useAdvisoryCheck() {
+  return useMutation({
+    mutationFn: (input: AdvisoryCheckInput) =>
+      apiFetch<ApiAdvisoryResponse>('/placements/advisory', { method: 'POST', body: JSON.stringify(input) }),
+    onError: (err) => console.error('Advisory check failed', err),
   })
 }
 

@@ -34,10 +34,11 @@ import 'server-only'
 
 import { Router, type Request, type Response } from 'express'
 import { verifyAuth } from '@/lib/verifyAuth'
-import { requirePermission } from '@/server/middleware/verifyPermission'
+import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import * as placementService from '@/server/services/placementService'
 import { resolveStudentFromUid } from '@/server/services/studentService'
-import { SetChoicesSchema, RecordOutcomeSchema, VerifyOutcomeSchema, BatchGenerateSchema } from '@shared/schemas/placement'
+import { SetChoicesSchema, RecordOutcomeSchema, VerifyOutcomeSchema, BatchGenerateSchema, AdvisoryCheckSchema } from '@shared/schemas/placement'
+import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
 
 export const placementsRouter = Router()
 
@@ -109,6 +110,41 @@ placementsRouter.patch('/me/outcome', requirePermission('placement.recordOwnChoi
   }
 })
 
+// POST /placements/advisory — SELF-SERVICE qualification calculator.
+// A student types their own MSCE grades and gets the programmes they qualify
+// for (top 10) plus, optionally, a pass/fail check on 3+ programmes they chose.
+// Pure calculator: it never reads internal marks or the student's ManebRecord.
+// LOCKED once the student has actually been placed (PLACED/CONFIRMED).
+const ADVISORY_SUBJECTS = new Set(MALAWI_SUBJECTS as readonly string[])
+
+placementsRouter.post('/advisory', requirePermission('placement.viewOwn'), async (req: Request, res: Response) => {
+  const parsed = AdvisoryCheckSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() })
+  try {
+    const student = await resolveStudentFromUid(req.user!.uid)
+    if (!student) return res.status(403).json({ error: 'No student record is linked to this account.' })
+
+    // Locked after placement — the advisory tools are a pre-placement aid only.
+    const placement = await placementService.getPlacementForStudent(student.id)
+    if (placement && (placement.status === 'PLACED' || placement.status === 'CONFIRMED')) {
+      return res.status(403).json({ error: 'The qualification checker is only available before you are placed.' })
+    }
+
+    // Build the numeric grade map, dropping any subject not in the canonical list.
+    const grades: Record<string, number> = {}
+    for (const g of parsed.data.grades) {
+      if (ADVISORY_SUBJECTS.has(g.subject)) grades[g.subject] = g.grade
+    }
+    if (Object.keys(grades).length === 0) {
+      return res.status(400).json({ error: 'Enter at least one valid subject grade.' })
+    }
+
+    return res.json(placementService.advise(grades, parsed.data.programmes, 10))
+  } catch (err) {
+    return sendError(res, err)
+  }
+})
+
 // ─────────────────────────────────────────────────────────
 //  STAFF / COHORT (literal paths before /:param)
 // ─────────────────────────────────────────────────────────
@@ -125,7 +161,7 @@ placementsRouter.get('/cohort', requirePermission('placement.view'), async (req:
 })
 
 // GET /placements/catalogue — the university/programme catalogue for pickers.
-placementsRouter.get('/catalogue', requirePermission('placement.view'), async (_req: Request, res: Response) => {
+placementsRouter.get('/catalogue', requireAnyPermission(['placement.view', 'placement.viewOwn']), async (_req: Request, res: Response) => {
   try {
     return res.json(placementService.getCatalogue())
   } catch (err) {

@@ -112,6 +112,40 @@ export const BatchGenerateSchema = z.object({
   academicYear: z.string().min(1),
 })
 
+// ─────────────────────────────────────────────────────────
+//  ADVISORY QUALIFICATION CHECKER (self-service, pre-placement)
+// ─────────────────────────────────────────────────────────
+// A Form-4 student types their own subject grades (MSCE scale 1..9, 1 = best)
+// and the engine returns the programmes they qualify for. The subjects are
+// constrained to the canonical MALAWI_SUBJECTS list on the client; the server
+// re-validates the grade range here and drops any unknown subject. This never
+// touches the student's real record — it is a pure calculator over manually
+// entered grades (which, after MANEB, are simply the student's MSCE grades).
+export const AdvisoryGradeSchema = z.object({
+  subject: z.string().min(1).max(60),
+  grade:   z.number().int().min(1, 'MSCE grades run 1-9').max(9, 'MSCE grades run 1-9'),
+})
+
+export const AdvisoryProgrammeRefSchema = z.object({
+  universityId: z.string().min(1),
+  programmeId:  z.string().min(1),
+})
+
+export const AdvisoryCheckSchema = z.object({
+  grades: z.array(AdvisoryGradeSchema)
+    .min(1, 'Enter at least one subject grade')
+    .max(15, 'Too many subjects'),
+  // Optional: specific programmes the student chose to check (min 3 when given).
+  // Omit to just get the top recommended programmes for the entered grades.
+  programmes: z.array(AdvisoryProgrammeRefSchema)
+    .min(3, 'Choose at least three programmes to check')
+    .max(20)
+    .optional(),
+})
+
+export type AdvisoryGrade        = z.infer<typeof AdvisoryGradeSchema>
+export type AdvisoryCheckInput   = z.infer<typeof AdvisoryCheckSchema>
+
 export type PlacementStatusValue    = z.infer<typeof PlacementStatusSchema>
 export type PlacementChoiceInput     = z.infer<typeof PlacementChoiceInputSchema>
 export type SetChoicesInput          = z.infer<typeof SetChoicesSchema>

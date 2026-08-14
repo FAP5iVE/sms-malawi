@@ -28,6 +28,7 @@ import { PlacementStatusBadge } from '@/components/placements/PlacementStatusBad
 import { PlacementRecommendationCard } from '@/components/placements/PlacementRecommendationCard'
 import { PlacementChoiceForm } from '@/components/placements/PlacementChoiceForm'
 import { PlacementOutcomeForm } from '@/components/placements/PlacementOutcomeForm'
+import { PlacementAdvisoryChecker } from '@/components/placements/PlacementAdvisoryChecker'
 import { GraduationCap, ListChecks, Award, Info } from 'lucide-react'
 
 function MyPlacementContent() {
@@ -57,19 +58,26 @@ function MyPlacementContent() {
 
   if (!placement) {
     return (
-      <div className="max-w-2xl mx-auto text-center py-16 px-4">
-        <GraduationCap className="w-10 h-10 mx-auto text-muted mb-3" />
-        <h2 className="font-heading font-semibold text-lg mb-1">No placement yet</h2>
-        <p className="text-sm text-muted">
-          Your university-placement eligibility hasn&apos;t been generated yet. It becomes available once your
-          certified MSCE results have been received and the school runs eligibility for your year. Check back after your
-          MSCE results are in.
-        </p>
+      <div className="max-w-3xl mx-auto space-y-8 px-4">
+        <div className="text-center py-8">
+          <GraduationCap className="w-10 h-10 mx-auto text-muted mb-3" />
+          <h2 className="font-heading font-semibold text-lg mb-1">No placement yet</h2>
+          <p className="text-sm text-muted max-w-xl mx-auto">
+            Your official placement record is created once the school generates eligibility from your certified MSCE
+            results. Until then, use the qualification checker below — enter your expected (or actual) MSCE grades to
+            see what you qualify for.
+          </p>
+        </div>
+        <PlacementAdvisoryChecker />
       </div>
     )
   }
 
   const eligibleCount = recommendations.filter((r) => r.eligible).length
+
+  // Same lock rule the server enforces on POST /placements/advisory: the
+  // checker is a pre-placement aid only.
+  const advisoryLocked = placement.status === 'PLACED' || placement.status === 'CONFIRMED'
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -212,6 +220,14 @@ function MyPlacementContent() {
           <p className="text-sm text-muted">No outcome recorded yet.</p>
         )}
       </section>
+
+      {/* Qualification checker — pre-placement advisory only; locks once PLACED. */}
+      {!advisoryLocked && (
+        <section className="rounded-xl border border-base p-4">
+          <h3 className="font-heading font-semibold text-sm mb-3">Check other programmes</h3>
+          <PlacementAdvisoryChecker />
+        </section>
+      )}
     </div>
   )
 }

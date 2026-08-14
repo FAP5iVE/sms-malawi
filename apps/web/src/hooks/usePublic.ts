@@ -14,6 +14,7 @@
 'use client'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { apiFetch, queryKeys } from '@/lib/api-client'
+import type { ApiPublicPlacement } from '@shared/types/api'
 import { STALE } from '@/components/providers/QueryProvider'
 
 // ─────────────────────────────────────────────────────────
@@ -145,6 +146,19 @@ export function usePublicPlacementStats(year?: string) {
   return useQuery({
     queryKey: queryKeys.public.placementStats(year),
     queryFn:  () => apiFetch<PublicPlacementStats>(`/public/placement-stats${year ? `?year=${year}` : ''}`),
+    staleTime: STALE.SLOW,
+  })
+}
+
+/** GET /public/placements — the actual named NCHE-selection list (student,
+    university, programme, status). Genuinely unauthenticated: this IS public
+    information once verified — apiFetch works identically with or without a
+    signed-in Firebase user. Only VERIFIED PLACED/CONFIRMED rows are ever
+    returned by the server; a pending student self-claim never appears here. */
+export function usePublicPlacements(year?: string) {
+  return useQuery({
+    queryKey: queryKeys.public.placements(year),
+    queryFn:  () => apiFetch<ApiPublicPlacement[]>(`/public/placements${year ? `?year=${year}` : ''}`),
     staleTime: STALE.SLOW,
   })
 }
