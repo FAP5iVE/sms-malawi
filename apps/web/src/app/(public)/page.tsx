@@ -244,6 +244,7 @@ export default function LandingPage() {
     { label: 'About', href: 'about', anchor: true },
     { label: 'Academics', href: 'academics', anchor: true },
     { label: 'Admissions', href: '/apply' },
+    { label: 'Placements', href: '/placement-results' },
     { label: 'Performance', href: 'performance', anchor: true },
     { label: 'Student Life', href: 'discover', anchor: true },
     { label: 'News', href: 'news', anchor: true },

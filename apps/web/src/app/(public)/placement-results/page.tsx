@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * apps/web/src/app/(public)/placements/page.tsx
+ * apps/web/src/app/(public)/placement-results/page.tsx
  * [CHANGE TYPE]: NEW FILE
  * [PURPOSE]: Public university-placement results — the actual NCHE selection
  *   list (student name, university, programme, status), not just aggregate
