@@ -492,7 +492,7 @@ export default function LandingPage() {
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 pt-[180px] w-full">
             <div className="max-w-3xl fade-up">
               <h1 className="font-heading font-extrabold text-white leading-[1.04] tracking-tight text-5xl md:text-6xl lg:text-7xl mb-4">
-                Welcome to {schoolInfo?.schoolName ?? 'SMS Malawi'}
+                Welcome to {schoolInfo?.schoolName ?? 'Malawi Scondary School'}
               </h1>
               <p className="font-heading font-semibold text-xl text-white/80 mb-1.5">
                 {schoolInfo?.systemTagline ?? 'Secondary School Management System'}
