@@ -18,35 +18,55 @@
  *     reject protocol-relative/external targets.
  *
  * [CHANGE TYPE]: VISUAL REDESIGN ONLY (login-page-redesign.zip is the source
- *   of truth for layout/visuals) — swapped the old two-column marketing-panel
- *   layout for a single centred "frosted glass" card on an ambient brand-navy
- *   backdrop. Nothing about auth, redirects, or state was touched:
- *   sanitizeRedirectTarget, the Suspense boundary, signInWithEmailAndPassword,
- *   the useAuthStore/useRouter/useSearchParams wiring, the noRoleAssigned/
- *   isBusy derivations, and the log-login-success/failed fire-and-forget
- *   calls are byte-for-byte the same logic as before this change, just
- *   re-wrapped in new markup.
- *   - Every colour comes from the project's existing design tokens
- *     (brand-navy/-mid/-light, brand-teal/-light, brand-coral, brand-amber,
- *     bg-page, bg-surface, text-body, text-muted, border-base, font-sans,
- *     font-heading) plus Tailwind's neutral white/black opacity scale for
- *     the decorative glass layers — no colours were invented and nothing in
- *     globals.css was touched. dark: variants throughout mean every surface
- *     (including the SVG background art) has both a light- and dark-mode
- *     rendering instead of assuming one theme.
+ *   of truth for layout/visuals) — a single centred "frosted glass" card on
+ *   an ambient, colour-rich backdrop. Nothing about auth, redirects, or
+ *   state was touched: sanitizeRedirectTarget, the Suspense boundary,
+ *   signInWithEmailAndPassword, the useAuthStore/useRouter/useSearchParams
+ *   wiring, the noRoleAssigned/isBusy derivations, and the
+ *   log-login-success/failed fire-and-forget calls are byte-for-byte the
+ *   same logic as before this change, just re-wrapped in new markup.
+ *
+ * [REVISION 2 — visual fixes after review]:
+ *   - The outer wrapper no longer carries `overflow-hidden`. It was clipping
+ *     real card content (the "Ready to apply?" footer, part of the auth
+ *     notice) on shorter viewports instead of letting the page scroll.
+ *     `overflow-hidden` now lives ONLY on the small absolute decorative
+ *     layer, where it belongs (containing blur bleed), never on a container
+ *     that also holds real content.
+ *   - Removed every opacity-modifier on the project's hand-rolled utility
+ *     classes (`text-muted/70`, `text-body/70`, `text-body/90`). Those
+ *     classes (bg-page, bg-surface, text-body, text-muted, border-base) are
+ *     plain `@layer utilities` rules, not Tailwind `@theme` colour tokens —
+ *     Tailwind's `/NN` opacity-modifier syntax only compiles for utilities
+ *     registered via `@theme` (confirmed by compiling this file's classes
+ *     through the Tailwind v4 CLI directly). A modifier on a non-token class
+ *     silently produces no rule, which is exactly why the "Contact your
+ *     school administrator" line was unreadable. Hierarchy is now expressed
+ *     with the existing distinct tokens (text-body vs text-muted) instead.
+ *   - The login card is genuinely translucent in BOTH themes now — dark
+ *     mode keeps the frosted look, and light mode uses a soft white/blur
+ *     glass (not a flat opaque `bg-surface`) with a visible border + shadow,
+ *     so it reads as a distinct card instead of white-on-white.
+ *   - Background art reworked to be denser, more varied in colour (teal,
+ *     coral, amber, purple, navy — all existing brand-* tokens, referenced
+ *     in the SVG via var(--color-brand-*) rather than invented hex), and
+ *     rendered with `preserveAspectRatio="xMidYMid slice"` on a plain
+ *     `inset-0 w-full h-full` box instead of arbitrary min-w/min-h — the
+ *     previous sizing could scale unevenly depending on viewport aspect
+ *     ratio, which is almost certainly why shapes rendered distorted.
+ *   - Card widens further on desktop (lg:max-w-4xl outer / lg:max-w-2xl
+ *     inner) so it reads as a substantial element rather than a small box
+ *     lost in the middle of the screen, while mobile stays a single
+ *     predefined max-w-sm card with no separate outer "frame" to distort.
+ *   - Trimmed internal spacing/padding slightly throughout so the whole
+ *     card comfortably fits inside a typical laptop viewport without
+ *     needing to scroll to reach the sign-in button.
  *   - Added a theme toggle, reusing the exact cycleTheme/themeIcons pattern
  *     already shipped in apps/web/src/app/(public)/page.tsx (useTheme +
  *     useHasMounted, Sun/Moon/Monitor icons cycling light → dark → system).
- *   - Kept a "Back to homepage" affordance (this page already linked home
- *     before this change) alongside the toggle in a small top bar so it's
- *     reachable on every breakpoint instead of only appearing on mobile.
- *   - The logo now reads from /images/logo.png (the school's real emblem —
- *     already used lower in this file previously) with "SMS Malawi"
- *     printed beneath it, in place of the redesign mockup's generic
- *     placeholder mark.
- *   - The mockup's "Ready to apply?" footer now links to the app's real
- *     /apply route (apps/web/src/app/(public)/apply) rather than the
- *     mockup's inert onApply callback prop.
+ *   - The logo reads from /images/logo.png with "SMS Malawi" printed
+ *     beneath it. The "Ready to apply?" footer links to the app's real
+ *     /apply route rather than the mockup's inert onApply callback prop.
  */
 'use client'
 
@@ -199,94 +219,132 @@ function LoginForm() {
   }
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-page flex flex-col font-sans">
-      {/* ── Ambient background: soft brand glow + organic line art ── */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1300px] h-[850px] rounded-full bg-gradient-to-br from-brand-navy-light/10 via-transparent to-brand-navy/20 dark:from-brand-navy-mid/20 dark:via-brand-navy/50 dark:to-black/50 blur-3xl" />
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 sm:w-[420px] sm:h-[420px] rounded-full bg-brand-teal/10 dark:bg-brand-teal/20 blur-[100px] sm:blur-[120px] animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 sm:w-[420px] sm:h-[420px] rounded-full bg-brand-coral/10 dark:bg-brand-coral/15 blur-[110px] sm:blur-[130px] animate-pulse" />
-        <div className="absolute top-1/3 right-1/3 w-48 h-48 sm:w-[300px] sm:h-[300px] rounded-full bg-brand-navy-light/10 dark:bg-brand-navy-light/15 blur-[90px] sm:blur-[100px]" />
+    <div className="relative min-h-screen w-full bg-page flex flex-col font-sans">
+      {/* ── Ambient background: vignette + colourful glow + organic line art.
+          overflow-hidden is scoped to THIS layer only, never to the page
+          wrapper, so decorative blur can never clip real card content. */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Soft vignette plate for depth */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1600px] h-[1000px] max-w-[94vw] rounded-[80px] blur-3xl bg-gradient-to-br from-brand-teal-light/[0.07] via-transparent to-brand-coral/[0.06] dark:from-brand-navy-mid/25 dark:via-brand-navy/55 dark:to-black/60" />
 
+        {/* Colourful glow orbs, spread and varied */}
+        <div className="absolute top-[6%] left-[4%] w-64 h-64 sm:w-[420px] sm:h-[420px] rounded-full bg-brand-teal/15 dark:bg-brand-teal/25 blur-[100px] sm:blur-[130px]" />
+        <div className="absolute bottom-[8%] right-[6%] w-64 h-64 sm:w-[420px] sm:h-[420px] rounded-full bg-brand-coral/15 dark:bg-brand-coral/22 blur-[110px] sm:blur-[140px]" />
+        <div className="absolute top-[18%] right-[12%] w-52 h-52 sm:w-72 sm:h-72 rounded-full bg-brand-amber/12 dark:bg-brand-amber/20 blur-[90px] sm:blur-[110px]" />
+        <div className="absolute bottom-[16%] left-[10%] w-52 h-52 sm:w-72 sm:h-72 rounded-full bg-brand-purple/12 dark:bg-brand-purple/20 blur-[90px] sm:blur-[110px]" />
+        <div className="absolute top-[42%] left-[46%] w-56 h-56 sm:w-80 sm:h-80 rounded-full bg-brand-navy-light/10 dark:bg-brand-navy-light/18 blur-[90px] sm:blur-[110px]" />
+
+        {/* Organic tube/ring line art in a full brand colour spread */}
         <svg
-          className="absolute w-full h-full min-w-[950px] min-h-[700px] opacity-[0.15] dark:opacity-70 transition-opacity"
+          className="absolute inset-0 w-full h-full opacity-[0.18] dark:opacity-90 transition-opacity duration-300"
           viewBox="0 0 1440 900"
+          preserveAspectRatio="xMidYMid slice"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
         >
           <defs>
-            <linearGradient id="loginTubeTeal" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient id="loginTeal" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="var(--color-brand-teal-light)" />
               <stop offset="100%" stopColor="var(--color-brand-teal)" />
             </linearGradient>
-            <linearGradient id="loginTubeCoral" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="var(--color-brand-coral)" stopOpacity="0.9" />
-              <stop offset="100%" stopColor="var(--color-brand-navy)" stopOpacity="0.9" />
+            <linearGradient id="loginCoral" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="var(--color-brand-coral)" />
+              <stop offset="100%" stopColor="var(--color-brand-amber)" />
             </linearGradient>
-            <linearGradient id="loginTubeNavy" x1="20%" y1="0%" x2="80%" y2="100%">
+            <linearGradient id="loginNavy" x1="20%" y1="0%" x2="80%" y2="100%">
               <stop offset="0%" stopColor="var(--color-brand-navy-light)" />
               <stop offset="55%" stopColor="var(--color-brand-navy-mid)" />
               <stop offset="100%" stopColor="var(--color-brand-navy)" />
             </linearGradient>
-            <filter id="loginSoftShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="18" stdDeviation="22" floodColor="#000000" floodOpacity="0.35" />
+            <linearGradient id="loginPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="var(--color-brand-purple)" />
+              <stop offset="100%" stopColor="var(--color-brand-navy-mid)" />
+            </linearGradient>
+            <linearGradient id="loginAmber" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="var(--color-brand-amber)" />
+              <stop offset="100%" stopColor="var(--color-brand-coral)" />
+            </linearGradient>
+            <filter id="loginSoftShadow" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="16" stdDeviation="20" floodColor="#000000" floodOpacity="0.32" />
             </filter>
           </defs>
 
-          {/* Top-centre ring */}
+          {/* Top-centre ring — teal */}
           <g filter="url(#loginSoftShadow)">
             <path
               d="M 590 130 C 590 85 640 50 695 50 C 750 50 790 90 790 145 C 790 200 745 240 690 240 C 640 240 600 200 600 155"
-              stroke="url(#loginTubeTeal)"
+              stroke="url(#loginTeal)"
               strokeWidth="54"
               strokeLinecap="round"
               fill="none"
             />
           </g>
 
-          {/* Centre-left zigzag pill */}
-          <g filter="url(#loginSoftShadow)" transform="translate(360, 310)">
+          {/* Centre-left zigzag pill — navy */}
+          <g filter="url(#loginSoftShadow)" transform="translate(330, 300)">
             <path
               d="M 40 40 L 90 40 C 110 40 120 50 120 70 L 120 100 C 120 120 110 130 90 130 L 40 130 C 20 130 10 140 10 160 L 10 190 C 10 210 20 220 40 220 L 90 220"
-              stroke="url(#loginTubeNavy)"
-              strokeWidth="50"
+              stroke="url(#loginNavy)"
+              strokeWidth="48"
               strokeLinecap="round"
               strokeLinejoin="round"
               fill="none"
             />
           </g>
 
-          {/* Bottom-centre C-curve */}
-          <g filter="url(#loginSoftShadow)" transform="translate(480, 560)">
+          {/* Bottom-centre C-curve — coral/amber */}
+          <g filter="url(#loginSoftShadow)" transform="translate(470, 560)">
             <path
               d="M 120 20 C 50 30 10 90 10 150 C 10 215 65 265 140 265 C 200 265 245 225 245 170"
-              stroke="url(#loginTubeCoral)"
-              strokeWidth="60"
+              stroke="url(#loginCoral)"
+              strokeWidth="58"
               strokeLinecap="round"
               fill="none"
             />
           </g>
 
-          {/* Right-side spiral ribbon */}
+          {/* Right-side spiral ribbon — purple */}
           <g filter="url(#loginSoftShadow)">
             <path
-              d="M 940 180 C 1030 190 1090 250 1080 340 C 1070 430 980 480 910 470 C 840 460 820 380 850 310 C 880 240 960 210 1040 230 C 1120 250 1160 330 1150 420 C 1140 510 1070 600 1000 660 C 920 730 830 780 750 820"
-              stroke="url(#loginTubeTeal)"
-              strokeWidth="52"
+              d="M 950 170 C 1040 180 1100 240 1090 330 C 1080 420 990 470 920 460 C 850 450 830 370 860 300 C 890 230 970 200 1050 220 C 1130 240 1170 320 1160 410 C 1150 500 1080 590 1010 650 C 930 720 840 770 760 810"
+              stroke="url(#loginPurple)"
+              strokeWidth="50"
               strokeLinecap="round"
               fill="none"
             />
           </g>
 
-          {/* Bottom-right sausage pillow */}
-          <g filter="url(#loginSoftShadow)" transform="translate(1080, 680)">
+          {/* Bottom-right sausage pillow — amber */}
+          <g filter="url(#loginSoftShadow)" transform="translate(1070, 660)">
             <path
               d="M 30 50 C 90 10 180 30 250 90 C 310 140 330 200 280 230"
-              stroke="url(#loginTubeNavy)"
-              strokeWidth="70"
+              stroke="url(#loginAmber)"
+              strokeWidth="66"
               strokeLinecap="round"
               fill="none"
             />
+          </g>
+
+          {/* Top-right accent ring — amber */}
+          <g filter="url(#loginSoftShadow)">
+            <circle cx="1250" cy="120" r="74" stroke="url(#loginAmber)" strokeWidth="42" fill="none" />
+          </g>
+
+          {/* Bottom-left arc — purple/navy */}
+          <g filter="url(#loginSoftShadow)">
+            <path
+              d="M 40 830 A 170 170 0 0 1 380 850"
+              stroke="url(#loginPurple)"
+              strokeWidth="46"
+              strokeLinecap="round"
+              fill="none"
+            />
+          </g>
+
+          {/* Small floating teal ring, upper-mid */}
+          <g filter="url(#loginSoftShadow)">
+            <circle cx="240" cy="120" r="46" stroke="url(#loginTeal)" strokeWidth="34" fill="none" />
           </g>
         </svg>
       </div>
@@ -295,7 +353,7 @@ function LoginForm() {
       <header className="relative z-30 flex items-center justify-between p-4 sm:p-6">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-sm font-heading font-medium text-body/70 hover:text-body bg-black/[0.02] dark:bg-white/[0.06] border border-base backdrop-blur-md rounded-lg px-3 py-2 transition-colors"
+          className="inline-flex items-center gap-2 text-sm font-heading font-medium text-muted hover:text-foreground bg-black/[0.02] dark:bg-white/[0.06] border border-base backdrop-blur-md rounded-lg px-3 py-2 transition-colors"
         >
           <Home className="w-4 h-4" />
           <span className="hidden sm:inline">Back to homepage</span>
@@ -305,20 +363,20 @@ function LoginForm() {
           type="button"
           onClick={cycleTheme}
           aria-label={mounted ? `Theme: ${theme}. Click to change.` : 'Toggle theme'}
-          className="w-9 h-9 rounded-lg border border-base bg-black/[0.02] dark:bg-white/[0.06] backdrop-blur-md text-body/70 hover:text-body flex items-center justify-center transition-colors"
+          className="w-9 h-9 rounded-lg border border-base bg-black/[0.02] dark:bg-white/[0.06] backdrop-blur-md text-muted hover:text-foreground flex items-center justify-center transition-colors"
         >
           {mounted ? themeIcons[(theme as keyof typeof themeIcons) ?? 'system'] : <Monitor className="w-4 h-4" aria-hidden />}
         </button>
       </header>
 
       {/* ── Centred content ── */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-4 pb-8 sm:pb-12">
+      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-4 sm:py-6">
         {/* Wide frosted plate */}
-        <div className="w-full max-w-md sm:max-w-lg rounded-[32px] sm:rounded-[36px] bg-black/[0.015] dark:bg-white/[0.03] border border-base dark:border-white/10 backdrop-blur-md p-3 sm:p-6 shadow-xl">
-          {/* Login glass card */}
-          <div className="w-full rounded-[26px] sm:rounded-[30px] bg-surface dark:bg-white/[0.07] border border-base dark:border-white/15 backdrop-blur-2xl p-6 sm:p-9 shadow-2xl flex flex-col">
+        <div className="w-full max-w-sm sm:max-w-2xl lg:max-w-4xl rounded-[28px] sm:rounded-[36px] bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/10 backdrop-blur-md p-2.5 sm:p-5 shadow-xl">
+          {/* Login glass card — translucent + blurred in BOTH themes */}
+          <div className="w-full max-w-sm sm:max-w-lg lg:max-w-2xl mx-auto rounded-[24px] sm:rounded-[30px] bg-white/80 dark:bg-white/[0.07] border border-black/5 dark:border-white/15 backdrop-blur-2xl p-6 sm:p-8 shadow-2xl flex flex-col">
             {/* Logo + system name */}
-            <div className="flex flex-col items-center justify-center mb-6 text-center">
+            <div className="flex flex-col items-center justify-center mb-5 text-center">
               <Link
                 href="/"
                 className="flex items-center justify-center p-1 transition-transform hover:scale-105"
@@ -330,16 +388,16 @@ function LoginForm() {
                   width={96}
                   height={96}
                   loading="eager"
-                  className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-lg"
+                  className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-lg"
                 />
               </Link>
-              <span className="mt-3 font-heading font-bold text-sm sm:text-base text-body tracking-tight">
+              <span className="mt-2.5 font-heading font-bold text-sm sm:text-base text-body tracking-tight">
                 SMS Malawi
               </span>
             </div>
 
             {/* Form title */}
-            <div className="mb-5 text-left">
+            <div className="mb-4 text-left">
               <h1 className="text-2xl sm:text-[26px] font-heading font-bold text-body tracking-tight">
                 Welcome back
               </h1>
@@ -382,7 +440,7 @@ function LoginForm() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@school.edu.mw"
-                  className="w-full px-3.5 py-2.5 sm:py-3 bg-page text-body placeholder:text-muted rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
+                  className="w-full px-3.5 py-2.5 sm:py-3 bg-page text-body placeholder:text-muted-foreground rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
                 />
               </div>
 
@@ -407,12 +465,12 @@ function LoginForm() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full px-3.5 py-2.5 sm:py-3 pr-11 bg-page text-body placeholder:text-muted rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
+                    className="w-full px-3.5 py-2.5 sm:py-3 pr-11 bg-page text-body placeholder:text-muted-foreground rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPass(!showPass)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-body focus:outline-none cursor-pointer transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-foreground focus:outline-none cursor-pointer transition-colors"
                     aria-label={showPass ? 'Hide password' : 'Show password'}
                   >
                     {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -423,7 +481,7 @@ function LoginForm() {
               <button
                 type="submit"
                 disabled={isBusy}
-                className="w-full py-3 bg-brand-navy hover:bg-brand-navy-mid active:bg-brand-navy text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-5 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 border border-transparent dark:border-white/10 dark:hover:border-brand-teal/40"
+                className="w-full py-3 bg-brand-navy hover:bg-brand-navy-mid active:bg-brand-navy text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-4 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 border border-transparent dark:border-white/10 dark:hover:border-brand-teal/40"
               >
                 {isBusy && <Loader2 className="w-4 h-4 animate-spin" />}
                 {isBusy ? 'Signing in…' : 'Sign in'}
@@ -431,8 +489,8 @@ function LoginForm() {
             </form>
 
             {/* Authorisation notice */}
-            <div className="mt-6 p-3.5 rounded-2xl bg-black/[0.015] dark:bg-white/[0.04] border border-base backdrop-blur-md text-center">
-              <div className="flex items-center justify-center gap-1.5 mb-1 text-body/90">
+            <div className="mt-5 p-3 rounded-2xl bg-black/[0.02] dark:bg-white/[0.04] border border-base backdrop-blur-md text-center">
+              <div className="flex items-center justify-center gap-1.5 mb-1 text-body">
                 <ShieldCheck className="w-4 h-4 text-brand-teal" />
                 <span className="text-[11px] font-heading font-semibold tracking-wide uppercase">
                   Authorised access
@@ -441,13 +499,13 @@ function LoginForm() {
               <p className="text-xs leading-relaxed text-muted font-sans">
                 This portal is for authorised students and staff only.
               </p>
-              <p className="text-xs leading-relaxed text-muted/70 font-sans mt-0.5">
+              <p className="text-xs leading-relaxed text-muted font-sans mt-0.5">
                 Contact your school administrator if you need access.
               </p>
             </div>
 
             {/* Footer: apply link */}
-            <div className="mt-6 text-center text-xs text-muted font-sans flex items-center justify-center gap-1.5">
+            <div className="mt-4 text-center text-xs text-muted font-sans flex items-center justify-center gap-1.5">
               <span>Ready to apply?</span>
               <Link
                 href="/apply"
