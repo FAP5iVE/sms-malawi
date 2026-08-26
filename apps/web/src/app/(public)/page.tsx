@@ -49,14 +49,41 @@
  *      — lucide-react deliberately excludes trademarked brand marks, so
  *      there is no lucide Facebook/Twitter/Instagram/YouTube/LinkedIn icon
  *      to import.
- *   8. No real hero/gallery/news-photo image assets exist in this project
- *      (confirmed in the prior rewrite); kept that page's established
- *      pattern of a clean icon-in-gradient placeholder instead of a broken
- *      <img> or the design mockup's "1200×660" dev-facing placeholder text.
+ *   8. Hero background is a real campus photo (apps/web/public/images/
+ *      hero-campus.webp) via next/image with `fill` + `object-cover`, which
+ *      crops to fill the banner on any viewport without ever stretching or
+ *      squishing the source image — safe from mobile up. The gallery/news
+ *      cards below still use ImagePlaceholder, since no per-item photo
+ *      assets exist for those yet.
+ *   9. The header/footer "S" badge is now the real favicon.png mark
+ *      (apps/web/public/favicon.png — already in the repo, was only used
+ *      as a favicon before) instead of a plain letter "S" in a coloured box.
+ *  10. Added a shared decorative "scribble" background — the same organic
+ *      line-art language as the login page's background (ScribbleDefs +
+ *      ScribbleArt below), scattered across the sections that were a single
+ *      flat colour with no texture at all (Announcement Rail, Academic
+ *      Advertisements, Discover, Performance, Events, Admissions CTA,
+ *      Contact). Hero and Footer already had their own decorative blobs and
+ *      are unchanged. Each section gets a different shape arrangement
+ *      (`variant`) so it doesn't read as one stamp repeated down the page,
+ *      and opacity is tuned much lower on text-dense light sections than on
+ *      the solid brand-colour bands, so it never fights legibility.
+ *  11. [BUG FIX] Six spots in the header (both nav-link classes, the search
+ *      and theme-toggle buttons, the search-close button, and search-result
+ *      rows) used `hover:bg-page` / `hover:text-body` — like `text-muted/70`
+ *      on the login page, these are hand-rolled `@layer utilities` classes
+ *      (not Tailwind `@theme` tokens), so `hover:` never compiled for them;
+ *      confirmed absent from the compiled CSS output before this fix. Now
+ *      `hover:bg-background` / `hover:text-foreground` — the token-backed
+ *      equivalents of the same two colours — which do support variants.
+ *      These hover states had never actually worked; unrelated to this
+ *      change's stated purpose, but caught while re-verifying the file.
+
  * [DEPENDS ON]: apps/web/src/hooks/usePublic.ts, next-themes
  */
 
 import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useTheme } from 'next-themes'
 import { useHasMounted } from '@/hooks/useHasMounted'
@@ -80,8 +107,10 @@ import {
 // SHARED HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Placeholder for a section that would show a real photo once school image
- *  assets exist — no hero/gallery/news images are in the project yet. */
+/** Placeholder for a section that would show a real per-item photo once
+ *  those assets exist — used for gallery/news/event cards. The hero banner
+ *  now has a real photo (see file header note 8); these per-item images
+ *  still don't exist anywhere in the project. */
 function ImagePlaceholder({ label, className = '' }: { label?: string; className?: string }) {
   return (
     <div
@@ -106,6 +135,102 @@ function formatRelativeDate(iso: string): string {
 }
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+
+/** Gradient defs shared by every <ScribbleArt> instance on this page — SVG
+ *  gradient ids are addressable anywhere in the document, so this renders
+ *  once (0×0, visually hidden) and every scribble below just references
+ *  these by url(#id) instead of redeclaring the same five gradients per
+ *  section. Colours are the project's real brand-* tokens via CSS var(),
+ *  the same approach the login page's background art uses, so both
+ *  surfaces draw from one accurate source of truth for the palette. */
+function ScribbleDefs() {
+  return (
+    <svg width="0" height="0" className="absolute" aria-hidden>
+      <defs>
+        <linearGradient id="scribbleTeal" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="var(--color-brand-teal-light)" />
+          <stop offset="100%" stopColor="var(--color-brand-teal)" />
+        </linearGradient>
+        <linearGradient id="scribbleCoral" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="var(--color-brand-coral)" />
+          <stop offset="100%" stopColor="var(--color-brand-amber)" />
+        </linearGradient>
+        <linearGradient id="scribbleNavy" x1="20%" y1="0%" x2="80%" y2="100%">
+          <stop offset="0%" stopColor="var(--color-brand-navy-light)" />
+          <stop offset="55%" stopColor="var(--color-brand-navy-mid)" />
+          <stop offset="100%" stopColor="var(--color-brand-navy)" />
+        </linearGradient>
+        <linearGradient id="scribblePurple" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="var(--color-brand-purple)" />
+          <stop offset="100%" stopColor="var(--color-brand-navy-mid)" />
+        </linearGradient>
+        <linearGradient id="scribbleAmber" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="var(--color-brand-amber)" />
+          <stop offset="100%" stopColor="var(--color-brand-coral)" />
+        </linearGradient>
+      </defs>
+    </svg>
+  )
+}
+
+/** Decorative organic line-art — same visual language as the login page's
+ *  background scribbles, scattered across this page's plain flat-colour
+ *  sections. `variant` picks one of five different shape arrangements so
+ *  the same motif doesn't repeat identically down the page (mirrors how
+ *  the login page scatters its own shapes rather than tiling one). Always
+ *  render this as an absolutely-positioned sibling BEFORE a section's real
+ *  content, with the content wrapper given `relative z-10` and the
+ *  section itself `relative overflow-hidden`, so it never intercepts
+ *  clicks or clips real content. */
+function ScribbleArt({ variant, className = '' }: { variant: 1 | 2 | 3 | 4 | 5; className?: string }) {
+  const layouts: Record<1 | 2 | 3 | 4 | 5, React.ReactNode> = {
+    1: (
+      <>
+        <circle cx="90" cy="70" r="42" stroke="url(#scribbleTeal)" strokeWidth="15" fill="none" />
+        <path d="M 850 50 C 900 32 958 54 968 104 C 978 154 928 186 878 176" stroke="url(#scribbleCoral)" strokeWidth="17" strokeLinecap="round" fill="none" />
+        <path d="M 55 250 L 96 250 C 108 250 114 256 114 268 L 114 286 C 114 298 108 304 96 304 L 55 304" stroke="url(#scribbleNavy)" strokeWidth="13" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </>
+    ),
+    2: (
+      <>
+        <path d="M 918 36 C 958 56 968 106 928 126 C 888 146 848 116 858 76 C 866 44 898 26 928 36" stroke="url(#scribblePurple)" strokeWidth="15" fill="none" />
+        <circle cx="66" cy="222" r="32" stroke="url(#scribbleAmber)" strokeWidth="13" fill="none" />
+        <path d="M 495 26 C 535 16 575 41 570 81 C 565 116 520 131 490 111" stroke="url(#scribbleTeal)" strokeWidth="14" strokeLinecap="round" fill="none" />
+      </>
+    ),
+    3: (
+      <>
+        <path d="M 78 36 C 38 56 28 106 68 126 C 108 146 148 116 138 76 C 130 44 98 26 68 36" stroke="url(#scribbleCoral)" strokeWidth="15" fill="none" />
+        <circle cx="928" cy="240" r="38" stroke="url(#scribbleNavy)" strokeWidth="14" fill="none" />
+        <path d="M 545 244 C 585 254 596 294 561 309 C 526 324 491 299 501 269" stroke="url(#scribblePurple)" strokeWidth="13" strokeLinecap="round" fill="none" />
+      </>
+    ),
+    4: (
+      <>
+        <path d="M 898 192 C 938 212 943 257 903 272 C 863 287 833 257 848 222" stroke="url(#scribbleAmber)" strokeWidth="15" strokeLinecap="round" fill="none" />
+        <circle cx="58" cy="54" r="28" stroke="url(#scribbleTeal)" strokeWidth="12" fill="none" />
+        <path d="M 475 252 L 515 252 C 527 252 533 258 533 270 L 533 280 C 533 292 527 298 515 298 L 475 298" stroke="url(#scribbleNavy)" strokeWidth="13" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      </>
+    ),
+    5: (
+      <>
+        <circle cx="500" cy="44" r="34" stroke="url(#scribbleCoral)" strokeWidth="14" fill="none" />
+        <path d="M 56 192 C 16 212 11 257 51 272 C 91 287 126 257 111 222" stroke="url(#scribbleTeal)" strokeWidth="15" fill="none" />
+        <path d="M 918 54 C 958 69 963 109 928 124 C 893 139 863 114 873 84" stroke="url(#scribbleAmber)" strokeWidth="13" strokeLinecap="round" fill="none" />
+      </>
+    ),
+  }
+  return (
+    <svg
+      className={`absolute inset-0 w-full h-full pointer-events-none ${className}`}
+      viewBox="0 0 1000 340"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden
+    >
+      {layouts[variant]}
+    </svg>
+  )
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -269,6 +394,7 @@ export default function LandingPage() {
       `}</style>
 
       <div className="bg-page text-body font-sans">
+        <ScribbleDefs />
         {/* ══════════════════════════════════════════════════════════════
             HEADER — fixed, transparent over hero, solid once scrolled
         ══════════════════════════════════════════════════════════════ */}
@@ -283,11 +409,11 @@ export default function LandingPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center gap-6">
             <button onClick={() => scrollTo('top')} className="flex items-center gap-3 shrink-0">
               <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center font-heading font-extrabold text-base transition-colors ${
-                  scrolled ? 'bg-brand-navy text-white' : 'bg-white/15 text-white'
+                className={`w-10 h-10 rounded-xl flex items-center justify-center p-1.5 transition-colors ${
+                  scrolled ? 'bg-brand-navy' : 'bg-white/15'
                 }`}
               >
-                S
+                <Image src="/favicon.png" alt="" width={40} height={40} className="w-full h-full object-contain" />
               </div>
               <div className="text-left leading-tight hidden sm:block">
                 <div className={`font-heading font-extrabold text-sm tracking-tight transition-colors ${scrolled ? 'text-brand-navy dark:text-white' : 'text-white'}`}>
@@ -306,7 +432,7 @@ export default function LandingPage() {
                     key={l.label}
                     onClick={() => scrollTo(l.href)}
                     className={`nav-link-underline px-2.5 py-2 rounded-lg transition-colors ${
-                      scrolled ? 'text-body hover:bg-page' : 'text-white/85 hover:bg-white/10'
+                      scrolled ? 'text-foreground hover:bg-background' : 'text-white/85 hover:bg-white/10'
                     }`}
                   >
                     {l.label}
@@ -316,7 +442,7 @@ export default function LandingPage() {
                     key={l.label}
                     href={l.href}
                     className={`nav-link-underline px-2.5 py-2 rounded-lg transition-colors ${
-                      scrolled ? 'text-body hover:bg-page' : 'text-white/85 hover:bg-white/10'
+                      scrolled ? 'text-foreground hover:bg-background' : 'text-white/85 hover:bg-white/10'
                     }`}
                   >
                     {l.label}
@@ -330,7 +456,7 @@ export default function LandingPage() {
                 onClick={() => { setSearchOpen((v) => !v); setMenuOpen(false) }}
                 aria-label="Search"
                 className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
-                  scrolled ? 'border-base text-body hover:bg-page' : 'border-white/25 text-white hover:bg-white/10'
+                  scrolled ? 'border-base text-foreground hover:bg-background' : 'border-white/25 text-white hover:bg-white/10'
                 }`}
               >
                 <Search className="w-4 h-4" />
@@ -339,7 +465,7 @@ export default function LandingPage() {
                 onClick={cycleTheme}
                 aria-label={mounted ? `Theme: ${theme}. Click to change.` : 'Toggle theme'}
                 className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
-                  scrolled ? 'border-base text-body hover:bg-page' : 'border-white/25 text-white hover:bg-white/10'
+                  scrolled ? 'border-base text-foreground hover:bg-background' : 'border-white/25 text-white hover:bg-white/10'
                 }`}
               >
                 {mounted ? themeIcons[theme ?? 'system'] : <Monitor className="w-4 h-4" aria-hidden />}
@@ -381,7 +507,7 @@ export default function LandingPage() {
                   <button
                     onClick={() => { setSearchOpen(false); setSearchQuery('') }}
                     aria-label="Close search"
-                    className="w-8 h-8 rounded-lg bg-page text-muted hover:text-body flex items-center justify-center shrink-0"
+                    className="w-8 h-8 rounded-lg bg-page text-muted hover:text-foreground flex items-center justify-center shrink-0"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -397,7 +523,7 @@ export default function LandingPage() {
                             key={`${r.kind}-${r.title}`}
                             href={r.href}
                             onClick={() => { setSearchOpen(false); setSearchQuery('') }}
-                            className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-page transition-colors flex items-center justify-between gap-4"
+                            className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-background transition-colors flex items-center justify-between gap-4"
                           >
                             <span className="text-sm font-heading font-semibold text-body line-clamp-1">{r.title}</span>
                             <span className="text-xs text-muted shrink-0">{r.tag}</span>
@@ -481,13 +607,15 @@ export default function LandingPage() {
             HERO
         ══════════════════════════════════════════════════════════════ */}
         <section id="top" className="relative bg-brand-navy overflow-hidden min-h-[640px] flex items-end">
-          <svg preserveAspectRatio="xMidYMid slice" viewBox="10 10 80 80" className="absolute inset-0 w-full h-full blur-[6px]" aria-hidden>
-            <path fill="#D98A0B" className="blob-slow" style={{ transformOrigin: '13px 25px' }} d="M37-5C25.1-14.7,5.7-19.1-9.2-10-28.5,1.8-32.7,31.1-19.8,49c15.5,21.5,52.6,22,67.2,2.3C59.4,35,53.7,8.5,37-5Z" />
-            <path fill="#24507F" className="blob-slower" style={{ transformOrigin: '13px 25px' }} d="M20.6,4.1C11.6,1.5-1.9,2.5-8,11.2-16.3,23.1-8.2,45.6,7.4,50S42.1,38.9,41,24.5C40.2,14.1,29.4,6.6,20.6,4.1Z" />
-            <path fill="#0E8A6A" className="blob-med" style={{ transformOrigin: '84px 93px' }} d="M105.9,48.6c-12.4-8.2-29.3-4.8-39.4.8-23.4,12.8-37.7,51.9-19.1,74.1s63.9,15.3,76-5.6c7.6-13.3,1.8-31.1-2.3-43.8C117.6,63.3,114.7,54.3,105.9,48.6Z" />
-            <path fill="#17B187" className="blob-fast" style={{ transformOrigin: '84px 93px' }} d="M102,67.1c-9.6-6.1-22-3.1-29.5,2-15.4,10.7-19.6,37.5-7.6,47.8s35.9,3.9,44.5-12.5C115.5,92.6,113.9,74.6,102,67.1Z" />
-          </svg>
-          <div className="absolute inset-0 bg-linear-to-b from-[rgba(11,29,51,.62)] via-[rgba(11,29,51,.72)] to-[rgba(11,29,51,.94)]" />
+          <Image
+            src="/images/hero-campus.webp"
+            alt={`${schoolInfo?.schoolName ?? 'School'} campus entrance`}
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-linear-to-b from-[rgba(11,29,51,.55)] via-[rgba(11,29,51,.72)] to-[rgba(11,29,51,.96)]" />
 
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 pt-[180px] w-full">
             <div className="max-w-3xl fade-up">
@@ -526,8 +654,9 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════════
             ANNOUNCEMENT RAIL — latest 2 undated announcements
         ══════════════════════════════════════════════════════════════ */}
-        <section className="bg-brand-navy">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 grid md:grid-cols-[200px_1fr] gap-8 items-center">
+        <section className="relative overflow-hidden bg-brand-navy">
+          <ScribbleArt variant={1} className="opacity-[0.16]" />
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 grid md:grid-cols-[200px_1fr] gap-8 items-center">
             <div>
               <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal-light mb-1.5">
                 Announcements
@@ -620,8 +749,9 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════════
             ACADEMIC ADVERTISEMENTS
         ══════════════════════════════════════════════════════════════ */}
-        <section className="bg-page py-16 sm:py-18 border-y border-base">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[300px_1fr] gap-12">
+        <section className="relative overflow-hidden bg-page py-16 sm:py-18 border-y border-base">
+          <ScribbleArt variant={2} className="opacity-[0.08] dark:opacity-[0.14]" />
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[300px_1fr] gap-12">
             <div>
               <h2 className="font-heading font-extrabold text-2xl sm:text-[28px] tracking-tight text-brand-navy dark:text-white mb-3 leading-tight">
                 Academic Advertisements
@@ -658,8 +788,9 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════════
             DISCOVER — id="about"
         ══════════════════════════════════════════════════════════════ */}
-        <section id="about" className="bg-surface py-20 sm:py-24">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section id="about" className="relative overflow-hidden bg-surface py-20 sm:py-24">
+          <ScribbleArt variant={3} className="opacity-[0.08] dark:opacity-[0.14]" />
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div id="discover" className="max-w-2xl mb-10">
               <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white mb-3.5">
                 Discover
@@ -776,8 +907,9 @@ export default function LandingPage() {
             PERFORMANCE — id="academics" anchors here too (see file header)
         ══════════════════════════════════════════════════════════════ */}
         <div id="academics" />
-        <section id="performance" className="bg-brand-navy py-20 sm:py-24 text-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section id="performance" className="relative overflow-hidden bg-brand-navy py-20 sm:py-24 text-white">
+          <ScribbleArt variant={4} className="opacity-[0.16]" />
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-end justify-between gap-8 mb-11 flex-wrap">
               <div className="max-w-xl">
                 <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal-light mb-3">
@@ -891,8 +1023,9 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════════
             EVENTS — dated announcements
         ══════════════════════════════════════════════════════════════ */}
-        <section id="events" className="bg-surface py-20 sm:py-24">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section id="events" className="relative overflow-hidden bg-surface py-20 sm:py-24">
+          <ScribbleArt variant={5} className="opacity-[0.08] dark:opacity-[0.14]" />
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-end justify-between mb-9 gap-4 flex-wrap">
               <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white">
                 Events
@@ -941,8 +1074,9 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════════
             ADMISSIONS CTA
         ══════════════════════════════════════════════════════════════ */}
-        <section className="bg-brand-teal py-16 sm:py-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[1fr_auto] gap-10 items-center">
+        <section className="relative overflow-hidden bg-brand-teal py-16 sm:py-20">
+          <ScribbleArt variant={2} className="opacity-[0.14]" />
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[1fr_auto] gap-10 items-center">
             <div>
               <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-white/70 mb-3">
                 Admissions {schoolInfo?.currentYear ?? currentYearNum + 1}
@@ -974,13 +1108,14 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════════
             STAY CONNECTED — newsletter + contact
         ══════════════════════════════════════════════════════════════ */}
-        <section id="contact" className="bg-page py-20 sm:py-24 border-b border-base">
+        <section id="contact" className="relative overflow-hidden bg-page py-20 sm:py-24 border-b border-base">
+          <ScribbleArt variant={1} className="opacity-[0.08] dark:opacity-[0.14]" />
           {/* [PRODUCTION FIX 2026-07-28] Two columns: left = Newsletter
               with Map stacked directly below it; right = the full Contact
               Us card, same height as the left column. Confirmed against
               a hand sketch before implementing (previous attempt used
               three equal columns, which wasn't what was asked for). */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-10 lg:gap-16">
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-10 lg:gap-16">
             {/* Newsletter */}
             <div>
               <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal mb-2.5">
@@ -1155,7 +1290,9 @@ export default function LandingPage() {
             <div className="grid grid-cols-2 lg:grid-cols-[1.2fr_1fr_1fr_1fr_1fr] gap-10 pb-12 border-b border-white/10">
               <div className="col-span-2 lg:col-span-1">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10.5 h-10.5 rounded-xl bg-white/10 flex items-center justify-center font-heading font-extrabold text-base">S</div>
+                  <div className="w-10.5 h-10.5 rounded-xl bg-white/10 flex items-center justify-center p-2">
+                    <Image src="/favicon.png" alt="" width={42} height={42} className="w-full h-full object-contain" />
+                  </div>
                   <div className="font-heading font-extrabold text-[15px] tracking-tight">{schoolInfo?.schoolName?.toUpperCase() ?? 'SMS MALAWI'}</div>
                 </div>
                 <div className="flex gap-2.5 font-heading font-bold text-[11px] tracking-[2.2px] uppercase text-brand-teal-light mb-5">
