@@ -58,6 +58,7 @@ import {
 } from '@shared/schemas/library'
 import * as libService from '@/server/services/libraryService'
 import * as workflowService from '@/server/services/libraryWorkflowService'
+import { sendError } from '@/server/lib/sendError'
 
 export const libraryRouter = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } }) // 100MB for eBooks
@@ -122,8 +123,7 @@ libraryRouter.post('/borrowings/issue', verifyAuth, requirePermission('library.i
     try {
       return res.status(201).json(await libService.issueBorrowing(parsed.data, req.user!.uid))
     } catch (err: unknown) {
-      const e = err as Error
-      return res.status(400).json({ error: e.message })
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'library' } })
     }
   })
 
@@ -161,8 +161,7 @@ libraryRouter.get('/digital/:id/view', verifyAuth, requirePermission('library.vi
       const url = await libService.getDigitalResourceViewUrl(String(req.params.id), req.user!.role)
       return res.json({ url })
     } catch (err: unknown) {
-      const e = err as Error & { status?: number }
-      return res.status(e.status ?? 500).json({ error: e.message })
+      return sendError(res, err, { tags: { module: 'library' } })
     }
   })
 
@@ -229,8 +228,7 @@ libraryRouter.post('/fine-waivers', verifyAuth,
       })
       return res.status(201).json({ id })
     } catch (err: unknown) {
-      const e = err as Error
-      return res.status(400).json({ error: e.message })
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'library' } })
     }
   })
 

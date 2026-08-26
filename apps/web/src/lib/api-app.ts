@@ -115,6 +115,7 @@ import { algoliaAdminRouter }  from '@/server/routes/algoliaAdmin'
 import { publicRouter }        from '@/server/routes/public'
 import { holidaysRouter }      from '@/server/routes/holidays'
 import { placementsRouter }    from '@/server/routes/placements'
+import { monitoringRouter }    from '@/server/routes/monitoring'
 
 
 
@@ -235,6 +236,7 @@ export function createApiApp() {
   app.use('/public',          publicRouter)
   app.use('/holidays',        holidaysRouter)
   app.use('/placements',      placementsRouter)
+  app.use('/monitoring',      monitoringRouter)
 
   // ── 7. 404 fallback ───────────────────────────────────────────────────────
   app.use((_req: Request, res: Response) => {

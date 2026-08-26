@@ -525,4 +525,14 @@ export const queryKeys = {
     eligible: (academicYear: string) => ['placements', 'eligible', academicYear] as const,
     analytics: (academicYear?: string) => ['placements', 'analytics', academicYear ?? null] as const,
   },
+  monitoring: {
+    summary: () => ['monitoring', 'summary'] as const,
+    issues: (status?: string, level?: string, uptimeOnly?: boolean) =>
+      ['monitoring', 'issues', status ?? null, level ?? null, uptimeOnly ?? false] as const,
+    alerts: () => ['monitoring', 'alerts'] as const,
+    replays: (statsPeriod: string) => ['monitoring', 'replays', statsPeriod] as const,
+    releases: (statsPeriod: string) => ['monitoring', 'releases', statsPeriod] as const,
+    logs: (level?: string) => ['monitoring', 'logs', level ?? null] as const,
+    feedback: () => ['monitoring', 'feedback'] as const,
+  },
 } as const

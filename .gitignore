@@ -82,3 +82,4 @@ create-test-accounts.mjs
 ci.yml
 .git
 .vercel
+.env*

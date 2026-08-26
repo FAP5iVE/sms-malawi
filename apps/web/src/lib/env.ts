@@ -34,6 +34,12 @@ const serverSchema = z.object({
   CRON_SECRET: z
     .string()
     .min(32, 'CRON_SECRET must be at least 32 characters for security'),
+  SENTRY_API_TOKEN: z
+    .string()
+    .min(1, 'SENTRY_API_TOKEN is required for the monitoring dashboard'),
+  SENTRY_WEBHOOK_SECRET: z
+    .string()
+    .min(1, 'SENTRY_WEBHOOK_SECRET is required to verify Sentry webhooks'),
   RESEND_API_KEY: z.string().optional(),
   ALGOLIA_APP_ID: z.string().optional(),
   ALGOLIA_ADMIN_KEY: z.string().optional(),
@@ -142,6 +148,10 @@ export const env = {
 
   // ── Cron
   get CRON_SECRET() { return getServerEnv().CRON_SECRET },
+
+  // ── Sentry monitoring
+  get SENTRY_API_TOKEN()      { return getServerEnv().SENTRY_API_TOKEN },
+  get SENTRY_WEBHOOK_SECRET() { return getServerEnv().SENTRY_WEBHOOK_SECRET },
 
   // ── Optional
   get RESEND_API_KEY()  { return getServerEnv().RESEND_API_KEY },

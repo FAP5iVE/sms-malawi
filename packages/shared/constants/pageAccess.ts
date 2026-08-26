@@ -57,6 +57,11 @@ export const PAGE_ACCESS: Record<string, readonly UserRole[]> = {
   // student-only.
   '/placements': ALL_ROLES,
   '/my-placement': ['student'],
+  // Monitoring — infra/error visibility, kept to the top two administrative
+  // tiers only (same tier as /user-management), unlike /reports' ALL_ROLES:
+  // error/outage data can incidentally reference internal identifiers or
+  // stack traces not appropriate for broad staff visibility.
+  '/monitoring': ['admin', 'high_rank'],
 }
 
 /**

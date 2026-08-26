@@ -47,6 +47,7 @@ import {
   ClipboardCheck,
   ShieldCheck,
   Settings,
+  Activity,
 } from 'lucide-react'
 
 import type { UserRole }   from '@shared/types/roles'
@@ -220,6 +221,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href:        '/reports',
     icon:        BarChart2,
     roles:       rolesFor('/reports'),
+  },
+  {
+    label:       'Monitoring',
+    mobileLabel: 'Monitor',
+    href:        '/monitoring',
+    icon:        Activity,
+    roles:       rolesFor('/monitoring'),
+    permission:  'monitoring.view',
   },
   {
     label:       'Placements',

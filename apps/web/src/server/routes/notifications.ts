@@ -11,6 +11,7 @@ import {
 } from '@/lib/push'
 import * as notificationFeedService from '@/server/services/notificationFeedService'
 import { logger }         from '@/lib/logger'
+import { sendError } from '@/server/lib/sendError'
 
 export const notificationsRouter = Router()
 
@@ -29,7 +30,7 @@ notificationsRouter.get(
       res.status(200).json(result)
     } catch (err) {
       logger.error({ err, uid }, '[notifications] Failed to list feed')
-      res.status(500).json({ error: 'Failed to load notifications.' })
+      sendError(res, err, { publicMessage: 'Failed to load notifications.', tags: { module: 'notifications' } })
     }
   }
 )
@@ -47,7 +48,7 @@ notificationsRouter.patch(
       res.status(200).json({ ok: true, marked: count })
     } catch (err) {
       logger.error({ err, uid }, '[notifications] Failed to mark all read')
-      res.status(500).json({ error: 'Failed to update notifications.' })
+      sendError(res, err, { publicMessage: 'Failed to update notifications.', tags: { module: 'notifications' } })
     }
   }
 )
@@ -64,7 +65,7 @@ notificationsRouter.patch(
       res.status(200).json({ ok: true })
     } catch (err) {
       logger.error({ err, uid, id }, '[notifications] Failed to mark read')
-      res.status(500).json({ error: 'Failed to update notification.' })
+      sendError(res, err, { publicMessage: 'Failed to update notification.', tags: { module: 'notifications' } })
     }
   }
 )
@@ -126,7 +127,7 @@ notificationsRouter.post(
       res.status(200).json({ ok: true })
     } catch (err) {
       logger.error({ err, uid }, '[notifications] Failed to register FCM token')
-      res.status(500).json({ error: 'Failed to register notification token.' })
+      sendError(res, err, { publicMessage: 'Failed to register notification token.', tags: { module: 'notifications' } })
     }
   }
 )
@@ -160,7 +161,7 @@ notificationsRouter.delete(
       res.status(200).json({ ok: true })
     } catch (err) {
       logger.error({ err, uid }, '[notifications] Failed to unregister FCM token')
-      res.status(500).json({ error: 'Failed to unregister notification token.' })
+      sendError(res, err, { publicMessage: 'Failed to unregister notification token.', tags: { module: 'notifications' } })
     }
   }
 )
@@ -184,7 +185,7 @@ notificationsRouter.get(
       res.status(200).json({ hasTokens: tokens.length > 0, tokenCount: tokens.length })
     } catch (err) {
       logger.error({ err, uid }, '[notifications] Failed to get token status')
-      res.status(500).json({ error: 'Failed to retrieve token status.' })
+      sendError(res, err, { publicMessage: 'Failed to retrieve token status.', tags: { module: 'notifications' } })
     }
   }
 )

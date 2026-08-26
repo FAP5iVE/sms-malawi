@@ -185,6 +185,6 @@ export function proxy(request: NextRequest): NextResponse {
 // API responses; the api/ bypass in Layer 1 handles passthrough.
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon\\.ico|zero-threat\\.html|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?|ttf|otf)).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?|ttf|otf)).*)',
   ],
 }

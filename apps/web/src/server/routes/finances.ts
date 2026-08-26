@@ -91,6 +91,7 @@ import { generateFinancialReport } from '@/server/services/reportExportService'
 import { getSignedViewUrl, uploadFile, FILE_PREFIX } from '@/lib/storage'
 import { prisma } from '@/lib/prisma'
 import { bulkGenerateInvoices } from '@/server/services/bulkInvoiceService'
+import * as Sentry from '@sentry/nextjs'
 import { logger } from '@/lib/logger'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
@@ -370,7 +371,16 @@ financesRouter.patch(
       })
       await accountingService.postEntry(entryId, req.user!.uid)
     } catch (err) {
+      // Best-effort accounting-ledger posting — the primary operation
+      // (expense/fine record) already succeeded and stays 200; this is
+      // purely a secondary-write failure. Previously only logger.error'd,
+      // meaning a real financial-integrity gap (a record exists with no
+      // posted journal entry) was invisible to Sentry. Now captured, tagged
+      // 'finances' — sentry.server.config.ts's own beforeSend additionally
+      // auto-escalates to level:fatal + critical_module:'finance' if the
+      // thrown message mentions JOURNAL/PAYROLL/INVOICE.
       logger.error({ event: 'accounting.expense_posting_failed', expenseId: expense.id, err })
+      Sentry.captureException(err, { tags: { module: 'finances', event: 'accounting.expense_posting_failed' } })
     }
     res.json(expense)
   }
@@ -409,7 +419,16 @@ financesRouter.patch(
       })
       await accountingService.postEntry(entryId, req.user!.uid)
     } catch (err) {
+      // Best-effort accounting-ledger posting — the primary operation
+      // (expense/fine record) already succeeded and stays 200; this is
+      // purely a secondary-write failure. Previously only logger.error'd,
+      // meaning a real financial-integrity gap (a record exists with no
+      // posted journal entry) was invisible to Sentry. Now captured, tagged
+      // 'finances' — sentry.server.config.ts's own beforeSend additionally
+      // auto-escalates to level:fatal + critical_module:'finance' if the
+      // thrown message mentions JOURNAL/PAYROLL/INVOICE.
       logger.error({ event: 'accounting.expense_markpaid_posting_failed', expenseId: expense.id, err })
+      Sentry.captureException(err, { tags: { module: 'finances', event: 'accounting.expense_markpaid_posting_failed' } })
     }
     res.json(updated)
   }
@@ -774,7 +793,16 @@ financesRouter.patch(
       })
       await accountingService.postEntry(entryId, req.user!.uid)
     } catch (err) {
+      // Best-effort accounting-ledger posting — the primary operation
+      // (expense/fine record) already succeeded and stays 200; this is
+      // purely a secondary-write failure. Previously only logger.error'd,
+      // meaning a real financial-integrity gap (a record exists with no
+      // posted journal entry) was invisible to Sentry. Now captured, tagged
+      // 'finances' — sentry.server.config.ts's own beforeSend additionally
+      // auto-escalates to level:fatal + critical_module:'finance' if the
+      // thrown message mentions JOURNAL/PAYROLL/INVOICE.
       logger.error({ event: 'accounting.library_fine_posting_failed', fineId: fine.id, err })
+      Sentry.captureException(err, { tags: { module: 'finances', event: 'accounting.library_fine_posting_failed' } })
     }
     res.json(fine)
   }

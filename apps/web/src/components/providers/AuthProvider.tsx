@@ -62,6 +62,7 @@ import { useEffect }         from 'react'
 import { useRouter }         from 'next/navigation'
 import { onIdTokenChanged, getAuth, signOut } from 'firebase/auth'
 import { auth, getFcmToken, removeFcmToken } from '@/lib/firebase'
+import * as Sentry from '@sentry/nextjs'
 import { apiFetch }          from '@/lib/api-client'
 import { useAuthStore }      from '@/store/authStore'
 import { SESSION_COOKIE, ROLE_COOKIE } from '@/proxy'
@@ -314,6 +315,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         roleRetryCount = 0
         clearAuth()
         clearAuthCookies()
+        Sentry.setUser(null)   // ID only when signed in (below) — never a name/email; cleared here on sign-out
         return
       }
 
@@ -326,6 +328,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Treat as unauthenticated — do not set stale state.
         clearAuth()
         clearAuthCookies()
+        Sentry.setUser(null)
         return
       }
 
@@ -385,6 +388,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // ── Update Zustand store (client-side role context) ──
       setUser(user, role, subtitle)
+
+      // ── Sentry user context (required for Crash-Free Users %) ──
+      // ID ONLY — never name/email. See sentry-scrub.ts for the matching
+      // server/edge-side redaction policy.
+      Sentry.setUser({ id: user.uid })
 
       // ── FCM Token Registration (fire and forget) ─────────
       // Register the device's FCM push token in the background.

@@ -14,6 +14,32 @@
  *   previous lowercase values matched neither. No other change to the
  *   5-step form UI structure.
  * [DEPENDS ON]: @shared/schemas/student (ApplicationSchema)
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-25).
+ * [PURPOSE]: Academic Year dropdown was a hardcoded ['2026','2027','2028']
+ *   array — a fixed, unmaintained placeholder (would run out entirely once
+ *   2029 arrived), in the wrong format besides ("2026" vs the "YYYY/YYYY"
+ *   format used everywhere else in the system for an academic year), and
+ *   the value it collected was never read back anywhere downstream
+ *   (applicationService.ts only writes it; the staff review pages and the
+ *   application→student conversion route never read it — conversion takes
+ *   an explicit classId instead). Replaced with
+ *   getAcademicYearOptions(schoolInfo.currentYear, { forward: 1 }) —
+ *   packages/shared/constants/malawi/academic.ts's own header comment
+ *   already named this exact file as one of its intended callers, it just
+ *   was never actually wired in. schoolInfo.currentYear comes from
+ *   usePublicSchoolInfo() (GET /public/school-info, no auth — this route
+ *   is unauthenticated), the same call the landing page already makes for
+ *   the same SETTING_KEYS.CURRENT_ACADEMIC_YEAR value, so the offered
+ *   years now track the school's actual configured current year and
+ *   auto-advance with it instead of expiring. `back: 0` (default 2) since
+ *   an applicant only ever applies for the current or next intake, never a
+ *   past one. defaultValues.academicYear starts empty (was hard-coded
+ *   '2027') and is set once schoolInfo loads, via setValue in a useEffect
+ *   guarded on the field still being unset — RHF's defaultValues can only
+ *   be a static value at mount, not one derived from an async fetch.
+ * [DEPENDS ON]: @shared/constants/malawi (getAcademicYearOptions),
+ *   apps/web/src/hooks/usePublic.ts (usePublicSchoolInfo)
  */
 'use client'
 import { useState } from 'react'

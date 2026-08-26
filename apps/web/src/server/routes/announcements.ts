@@ -56,6 +56,7 @@ import { COLLECTIONS } from '@shared/constants/storage'
 import { AnnouncementSchema } from '@shared/schemas/announcement'
 import * as announcementService from '@/server/services/announcementService'
 import { uploadFile, FILE_PREFIX } from '@/lib/storage'
+import { sendError } from '@/server/lib/sendError'
 
 export const announcementsRouter = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }) // 8MB
@@ -75,8 +76,7 @@ announcementsRouter.get(
       const announcements = await announcementService.listForViewer({ uid: user.uid, role: user.role })
       return res.json({ announcements })
     } catch (err: unknown) {
-      const e = err as Error
-      return res.status(500).json({ error: e.message })
+      return sendError(res, err, { tags: { module: 'announcements' } })
     }
   }
 )
@@ -96,8 +96,7 @@ announcementsRouter.get(
       const announcements = await announcementService.listPending()
       return res.json({ announcements })
     } catch (err: unknown) {
-      const e = err as Error
-      return res.status(500).json({ error: e.message })
+      return sendError(res, err, { tags: { module: 'announcements' } })
     }
   }
 )
@@ -171,8 +170,7 @@ announcementsRouter.post(
       )
       return res.status(201).json(created)
     } catch (err: unknown) {
-      const e = err as Error
-      return res.status(400).json({ error: e.message })
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'announcements' } })
     }
   }
 )
@@ -219,8 +217,7 @@ announcementsRouter.patch(
       const result = await announcementService.publishAnnouncement(id, user.uid)
       return res.json(result)
     } catch (err: unknown) {
-      const e = err as Error & { status?: number }
-      return res.status(e.status ?? 400).json({ error: e.message })
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'announcements' } })
     }
   }
 )
@@ -239,8 +236,7 @@ announcementsRouter.patch(
       const result = await announcementService.rejectAnnouncement(id, user.uid, reason)
       return res.json(result)
     } catch (err: unknown) {
-      const e = err as Error & { status?: number }
-      return res.status(e.status ?? 400).json({ error: e.message })
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'announcements' } })
     }
   }
 )

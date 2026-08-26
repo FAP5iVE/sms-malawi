@@ -70,6 +70,7 @@ import * as settingsService     from '@/server/services/settingsService'
 import * as calendarEventService from '@/server/services/calendarEventService'
 import * as studentService      from '@/server/services/studentService'
 import { format, parseISO, addDays } from 'date-fns'
+import { sendError } from '@/server/lib/sendError'
 
 export const calendarRouter = Router()
 
@@ -414,8 +415,7 @@ calendarRouter.patch('/events/:id',
       )
       return res.json(event)
     } catch (err: unknown) {
-      const e = err as Error & { status?: number }
-      return res.status(e.status ?? 400).json({ error: e.message })
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'calendar' } })
     }
   }
 )

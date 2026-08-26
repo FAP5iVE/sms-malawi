@@ -67,6 +67,7 @@ import * as settingsService  from '@/server/services/settingsService'
 import { SETTING_KEYS, SETTING_META } from '@shared/types/settings'
 import type { SettingKey, DepartmentTitles } from '@shared/types/settings'
 import { logger }            from '@/lib/logger'
+import { sendError } from '@/server/lib/sendError'
 
 export const settingsRouter = Router()
 
@@ -216,8 +217,8 @@ settingsRouter
     try {
       await settingsService.setMany(updates, req.user!.uid)
     } catch (err) {
-      const e = err as Error & { status?: number; validationErrors?: unknown }
-      return res.status(e.status ?? 500).json({ error: e.message, validationErrors: e.validationErrors })
+      const e = err as Error & { validationErrors?: unknown }
+      return sendError(res, err, { tags: { module: 'settings' }, extraFields: { validationErrors: e.validationErrors } })
     }
     return res.json({ ok: true })
   })
@@ -308,9 +309,7 @@ settingsRouter
         await settingsService.set(SETTING_KEYS.STAFF_LOAN_INTEREST_RATE, Number(body.loanInterestRate) as never, req.user!.uid)
       }
     } catch (err) {
-      const status = (err as { status?: number })?.status ?? 400
-      const message = err instanceof Error ? err.message : 'Invalid finance settings data.'
-      return res.status(status).json({ error: message })
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Invalid finance settings data.', tags: { module: 'settings' } })
     }
     return res.json({ ok: true })
   })
@@ -337,9 +336,7 @@ settingsRouter
     try {
       await settingsService.set(SETTING_KEYS.HR_DEPARTMENT_TITLES, departmentTitles as DepartmentTitles, req.user!.uid)
     } catch (err) {
-      const status = (err as { status?: number })?.status ?? 400
-      const message = err instanceof Error ? err.message : 'Invalid department/title data.'
-      return res.status(status).json({ error: message })
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Invalid department/title data.', tags: { module: 'settings' } })
     }
     return res.json({ ok: true })
   })
@@ -409,9 +406,7 @@ settingsRouter
         await settingsService.set(SETTING_KEYS.SCHOOL_FOUNDED_YEAR, Number(body.foundedYear) as never, req.user!.uid)
       }
     } catch (err) {
-      const status = (err as { status?: number })?.status ?? 400
-      const message = err instanceof Error ? err.message : 'Invalid school identity data.'
-      return res.status(status).json({ error: message })
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Invalid school identity data.', tags: { module: 'settings' } })
     }
     return res.json({ ok: true })
   })

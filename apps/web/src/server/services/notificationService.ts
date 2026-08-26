@@ -130,7 +130,7 @@ async function getPrefs(uid: string): Promise<NotifPrefs> {
 export async function getSchoolBranding(): Promise<SchoolBranding> {
   try {
     const identity = await getIdentitySettings()
-    const loginUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://malawiedustack.eu.org'
+    const loginUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sms-malawi.vercel.app'
     return {
       schoolName: identity.schoolName,
       schoolAddress: identity.schoolAddress,
@@ -145,7 +145,7 @@ export async function getSchoolBranding(): Promise<SchoolBranding> {
       schoolAddress: 'Malawi',
       schoolEmail: 'info@school.mw',
       schoolPhone: '',
-      loginUrl: process.env.NEXT_PUBLIC_APP_URL ?? 'https://malawiedustack.eu.org',
+      loginUrl: process.env.NEXT_PUBLIC_APP_URL ?? 'https://sms-malawi.vercel.app/login',
     }
   }
 }

@@ -17,17 +17,46 @@
  *      text-muted, dark:text-white) throughout rather than fixed colors,
  *      so contrast holds in both themes.
  * [DEPENDS ON]: userManagementService.ts's listUsers() join (same session)
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-25).
+ * [PURPOSE]: "Add User" previously opened its own independent inline form
+ *   (email/displayName/phone/role → POST /users), creating a bare Firebase
+ *   Auth account with no linked Student/StaffProfile row — completely
+ *   disconnected from the HR and Students domains and their forms/backend.
+ *   Replaced with the real flow: AddUserTypeDialog asks Staff or Student,
+ *   then this page renders the SAME components/hr/StaffForm.tsx the HR
+ *   Directory's "Add Staff" uses, or the SAME components/students/
+ *   StudentForm.tsx the Students page's "Add Student" uses — no duplicated
+ *   fields, validation, or submit logic. Those forms invalidate only their
+ *   own domain's query cache (queryKeys.hr.all() / queryKeys.students.
+ *   all()), so this page now also invalidates queryKeys.admin.users() when
+ *   either form closes, or the User Accounts table below would keep
+ *   showing stale data until a manual refresh. useCreateUser/POST /users/
+ *   userManagementService.createUser are left in place (unused by this
+ *   page now) — CreateUserSchema's studentId/staffId link fields suggest a
+ *   distinct "provision login for an already-existing record with no
+ *   account yet" use case that may still need a home; removing that
+ *   backend capability was out of scope for this fix.
+ * [DEPENDS ON]: components/shared/AddUserTypeDialog.tsx (same session);
+ *   POST /students widened to requireAnyPermission(['student.create',
+ *   'userMgmt.createUser']) (server/routes/students.ts, same session) so
+ *   admin's Student choice here doesn't 403 — see that file's header for
+ *   the full rationale.
  */
 
 import { useState, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { RoleGuard } from '@/components/shared/RoleGuard'
-import { useUsers, useCreateUser, useUpdateUserRole, useToggleUserDisabled, useSendPasswordReset } from '@/hooks/useAdmin'
+import { AddUserTypeDialog, type NewUserType } from '@/components/shared/AddUserTypeDialog'
+import { StaffForm } from '@/components/hr/StaffForm'
+import { StudentForm } from '@/components/students/StudentForm'
+import { useUsers, useUpdateUserRole, useToggleUserDisabled, useSendPasswordReset } from '@/hooks/useAdmin'
 import { useSystemHealth } from '@/hooks/useReports'
+import { queryKeys } from '@/lib/api-client'
 import type { ApiFirebaseUser, ApiUserListResponse, ApiSystemHealth, ApiServiceHealth } from '@shared/types/api'
 import { UserPlus, Shield, Power, Key, Activity, Search, ArrowUpDown } from 'lucide-react'
 import { USER_ROLES, ROLE_LABELS } from '@shared/types/roles'
-import type { CreateUserInput } from '@shared/schemas/admin'
 
 export default function UserManagementPage() {
   return (
@@ -73,8 +102,11 @@ function UserManagementContent() {
   const initialTab: 'users' | 'health' = tabParam === 'health' ? 'health' : 'users'
 
   const [tab, setTab] = useState<'users' | 'health'>(initialTab)
-  const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState<Partial<CreateUserInput>>({})
+  // Add User — step 1 is the type chooser; step 2 renders the matching
+  // canonical form (StaffForm or StudentForm). addUserType doubles as the
+  // "which form is open" flag, so only one of the two is ever mounted.
+  const [showTypeChooser, setShowTypeChooser] = useState(false)
+  const [addUserType, setAddUserType] = useState<NewUserType | null>(null)
 
   // ── Filters / sort ────────────────────────────────────────────────────
   const [search, setSearch] = useState('')
@@ -84,12 +116,23 @@ function UserManagementContent() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [groupByRole, setGroupByRole] = useState(true)
 
+  const qc = useQueryClient()
   const { data: usersData } = useUsers()
   const { data: health } = useSystemHealth()
-  const createUser        = useCreateUser()
   const updateRole        = useUpdateUserRole()
   const toggleDisabled    = useToggleUserDisabled()
   const resetPassword     = useSendPasswordReset()
+
+  // StaffForm/StudentForm each invalidate only their own domain's query
+  // cache (queryKeys.hr.all() / queryKeys.students.all()) — correct for
+  // their native pages, but this page's User Accounts table (GET /users)
+  // needs its own cache invalidated too, or a newly-created account
+  // wouldn't show up until a manual refresh. Fired on every close, not
+  // just success — an extra refetch of already-current data is harmless.
+  function closeUserForm() {
+    setAddUserType(null)
+    qc.invalidateQueries({ queryKey: queryKeys.admin.users() })
+  }
   // [PRODUCTION FIX 2026-07-28] `?? []` created a fresh array reference on
   // every render, which defeated the filteredSorted useMemo below (its
   // dependency array saw "users" as different every time). Memoized so it
@@ -202,9 +245,9 @@ function UserManagementContent() {
           <p className="text-sm text-muted mt-0.5">User accounts, roles, and system health</p>
         </div>
         {tab === 'users' && (
-          <button onClick={() => setShowCreate(true)}
+          <button onClick={() => setShowTypeChooser(true)}
             className="flex items-center gap-2 bg-brand-teal text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-teal-light">
-            <UserPlus className="w-4 h-4" /> Create User
+            <UserPlus className="w-4 h-4" /> Add User
           </button>
         )}
       </div>
@@ -223,50 +266,6 @@ function UserManagementContent() {
 
       {tab === 'users' && (
         <>
-          {showCreate && (
-            <div className="bg-surface p-5 space-y-3">
-              <h3 className="font-semibold text-brand-navy dark:text-white">Create New User</h3>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {([
-                  { key: 'email',       label: 'Email',        type: 'email' },
-                  { key: 'displayName', label: 'Full Name',    type: 'text'  },
-                  { key: 'phone',       label: 'Phone',        type: 'tel'   },
-                ] as const).map(({ key, label, type }) => (
-                  <div key={key}>
-                    <label className="block text-xs font-semibold text-muted uppercase mb-1">{label}</label>
-                    <input
-                        type={type}
-                        aria-label={label}
-                        value={(form[key] ?? '') as string}
-                        onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
-                      className="w-full border border-base rounded-xl px-3 py-2 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
-                  </div>
-                ))}
-                <div>
-                  <label className="block text-xs font-semibold text-muted uppercase mb-1">Role</label>
-                  <select
-                    aria-label="Role"
-                    value={form.role ?? ''}
-                    onChange={(e) => setForm((p) => ({ ...p, role: e.target.value as typeof USER_ROLES[number] }))}
-                    className="w-full border border-base rounded-xl px-3 py-2 text-sm bg-page text-body focus:outline-none">
-                    <option value="">Select role…</option>
-                    {USER_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm border border-base rounded-xl text-body">Cancel</button>
-                <button disabled={createUser.isPending} onClick={() => {
-                  if (form.email && form.displayName && form.role)
-                    createUser.mutate(form as CreateUserInput, { onSuccess: () => { setShowCreate(false); setForm({}) } })
-                }} className="px-5 py-2 text-sm bg-brand-teal text-white rounded-xl font-semibold disabled:opacity-60">
-                  {createUser.isPending ? 'Creating…' : 'Create & Send Email'}
-                </button>
-              </div>
-              {createUser.isSuccess && <p className="text-sm text-emerald-600 dark:text-emerald-400">✓ User created. Temporary password sent to their email.</p>}
-            </div>
-          )}
-
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-2.5 bg-surface p-4">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -358,6 +357,27 @@ function UserManagementContent() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* ── Add User — step 1: type chooser ─────────────────────────────── */}
+      <AddUserTypeDialog
+        open={showTypeChooser}
+        onSelect={(type) => {
+          setShowTypeChooser(false)
+          setAddUserType(type)
+        }}
+        onCancel={() => setShowTypeChooser(false)}
+      />
+
+      {/* ── Add User — step 2: the SAME forms HR/Students use ───────────── */}
+      {/* StaffForm/StudentForm each manage their own visible state and exit
+          animation, then call onClose once — closeUserForm() clears the
+          open flag and refreshes this page's User Accounts table. */}
+      {addUserType === 'staff' && (
+        <StaffForm key="add-user-staff-form" onClose={closeUserForm} />
+      )}
+      {addUserType === 'student' && (
+        <StudentForm key="add-user-student-form" onClose={closeUserForm} />
       )}
     </div>
   )

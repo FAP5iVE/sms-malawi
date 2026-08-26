@@ -16,6 +16,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs'
+import { scrubEvent, scrubLog } from '@/lib/sentry-scrub'
 
 const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN
 
@@ -45,6 +46,7 @@ Sentry.init({
 
   // Filter out known non-actionable errors.
   beforeSend(event) {
+    event = scrubEvent(event)
     // Ignore network errors from client-side fetch cancellations.
     if (event.exception?.values?.[0]?.type === 'TypeError') {
       const msg = event.exception.values[0].value ?? ''
@@ -54,6 +56,7 @@ Sentry.init({
     }
     return event
   },
+  beforeSendLog: scrubLog,
 
   // Tag all events with app version / environment.
   initialScope: {

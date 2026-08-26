@@ -38,7 +38,7 @@ export default function AdmissionsPage() {
         <div className="bg-brand-teal rounded-2xl p-7 mb-14 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
           <div>
             <h2 className="font-heading font-bold text-xl text-white mb-1.5">Ready to apply?</h2>
-            <p className="text-sm text-white/80">Start your application online — it only takes a few minutes.</p>
+            <p className="text-sm text-white/80">Start your application online it only takes a few minutes.</p>
           </div>
           <Link
             href="/apply"
@@ -94,7 +94,7 @@ export default function AdmissionsPage() {
             ))}
           </ul>
           <p className="text-xs text-muted mt-4">
-            Exact requirements can vary by year and available places — the admissions office (contact details
+            Exact requirements can vary by year and available places. The admissions office (contact details
             below) can confirm specifics for your application.
           </p>
         </section>
@@ -109,7 +109,7 @@ export default function AdmissionsPage() {
             <div className="h-32 rounded-xl bg-surface animate-pulse" />
           ) : fees.length === 0 ? (
             <p className="text-sm text-muted">
-              Fee figures for the current academic year have not been published yet — contact the admissions
+              Fee figures for the current academic year have not been published yet. Contact the admissions
               office below for the current schedule.
             </p>
           ) : (
@@ -133,7 +133,7 @@ export default function AdmissionsPage() {
           <p className="text-sm text-muted leading-relaxed">
             A limited number of scholarships and fee-reduction arrangements are available each year for
             students who qualify, based on academic merit and demonstrated financial need. Scholarship
-            enquiries are handled directly by the admissions office — contact details below.
+            enquiries are handled directly by the admissions office, contact details below.
           </p>
         </section>
 

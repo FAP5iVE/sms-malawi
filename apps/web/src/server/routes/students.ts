@@ -27,6 +27,7 @@ import * as pendingActionService       from '@/server/services/pendingActionServ
 import { StudentStatusSchema }         from '@shared/schemas/student'
 import type { StudentStatus, Sex }     from '@prisma/client'
 import type { UserRole }               from '@shared/types/roles'
+import { sendError } from '@/server/lib/sendError'
 
 export const studentsRouter = Router()
 
@@ -158,9 +159,7 @@ studentsRouter.get(
       try {
         await studentService.assertStudentOwnership(user.uid, id)
       } catch (err) {
-        const e = err as { status?: number; message: string }
-        res.status(e.status ?? 403).json({ error: e.message })
-        return
+        return sendError(res, err, { defaultStatus: 403, tags: { module: 'students' } })
       }
     }
 

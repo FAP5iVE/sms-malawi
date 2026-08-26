@@ -39,19 +39,12 @@ import * as placementService from '@/server/services/placementService'
 import { resolveStudentFromUid } from '@/server/services/studentService'
 import { SetChoicesSchema, RecordOutcomeSchema, VerifyOutcomeSchema, BatchGenerateSchema, AdvisoryCheckSchema } from '@shared/schemas/placement'
 import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
+import { sendError } from '@/server/lib/sendError'
 
 export const placementsRouter = Router()
 
 // Every placement route requires an authenticated user.
 placementsRouter.use(verifyAuth)
-
-// Translate a service error carrying an HTTP `status` into a JSON response.
-function sendError(res: Response, err: unknown): Response {
-  const status = (err as { status?: number } | null)?.status ?? 500
-  const message = err instanceof Error ? err.message : 'Unexpected error.'
-  if (status >= 500) console.error('placements route error:', err)
-  return res.status(status).json({ error: message })
-}
 
 // ─────────────────────────────────────────────────────────
 //  STUDENT SELF-SERVICE (/me*) — resolve UID → student id FIRST
@@ -70,7 +63,7 @@ placementsRouter.get('/me', requirePermission('placement.viewOwn'), async (req: 
     const recommendations = await placementService.getRecommendationsForPlacement(placement.id)
     return res.json({ placement, recommendations })
   } catch (err) {
-    return sendError(res, err)
+    return sendError(res, err, { tags: { module: 'placements' } })
   }
 })
 
@@ -88,7 +81,7 @@ placementsRouter.patch('/me/choices', requirePermission('placement.recordOwnChoi
     const updated = await placementService.setChoices(placement.id, parsed.data, req.user!.uid, req.user!.role)
     return res.json(updated)
   } catch (err) {
-    return sendError(res, err)
+    return sendError(res, err, { tags: { module: 'placements' } })
   }
 })
 
@@ -106,7 +99,7 @@ placementsRouter.patch('/me/outcome', requirePermission('placement.recordOwnChoi
     const updated = await placementService.recordOutcome(placement.id, parsed.data, req.user!.uid, req.user!.role)
     return res.json(updated)
   } catch (err) {
-    return sendError(res, err)
+    return sendError(res, err, { tags: { module: 'placements' } })
   }
 })
 
@@ -141,7 +134,7 @@ placementsRouter.post('/advisory', requirePermission('placement.viewOwn'), async
 
     return res.json(placementService.advise(grades, parsed.data.programmes, 10))
   } catch (err) {
-    return sendError(res, err)
+    return sendError(res, err, { tags: { module: 'placements' } })
   }
 })
 
@@ -156,7 +149,7 @@ placementsRouter.get('/cohort', requirePermission('placement.view'), async (req:
     const placements = await placementService.listPlacements(status ? { status } : {})
     return res.json(placements)
   } catch (err) {
-    return sendError(res, err)
+    return sendError(res, err, { tags: { module: 'placements' } })
   }
 })
 
@@ -165,7 +158,7 @@ placementsRouter.get('/catalogue', requireAnyPermission(['placement.view', 'plac
   try {
     return res.json(placementService.getCatalogue())
   } catch (err) {
-    return sendError(res, err)
+    return sendError(res, err, { tags: { module: 'placements' } })
   }
 })
 
@@ -177,7 +170,7 @@ placementsRouter.get('/eligible', requirePermission('placement.manage'), async (
     const students = await placementService.listPlacementEligibleStudents(academicYear)
     return res.json(students)
   } catch (err) {
-    return sendError(res, err)
+    return sendError(res, err, { tags: { module: 'placements' } })
   }
 })
 
@@ -189,7 +182,7 @@ placementsRouter.post('/batch-generate', requirePermission('placement.manage'), 
     const result = await placementService.batchGenerate(parsed.data.academicYear, req.user!.uid, req.user!.role)
     return res.json(result)
   } catch (err) {
-    return sendError(res, err)
+    return sendError(res, err, { tags: { module: 'placements' } })
   }
 })
 
@@ -206,7 +199,7 @@ placementsRouter.get('/:studentId', requirePermission('placement.view'), async (
     const recommendations = await placementService.getRecommendationsForPlacement(placement.id)
     return res.json({ placement, recommendations })
   } catch (err) {
-    return sendError(res, err)
+    return sendError(res, err, { tags: { module: 'placements' } })
   }
 })
 
@@ -219,7 +212,7 @@ placementsRouter.post('/:studentId/generate', requirePermission('placement.manag
     const result = await placementService.generateForStudent(studentId, academicYear, req.user!.uid, req.user!.role)
     return res.status(201).json(result)
   } catch (err) {
-    return sendError(res, err)
+    return sendError(res, err, { tags: { module: 'placements' } })
   }
 })
 
@@ -232,7 +225,7 @@ placementsRouter.patch('/:id/choices', requirePermission('placement.manage'), as
     const updated = await placementService.setChoices(id, parsed.data, req.user!.uid, req.user!.role)
     return res.json(updated)
   } catch (err) {
-    return sendError(res, err)
+    return sendError(res, err, { tags: { module: 'placements' } })
   }
 })
 
@@ -245,7 +238,7 @@ placementsRouter.patch('/:id/outcome', requirePermission('placement.recordOutcom
     const updated = await placementService.recordOutcome(id, parsed.data, req.user!.uid, req.user!.role)
     return res.json(updated)
   } catch (err) {
-    return sendError(res, err)
+    return sendError(res, err, { tags: { module: 'placements' } })
   }
 })
 
@@ -258,7 +251,7 @@ placementsRouter.patch('/:id/verify', requirePermission('placement.verifyOutcome
     const updated = await placementService.verifyOutcome(id, parsed.data, req.user!.uid, req.user!.role)
     return res.json(updated)
   } catch (err) {
-    return sendError(res, err)
+    return sendError(res, err, { tags: { module: 'placements' } })
   }
 })
 

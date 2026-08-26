@@ -273,7 +273,7 @@ publicRouter.post('/newsletter/subscribe', async (req, res) => {
     update: { name: name ?? undefined, token, confirmed: false, unsubscribedAt: null },
   })
 
-  const confirmUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://malawiedustack.eu.org'}/newsletter/confirm?token=${token}`
+  const confirmUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://sms-malawi.vercel.app'}/newsletter/confirm?token=${token}`
 
   const school = await getSchoolBranding()
   await sendEmail({

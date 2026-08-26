@@ -95,6 +95,7 @@ import * as examService        from '@/server/services/examService'
 import { getSignedViewUrl, canReadFile } from '@/lib/storage'
 import { prisma }              from '@/lib/prisma'
 import * as reportCardService  from '@/server/services/reportCardService'
+import { sendError } from '@/server/lib/sendError'
 
 export const examsRouter = Router()
 
@@ -274,8 +275,7 @@ examsRouter.get('/results/:studentId', verifyAuth,
       const result = await examService.getStudentResults(sid, academicYear, Number(term))
       return res.json(result)
     } catch (err: unknown) {
-      const e = err as Error & { status?: number }
-      return res.status(e.status ?? 500).json({ error: e.message })
+      return sendError(res, err, { tags: { module: 'exams' } })
     }
   })
 
@@ -314,8 +314,7 @@ examsRouter.get('/report-card/:studentId', verifyAuth,
     try {
       await examService.getStudentResults(sid, academicYear, Number(term)) // fee gate
     } catch (err: unknown) {
-      const e = err as Error & { status?: number }
-      return res.status(e.status ?? 500).json({ error: e.message })
+      return sendError(res, err, { tags: { module: 'exams' } })
     }
     const result = await prisma.termResult.findFirst({ where: { studentId: sid, academicYear, term: Number(term) } })
     if (!result?.reportCardKey) return res.status(404).json({ error: 'Report card not yet generated.' })
@@ -340,8 +339,7 @@ examsRouter.get('/report-card/:studentId/data', verifyAuth,
     try {
       await examService.getStudentResults(sid, academicYear, Number(term)) // fee gate
     } catch (err: unknown) {
-      const e = err as Error & { status?: number }
-      return res.status(e.status ?? 500).json({ error: e.message })
+      return sendError(res, err, { tags: { module: 'exams' } })
     }
 
     const termNum = Number(term) as 1 | 2 | 3
@@ -384,8 +382,7 @@ examsRouter.post('/report-card/mine', verifyAuth,
     try {
       await examService.getStudentResults(student.id, academicYear, termNum) // fee gate + release check
     } catch (err: unknown) {
-      const e = err as Error & { status?: number }
-      return res.status(e.status ?? 500).json({ error: e.message })
+      return sendError(res, err, { tags: { module: 'exams' } })
     }
 
     const result = await reportCardService.generateSingleReportCard(student.id, termNum, academicYear, req.user!.uid)

@@ -38,6 +38,7 @@ import {
 } from '@shared/schemas/student'
 import * as appService    from '@/server/services/applicationService'
 import * as studentService from '@/server/services/studentService'
+import { sendError } from '@/server/lib/sendError'
 
 export const applicationsRouter = Router()
 
@@ -55,8 +56,10 @@ applicationsRouter.post('/public', createRateLimiter('auth'), async (req, res) =
         message: 'An application for this applicant (same name, date of birth and guardian contact) already exists and is being reviewed.',
       })
     }
-    console.error('Public application error:', err)
-    return res.status(500).json({ error: 'Failed to submit application. Please try again.' })
+    return sendError(res, err, {
+      publicMessage: 'Failed to submit application. Please try again.',
+      tags: { module: 'applications' },
+    })
   }
 })
 

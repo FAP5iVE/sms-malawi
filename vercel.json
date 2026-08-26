@@ -21,7 +21,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://*.firebaseapp.com https://*.googleapis.com https://*.sentry.io; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cloud.appwrite.io; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.sentry.io wss://*.firebaseio.com; frame-ancestors 'none';"
+          "value": "default-src 'self'; worker-src 'self' blob:; child-src 'self' blob:; script-src 'self' 'unsafe-inline' https://*.firebaseapp.com https://*.googleapis.com https://*.sentry.io; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cloud.appwrite.io; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.sentry.io wss://*.firebaseio.com; frame-ancestors 'none'; report-uri https://o4511413323038720.ingest.de.sentry.io/api/4511413398995024/security/?sentry_key=15f22bce93e1adc4893896ded847c21c&sentry_environment=production"
         }
       ]
     },

@@ -1508,3 +1508,54 @@ model PlacementChoice {
   @@unique([placementId, rank])
   @@map("placement_choices")
 }
+
+// ─────────────────────────────────────────────────────────
+// SENTRY MONITORING CACHE (webhook-populated + periodic rollup sync)
+// Populated by apps/web/src/server/services/monitoringService.ts.
+// Never holds student/staff PII — Sentry-side scrubbing (Section 6) already
+// keeps that out of the events themselves.
+// ─────────────────────────────────────────────────────────
+
+model SentryIssueCache {
+  id              String    @id @default(cuid())
+  sentryIssueId   String    @unique
+  shortId         String?
+  title           String
+  culprit         String?
+  level           String    // error | warning | fatal | info | debug
+  status          String    // unresolved | resolved | ignored
+  substatus       String?   // archived_until_escalating | regressed | new | ongoing | ...
+  issueCategory   String?   // error | performance | uptime
+  isUptimeIssue   Boolean   @default(false)
+  eventCount      Int       @default(0)
+  userCount       Int       @default(0)
+  firstSeenAt     DateTime?
+  lastSeenAt      DateTime?
+  permalink       String?
+  raw             Json      // normalized full payload, for the detail drawer
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([status, level])
+  @@index([lastSeenAt])
+  @@index([isUptimeIssue])
+}
+
+model SentryAlertCache {
+  id              String    @id @default(cuid())
+  sentryAlertId   String    @unique
+  name            String
+  enabled         Boolean   @default(true)
+  lastTriggeredAt DateTime?
+  raw             Json
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model SentryRollupStat {
+  id          String    @id @default(cuid())
+  metricKey   String    @unique   // e.g. "crash_free_sessions:7d", "apdex:24h", "releases_count:30d", "crash_free_users:7d"
+  value       Float
+  windowLabel String              // "7d", "24h", "30d" — for display only
+  syncedAt    DateTime  @default(now())
+}

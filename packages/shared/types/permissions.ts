@@ -343,6 +343,11 @@ export type Permission =
   | 'placement.recordOutcome'       // Record a placement outcome for a student (high_rank, exam_officer)
   | 'placement.verifyOutcome'       // Verify a recorded placement outcome (high_rank only)
 
+   // ── MONITORING (Sentry-backed admin dashboard) ─────────
+  | 'monitoring.view'                // View the Sentry-backed monitoring dashboard (admin/high_rank only)
+  | 'monitoring.manage'              // Acknowledge/resolve issues & toggle alerts from our own UI
+  | 'monitoring.submitFeedback'      // Submit in-app "report a problem" feedback (Sentry User Feedback) — every role
+
 // ─────────────────────────────────────────────────────────
 //  ROLE → PERMISSION MAP
 //  Each role gets a ReadonlySet<Permission> for O(1) has() checks.
@@ -472,7 +477,14 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'placement.manage',
     'placement.recordOutcome',
     'placement.verifyOutcome',
+
+    // Monitoring — full dashboard access
+     'monitoring.view',
+     'monitoring.manage',
+     'monitoring.submitFeedback',
   ]),
+
+  
 
   // ── HIGH_RANK ─────────────────────────────────────────
   // Headteacher, deputy headteacher, principal.
@@ -648,6 +660,11 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'placement.manage',
     'placement.recordOutcome',
     'placement.verifyOutcome',
+
+    // Monitoring — full dashboard access
+     'monitoring.view',
+     'monitoring.manage',
+     'monitoring.submitFeedback',
   ]),
 
   // ── FINANCE ───────────────────────────────────────────

@@ -33,6 +33,7 @@ import { overdueLibraryJob } from '@/server/jobs/overdueLibraryJob'
 import { runRiskAssessmentJob } from '@/server/services/riskJob'
 import * as settingsService from '@/server/services/settingsService'
 import { SETTING_KEYS } from '@shared/types/settings'
+import * as Sentry from '@sentry/nextjs'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -49,7 +50,7 @@ async function runTask(name: string, fn: () => Promise<unknown>) {
     const result = await fn()
     return { name, ok: true, result: result ?? null }
   } catch (err) {
-    console.error(`[cron/daily-tasks] ${name} failed:`, err)
+    Sentry.captureException(err, { tags: { cron: 'daily-tasks', task: name } })
     return { name, ok: false, error: err instanceof Error ? err.message : 'Unknown error' }
   }
 }
@@ -63,20 +64,36 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { current_academic_year: academicYear, current_term: academicTerm } =
-    await settingsService.getMany([SETTING_KEYS.CURRENT_ACADEMIC_YEAR, SETTING_KEYS.CURRENT_TERM])
+   // Sentry.withMonitor wraps the WHOLE run — this is the "did the cron
+  // actually fire and complete" signal (research §7). Per-task failures
+  // (above) are separately captured and do NOT fail the monitor itself —
+  // this file's own existing design philosophy ("a task failing must not
+  // stop the others") is preserved exactly; withMonitor just adds
+  // visibility on top, it doesn't change what happens when a task fails.
+  const results = await Sentry.withMonitor(
+    'sms-daily-tasks',
+    async () => {
+      const { current_academic_year: academicYear, current_term: academicTerm } =
+        await settingsService.getMany([SETTING_KEYS.CURRENT_ACADEMIC_YEAR, SETTING_KEYS.CURRENT_TERM])
 
-  // Sequential, not Promise.all — several of these touch the same tables
-  // (Invoice, Payment) and running them concurrently risks lock contention
-  // on a Neon connection that's already shared with normal app traffic.
-  const results = [
-    await runTask('fee-reminders', dailyFeeReminderJob),
-    await runTask('overdue-library', overdueLibraryJob),
-    await runTask('contract-alerts', contractExpiryJob),
-    await runTask('installment-check', dailyInstallmentCheckJob),
-    await runTask('late-penalties', dailyLatePenaltiesJob),
-    await runTask('risk-detection', () => runRiskAssessmentJob(academicTerm, academicYear)),
-  ]
+      return [
+        await runTask('fee-reminders', dailyFeeReminderJob),
+        await runTask('overdue-library', overdueLibraryJob),
+        await runTask('contract-alerts', contractExpiryJob),
+        await runTask('installment-check', dailyInstallmentCheckJob),
+        await runTask('late-penalties', dailyLatePenaltiesJob),
+        await runTask('risk-detection', () => runRiskAssessmentJob(academicTerm, academicYear)),
+      ]
+    },
+    {
+      schedule: { type: 'crontab', value: '0 4 * * *' },   // matches vercel.json's real cron entry exactly
+      timezone: 'Africa/Blantyre',                          // Malawi — not UTC, not a placeholder
+      checkinMargin: 5,      // minutes grace before "missed"
+      maxRuntime: 2,         // minutes — headroom above the real maxDuration=60s cap above
+      failureIssueThreshold: 1,
+      recoveryThreshold: 1,
+    },
+  )
 
   const allOk = results.every((r) => r.ok)
   return NextResponse.json(
