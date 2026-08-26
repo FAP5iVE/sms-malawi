@@ -382,13 +382,14 @@ function LoginForm() {
       </div>
 
       {/* ── Top bar: home + theme toggle ── */}
-      <header className="relative z-30 flex items-center justify-between p-4 sm:p-6">
+      <header className="relative z-30 flex items-center justify-between p-3 sm:p-4">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-sm font-heading font-medium text-white bg-brand-navy hover:bg-brand-navy-mid rounded-lg px-3 py-2 shadow-md transition-colors"
+          aria-label="Back to homepage"
+          title="Back to homepage"
+          className="w-9 h-9 rounded-lg bg-brand-navy hover:bg-brand-navy-mid text-white shadow-md flex items-center justify-center transition-colors"
         >
           <Home className="w-4 h-4" />
-          <span className="hidden sm:inline">Back to homepage</span>
         </Link>
 
         <button
@@ -402,7 +403,7 @@ function LoginForm() {
       </header>
 
       {/* ── Centred content ── */}
-      <main className="relative z-10 flex-1 flex items-start justify-center px-4 pt-1 sm:pt-2 pb-6 sm:pb-8">
+      <main className="relative z-10 flex-1 flex items-start justify-center px-4 pt-0 pb-6 sm:pb-8">
         {/* Wide frosted plate */}
         <div className="w-full max-w-sm sm:max-w-2xl lg:max-w-4xl rounded-[28px] sm:rounded-[36px] bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/10 backdrop-blur-md p-2.5 sm:p-5 shadow-xl">
           {/* Login glass card — translucent + blurred in BOTH themes */}
