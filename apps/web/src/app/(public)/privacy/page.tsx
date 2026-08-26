@@ -12,12 +12,14 @@
  */
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 
 const LAST_UPDATED = 'August 2026'
 
 export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-page">
+      <PublicAmbientBackground />
       <header className="bg-surface border-b border-base sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-4">
           <Link
@@ -38,7 +40,7 @@ export default function PrivacyPolicyPage() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
+      <main className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-12">
         <h1 className="font-heading font-bold text-3xl text-brand-navy mb-2">Privacy Policy</h1>
         <p className="text-muted text-sm font-sans mb-10">Last updated: {LAST_UPDATED}</p>
 

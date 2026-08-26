@@ -18,6 +18,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, GraduationCap, Search, School, TrendingUp } from 'lucide-react'
 import { usePublicPlacements, usePublicPlacementStats } from '@/hooks/usePublic'
+import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 
 export default function PublicPlacementsPage() {
   const [year, setYear] = useState<string>('')
@@ -56,6 +57,7 @@ export default function PublicPlacementsPage() {
 
   return (
     <div className="min-h-screen bg-page">
+      <PublicAmbientBackground />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <Link href="/#performance" className="inline-flex items-center gap-2 text-sm text-brand-teal hover:underline mb-6">
           <ArrowLeft className="w-4 h-4" /> Back to home

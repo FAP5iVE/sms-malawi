@@ -23,6 +23,7 @@ import { useRouter } from 'next/navigation'
 import { updatePassword, getAuth } from 'firebase/auth'
 import { Loader2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
+import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 
 export default function ChangePasswordPage() {
   const router = useRouter()
@@ -58,7 +59,8 @@ export default function ChangePasswordPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-page px-4">
-      <div className="w-full max-w-sm">
+      <PublicAmbientBackground />
+      <div className="relative z-10 w-full max-w-sm">
         <h1 className="font-heading text-2xl font-bold text-brand-navy mb-2">Set your password</h1>
         <p className="text-muted text-sm mb-8">
           This is your first login. Please create a new password before continuing.

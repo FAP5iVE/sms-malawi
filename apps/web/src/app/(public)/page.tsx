@@ -1279,6 +1279,26 @@ export default function LandingPage() {
             FOOTER
         ══════════════════════════════════════════════════════════════ */}
         <footer className="relative bg-brand-navy text-white pt-16 overflow-hidden rounded-t-[2.5rem]">
+          {/* Background photo — same hero campus image + treatment as the
+              HERO section above, reused here so the page's two navy
+              bookends share one visual language instead of the footer
+              being a flat colour. `fill` + `object-cover` + `sizes="100vw"`
+              is the same responsive approach the hero uses, so this scales
+              correctly on mobile without any separate breakpoint handling.
+              The gradient overlay opacity is pushed higher than the hero's
+              (.55/.72/.96 → .82/.90/.98) because footer text runs much
+              smaller than the hero's large display type and needs more
+              contrast against the photo to stay legible on every screen
+              size, phones included. */}
+          <Image
+            src="/images/hero-campus.webp"
+            alt=""
+            fill
+            sizes="100vw"
+            className="object-cover object-center pointer-events-none select-none"
+          />
+          <div className="absolute inset-0 bg-linear-to-b from-[rgba(11,29,51,.82)] via-[rgba(11,29,51,.90)] to-[rgba(11,29,51,.98)]" />
+
           <svg preserveAspectRatio="xMidYMid slice" viewBox="10 10 80 80" aria-hidden className="absolute inset-0 w-full h-full blur-[14px] opacity-[0.07] pointer-events-none">
             <path fill="#D98A0B" className="blob-med" style={{ transformOrigin: '13px 25px' }} d="M37-5C25.1-14.7,5.7-19.1-9.2-10-28.5,1.8-32.7,31.1-19.8,49c15.5,21.5,52.6,22,67.2,2.3C59.4,35,53.7,8.5,37-5Z" />
             <path fill="#24507F" className="blob-slower" style={{ transformOrigin: '13px 25px' }} d="M20.6,4.1C11.6,1.5-1.9,2.5-8,11.2-16.3,23.1-8.2,45.6,7.4,50S42.1,38.9,41,24.5C40.2,14.1,29.4,6.6,20.6,4.1Z" />

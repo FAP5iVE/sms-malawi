@@ -12,6 +12,7 @@
 import Link from 'next/link'
 import { ArrowLeft, ClipboardCheck, ListChecks, Banknote, Award, Phone, Mail, MapPin } from 'lucide-react'
 import { usePublicSchoolInfo, usePublicFeeStructure } from '@/hooks/usePublic'
+import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 
 function formatMWK(amount: number): string {
   return `MWK ${amount.toLocaleString()}`
@@ -24,7 +25,8 @@ export default function AdmissionsPage() {
 
   return (
     <div className="min-h-screen bg-page">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <PublicAmbientBackground />
+      <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <Link href="/#discover" className="inline-flex items-center gap-2 text-sm text-brand-teal hover:underline mb-6">
           <ArrowLeft className="w-4 h-4" /> Back to home
         </Link>

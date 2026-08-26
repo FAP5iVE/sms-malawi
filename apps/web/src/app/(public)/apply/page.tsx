@@ -23,23 +23,53 @@
  *   the value it collected was never read back anywhere downstream
  *   (applicationService.ts only writes it; the staff review pages and the
  *   application→student conversion route never read it — conversion takes
- *   an explicit classId instead). Replaced with
- *   getAcademicYearOptions(schoolInfo.currentYear, { forward: 1 }) —
- *   packages/shared/constants/malawi/academic.ts's own header comment
- *   already named this exact file as one of its intended callers, it just
- *   was never actually wired in. schoolInfo.currentYear comes from
- *   usePublicSchoolInfo() (GET /public/school-info, no auth — this route
- *   is unauthenticated), the same call the landing page already makes for
- *   the same SETTING_KEYS.CURRENT_ACADEMIC_YEAR value, so the offered
- *   years now track the school's actual configured current year and
- *   auto-advance with it instead of expiring. `back: 0` (default 2) since
- *   an applicant only ever applies for the current or next intake, never a
- *   past one. defaultValues.academicYear starts empty (was hard-coded
- *   '2027') and is set once schoolInfo loads, via setValue in a useEffect
- *   guarded on the field still being unset — RHF's defaultValues can only
- *   be a static value at mount, not one derived from an async fetch.
- * [DEPENDS ON]: @shared/constants/malawi (getAcademicYearOptions),
- *   apps/web/src/hooks/usePublic.ts (usePublicSchoolInfo)
+ *   an explicit classId instead). NOTE: this exact fix was previously
+ *   *documented* right here without actually being applied to the code
+ *   below (the hardcoded array and the '2027' default were both still
+ *   live) — this revision is the one that actually wires it in.
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-27) — three fixes
+ *   in the same session:
+ *   1. Academic Year dropdown now genuinely uses the shared
+ *      <AcademicYearSelect> (apps/web/src/components/shared/
+ *      AcademicYearSelect.tsx, new this session) instead of the stale
+ *      hardcoded array — it computes options from
+ *      getAcademicYearOptions(schoolInfo.currentYear, { back: 0, forward: 1 })
+ *      (`back: 0` since an applicant only ever applies for the current or
+ *      next intake, never a past one), where schoolInfo comes from
+ *      usePublicSchoolInfo() (GET /public/school-info, unauthenticated —
+ *      the same call the landing page already makes for the same
+ *      SETTING_KEYS.CURRENT_ACADEMIC_YEAR value). No useEffect/setValue
+ *      dance is needed: it's a plain register()-based uncontrolled
+ *      `<select>`, so the browser's normal "select the first rendered
+ *      option" behaviour already lands on the current year — the
+ *      hardcoded `academicYear: '2027'` default is removed from
+ *      defaultValues entirely rather than fought with.
+ *   2. Background redesigned to match (public)/login/page.tsx's ambient
+ *      backdrop exactly (vignette, colour glow orbs, organic SVG line
+ *      art) — extracted into the new shared, zero-prop
+ *      <AmbientBackground> (apps/web/src/components/shared/
+ *      AmbientBackground.tsx) rather than copy-pasted, since it's now used
+ *      by two pages. Only the page background changes; the form/success
+ *      cards keep their existing bg-surface styling untouched.
+ *   3. Fixed a real auto-submit defect: the Next/Submit button occupying
+ *      the same tree position swapped its `type` attribute between
+ *      "button" (steps 0-3) and "submit" (step 4) with no distinguishing
+ *      `key`, so React reused the same DOM node and mutated its `type` in
+ *      place — under React's event-dispatch order, the *same* interaction
+ *      that advanced the wizard into step 4 could still have its default
+ *      browser action evaluated against the button's new "submit" type,
+ *      firing the actual application submission before the Review step
+ *      ever finished rendering (reported symptom: reaching Review
+ *      immediately shows "Submitting…" with no chance to check the
+ *      entered data first). Fixed by giving the two button variants
+ *      distinct `key`s, converting both to `type="button"` with an
+ *      explicit `onClick={handleSubmit(onSubmit)}` on the Review step's
+ *      button (no more reliance on native form submission at all), and
+ *      the `<form>` itself now only ever calls `e.preventDefault()` on its
+ *      own onSubmit — so an Enter keypress on any earlier step can no
+ *      longer trigger an implicit submit either.
+ * [DEPENDS ON]: apps/web/src/components/shared/AcademicYearSelect.tsx (new),
+ *   apps/web/src/components/shared/AmbientBackground.tsx (new)
  */
 'use client'
 import { useState } from 'react'
@@ -51,6 +81,8 @@ import type { ApplicationInput } from '@shared/schemas/student'
 import { MALAWI_DISTRICTS, FORM_LABELS } from '@shared/constants/malawi'
 import { getCountriesForForm, COUNTRY_CALLING_CODES } from '@shared/constants/countries'
 import { GUARDIAN_RELATIONSHIPS } from '@shared/constants/admissions'
+import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
+import { AmbientBackground } from '@/components/shared/AmbientBackground'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -153,7 +185,6 @@ export default function ApplyPage() {
       nationality: 'Malawi',
       countryCode: '+265',
       guardianCountryCode: '+265',
-      academicYear: '2027',
     },
   })
 
@@ -210,8 +241,9 @@ export default function ApplyPage() {
   // -- SUCCESS STATE ----------------------------------------------------------
   if (submitted) {
     return (
-      <div className="min-h-screen bg-page flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
+      <div className="relative min-h-screen bg-page flex items-center justify-center px-4">
+        <AmbientBackground />
+        <div className="relative z-10 text-center max-w-md">
           <div className="w-20 h-20 rounded-full bg-brand-teal/15 flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-10 h-10 text-brand-teal" />
           </div>
@@ -256,9 +288,11 @@ export default function ApplyPage() {
   const values = getValues()
 
   return (
-    <div className="min-h-screen bg-page">
+    <div className="relative min-h-screen bg-page">
+      <AmbientBackground />
+
       {/* -- HEADER -- */}
-      <header className="bg-surface border-b border-base sticky top-0 z-10">
+      <header className="relative z-30 bg-surface border-b border-base sticky top-0">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-4">
           <Link
             href="/"
@@ -278,7 +312,7 @@ export default function ApplyPage() {
         </div>
       </header>
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
+      <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-10">
         {/* Title */}
         <div className="mb-8 text-center">
           <h1 className="font-heading font-bold text-3xl text-brand-navy mb-2">
@@ -335,7 +369,12 @@ export default function ApplyPage() {
         </div>
 
         {/* Form card */}
-        <form onSubmit={handleSubmit(onSubmit)}>
+        {/* [PRODUCTION FIX 2026-08-27] Never rely on native <form> submission —
+            see this file's header comment for the full auto-submit defect this
+            closes. onSubmit here only ever prevents the browser's default
+            action; the Review step's button below calls handleSubmit(onSubmit)
+            explicitly, and every other step's button is type="button". */}
+        <form onSubmit={(e) => e.preventDefault()}>
           <div className="bg-surface border border-base rounded-3xl p-6 sm:p-8 mb-6">
 
             {/* -- STEP 0: Personal Details -- */}
@@ -511,16 +550,12 @@ export default function ApplyPage() {
                     </select>
                   </Field>
                   <Field label="Academic Year" required error={errors.academicYear?.message}>
-                    <select
+                    <AcademicYearSelect
+                      value={watch('academicYear')}
                       {...register('academicYear')}
+                      optionsConfig={{ back: 0, forward: 1 }}
                       className={`${inputCls} ${errors.academicYear ? inputError : inputBase}`}
-                    >
-                      {['2026', '2027', '2028'].map((y) => (
-                        <option key={y} value={y}>
-                          {y}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </Field>
                   <Field
                     label="Previous School"
@@ -730,6 +765,7 @@ export default function ApplyPage() {
             </div>
             {step < STEPS.length - 1 ? (
               <button
+                key="next-btn"
                 type="button"
                 onClick={goNext}
                 className="flex items-center gap-2 bg-brand-navy text-white px-6 py-2.5 rounded-xl text-sm font-heading font-semibold hover:bg-brand-navy-mid transition-colors"
@@ -738,7 +774,9 @@ export default function ApplyPage() {
               </button>
             ) : (
               <button
-                type="submit"
+                key="submit-btn"
+                type="button"
+                onClick={handleSubmit(onSubmit)}
                 disabled={submitting}
                 className="flex items-center gap-2 bg-brand-teal text-white px-8 py-2.5 rounded-xl text-sm font-heading font-semibold hover:bg-brand-teal-light transition-colors disabled:opacity-60 shadow-sm"
               >

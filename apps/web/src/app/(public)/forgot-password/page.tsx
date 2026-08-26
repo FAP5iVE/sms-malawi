@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { sendPasswordResetEmail } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { ArrowLeft, Mail, CheckCircle2, Loader2 } from 'lucide-react'
+import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
@@ -36,6 +37,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen grid lg:grid-cols-[1fr_1fr] font-sans">
+      <PublicAmbientBackground />
       <div className="hidden lg:flex flex-col justify-between bg-brand-navy p-12">
         <Link href="/" className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm w-fit">
           <ArrowLeft className="w-4 h-4" />
