@@ -364,13 +364,17 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
   // Exception: admin.unlockMarks (technical maintenance for exam module).
   admin: new Set<Permission>([
     // Students — oversight only
-    'student.view',
-    'student.approvePendingAction',
-    'student.hardDelete',           // The one destructive permission; policy says never use
-    'student.viewFeeStatus',
-    'student.viewLibraryStatus',
-    'student.viewAttendance',
-    'student.viewRiskStatus',
+    'student.view',                 // View any student record
+   'student.viewOwn',                // Student views own record only
+   'student.create',                 // Create new student record
+   'student.edit',                   // Edit any student record
+   'student.softDelete',             // Soft-delete (queues a pending action)
+   'student.hardDelete',             // Hard delete — admin only, policy: never use
+   'student.approvePendingAction',   // Approve pending changes from lower_rank
+   'student.printProfile',           // Print student profile / ID card
+   'student.viewFeeStatus',          // See fee status on student record
+   'student.viewLibraryStatus',      // See library borrowing status on student record
+   'student.viewAttendance',         // See attendance records for any student
 
     // Classes — oversight only
     'class.view',
@@ -427,6 +431,11 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // HR — system account management only (no HR data logic)
     'hr.viewAnyProfile',
     'hr.viewHRReports',
+    'hr.viewAnyProfile',
+    'hr.createStaff',
+    'hr.editStaff',
+    'hr.terminateStaff',
+    'hr.assignRole',
 
     // Exams — view / oversight / export only; NO result-editing capability
     // (AC-1: admin sees everything, edits nothing). exam.unlockMarks removed
