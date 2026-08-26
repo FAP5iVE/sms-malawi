@@ -64,9 +64,41 @@
  *   - Added a theme toggle, reusing the exact cycleTheme/themeIcons pattern
  *     already shipped in apps/web/src/app/(public)/page.tsx (useTheme +
  *     useHasMounted, Sun/Moon/Monitor icons cycling light → dark → system).
- *   - The logo reads from /images/logo.png with "SMS Malawi" printed
- *     beneath it. The "Ready to apply?" footer links to the app's real
- *     /apply route rather than the mockup's inert onApply callback prop.
+ *   - The "Ready to apply?" footer links to the app's real /apply route
+ *     rather than the mockup's inert onApply callback prop.
+ *
+ * [REVISION 3 — visual fixes after second review]:
+ *   - Home/theme-toggle chips switched from translucent glass to a solid
+ *     bg-brand-navy fill (white icon/text) so they read as buttons sitting
+ *     directly on the background, not glass panels — matches the request
+ *     to make them "a strong solid color" rather than another frosted card.
+ *   - Muted secondary text (the subtitle, the two authorisation-notice
+ *     lines, "Ready to apply?") now uses `text-muted-foreground
+ *     dark:text-foreground`. In dark mode the plain muted-gray token was
+ *     genuinely low-contrast against the colourful blurred backdrop
+ *     bleeding through the glass card, so those specific lines bump to the
+ *     full-contrast foreground colour in dark mode while keeping the softer
+ *     muted tone in light mode (unaffected, per the original report).
+ *   - The authorisation-notice box's dark-mode fill changed from
+ *     `dark:bg-white/[0.04]` to `dark:bg-black/25` — a white-tinted overlay
+ *     was brightening whatever colourful blur sat behind it (working
+ *     against the light-gray text on top of it); a black-tinted scrim dims
+ *     it instead, which is what that text actually needs to stay readable.
+ *   - "Forgot password?" bumped to font-bold + brand-teal-light so it reads
+ *     as a clear accent instead of blending into the muted palette.
+ *   - The card moved from vertically-centered to top-aligned
+ *     (`items-start` + minimal top padding) so its top edge sits close to
+ *     the header instead of leaving a large empty gap above it, on both
+ *     mobile and desktop.
+ *   - Logo replaced with the 5iveStack Labs mark, switched by resolved
+ *     theme: the black-on-transparent (BVO) variant in light mode, and a
+ *     white-on-transparent (WVO) variant — generated from the supplied BVO
+ *     artwork by remapping its black shape layer to white and leaving the
+ *     orange unchanged, since a true WVO file wasn't provided — in dark
+ *     mode, so the mark keeps contrast against the card behind it either
+ *     way. Both files ship at apps/web/public/images/. Sized up
+ *     (w-56/64/72 vs. the old w-14/16 icon-only mark) to match the
+ *     requested larger footprint. "SMS Malawi" stays printed beneath it.
  */
 'use client'
 
@@ -205,7 +237,7 @@ function LoginForm() {
   // shipped on the public homepage (apps/web/src/app/(public)/page.tsx),
   // just wired up locally here since this page doesn't share that file's
   // header component.
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, resolvedTheme } = useTheme()
   const mounted = useHasMounted()
   const themeIcons = {
     light: <Sun className="w-4 h-4" />,
@@ -353,7 +385,7 @@ function LoginForm() {
       <header className="relative z-30 flex items-center justify-between p-4 sm:p-6">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-sm font-heading font-medium text-muted hover:text-foreground bg-black/[0.02] dark:bg-white/[0.06] border border-base backdrop-blur-md rounded-lg px-3 py-2 transition-colors"
+          className="inline-flex items-center gap-2 text-sm font-heading font-medium text-white bg-brand-navy hover:bg-brand-navy-mid rounded-lg px-3 py-2 shadow-md transition-colors"
         >
           <Home className="w-4 h-4" />
           <span className="hidden sm:inline">Back to homepage</span>
@@ -363,32 +395,38 @@ function LoginForm() {
           type="button"
           onClick={cycleTheme}
           aria-label={mounted ? `Theme: ${theme}. Click to change.` : 'Toggle theme'}
-          className="w-9 h-9 rounded-lg border border-base bg-black/[0.02] dark:bg-white/[0.06] backdrop-blur-md text-muted hover:text-foreground flex items-center justify-center transition-colors"
+          className="w-9 h-9 rounded-lg bg-brand-navy hover:bg-brand-navy-mid text-white shadow-md flex items-center justify-center transition-colors"
         >
           {mounted ? themeIcons[(theme as keyof typeof themeIcons) ?? 'system'] : <Monitor className="w-4 h-4" aria-hidden />}
         </button>
       </header>
 
       {/* ── Centred content ── */}
-      <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-4 sm:py-6">
+      <main className="relative z-10 flex-1 flex items-start justify-center px-4 pt-1 sm:pt-2 pb-6 sm:pb-8">
         {/* Wide frosted plate */}
         <div className="w-full max-w-sm sm:max-w-2xl lg:max-w-4xl rounded-[28px] sm:rounded-[36px] bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/10 backdrop-blur-md p-2.5 sm:p-5 shadow-xl">
           {/* Login glass card — translucent + blurred in BOTH themes */}
           <div className="w-full max-w-sm sm:max-w-lg lg:max-w-2xl mx-auto rounded-[24px] sm:rounded-[30px] bg-white/80 dark:bg-white/[0.07] border border-black/5 dark:border-white/15 backdrop-blur-2xl p-6 sm:p-8 shadow-2xl flex flex-col">
-            {/* Logo + system name */}
+            {/* Logo + system name — BVO (dark-on-light) mark in light mode,
+                WVO (light-on-dark) mark in dark mode, so the mark always
+                has contrast against the card behind it. */}
             <div className="flex flex-col items-center justify-center mb-5 text-center">
               <Link
                 href="/"
-                className="flex items-center justify-center p-1 transition-transform hover:scale-105"
+                className="flex items-center justify-center transition-transform hover:scale-105"
                 title="Home"
               >
                 <Image
-                  src="/images/logo.png"
-                  alt="SMS Malawi logo"
-                  width={96}
-                  height={96}
+                  src={
+                    mounted && resolvedTheme === 'dark'
+                      ? '/images/5ivestacks-labs-logo-wvo.svg'
+                      : '/images/5ivestacks-labs-logo-bvo.svg'
+                  }
+                  alt="5iveStack Labs logo"
+                  width={380}
+                  height={150}
                   loading="eager"
-                  className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-lg"
+                  className="w-56 sm:w-64 lg:w-72 h-auto object-contain drop-shadow-lg"
                 />
               </Link>
               <span className="mt-2.5 font-heading font-bold text-sm sm:text-base text-body tracking-tight">
@@ -401,7 +439,7 @@ function LoginForm() {
               <h1 className="text-2xl sm:text-[26px] font-heading font-bold text-body tracking-tight">
                 Welcome back
               </h1>
-              <p className="text-muted text-sm mt-1">Sign in to your school account</p>
+              <p className="text-muted-foreground dark:text-foreground text-sm mt-1">Sign in to your school account</p>
             </div>
 
             {/* Status alerts */}
@@ -451,7 +489,7 @@ function LoginForm() {
                   </label>
                   <Link
                     href="/forgot-password"
-                    className="text-xs text-brand-teal hover:text-brand-teal-light transition-colors font-heading"
+                    className="text-xs font-bold text-brand-teal-light hover:text-brand-teal transition-colors font-heading"
                   >
                     Forgot password?
                   </Link>
@@ -489,23 +527,23 @@ function LoginForm() {
             </form>
 
             {/* Authorisation notice */}
-            <div className="mt-5 p-3 rounded-2xl bg-black/[0.02] dark:bg-white/[0.04] border border-base backdrop-blur-md text-center">
+            <div className="mt-5 p-3 rounded-2xl bg-black/[0.02] dark:bg-black/25 border border-base backdrop-blur-md text-center">
               <div className="flex items-center justify-center gap-1.5 mb-1 text-body">
                 <ShieldCheck className="w-4 h-4 text-brand-teal" />
                 <span className="text-[11px] font-heading font-semibold tracking-wide uppercase">
                   Authorised access
                 </span>
               </div>
-              <p className="text-xs leading-relaxed text-muted font-sans">
+              <p className="text-xs leading-relaxed text-muted-foreground dark:text-foreground font-sans">
                 This portal is for authorised students and staff only.
               </p>
-              <p className="text-xs leading-relaxed text-muted font-sans mt-0.5">
+              <p className="text-xs leading-relaxed text-muted-foreground dark:text-foreground font-sans mt-0.5">
                 Contact your school administrator if you need access.
               </p>
             </div>
 
             {/* Footer: apply link */}
-            <div className="mt-4 text-center text-xs text-muted font-sans flex items-center justify-center gap-1.5">
+            <div className="mt-4 text-center text-xs text-muted-foreground dark:text-foreground font-sans flex items-center justify-center gap-1.5">
               <span>Ready to apply?</span>
               <Link
                 href="/apply"
