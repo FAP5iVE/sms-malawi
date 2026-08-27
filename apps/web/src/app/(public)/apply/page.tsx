@@ -68,19 +68,8 @@
  *      the `<form>` itself now only ever calls `e.preventDefault()` on its
  *      own onSubmit — so an Enter keypress on any earlier step can no
  *      longer trigger an implicit submit either.
- * [CHANGE TYPE]: TARGETED EDIT (2026-08-27, follow-up).
- * [PURPOSE]: Swapped this page's background from its own local
- *   <AmbientBackground> (apps/web/src/components/shared/AmbientBackground.tsx)
- *   over to the shared <PublicAmbientBackground> (apps/web/src/components/
- *   shared/PublicAmbientBackground.tsx) that now backs every other public
- *   content page (Events, News, the Discover pages, Gallery, Change
- *   Password, Privacy, Terms) — so Apply matches that same artwork, the
- *   same `fixed`-positioning fix for long pages, and the same theme-aware
- *   readability scrim, instead of drifting from it as a second,
- *   independently-maintained copy. Only the import and the two render
- *   sites change; nothing else on this page is touched.
- * [DEPENDS ON]: apps/web/src/components/shared/AcademicYearSelect.tsx,
- *   apps/web/src/components/shared/PublicAmbientBackground.tsx
+ *      [DEPENDS ON]: apps/web/src/components/shared/AcademicYearSelect.tsx,
+ *      apps/web/src/components/shared/PublicAmbientBackground.tsx
  */
 'use client'
 import { useState } from 'react'
@@ -116,6 +105,13 @@ const inputCls =
 const inputError =
   'border-brand-coral focus:ring-brand-coral/25 focus:border-brand-coral bg-brand-coral/5'
 const inputBase = 'border-base'
+// Deliberately has no `w-full` (unlike inputCls) — this sits next to the phone
+// number input in a flex row, so it needs a fixed, compact width instead of
+// stretching. Sized to fit the longest calling code in COUNTRY_CALLING_CODES
+// (4 characters, e.g. '+265') plus the browser's native dropdown arrow.
+const phoneCodeSelectCls =
+  'w-24 shrink-0 truncate border rounded-xl pl-3 pr-1 py-3 text-sm bg-surface text-body ' +
+  'focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal transition-all'
 
 function Field({
   label,
@@ -156,11 +152,11 @@ function SectionHeader({
 }) {
   return (
     <div className="flex items-center gap-3 mb-6 pb-4 border-b border-base">
-      <div className="w-10 h-10 rounded-xl bg-brand-navy/8 flex items-center justify-center shrink-0">
-        <Icon className="w-5 h-5 text-brand-navy" />
+      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+        <Icon className="w-5 h-5 text-primary" />
       </div>
       <div>
-        <h3 className="font-heading font-bold text-base text-brand-navy">{title}</h3>
+        <h3 className="font-heading font-bold text-base text-primary">{title}</h3>
         <p className="text-xs text-muted font-sans">{subtitle}</p>
       </div>
     </div>
@@ -258,7 +254,7 @@ export default function ApplyPage() {
           <div className="w-20 h-20 rounded-full bg-brand-teal/15 flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-10 h-10 text-brand-teal" />
           </div>
-          <h1 className="font-heading font-bold text-2xl text-brand-navy mb-3">
+          <h1 className="font-heading font-bold text-2xl text-primary mb-3">
             Application Submitted!
           </h1>
           <p className="text-muted font-sans leading-relaxed mb-8">
@@ -316,7 +312,7 @@ export default function ApplyPage() {
             <div className="w-7 h-7 rounded-lg bg-brand-navy flex items-center justify-center">
               <span className="text-white text-xs font-heading font-bold">S</span>
             </div>
-            <span className="font-heading font-semibold text-sm text-brand-navy">
+            <span className="font-heading font-semibold text-sm text-primary">
               Student Application
             </span>
           </div>
@@ -326,7 +322,7 @@ export default function ApplyPage() {
       <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-10">
         {/* Title */}
         <div className="mb-8 text-center">
-          <h1 className="font-heading font-bold text-3xl text-brand-navy mb-2">
+          <h1 className="font-heading font-bold text-3xl text-primary mb-2">
             Apply for Admission
           </h1>
           <p className="text-muted font-sans">
@@ -364,7 +360,7 @@ export default function ApplyPage() {
                     {done ? <CheckCircle2 className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
                   </div>
                   <span
-                    className={`text-[10px] font-heading font-semibold hidden sm:block ${active ? 'text-brand-navy' : 'text-muted'}`}
+                    className={`text-[10px] font-heading font-semibold hidden sm:block ${active ? 'text-primary' : 'text-muted'}`}
                   >
                     {s.label}
                   </span>
@@ -505,18 +501,19 @@ export default function ApplyPage() {
                     <div className="flex gap-2">
                       <select
                         {...register('countryCode')}
-                        className={`${inputCls} ${inputBase} w-40 flex-shrink-0`}
+                        aria-label="Country calling code"
+                        className={`${phoneCodeSelectCls} ${inputBase}`}
                       >
                         {COUNTRY_CALLING_CODES.map((c) => (
                           <option key={c.code} value={c.callingCode}>
-                            {c.name} ({c.callingCode})
+                            {c.callingCode} {c.name}
                           </option>
                         ))}
                       </select>
                       <input
                         {...register('phone')}
                         type="tel"
-                        className={`${inputCls} flex-1 ${errors.phone ? inputError : inputBase}`}
+                        className={`${inputCls} flex-1 min-w-0 ${errors.phone ? inputError : inputBase}`}
                         placeholder="999 123 456"
                       />
                     </div>
@@ -633,18 +630,19 @@ export default function ApplyPage() {
                     <div className="flex gap-2">
                       <select
                         {...register('guardianCountryCode')}
-                        className={`${inputCls} ${inputBase} w-40 flex-shrink-0`}
+                        aria-label="Country calling code"
+                        className={`${phoneCodeSelectCls} ${inputBase}`}
                       >
                         {COUNTRY_CALLING_CODES.map((c) => (
                           <option key={c.code} value={c.callingCode}>
-                            {c.name} ({c.callingCode})
+                            {c.callingCode} {c.name}
                           </option>
                         ))}
                       </select>
                       <input
                         {...register('guardianPhone')}
                         type="tel"
-                        className={`${inputCls} flex-1 ${errors.guardianPhone ? inputError : inputBase}`}
+                        className={`${inputCls} flex-1 min-w-0 ${errors.guardianPhone ? inputError : inputBase}`}
                         placeholder="999 123 456"
                       />
                     </div>
@@ -734,7 +732,7 @@ export default function ApplyPage() {
                   },
                 ].map(({ heading, rows }) => (
                   <div key={heading} className="mb-5 bg-page rounded-2xl p-5 border border-base">
-                    <h4 className="font-heading font-semibold text-sm text-brand-navy mb-3">
+                    <h4 className="font-heading font-semibold text-sm text-primary mb-3">
                       {heading}
                     </h4>
                     <dl className="space-y-1.5">
