@@ -68,8 +68,19 @@
  *      the `<form>` itself now only ever calls `e.preventDefault()` on its
  *      own onSubmit — so an Enter keypress on any earlier step can no
  *      longer trigger an implicit submit either.
- * [DEPENDS ON]: apps/web/src/components/shared/AcademicYearSelect.tsx (new),
- *   apps/web/src/components/shared/AmbientBackground.tsx (new)
+ * [CHANGE TYPE]: TARGETED EDIT (2026-08-27, follow-up).
+ * [PURPOSE]: Swapped this page's background from its own local
+ *   <AmbientBackground> (apps/web/src/components/shared/AmbientBackground.tsx)
+ *   over to the shared <PublicAmbientBackground> (apps/web/src/components/
+ *   shared/PublicAmbientBackground.tsx) that now backs every other public
+ *   content page (Events, News, the Discover pages, Gallery, Change
+ *   Password, Privacy, Terms) — so Apply matches that same artwork, the
+ *   same `fixed`-positioning fix for long pages, and the same theme-aware
+ *   readability scrim, instead of drifting from it as a second,
+ *   independently-maintained copy. Only the import and the two render
+ *   sites change; nothing else on this page is touched.
+ * [DEPENDS ON]: apps/web/src/components/shared/AcademicYearSelect.tsx,
+ *   apps/web/src/components/shared/PublicAmbientBackground.tsx
  */
 'use client'
 import { useState } from 'react'
@@ -82,7 +93,7 @@ import { MALAWI_DISTRICTS, FORM_LABELS } from '@shared/constants/malawi'
 import { getCountriesForForm, COUNTRY_CALLING_CODES } from '@shared/constants/countries'
 import { GUARDIAN_RELATIONSHIPS } from '@shared/constants/admissions'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
-import { AmbientBackground } from '@/components/shared/AmbientBackground'
+import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -242,7 +253,7 @@ export default function ApplyPage() {
   if (submitted) {
     return (
       <div className="relative min-h-screen bg-page flex items-center justify-center px-4">
-        <AmbientBackground />
+        <PublicAmbientBackground />
         <div className="relative z-10 text-center max-w-md">
           <div className="w-20 h-20 rounded-full bg-brand-teal/15 flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-10 h-10 text-brand-teal" />
@@ -289,7 +300,7 @@ export default function ApplyPage() {
 
   return (
     <div className="relative min-h-screen bg-page">
-      <AmbientBackground />
+      <PublicAmbientBackground />
 
       {/* -- HEADER -- */}
       <header className="relative z-30 bg-surface border-b border-base sticky top-0">

@@ -179,12 +179,14 @@ export function PublicAmbientBackground() {
           in light mode (already subtle, so a light 30% wash is enough) but
           jumps to `dark:opacity-90` in dark mode (very saturated against the
           near-black page background), so dark mode needs a much stronger
-          72% wash to bring it back down to a comfortable, readable level.
+          82% wash to bring it back down to a comfortable, readable level —
+          still short of 100%, so the shapes stay faintly visible rather
+          than vanishing outright.
           Using `hsl(var(--background) / alpha)` rather than a hardcoded
           white/black means this automatically tracks whatever the theme
           toggle sets `--background` to, light or dark, with no extra logic
           here. */}
-      <div className="absolute inset-0 bg-[hsl(var(--background)/0.3)] dark:bg-[hsl(var(--background)/0.72)] transition-colors duration-300" />
+      <div className="absolute inset-0 bg-[hsl(var(--background)/0.3)] dark:bg-[hsl(var(--background)/0.82)] transition-colors duration-300" />
     </div>
   )
 }
