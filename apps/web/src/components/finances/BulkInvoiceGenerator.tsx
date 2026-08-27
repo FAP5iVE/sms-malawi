@@ -30,6 +30,23 @@
  *       function name only.
  * [DEPENDS ON]: W/components/shared/ConfirmDialog.tsx (same phase),
  *   W/lib/api-client.ts (apiFetch)
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-27).
+ * [PURPOSE]: The Academic Year field was a free-text `<input
+ *   placeholder="2025/2026">` seeded with a hardcoded '2025/2026' initial
+ *   value — for a control that fires real financial record creation
+ *   across an entire class or school, a typo'd year silently generating
+ *   invoices tagged with the wrong (or malformed) academic year is a
+ *   costly mistake to unwind. Replaced with the shared
+ *   <AcademicYearSelect> (apps/web/src/components/shared/
+ *   AcademicYearSelect.tsx) — same fix as apply/page.tsx and
+ *   ForecastPanel.tsx. The hardcoded initial useState value is now the
+ *   shared FALLBACK_YEAR constant, matching the same "seed the initial
+ *   render synchronously, let the select show the live options" pattern
+ *   used in ForecastPanel.tsx (this file doesn't eagerly fetch on mount
+ *   the way ForecastPanel does, so this fallback only ever matters for
+ *   the very first paint before usePublicSchoolInfo() resolves).
+ * [DEPENDS ON (added)]: apps/web/src/components/shared/AcademicYearSelect.tsx (new)
  */
 
 import { useState, useCallback }     from 'react'
@@ -54,9 +71,15 @@ import {
 }                                     from '@/lib/motion'
 import { apiFetch }                   from '@/lib/api-client'
 import ConfirmDialog                  from '@/components/shared/ConfirmDialog'
+import { AcademicYearSelect }         from '@/components/shared/AcademicYearSelect'
 import { useClasses }                 from '@/hooks/useClasses'
 import { formatMWK }                  from '@shared/constants/malawi'
 import type { BulkInvoiceResult, StudentInvoiceResult, InvoiceOutcome } from '@/server/services/bulkInvoiceService'
+
+// Matches the fallback-while-loading convention used elsewhere
+// (apps/web/src/hooks/usePublic.ts, ForecastPanel.tsx) for this field's
+// initial synchronous state, before usePublicSchoolInfo() resolves.
+const FALLBACK_YEAR = '2025/2026'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OUTCOME CONFIG
@@ -149,7 +172,7 @@ export function BulkInvoiceGenerator() {
   const { data: classes = [] } = useClasses()
 
   const [classId,      setClassId]      = useState<string>('ALL')
-  const [academicYear, setAcademicYear] = useState('2025/2026')
+  const [academicYear, setAcademicYear] = useState(FALLBACK_YEAR)
   const [term,         setTerm]         = useState(1)
   const [result,       setResult]       = useState<BulkInvoiceResult | null>(null)
   const [generating,   setGenerating]   = useState(false)
@@ -223,10 +246,9 @@ export function BulkInvoiceGenerator() {
           <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
             Academic Year
           </label>
-          <input
+          <AcademicYearSelect
             value={academicYear}
             onChange={(e) => setAcademicYear(e.target.value)}
-            placeholder="2025/2026"
             className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
           />
         </div>

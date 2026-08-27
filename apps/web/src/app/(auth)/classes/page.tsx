@@ -22,6 +22,19 @@
  *      audit repeatedly flags elsewhere.
  * [DEPENDS ON]: apps/web/src/hooks/useClasses.ts (useCreateClass,
  *   useUpdateClass, useArchiveClass), apps/web/src/hooks/usePermissions.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-27).
+ * [PURPOSE]: The Add/Edit Class dialog's "Academic Year" field was a
+ *   free-text `<input placeholder="2025/2026">` — nothing stopped a typo'd
+ *   format ("2025-2026", "25/26") from being submitted, which would then
+ *   fail every downstream parseAcademicYear() call that expects the exact
+ *   "YYYY/YYYY" shape. Replaced with the shared <AcademicYearSelect>
+ *   (apps/web/src/components/shared/AcademicYearSelect.tsx) — the same
+ *   fix already applied to apply/page.tsx's Academic Year field. `watch`
+ *   added to the form-hook destructure so the select's out-of-window
+ *   safety net can see the field's current value when editing an existing
+ *   class from a prior academic year.
+ * [DEPENDS ON]: apps/web/src/components/shared/AcademicYearSelect.tsx (new)
  */
 'use client'
 
@@ -37,6 +50,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { Field, inputCls } from '@/components/students/StudentFormSections'
+import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { Users, ChevronRight, UserPlus, Pencil, Archive, X, Inbox, ArchiveRestore } from 'lucide-react'
 
 const FORM_COLORS = [
@@ -260,6 +274,7 @@ function ClassFormDialog({ onClose, classToEdit }: ClassFormDialogProps) {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<CreateClassInput>({
     resolver: zodResolver(CreateClassSchema) as Resolver<CreateClassInput>,
@@ -338,7 +353,11 @@ function ClassFormDialog({ onClose, classToEdit }: ClassFormDialogProps) {
               <input type="text" {...register('teacherId')} placeholder="Optional" className={inputCls} />
             </Field>
             <Field label="Academic Year" error={errors.academicYear?.message} required>
-              <input type="text" {...register('academicYear')} placeholder="2025/2026" className={inputCls} />
+              <AcademicYearSelect
+                value={watch('academicYear')}
+                {...register('academicYear')}
+                className={inputCls}
+              />
             </Field>
 
             {submitError && (

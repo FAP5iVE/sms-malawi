@@ -18,6 +18,17 @@
  *      was a frontend-only gap blocking three roles from a page their
  *      own backend route already allows them to call).
  * [DEPENDS ON]: apps/web/src/lib/api-client.ts (apiFetch, queryKeys)
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-27).
+ * [PURPOSE]: `useClasses('2025/2026')` was hardcoded — the Class filter
+ *   dropdown it feeds would silently go empty (no classes to select, no
+ *   error shown) the moment the school's real academic year moved past
+ *   2025/2026, since no class from a different year would ever match.
+ *   Replaced with usePublicSchoolInfo().currentYear (GET
+ *   /public/school-info, unauthenticated), the same live source and
+ *   FALLBACK_YEAR convention already used by (auth)/exams/page.tsx for
+ *   the identical value.
+ * [DEPENDS ON (added)]: apps/web/src/hooks/usePublic.ts (usePublicSchoolInfo)
  */
 'use client'
 
@@ -26,6 +37,7 @@ import { useQuery } from '@tanstack/react-query'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { useClasses } from '@/hooks/useClasses'
+import { usePublicSchoolInfo } from '@/hooks/usePublic'
 import type { ApiTimetableSlot, ApiClass } from '@shared/types/api'
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'] as const
@@ -36,6 +48,10 @@ const DAY_LABELS = {
   THURSDAY: 'Thu',
   FRIDAY: 'Fri',
 }
+
+// Fallback used only while usePublicSchoolInfo() is still loading — matches
+// the same constant name/value already used for this in (auth)/exams/page.tsx.
+const FALLBACK_YEAR = '2025/2026'
 
 export default function TimetablePage() {
   return (
@@ -48,7 +64,8 @@ export default function TimetablePage() {
 }
 
 function TimetableContent() {
-  const { data: classes = [] } = useClasses('2025/2026')
+  const { data: schoolInfo } = usePublicSchoolInfo()
+  const { data: classes = [] } = useClasses(schoolInfo?.currentYear ?? FALLBACK_YEAR)
   const [selectedClassId, setSelectedClassId] = useState('')
   const [term, setTerm] = useState(1)
 

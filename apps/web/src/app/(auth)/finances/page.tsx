@@ -9,13 +9,25 @@
  * [PURPOSE]: Initialises the active tab from ?tab= (post-hydration,
  *   validated against the role-visible tab list) so FinanceDashboard's
  *   corrected quick actions can deep-link into Invoices/Expenses/etc.
- * [DEPENDS ON]: none
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-27).
+ * [PURPOSE]: `const YEAR = '2025/2026'` was hardcoded and fed every finance
+ *   tab on this page (invoices, expenses, budget, fee structure,
+ *   scholarships, reports) — it would silently keep tagging every new
+ *   financial record with 2025/2026 forever, regardless of the school's
+ *   real configured year. Replaced with usePublicSchoolInfo().currentYear
+ *   (GET /public/school-info, unauthenticated) with a FALLBACK_YEAR
+ *   constant for the brief window before it resolves — the exact same
+ *   pattern already used correctly by (auth)/exams/page.tsx for the
+ *   identical value.
+ * [DEPENDS ON]: apps/web/src/hooks/usePublic.ts (usePublicSchoolInfo)
  */
 
 import { useState, Suspense }    from 'react'
 import { useSearchParams }       from 'next/navigation'
 import { RoleGuard }             from '@/components/shared/RoleGuard'
 import { useAuthStore }          from '@/store/authStore'
+import { usePublicSchoolInfo }   from '@/hooks/usePublic'
 import { InvoicesTab }           from '@/components/finances/InvoicesTab'
 import { ExpensesTab }           from '@/components/finances/ExpensesTab'
 import { PayrollTab }            from '@/components/finances/PayrollTab'
@@ -44,6 +56,10 @@ type Tab =
   | 'forecast'
   | 'ledger'
   | 'debts'
+
+// Fallback used only while usePublicSchoolInfo() is still loading — matches
+// the same constant name/value already used for this in (auth)/exams/page.tsx.
+const FALLBACK_YEAR = '2025/2026'
 
 export default function FinancesPage() {
   return (
@@ -79,7 +95,8 @@ function FinancesLoadingSkeleton() {
 
 function FinancesContent() {
   const { role }   = useAuthStore()
-  const YEAR = '2025/2026'
+  const { data: schoolInfo } = usePublicSchoolInfo()
+  const YEAR = schoolInfo?.currentYear ?? FALLBACK_YEAR
   const TERM = 1
 
   const isStudent = role === 'student'

@@ -3,11 +3,27 @@
 /*
  * apps/web/src/components/settings/AcademicPolicySettings.tsx — Phase D15
  * High Rank / Admin: academic calendar dates, attendance thresholds, report card policy.
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-27).
+ * [PURPOSE]: "Current Academic Year" — the actual source of truth this
+ *   whole app derives its academic year from (SETTING_KEYS.
+ *   CURRENT_ACADEMIC_YEAR) — was a free-text `<input placeholder=
+ *   "2025/2026">`. Since every parseAcademicYear() call downstream
+ *   requires the exact "YYYY/YYYY" shape, a single admin typo here
+ *   ("2025-2026", "25/26") would break academic-year derivation
+ *   app-wide. Replaced with the shared <AcademicYearSelect>
+ *   (apps/web/src/components/shared/AcademicYearSelect.tsx) so the value
+ *   can now only ever be a well-formed, real option — `{ back: 2,
+ *   forward: 3 }` gives a bit more forward runway than the shared
+ *   component's default, since this is the one field admins use to
+ *   advance the setting itself ahead of a new academic year.
+ * [DEPENDS ON]: apps/web/src/components/shared/AcademicYearSelect.tsx (new)
  */
 
 import { useState, useEffect } from 'react'
 import { Loader2, Save }       from 'lucide-react'
 import { apiFetch }            from '@/lib/api-client'
+import { AcademicYearSelect }  from '@/components/shared/AcademicYearSelect'
 
 const inputCls = 'w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25'
 
@@ -96,7 +112,12 @@ export function AcademicPolicySettings() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Current Academic Year</label>
-              <input value={policy.current_academic_year} onChange={(e) => set('current_academic_year', e.target.value)} className={inputCls} placeholder="2025/2026" />
+              <AcademicYearSelect
+                value={policy.current_academic_year}
+                onChange={(e) => set('current_academic_year', e.target.value)}
+                optionsConfig={{ back: 2, forward: 3 }}
+                className={inputCls}
+              />
             </div>
             <div>
               <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Current Term</label>

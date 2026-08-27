@@ -15,6 +15,18 @@
  * [DEPENDS ON]: W/lib/api-client.ts (apiFetch), finances.ts's new
  *   GET /forecast route
  *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-27).
+ * [PURPOSE]: The Academic Year field was a free-text `<input>` seeded
+ *   with a hardcoded '2025/2026' initial value — a typo'd format here
+ *   silently returns an empty/wrong forecast rather than an error, since
+ *   the forecast route just filters by the literal string. Replaced with
+ *   the shared <AcademicYearSelect> (apps/web/src/components/shared/
+ *   AcademicYearSelect.tsx), which also fixes the hardcoded initial
+ *   useState value the same way — the select's first option is the
+ *   school's real current academic year, so the initial state is now an
+ *   empty string that the select fills in from live data on first render.
+ * [DEPENDS ON (added)]: apps/web/src/components/shared/AcademicYearSelect.tsx (new)
+ *
  * Finance forecasting UI with three-series Recharts ComposedChart:
  *   - Solid bar  → ACTUAL collected revenue
  *   - Striped/dashed bar  → FORECAST projected revenue
@@ -39,7 +51,15 @@ import {
 import { TrendingUp, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 import { apiFetch }             from '@/lib/api-client'
 import { formatMWK }            from '@shared/constants/malawi'
+import { AcademicYearSelect }   from '@/components/shared/AcademicYearSelect'
 import type { ForecastReport, MonthlyDataPoint } from '@/server/services/forecastService'
+
+// Seeds the mount-effect's eager first fetch (below) synchronously, before
+// usePublicSchoolInfo() has had a chance to resolve — matches the same
+// fallback-while-loading convention used elsewhere (apps/web/src/hooks/
+// usePublic.ts, exams/page.tsx). The <AcademicYearSelect> field itself
+// always offers the real, live current year regardless of this seed.
+const FALLBACK_YEAR = '2025/2026'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CHART DATA TRANSFORM
@@ -138,7 +158,7 @@ function buildForecastUrl(academicYear: string, forwardMonths: number): string {
 }
 
 export function ForecastPanel() {
-  const [academicYear, setAcademicYear] = useState('2025/2026')
+  const [academicYear, setAcademicYear] = useState(FALLBACK_YEAR)
   const [forwardMonths, setForwardMonths] = useState(3)
   const [report,   setReport]   = useState<ForecastReport | null>(null)
   // R19 — starts `true`, not `false`: the mount effect below always kicks
@@ -206,8 +226,11 @@ export function ForecastPanel() {
             <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
               Academic Year
             </label>
-            <input value={academicYear} onChange={(e) => setAcademicYear(e.target.value)}
-              className="min-h-[44px] border border-base rounded-xl px-3 text-sm bg-page text-body w-32 focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+            <AcademicYearSelect
+              value={academicYear}
+              onChange={(e) => setAcademicYear(e.target.value)}
+              className="min-h-[44px] border border-base rounded-xl px-3 text-sm bg-page text-body w-32 focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+            />
           </div>
           <div>
             <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">

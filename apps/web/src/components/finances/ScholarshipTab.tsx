@@ -15,6 +15,18 @@
  *      database ID to award a scholarship.
  * [DEPENDS ON]: W/lib/api-client.ts, W/hooks/useFinances.ts,
  *   W/hooks/useStudents.ts (search param, added this phase)
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-27).
+ * [PURPOSE]: The Academic Year field was a free-text `<input
+ *   placeholder="2025/2026">` — a typo'd format here would break
+ *   parseAcademicYear() wherever this scholarship's academicYear is later
+ *   read. Replaced with the shared <AcademicYearSelect> (apps/web/src/
+ *   components/shared/AcademicYearSelect.tsx). `value={watch(
+ *   'academicYear')}` is passed alongside the register spread so the
+ *   select's out-of-window safety net can see the incoming `academicYear`
+ *   prop's value (from the parent finances/page.tsx tab), in case it ever
+ *   falls outside the computed default window.
+ * [DEPENDS ON (added)]: apps/web/src/components/shared/AcademicYearSelect.tsx (new)
  */
 'use client'
 
@@ -28,6 +40,7 @@ import { CreateScholarshipSchema } from '@shared/schemas/finance'
 import type { CreateScholarshipInput } from '@shared/schemas/finance'
 import type { ApiScholarship, ApiStudent } from '@shared/types/api'
 import { formatMWK } from '@shared/constants/malawi'
+import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { PlusCircle, GraduationCap, Loader2, X, Search } from 'lucide-react'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 
@@ -261,10 +274,9 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
 
               <div>
                 <label className="block text-sm font-medium mb-1">Academic Year</label>
-                <input
+                <AcademicYearSelect
+                  value={watch('academicYear')}
                   {...register('academicYear')}
-                  type="text"
-                  placeholder="2025/2026"
                   className="input w-full"
                 />
                 {errors.academicYear && (

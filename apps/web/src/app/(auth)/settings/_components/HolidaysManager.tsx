@@ -6,8 +6,22 @@
  *   destructive, previously entirely unconfirmed one-tap delete) and a
  *   visible onError on the delete mutation, which previously discarded
  *   failures silently.
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-27).
+ * [PURPOSE]: The year-picker dropdown was a hardcoded [2025, 2026, 2027,
+ *   2028] literal — the exact same "would run out entirely" defect class
+ *   as apply/page.tsx's Academic Year select, just for a plain calendar
+ *   year (holidays are calendar-year-scoped, not academic-year-scoped).
+ *   Replaced with getCalendarYearOptions(new Date().getFullYear()) —
+ *   academic.ts's own header comment already named this exact picker as
+ *   one of its intended callers. Uses the real browser "today" (already
+ *   how `year`'s initial useState value is computed a few lines below;
+ *   the dropdown's option list now uses the identical source) rather than
+ *   a settings-derived academic year, since public holidays run on the
+ *   calendar year, not the school's academic year.
  * [DEPENDS ON]: W/lib/api-client.ts,
- *   W/components/shared/ConfirmDialog.tsx (R15)
+ *   W/components/shared/ConfirmDialog.tsx (R15),
+ *   @shared/constants/malawi (getCalendarYearOptions)
  */
 'use client'
 import { useState }       from 'react'
@@ -15,6 +29,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, Loader2, CalendarDays } from 'lucide-react'
 import { format }         from 'date-fns'
 import { apiFetch, queryKeys } from '@/lib/api-client'
+import { getCalendarYearOptions } from '@shared/constants/malawi'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 
 interface Holiday { id: string; name: string; date: string; year: number; isRecurring: boolean }
@@ -73,7 +88,7 @@ export function HolidaysManager() {
           onChange={(e) => setYear(Number(e.target.value))}
           className="border border-base rounded-xl px-3 py-1.5 text-sm bg-surface focus:outline-none"
         >
-          {[2025, 2026, 2027, 2028].map((y) => <option key={y} value={y}>{y}</option>)}
+          {getCalendarYearOptions(new Date().getFullYear()).map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
       </div>
 

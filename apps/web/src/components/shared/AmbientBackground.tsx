@@ -15,7 +15,29 @@
  *   wrapper `position: relative` and layering real content above this with
  *   its own `relative z-*`, exactly as (public)/login/page.tsx already does
  *   and as apply/page.tsx now does too.
- * [DEPENDS ON]: none
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-27).
+ * [PURPOSE]: The art underneath was busy/colourful enough in places to
+ *   fight with page text sitting directly on top of it (not inside an
+ *   opaque bg-surface card) — reported as font colour clashing with the
+ *   background. Added one more layer, last in DOM order so it paints over
+ *   the glow orbs and SVG line art: a flat `bg-page` scrim, same
+ *   `absolute inset-0` footprint as this component's own root (so it's
+ *   exactly this background's size, never larger/smaller), letting the
+ *   art show through dimmed rather than hiding it outright.
+ *   Theme-adaptive for free — `bg-page` resolves to the app's own
+ *   `--color-page` CSS variable (globals.css), which next-themes already
+ *   flips between a near-white value in light mode and a near-black value
+ *   in dark mode (`attribute="class"`, see ThemeProvider.tsx) — the exact
+ *   `bg-page/NN` semi-opacity convention already used elsewhere in this
+ *   app for theme-aware scrims (e.g. library/page.tsx's `bg-page/70`
+ *   table-row overlay). Opacity is heavier in dark mode (`/75` vs `/55`)
+ *   because the SVG art itself is far more vivid there (opacity-90 vs.
+ *   opacity-[0.18] in light mode, a few lines below) and needs more
+ *   dimming to bring text contrast back to the same place.
+ * [DEPENDS ON]: apps/web/src/app/globals.css (--color-page light/dark
+ *   values), apps/web/src/components/providers/ThemeProvider.tsx
+ *   (next-themes attribute="class")
  */
 export function AmbientBackground() {
   return (
@@ -143,6 +165,14 @@ export function AmbientBackground() {
           <circle cx="240" cy="120" r="46" stroke="url(#ambientTeal)" strokeWidth="34" fill="none" />
         </g>
       </svg>
+
+      {/* Dim scrim — paints over the glow orbs and SVG art above, same
+          inset-0 footprint as this component's own root, so text sitting
+          directly on this background (outside an opaque bg-surface card)
+          keeps enough contrast. bg-page tracks the theme toggle on its
+          own (see header comment); dark mode gets a heavier scrim since
+          the art above it is far more vivid there. */}
+      <div className="absolute inset-0 bg-page/55 dark:bg-page/75" />
     </div>
   )
 }

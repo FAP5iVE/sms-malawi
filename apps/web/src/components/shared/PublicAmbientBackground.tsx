@@ -34,6 +34,16 @@
  *   this component's shapes are the translucent decoration drawn over it —
  *   do not move this into a layout.tsx outside that wrapper, or it will
  *   render behind the page's opaque background colour and disappear.
+ *
+ * [READABILITY SCRIM]: Unlike the login page, most pages this component
+ *   backs run body text directly over the open page background rather than
+ *   always inside a card, and the login page's `dark:opacity-90` on the
+ *   line art turned out far too intense once it wasn't confined to a login
+ *   card's edges — it visually collided with headings/paragraphs in dark
+ *   mode. A translucent scrim (the theme's own `--background` colour at
+ *   partial alpha, not a solid fill) sits above the artwork and below the
+ *   content for exactly this reason; see its own comment further down for
+ *   the alpha values.
  */
 export function PublicAmbientBackground() {
   return (
@@ -154,6 +164,27 @@ export function PublicAmbientBackground() {
           <circle cx="240" cy="120" r="46" stroke="url(#pageAmbientTeal)" strokeWidth="34" fill="none" />
         </g>
       </svg>
+
+      {/* Readability scrim — sits above the glow orbs and line art, below the
+          page content (content wrappers use `relative z-10`, this component
+          has no z-index so it always paints underneath them). Not a solid
+          fill: it's the page's own `--background` colour at partial alpha,
+          so it recedes the artwork just enough to read text placed directly
+          on the page (not every section here sits inside a card) without
+          blanking the decoration out entirely. Sized to `inset-0` of this
+          same `fixed` wrapper, so it exactly matches the artwork's coverage
+          on every screen size.
+          Two different alpha values because the artwork itself isn't
+          equally intense in both themes — the SVG above is `opacity-[0.18]`
+          in light mode (already subtle, so a light 30% wash is enough) but
+          jumps to `dark:opacity-90` in dark mode (very saturated against the
+          near-black page background), so dark mode needs a much stronger
+          72% wash to bring it back down to a comfortable, readable level.
+          Using `hsl(var(--background) / alpha)` rather than a hardcoded
+          white/black means this automatically tracks whatever the theme
+          toggle sets `--background` to, light or dark, with no extra logic
+          here. */}
+      <div className="absolute inset-0 bg-[hsl(var(--background)/0.3)] dark:bg-[hsl(var(--background)/0.72)] transition-colors duration-300" />
     </div>
   )
 }

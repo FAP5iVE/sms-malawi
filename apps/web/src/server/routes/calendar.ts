@@ -47,12 +47,33 @@
  *      Without this, POST /events would create rows nothing ever
  *      displayed.
  *   6. Added `import 'server-only'`.
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-27) — two more
+ *   hardcoded-year defects in this same route, found during a codebase-wide
+ *   sweep for exactly this bug class:
+ *   7. Source 7 (timetable slots): the Prisma `where` filter had
+ *      `academicYear: '2025/2026'` hardcoded — every other one of this
+ *      file's own sources (holidays, terms, exams, leave) is
+ *      request/settings-scoped, but this one could never return timetable
+ *      slots for any year but 2025/2026, ever, silently. Replaced with
+ *      settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR) — same
+ *      settingsService import this file already uses for getTermDates(),
+ *      same call already used correctly by classes.ts's own
+ *      /subject-assignments routes for the identical value.
+ *   8. rangeStart/rangeEnd's fallback (used when the caller omits ?start=
+ *      /?end=) was `new Date(2025, 8, 1)` / `new Date(2026, 11, 31)` —
+ *      hardcoded to one specific academic year's span. Replaced with the
+ *      already-fetched termDates' own term1.start/term3.end (moved above
+ *      this computation so it's available), so an omitted range now
+ *      defaults to the *current* academic year's actual configured span
+ *      instead of a permanently-fixed one.
  * [DEPENDS ON]: apps/web/src/server/services/calendarEventService.ts (new,
  *   same phase), apps/web/src/server/services/settingsService.ts
  *   (getTermDates — same phase), apps/web/src/server/services/
  *   studentService.ts (resolveStudentFromUid), @shared/constants/malawi
  *   (COLLECTIONS.ANNOUNCEMENTS), @shared/schemas/calendarEvent (new,
  *   same phase)
+ * [DEPENDS ON (added)]: @shared/types/settings (SETTING_KEYS)
  */
 import 'server-only'
 
@@ -64,6 +85,7 @@ import { prisma }      from '@/lib/prisma'
 import { logger }      from '@/lib/logger'
 import type { CalendarEvent } from '@shared/types/calendar'
 import { CALENDAR_COLORS }   from '@shared/types/calendar'
+import { SETTING_KEYS }      from '@shared/types/settings'
 import { COLLECTIONS }       from '@shared/constants/storage'
 import { CreateCalendarEventSchema, UpdateCalendarEventSchema } from '@shared/schemas/calendarEvent'
 import * as settingsService     from '@/server/services/settingsService'
@@ -97,8 +119,15 @@ calendarRouter.get('/events',
     const role     = req.user!.role
     const uid      = req.user!.uid
 
-    const rangeStart = startStr ? parseISO(startStr) : new Date(2025, 8, 1)
-    const rangeEnd   = endStr   ? parseISO(endStr)   : new Date(2026, 11, 31)
+    // [PRODUCTION FIX 2026-08-27] termDates is fetched here now (moved up
+    // from source 2, below) specifically so its term1.start/term3.end can
+    // serve as the default range when the caller omits ?start=/?end= —
+    // previously a hardcoded new Date(2025, 8, 1)/new Date(2026, 11, 31)
+    // span that only ever matched the 2025/2026 academic year.
+    const termDates = await settingsService.getTermDates()
+
+    const rangeStart = startStr ? parseISO(startStr) : parseISO(termDates.term1.start)
+    const rangeEnd   = endStr   ? parseISO(endStr)   : parseISO(termDates.term3.end)
 
     const events: CalendarEvent[] = []
 
@@ -128,7 +157,6 @@ calendarRouter.get('/events',
 
     // ── 2. Term start/end dates (SETTING_KEYS.TERM1_START..TERM3_END —
     //      admin-configurable, previously six hardcoded 2025/2026 literals) ──
-    const termDates = await settingsService.getTermDates()
     const TERM_PERIODS = [
       { id: 't1-start', title: 'Term 1 Starts', date: termDates.term1.start },
       { id: 't1-end',   title: 'Term 1 Ends',   date: termDates.term1.end },
@@ -252,8 +280,9 @@ calendarRouter.get('/events',
         ? { teacherUid: uid }
         : {}
 
+      const currentAcademicYear = await settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
       const slots = await prisma.timetableSlot.findMany({
-        where: { ...timetableFilter, academicYear: '2025/2026' },
+        where: { ...timetableFilter, academicYear: currentAcademicYear },
         include: { class: { select: { name: true } } },
         take: 200,
       })
