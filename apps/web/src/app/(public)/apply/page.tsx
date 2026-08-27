@@ -68,8 +68,19 @@
  *      the `<form>` itself now only ever calls `e.preventDefault()` on its
  *      own onSubmit — so an Enter keypress on any earlier step can no
  *      longer trigger an implicit submit either.
- *      [DEPENDS ON]: apps/web/src/components/shared/AcademicYearSelect.tsx,
- *      apps/web/src/components/shared/PublicAmbientBackground.tsx
+ *  [CHANGE TYPE]: TARGETED EDIT (2026-08-27, follow-up).
+ *  [PURPOSE]: Swapped this page's background from its own local
+ *   <AmbientBackground> (apps/web/src/components/shared/AmbientBackground.tsx)
+ *   over to the shared <PublicAmbientBackground> (apps/web/src/components/
+ *   shared/PublicAmbientBackground.tsx) that now backs every other public
+ *   content page (Events, News, the Discover pages, Gallery, Change
+ *   Password, Privacy, Terms) — so Apply matches that same artwork, the
+ *   same `fixed`-positioning fix for long pages, and the same theme-aware
+ *   readability scrim, instead of drifting from it as a second,
+ *   independently-maintained copy. Only the import and the two render
+ *   sites change; nothing else on this page is touched.
+ * [DEPENDS ON]: apps/web/src/components/shared/AcademicYearSelect.tsx,
+ *   apps/web/src/components/shared/PublicAmbientBackground.tsx
  */
 'use client'
 import { useState } from 'react'
@@ -83,6 +94,7 @@ import { getCountriesForForm, COUNTRY_CALLING_CODES } from '@shared/constants/co
 import { GUARDIAN_RELATIONSHIPS } from '@shared/constants/admissions'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
+import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -316,6 +328,7 @@ export default function ApplyPage() {
               Student Application
             </span>
           </div>
+          <PublicThemeToggle className="ml-auto" />
         </div>
       </header>
 

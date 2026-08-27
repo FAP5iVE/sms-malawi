@@ -13,6 +13,7 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
+import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
 
 const LAST_UPDATED = 'August 2026'
 
@@ -33,10 +34,11 @@ export default function PrivacyPolicyPage() {
             <div className="w-7 h-7 rounded-lg bg-brand-navy flex items-center justify-center">
               <span className="text-white text-xs font-heading font-bold">S</span>
             </div>
-            <span className="font-heading font-semibold text-sm text-brand-navy">
+            <span className="font-heading font-semibold text-sm text-primary">
               Privacy Policy
             </span>
           </div>
+          <PublicThemeToggle className="ml-auto" />
         </div>
       </header>
 

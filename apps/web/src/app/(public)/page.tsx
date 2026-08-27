@@ -91,7 +91,7 @@ import { FaFacebook, FaTwitter, FaInstagram, FaYoutube, FaLinkedin } from 'react
 import {
   Sun, Moon, Monitor, Search, ArrowRight, Menu, X,
   ExternalLink, Send, Loader2, CheckCircle2,
-  ImageIcon, Target, Compass, Sparkles, CalendarDays,
+  ImageIcon, Target, Compass, Sparkles, CalendarDays, LogIn,
 } from 'lucide-react'
 import {
   usePublicSchoolInfo,
@@ -470,6 +470,15 @@ export default function LandingPage() {
               >
                 {mounted ? themeIcons[theme ?? 'system'] : <Monitor className="w-4 h-4" aria-hidden />}
               </button>
+              <Link
+                href="/login"
+                aria-label="Login Portal"
+                className={`sm:hidden w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
+                  scrolled ? 'border-base text-body hover:bg-page' : 'border-white/25 text-white hover:bg-white/10'
+                }`}
+              >
+                <LogIn className="w-4 h-4" />
+              </Link>
               <Link
                 href="/login"
                 className="hidden sm:flex items-center gap-2 bg-brand-teal text-white px-4 py-2.5 rounded-lg font-heading font-bold text-[13px] hover:bg-brand-teal-light transition-colors"

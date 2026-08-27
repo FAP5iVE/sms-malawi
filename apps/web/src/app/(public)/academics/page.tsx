@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { ArrowLeft, BookOpen, FlaskConical, Library, Monitor, GraduationCap, ExternalLink } from 'lucide-react'
 import { usePublicManebStats } from '@/hooks/usePublic'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
+import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
 
 const SUBJECTS_JUNIOR = [
   'English', 'Chichewa', 'Mathematics', 'Biology', 'Physical Science',
@@ -33,9 +34,12 @@ export default function AcademicsPage() {
     <div className="min-h-screen bg-page">
       <PublicAmbientBackground />
       <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <Link href="/#about" className="inline-flex items-center gap-2 text-sm text-brand-teal hover:underline mb-6">
-          <ArrowLeft className="w-4 h-4" /> Back to home
-        </Link>
+        <div className="flex items-center justify-between mb-6">
+          <Link href="/#about" className="inline-flex items-center gap-2 text-sm text-brand-teal hover:underline">
+            <ArrowLeft className="w-4 h-4" /> Back to home
+          </Link>
+          <PublicThemeToggle />
+        </div>
         <h1 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white mb-3">
           Academics
         </h1>

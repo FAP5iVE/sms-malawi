@@ -239,7 +239,7 @@ function SettingsPageInner() {
         </p>
       </div>
 
-      <div className="flex gap-6 items-start">
+      <div className="flex flex-col md:flex-row gap-6 items-start">
 
         {/* ── Sidebar (desktop) ─────────────────────────────────────────── */}
         <aside className="hidden md:flex flex-col w-52 shrink-0 bg-surface border border-base rounded-2xl overflow-hidden">

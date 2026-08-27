@@ -512,7 +512,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
               {/* Scrollable step content */}
               <form
                 onSubmit={handleSubmit(onSubmit, onInvalid)}
-                className="flex-1 overflow-y-auto flex flex-col"
+                className="flex-1 min-h-0 overflow-hidden flex flex-col"
               >
                 {/* Photo upload — Step 1 only */}
                 {currentStep === 0 && (
@@ -523,8 +523,14 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                   />
                 )}
 
-                {/* Animated step panel */}
-                <div className="flex-1 overflow-hidden relative">
+                {/* Animated step panel — the real scroll owner. Vertical
+                    overflow now scrolls here (previously this div's plain
+                    overflow-hidden silently clipped fields below the fold,
+                    while the outer form's overflow-y-auto never had
+                    anything to scroll); horizontal stays clipped to keep
+                    masking the AnimatePresence slide transition between
+                    steps. */}
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative">
                   <AnimatePresence custom={direction} mode="wait" initial={false}>
                     <motion.div
                       key={currentStep}

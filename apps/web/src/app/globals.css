@@ -553,6 +553,35 @@
 }
 
 /* ─────────────────────────────────────────────────────────
+   MOBILE MAIN-CONTENT SCROLL CLEARANCE  [FE-001 fix]
+   Reserves bottom padding on the authenticated shell's
+   scrollable <main> equal to MobileBottomNav's real,
+   safe-area-inclusive height, so the last item on every
+   page is never rendered underneath the fixed tab bar.
+
+   MobileBottomNav is: 60px content (min-h-15) +
+   env(safe-area-inset-bottom) for the device's gesture bar,
+   confirmed in components/shared/MobileBottomNav.tsx.
+   A small extra buffer (1rem) is added so the final card
+   has breathing room above the bar, not just clears it
+   flush.
+
+   Only applies below md (768px) — MobileBottomNav is
+   md:hidden, so at md+ there is no fixed bottom bar to
+   clear and padding resets to match md:p-6's 1.5rem.
+   ───────────────────────────────────────────────────────── */
+
+.main-scroll-pad {
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 1rem);
+}
+
+@media (min-width: 768px) {
+  .main-scroll-pad {
+    padding-bottom: 1.5rem;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
    PRINT STYLES
    Hide all navigation chrome when printing — report cards,
    fee statements, payslips, student profiles.
