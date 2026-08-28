@@ -48,6 +48,7 @@ import {
   ShieldCheck,
   Settings,
   Activity,
+  Images,
 } from 'lucide-react'
 
 import type { UserRole }   from '@shared/types/roles'
@@ -205,6 +206,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon:        Bell,
     roles:       rolesFor('/announcements'),
     badge:       'unreadNotifications',
+  },
+  {
+    label:       'Gallery',
+    mobileLabel: 'Gallery',
+    href:        '/gallery',
+    icon:        Images,
+    roles:       rolesFor('/gallery'),
   },
   {
     label:       'Calendar',

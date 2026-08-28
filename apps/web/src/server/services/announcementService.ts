@@ -89,6 +89,9 @@ export interface CreateAnnouncementInput {
   // Appwrite file ID (FILE_PREFIX.ANNOUNCEMENT_IMAGE) — optional cover
   // image, primarily for the public News section.
   imageKey?: string
+  // [PRODUCTION FIX] See AnnouncementSchema in @shared/schemas/announcement
+  // for the full explanation of ANNOUNCEMENT vs NEWS.
+  postType?: 'ANNOUNCEMENT' | 'NEWS'
 }
 
 // ─── AUDIENCE RESOLUTION ──────────────────────────────────
@@ -325,6 +328,18 @@ async function notifyAudience(announcementId: string, payload: NotifyPayload): P
  * trusted from client input.
  */
 export async function createAnnouncement(data: CreateAnnouncementInput, directPublish: boolean) {
+  const postType = data.postType ?? 'ANNOUNCEMENT'
+  // [PRODUCTION FIX] NEWS is public-site content only — it must never
+  // appear in anyone's internal /announcements tab. Rather than trust the
+  // client to leave targetAll/targetRoles empty and publicWebsite on, force
+  // it server-side so a NEWS item can never accidentally leak into internal
+  // targeting, and so listForViewer()'s postType filter below is always
+  // sufficient on its own without relying on this invariant elsewhere.
+  const targetAll    = postType === 'NEWS' ? false : (data.targetAll ?? false)
+  const targetRoles  = postType === 'NEWS' ? [] : (data.targetRoles ?? [])
+  const targetClassId = postType === 'NEWS' ? null : (data.targetClassId ?? null)
+  const publicWebsite = postType === 'NEWS' ? true : (data.publicWebsite ?? false)
+
   const scheduledForDate = data.scheduledFor ? new Date(data.scheduledFor) : null
   const isFutureScheduled = !!scheduledForDate && scheduledForDate.getTime() > Date.now()
 
@@ -338,13 +353,14 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
   await ref.set({
     title: data.title,
     body: data.body,
-    targetAll: data.targetAll ?? false,
-    targetRoles: data.targetRoles ?? [],
-    targetClassId: data.targetClassId ?? null,
+    targetAll,
+    targetRoles,
+    targetClassId,
     scheduledFor: data.scheduledFor ?? null,
     eventDate: data.eventDate ?? null,
-    publicWebsite: data.publicWebsite ?? false,
+    publicWebsite,
     imageKey: data.imageKey ?? null,
+    postType,
     createdByUid: data.createdByUid,
     createdByRole: data.createdByRole,
     status,
@@ -362,12 +378,12 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
     void notifyAudience(ref.id, {
       title: data.title,
       body: data.body,
-      targetAll: data.targetAll ?? false,
-      targetRoles: data.targetRoles ?? [],
-      targetClassId: data.targetClassId,
+      targetAll,
+      targetRoles,
+      targetClassId,
       eventDate: data.eventDate,
       createdByUid: data.createdByUid,
-      publicWebsite: data.publicWebsite ?? false,
+      publicWebsite,
     })
   }
 
@@ -536,6 +552,7 @@ export interface ViewerAnnouncement {
   createdByUid: string
   createdByRole: string | null
   createdAt: string | null
+  postType: 'ANNOUNCEMENT' | 'NEWS'
 }
 
 /** Coerce a stored createdAt (Firestore Timestamp | string | null) to ISO. */
@@ -564,6 +581,7 @@ function mapViewer(id: string, data: DocumentData): ViewerAnnouncement {
     createdByUid: (data.createdByUid as string) ?? '',
     createdByRole: (data.createdByRole as string | null | undefined) ?? null,
     createdAt: toIso(data.createdAt),
+    postType: ((data.postType as string | undefined) === 'NEWS' ? 'NEWS' : 'ANNOUNCEMENT'),
   }
 }
 
@@ -587,9 +605,13 @@ export async function listForViewer(viewer: { uid: string; role: string }): Prom
     .map((d) => mapViewer(d.id, d.data()))
     .filter(
       (a) =>
-        a.targetAll ||
-        a.targetRoles.includes(viewer.role) ||
-        a.createdByUid === viewer.uid,
+        // [PRODUCTION FIX] NEWS is public-site-only content — it must
+        // never surface in a user's internal /announcements tab, no
+        // matter what targetAll/targetRoles happen to be on the doc.
+        a.postType !== 'NEWS' &&
+        (a.targetAll ||
+          a.targetRoles.includes(viewer.role) ||
+          a.createdByUid === viewer.uid),
     )
 }
 

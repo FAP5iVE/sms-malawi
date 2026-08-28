@@ -347,6 +347,11 @@ export const queryKeys = {
     detail: (id: string) => ['announcements', 'detail', id] as const,
   },
 
+  // ── Gallery (admin management list — apps/web/src/app/(auth)/gallery)
+  gallery: {
+    all: () => ['gallery'] as const,
+  },
+
   // ── Notification feed (N4)
   notifications: {
     feed: () => ['notifications', 'feed'] as const,

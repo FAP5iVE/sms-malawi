@@ -43,23 +43,36 @@ interface Props {
    *  to items with eventDate set) reads. Everything else — validation,
    *  the POST /announcements call, the approval workflow — is identical
    *  to a plain announcement; an event is just an announcement with a
-   *  date attached, not a separate system. */
-  mode?: 'announcement' | 'event'
+   *  date attached, not a separate system.
+   *
+   *  'news' posts with postType: 'NEWS' — see AnnouncementSchema and
+   *  announcementService.createAnnouncement() for what that enforces
+   *  server-side (forced publicWebsite=true, cleared internal targeting).
+   *  It never appears in any user's internal /announcements tab; it is
+   *  public-website content only. The same publishDirect/createWithApproval
+   *  permission check as a normal announcement still applies — a role that
+   *  requires approval for announcements requires it for news too. */
+  mode?: 'announcement' | 'event' | 'news'
 }
 
 export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
   const isEvent = mode === 'event'
+  const isNews = mode === 'news'
+  const noun = isEvent ? 'event' : isNews ? 'news article' : 'announcement'
   const { user } = useAuthStore()
   const { can } = usePermissions()
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
-  const [targetAll, setTargetAll] = useState(true)
+  // News never targets an internal audience — see the postType comment
+  // above — so it starts with no internal targeting rather than the
+  // "everyone" default a real announcement uses.
+  const [targetAll, setTargetAll] = useState(!isNews)
   const [targetRoles, setTargetRoles] = useState<string[]>([])
   // [PRODUCTION FIX 2026-07-28] publicWebsite is a separate opt-in from
   // targetAll — see announcementService.ts's CreateAnnouncementInput
   // comment for why these must not be conflated. Defaults on for event
-  // mode since that's the whole point of creating one.
-  const [publicWebsite, setPublicWebsite] = useState(isEvent)
+  // and news mode since that's the whole point of creating either.
+  const [publicWebsite, setPublicWebsite] = useState(isEvent || isNews)
   const [eventDate, setEventDate] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -82,7 +95,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
     e.preventDefault()
     setError(null)
     if (!user?.uid) {
-      setError(`You must be signed in to post an ${isEvent ? 'event' : 'announcement'}. Please refresh and try again.`)
+      setError(`You must be signed in to post ${isEvent ? 'an' : 'a'} ${noun}. Please refresh and try again.`)
       return
     }
     if (isEvent && !eventDate) {
@@ -96,6 +109,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
       targetRoles,
       publicWebsite,
       eventDate: isEvent && eventDate ? new Date(eventDate).toISOString() : undefined,
+      postType: isNews ? 'NEWS' : 'ANNOUNCEMENT',
     })
     if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Validation error')
     setLoading(true)
@@ -121,13 +135,14 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
           targetRoles: parsed.data.targetRoles,
           publicWebsite: parsed.data.publicWebsite,
           eventDate: parsed.data.eventDate,
+          postType: parsed.data.postType,
           imageKey,
         }),
       })
       onClose()
     } catch (err) {
-      console.error(`Failed to post ${isEvent ? 'event' : 'announcement'}:`, err)
-      setError(err instanceof Error ? err.message : `Failed to post ${isEvent ? 'event' : 'announcement'}. Please try again.`)
+      console.error(`Failed to post ${noun}:`, err)
+      setError(err instanceof Error ? err.message : `Failed to post ${noun}. Please try again.`)
     } finally {
       setLoading(false)
     }
@@ -143,24 +158,28 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
           the close button stays reachable no matter how far you've scrolled. */}
       <div className="bg-surface rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">{isEvent ? 'New Event' : 'New Announcement'}</h2>
+          <h2 className="font-heading font-bold text-brand-navy">
+            {isEvent ? 'New Event' : isNews ? 'Write News Article' : 'New Announcement'}
+          </h2>
           <button
             onClick={onClose}
             className="p-1.5 hover:bg-page rounded-lg"
-            aria-label={isEvent ? 'Close event form' : 'Close announcement form'}
+            aria-label={`Close ${noun} form`}
           >
             <X className="w-4 h-4 text-muted" />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label htmlFor="announcement-title" className="block text-sm font-medium text-body mb-1.5">Title</label>
+            <label htmlFor="announcement-title" className="block text-sm font-medium text-body mb-1.5">
+              {isNews ? 'Headline' : 'Title'}
+            </label>
             <input
               id="announcement-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              placeholder={isEvent ? 'Event title' : 'Announcement title'}
+              placeholder={isEvent ? 'Event title' : isNews ? 'Article headline' : 'Announcement title'}
               maxLength={200}
               className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             />
@@ -180,75 +199,94 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
           )}
           <div>
             <label htmlFor="announcement-body" className="block text-sm font-medium text-body mb-1.5">
-              {isEvent ? 'Details' : 'Message'}
+              {isEvent ? 'Details' : isNews ? 'Article' : 'Message'}
             </label>
             <textarea
               id="announcement-body"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               required
-              rows={4}
-              placeholder={isEvent ? 'Describe the event…' : 'Write your announcement here…'}
+              rows={isNews ? 10 : 4}
+              placeholder={isEvent ? 'Describe the event…' : isNews ? 'Write the full article…' : 'Write your announcement here…'}
               className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page resize-none focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             />
           </div>
-          <div>
-            <label className="flex items-center gap-2 text-sm mb-2">
-              <input
-                type="checkbox"
-                checked={targetAll}
-                onChange={(e) => setTargetAll(e.target.checked)}
-                className="accent-brand-teal"
-              />
-              Send to everyone
-            </label>
-            {!targetAll && (
-              <div className="flex flex-wrap gap-2">
-                {USER_ROLES.map((r) => (
-                  <label
-                    key={r}
-                    className="flex items-center gap-1.5 text-xs border border-base rounded-lg px-3 py-1.5 cursor-pointer hover:bg-page"
-                  >
-                    <input
-                      type="checkbox"
-                      value={r}
-                      checked={targetRoles.includes(r)}
-                      onChange={(e) =>
-                        setTargetRoles((prev) =>
-                          e.target.checked ? [...prev, r] : prev.filter((x) => x !== r)
-                        )
-                      }
-                      className="accent-brand-teal"
-                    />
-                    {r.replace('_', ' ')}
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* [PRODUCTION FIX] News is public-site-only content by design —
+              see the postType comment on the Props interface above. There
+              is no internal targeting to configure and nothing to opt into,
+              so this whole block (and the publicWebsite toggle right after
+              it) is skipped entirely in news mode. */}
+          {!isNews && (
+            <div>
+              <label className="flex items-center gap-2 text-sm mb-2">
+                <input
+                  type="checkbox"
+                  checked={targetAll}
+                  onChange={(e) => setTargetAll(e.target.checked)}
+                  className="accent-brand-teal"
+                />
+                Send to everyone
+              </label>
+              {!targetAll && (
+                <div className="flex flex-wrap gap-2">
+                  {USER_ROLES.map((r) => (
+                    <label
+                      key={r}
+                      className="flex items-center gap-1.5 text-xs border border-base rounded-lg px-3 py-1.5 cursor-pointer hover:bg-page"
+                    >
+                      <input
+                        type="checkbox"
+                        value={r}
+                        checked={targetRoles.includes(r)}
+                        onChange={(e) =>
+                          setTargetRoles((prev) =>
+                            e.target.checked ? [...prev, r] : prev.filter((x) => x !== r)
+                          )
+                        }
+                        className="accent-brand-teal"
+                      />
+                      {r.replace('_', ' ')}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {/* [PRODUCTION FIX 2026-07-28] Public website opt-in — independent
               of "Send to everyone" above, which only controls internal
-              visibility. */}
+              visibility. News is always public, so the toggle itself is
+              hidden for it (nothing to opt into), but the cover-image
+              picker below still applies. */}
           <div className="border-t border-base pt-4">
-            <label className="flex items-center gap-2 text-sm mb-1">
-              <input
-                type="checkbox"
-                checked={publicWebsite}
-                onChange={(e) => setPublicWebsite(e.target.checked)}
-                className="accent-brand-teal"
-              />
-              Publish to public website
-            </label>
-            <p className="text-xs text-muted mb-3">
-              Shows on the public landing page (News, Events, or Academic Advertisements). Separate from
-              &quot;Send to everyone&quot; above — that only controls who inside the school sees it.
-              {isEvent && ' Events are typically public — leave this checked unless this is an internal-only event.'}
-            </p>
+            {!isNews && (
+              <>
+                <label className="flex items-center gap-2 text-sm mb-1">
+                  <input
+                    type="checkbox"
+                    checked={publicWebsite}
+                    onChange={(e) => setPublicWebsite(e.target.checked)}
+                    className="accent-brand-teal"
+                  />
+                  Publish to public website
+                </label>
+                <p className="text-xs text-muted mb-3">
+                  Shows on the public landing page (News, Events, or Academic Advertisements). Separate from
+                  &quot;Send to everyone&quot; above — that only controls who inside the school sees it.
+                  {isEvent && ' Events are typically public — leave this checked unless this is an internal-only event.'}
+                </p>
+              </>
+            )}
+            {isNews && (
+              <p className="text-xs text-muted mb-3">
+                News articles are public-website content only — this never appears in anyone&apos;s
+                internal Announcements tab.
+              </p>
+            )}
 
             {publicWebsite && (
               <div>
                 <label className="block text-sm font-medium text-body mb-1.5">
-                  Cover image <span className="text-muted font-normal">(optional)</span>
+                  {isNews ? 'Photo' : 'Cover image'} <span className="text-muted font-normal">(optional)</span>
                 </label>
                 {imagePreview ? (
                   <div className="relative">
@@ -266,7 +304,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
                 ) : (
                   <label className="flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-base rounded-xl h-24 cursor-pointer hover:border-brand-teal transition-colors text-muted">
                     <ImagePlus className="w-5 h-5" aria-hidden />
-                    <span className="text-xs">Add a cover image</span>
+                    <span className="text-xs">{isNews ? 'Add a photo' : 'Add a cover image'}</span>
                     <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
                   </label>
                 )}
@@ -275,7 +313,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
           </div>
           {!canPublishDirectly && (
             <p className="text-xs text-muted bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              Your {isEvent ? 'event' : 'announcement'} will be submitted for approval before publishing.
+              Your {noun} will be submitted for approval before publishing.
             </p>
           )}
           {error && (
@@ -298,8 +336,8 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
             >
               {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {canPublishDirectly
-                ? (isEvent ? 'Publish Event' : 'Publish')
-                : (isEvent ? 'Submit Event for Approval' : 'Submit for Approval')}
+                ? (isEvent ? 'Publish Event' : isNews ? 'Publish Article' : 'Publish')
+                : (isEvent ? 'Submit Event for Approval' : isNews ? 'Submit Article for Approval' : 'Submit for Approval')}
             </button>
           </div>
         </form>

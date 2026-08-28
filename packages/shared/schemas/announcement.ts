@@ -89,10 +89,10 @@ export const AnnouncementSchema = z.object({
   scheduledFor: z.string().datetime().optional(), // announcement.schedule (high_rank only) — role check enforced server-side
   eventDate: z.string().datetime().optional(), // if the announcement is about an upcoming event — the date calendar.ts's announcement source and the email template's AnnouncementEmailData.eventDate both read
   status: z.enum(['DRAFT', 'PENDING_APPROVAL', 'PUBLISHED', 'SCHEDULED']).default('DRAFT'),
-  // [PRODUCTION FIX 2026-07-28] See announcementService.ts's
-  // CreateAnnouncementInput comment — independent of targetAll, an explicit
+
   // opt-in to public website visibility.
   publicWebsite: z.boolean().default(false),
-  imageKey: z.string().optional(), // Appwrite file ID, FILE_PREFIX.ANNOUNCEMENT_IMAGE
+  imageKey: z.string().optional(),
+  postType: z.enum(['ANNOUNCEMENT', 'NEWS']).default('ANNOUNCEMENT'),
 })
 export type CreateAnnouncementFormInput = z.infer<typeof AnnouncementSchema>

@@ -46,6 +46,10 @@ export const PAGE_ACCESS: Record<string, readonly UserRole[]> = {
   '/library': ALL_ROLES,
   '/hr': ALL_STAFF,
   '/announcements': ALL_ROLES,
+  // [PRODUCTION FIX — Issue #6] New admin gallery management page. Matches
+  // gallery.ts's requireRole(['admin', 'high_rank', 'lower_rank']) exactly —
+  // no approval workflow for this content type, unlike Announcements/News.
+  '/gallery': ['admin', 'high_rank', 'lower_rank'],
   '/calendar': ALL_ROLES,
   '/reports': ALL_ROLES,
   '/applications': ['admin', 'high_rank', 'lower_rank'],

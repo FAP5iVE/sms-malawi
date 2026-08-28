@@ -15,22 +15,28 @@ import { Router } from 'express'
 import multer from 'multer'
 import { prisma } from '@/lib/prisma'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
-import { uploadFile, FILE_PREFIX } from '@/lib/storage'
+import { uploadFile, getPublicViewUrl, FILE_PREFIX } from '@/lib/storage'
 
 export const galleryRouter = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
 
 // GET /gallery — internal management list (all photos, most recent first).
-galleryRouter.get('/', verifyAuth, requireRole(['admin', 'high_rank']), async (_req, res) => {
+// [PRODUCTION FIX] Previously returned raw rows with only fileKey — the
+// admin management page needs an actual viewable URL to render thumbnails,
+// same as /public/gallery already computes for the public page.
+galleryRouter.get('/', verifyAuth, requireRole(['admin', 'high_rank', 'lower_rank']), async (_req, res) => {
   const photos = await prisma.galleryPhoto.findMany({ orderBy: [{ displayOrder: 'asc' }, { createdAt: 'desc' }] })
-  res.json(photos)
+  const withUrls = await Promise.all(
+    photos.map(async (p) => ({ ...p, url: await getPublicViewUrl('', p.fileKey) })),
+  )
+  res.json(withUrls)
 })
 
 // POST /gallery — upload a new photo.
 galleryRouter.post(
   '/',
   verifyAuth,
-  requireRole(['admin', 'high_rank']),
+  requireRole(['admin', 'high_rank', 'lower_rank']),
   upload.single('file'),
   async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
@@ -60,7 +66,7 @@ galleryRouter.post(
 // DELETE /gallery/:id — removes the index row (Appwrite file is left in
 // place; matches the codebase's existing convention of not hard-deleting
 // storage objects on row removal elsewhere).
-galleryRouter.delete('/:id', verifyAuth, requireRole(['admin', 'high_rank']), async (req, res) => {
+galleryRouter.delete('/:id', verifyAuth, requireRole(['admin', 'high_rank', 'lower_rank']), async (req, res) => {
   await prisma.galleryPhoto.delete({ where: { id: String(req.params.id) } }).catch(() => null)
   res.json({ ok: true })
 })

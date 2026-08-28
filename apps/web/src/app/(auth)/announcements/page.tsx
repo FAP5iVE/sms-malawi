@@ -33,7 +33,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { useAuthStore } from '@/store/authStore'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Bell, PlusCircle, Megaphone, Check, Loader2, CalendarDays, X, Trash2 } from 'lucide-react'
+import { Bell, PlusCircle, Megaphone, Check, Loader2, CalendarDays, X, Trash2, Newspaper } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -343,7 +343,7 @@ function PendingApprovalList() {
 function AnnouncementsContent() {
   const { announcements, loading: isLoading, error: announcementsError } = useAnnouncements()
   const { can } = usePermissions()
-  const [formMode, setFormMode] = useState<'announcement' | 'event' | null>(null)
+  const [formMode, setFormMode] = useState<'announcement' | 'event' | 'news' | null>(null)
 
   const canCreate = can('announcement.create') || can('announcement.createWithApproval')
   const canApprove = can('announcement.approvePublish')
@@ -358,6 +358,17 @@ function AnnouncementsContent() {
         </div>
         {canCreate && (
           <div className="flex items-center gap-2">
+            {/* [PRODUCTION FIX] "Write News Article" — same create/approval
+                permission as a regular announcement (postType: 'NEWS' is
+                what makes this different, not who can press the button).
+                Publishes public-website-only content; see AnnouncementForm's
+                postType comment. */}
+            <button
+              onClick={() => setFormMode('news')}
+              className="flex items-center gap-2 border border-base text-body px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-page transition-colors min-h-[44px]"
+            >
+              <Newspaper className="w-4 h-4" aria-hidden="true" /> Write News Article
+            </button>
             <button
               onClick={() => setFormMode('event')}
               className="flex items-center gap-2 border border-base text-body px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-page transition-colors min-h-[44px]"

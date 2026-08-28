@@ -163,6 +163,7 @@ announcementsRouter.post(
           eventDate: parsed.data.eventDate,
           publicWebsite: parsed.data.publicWebsite,
           imageKey: parsed.data.imageKey,
+          postType: parsed.data.postType,
           createdByUid: user.uid,
           createdByRole: user.role,
         },
