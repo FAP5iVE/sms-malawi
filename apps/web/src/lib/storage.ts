@@ -35,8 +35,15 @@ import * as sdk from 'node-appwrite'
 // ─── BUCKET CONFIG ────────────────────────────────────────────────────────────
 // Single Appwrite bucket enforced by free-tier constraint.
 // All files are path-partitioned using fileId prefixes that encode the category.
-
-export const SCHOOL_BUCKET = 'school_files' as const
+//
+// [PRODUCTION FIX] This must be the bucket's actual Appwrite $id, not a
+// human-readable label. The bucket was created in the Appwrite Console as
+// "School Files" without a custom ID, so Appwrite auto-generated one
+// ("6a0c5723001522915a0f") rather than using the literal string
+// "school_files" this constant previously held — every uploadFile/getFile/
+// deleteFile call was pointing at a bucket ID that didn't exist, causing
+// "Storage bucket with the requested ID could not be found."
+export const SCHOOL_BUCKET = '6a0c5723001522915a0f' as const
 
 export const STORAGE_BUCKETS = {
   STUDENT_FILES:   SCHOOL_BUCKET,
