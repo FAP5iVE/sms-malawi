@@ -210,9 +210,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
   {
     label:       'Gallery',
     mobileLabel: 'Gallery',
-    href:        '/gallery',
+    href:        '/gallery-admin',
     icon:        Images,
-    roles:       rolesFor('/gallery'),
+    roles:       rolesFor('/gallery-admin'),
   },
   {
     label:       'Calendar',
