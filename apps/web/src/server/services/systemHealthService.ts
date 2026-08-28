@@ -33,8 +33,15 @@ interface ServiceStatus {
 async function checkNeon(): Promise<ServiceStatus> {
   const start = Date.now()
   try {
-    await prisma.$queryRaw`SELECT 1`
-    return { name: 'Neon PostgreSQL', status: 'ok', latencyMs: Date.now() - start }
+    const [row] = await prisma.$queryRaw<{ pretty: string }[]>`
+      SELECT pg_size_pretty(pg_database_size(current_database())) as pretty
+    `
+    return {
+      name: 'Neon PostgreSQL',
+      status: 'ok',
+      latencyMs: Date.now() - start,
+      details: `${row?.pretty ?? 'unknown size'} used`,
+    }
   } catch (e: unknown) {
     return { name: 'Neon PostgreSQL', status: 'down', details: String(e) }
   }

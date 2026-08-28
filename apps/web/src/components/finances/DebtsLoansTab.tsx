@@ -55,14 +55,14 @@ export function DebtsLoansTab() {
     <div className="space-y-8">
       {/* Summary strip */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-surface border border-base rounded-xl p-5">
+        <div className="bg-surface border border-base rounded-xl p-5 min-w-0">
           <p className="text-xs text-muted uppercase tracking-wider">Owed to Vendors &amp; Companies</p>
-          <p className="text-2xl font-bold text-brand-coral mt-1">{formatMWK(totalVendor)}</p>
+          <p className="text-xl sm:text-2xl font-bold text-brand-coral mt-1 break-words">{formatMWK(totalVendor)}</p>
           <p className="text-xs text-muted mt-1">{vendorDebts.length} unpaid expense{vendorDebts.length === 1 ? '' : 's'}</p>
         </div>
-        <div className="bg-surface border border-base rounded-xl p-5">
+        <div className="bg-surface border border-base rounded-xl p-5 min-w-0">
           <p className="text-xs text-muted uppercase tracking-wider">Outstanding Staff Loan Balance</p>
-          <p className="text-2xl font-bold text-brand-amber mt-1">{formatMWK(totalStaff)}</p>
+          <p className="text-xl sm:text-2xl font-bold text-brand-amber mt-1 break-words">{formatMWK(totalStaff)}</p>
           <p className="text-xs text-muted mt-1">{staffLoans.length} active loan{staffLoans.length === 1 ? '' : 's'}</p>
         </div>
       </div>

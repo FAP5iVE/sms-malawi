@@ -866,9 +866,14 @@ financesRouter.get(
       const invoices = await prisma.invoice.findMany({
         where: { academicYear, term: yearNum },
         orderBy: { status: 'asc' },
+        // Same convention GET /invoices already uses above ([R9]) — never
+        // surface a raw studentId cuid in a UI-facing report.
+        include: { student: { select: { firstName: true, lastName: true, registrationNo: true } } },
       })
       return res.json(invoices.map((inv) => ({
-        studentId: inv.studentId, academicYear: inv.academicYear, term: inv.term,
+        student: inv.student ? `${inv.student.firstName} ${inv.student.lastName}` : '—',
+        studentRegNo: inv.student?.registrationNo ?? '—',
+        academicYear: inv.academicYear, term: inv.term,
         total: Number(inv.totalAmount), paid: Number(inv.paidAmount), balance: Number(inv.balance),
         status: inv.status, dueDate: inv.dueDate,
       })))
@@ -877,9 +882,12 @@ financesRouter.get(
       const overdue = await prisma.invoice.findMany({
         where: { academicYear, term: yearNum, status: { in: ['UNPAID', 'PARTIAL', 'OVERDUE'] } },
         orderBy: { balance: 'desc' },
+        include: { student: { select: { firstName: true, lastName: true, registrationNo: true } } },
       })
       return res.json(overdue.map((inv) => ({
-        studentId: inv.studentId, term: inv.term, balance: Number(inv.balance),
+        student: inv.student ? `${inv.student.firstName} ${inv.student.lastName}` : '—',
+        studentRegNo: inv.student?.registrationNo ?? '—',
+        term: inv.term, balance: Number(inv.balance),
         status: inv.status, dueDate: inv.dueDate,
       })))
     }

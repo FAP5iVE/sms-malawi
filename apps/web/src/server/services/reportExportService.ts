@@ -91,7 +91,8 @@ function styleHeader(ws: ExcelJS.Worksheet, cols: string[]) {
 async function buildFeeCollectionSheet(wb: ExcelJS.Workbook, academicYear: string, term: number) {
   const ws = wb.addWorksheet('Fee Collection')
   const cols = [
-    'Student ID',
+    'Student',
+    'Student Reg No',
     'Academic Year',
     'Term',
     'Total (MWK)',
@@ -102,18 +103,20 @@ async function buildFeeCollectionSheet(wb: ExcelJS.Workbook, academicYear: strin
   ]
   ws.columns = cols.map((h, i) => ({
     key: String(i),
-    width: i > 2 && i < 6 ? 18 : 15,
+    width: i > 3 && i < 7 ? 18 : 15,
   }))
   styleHeader(ws, cols)
 
   const invoices = await prisma.invoice.findMany({
     where: { academicYear, term },
     orderBy: { status: 'asc' },
+    include: { student: { select: { firstName: true, lastName: true, registrationNo: true } } },
   })
 
   invoices.forEach((inv) => {
     ws.addRow([
-      inv.studentId,
+      inv.student ? `${inv.student.firstName} ${inv.student.lastName}` : '—',
+      inv.student?.registrationNo ?? '—',
       inv.academicYear,
       `Term ${inv.term}`,
       Number(inv.totalAmount),
@@ -130,6 +133,7 @@ async function buildFeeCollectionSheet(wb: ExcelJS.Workbook, academicYear: strin
     'TOTALS',
     '',
     '',
+    '',
     invoices.reduce((s, i) => s + Number(i.totalAmount), 0),
     invoices.reduce((s, i) => s + Number(i.paidAmount), 0),
     invoices.reduce((s, i) => s + Number(i.balance), 0),
@@ -138,18 +142,20 @@ async function buildFeeCollectionSheet(wb: ExcelJS.Workbook, academicYear: strin
 
 async function buildOutstandingSheet(wb: ExcelJS.Workbook, academicYear: string, term: number) {
   const ws = wb.addWorksheet('Outstanding Balances')
-  const cols = ['Student ID', 'Term', 'Balance (MWK)', 'Status', 'Due Date']
+  const cols = ['Student', 'Student Reg No', 'Term', 'Balance (MWK)', 'Status', 'Due Date']
   ws.columns = cols.map(() => ({ width: 18 }))
   styleHeader(ws, cols)
 
   const overdue = await prisma.invoice.findMany({
     where: { academicYear, term, status: { in: ['UNPAID', 'PARTIAL', 'OVERDUE'] } },
     orderBy: { balance: 'desc' },
+    include: { student: { select: { firstName: true, lastName: true, registrationNo: true } } },
   })
 
   overdue.forEach((inv) => {
     ws.addRow([
-      inv.studentId,
+      inv.student ? `${inv.student.firstName} ${inv.student.lastName}` : '—',
+      inv.student?.registrationNo ?? '—',
       `Term ${inv.term}`,
       Number(inv.balance),
       inv.status,

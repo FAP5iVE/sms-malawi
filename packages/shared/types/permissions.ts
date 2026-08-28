@@ -785,9 +785,12 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Classes — view only
     'class.view',
 
-    // Announcements — own only
+    // Announcements — [PRODUCTION FIX] library may now publish news
+    // directly (no approval hop) at the school's request, in addition to
+    // its existing own-only create/edit/delete.
     'announcement.view',
     'announcement.createWithApproval',
+    'announcement.publishDirect',
     'announcement.editOwn',
     'announcement.deleteOwn',
 
@@ -885,11 +888,16 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'application.view',
     'application.review',
 
-    // Announcements — own submissions go to approval; also holds
-    // approval authority per the intended workflow (approved by admin
-    // or lower_rank staff) [SEC-001][N3]
+    // Announcements — originally own submissions went to approval, with
+    // approval authority over others' per the intended workflow (approved
+    // by admin or lower_rank staff) [SEC-001][N3]. [PRODUCTION FIX] Now
+    // additionally holds publishDirect at the school's explicit request —
+    // this removes the second-set-of-eyes control [SEC-001] previously
+    // enforced for this role's own submissions. Revisit if that was not
+    // the intent.
     'announcement.view',
     'announcement.createWithApproval',
+    'announcement.publishDirect',
     'announcement.approvePublish',
     'announcement.reject',
     'announcement.editOwn',

@@ -270,6 +270,9 @@ export async function listFiles(prefix?: FilePrefix, limit = 25, offset = 0) {
 
 export async function getStorageUsage(): Promise<{ totalFiles: number; totalSizeBytes: number }> {
   const storage = new sdk.Storage(getClient())
-  const result  = await storage.listFiles(SCHOOL_BUCKET, [sdk.Query.limit(1)])
-  return { totalFiles: result.total, totalSizeBytes: 0 }
+  const [bucket, result] = await Promise.all([
+    storage.getBucket(SCHOOL_BUCKET),
+    storage.listFiles(SCHOOL_BUCKET, [sdk.Query.limit(1)]),
+  ])
+  return { totalFiles: result.total, totalSizeBytes: bucket.totalSize ?? 0 }
 }

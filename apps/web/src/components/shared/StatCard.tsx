@@ -241,8 +241,10 @@ export function StatCard({
       </div>
 
       {/* ── Value + Labels ────────────────────────────────────────────────── */}
-      <div>
-        <p className="text-2xl font-bold font-heading text-brand-navy tabular">{value}</p>
+      <div className="min-w-0">
+        <p className="text-xl sm:text-2xl font-bold font-heading text-brand-navy tabular break-words">
+          {value}
+        </p>
         {subLabel && <p className="text-xs text-muted mt-0.5">{subLabel}</p>}
         <p className="text-sm text-muted mt-1">{label}</p>
       </div>

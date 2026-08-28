@@ -148,7 +148,8 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
       )}
 
       <div className="bg-surface border border-base rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="border-b border-base bg-page">
               <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
@@ -282,6 +283,7 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Log Expense Modal */}

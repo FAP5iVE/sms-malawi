@@ -114,7 +114,8 @@ export function InvoicesTab({ academicYear, term }: { academicYear: string; term
       </div>
       {/* Invoices table */}
       <div className="bg-surface border border-base rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="border-b border-base bg-page">
               <th className="text-left px-4 py-3 font-heading font-semibold text-xs uppercase tracking-wide text-muted">
@@ -222,6 +223,7 @@ export function InvoicesTab({ academicYear, term }: { academicYear: string; term
             )}
           </tbody>
         </table>
+        </div>
       </div>
       {/* Record Payment Modal */}
       {payingInvoice && (

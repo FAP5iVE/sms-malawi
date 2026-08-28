@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useBudgetVsActual, useCreateBudget } from '@/hooks/useFinances'
 import { useDepartmentTitles } from '@/hooks/useSettings'
 import { formatMWK } from '@shared/constants/malawi'
+import { MOBILE_BREAKPOINT } from '@shared/constants/breakpoints'
 import { Plus, Loader2 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -56,9 +57,17 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
   const spent = budget.map((b) => b.spent)
 
   const chartOptions = {
-    chart: { type: 'bar' as const, toolbar: { show: false } },
+    chart: { type: 'bar' as const, toolbar: { show: false }, height: 300 },
     plotOptions: { bar: { horizontal: false, columnWidth: '55%' } },
-    xaxis: { categories },
+    xaxis: {
+      categories,
+      labels: {
+        rotate: -45,
+        trim: true,
+        hideOverlappingLabels: true,
+        style: { fontSize: '11px' },
+      },
+    },
     yaxis: {
       labels: {
         formatter: (v: number) => `MWK ${(v / 1_000_000).toFixed(1)}M`,
@@ -66,9 +75,25 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
     },
     colors: ['#0F2744', '#0E8A6A'],
     legend: { position: 'top' as const },
+    // Per-bar numeric labels are dropped in favor of the tooltip below and
+    // the y-axis scale — exact figures are one tap away, and the chart
+    // reads as a clean shape instead of a wall of small numbers on every
+    // bar. This also removes the white-on-white illegible labels that
+    // appeared whenever a bar was too short for its label to fit inside it.
+    dataLabels: { enabled: false },
     tooltip: {
       y: { formatter: (v: number) => formatMWK(v) },
     },
+    responsive: [
+      {
+        breakpoint: MOBILE_BREAKPOINT,
+        options: {
+          chart: { height: 260 },
+          xaxis: { labels: { style: { fontSize: '9px' }, rotate: -60 } },
+          legend: { position: 'bottom' as const, fontSize: '11px' },
+        },
+      },
+    ],
   }
 
   const series = [
@@ -187,7 +212,7 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
             <p className="font-heading font-semibold text-sm text-brand-navy mb-4">
               Budget vs Actual Spending
             </p>
-            <Chart type="bar" options={chartOptions} series={series} height={300} />
+            <Chart type="bar" options={chartOptions} series={series} />
           </div>
 
           {/* Table */}

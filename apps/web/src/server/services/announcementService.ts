@@ -54,6 +54,7 @@ import type { DocumentData } from 'firebase-admin/firestore'
 import type { StaffRole } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
+import { sendBatchEmails } from '@/lib/email'
 import * as notificationService from '@/server/services/notificationService'
 import * as notificationFeedService from '@/server/services/notificationFeedService'
 import { deriveAudience } from '@shared/schemas/announcement'
@@ -151,6 +152,92 @@ interface NotifyPayload {
   targetClassId?: string | null
   eventDate?: string | null
   createdByUid: string
+  // [FIX] Previously unused by notifyAudience() — publicWebsite items with
+  // targetAll=false (a public-only news post, no internal targeting) fired
+  // zero internal notifications and never touched NewsletterSubscriber at
+  // all. Threading this through lets notifyAudience() close both gaps.
+  publicWebsite?: boolean
+}
+
+/**
+ * [FIX] Emails every confirmed, still-subscribed newsletter address when a
+ * publicWebsite announcement goes live. Nothing previously read this table
+ * on publish — people could subscribe and simply never hear anything.
+ * Best-effort: a delivery failure here must never affect the publish itself.
+ */
+async function notifyNewsletterSubscribers(announcementId: string, payload: { title: string; body: string }): Promise<void> {
+  try {
+    const subscribers = await prisma.newsletterSubscriber.findMany({
+      where: { confirmed: true, unsubscribedAt: null },
+      select: { email: true },
+    })
+    if (subscribers.length === 0) return
+
+    const siteUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sms-malawi.vercel.app'
+    const preview  = payload.body.length > 400 ? `${payload.body.slice(0, 400)}…` : payload.body
+
+    await sendBatchEmails({
+      continueOnError: true,
+      emails: subscribers.map((s) => ({
+        to: s.email,
+        subject: `New: ${payload.title}`,
+        html: `<h2>${payload.title}</h2>
+          <p>${preview.replace(/\n/g, '<br />')}</p>
+          <p><a href="${siteUrl}/news">Read the full article</a></p>
+          <p style="font-size:12px;color:#888;margin-top:24px;">
+            <a href="${siteUrl}/newsletter/unsubscribe?email=${encodeURIComponent(s.email)}">Unsubscribe</a>
+          </p>`,
+        tags: [{ name: 'type', value: 'newsletter-broadcast' }],
+      })),
+    })
+  } catch (err) {
+    logger.error({ err, announcementId }, 'Failed to notify newsletter subscribers')
+  }
+}
+
+/**
+ * [FIX] Guarantees every active internal user gets an in-app feed item +
+ * push when a news item is public, even if the author didn't (or a
+ * public-only post correctly has targetAll=false and no internal
+ * targetRoles). Skipped when targetAll is already true, since the regular
+ * notifyAudience() path already reaches everyone in that case — this only
+ * fills the gap, it never double-notifies.
+ */
+async function notifyAllSystemUsers(announcementId: string, payload: { title: string; body: string }): Promise<void> {
+  try {
+    const [staff, students] = await Promise.all([
+      prisma.staffProfile.findMany({ where: { status: 'ACTIVE' }, select: { uid: true } }),
+      prisma.student.findMany({ where: { status: 'ACTIVE' }, select: { firebaseUid: true } }),
+    ])
+    const uids = [
+      ...staff.map((s) => s.uid),
+      ...students.map((s) => s.firebaseUid).filter((u): u is string => !!u),
+    ]
+    if (uids.length === 0) return
+
+    await notificationService.sendAnnouncementNotification({
+      emails: [],
+      topic: 'announcements_all',
+      data: {
+        title: payload.title,
+        body: payload.body,
+        authorName: 'School Administration',
+        audience: 'ALL',
+        publishedAt: new Date(),
+        announcementId,
+      },
+    })
+
+    await notificationFeedService.pushToManyFeeds(uids, {
+      title: `New article: ${payload.title}`,
+      body: payload.body,
+      type: 'INFO',
+      category: 'news',
+      actionUrl: '/news',
+    })
+  } catch (err) {
+    logger.error({ err, announcementId }, 'Failed to notify all system users of new public article')
+  }
 }
 
 /** Resolves recipients + author identity and fires the real, previously
@@ -217,6 +304,16 @@ async function notifyAudience(announcementId: string, payload: NotifyPayload): P
   } catch (err) {
     logger.error({ err, announcementId }, 'Failed to send announcement notification')
   }
+
+  // [FIX] These two are independent of the internal targeting above and of
+  // each other's success/failure — run outside the try/catch that guards
+  // the internal send so one failing never blocks the other.
+  if (payload.publicWebsite) {
+    void notifyNewsletterSubscribers(announcementId, { title: payload.title, body: payload.body })
+    if (!payload.targetAll) {
+      void notifyAllSystemUsers(announcementId, { title: payload.title, body: payload.body })
+    }
+  }
 }
 
 // ─── CRUD ──────────────────────────────────────────────────
@@ -270,6 +367,7 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
       targetClassId: data.targetClassId,
       eventDate: data.eventDate,
       createdByUid: data.createdByUid,
+      publicWebsite: data.publicWebsite ?? false,
     })
   }
 
@@ -301,6 +399,7 @@ export async function publishAnnouncement(id: string, approvedByUid: string) {
     targetClassId: existing.targetClassId as string | null | undefined,
     eventDate: existing.eventDate as string | null | undefined,
     createdByUid: existing.createdByUid as string,
+    publicWebsite: (existing.publicWebsite as boolean | undefined) ?? false,
   })
 
   return { id, status: 'PUBLISHED' }
@@ -380,6 +479,7 @@ export async function promoteDueScheduled(): Promise<{ promoted: number }> {
       targetClassId: data.targetClassId as string | null | undefined,
       eventDate: data.eventDate as string | null | undefined,
       createdByUid: data.createdByUid as string,
+      publicWebsite: (data.publicWebsite as boolean | undefined) ?? false,
     })
     promoted++
   }
