@@ -65,7 +65,7 @@ import { differenceInBusinessDays, isWeekend, addDays, startOfDay, endOfDay } fr
 
 function getAuth() { return admin.auth() }
 import type {
-  CreateStaffInput, LeaveRequestInput, ReviewLeaveInput,
+  CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput,
   LoanRequestInput, PerformanceNoteInput
 } from '@shared/schemas/hr'
 import type { LeaveType, Prisma} from '@prisma/client'
@@ -111,6 +111,58 @@ export async function getStaffProfile(id: string) {
       performanceNotes: { orderBy: { createdAt: 'desc' }, take: 5 },
     },
   })
+}
+
+// General "edit staff details" update — deliberately scoped to the same
+// fields UpdateStaffSchema allows (see that schema's own comment): no
+// employeeNo, role, or status. Role changes and status/termination changes
+// carry their own, more sensitive permissions (hr.assignRole,
+// hr.terminateStaff) and are not handled by this function.
+export async function updateStaff(id: string, input: UpdateStaffInput) {
+  const before = await prisma.staffProfile.findUnique({ where: { id } })
+  if (!before) {
+    throw Object.assign(new Error('Staff member not found.'), { status: 404 })
+  }
+
+  const updateData: Prisma.StaffProfileUncheckedUpdateInput = {}
+  if (input.firstName         !== undefined) updateData.firstName         = input.firstName
+  if (input.lastName          !== undefined) updateData.lastName          = input.lastName
+  if (input.email             !== undefined) updateData.email             = input.email
+  if (input.phone             !== undefined) updateData.phone             = input.phone
+  if (input.department        !== undefined) updateData.department        = input.department
+  if (input.jobTitle          !== undefined) updateData.jobTitle          = input.jobTitle
+  if (input.employmentType    !== undefined) updateData.employmentType    = input.employmentType
+  if (input.contractExpiry    !== undefined) updateData.contractExpiry    = new Date(input.contractExpiry)
+  if (input.salaryStructureId !== undefined) updateData.salaryStructureId = input.salaryStructureId
+
+  const updated = await prisma.staffProfile.update({
+    where: { id },
+    data:  updateData,
+  })
+
+  // Keep the Firebase Auth display name in step if either name field
+  // changed — createStaff sets displayName from firstName+lastName at
+  // creation, so an edit that changes either should carry through.
+  if (input.firstName !== undefined || input.lastName !== undefined) {
+    try {
+      await getAuth().updateUser(updated.uid, {
+        displayName: `${updated.firstName} ${updated.lastName}`,
+      })
+    } catch (err) {
+      logger.error({ err, uid: updated.uid }, '[hrService.updateStaff] failed to sync Firebase displayName')
+    }
+  }
+
+  void algolia.updateStaff({
+    objectID:   updated.id,
+    firstName:  updated.firstName,
+    lastName:   updated.lastName,
+    fullName:   `${updated.firstName} ${updated.lastName}`,
+    department: updated.department,
+    email:      updated.email ?? null,
+  })
+
+  return getStaffProfile(id)
 }
 
 // Creating a staff member now provisions their login end-to-end, mirroring

@@ -11,6 +11,13 @@
  *   API boundary rather than silently persisting. Matches this same
  *   phase's schema.prisma fix converting StaffProfile.role from an
  *   unenforced String to a real Prisma enum.
+ * [MOBILE UI AUDIT FIX]: Added UpdateStaffSchema — hr.editStaff and
+ *   hr.viewAnyProfile already existed in the permission matrix but had no
+ *   backing route, hook, or UI (only GET /:id and POST / existed). This
+ *   backs the new PATCH /hr/:id, mirroring students.ts's UpdateStudentSchema
+ *   pattern: all fields optional, and deliberately narrower than
+ *   CreateStaffSchema (no employeeNo/role/status — see the schema's own
+ *   comment for why).
  * [DEPENDS ON]: S/types/roles.ts (USER_ROLES)
  */
 import { z } from 'zod'
@@ -32,6 +39,24 @@ export const CreateStaffSchema = z.object({
   jobTitle:       z.string().min(1),
   employmentType: z.enum(['FULL_TIME','PART_TIME','CONTRACT','TEMPORARY']).default('FULL_TIME'),
   dateJoined:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  contractExpiry: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  salaryStructureId: z.string().optional(),
+})
+
+// Deliberately narrower than CreateStaffSchema: no employeeNo (immutable
+// identifier), no role (role changes are gated by the separate
+// hr.assignRole permission, not hr.editStaff — a role-change flow, if
+// built, should be its own endpoint), no status (gated by
+// hr.terminateStaff for the same reason). This schema backs the general
+// "edit staff details" PATCH, matching hr.editStaff's actual scope.
+export const UpdateStaffSchema = z.object({
+  firstName:      z.string().min(1).optional(),
+  lastName:       z.string().min(1).optional(),
+  email:          z.string().email().optional(),
+  phone:          z.string().optional(),
+  department:     z.string().min(1).optional(),
+  jobTitle:       z.string().min(1).optional(),
+  employmentType: z.enum(['FULL_TIME','PART_TIME','CONTRACT','TEMPORARY']).optional(),
   contractExpiry: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   salaryStructureId: z.string().optional(),
 })
@@ -63,6 +88,7 @@ export const PerformanceNoteSchema = z.object({
 })
 
 export type CreateStaffInput    = z.infer<typeof CreateStaffSchema>
+export type UpdateStaffInput    = z.infer<typeof UpdateStaffSchema>
 export type LeaveRequestInput   = z.infer<typeof LeaveRequestSchema>
 export type ReviewLeaveInput    = z.infer<typeof ReviewLeaveSchema>
 export type LoanRequestInput    = z.infer<typeof LoanRequestSchema>

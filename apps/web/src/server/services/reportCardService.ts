@@ -527,8 +527,35 @@ export async function batchGenerateReportCards(
     select: { id: true, registrationNo: true, firstName: true, lastName: true },
   })
 
+  // [PRODUCTION FIX] This previously always regenerated every student's PDF
+  // on every call — opening the "Generate All" screen a second time for a
+  // class/term that already had report cards silently redid the work
+  // (re-rendering + re-uploading every PDF) instead of just showing what
+  // was already there. Existing, already-generated ones are now looked up
+  // once and returned as-is; only students genuinely missing a report card
+  // for this exact (studentId, academicYear, term) go through real
+  // generation. A real regenerate is still one click away via the
+  // per-student Retry button (POST /exams/report-card,
+  // generateSingleReportCard() below), which is unaffected by this check.
+  const existing = await prisma.termResult.findMany({
+    where: {
+      studentId: { in: students.map((s) => s.id) },
+      academicYear,
+      term,
+      reportCardKey: { not: null },
+    },
+    select: { studentId: true, reportCardKey: true },
+  })
+  const existingByStudent = new Map(existing.map((e) => [e.studentId, e.reportCardKey as string]))
+
   logger.info(
-    { event: 'report-cards.batch.start', classId, term, academicYear, count: students.length, actorUid },
+    {
+      event: 'report-cards.batch.start',
+      classId, term, academicYear,
+      count: students.length,
+      alreadyGenerated: existingByStudent.size,
+      actorUid,
+    },
     'Starting batch report card generation',
   )
 
@@ -536,6 +563,17 @@ export async function batchGenerateReportCards(
     students,
     CONCURRENT_LIMIT,
     async (s) => {
+      const existingFileId = existingByStudent.get(s.id)
+      if (existingFileId) {
+        const url = await getReportCardUrl(existingFileId)
+        return {
+          studentId:      s.id,
+          registrationNo: s.registrationNo,
+          fullName:       `${s.firstName} ${s.lastName}`,
+          fileId:         existingFileId,
+          url,
+        }
+      }
       try {
         return await generateForStudent(s, term, academicYear)
       } catch (err) {

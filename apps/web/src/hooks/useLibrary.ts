@@ -22,7 +22,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type {
   CreateBookInput, IssueBorrowingInput, ReturnBorrowingInput,
   CreateRecommendationInput, ReviewRecommendationInput, RejectRecommendationInput,
-  CreateFineWaiverInput, RejectFineWaiverInput,
+  CreateFineWaiverInput, RejectFineWaiverInput, CreateDigitalResourceInput,
 } from '@shared/schemas/library'
 import type { ApiResourceRecommendation, ApiFineWaiverRequest } from '@shared/types/api'
 import { apiFetch, queryKeys } from '@/lib/api-client'
@@ -69,6 +69,24 @@ export function useCreateBook() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: CreateBookInput) => apiFetch('/library', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
+  })
+}
+
+export function useUploadDigitalResource() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateDigitalResourceInput & { file: File }) => {
+      const { file, ...meta } = input
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('title', meta.title)
+      formData.append('type', meta.type)
+      if (meta.subject) formData.append('subject', meta.subject)
+      if (meta.form !== undefined) formData.append('form', String(meta.form))
+      if (meta.academicYear) formData.append('academicYear', meta.academicYear)
+      return apiFetch('/library/digital/upload', { method: 'POST', body: formData })
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
   })
 }

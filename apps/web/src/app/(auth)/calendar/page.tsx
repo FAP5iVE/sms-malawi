@@ -39,6 +39,7 @@ import interactionPlugin from '@fullcalendar/interaction'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Calendar, Clock, MapPin, Tag, PlusCircle, Trash2, Loader2 } from 'lucide-react'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { useIsMobile } from '@/hooks/use-mobile'
 import {
   useCalendarEvents,
   useCreateCalendarEvent,
@@ -445,8 +446,10 @@ function EventDetailPanel({
 
 function CalendarContent() {
   const calRef = useRef<InstanceType<typeof FullCalendar>>(null)
+  const isMobile = useIsMobile()
   const [dateRange, setDateRange] = useState({ start: '2025-09-01', end: '2026-07-31' })
   const [selected, setSelected] = useState<CalendarEvent | null>(null)
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const { can } = usePermissions()
   const [activeCategories, setActiveCategories] = useState<Set<CalendarEventCategory>>(
@@ -469,6 +472,14 @@ function CalendarContent() {
   const filteredEvents = useMemo(
     () => serverEvents.filter((e) => activeCategories.has(e.category)),
     [serverEvents, activeCategories]
+  )
+
+  // Events for the currently tapped day, on mobile — populates the list
+  // panel below the grid (Design Reference: native Samsung Calendar's
+  // "tap a date → see its events in a list underneath" pattern).
+  const selectedDateEvents = useMemo(
+    () => (selectedDate ? filteredEvents.filter((e) => e.start.slice(0, 10) === selectedDate) : []),
+    [selectedDate, filteredEvents]
   )
 
   const handleEventClick = useCallback(
@@ -539,22 +550,51 @@ function CalendarContent() {
 
       {/* ── FullCalendar ── */}
       <div className="bg-surface border border-base rounded-2xl overflow-hidden">
-        <div className="p-1 sm:p-4 [&_.fc-toolbar-title]:font-heading [&_.fc-toolbar-title]:text-brand-navy [&_.fc-toolbar-title]:font-bold [&_.fc-button]:bg-brand-navy [&_.fc-button]:border-brand-navy [&_.fc-button:hover]:bg-brand-navy/80 [&_.fc-button-active]:bg-brand-teal [&_.fc-button-active]:border-brand-teal [&_.fc-today-button]:bg-brand-teal [&_.fc-today-button]:border-brand-teal [&_.fc-event]:rounded-md [&_.fc-event]:text-xs [&_.fc-daygrid-day-number]:text-brand-navy [&_.fc-col-header-cell-cushion]:font-heading [&_.fc-col-header-cell-cushion]:text-brand-navy [&_.fc-daygrid-day.fc-day-today]:bg-brand-teal/5">
+        <div className="p-1 sm:p-4 [&_.fc-toolbar]:flex-wrap [&_.fc-toolbar]:gap-2 [&_.fc-toolbar-title]:font-heading [&_.fc-toolbar-title]:text-brand-navy [&_.fc-toolbar-title]:font-bold [&_.fc-toolbar-title]:text-base sm:[&_.fc-toolbar-title]:text-xl [&_.fc-button]:bg-brand-navy [&_.fc-button]:border-brand-navy [&_.fc-button:hover]:bg-brand-navy/80 [&_.fc-button-active]:bg-brand-teal [&_.fc-button-active]:border-brand-teal [&_.fc-today-button]:bg-brand-teal [&_.fc-today-button]:border-brand-teal [&_.fc-event]:rounded-md [&_.fc-event]:text-xs [&_.fc-daygrid-day-number]:text-brand-navy [&_.fc-col-header-cell-cushion]:font-heading [&_.fc-col-header-cell-cushion]:text-brand-navy [&_.fc-daygrid-day.fc-day-today]:bg-brand-teal/5">
           <FullCalendar
             ref={calRef}
             plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
             initialView="dayGridMonth"
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
-            }}
+            headerToolbar={
+              isMobile
+                ? { left: 'prev,next', center: 'title', right: 'today' }
+                : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' }
+            }
+            footerToolbar={
+              isMobile
+                ? { center: 'dayGridMonth,timeGridWeek,listWeek' }
+                : undefined
+            }
             events={filteredEvents}
             datesSet={handleDatesSet}
             eventClick={handleEventClick}
+            dateClick={(arg) => { if (isMobile) setSelectedDate(arg.dateStr) }}
             height="auto"
             eventDisplay="block"
-            dayMaxEvents={3}
+            dayMaxEvents={isMobile ? 0 : 3}
+            dayCellContent={(arg) => {
+              if (!isMobile) return arg.dayNumberText
+              const dateStr = format(arg.date, 'yyyy-MM-dd')
+              const categoriesPresent = [...new Set(
+                filteredEvents.filter((e) => e.start.slice(0, 10) === dateStr).map((e) => e.category)
+              )]
+              return (
+                <div className="flex flex-col items-center gap-0.5 py-0.5">
+                  <span>{arg.dayNumberText}</span>
+                  {categoriesPresent.length > 0 && (
+                    <div className="flex gap-0.5">
+                      {categoriesPresent.slice(0, 4).map((cat) => (
+                        <span
+                          key={cat}
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: CALENDAR_COLORS[cat] }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            }}
             nowIndicator
             weekends
             firstDay={1}
@@ -585,6 +625,41 @@ function CalendarContent() {
           />
         </div>
       </div>
+
+      {/* ── Selected-day event list (mobile) ──
+          Mirrors the native Samsung Calendar reference: tapping a date in
+          the grid above populates this panel with that day's full events,
+          instead of cramming event titles into the tiny day cells. */}
+      {isMobile && selectedDate && (
+        <div className="bg-surface border border-base rounded-2xl p-4 space-y-2">
+          <p className="text-sm font-heading font-semibold text-brand-navy">
+            {format(new Date(`${selectedDate}T00:00:00`), 'EEEE, MMMM d')}
+          </p>
+          {selectedDateEvents.length === 0 ? (
+            <p className="text-sm text-muted">No events this day.</p>
+          ) : (
+            selectedDateEvents.map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => setSelected(e)}
+                className="w-full flex items-start gap-2 text-left p-2 rounded-xl hover:bg-page"
+              >
+                <span
+                  className="w-2 h-2 rounded-full mt-1.5 shrink-0"
+                  style={{ backgroundColor: CALENDAR_COLORS[e.category] }}
+                />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-body truncate">{e.title}</p>
+                  <p className="text-xs text-muted">
+                    {e.allDay ? 'All day' : format(new Date(e.start), 'h:mm a')}
+                  </p>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      )}
 
       {/* ── Event Detail Panel ── */}
       <EventDetailPanel event={selected} onClose={() => setSelected(null)} />

@@ -146,13 +146,21 @@ libraryRouter.get('/digital', verifyAuth, requirePermission('library.viewDigital
 
 libraryRouter.post('/digital/upload', verifyAuth, requirePermission('library.uploadDigitalResource'),
   upload.single('file'), async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
-    const parsed = CreateDigitalResourceSchema.safeParse(req.body)
-    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    const resource = await libService.uploadDigitalResource(
-      parsed.data, req.file.buffer, req.file.originalname, req.file.mimetype, req.file.size, req.user!.uid
-    )
-    return res.status(201).json(resource)
+    // [PRODUCTION FIX] No try/catch — same systemic bug as the other
+    // upload.single() handlers across this codebase: an error from
+    // uploadDigitalResource() became an unhandled rejection with no
+    // response ever sent, hanging the client's fetch indefinitely.
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
+      const parsed = CreateDigitalResourceSchema.safeParse(req.body)
+      if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+      const resource = await libService.uploadDigitalResource(
+        parsed.data, req.file.buffer, req.file.originalname, req.file.mimetype, req.file.size, req.user!.uid
+      )
+      return res.status(201).json(resource)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'library', route: 'digital-upload' } })
+    }
   })
 
 libraryRouter.get('/digital/:id/view', verifyAuth, requirePermission('library.viewDigitalResources'),

@@ -141,12 +141,17 @@ export async function listUsers(pageToken?: string) {
   // Firebase Auth fields — no employment/registration number, even though
   // that's exactly the kind of identifier an admin filters/sorts by. Batch
   // join against StaffProfile/Student by uid rather than N+1 queries.
+  // [MOBILE UI AUDIT FIX] Also select each record's own id (not just its
+  // display employeeNo/registrationNo) so a user row can link straight to
+  // /hr/:id or /students/:id.
   const [staff, students] = await Promise.all([
-    prisma.staffProfile.findMany({ where: { uid: { in: uids } }, select: { uid: true, employeeNo: true } }),
-    prisma.student.findMany({ where: { firebaseUid: { in: uids } }, select: { firebaseUid: true, registrationNo: true } }),
+    prisma.staffProfile.findMany({ where: { uid: { in: uids } }, select: { id: true, uid: true, employeeNo: true } }),
+    prisma.student.findMany({ where: { firebaseUid: { in: uids } }, select: { id: true, firebaseUid: true, registrationNo: true } }),
   ])
   const employeeNoByUid = new Map(staff.map((s) => [s.uid, s.employeeNo]))
+  const staffIdByUid = new Map(staff.map((s) => [s.uid, s.id]))
   const registrationNoByUid = new Map(students.filter((s) => s.firebaseUid).map((s) => [s.firebaseUid as string, s.registrationNo]))
+  const studentIdByUid = new Map(students.filter((s) => s.firebaseUid).map((s) => [s.firebaseUid as string, s.id]))
 
   return {
     users: result.users.map((u) => ({
@@ -160,6 +165,8 @@ export async function listUsers(pageToken?: string) {
       lastSignIn:  u.metadata.lastSignInTime,
       employeeNo:     employeeNoByUid.get(u.uid) ?? null,
       registrationNo: registrationNoByUid.get(u.uid) ?? null,
+      staffProfileId: staffIdByUid.get(u.uid) ?? null,
+      studentId:      studentIdByUid.get(u.uid) ?? null,
     })),
     pageToken: result.pageToken,
   }

@@ -65,12 +65,30 @@ export function requireRole(allowed: UserRole[]) {
  * Extracts and verifies a Firebase ID token from a Next.js App Router request.
  * Returns the decoded token or null if missing/invalid.
  * Used by API route handlers (not Express middleware).
+ *
+ * [PRODUCTION FIX] Added a `?token=` query-param fallback alongside the
+ * Authorization header. This route's only real caller,
+ * /api/files/[fileId]/route.ts, hands back URLs (via storage.ts's
+ * getSignedViewUrl()) meant to be opened directly — <a href>, <iframe src>,
+ * window.open() — none of which can attach a request header. Every such
+ * consumer (ReportCardGenerator.tsx's view/download links,
+ * DigitalResourceViewer.tsx's iframe) was getting a 401 "Unauthorised" on
+ * every click, since a header-only check can never be satisfied by a plain
+ * navigation. The `ttl=` param already baked into these URLs signals this
+ * was always meant to work as a self-contained link — this fallback
+ * actually implements that intent rather than just naming it. Query-param
+ * tokens are still short-lived Firebase ID tokens (~1hr) verified exactly
+ * like the header path, so this doesn't weaken the access-control checks
+ * that follow in the route (canReadFile still runs against the same
+ * decoded uid/role either way) — it only changes where the token may be read from.
  */
 export async function getIdTokenFromRequest(
   request: NextRequest,
 ): Promise<import('firebase-admin/auth').DecodedIdToken | null> {
-  const authHeader = request.headers.get('authorization') ?? ''
-  const token      = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  const authHeader  = request.headers.get('authorization') ?? ''
+  const headerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  const queryToken  = request.nextUrl.searchParams.get('token') ?? ''
+  const token       = headerToken || queryToken
   if (!token) return null
   try {
     const { getAuth } = await import('firebase-admin/auth')

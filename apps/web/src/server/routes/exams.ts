@@ -111,28 +111,36 @@ examsRouter.get(
   verifyAuth,
   requireRole(['admin', 'exam_officer']),
   async (req, res) => {
-    // R15 (typecheck cleanup in a touched file): Express 5 types
-    // req.params values as string | string[]; coerce explicitly.
-    const classId = String(req.params['classId'] ?? '')
-    const term    = String(req.params['term'] ?? '')
-    const { academicYear }  = req.query as { academicYear?: string }
+    // [PRODUCTION FIX] No try/catch — same systemic bug found across every
+    // other file-upload-adjacent route in this codebase. An error thrown
+    // outside the per-student loop's own try/catch (e.g. the Prisma
+    // lookups below) would hang the request with no response ever sent.
+    try {
+      // R15 (typecheck cleanup in a touched file): Express 5 types
+      // req.params values as string | string[]; coerce explicitly.
+      const classId = String(req.params['classId'] ?? '')
+      const term    = String(req.params['term'] ?? '')
+      const { academicYear }  = req.query as { academicYear?: string }
 
-    if (!academicYear) {
-      return res.status(400).json({ error: 'academicYear query param required' })
+      if (!academicYear) {
+        return res.status(400).json({ error: 'academicYear query param required' })
+      }
+
+      const termNum = parseInt(term, 10) as 1 | 2 | 3
+      if (![1, 2, 3].includes(termNum)) {
+        return res.status(400).json({ error: 'term must be 1, 2 or 3' })
+      }
+
+      const results = await reportCardService.batchGenerateReportCards(
+        classId,
+        termNum,
+        academicYear,
+        req.user!.uid,
+      )
+      return res.json(results)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'exams', route: 'report-cards-batch' } })
     }
-
-    const termNum = parseInt(term, 10) as 1 | 2 | 3
-    if (![1, 2, 3].includes(termNum)) {
-      return res.status(400).json({ error: 'term must be 1, 2 or 3' })
-    }
-
-    const results = await reportCardService.batchGenerateReportCards(
-      classId,
-      termNum,
-      academicYear,
-      req.user!.uid,
-    )
-    return res.json(results)
   },
 )
 

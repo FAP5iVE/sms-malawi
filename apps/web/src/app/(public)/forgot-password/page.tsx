@@ -32,7 +32,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { sendPasswordResetEmail } from 'firebase/auth'
+import { sendPasswordResetEmail, type ActionCodeSettings } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { ArrowLeft, Mail, CheckCircle2, Loader2, Home } from 'lucide-react'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
@@ -50,7 +50,11 @@ export default function ForgotPasswordPage() {
     setError(null)
     setLoading(true)
     try {
-      await sendPasswordResetEmail(auth, email)
+      const actionCodeSettings: ActionCodeSettings = {
+        url: `${window.location.origin}/reset-password`,
+        handleCodeInApp: true,
+      }
+      await sendPasswordResetEmail(auth, email, actionCodeSettings)
       setSent(true)
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''

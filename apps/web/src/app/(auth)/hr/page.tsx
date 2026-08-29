@@ -92,7 +92,9 @@ import {
   Wallet,
   FileDown,
   X,
+  ChevronRight,
 }                           from 'lucide-react'
+import Link                 from 'next/link'
 import { ModuleTabs }       from '@/components/shared/ModuleTabs'
 import { formatMWK }        from '@shared/constants/malawi'
 import { useMyPayslips, useMySalaryStructure, downloadPayslip } from '@/hooks/usePayroll'
@@ -322,15 +324,16 @@ function HRContent() {
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {(staff as ApiStaffProfile[]).map((s) => (
-                <div
+                <Link
                   key={s.id}
-                  className="bg-surface border border-base rounded-xl p-4 flex items-center gap-3"
+                  href={`/hr/${s.id}`}
+                  className="bg-surface border border-base rounded-xl p-4 flex items-center gap-3 text-left hover:border-brand-teal active:bg-page transition-colors"
                 >
                   <div className="w-10 h-10 rounded-full bg-brand-navy/10 flex items-center justify-center text-brand-navy font-semibold text-sm shrink-0">
                     {s.firstName[0]}
                     {s.lastName[0]}
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-semibold text-body truncate">
                       {s.firstName} {s.lastName}
                     </p>
@@ -347,7 +350,8 @@ function HRContent() {
                       {s.status}
                     </span>
                   </div>
-                </div>
+                  <ChevronRight className="w-4 h-4 text-muted shrink-0" aria-hidden />
+                </Link>
               ))}
             </div>
           )}

@@ -48,6 +48,7 @@ import { useState, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import Link from 'next/link'
 import { AddUserTypeDialog, type NewUserType } from '@/components/shared/AddUserTypeDialog'
 import { StaffForm } from '@/components/hr/StaffForm'
 import { StudentForm } from '@/components/students/StudentForm'
@@ -195,12 +196,28 @@ function UserManagementContent() {
   }, [filteredSorted, groupByRole])
 
   function renderUserRow(u: ApiFirebaseUser) {
+    const profileHref = u.staffProfileId
+      ? `/hr/${u.staffProfileId}`
+      : u.studentId
+        ? `/students/${u.studentId}`
+        : null
+
     return (
       <tr key={u.uid} className="hover:bg-page/60">
         <td className="px-4 py-3">
-          <p className="font-medium text-body">{u.displayName || u.email}</p>
-          <p className="text-xs text-muted">{u.email}</p>
-          <p className="text-[10.5px] text-muted/70 font-mono mt-0.5">{u.uid}</p>
+          {profileHref ? (
+            <Link href={profileHref} className="block hover:underline">
+              <p className="font-medium text-body">{u.displayName || u.email}</p>
+              <p className="text-xs text-muted">{u.email}</p>
+              <p className="text-[10.5px] text-muted/70 font-mono mt-0.5">{u.uid}</p>
+            </Link>
+          ) : (
+            <>
+              <p className="font-medium text-body">{u.displayName || u.email}</p>
+              <p className="text-xs text-muted">{u.email}</p>
+              <p className="text-[10.5px] text-muted/70 font-mono mt-0.5">{u.uid}</p>
+            </>
+          )}
         </td>
         <td className="px-4 py-3">
           <select

@@ -50,7 +50,8 @@
  *   phase)
  */
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { getAuth } from 'firebase/auth'
 import { useSearchParams }   from 'next/navigation'
 import { RoleGuard }         from '@/components/shared/RoleGuard'
 import { PermissionGuard }   from '@/components/shared/PermissionGuard'
@@ -74,12 +75,13 @@ import {
   useUpdateBook,
   useArchiveBook,
   useCreateBook,
+  useUploadDigitalResource,
   useCatalogReportStats,
   useFines,
   useClearFine,
 }                            from '@/hooks/useLibrary'
 import { DigitalResourceViewer } from '@/components/library/DigitalResourceViewer'
-import { BookOpen, Scan, FileText, AlertTriangle, Eye, Check, X as XIcon, Undo2, Pencil, Archive, ArrowUpDown, Users2 } from 'lucide-react'
+import { BookOpen, Scan, FileText, AlertTriangle, Eye, Check, X as XIcon, Undo2, Pencil, Archive, ArrowUpDown, Users2, Upload, Loader2 } from 'lucide-react'
 import { ModuleTabs }        from '@/components/shared/ModuleTabs'
 import { MALAWI_SUBJECTS, formatMWK } from '@shared/constants/malawi'
 import type {
@@ -321,6 +323,279 @@ function BookFormModal({
   )
 }
 
+function UploadDigitalResourceModal({ onClose }: { onClose: () => void }) {
+  const upload = useUploadDigitalResource()
+
+  const [title, setTitle]     = useState('')
+  const [type, setType]       = useState('EBOOK')
+  const [subject, setSubject] = useState('')
+  const [form, setForm]       = useState('')
+  const [file, setFile]       = useState<File | null>(null)
+
+  function handleSubmit() {
+    if (!title.trim() || !file) return
+    upload.mutate(
+      {
+        title: title.trim(),
+        type: type as 'EBOOK' | 'PAST_PAPER' | 'REFERENCE' | 'STUDY_GUIDE',
+        subject: subject || undefined,
+        form: form ? Number(form) : undefined,
+        file,
+      },
+      { onSuccess: onClose },
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
+        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
+          <h2 className="font-heading font-bold text-brand-navy">Add Digital Resource</h2>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
+            <XIcon className="w-4 h-4 text-muted" />
+          </button>
+        </div>
+        <div className="p-6 space-y-3">
+          <div>
+            <label htmlFor="dr-title" className="text-xs text-muted mb-1 block">Title</label>
+            <input id="dr-title" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="dr-type" className="text-xs text-muted mb-1 block">Type</label>
+              <select id="dr-type" value={type} onChange={(e) => setType(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11">
+                <option value="EBOOK">eBook</option>
+                <option value="PAST_PAPER">Past Paper</option>
+                <option value="REFERENCE">Reference</option>
+                <option value="STUDY_GUIDE">Study Guide</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="dr-form" className="text-xs text-muted mb-1 block">Form <span className="text-muted/70">(optional)</span></label>
+              <select id="dr-form" value={form} onChange={(e) => setForm(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11">
+                <option value="">All forms</option>
+                {[1, 2, 3, 4].map((f) => <option key={f} value={f}>Form {f}</option>)}
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="dr-subject" className="text-xs text-muted mb-1 block">Subject <span className="text-muted/70">(optional)</span></label>
+              <select id="dr-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11">
+                <option value="">All subjects</option>
+                {MALAWI_SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="dr-file" className="text-xs text-muted mb-1 block">File</label>
+            <input
+              id="dr-file"
+              type="file"
+              accept="application/pdf,image/*"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-teal/10 file:text-brand-teal file:text-xs file:font-semibold"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={upload.isPending || !title.trim() || !file}
+            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+          >
+            {upload.isPending ? 'Uploading…' : 'Upload'}
+          </button>
+          {upload.error && (
+            <p className="text-sm text-brand-coral">
+              {upload.error instanceof Error ? upload.error.message : 'Something went wrong.'}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface BorrowerHit {
+  id: string
+  fullName: string
+  sublabel: string
+}
+
+// Reuses the same /api/search/fallback endpoint GlobalSearch.tsx already
+// calls — only students/staff are relevant here, so book hits are dropped.
+async function searchBorrowers(query: string, type: 'student' | 'staff'): Promise<BorrowerHit[]> {
+  try {
+    const token = await getAuth().currentUser?.getIdToken()
+    const res = await fetch(`/api/search/fallback?q=${encodeURIComponent(query)}`, {
+      headers: { Authorization: `Bearer ${token ?? ''}` },
+    })
+    if (!res.ok) return []
+    const data = await res.json() as {
+      students: { id: string; fullName: string; registrationNo: string; className: string | null }[]
+      staff:    { id: string; fullName: string; role: string; department: string }[]
+    }
+    return type === 'student'
+      ? data.students.map((s) => ({ id: s.id, fullName: s.fullName, sublabel: `${s.registrationNo}${s.className ? ` · ${s.className}` : ''}` }))
+      : data.staff.map((s) => ({ id: s.id, fullName: s.fullName, sublabel: s.department }))
+  } catch {
+    return []
+  }
+}
+
+function BorrowerPicker({
+  type, value, onChange,
+}: {
+  type: 'student' | 'staff'
+  value: BorrowerHit | null
+  onChange: (hit: BorrowerHit | null) => void
+}) {
+  const [query, setQuery]     = useState('')
+  const [results, setResults] = useState<BorrowerHit[]>([])
+  const [open, setOpen]       = useState(false)
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleChange = useCallback((v: string) => {
+    setQuery(v)
+    onChange(null)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (v.trim().length < 2) { setResults([]); setOpen(false); return }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      setResults(await searchBorrowers(v, type))
+      setOpen(true)
+      setLoading(false)
+    }, 300)
+  }, [type, onChange])
+
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
+
+  return (
+    <div className="relative">
+      <input
+        value={value ? value.fullName : query}
+        onChange={(e) => handleChange(e.target.value)}
+        onFocus={() => results.length > 0 && setOpen(true)}
+        placeholder={type === 'student' ? 'Search student by name…' : 'Search staff by name…'}
+        className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        autoComplete="off"
+      />
+      {loading && <Loader2 className="w-4 h-4 animate-spin text-muted absolute right-3 top-1/2 -translate-y-1/2" />}
+      {open && results.length > 0 && (
+        <div className="absolute z-20 mt-1 w-full bg-surface border border-base rounded-lg shadow-lg max-h-56 overflow-y-auto">
+          {results.map((hit) => (
+            <button
+              key={hit.id}
+              type="button"
+              onClick={() => { onChange(hit); setQuery(''); setOpen(false) }}
+              className="w-full text-left px-3 py-2 hover:bg-page text-sm"
+            >
+              <p className="font-medium text-body">{hit.fullName}</p>
+              <p className="text-xs text-muted">{hit.sublabel}</p>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function IssueBookModal({
+  bookId, onClose, onIssued,
+}: {
+  bookId: string
+  onClose: () => void
+  /** Called once, only on a successful issue (not on cancel) — lets a
+   *  caller react to the specific outcome, e.g. clearing a scan result. */
+  onIssued?: () => void
+}) {
+  const issueBorrowing = useIssueBorrowing()
+  const [borrowerType, setBorrowerType] = useState<'student' | 'staff'>('student')
+  const [borrower, setBorrower] = useState<BorrowerHit | null>(null)
+  const [dueDate, setDueDate] = useState('')
+
+  function handleSubmit() {
+    if (!borrower || !dueDate) return
+    issueBorrowing.mutate({
+      bookId,
+      borrowerType: borrowerType === 'student' ? 'STUDENT' : 'STAFF',
+      studentId: borrowerType === 'student' ? borrower.id : undefined,
+      staffId: borrowerType === 'staff' ? borrower.id : undefined,
+      dueDate,
+    }, {
+      onSuccess: () => {
+        onIssued?.()
+        onClose()
+      },
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
+        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
+          <h2 className="font-heading font-bold text-brand-navy">Issue Book</h2>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
+            <XIcon className="w-4 h-4 text-muted" />
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => { setBorrowerType('student'); setBorrower(null) }}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${borrowerType === 'student' ? 'bg-brand-navy text-white border-brand-navy' : 'border-base text-body'}`}
+            >
+              Student
+            </button>
+            <button
+              type="button"
+              onClick={() => { setBorrowerType('staff'); setBorrower(null) }}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${borrowerType === 'staff' ? 'bg-brand-navy text-white border-brand-navy' : 'border-base text-body'}`}
+            >
+              Staff
+            </button>
+          </div>
+
+          <div>
+            <label className="text-xs text-muted mb-1 block">
+              {borrowerType === 'student' ? 'Student' : 'Staff member'}
+            </label>
+            <BorrowerPicker type={borrowerType} value={borrower} onChange={setBorrower} />
+          </div>
+
+          <div>
+            <label htmlFor="issue-due-date" className="text-xs text-muted mb-1 block">Due date</label>
+            <input
+              id="issue-due-date"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={issueBorrowing.isPending || !borrower || !dueDate}
+            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+          >
+            {issueBorrowing.isPending ? 'Issuing…' : 'Issue Book'}
+          </button>
+          {issueBorrowing.error && (
+            <p className="text-sm text-brand-coral">
+              {issueBorrowing.error instanceof Error ? issueBorrowing.error.message : 'Something went wrong.'}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function LibraryContent() {
   const { role }  = useAuthStore()
 
@@ -363,6 +638,8 @@ function LibraryContent() {
   const [scanResult, setScanResult] = useState<ApiBook | null>(null)
   const [scanError, setScanError]   = useState<string | null>(null)
   const [viewingResource, setViewingResource] = useState<{ id: string; title: string } | null>(null)
+  const [showUploadResource, setShowUploadResource] = useState(false)
+  const [issuingBookId, setIssuingBookId] = useState<string | null>(null)
 
   const [recTitle, setRecTitle]   = useState('')
   const [recReason, setRecReason] = useState('')
@@ -411,7 +688,6 @@ function LibraryContent() {
   const { data: fineWaivers = [] }      = useFineWaivers('PENDING')
 
   const scanBarcode        = useScanBarcode()
-  const issueBorrowing     = useIssueBorrowing()
   const returnBook         = useReturnBook()
   const createRecommendation  = useCreateRecommendation()
   const approveRecommendation = useApproveRecommendation()
@@ -434,20 +710,7 @@ function LibraryContent() {
   }
 
   function handleIssue(bookId: string) {
-    const studentId = window.prompt('Student ID to issue this book to (leave blank if issuing to staff):')?.trim()
-    const staffId = studentId ? undefined : window.prompt('Staff ID to issue this book to:')?.trim()
-    if (!studentId && !staffId) return
-    const dueDate = window.prompt('Due date (YYYY-MM-DD):', '')?.trim()
-    if (!dueDate) return
-    issueBorrowing.mutate({
-      bookId,
-      borrowerType: studentId ? 'STUDENT' : 'STAFF',
-      studentId: studentId || undefined,
-      staffId: staffId || undefined,
-      dueDate,
-    }, {
-      onSuccess: () => setScanResult(null),
-    })
+    setIssuingBookId(bookId)
   }
 
   function handleReturn(borrowingId: string) {
@@ -837,37 +1100,48 @@ function LibraryContent() {
       {/* ── Digital library tab ────────────────────────────────────────────── */}
       {tab === 'digital' && (
         <div className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <select
-              value={digitalTypeFilter}
-              onChange={(e) => setDigitalTypeFilter(e.target.value)}
-              className="border border-base rounded-xl px-3 py-2 text-sm bg-surface min-h-[44px]"
-              aria-label="Filter by resource type"
-            >
-              <option value="">All types</option>
-              <option value="EBOOK">eBook</option>
-              <option value="PAST_PAPER">Past Paper</option>
-              <option value="REFERENCE">Reference</option>
-              <option value="STUDY_GUIDE">Study Guide</option>
-            </select>
-            <select
-              value={digitalFormFilter}
-              onChange={(e) => setDigitalFormFilter(e.target.value)}
-              className="border border-base rounded-xl px-3 py-2 text-sm bg-surface min-h-[44px]"
-              aria-label="Filter by form"
-            >
-              <option value="">All forms</option>
-              {[1, 2, 3, 4].map((f) => <option key={f} value={f}>Form {f}</option>)}
-            </select>
-            <select
-              value={digitalSubjectFilter}
-              onChange={(e) => setDigitalSubjectFilter(e.target.value)}
-              className="border border-base rounded-xl px-3 py-2 text-sm bg-surface min-h-[44px]"
-              aria-label="Filter by subject"
-            >
-              <option value="">All subjects</option>
-              {MALAWI_SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={digitalTypeFilter}
+                onChange={(e) => setDigitalTypeFilter(e.target.value)}
+                className="border border-base rounded-xl px-3 py-2 text-sm bg-surface min-h-[44px]"
+                aria-label="Filter by resource type"
+              >
+                <option value="">All types</option>
+                <option value="EBOOK">eBook</option>
+                <option value="PAST_PAPER">Past Paper</option>
+                <option value="REFERENCE">Reference</option>
+                <option value="STUDY_GUIDE">Study Guide</option>
+              </select>
+              <select
+                value={digitalFormFilter}
+                onChange={(e) => setDigitalFormFilter(e.target.value)}
+                className="border border-base rounded-xl px-3 py-2 text-sm bg-surface min-h-[44px]"
+                aria-label="Filter by form"
+              >
+                <option value="">All forms</option>
+                {[1, 2, 3, 4].map((f) => <option key={f} value={f}>Form {f}</option>)}
+              </select>
+              <select
+                value={digitalSubjectFilter}
+                onChange={(e) => setDigitalSubjectFilter(e.target.value)}
+                className="border border-base rounded-xl px-3 py-2 text-sm bg-surface min-h-[44px]"
+                aria-label="Filter by subject"
+              >
+                <option value="">All subjects</option>
+                {MALAWI_SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            {isLibStaff && (
+              <button
+                type="button"
+                onClick={() => setShowUploadResource(true)}
+                className="shrink-0 inline-flex items-center gap-2 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+              >
+                <Upload className="w-4 h-4" aria-hidden /> Add Resource
+              </button>
+            )}
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {(digitalResources as ApiDigitalResource[]).length === 0 && (
@@ -912,6 +1186,18 @@ function LibraryContent() {
             )}
           </div>
         </div>
+      )}
+
+      {showUploadResource && (
+        <UploadDigitalResourceModal onClose={() => setShowUploadResource(false)} />
+      )}
+
+      {issuingBookId && (
+        <IssueBookModal
+          bookId={issuingBookId}
+          onClose={() => setIssuingBookId(null)}
+          onIssued={() => setScanResult(null)}
+        />
       )}
 
       {/* ── Recommendations tab ──────────────────────────────────────────── */}

@@ -50,6 +50,7 @@ import { prisma } from '@/lib/prisma'
 import { CreateAssignmentSchema } from '@shared/schemas/student'
 import * as assignmentService from '@/server/services/assignmentService'
 import { uploadFile, FILE_PREFIX } from '@/lib/storage'
+import { sendError } from '@/server/lib/sendError'
 
 export const assignmentsRouter = Router({ mergeParams: true })
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }) // 25MB
@@ -146,39 +147,47 @@ assignmentsRouter.post(
   requireAssignmentViewAccess,
   upload.single('file'),
   async (req: Request, res: Response) => {
-    const user = req.user!
-    if (user.role !== 'student') {
-      return res.status(403).json({ error: 'Only enrolled students may submit assignments.' })
-    }
+    // [PRODUCTION FIX] No try/catch at all — an error from uploadFile()
+    // or submitAssignment() became an unhandled rejection with no response
+    // ever sent, hanging the client's fetch. Same systemic bug found across
+    // announcements.ts, gallery.ts, finances.ts, hr.ts, and library.ts.
+    try {
+      const user = req.user!
+      if (user.role !== 'student') {
+        return res.status(403).json({ error: 'Only enrolled students may submit assignments.' })
+      }
 
-    const assignmentId = String(req.params.id)
+      const assignmentId = String(req.params.id)
 
-    const student = await prisma.student.findFirst({
-      where:  { firebaseUid: user.uid },
-      select: { id: true },
-    })
-    if (!student) {
-      return res.status(404).json({ error: 'No student record is linked to this account.' })
-    }
+      const student = await prisma.student.findFirst({
+        where:  { firebaseUid: user.uid },
+        select: { id: true },
+      })
+      if (!student) {
+        return res.status(404).json({ error: 'No student record is linked to this account.' })
+      }
 
-    let fileKey: string | null = null
-    if (req.file) {
-      const uploaded = await uploadFile(
-        FILE_PREFIX.ASSIGNMENT_SUBMISSION,
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype
+      let fileKey: string | null = null
+      if (req.file) {
+        const uploaded = await uploadFile(
+          FILE_PREFIX.ASSIGNMENT_SUBMISSION,
+          req.file.buffer,
+          req.file.originalname,
+          req.file.mimetype
+        )
+        fileKey = uploaded.fileId
+      }
+
+      const submission = await assignmentService.submitAssignment(
+        assignmentId,
+        student.id,
+        fileKey,
+        user.uid,
+        user.role
       )
-      fileKey = uploaded.fileId
+      return res.status(201).json(submission)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'assignments', route: 'submit' } })
     }
-
-    const submission = await assignmentService.submitAssignment(
-      assignmentId,
-      student.id,
-      fileKey,
-      user.uid,
-      user.role
-    )
-    return res.status(201).json(submission)
   }
 )

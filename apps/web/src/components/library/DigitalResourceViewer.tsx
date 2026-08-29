@@ -50,10 +50,28 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Loader2, X, AlertTriangle, Eye }   from 'lucide-react'
 import { motion, AnimatePresence }           from 'framer-motion'
+import { getAuth }                           from 'firebase/auth'
 import { useMotionEnabled }                  from '@/store/motionStore'
 import { reducedMotionVariants, reducedMotionTransition, SPRING } from '@/lib/motion'
 import { useDigitalResourceView }            from '@/hooks/useLibrary'
 import { VIEW_URL_TTL_SECS } from '@shared/constants/storage'
+
+// [PRODUCTION FIX] /api/files/[fileId] requires a live auth token
+// (getIdTokenFromRequest, verifyAuth.ts) and this signed URL is loaded
+// directly as an <iframe src> below — a plain navigation that can never
+// attach a request header. Every open previously returned {"error":
+// "Unauthorised"}. Appending a freshly-fetched ID token as ?token= (now
+// accepted as a fallback by getIdTokenFromRequest) fixes this without
+// weakening the access check — the same decoded uid/role still gets
+// verified, just read from the query string instead of a header this
+// iframe load could never send.
+async function appendAuthToken(url: string): Promise<string> {
+  const user = getAuth().currentUser
+  if (!user) return url
+  const token = await user.getIdToken()
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}token=${encodeURIComponent(token)}`
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COUNTDOWN REFRESH (re-fetches URL before expiry)
@@ -86,7 +104,7 @@ export function DigitalResourceViewer({
   const fetchUrl = useCallback(() => {
     setError(null)
     viewResource.mutate(resourceId, {
-      onSuccess: (session) => setViewUrl(session.url),
+      onSuccess: (session) => { void appendAuthToken(session.url).then(setViewUrl) },
       onError:   (e) => setError(e instanceof Error ? e.message : 'Unable to load resource'),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,7 +121,7 @@ export function DigitalResourceViewer({
   // deferred) and the "Try again" button (an event handler).
   useEffect(() => {
     viewResource.mutate(resourceId, {
-      onSuccess: (session) => setViewUrl(session.url),
+      onSuccess: (session) => { void appendAuthToken(session.url).then(setViewUrl) },
       onError:   (e) => setError(e instanceof Error ? e.message : 'Unable to load resource'),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps

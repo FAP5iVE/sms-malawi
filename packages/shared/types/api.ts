@@ -462,6 +462,38 @@ export interface ApiStaffProfile {
   dateJoined: string
 }
 
+/**
+ * The richer single-staff-member shape returned by GET /hr/:id
+ * (hrService.getStaffProfile) — includes email/phone (which the lighter
+ * directory-list shape above omits) plus this term's leave balances,
+ * recent leave requests, active loans, and recent performance notes.
+ * Backs the read-only staff profile page and StaffForm's edit mode.
+ */
+export interface ApiStaffDetail extends ApiStaffProfile {
+  email: string
+  phone?: string
+  salaryStructureId?: string
+  leaveBalances: {
+    id: string
+    leaveType: string
+    totalDays: number
+    usedDays: number
+    pendingDays: number
+    year: number
+  }[]
+  leaveRequests: ApiLeaveRequest[]
+  loans: ApiStaffLoan[]
+  performanceNotes: {
+    id: string
+    academicYear: string
+    term: number
+    rating: number
+    notes: string
+    authorUid: string
+    createdAt: string
+  }[]
+}
+
 export interface ApiLeaveRequest {
   id: string
   staffId: string
@@ -888,6 +920,12 @@ export interface ApiFirebaseUser {
    *  record yet, or the account isn't linked to a student). */
   employeeNo?:     string | null
   registrationNo?: string | null
+  /** [MOBILE UI AUDIT FIX] StaffProfile.id / Student.id for the same join
+   *  above — lets the UI link a row straight to /hr/:id or /students/:id
+   *  without a second lookup. null under the same conditions as
+   *  employeeNo/registrationNo above. */
+  staffProfileId?: string | null
+  studentId?:      string | null
 }
 
 export interface ApiUserListResponse {

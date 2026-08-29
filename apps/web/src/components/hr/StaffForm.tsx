@@ -13,33 +13,47 @@
  *   fallback for manual relay (the server also emails it). Creating the staff
  *   member now provisions their login end-to-end server-side
  *   (hrService.createStaff) — this form no longer collects a uid.
- * [DEPENDS ON]: W/hooks/useHR.ts (useCreateStaff), @shared/schemas/hr
- *   (CreateStaffSchema), @shared/types/roles (ROLE_LABELS/USER_ROLES).
+ * [MOBILE UI AUDIT FIX]: Added edit mode (staffId? prop), mirroring
+ *   StudentForm.tsx's studentId? convention exactly — the HR Staff
+ *   Directory's cards were not clickable/viewable at all before this
+ *   fix. When staffId is supplied: fetches the existing profile
+ *   (useStaffProfile), switches the zod resolver from CreateStaffSchema
+ *   to the narrower UpdateStaffSchema (no employeeNo/role/dateJoined —
+ *   those fields are hidden rather than shown-disabled), prefills via
+ *   reset() once data resolves, and submits through the new
+ *   useUpdateStaff() mutation instead of useCreateStaff(). The
+ *   post-submit temp-password screen only applies to creation.
+ * [DEPENDS ON]: W/hooks/useHR.ts (useCreateStaff, useUpdateStaff,
+ *   useStaffProfile), @shared/schemas/hr (CreateStaffSchema,
+ *   UpdateStaffSchema), @shared/types/roles (ROLE_LABELS/USER_ROLES),
+ *   @shared/types/api (ApiStaffDetail).
  */
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
+import type { Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CreateStaffSchema } from '@shared/schemas/hr'
-import type { CreateStaffInput } from '@shared/schemas/hr'
-
-// CreateStaffSchema has a defaulted field (employmentType), so its INPUT type
-// (what the form fields hold before parsing — employmentType optional) differs
-// from its OUTPUT type (CreateStaffInput — employmentType required). useForm is
-// parameterised with both so the resolver, field registration, and the
-// transformed submit handler all line up. Typing useForm on the output type
-// alone is what produced the "two different Resolver types" mismatch.
+import { CreateStaffSchema, UpdateStaffSchema } from '@shared/schemas/hr'
+import type { CreateStaffInput, UpdateStaffInput } from '@shared/schemas/hr'
+import type { ApiStaffDetail } from '@shared/types/api'
 type StaffFormValues = z.input<typeof CreateStaffSchema>
 import { USER_ROLES, ROLE_LABELS } from '@shared/types/roles'
-import { useCreateStaff } from '@/hooks/useHR'
+import { useCreateStaff, useUpdateStaff, useStaffProfile } from '@/hooks/useHR'
 import { useDepartmentTitles } from '@/hooks/useSettings'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, AlertTriangle, CheckCircle2, Copy } from 'lucide-react'
 
 interface Props {
   onClose: () => void
+  /** When supplied, the form opens pre-filled in edit mode against this
+   *  staff member instead of creating a new one — mirrors
+   *  StudentForm.tsx's studentId? convention. Edit mode is scoped to
+   *  UpdateStaffSchema's fields only (no employeeNo/role/dateJoined —
+   *  see that schema's own comment for why), so those fields are hidden
+   *  rather than shown-disabled when editing. */
+  staffId?: string
 }
 
 // Staff cannot be created with the student role — student accounts are
@@ -59,8 +73,11 @@ const ic =
 
 const lbl = 'block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5'
 
-export function StaffForm({ onClose }: Props) {
+export function StaffForm({ onClose, staffId }: Props) {
+  const isEdit = !!staffId
+  const { data: existingStaff } = useStaffProfile(staffId ?? '')
   const createStaff = useCreateStaff()
+  const updateStaff = useUpdateStaff()
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [created, setCreated] = useState<{ name: string; email: string; tempPassword: string } | null>(null)
   const [copied, setCopied] = useState(false)
@@ -70,11 +87,25 @@ export function StaffForm({ onClose }: Props) {
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<StaffFormValues, unknown, CreateStaffInput>({
-    resolver: zodResolver(CreateStaffSchema),
+    // The ternary picks between two schemas with different (but
+    // compatible-at-runtime) shapes — UpdateStaffSchema's fields are a
+    // strict subset of CreateStaffInput's, and onSubmit already narrows to
+    // that subset before calling updateStaff, so this is safe. TypeScript
+    // can't resolve the ternary to a single static Resolver type since
+    // isEdit is only known at runtime, hence the assertion.
+    resolver: zodResolver(isEdit ? UpdateStaffSchema : CreateStaffSchema) as unknown as Resolver<StaffFormValues, unknown, CreateStaffInput>,
     defaultValues: { employmentType: 'FULL_TIME' },
   })
+
+  // Prefill once the existing staff member's data resolves.
+  useEffect(() => {
+    if (existingStaff) {
+      reset(mapStaffToFormValues(existingStaff as ApiStaffDetail))
+    }
+  }, [existingStaff, reset])
 
   // [PRODUCTION FIX 2026-07-27] Department/title are now selected from the
   // admin/hr/high_rank-editable taxonomy (Settings → Departments & Titles)
@@ -96,6 +127,19 @@ export function StaffForm({ onClose }: Props) {
 
   function onSubmit(data: CreateStaffInput) {
     setSubmitError(null)
+    if (isEdit) {
+      const { firstName, lastName, email, phone, department, jobTitle, employmentType, contractExpiry, salaryStructureId } = data
+      updateStaff.mutate(
+        { id: staffId!, data: { firstName, lastName, email, phone, department, jobTitle, employmentType, contractExpiry, salaryStructureId } as UpdateStaffInput },
+        {
+          onSuccess: () => onClose(),
+          onError: (err) => {
+            setSubmitError(err instanceof Error ? err.message : 'Failed to save changes. Please try again.')
+          },
+        },
+      )
+      return
+    }
     createStaff.mutate(data, {
       onSuccess: (res) => {
         // The server returns the created profile plus a tempPassword fallback.
@@ -144,7 +188,7 @@ export function StaffForm({ onClose }: Props) {
         >
           <div className="flex items-center justify-between px-6 py-4 border-b border-base">
             <h2 className="font-heading font-bold text-brand-navy">
-              {created ? 'Staff Account Created' : 'Add Staff Member'}
+              {created ? 'Staff Account Created' : isEdit ? 'Edit Staff Member' : 'Add Staff Member'}
             </h2>
             <button
               type="button"
@@ -214,24 +258,28 @@ export function StaffForm({ onClose }: Props) {
                   <input id="sf-email" type="email" {...register('email')} className={ic} placeholder="name@school.mw" />
                   {errors.email && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.email.message}</p>}
                 </div>
-                <div>
-                  <label className={lbl} htmlFor="sf-employeeNo">Employee no.</label>
-                  <input id="sf-employeeNo" {...register('employeeNo')} className={ic} placeholder="e.g. EMP-014" />
-                  {errors.employeeNo && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.employeeNo.message}</p>}
-                </div>
+                {!isEdit && (
+                  <div>
+                    <label className={lbl} htmlFor="sf-employeeNo">Employee no.</label>
+                    <input id="sf-employeeNo" {...register('employeeNo')} className={ic} placeholder="e.g. EMP-014" />
+                    {errors.employeeNo && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.employeeNo.message}</p>}
+                  </div>
+                )}
                 <div>
                   <label className={lbl} htmlFor="sf-phone">Phone (optional)</label>
                   <input id="sf-phone" {...register('phone')} className={ic} placeholder="+265…" />
                   {errors.phone && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.phone.message}</p>}
                 </div>
-                <div>
-                  <label className={lbl} htmlFor="sf-role">Role</label>
-                  <select id="sf-role" {...register('role')} className={ic} defaultValue="">
-                    <option value="" disabled>Select role…</option>
-                    {STAFF_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                  </select>
-                  {errors.role && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.role.message}</p>}
-                </div>
+                {!isEdit && (
+                  <div>
+                    <label className={lbl} htmlFor="sf-role">Role</label>
+                    <select id="sf-role" {...register('role')} className={ic} defaultValue="">
+                      <option value="" disabled>Select role…</option>
+                      {STAFF_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                    </select>
+                    {errors.role && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.role.message}</p>}
+                  </div>
+                )}
                 <div>
                   <label className={lbl} htmlFor="sf-employmentType">Employment type</label>
                   <select id="sf-employmentType" {...register('employmentType')} className={ic}>
@@ -273,11 +321,13 @@ export function StaffForm({ onClose }: Props) {
                   </select>
                   {errors.jobTitle && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.jobTitle.message}</p>}
                 </div>
-                <div>
-                  <label className={lbl} htmlFor="sf-dateJoined">Date joined</label>
-                  <input id="sf-dateJoined" type="date" {...register('dateJoined')} className={ic} />
-                  {errors.dateJoined && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.dateJoined.message}</p>}
-                </div>
+                {!isEdit && (
+                  <div>
+                    <label className={lbl} htmlFor="sf-dateJoined">Date joined</label>
+                    <input id="sf-dateJoined" type="date" {...register('dateJoined')} className={ic} />
+                    {errors.dateJoined && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.dateJoined.message}</p>}
+                  </div>
+                )}
                 <div>
                   <label className={lbl} htmlFor="sf-contractExpiry">Contract expiry (optional)</label>
                   <input id="sf-contractExpiry" type="date" {...register('contractExpiry')} className={ic} />
@@ -302,11 +352,11 @@ export function StaffForm({ onClose }: Props) {
                 </button>
                 <button
                   type="submit"
-                  disabled={createStaff.isPending}
+                  disabled={createStaff.isPending || updateStaff.isPending}
                   className="px-5 py-2.5 text-sm bg-brand-teal text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 hover:bg-brand-teal-light min-h-11"
                 >
-                  {createStaff.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Create Staff &amp; Send Login
+                  {(createStaff.isPending || updateStaff.isPending) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {isEdit ? 'Save Changes' : 'Create Staff & Send Login'}
                 </button>
               </div>
             </form>
@@ -315,4 +365,20 @@ export function StaffForm({ onClose }: Props) {
       </motion.div>
     </AnimatePresence>
   )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+function mapStaffToFormValues(s: ApiStaffDetail): Partial<StaffFormValues> {
+  return {
+    firstName:         s.firstName,
+    lastName:          s.lastName,
+    email:             s.email,
+    phone:             s.phone,
+    department:        s.department,
+    jobTitle:          s.jobTitle,
+    employmentType:    s.employmentType as StaffFormValues['employmentType'],
+    contractExpiry:    s.contractExpiry?.slice(0, 10),
+    salaryStructureId: s.salaryStructureId,
+  }
 }

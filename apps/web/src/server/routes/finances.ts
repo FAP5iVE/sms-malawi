@@ -93,6 +93,7 @@ import { prisma } from '@/lib/prisma'
 import { bulkGenerateInvoices } from '@/server/services/bulkInvoiceService'
 import * as Sentry from '@sentry/nextjs'
 import { logger } from '@/lib/logger'
+import { sendError } from '@/server/lib/sendError'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
 
@@ -292,18 +293,27 @@ financesRouter.post(
   requireRole(['admin', 'finance']),
   upload.single('file'),
   async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
-    const uploaded = await uploadFile(
-      FILE_PREFIX.EXPENSE_RECEIPT,
-      req.file.buffer,
-      req.file.originalname,
-      req.file.mimetype
-    )
-    const expense = await prisma.expense.update({
-      where: { id: String(req.params.id) },
-      data: { receiptKey: uploaded.fileId },
-    })
-    res.status(201).json({ receiptKey: expense.receiptKey })
+    // [PRODUCTION FIX] No try/catch — same systemic bug as the other
+    // upload.single() handlers across this codebase (announcements.ts,
+    // gallery.ts, assignments.ts, hr.ts, library.ts): an error from
+    // uploadFile() became an unhandled rejection with no response sent,
+    // hanging the client's fetch indefinitely.
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
+      const uploaded = await uploadFile(
+        FILE_PREFIX.EXPENSE_RECEIPT,
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype
+      )
+      const expense = await prisma.expense.update({
+        where: { id: String(req.params.id) },
+        data: { receiptKey: uploaded.fileId },
+      })
+      res.status(201).json({ receiptKey: expense.receiptKey })
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'receipt-upload' } })
+    }
   }
 )
 
@@ -866,14 +876,9 @@ financesRouter.get(
       const invoices = await prisma.invoice.findMany({
         where: { academicYear, term: yearNum },
         orderBy: { status: 'asc' },
-        // Same convention GET /invoices already uses above ([R9]) — never
-        // surface a raw studentId cuid in a UI-facing report.
-        include: { student: { select: { firstName: true, lastName: true, registrationNo: true } } },
       })
       return res.json(invoices.map((inv) => ({
-        student: inv.student ? `${inv.student.firstName} ${inv.student.lastName}` : '—',
-        studentRegNo: inv.student?.registrationNo ?? '—',
-        academicYear: inv.academicYear, term: inv.term,
+        studentId: inv.studentId, academicYear: inv.academicYear, term: inv.term,
         total: Number(inv.totalAmount), paid: Number(inv.paidAmount), balance: Number(inv.balance),
         status: inv.status, dueDate: inv.dueDate,
       })))
@@ -882,12 +887,9 @@ financesRouter.get(
       const overdue = await prisma.invoice.findMany({
         where: { academicYear, term: yearNum, status: { in: ['UNPAID', 'PARTIAL', 'OVERDUE'] } },
         orderBy: { balance: 'desc' },
-        include: { student: { select: { firstName: true, lastName: true, registrationNo: true } } },
       })
       return res.json(overdue.map((inv) => ({
-        student: inv.student ? `${inv.student.firstName} ${inv.student.lastName}` : '—',
-        studentRegNo: inv.student?.registrationNo ?? '—',
-        term: inv.term, balance: Number(inv.balance),
+        studentId: inv.studentId, term: inv.term, balance: Number(inv.balance),
         status: inv.status, dueDate: inv.dueDate,
       })))
     }

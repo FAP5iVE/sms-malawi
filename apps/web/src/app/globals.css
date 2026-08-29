@@ -311,7 +311,6 @@
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
-    overflow-x: hidden;
   }
 
   body {
@@ -323,8 +322,6 @@
     -webkit-font-smoothing:  antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'rlig' 1, 'calt' 1;
-    overflow-x: hidden;
-    max-width: 100vw;
   }
 
   /* Headings */
@@ -556,35 +553,6 @@
 }
 
 /* ─────────────────────────────────────────────────────────
-   MOBILE MAIN-CONTENT SCROLL CLEARANCE  [FE-001 fix]
-   Reserves bottom padding on the authenticated shell's
-   scrollable <main> equal to MobileBottomNav's real,
-   safe-area-inclusive height, so the last item on every
-   page is never rendered underneath the fixed tab bar.
-
-   MobileBottomNav is: 60px content (min-h-15) +
-   env(safe-area-inset-bottom) for the device's gesture bar,
-   confirmed in components/shared/MobileBottomNav.tsx.
-   A small extra buffer (1rem) is added so the final card
-   has breathing room above the bar, not just clears it
-   flush.
-
-   Only applies below md (768px) — MobileBottomNav is
-   md:hidden, so at md+ there is no fixed bottom bar to
-   clear and padding resets to match md:p-6's 1.5rem.
-   ───────────────────────────────────────────────────────── */
-
-.main-scroll-pad {
-  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 1rem);
-}
-
-@media (min-width: 768px) {
-  .main-scroll-pad {
-    padding-bottom: 1.5rem;
-  }
-}
-
-/* ─────────────────────────────────────────────────────────
    PRINT STYLES
    Hide all navigation chrome when printing — report cards,
    fee statements, payslips, student profiles.
@@ -786,4 +754,33 @@
 * {
   scrollbar-width:  thin;
   scrollbar-color:  hsl(var(--muted)) hsl(var(--background));
+}
+
+/* ─────────────────────────────────────────────────────────
+   MOBILE SCROLL BOTTOM CLEARANCE [PRODUCTION FIX]
+   Referenced by apps/web/src/app/(auth)/layout.tsx's <main> as
+   `main-scroll-pad` (see that file's comment, [FE-001]) but never
+   actually defined anywhere in the codebase — the class applied
+   zero padding, so on mobile the last item of any scrollable list
+   sat directly behind MobileBottomNav.tsx's fixed bar instead of
+   above it.
+
+   Must match MobileBottomNav.tsx's real total height exactly:
+   60px content + env(safe-area-inset-bottom) for the iOS home
+   indicator (see that file's own comment, same numbers). The extra
+   1rem is breathing room so the last item isn't flush against the
+   bar's top edge, not part of the clearance calculation itself.
+
+   md+ (768px, matching the layout's breakpoint) resets to the
+   layout's own md:p-6 (1.5rem) since no fixed bottom bar exists
+   at that breakpoint — this class must not add extra padding there.
+   ───────────────────────────────────────────────────────── */
+.main-scroll-pad {
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 1rem);
+}
+
+@media (min-width: 768px) {
+  .main-scroll-pad {
+    padding-bottom: 1.5rem;
+  }
 }

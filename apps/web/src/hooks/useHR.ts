@@ -19,7 +19,7 @@
  */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { CreateStaffInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput } from '@shared/schemas/hr'
+import type { CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput } from '@shared/schemas/hr'
 import type { ApiStaffLoan, ApiLeaveRequest } from '@shared/types/api'
 import type { ConflictCheckResult } from '@/server/services/leaveConflictService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
@@ -47,6 +47,18 @@ export function useCreateStaff() {
   return useMutation({
     mutationFn: (data: CreateStaffInput) => apiFetch('/hr', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
+  })
+}
+
+export function useUpdateStaff() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateStaffInput }) =>
+      apiFetch(`/hr/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: (_result, { id }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.hr.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.hr.staffDetail(id) })
+    },
   })
 }
 

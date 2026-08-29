@@ -42,6 +42,7 @@
 
 import { useState, useCallback }       from 'react'
 import { motion, AnimatePresence }     from 'framer-motion'
+import { getAuth }                      from 'firebase/auth'
 import {
   FileText,
   Download,
@@ -124,6 +125,33 @@ function StudentResultRow({
   row:     StudentRow
   onRetry: (studentId: string) => void
 }) {
+  // [PRODUCTION FIX] These used to be plain <a href={row.url}> links.
+  // /api/files/[fileId] requires a live auth token, and a direct browser
+  // navigation can never attach one — every click returned {"error":
+  // "Unauthorised"}. Fetching a fresh ID token at click time and appending
+  // it as the ?token= param (now accepted by getIdTokenFromRequest, see
+  // verifyAuth.ts) makes these work without weakening the access check —
+  // it's still the same decoded uid/role being verified, just read from
+  // the query string instead of a header this navigation could never send.
+  const openWithToken = useCallback(async (mode: 'view' | 'download') => {
+    if (!row.url) return
+    const user = getAuth().currentUser
+    if (!user) return
+    const token = await user.getIdToken()
+    const separator = row.url.includes('?') ? '&' : '?'
+    const authedUrl = `${row.url}${separator}token=${encodeURIComponent(token)}`
+    if (mode === 'view') {
+      window.open(authedUrl, '_blank', 'noopener,noreferrer')
+    } else {
+      const a = document.createElement('a')
+      a.href = authedUrl
+      a.download = `report-card-${row.registrationNo}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    }
+  }, [row.url, row.registrationNo])
+
   return (
     <div className="flex items-center gap-3 px-4 py-3 bg-surface border-b border-base last:border-0">
       {/* Status icon */}
@@ -147,23 +175,22 @@ function StudentResultRow({
       <div className="flex items-center gap-2 shrink-0">
         {row.rowStatus === 'done' && row.url && (
           <>
-            <a
-              href={row.url}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => void openWithToken('view')}
               className="p-1.5 rounded-lg text-brand-teal hover:bg-brand-teal/10 transition-colors"
               aria-label={`View report card for ${row.fullName}`}
             >
               <ExternalLink className="w-4 h-4" />
-            </a>
-            <a
-              href={row.url}
-              download={`report-card-${row.registrationNo}.pdf`}
+            </button>
+            <button
+              type="button"
+              onClick={() => void openWithToken('download')}
               className="p-1.5 rounded-lg text-brand-navy hover:bg-brand-navy/10 transition-colors"
               aria-label={`Download report card for ${row.fullName}`}
             >
               <Download className="w-4 h-4" />
-            </a>
+            </button>
           </>
         )}
         {row.rowStatus === 'failed' && (

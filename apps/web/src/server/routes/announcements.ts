@@ -114,17 +114,27 @@ announcementsRouter.post(
   requireAnyPermission(['announcement.create', 'announcement.createWithApproval']),
   upload.single('file'),
   async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
-    if (!req.file.mimetype.startsWith('image/')) {
-      return res.status(400).json({ error: 'Only image files are allowed.' })
+    // [PRODUCTION FIX] This handler had no try/catch at all — any error
+    // thrown by uploadFile() (Appwrite rejecting the request, a transient
+    // network error, etc.) became an unhandled promise rejection in
+    // Express 4, which never sends a response. The client's fetch then
+    // hangs indefinitely — this is the "publish just spins forever" bug
+    // for every image-attached Announcement/Event/News submission.
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
+      if (!req.file.mimetype.startsWith('image/')) {
+        return res.status(400).json({ error: 'Only image files are allowed.' })
+      }
+      const uploaded = await uploadFile(
+        FILE_PREFIX.ANNOUNCEMENT_IMAGE,
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+      )
+      res.status(201).json({ imageKey: uploaded.fileId })
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'announcements', route: 'image-upload' } })
     }
-    const uploaded = await uploadFile(
-      FILE_PREFIX.ANNOUNCEMENT_IMAGE,
-      req.file.buffer,
-      req.file.originalname,
-      req.file.mimetype,
-    )
-    res.status(201).json({ imageKey: uploaded.fileId })
   },
 )
 

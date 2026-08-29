@@ -52,9 +52,10 @@ import { Router } from 'express'
 import multer from 'multer'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission } from '@/server/middleware/verifyPermission'
-import { CreateStaffSchema, LeaveRequestSchema, ReviewLeaveSchema, LoanRequestSchema, PerformanceNoteSchema } from '@shared/schemas/hr'
+import { CreateStaffSchema, UpdateStaffSchema, LeaveRequestSchema, ReviewLeaveSchema, LoanRequestSchema, PerformanceNoteSchema } from '@shared/schemas/hr'
 import * as hrService from '@/server/services/hrService'
 import { getSignedViewUrl } from '@/lib/storage'
+import { sendError } from '@/server/lib/sendError'
 import { prisma } from '@/lib/prisma'
 
 export const hrRouter = Router()
@@ -74,6 +75,18 @@ hrRouter.get('/', verifyAuth, requireRole([...REVIEWERS]),
 hrRouter.get('/:id', verifyAuth, requireRole([...REVIEWERS]),
   async (req, res) => {return res.json(await hrService.getStaffProfile(String(req.params.id)))})
 
+hrRouter.patch('/:id', verifyAuth, requirePermission('hr.editStaff'),
+  async (req, res) => {
+    const parsed = UpdateStaffSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    try {
+      return res.json(await hrService.updateStaff(String(req.params.id), parsed.data))
+    } catch (err) {
+      const status = (err as { status?: number }).status ?? 500
+      return res.status(status).json({ error: (err as Error).message ?? 'Failed to update staff member.' })
+    }
+  })
+
 hrRouter.post('/', verifyAuth, requireRole([...HR_ADMIN]),
   async (req, res) => {
     const parsed = CreateStaffSchema.safeParse(req.body)
@@ -83,10 +96,18 @@ hrRouter.post('/', verifyAuth, requireRole([...HR_ADMIN]),
 
 hrRouter.post('/:id/photo', verifyAuth, requireRole([...HR_ADMIN]), upload.single('photo'),
   async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No photo uploaded.' })
-    const fileId = await hrService.uploadStaffPhoto(String(req.params.id), req.file.buffer, req.file.originalname)
-    const url = await getSignedViewUrl(fileId)
-    return res.json({ fileId, url })
+    // [PRODUCTION FIX] No try/catch — same systemic bug as the other
+    // upload.single() handlers across this codebase: an error from
+    // uploadStaffPhoto()/getSignedViewUrl() became an unhandled rejection
+    // with no response ever sent, hanging the client's fetch indefinitely.
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No photo uploaded.' })
+      const fileId = await hrService.uploadStaffPhoto(String(req.params.id), req.file.buffer, req.file.originalname)
+      const url = await getSignedViewUrl(fileId)
+      return res.json({ fileId, url })
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'hr', route: 'photo-upload' } })
+    }
   })
 
 // ── CONTRACT EXPIRY ALERTS ──
