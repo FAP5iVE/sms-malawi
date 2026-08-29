@@ -668,7 +668,7 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     key: SETTING_KEYS.FINANCE_PAYE_BRACKETS,
     category: SETTING_CATEGORIES.FINANCE,
     isPublic: false,
-    description: 'PAYE income tax brackets. Each bracket defines a monthly income range and tax rate. Verify with MRA annually.',
+    description: 'PAYE income tax brackets. Each bracket defines an annual income range and tax rate — payroll annualizes the monthly gross, applies these bracket-by-bracket, then divides by 12 (see payrollService.ts\'s calculateMonthlyPAYE()). Verify with MRA annually.',
     defaultValue: DEFAULT_PAYE_BRACKETS.brackets,
   },
   [SETTING_KEYS.STAFF_LOAN_INTEREST_RATE]: {
