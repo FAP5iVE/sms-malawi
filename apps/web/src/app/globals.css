@@ -127,15 +127,25 @@
   --color-sidebar-border:             hsl(var(--sidebar-border));
   --color-sidebar-ring:               hsl(var(--sidebar-ring));
 
-  /* ── School brand colours (static — same in light and dark) */
-  --color-brand-navy:       #1e3a5f;
-  --color-brand-navy-mid:   #2e86ab;
-  --color-brand-navy-light: #4a90d9;
-  --color-brand-teal:       #0e8a6a;
-  --color-brand-teal-light: #1db88e;
-  --color-brand-amber:      #d97706;
-  --color-brand-coral:      #dc4f3a;
-  --color-brand-purple:     #6b3fa0;
+  /* ── School brand colours
+        [PRODUCTION FIX] These were static hex values — "same in light and
+        dark" — which is exactly the anti-pattern --primary's own comment
+        two sections below warns against ("Never use the same navy as
+        light mode — it disappears on dark bg"). Every text-brand-teal /
+        bg-brand-navy / etc. class in the app was rendering the same dark,
+        desaturated color on the near-black dark-mode background, which is
+        why stat numbers and icons look dull/swallowed in dark mode. Now
+        theme-aware via HSL vars with :root/.dark overrides, exactly like
+        --primary — light mode is visually unchanged, dark mode gets
+        brighter, more saturated equivalents. */
+  --color-brand-navy:       hsl(var(--brand-navy));
+  --color-brand-navy-mid:   hsl(var(--brand-navy-mid));
+  --color-brand-navy-light: hsl(var(--brand-navy-light));
+  --color-brand-teal:       hsl(var(--brand-teal));
+  --color-brand-teal-light: hsl(var(--brand-teal-light));
+  --color-brand-amber:      hsl(var(--brand-amber));
+  --color-brand-coral:      hsl(var(--brand-coral));
+  --color-brand-purple:     hsl(var(--brand-purple));
 
   /* ── Radius tokens */
   --radius-sm: 0.25rem;
@@ -232,6 +242,18 @@
     --color-surface: 0 0% 100%;   /* same as --card */
     --color-text:    222 47% 11%; /* same as --foreground */
     --color-muted-val: 215 16% 47%;
+
+    /* ── Brand palette [PRODUCTION FIX] — light-mode values, HSL
+       equivalents of the previous static hex, so light mode is visually
+       unchanged by this fix. */
+    --brand-navy:        213 51% 24%;  /* #1e3a5f */
+    --brand-navy-mid:    199 56% 40%;  /* #2e86ab */
+    --brand-navy-light:  209 67% 55%;  /* #4a90d9 */
+    --brand-teal:        163 79% 30%;  /* #0e8a6a */
+    --brand-teal-light:  162 72% 40%;  /* #1db88e */
+    --brand-amber:       32  93% 44%;  /* #d97706 */
+    --brand-coral:       8   68% 53%;  /* #dc4f3a */
+    --brand-purple:      271 43% 43%;  /* #6b3fa0 */
   }
 
   /* ── DARK MODE ──────────────────────────────────────── */
@@ -296,6 +318,21 @@
     --color-surface:  224 36% 11%;
     --color-text:     215 25% 93%;
     --color-muted-val: 215 16% 58%;
+
+    /* ── Brand palette [PRODUCTION FIX] — dark-mode overrides. Same hues
+       as light mode, lightness/saturation raised so each color actually
+       reads against the #070e1a page / #111827 card backgrounds instead
+       of visually merging into them. --brand-navy specifically mirrors
+       --primary's own dark value above for the same reason documented
+       there. */
+    --brand-navy:        210 68% 62%;  /* #4a9bd4 — matches --primary dark */
+    --brand-navy-mid:    199 70% 65%;
+    --brand-navy-light:  209 80% 72%;
+    --brand-teal:        163 60% 55%;
+    --brand-teal-light:  162 65% 62%;
+    --brand-amber:       38  92% 60%;
+    --brand-coral:       8   85% 68%;
+    --brand-purple:      258 90% 76%;
   }
 
   /* ── GLOBAL RESETS ─────────────────────────────────── */
