@@ -35,6 +35,7 @@ import { Sidebar } from '@/components/shared/Sidebar'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
+import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 import { useInactivityTimer } from '@/hooks/useInactivityTimer'
 import { useMotionEnabled } from '@/store/motionStore'
 import { PAGE_VARIANTS } from '@/lib/motion'
@@ -131,26 +132,34 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           2. Main column  — always fills remaining width
       */}
       <div className="flex h-dvh overflow-hidden bg-page">
+        {/* Same shared backdrop every public page uses — set once here so
+            every authenticated page inherits it with no per-page changes.
+            `fixed inset-0` + `pointer-events-none` means it costs nothing
+            in this flex layout and never intercepts clicks/touches. */}
+        <PublicAmbientBackground />
+
         {/* ── Sidebar wrapper ─────────────────────────────────────────────
           `hidden`    → display:none below md (Sidebar not rendered visually)
           `md:flex`   → flex container from md up (Sidebar is a flex child;
                         collapsed rail md–lg via `md:w-12`, full width `lg:w-auto`)
           `shrink-0`  → prevents the sidebar from shrinking on resize edge cases
+          `relative z-10` → stacks above the fixed ambient background layer.
 
           Since Sidebar uses motion.aside with its own width management, the
           wrapper only provides the breakpoint-controlled `display` toggle.
           Sidebar's internal spring-animated width still works correctly.
         ────────────────────────────────────────────────────────────────── */}
-        <div className="hidden md:flex md:w-12 lg:w-auto shrink-0">
+        <div className="hidden md:flex md:w-12 lg:w-auto shrink-0 relative z-10">
           <Sidebar />
         </div>
 
         {/* ── Main content column ─────────────────────────────────────────
           `flex-1` → fills remaining horizontal space after the sidebar.
           `min-w-0` → prevents flex child from overflowing on very wide content.
+          `relative z-10` → stacks above the fixed ambient background layer.
           The column is itself a flex column: PageHeader (fixed height) + main (flex-1).
         ────────────────────────────────────────────────────────────────── */}
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative z-10">
           {/*
             PageHeader — Phase C2 will add a mobile variant.
             For C1 the existing PageHeader renders across all breakpoints.
