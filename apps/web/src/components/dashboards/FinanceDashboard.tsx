@@ -47,6 +47,19 @@ import type { QuickAction } from '@/components/shared/QuickActions'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
+    // [PRODUCTION FIX] Added — none of the four actions below actually
+    // created an invoice; they all just landed on the tab passively
+    // (Record Payment / Generate Receipt need an existing invoice to act
+    // on, Student Balances is read-only). ?action=new deep-links straight
+    // into the new-invoice modal InvoicesTab.tsx now has, same convention
+    // as the existing ?tab= deep-links on this page.
+    label: 'New Invoice',
+    href: '/finances?tab=invoices&action=new',
+    icon: FileText,
+    color: 'bg-brand-navy/10',
+    text: 'text-brand-navy',
+  },
+  {
     label: 'Record Payment',
     // R15: payments live in the Invoices tab (page reads ?tab= as of this phase)
     href: '/finances?tab=invoices',

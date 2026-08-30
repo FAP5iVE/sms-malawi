@@ -19,7 +19,7 @@
  */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput } from '@shared/schemas/hr'
+import type { CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput } from '@shared/schemas/hr'
 import type { ApiStaffLoan, ApiLeaveRequest } from '@shared/types/api'
 import type { ConflictCheckResult } from '@/server/services/leaveConflictService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
@@ -58,6 +58,39 @@ export function useUpdateStaff() {
     onSuccess: (_result, { id }) => {
       qc.invalidateQueries({ queryKey: queryKeys.hr.all() })
       qc.invalidateQueries({ queryKey: queryKeys.hr.staffDetail(id) })
+    },
+  })
+}
+
+// [PRODUCTION FIX] Salary was never fetchable or settable anywhere in the
+// app — no field in the staff form, no route, no service function. See
+// hrService.ts's getSalaryStructure/upsertSalaryStructure and this same
+// phase's hr.ts route additions.
+export interface ApiSalaryStructure {
+  id: string
+  staffUid: string
+  baseSalary: string
+  allowances: string
+  loanBalance: string
+  monthlyLoanDeduction: string
+  updatedAt: string
+}
+
+export function useSalary(staffId: string) {
+  return useQuery({
+    queryKey: queryKeys.hr.salary(staffId),
+    queryFn: () => apiFetch<ApiSalaryStructure | null>(`/hr/${staffId}/salary`),
+    enabled: !!staffId,
+  })
+}
+
+export function useUpdateSalary() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ staffId, data }: { staffId: string; data: UpdateSalaryInput }) =>
+      apiFetch(`/hr/${staffId}/salary`, { method: 'PUT', body: JSON.stringify(data) }),
+    onSuccess: (_result, { staffId }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.hr.salary(staffId) })
     },
   })
 }

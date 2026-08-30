@@ -296,6 +296,9 @@ export const queryKeys = {
     staff: (filters?: Record<string, unknown>) =>
       ['hr', 'staff', filters ?? {}] as const,
     staffDetail: (id: string) => ['hr', 'staff', id] as const,
+    // [PRODUCTION FIX] Salary was never fetchable/settable anywhere — see
+    // hrService.ts's getSalaryStructure/upsertSalaryStructure.
+    salary: (staffId: string) => ['hr', 'staff', staffId, 'salary'] as const,
     leaveRequests: (filters?: Record<string, unknown>) =>
       ['hr', 'leave', 'requests', filters ?? {}] as const,
     leaveBalances: (staffId: string, year: number) =>

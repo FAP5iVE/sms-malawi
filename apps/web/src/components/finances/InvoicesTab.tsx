@@ -23,15 +23,18 @@
  */
 'use client'
 
-import { useState } from 'react'
-import { useInvoices, useStudentBalance, useRecordPayment } from '@/hooks/useFinances'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { getAuth } from 'firebase/auth'
+import { useInvoices, useStudentBalance, useRecordPayment, useGenerateInvoice } from '@/hooks/useFinances'
 import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
 import { formatMWK } from '@shared/constants/malawi'
-import { PlusCircle, Loader2 } from 'lucide-react'
+import { PlusCircle, Loader2, X as XIcon, FileText } from 'lucide-react'
 import { InvoiceNotes } from '@/components/finances/InvoiceNotes'
+import { BulkInvoiceGenerator } from '@/components/finances/BulkInvoiceGenerator'
 import type { ApiInvoice } from '@shared/types/api'
-import { PaymentMethodSchema } from '@shared/schemas/finance'
+import { PaymentMethodSchema, GenerateInvoiceSchema } from '@shared/schemas/finance'
+import { useSearchParams } from 'next/navigation'
 import { z } from 'zod'
 
 type PaymentMethodType = z.infer<typeof PaymentMethodSchema>
@@ -52,10 +55,19 @@ export function InvoicesTab({ academicYear, term }: { academicYear: string; term
   const { can } = usePermissions()
   const isStudent = role === 'student'
   const canRecordPayment = can('finance.recordPayment')
+  const canGenerateInvoice = can('finance.generateInvoice')
 
   const [statusFilter, setStatusFilter] = useState('')
   const [payingInvoice, setPayingInvoice] = useState<ApiInvoice | null>(null)
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null)
+
+  // [PRODUCTION FIX] Dashboard's "Generate Invoice" quick action
+  // (FinanceDashboard.tsx) linked here with no way to actually act once
+  // arrived — deep-linking with ?action=new now opens this modal directly
+  // on load, same ?tab= convention finances/page.tsx already uses.
+  const searchParams = useSearchParams()
+  const [showNewInvoice, setShowNewInvoice] = useState(searchParams.get('action') === 'new')
+  const [showBulkGenerator, setShowBulkGenerator] = useState(searchParams.get('action') === 'bulk')
 
   const filters: Record<string, string | number> = { academicYear, term }
   if (statusFilter) filters.status = statusFilter
@@ -94,23 +106,50 @@ export function InvoicesTab({ academicYear, term }: { academicYear: string; term
   }
   return (
     <div className="space-y-4">
-      {/* Status chips */}
-      <div className="flex gap-2 flex-wrap">
-        {['', 'UNPAID', 'PARTIAL', 'PAID', 'OVERDUE'].map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={[
-              'px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors',
-              statusFilter === s
-                ? 'bg-brand-navy text-white border-brand-navy'
-                : 'bg-surface border-base text-muted hover:border-brand-navy',
-            ].join(' ')}
-            aria-label={s || 'All statuses'}
-          >
-            {s || 'All'}
-          </button>
-        ))}
+      {/* Status chips + New Invoice */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
+          {['', 'UNPAID', 'PARTIAL', 'PAID', 'OVERDUE'].map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={[
+                'px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors',
+                statusFilter === s
+                  ? 'bg-brand-navy text-white border-brand-navy'
+                  : 'bg-surface border-base text-muted hover:border-brand-navy',
+              ].join(' ')}
+              aria-label={s || 'All statuses'}
+            >
+              {s || 'All'}
+            </button>
+          ))}
+        </div>
+        {/* [PRODUCTION FIX] Neither of these existed — POST
+            /finances/invoices/generate and POST
+            /finances/invoices/bulk-generate both already worked (the
+            latter via BulkInvoiceGenerator.tsx, a fully-built component
+            that was never mounted on any page). Only student-fee-balance
+            invoices (auto-generated elsewhere) ever appeared in this tab
+            as a result. */}
+        {canGenerateInvoice && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setShowBulkGenerator(true)}
+              className="inline-flex items-center gap-2 border border-brand-navy text-brand-navy rounded-xl px-4 py-2 text-sm font-semibold hover:bg-brand-navy/5 transition-colors min-h-[40px]"
+            >
+              <FileText className="w-4 h-4" aria-hidden /> Bulk Generate
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowNewInvoice(true)}
+              className="inline-flex items-center gap-2 bg-brand-teal text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-brand-teal-light transition-colors min-h-[40px]"
+            >
+              <PlusCircle className="w-4 h-4" aria-hidden /> New Invoice
+            </button>
+          </div>
+        )}
       </div>
       {/* Invoices table */}
       <div className="bg-surface border border-base rounded-xl overflow-hidden">
@@ -291,6 +330,206 @@ export function InvoicesTab({ academicYear, term }: { academicYear: string; term
           </div>
         </div>
       )}
+
+      {showNewInvoice && (
+        <NewInvoiceModal
+          defaultAcademicYear={academicYear}
+          defaultTerm={term}
+          onClose={() => setShowNewInvoice(false)}
+        />
+      )}
+
+      {showBulkGenerator && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+          <div className="absolute inset-0" onClick={() => setShowBulkGenerator(false)} />
+          <div className="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
+            <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
+              <h2 className="font-heading font-bold text-brand-navy">Bulk Generate Invoices</h2>
+              <button onClick={() => setShowBulkGenerator(false)} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
+                <XIcon className="w-4 h-4 text-muted" />
+              </button>
+            </div>
+            <div className="p-6">
+              <BulkInvoiceGenerator />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface StudentHit {
+  id: string
+  fullName: string
+  sublabel: string
+}
+
+// Same /api/search/fallback endpoint the library page's borrower picker
+// already uses — students only, staff hits dropped.
+async function searchStudents(query: string): Promise<StudentHit[]> {
+  try {
+    const token = await getAuth().currentUser?.getIdToken()
+    const res = await fetch(`/api/search/fallback?q=${encodeURIComponent(query)}`, {
+      headers: { Authorization: `Bearer ${token ?? ''}` },
+    })
+    if (!res.ok) return []
+    const data = await res.json() as {
+      students: { id: string; fullName: string; registrationNo: string; className: string | null }[]
+    }
+    return data.students.map((s) => ({
+      id: s.id,
+      fullName: s.fullName,
+      sublabel: `${s.registrationNo}${s.className ? ` · ${s.className}` : ''}`,
+    }))
+  } catch {
+    return []
+  }
+}
+
+function StudentPicker({ value, onChange }: { value: StudentHit | null; onChange: (hit: StudentHit | null) => void }) {
+  const [query, setQuery]     = useState('')
+  const [results, setResults] = useState<StudentHit[]>([])
+  const [open, setOpen]       = useState(false)
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleChange = useCallback((v: string) => {
+    setQuery(v)
+    onChange(null)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (v.trim().length < 2) { setResults([]); setOpen(false); return }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      setResults(await searchStudents(v))
+      setOpen(true)
+      setLoading(false)
+    }, 300)
+  }, [onChange])
+
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
+
+  return (
+    <div className="relative">
+      <input
+        value={value ? value.fullName : query}
+        onChange={(e) => handleChange(e.target.value)}
+        onFocus={() => results.length > 0 && setOpen(true)}
+        placeholder="Search student by name…"
+        className="input w-full"
+        autoComplete="off"
+      />
+      {loading && <Loader2 className="w-4 h-4 animate-spin text-muted absolute right-3 top-1/2 -translate-y-1/2" />}
+      {open && results.length > 0 && (
+        <div className="absolute z-20 mt-1 w-full bg-surface border border-base rounded-lg shadow-lg max-h-56 overflow-y-auto">
+          {results.map((hit) => (
+            <button
+              key={hit.id}
+              type="button"
+              onClick={() => { onChange(hit); setQuery(''); setOpen(false) }}
+              className="w-full text-left px-3 py-2 hover:bg-page text-sm"
+            >
+              <p className="font-medium text-body">{hit.fullName}</p>
+              <p className="text-xs text-muted">{hit.sublabel}</p>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// [PRODUCTION FIX] The backend (feeService.generateInvoice, via POST
+// /finances/invoices/generate) already computes the invoice amount from
+// the student's applicable fee structure and applies any scholarship
+// discount, and already refuses a duplicate for the same student/term
+// with a clear error — this form just needs to collect who/when.
+function NewInvoiceModal({
+  defaultAcademicYear, defaultTerm, onClose,
+}: {
+  defaultAcademicYear: string
+  defaultTerm: number
+  onClose: () => void
+}) {
+  const generateInvoice = useGenerateInvoice()
+  const [student, setStudent] = useState<StudentHit | null>(null)
+  const [academicYear, setAcademicYear] = useState(defaultAcademicYear)
+  const [term, setTerm] = useState(defaultTerm)
+  const [dueDate, setDueDate] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  function handleSubmit() {
+    setError(null)
+    if (!student || !dueDate) return
+    const parsed = GenerateInvoiceSchema.safeParse({ studentId: student.id, academicYear, term, dueDate })
+    if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Please check the form.')
+    generateInvoice.mutate(parsed.data, {
+      onSuccess: onClose,
+      onError: (err) => setError(err instanceof Error ? err.message : 'Failed to generate invoice.'),
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-base">
+          <h2 className="font-heading font-bold text-brand-navy flex items-center gap-2">
+            <FileText className="w-4 h-4" aria-hidden /> New Invoice
+          </h2>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
+            <XIcon className="w-4 h-4 text-muted" />
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="text-xs text-muted mb-1 block">Student</label>
+            <StudentPicker value={student} onChange={setStudent} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="inv-year" className="text-xs text-muted mb-1 block">Academic Year</label>
+              <input
+                id="inv-year"
+                value={academicYear}
+                onChange={(e) => setAcademicYear(e.target.value)}
+                placeholder="2025/2026"
+                className="input w-full"
+              />
+            </div>
+            <div>
+              <label htmlFor="inv-term" className="text-xs text-muted mb-1 block">Term</label>
+              <select id="inv-term" value={term} onChange={(e) => setTerm(Number(e.target.value))} className="input w-full">
+                {[1, 2, 3].map((t) => <option key={t} value={t}>Term {t}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label htmlFor="inv-due" className="text-xs text-muted mb-1 block">Due Date</label>
+            <input
+              id="inv-due"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="input w-full"
+            />
+          </div>
+
+          {error && <p className="text-sm text-brand-coral">{error}</p>}
+
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={generateInvoice.isPending || !student || !dueDate}
+            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 min-h-11"
+          >
+            {generateInvoice.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {generateInvoice.isPending ? 'Generating…' : 'Generate Invoice'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

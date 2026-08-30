@@ -51,8 +51,8 @@ import 'server-only'
 import { Router } from 'express'
 import multer from 'multer'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
-import { requirePermission } from '@/server/middleware/verifyPermission'
-import { CreateStaffSchema, UpdateStaffSchema, LeaveRequestSchema, ReviewLeaveSchema, LoanRequestSchema, PerformanceNoteSchema } from '@shared/schemas/hr'
+import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
+import { CreateStaffSchema, UpdateStaffSchema, LeaveRequestSchema, ReviewLeaveSchema, LoanRequestSchema, PerformanceNoteSchema, UpdateSalarySchema } from '@shared/schemas/hr'
 import * as hrService from '@/server/services/hrService'
 import { getSignedViewUrl } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
@@ -84,6 +84,39 @@ hrRouter.patch('/:id', verifyAuth, requirePermission('hr.editStaff'),
     } catch (err) {
       const status = (err as { status?: number }).status ?? 500
       return res.status(status).json({ error: (err as Error).message ?? 'Failed to update staff member.' })
+    }
+  })
+
+// [PRODUCTION FIX] Salary was never settable anywhere in this codebase —
+// StaffForm.tsx had no field for it, and no route/service function ever
+// wrote to SalaryStructure at all (payrollService.ts reads baseSalary/
+// allowances from it, but nothing created it). Gated on the permissions
+// the matrix already defined for exactly this
+// (hr.manageSalaryStructure / finance.manageSalaryStructure) — both roles
+// were already granted these, they just had nothing to call.
+hrRouter.get('/:id/salary', verifyAuth,
+  requireAnyPermission(['hr.manageSalaryStructure', 'finance.manageSalaryStructure']),
+  async (req, res) => {
+    try {
+      const salary = await hrService.getSalaryStructure(String(req.params.id))
+      return res.json(salary) // null if none set yet — the form treats that as "not yet configured"
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'hr', route: 'salary-get' } })
+    }
+  })
+
+hrRouter.put('/:id/salary', verifyAuth,
+  requireAnyPermission(['hr.manageSalaryStructure', 'finance.manageSalaryStructure']),
+  async (req, res) => {
+    const parsed = UpdateSalarySchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    try {
+      const result = await hrService.upsertSalaryStructure(
+        String(req.params.id), parsed.data, req.user!.uid, req.user!.role,
+      )
+      return res.json(result)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'hr', route: 'salary-upsert' } })
     }
   })
 

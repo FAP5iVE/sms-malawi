@@ -40,10 +40,11 @@ import type { CreateStaffInput, UpdateStaffInput } from '@shared/schemas/hr'
 import type { ApiStaffDetail } from '@shared/types/api'
 type StaffFormValues = z.input<typeof CreateStaffSchema>
 import { USER_ROLES, ROLE_LABELS } from '@shared/types/roles'
-import { useCreateStaff, useUpdateStaff, useStaffProfile } from '@/hooks/useHR'
+import { useCreateStaff, useUpdateStaff, useStaffProfile, useSalary, useUpdateSalary } from '@/hooks/useHR'
 import { useDepartmentTitles } from '@/hooks/useSettings'
+import { usePermissions } from '@/hooks/usePermissions'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, AlertTriangle, CheckCircle2, Copy } from 'lucide-react'
+import { X, Loader2, AlertTriangle, CheckCircle2, Copy, Wallet } from 'lucide-react'
 
 interface Props {
   onClose: () => void
@@ -78,6 +79,7 @@ export function StaffForm({ onClose, staffId }: Props) {
   const { data: existingStaff } = useStaffProfile(staffId ?? '')
   const createStaff = useCreateStaff()
   const updateStaff = useUpdateStaff()
+  const { can } = usePermissions()
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [created, setCreated] = useState<{ name: string; email: string; tempPassword: string } | null>(null)
   const [copied, setCopied] = useState(false)
@@ -128,9 +130,9 @@ export function StaffForm({ onClose, staffId }: Props) {
   function onSubmit(data: CreateStaffInput) {
     setSubmitError(null)
     if (isEdit) {
-      const { firstName, lastName, email, phone, department, jobTitle, employmentType, contractExpiry, salaryStructureId } = data
+      const { firstName, lastName, email, phone, department, jobTitle, employmentType, contractExpiry } = data
       updateStaff.mutate(
-        { id: staffId!, data: { firstName, lastName, email, phone, department, jobTitle, employmentType, contractExpiry, salaryStructureId } as UpdateStaffInput },
+        { id: staffId!, data: { firstName, lastName, email, phone, department, jobTitle, employmentType, contractExpiry } as UpdateStaffInput },
         {
           onSuccess: () => onClose(),
           onError: (err) => {
@@ -335,6 +337,21 @@ export function StaffForm({ onClose, staffId }: Props) {
                 </div>
               </div>
 
+              {/* [PRODUCTION FIX] Salary was never settable anywhere in the
+                  app — see hrService.ts's getSalaryStructure/
+                  upsertSalaryStructure. Only shown once a staff record
+                  exists (a brand-new hire has no SalaryStructure row to
+                  create yet without an id to key it against) and only to
+                  roles the permission matrix already grants
+                  hr.manageSalaryStructure/finance.manageSalaryStructure to
+                  — everyone else simply doesn't see this section, same as
+                  every other PermissionGuard-gated panel in this app. */}
+              {isEdit && staffId && (can('hr.manageSalaryStructure') || can('finance.manageSalaryStructure')) && (
+                <div className="px-6 pb-2">
+                  <SalarySection staffId={staffId} />
+                </div>
+              )}
+
               {submitError && (
                 <p role="alert" className="mx-6 mb-4 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
@@ -369,6 +386,102 @@ export function StaffForm({ onClose, staffId }: Props) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// [PRODUCTION FIX] Own local form, deliberately separate from the main
+// react-hook-form above — this saves through its own PUT /hr/:id/salary
+// endpoint (useUpdateSalary), not the staff-details PATCH, since salary is
+// a distinct concern (SalaryStructure is its own table, keyed by staffUid,
+// not a plain field on StaffProfile) with its own permission gate already
+// applied by the caller before this renders at all.
+function SalarySection({ staffId }: { staffId: string }) {
+  const { data: salary, isLoading } = useSalary(staffId)
+  const updateSalary = useUpdateSalary()
+  const [baseSalary, setBaseSalary] = useState('')
+  const [allowances, setAllowances] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [prevSalary,setPrevSalary] = useState(salary)
+
+    if (salary !== prevSalary) {
+      setPrevSalary(salary)
+      if (salary){
+        setBaseSalary(salary.baseSalary)
+        setAllowances(salary.allowances)
+    }}
+
+  function handleSave() {
+    setSaved(false)
+    const base = Number(baseSalary)
+    const allow = Number(allowances) || 0
+    if (!Number.isFinite(base) || base < 0) return
+    updateSalary.mutate(
+      { staffId, data: { baseSalary: base, allowances: allow } },
+      { onSuccess: () => setSaved(true) },
+    )
+  }
+
+  return (
+    <div className="border border-base rounded-xl p-4 bg-page/50">
+      <div className="flex items-center gap-2 mb-3">
+        <Wallet className="w-4 h-4 text-brand-teal" aria-hidden />
+        <h3 className="text-sm font-heading font-semibold text-body">Salary</h3>
+      </div>
+      {isLoading ? (
+        <p className="text-xs text-muted">Loading…</p>
+      ) : (
+        <>
+          {!salary && (
+            <p className="text-xs text-muted mb-3">
+              No salary set up for this staff member yet — payroll can&apos;t generate a payslip for them until this is filled in.
+            </p>
+          )}
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className={lbl} htmlFor="sf-baseSalary">Base salary (MWK / month)</label>
+              <input
+                id="sf-baseSalary"
+                type="number"
+                min="0"
+                step="0.01"
+                value={baseSalary}
+                onChange={(e) => setBaseSalary(e.target.value)}
+                className={ic}
+              />
+            </div>
+            <div>
+              <label className={lbl} htmlFor="sf-allowances">Allowances (MWK / month, optional)</label>
+              <input
+                id="sf-allowances"
+                type="number"
+                min="0"
+                step="0.01"
+                value={allowances}
+                onChange={(e) => setAllowances(e.target.value)}
+                className={ic}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mt-3">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={updateSalary.isPending || !baseSalary}
+              className="px-4 py-2 text-xs font-semibold bg-brand-navy text-white rounded-lg disabled:opacity-60 flex items-center gap-2 min-h-11"
+            >
+              {updateSalary.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {salary ? 'Update Salary' : 'Set Salary'}
+            </button>
+            {saved && <span className="text-xs text-brand-teal">Saved.</span>}
+            {updateSalary.error && (
+              <span className="text-xs text-brand-coral">
+                {updateSalary.error instanceof Error ? updateSalary.error.message : 'Failed to save.'}
+              </span>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function mapStaffToFormValues(s: ApiStaffDetail): Partial<StaffFormValues> {
   return {
     firstName:         s.firstName,
@@ -379,6 +492,5 @@ function mapStaffToFormValues(s: ApiStaffDetail): Partial<StaffFormValues> {
     jobTitle:          s.jobTitle,
     employmentType:    s.employmentType as StaffFormValues['employmentType'],
     contractExpiry:    s.contractExpiry?.slice(0, 10),
-    salaryStructureId: s.salaryStructureId,
   }
 }

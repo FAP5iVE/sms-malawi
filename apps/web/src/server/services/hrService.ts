@@ -62,11 +62,12 @@ import { uploadFile, FILE_PREFIX } from '@/lib/storage'
 import { sendEmail } from '@/lib/email'
 import { generateTempPassword } from '@/lib/tempPassword'
 import { differenceInBusinessDays, isWeekend, addDays, startOfDay, endOfDay } from 'date-fns'
+import * as auditService from '@/server/services/auditService'
 
 function getAuth() { return admin.auth() }
 import type {
   CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput,
-  LoanRequestInput, PerformanceNoteInput
+  LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput
 } from '@shared/schemas/hr'
 import type { LeaveType, Prisma} from '@prisma/client'
 import * as algolia from '@/server/services/algoliaService'
@@ -113,6 +114,35 @@ export async function getStaffProfile(id: string) {
   })
 }
 
+// [PRODUCTION FIX] Salary was never actually settable anywhere — see this
+// function's route in hr.ts for the full account of what was missing.
+// SalaryStructure has no Prisma relation back to StaffProfile (it's keyed
+// by staffUid, a plain Firebase UID string — matching how
+// payrollService.ts already reads it), so this resolves id -> uid first,
+// same pattern as the loan functions below.
+export async function getSalaryStructure(id: string) {
+  const staff = await prisma.staffProfile.findUniqueOrThrow({ where: { id }, select: { uid: true } })
+  return prisma.salaryStructure.findUnique({ where: { staffUid: staff.uid } })
+}
+
+export async function upsertSalaryStructure(id: string, data: UpdateSalaryInput, actorUid: string, actorRole: string) {
+  const staff = await prisma.staffProfile.findUniqueOrThrow({ where: { id }, select: { uid: true } })
+  const result = await prisma.salaryStructure.upsert({
+    where:  { staffUid: staff.uid },
+    update: { baseSalary: data.baseSalary, allowances: data.allowances },
+    create: { staffUid: staff.uid, baseSalary: data.baseSalary, allowances: data.allowances },
+  })
+  await auditService.log({
+    action:     'hr.salary.upsert',
+    entityType: 'SalaryStructure',
+    entityId:   result.id,
+    actorUid,
+    actorRole,
+    metadata:   { context: { staffId: id, baseSalary: data.baseSalary, allowances: data.allowances } },
+  })
+  return result
+}
+
 // General "edit staff details" update — deliberately scoped to the same
 // fields UpdateStaffSchema allows (see that schema's own comment): no
 // employeeNo, role, or status. Role changes and status/termination changes
@@ -133,7 +163,6 @@ export async function updateStaff(id: string, input: UpdateStaffInput) {
   if (input.jobTitle          !== undefined) updateData.jobTitle          = input.jobTitle
   if (input.employmentType    !== undefined) updateData.employmentType    = input.employmentType
   if (input.contractExpiry    !== undefined) updateData.contractExpiry    = new Date(input.contractExpiry)
-  if (input.salaryStructureId !== undefined) updateData.salaryStructureId = input.salaryStructureId
 
   const updated = await prisma.staffProfile.update({
     where: { id },

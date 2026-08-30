@@ -12,7 +12,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ApiFinanceSummary, ApiInvoice, ApiExpense, ApiScholarship, ApiDebtsSummary } from '@shared/types/api'
-import type { RecordPaymentInput, CreateExpenseInput, CreateBudgetInput, CreateFeeStructureInput } from '@shared/schemas/finance'
+import type { RecordPaymentInput, CreateExpenseInput, CreateBudgetInput, CreateFeeStructureInput, GenerateInvoiceInput } from '@shared/schemas/finance'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 
 export function useFinanceSummary(academicYear: string, term: number) {
@@ -70,6 +70,21 @@ export function useRecordPayment() {
   return useMutation({
     mutationFn: (data: RecordPaymentInput) =>
       apiFetch<{ payment: unknown; invoice: ApiInvoice }>('/finances/payments', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
+  })
+}
+
+// [PRODUCTION FIX] The backend endpoint (POST /finances/invoices/generate)
+// already existed and works — nothing in the UI ever called it.
+// InvoicesTab.tsx (same phase) is this hook's only caller.
+export function useGenerateInvoice() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: GenerateInvoiceInput) =>
+      apiFetch<ApiInvoice>('/finances/invoices/generate', {
         method: 'POST',
         body: JSON.stringify(data),
       }),

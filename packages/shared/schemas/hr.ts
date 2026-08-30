@@ -58,7 +58,17 @@ export const UpdateStaffSchema = z.object({
   jobTitle:       z.string().min(1).optional(),
   employmentType: z.enum(['FULL_TIME','PART_TIME','CONTRACT','TEMPORARY']).optional(),
   contractExpiry: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  salaryStructureId: z.string().optional(),
+})
+
+// [PRODUCTION FIX] Real salary management — StaffProfile.salaryStructureId
+// (removed from UpdateStaffSchema above) was a dead plain string with no
+// relation to the actual SalaryStructure table and nothing ever wrote to
+// it. Salary is genuinely tracked in SalaryStructure, keyed by staffUid
+// (Firebase UID), which payrollService.ts already reads from — this
+// schema is for the create/update endpoint that was missing entirely.
+export const UpdateSalarySchema = z.object({
+  baseSalary: z.number().min(0),
+  allowances: z.number().min(0).default(0),
 })
 
 export const LeaveRequestSchema = z.object({
@@ -93,3 +103,4 @@ export type LeaveRequestInput   = z.infer<typeof LeaveRequestSchema>
 export type ReviewLeaveInput    = z.infer<typeof ReviewLeaveSchema>
 export type LoanRequestInput    = z.infer<typeof LoanRequestSchema>
 export type PerformanceNoteInput = z.infer<typeof PerformanceNoteSchema>
+export type UpdateSalaryInput   = z.infer<typeof UpdateSalarySchema>
