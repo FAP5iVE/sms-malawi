@@ -67,7 +67,7 @@ import * as auditService from '@/server/services/auditService'
 function getAuth() { return admin.auth() }
 import type {
   CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput,
-  LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput
+  LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput, CreateAllowanceInput
 } from '@shared/schemas/hr'
 import type { LeaveType, Prisma} from '@prisma/client'
 import * as algolia from '@/server/services/algoliaService'
@@ -129,8 +129,8 @@ export async function upsertSalaryStructure(id: string, data: UpdateSalaryInput,
   const staff = await prisma.staffProfile.findUniqueOrThrow({ where: { id }, select: { uid: true } })
   const result = await prisma.salaryStructure.upsert({
     where:  { staffUid: staff.uid },
-    update: { baseSalary: data.baseSalary, allowances: data.allowances },
-    create: { staffUid: staff.uid, baseSalary: data.baseSalary, allowances: data.allowances },
+    update: { baseSalary: data.baseSalary },
+    create: { staffUid: staff.uid, baseSalary: data.baseSalary },
   })
   await auditService.log({
     action:     'hr.salary.upsert',
@@ -138,9 +138,51 @@ export async function upsertSalaryStructure(id: string, data: UpdateSalaryInput,
     entityId:   result.id,
     actorUid,
     actorRole,
-    metadata:   { context: { staffId: id, baseSalary: data.baseSalary, allowances: data.allowances } },
+    metadata:   { context: { staffId: id, baseSalary: data.baseSalary } },
   })
   return result
+}
+
+// [PRODUCTION FIX] Itemized allowances — see StaffAllowance in
+// schema.prisma and CreateAllowanceSchema for the full reasoning. These
+// three functions are the entire CRUD surface for them; payrollService.ts
+// reads listAllowances-equivalent logic directly (a slightly different
+// query — recurring OR matching the specific run's month/year) to compute
+// each month's gross.
+export async function listAllowances(id: string) {
+  const staff = await prisma.staffProfile.findUniqueOrThrow({ where: { id }, select: { uid: true } })
+  return prisma.staffAllowance.findMany({
+    where: { staffUid: staff.uid },
+    orderBy: [{ recurring: 'desc' }, { createdAt: 'desc' }],
+  })
+}
+
+export async function addAllowance(id: string, data: CreateAllowanceInput, actorUid: string, actorRole: string) {
+  const staff = await prisma.staffProfile.findUniqueOrThrow({ where: { id }, select: { uid: true } })
+  const result = await prisma.staffAllowance.create({
+    data: {
+      staffUid:     staff.uid,
+      type:         data.type,
+      amount:       data.amount,
+      recurring:    data.recurring,
+      paidMonth:    data.recurring ? null : data.paidMonth,
+      paidYear:     data.recurring ? null : data.paidYear,
+      notes:        data.notes,
+      createdByUid: actorUid,
+    },
+  })
+  await auditService.log({
+    action: 'hr.allowance.create', entityType: 'StaffAllowance', entityId: result.id,
+    actorUid, actorRole, metadata: { context: { staffId: id, type: data.type, amount: data.amount, recurring: data.recurring } },
+  })
+  return result
+}
+
+export async function deleteAllowance(allowanceId: string, actorUid: string, actorRole: string) {
+  await prisma.staffAllowance.delete({ where: { id: allowanceId } })
+  await auditService.log({
+    action: 'hr.allowance.delete', entityType: 'StaffAllowance', entityId: allowanceId, actorUid, actorRole,
+  })
 }
 
 // General "edit staff details" update — deliberately scoped to the same

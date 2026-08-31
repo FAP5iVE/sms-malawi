@@ -19,7 +19,7 @@
  */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput } from '@shared/schemas/hr'
+import type { CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput, CreateAllowanceInput } from '@shared/schemas/hr'
 import type { ApiStaffLoan, ApiLeaveRequest } from '@shared/types/api'
 import type { ConflictCheckResult } from '@/server/services/leaveConflictService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
@@ -91,6 +91,51 @@ export function useUpdateSalary() {
       apiFetch(`/hr/${staffId}/salary`, { method: 'PUT', body: JSON.stringify(data) }),
     onSuccess: (_result, { staffId }) => {
       qc.invalidateQueries({ queryKey: queryKeys.hr.salary(staffId) })
+    },
+  })
+}
+
+// [PRODUCTION FIX] Itemized allowances — see StaffAllowance in
+// schema.prisma / CreateAllowanceSchema for why a flat number wasn't
+// enough. StaffForm.tsx's SalarySection (same phase) is the only caller.
+export interface ApiAllowance {
+  id: string
+  staffUid: string
+  type: string
+  amount: string
+  recurring: boolean
+  paidMonth: number | null
+  paidYear: number | null
+  notes: string | null
+  createdAt: string
+}
+
+export function useAllowances(staffId: string) {
+  return useQuery({
+    queryKey: queryKeys.hr.allowances(staffId),
+    queryFn: () => apiFetch<ApiAllowance[]>(`/hr/${staffId}/allowances`),
+    enabled: !!staffId,
+  })
+}
+
+export function useAddAllowance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ staffId, data }: { staffId: string; data: CreateAllowanceInput }) =>
+      apiFetch<ApiAllowance>(`/hr/${staffId}/allowances`, { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: (_result, { staffId }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.hr.allowances(staffId) })
+    },
+  })
+}
+
+export function useDeleteAllowance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ allowanceId }: { allowanceId: string; staffId: string }) =>
+      apiFetch(`/hr/allowances/${allowanceId}`, { method: 'DELETE' }),
+    onSuccess: (_result, { staffId }) => {
+      qc.invalidateQueries({ queryKey: queryKeys.hr.allowances(staffId) })
     },
   })
 }

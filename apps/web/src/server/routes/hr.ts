@@ -52,7 +52,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
-import { CreateStaffSchema, UpdateStaffSchema, LeaveRequestSchema, ReviewLeaveSchema, LoanRequestSchema, PerformanceNoteSchema, UpdateSalarySchema } from '@shared/schemas/hr'
+import { CreateStaffSchema, UpdateStaffSchema, LeaveRequestSchema, ReviewLeaveSchema, LoanRequestSchema, PerformanceNoteSchema, UpdateSalarySchema, CreateAllowanceSchema } from '@shared/schemas/hr'
 import * as hrService from '@/server/services/hrService'
 import { getSignedViewUrl } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
@@ -117,6 +117,45 @@ hrRouter.put('/:id/salary', verifyAuth,
       return res.json(result)
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'hr', route: 'salary-upsert' } })
+    }
+  })
+
+// [PRODUCTION FIX] Itemized allowances — see StaffAllowance in
+// schema.prisma / CreateAllowanceSchema for why a flat number wasn't
+// enough. Same permission gate as the salary routes above.
+hrRouter.get('/:id/allowances', verifyAuth,
+  requireAnyPermission(['hr.manageSalaryStructure', 'finance.manageSalaryStructure']),
+  async (req, res) => {
+    try {
+      return res.json(await hrService.listAllowances(String(req.params.id)))
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'hr', route: 'allowances-list' } })
+    }
+  })
+
+hrRouter.post('/:id/allowances', verifyAuth,
+  requireAnyPermission(['hr.manageSalaryStructure', 'finance.manageSalaryStructure']),
+  async (req, res) => {
+    const parsed = CreateAllowanceSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    try {
+      const result = await hrService.addAllowance(
+        String(req.params.id), parsed.data, req.user!.uid, req.user!.role,
+      )
+      return res.status(201).json(result)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'hr', route: 'allowances-create' } })
+    }
+  })
+
+hrRouter.delete('/allowances/:allowanceId', verifyAuth,
+  requireAnyPermission(['hr.manageSalaryStructure', 'finance.manageSalaryStructure']),
+  async (req, res) => {
+    try {
+      await hrService.deleteAllowance(String(req.params.allowanceId), req.user!.uid, req.user!.role)
+      return res.json({ ok: true })
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'hr', route: 'allowances-delete' } })
     }
   })
 

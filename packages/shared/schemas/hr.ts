@@ -68,7 +68,6 @@ export const UpdateStaffSchema = z.object({
 // schema is for the create/update endpoint that was missing entirely.
 export const UpdateSalarySchema = z.object({
   baseSalary: z.number().min(0),
-  allowances: z.number().min(0).default(0),
 })
 
 export const LeaveRequestSchema = z.object({
@@ -97,6 +96,21 @@ export const PerformanceNoteSchema = z.object({
   notes:        z.string().min(10).max(1000),
 })
 
+// [PRODUCTION FIX] Allowances are itemized now (see StaffAllowance in
+// schema.prisma) — each has its own type and amount, and can be a
+// one-time payment tied to a specific month rather than folded into every
+// month's base salary.
+export const CreateAllowanceSchema = z.object({
+  type:      z.string().min(1).max(60),
+  amount:    z.number().min(0),
+  recurring: z.boolean().default(true),
+  paidMonth: z.number().int().min(1).max(12).optional(),
+  paidYear:  z.number().int().min(2000).optional(),
+  notes:     z.string().max(500).optional(),
+}).refine(
+  (data) => data.recurring || (data.paidMonth !== undefined && data.paidYear !== undefined),
+  { message: 'One-time allowances need paidMonth and paidYear.', path: ['paidMonth'] },
+)
 export type CreateStaffInput    = z.infer<typeof CreateStaffSchema>
 export type UpdateStaffInput    = z.infer<typeof UpdateStaffSchema>
 export type LeaveRequestInput   = z.infer<typeof LeaveRequestSchema>
@@ -104,3 +118,4 @@ export type ReviewLeaveInput    = z.infer<typeof ReviewLeaveSchema>
 export type LoanRequestInput    = z.infer<typeof LoanRequestSchema>
 export type PerformanceNoteInput = z.infer<typeof PerformanceNoteSchema>
 export type UpdateSalaryInput   = z.infer<typeof UpdateSalarySchema>
+export type CreateAllowanceInput = z.infer<typeof CreateAllowanceSchema>

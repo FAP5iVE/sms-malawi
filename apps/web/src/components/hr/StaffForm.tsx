@@ -32,7 +32,7 @@
 
 import { useState, useEffect } from 'react'
 import { z } from 'zod'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import type { Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateStaffSchema, UpdateStaffSchema } from '@shared/schemas/hr'
@@ -40,7 +40,7 @@ import type { CreateStaffInput, UpdateStaffInput } from '@shared/schemas/hr'
 import type { ApiStaffDetail } from '@shared/types/api'
 type StaffFormValues = z.input<typeof CreateStaffSchema>
 import { USER_ROLES, ROLE_LABELS } from '@shared/types/roles'
-import { useCreateStaff, useUpdateStaff, useStaffProfile, useSalary, useUpdateSalary } from '@/hooks/useHR'
+import { useCreateStaff, useUpdateStaff, useStaffProfile, useSalary, useUpdateSalary, useAllowances, useAddAllowance, useDeleteAllowance } from '@/hooks/useHR'
 import { useDepartmentTitles } from '@/hooks/useSettings'
 import { usePermissions } from '@/hooks/usePermissions'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -87,7 +87,7 @@ export function StaffForm({ onClose, staffId }: Props) {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     reset,
     formState: { errors },
@@ -117,7 +117,7 @@ export function StaffForm({ onClose, staffId }: Props) {
   // mismatched pair.
   const { data: departmentTitles = {}, isLoading: deptLoading } = useDepartmentTitles()
   const departments = Object.keys(departmentTitles).sort()
-  const selectedDept = watch('department')
+  const selectedDept = useWatch({ control, name: 'department' })
   const titlesForDept = selectedDept ? (departmentTitles[selectedDept] ?? []) : []
 
   function handleDepartmentChange() {
@@ -386,56 +386,109 @@ export function StaffForm({ onClose, staffId }: Props) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-// [PRODUCTION FIX] Own local form, deliberately separate from the main
-// react-hook-form above — this saves through its own PUT /hr/:id/salary
-// endpoint (useUpdateSalary), not the staff-details PATCH, since salary is
-// a distinct concern (SalaryStructure is its own table, keyed by staffUid,
-// not a plain field on StaffProfile) with its own permission gate already
-// applied by the caller before this renders at all.
+const ALLOWANCE_TYPES = ['Housing', 'Transport', 'Responsibility', 'Airtime', 'Bonus', 'Other']
+
+// [PRODUCTION FIX] Full rebuild — allowances are itemized now (type +
+// amount + recurring/one-time), not a single flat number bundled into
+// base salary. This card mirrors exactly what payrollService.ts sums for
+// a payslip: base salary, every recurring allowance, plus any one-time
+// allowance that falls in the run's own month — so "Monthly Gross" below
+// is the real figure that would appear on this month's payslip, not an
+// approximation.
 function SalarySection({ staffId }: { staffId: string }) {
-  const { data: salary, isLoading } = useSalary(staffId)
+  const { data: salary, isLoading: salaryLoading } = useSalary(staffId)
+  const { data: allowances = [], isLoading: allowancesLoading } = useAllowances(staffId)
   const updateSalary = useUpdateSalary()
+  const addAllowance = useAddAllowance()
+  const deleteAllowance = useDeleteAllowance()
+
   const [baseSalary, setBaseSalary] = useState('')
-  const [allowances, setAllowances] = useState('')
-  const [saved, setSaved] = useState(false)
-  const [prevSalary,setPrevSalary] = useState(salary)
+  const [baseSaved, setBaseSaved] = useState(false)
+  const [prevSalary, setPrevSalary] = useState(salary)
 
-    if (salary !== prevSalary) {
-      setPrevSalary(salary)
-      if (salary){
-        setBaseSalary(salary.baseSalary)
-        setAllowances(salary.allowances)
-    }}
+  const [showAddAllowance, setShowAddAllowance] = useState(false)
+  // ALLOWANCE_TYPES is a fixed non-empty literal declared above, so index 0
+  // always exists — this just tells TS what a plain array index can't prove.
+  const [allowType, setAllowType] = useState(ALLOWANCE_TYPES[0]!)
+  const [allowAmount, setAllowAmount] = useState('')
+  const [allowRecurring, setAllowRecurring] = useState(true)
+  const now = new Date()
+  const [allowMonth, setAllowMonth] = useState(String(now.getMonth() + 1))
+  const [allowYear, setAllowYear] = useState(String(now.getFullYear()))
+  const [allowNotes, setAllowNotes] = useState('')
+  const [allowError, setAllowError] = useState<string | null>(null)
 
-  function handleSave() {
-    setSaved(false)
+  // Sync base salary from the fetched record during render instead of an
+  // effect, so the salary landing doesn't cost an extra render pass.
+  if (salary !== prevSalary) {
+    setPrevSalary(salary)
+    if (salary) setBaseSalary(salary.baseSalary)
+  }
+
+  function handleSaveBase() {
+    setBaseSaved(false)
     const base = Number(baseSalary)
-    const allow = Number(allowances) || 0
     if (!Number.isFinite(base) || base < 0) return
-    updateSalary.mutate(
-      { staffId, data: { baseSalary: base, allowances: allow } },
-      { onSuccess: () => setSaved(true) },
+    updateSalary.mutate({ staffId, data: { baseSalary: base } }, { onSuccess: () => setBaseSaved(true) })
+  }
+
+  function handleAddAllowance() {
+    setAllowError(null)
+    const amount = Number(allowAmount)
+    if (!allowType.trim() || !Number.isFinite(amount) || amount <= 0) {
+      setAllowError('Enter a type and a positive amount.')
+      return
+    }
+    addAllowance.mutate(
+      {
+        staffId,
+        data: {
+          type: allowType.trim(),
+          amount,
+          recurring: allowRecurring,
+          paidMonth: allowRecurring ? undefined : Number(allowMonth),
+          paidYear:  allowRecurring ? undefined : Number(allowYear),
+          notes: allowNotes.trim() || undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          setShowAddAllowance(false)
+          setAllowAmount(''); setAllowNotes(''); setAllowRecurring(true)
+        },
+        onError: (err) => setAllowError(err instanceof Error ? err.message : 'Failed to add allowance.'),
+      },
     )
   }
 
+  const recurringAllowances = allowances.filter((a) => a.recurring)
+  const oneTimeAllowances   = allowances.filter((a) => !a.recurring)
+  const recurringTotal = recurringAllowances.reduce((sum, a) => sum + Number(a.amount), 0)
+  const monthlyGross = (Number(baseSalary) || 0) + recurringTotal
+
+  const isLoading = salaryLoading || allowancesLoading
+
   return (
-    <div className="border border-base rounded-xl p-4 bg-page/50">
-      <div className="flex items-center gap-2 mb-3">
+    <div className="border border-base rounded-xl p-4 bg-page/50 space-y-4">
+      <div className="flex items-center gap-2">
         <Wallet className="w-4 h-4 text-brand-teal" aria-hidden />
-        <h3 className="text-sm font-heading font-semibold text-body">Salary</h3>
+        <h3 className="text-sm font-heading font-semibold text-body">Salary Structure</h3>
       </div>
+
       {isLoading ? (
         <p className="text-xs text-muted">Loading…</p>
       ) : (
         <>
           {!salary && (
-            <p className="text-xs text-muted mb-3">
+            <p className="text-xs text-muted">
               No salary set up for this staff member yet — payroll can&apos;t generate a payslip for them until this is filled in.
             </p>
           )}
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className={lbl} htmlFor="sf-baseSalary">Base salary (MWK / month)</label>
+
+          {/* Base salary */}
+          <div>
+            <label className={lbl} htmlFor="sf-baseSalary">Base salary (MWK / month)</label>
+            <div className="flex items-end gap-2">
               <input
                 id="sf-baseSalary"
                 type="number"
@@ -445,37 +498,177 @@ function SalarySection({ staffId }: { staffId: string }) {
                 onChange={(e) => setBaseSalary(e.target.value)}
                 className={ic}
               />
+              <button
+                type="button"
+                onClick={handleSaveBase}
+                disabled={updateSalary.isPending || !baseSalary}
+                className="shrink-0 px-4 py-2 text-xs font-semibold bg-brand-navy text-white rounded-lg disabled:opacity-60 flex items-center gap-2 min-h-11"
+              >
+                {updateSalary.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {salary ? 'Update' : 'Set'}
+              </button>
             </div>
-            <div>
-              <label className={lbl} htmlFor="sf-allowances">Allowances (MWK / month, optional)</label>
-              <input
-                id="sf-allowances"
-                type="number"
-                min="0"
-                step="0.01"
-                value={allowances}
-                onChange={(e) => setAllowances(e.target.value)}
-                className={ic}
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-3 mt-3">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={updateSalary.isPending || !baseSalary}
-              className="px-4 py-2 text-xs font-semibold bg-brand-navy text-white rounded-lg disabled:opacity-60 flex items-center gap-2 min-h-11"
-            >
-              {updateSalary.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {salary ? 'Update Salary' : 'Set Salary'}
-            </button>
-            {saved && <span className="text-xs text-brand-teal">Saved.</span>}
+            {baseSaved && <p className="text-xs text-brand-teal mt-1">Saved.</p>}
             {updateSalary.error && (
-              <span className="text-xs text-brand-coral">
+              <p className="text-xs text-brand-coral mt-1">
                 {updateSalary.error instanceof Error ? updateSalary.error.message : 'Failed to save.'}
-              </span>
+              </p>
             )}
           </div>
+
+          {/* Allowances list */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className={lbl} htmlFor="sf-allowance-list">Allowances</label>
+              <button
+                type="button"
+                onClick={() => setShowAddAllowance((v) => !v)}
+                className="text-xs font-semibold text-brand-teal hover:underline"
+              >
+                {showAddAllowance ? 'Cancel' : '+ Add allowance'}
+              </button>
+            </div>
+
+            {allowances.length === 0 && !showAddAllowance && (
+              <p className="text-xs text-muted">No allowances recorded.</p>
+            )}
+
+            {allowances.length > 0 && (
+              <ul id="sf-allowance-list" className="divide-y divide-base border border-base rounded-lg overflow-hidden mb-2">
+                {allowances.map((a) => (
+                  <li key={a.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-surface">
+                    <div className="min-w-0">
+                      <p className="text-sm text-body font-medium truncate">
+                        {a.type} <span className="text-muted font-normal">— MWK {Number(a.amount).toLocaleString()}</span>
+                      </p>
+                      <p className="text-xs text-muted">
+                        {a.recurring
+                          ? 'Every month'
+                          : `One-time · ${a.paidMonth}/${a.paidYear}`}
+                        {a.notes ? ` · ${a.notes}` : ''}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteAllowance.mutate({ allowanceId: a.id, staffId })}
+                      aria-label={`Remove ${a.type} allowance`}
+                      className="shrink-0 text-brand-coral hover:underline text-xs font-semibold"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {showAddAllowance && (
+              <div className="border border-base rounded-lg p-3 bg-surface space-y-3">
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className={lbl} htmlFor="sf-allow-type">Type</label>
+                    <select id="sf-allow-type" value={allowType} onChange={(e) => setAllowType(e.target.value)} className={ic}>
+                      {ALLOWANCE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={lbl} htmlFor="sf-allow-amount">Amount (MWK)</label>
+                    <input
+                      id="sf-allow-amount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={allowAmount}
+                      onChange={(e) => setAllowAmount(e.target.value)}
+                      className={ic}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 text-sm text-body cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={allowRecurring}
+                      onChange={() => setAllowRecurring(true)}
+                      className="accent-brand-teal"
+                    />
+                    Every month
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-body cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={!allowRecurring}
+                      onChange={() => setAllowRecurring(false)}
+                      className="accent-brand-teal"
+                    />
+                    One-time payment
+                  </label>
+                </div>
+
+                {!allowRecurring && (
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className={lbl} htmlFor="sf-allow-month">Month</label>
+                      <select id="sf-allow-month" value={allowMonth} onChange={(e) => setAllowMonth(e.target.value)} className={ic}>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                          <option key={m} value={m}>{new Date(2000, m - 1).toLocaleString('default', { month: 'long' })}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={lbl} htmlFor="sf-allow-year">Year</label>
+                      <input id="sf-allow-year" type="number" value={allowYear} onChange={(e) => setAllowYear(e.target.value)} className={ic} />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className={lbl} htmlFor="sf-allow-notes">Notes (optional)</label>
+                  <input id="sf-allow-notes" value={allowNotes} onChange={(e) => setAllowNotes(e.target.value)} className={ic} placeholder="e.g. July fuel reimbursement" />
+                </div>
+
+                {allowError && <p className="text-xs text-brand-coral">{allowError}</p>}
+
+                <button
+                  type="button"
+                  onClick={handleAddAllowance}
+                  disabled={addAllowance.isPending || !allowAmount}
+                  className="px-4 py-2 text-xs font-semibold bg-brand-teal text-white rounded-lg disabled:opacity-60 flex items-center gap-2 min-h-11"
+                >
+                  {addAllowance.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Add Allowance
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Payslip-style summary */}
+          {salary && (
+            <div className="border-t border-base pt-3 text-sm space-y-1">
+              <div className="flex justify-between text-muted">
+                <span>Base salary</span>
+                <span>MWK {(Number(baseSalary) || 0).toLocaleString()}</span>
+              </div>
+              {recurringAllowances.map((a) => (
+                <div key={a.id} className="flex justify-between text-muted">
+                  <span>{a.type} (recurring)</span>
+                  <span>MWK {Number(a.amount).toLocaleString()}</span>
+                </div>
+              ))}
+              <div className="flex justify-between font-heading font-semibold text-body pt-1 border-t border-base mt-1">
+                <span>Monthly Gross</span>
+                <span>MWK {monthlyGross.toLocaleString()}</span>
+              </div>
+              {oneTimeAllowances.length > 0 && (
+                <p className="text-xs text-muted pt-1">
+                  Plus {oneTimeAllowances.length} one-time allowance{oneTimeAllowances.length > 1 ? 's' : ''} applied only in their named month.
+                </p>
+              )}
+              <p className="text-xs text-muted pt-1">
+                PAYE, pension, and any loan deduction are calculated automatically at each pay run — not shown here.
+              </p>
+            </div>
+          )}
         </>
       )}
     </div>

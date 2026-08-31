@@ -480,12 +480,41 @@ model SalaryStructure {
   id           String   @id @default(cuid())
   staffUid     String   @unique
   baseSalary   Decimal  @db.Decimal(12, 2)
+  // [PRODUCTION FIX] Deprecated — a single flat number couldn't represent
+  // allowances that differ by type or arrive at different times, which is
+  // how they actually work. Replaced by StaffAllowance below (itemized,
+  // one row per allowance). Left in place for existing data/backward
+  // compatibility; the new salary UI and payrollService.ts's gross
+  // calculation both read StaffAllowance now, not this field.
   allowances   Decimal  @db.Decimal(12, 2) @default(0)
   loanBalance  Decimal  @db.Decimal(12, 2) @default(0)
   monthlyLoanDeduction Decimal @db.Decimal(12, 2) @default(0)
   updatedAt    DateTime @updatedAt
 
   @@map("salary_structures")
+}
+
+// [PRODUCTION FIX] New model — allowances genuinely differ by type (housing,
+// transport, responsibility, one-off bonus, etc.) and don't all arrive on
+// the same monthly cycle as base salary. `recurring: true` rows are
+// included in every payroll run automatically; `recurring: false` rows are
+// one-time and only apply to the specific (paidMonth, paidYear) they name —
+// payrollService.ts's gross calculation sums both kinds correctly per run.
+model StaffAllowance {
+  id           String   @id @default(cuid())
+  staffUid     String
+  type         String   // free text, e.g. "Housing", "Transport", "Responsibility", "Bonus"
+  amount       Decimal  @db.Decimal(12, 2)
+  recurring    Boolean  @default(true)
+  paidMonth    Int?     // 1-12 — required when recurring = false, ignored when true
+  paidYear     Int?
+  notes        String?
+  createdByUid String
+  createdAt    DateTime @default(now())
+
+  @@index([staffUid])
+  @@index([staffUid, recurring])
+  @@map("staff_allowances")
 }
 
 // ─── BUDGET ──────────────────────────────────────────────
