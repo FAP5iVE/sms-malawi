@@ -23,16 +23,19 @@
  */
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { getAuth } from 'firebase/auth'
+import { useState, useEffect } from 'react'
 import { useInvoices, useStudentBalance, useRecordPayment, useGenerateInvoice } from '@/hooks/useFinances'
+import { useStudents } from '@/hooks/useStudents'
+import { useClasses } from '@/hooks/useClasses'
 import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
 import { formatMWK } from '@shared/constants/malawi'
-import { PlusCircle, Loader2, X as XIcon, FileText } from 'lucide-react'
+import { PlusCircle, Loader2, X as XIcon, FileText, Search } from 'lucide-react'
 import { InvoiceNotes } from '@/components/finances/InvoiceNotes'
 import { BulkInvoiceGenerator } from '@/components/finances/BulkInvoiceGenerator'
-import type { ApiInvoice } from '@shared/types/api'
+import type { ApiInvoice, ApiStudent } from '@shared/types/api'
+import { apiFetch, queryKeys } from '@/lib/api-client'
+import { useQueryClient } from '@tanstack/react-query'
 import { PaymentMethodSchema, GenerateInvoiceSchema } from '@shared/schemas/finance'
 import { useSearchParams } from 'next/navigation'
 import { z } from 'zod'
@@ -361,91 +364,87 @@ export function InvoicesTab({ academicYear, term }: { academicYear: string; term
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface StudentHit {
-  id: string
-  fullName: string
-  sublabel: string
-}
-
-// Same /api/search/fallback endpoint the library page's borrower picker
-// already uses — students only, staff hits dropped.
-async function searchStudents(query: string): Promise<StudentHit[]> {
-  try {
-    const token = await getAuth().currentUser?.getIdToken()
-    const res = await fetch(`/api/search/fallback?q=${encodeURIComponent(query)}`, {
-      headers: { Authorization: `Bearer ${token ?? ''}` },
-    })
-    if (!res.ok) return []
-    const data = await res.json() as {
-      students: { id: string; fullName: string; registrationNo: string; className: string | null }[]
-    }
-    return data.students.map((s) => ({
-      id: s.id,
-      fullName: s.fullName,
-      sublabel: `${s.registrationNo}${s.className ? ` · ${s.className}` : ''}`,
-    }))
-  } catch {
-    return []
-  }
-}
-
-function StudentPicker({ value, onChange }: { value: StudentHit | null; onChange: (hit: StudentHit | null) => void }) {
-  const [query, setQuery]     = useState('')
-  const [results, setResults] = useState<StudentHit[]>([])
-  const [open, setOpen]       = useState(false)
-  const [loading, setLoading] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const handleChange = useCallback((v: string) => {
-    setQuery(v)
-    onChange(null)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (v.trim().length < 2) { setResults([]); setOpen(false); return }
-    debounceRef.current = setTimeout(async () => {
-      setLoading(true)
-      setResults(await searchStudents(v))
-      setOpen(true)
-      setLoading(false)
-    }, 300)
-  }, [onChange])
-
-  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
+// [PRODUCTION FIX] Deliberately not the library page's autocomplete-dropdown
+// pattern — an invoice entry needs to find one specific student among
+// hundreds confidently, not just guess a name. This is a real search-and-
+// filter panel: registration number or name, narrowable by class, with
+// results shown as a proper list (including each student's current fee
+// balance for context) rather than a single-line typeahead.
+function StudentSearchPanel({
+  selectedId, onSelect,
+}: {
+  selectedId: string | null
+  onSelect: (student: ApiStudent) => void
+}) {
+  const [search, setSearch] = useState('')
+  const [classId, setClassId] = useState('')
+  const { data: classes = [] } = useClasses()
+  const { data, isLoading } = useStudents({
+    search: search.length >= 2 ? search : undefined,
+    classId: classId || undefined,
+    status: 'ACTIVE',
+  })
+  const students = data?.students ?? []
 
   return (
-    <div className="relative">
-      <input
-        value={value ? value.fullName : query}
-        onChange={(e) => handleChange(e.target.value)}
-        onFocus={() => results.length > 0 && setOpen(true)}
-        placeholder="Search student by name…"
-        className="input w-full"
-        autoComplete="off"
-      />
-      {loading && <Loader2 className="w-4 h-4 animate-spin text-muted absolute right-3 top-1/2 -translate-y-1/2" />}
-      {open && results.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full bg-surface border border-base rounded-lg shadow-lg max-h-56 overflow-y-auto">
-          {results.map((hit) => (
-            <button
-              key={hit.id}
-              type="button"
-              onClick={() => { onChange(hit); setQuery(''); setOpen(false) }}
-              className="w-full text-left px-3 py-2 hover:bg-page text-sm"
-            >
-              <p className="font-medium text-body">{hit.fullName}</p>
-              <p className="text-xs text-muted">{hit.sublabel}</p>
-            </button>
-          ))}
+    <div className="border border-base rounded-xl overflow-hidden">
+      <div className="p-3 border-b border-base bg-page/50 space-y-2">
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or registration number…"
+            className="input w-full pl-8"
+          />
         </div>
-      )}
+        <select value={classId} onChange={(e) => setClassId(e.target.value)} className="input w-full">
+          <option value="">All classes</option>
+          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+      <div className="max-h-56 overflow-y-auto divide-y divide-base">
+        {isLoading ? (
+          <p className="text-xs text-muted text-center py-6">Searching…</p>
+        ) : students.length === 0 ? (
+          <p className="text-xs text-muted text-center py-6">
+            {search.length >= 2 || classId ? 'No matching students.' : 'Type at least 2 characters or pick a class to search.'}
+          </p>
+        ) : (
+          students.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onSelect(s)}
+              className={[
+                'w-full text-left px-3 py-2.5 hover:bg-page transition-colors flex items-center justify-between gap-3',
+                selectedId === s.id ? 'bg-brand-teal/10' : '',
+              ].join(' ')}
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-body truncate">{s.firstName} {s.lastName}</p>
+                <p className="text-xs text-muted">{s.registrationNo}{s.class ? ` · ${s.class.name}` : ''}</p>
+              </div>
+              {typeof s.feeBalance === 'number' && s.feeBalance > 0 && (
+                <span className="shrink-0 text-xs font-semibold text-brand-coral">{formatMWK(s.feeBalance)} due</span>
+              )}
+            </button>
+          ))
+        )}
+      </div>
     </div>
   )
 }
 
-// [PRODUCTION FIX] The backend (feeService.generateInvoice, via POST
-// /finances/invoices/generate) already computes the invoice amount from
-// the student's applicable fee structure and applies any scholarship
-// discount, and already refuses a duplicate for the same student/term
-// with a clear error — this form just needs to collect who/when.
+// [PRODUCTION FIX] Every real field this endpoint accepts is wired here —
+// studentId/academicYear/term/dueDate (the original four), plus
+// manualDiscount (new — see GenerateInvoiceSchema/feeService.generateInvoice
+// this same phase) and an initial note (via the existing invoice-notes
+// endpoint, called right after creation succeeds). subtotal/discount-from-
+// scholarship/totalAmount/balance/status are NOT inputs here because
+// they're genuinely computed server-side from the student's fee structure
+// and any active scholarship — exposing fake editable copies of those
+// would just let the form lie about what's actually going to happen.
 function NewInvoiceModal({
   defaultAcademicYear, defaultTerm, onClose,
 }: {
@@ -453,29 +452,57 @@ function NewInvoiceModal({
   defaultTerm: number
   onClose: () => void
 }) {
+  const qc = useQueryClient()
   const generateInvoice = useGenerateInvoice()
-  const [student, setStudent] = useState<StudentHit | null>(null)
+  const [student, setStudent] = useState<ApiStudent | null>(null)
   const [academicYear, setAcademicYear] = useState(defaultAcademicYear)
   const [term, setTerm] = useState(defaultTerm)
   const [dueDate, setDueDate] = useState('')
+  const [manualDiscount, setManualDiscount] = useState('')
+  const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [savingNote, setSavingNote] = useState(false)
 
-  function handleSubmit() {
+  async function handleSubmit() {
     setError(null)
     if (!student || !dueDate) return
-    const parsed = GenerateInvoiceSchema.safeParse({ studentId: student.id, academicYear, term, dueDate })
+    const parsed = GenerateInvoiceSchema.safeParse({
+      studentId: student.id,
+      academicYear,
+      term,
+      dueDate,
+      manualDiscount: manualDiscount ? Number(manualDiscount) : undefined,
+    })
     if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Please check the form.')
+
     generateInvoice.mutate(parsed.data, {
-      onSuccess: onClose,
+      onSuccess: async (invoice) => {
+        const created = invoice as ApiInvoice
+        if (notes.trim()) {
+          setSavingNote(true)
+          try {
+            await apiFetch(`/finances/invoices/${created.id}/notes`, {
+              method: 'POST',
+              body: JSON.stringify({ body: notes.trim() }),
+            })
+            void qc.invalidateQueries({ queryKey: queryKeys.finances.invoiceNotes(created.id) })
+          } finally {
+            setSavingNote(false)
+          }
+        }
+        onClose()
+      },
       onError: (err) => setError(err instanceof Error ? err.message : 'Failed to generate invoice.'),
     })
   }
 
+  const isBusy = generateInvoice.isPending || savingNote
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-base">
+      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
+        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy flex items-center gap-2">
             <FileText className="w-4 h-4" aria-hidden /> New Invoice
           </h2>
@@ -486,8 +513,21 @@ function NewInvoiceModal({
         <div className="p-6 space-y-4">
           <div>
             <label className="text-xs text-muted mb-1 block">Student</label>
-            <StudentPicker value={student} onChange={setStudent} />
+            {student ? (
+              <div className="flex items-center justify-between gap-3 border border-brand-teal/30 bg-brand-teal/5 rounded-xl px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium text-body">{student.firstName} {student.lastName}</p>
+                  <p className="text-xs text-muted">{student.registrationNo}{student.class ? ` · ${student.class.name}` : ''}</p>
+                </div>
+                <button type="button" onClick={() => setStudent(null)} className="text-xs font-semibold text-brand-teal hover:underline shrink-0">
+                  Change
+                </button>
+              </div>
+            ) : (
+              <StudentSearchPanel selectedId={null} onSelect={setStudent} />
+            )}
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="inv-year" className="text-xs text-muted mb-1 block">Academic Year</label>
@@ -506,6 +546,7 @@ function NewInvoiceModal({
               </select>
             </div>
           </div>
+
           <div>
             <label htmlFor="inv-due" className="text-xs text-muted mb-1 block">Due Date</label>
             <input
@@ -517,16 +558,52 @@ function NewInvoiceModal({
             />
           </div>
 
+          <div>
+            <label htmlFor="inv-discount" className="text-xs text-muted mb-1 block">
+              Additional Discount (MWK, optional)
+            </label>
+            <input
+              id="inv-discount"
+              type="number"
+              min="0"
+              step="0.01"
+              value={manualDiscount}
+              onChange={(e) => setManualDiscount(e.target.value)}
+              placeholder="0"
+              className="input w-full"
+            />
+            <p className="text-xs text-muted mt-1">
+              Applied on top of any active scholarship — for a one-off adjustment, not a standing discount.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="inv-notes" className="text-xs text-muted mb-1 block">Note (optional)</label>
+            <textarea
+              id="inv-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Visible to finance staff on this invoice"
+              className="input w-full resize-none"
+            />
+          </div>
+
+          <p className="text-xs text-muted">
+            The invoice amount is calculated automatically from this student&apos;s class fee structure for the
+            selected year and term, minus any active scholarship and the discount above.
+          </p>
+
           {error && <p className="text-sm text-brand-coral">{error}</p>}
 
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={generateInvoice.isPending || !student || !dueDate}
+            disabled={isBusy || !student || !dueDate}
             className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 min-h-11"
           >
-            {generateInvoice.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {generateInvoice.isPending ? 'Generating…' : 'Generate Invoice'}
+            {isBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {isBusy ? 'Generating…' : 'Generate Invoice'}
           </button>
         </div>
       </div>

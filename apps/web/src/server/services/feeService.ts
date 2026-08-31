@@ -118,6 +118,11 @@ export async function generateInvoice(
       ? subtotal * (Number(scholarship.value) / 100)
       : Number(scholarship.value)
   }
+  // [PRODUCTION FIX] Manual discount stacks on top of any scholarship
+  // discount rather than replacing it — a scholarship and a one-off
+  // manual adjustment are independent reasons a family might owe less,
+  // and there's no reason entering one should silently discard the other.
+  if (data.manualDiscount) discount += data.manualDiscount
   const totalAmount = Math.max(0, subtotal - discount)
 
   const invoice = await prisma.invoice.create({
