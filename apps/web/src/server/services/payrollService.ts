@@ -115,6 +115,24 @@ export async function processMonthlyPayroll(
   )
   const staffIdByUid = new Map(staffProfiles.map((s) => [s.uid, s.id]))
 
+  // [PRODUCTION FIX] Allowances are itemized now (StaffAllowance) — a
+  // recurring one counts every month; a one-time one only counts for the
+  // specific (paidMonth, paidYear) it names. sal.allowances (the old flat
+  // field) is no longer read here.
+  const allowances = await prisma.staffAllowance.findMany({
+    where: {
+      staffUid: { in: staffUids },
+      OR: [
+        { recurring: true },
+        { recurring: false, paidMonth: month, paidYear: year },
+      ],
+    },
+  })
+  const allowanceTotalByUid = new Map<string, number>()
+  for (const a of allowances) {
+    allowanceTotalByUid.set(a.staffUid, (allowanceTotalByUid.get(a.staffUid) ?? 0) + Number(a.amount))
+  }
+
   let totalGross = 0
   let totalNet = 0
   const payslipData: {
@@ -128,7 +146,7 @@ export async function processMonthlyPayroll(
   }[] = []
 
   for (const sal of salaries) {
-    const gross = Number(sal.baseSalary) + Number(sal.allowances)
+    const gross = Number(sal.baseSalary) + (allowanceTotalByUid.get(sal.staffUid) ?? 0)
     const paye = calculateMonthlyPAYE(gross, payeBrackets)
     const pension = gross * (pensionPercent / 100)
     const loanDeduction = Number(sal.monthlyLoanDeduction)

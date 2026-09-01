@@ -1,245 +1,123 @@
 /*
- * apps/web/src/server/services/payrollService.ts
+ * apps/web/src/server/routes/payroll.ts
  *
- * [CHANGE TYPE]: TARGETED EDIT, three fixes
+ * [CHANGE TYPE]: TARGETED EDIT
  * [R-PHASE]: R10 — Finance II: Payroll, Forecasting & the Finance↔Library
  *   Reconciliation
  * [PURPOSE]:
- *   1. Replaced the hardcoded PAYE tax brackets (100_000/350_000/
- *      2_000_000 monthly thresholds, 0.15/0.3/0.35 rates) and
- *      PENSION_RATE=0.05 with reads from
- *      SETTING_KEYS.FINANCE_PAYE_BRACKETS/FINANCE_PENSION_PERCENT
- *      (Phase 1B; already built and simply uncalled — the fourth
- *      confirmed instance of a Settings panel with zero effect on real
- *      computation, after grading/3A, promotion/3C, and this one).
- *      FINANCE_PAYE_BRACKETS' bounds are annual (PayeBracket.minAnnualMwk/
- *      maxAnnualMwk), while this function computes a monthly gross —
- *      calculateMonthlyPAYE() below annualizes the monthly gross,
- *      applies genuine marginal (bracket-by-bracket) taxation across the
- *      configured brackets, then divides the resulting annual tax by 12.
- *   2. processMonthlyPayroll(): wrapped the PayrollRun create → per-staff
- *      Payslip create (+ loan-balance decrement) → PDF generation →
- *      status-update sequence in a single Prisma $transaction, so a
- *      mid-run crash cannot leave a run permanently stuck at PROCESSING
- *      against the @@unique([month,year]) constraint (which blocks any
- *      retry for that month regardless of the stuck row's status, since
- *      the existing-run check above is unconditional on status). PDF
- *      generation launches a headless browser per staff member and is
- *      genuinely slow — an explicit, generous transaction timeout (2
- *      minutes) is passed to accommodate this rather than leaving Prisma's
- *      default ~5s interactive-transaction timeout to fail large runs.
- *   3. staffName is now resolved via a real join against StaffProfile
- *      (matched by uid, the same "no Prisma relation exists for a
- *      Firebase-UID plain-string reference" pattern R9 established for
- *      invoice-note authors) instead of being set to the raw staffUid —
- *      the fifth confirmed "raw ID instead of name" instance in this
- *      audit.
- *
- *   [POST-R11, user-requested follow-up beyond the roadmap's literal
- *   scope]: this run loop previously decremented
- *   SalaryStructure.loanBalance — a field confirmed to have zero readers
- *   anywhere in the codebase, entirely disconnected from StaffLoan
- *   (the real, UI-connected loan model the Loans tab built in R11
- *   displays). Removed that dead write; after the transaction commits,
- *   each staff member's loanDeduction is now reconciled against their
- *   real StaffLoan via hrService.recordLoanRepayment() (which also
- *   settles the loan and clears SalaryStructure.monthlyLoanDeduction
- *   once the balance reaches zero — see hrService.ts's disburseLoan()/
- *   recordLoanRepayment() for the other half of this connection).
- * [DEPENDS ON]: settingsService.ts (FINANCE_PAYE_BRACKETS/
- *   FINANCE_PENSION_PERCENT, already correctly built), StaffProfile model,
- *   hrService.recordLoanRepayment() (POST-R11 loan↔payroll reconciliation)
+ *   1. Mounted the (now-rebuilt) payrollApprovalService behind
+ *      POST /runs/:id/submit-for-approval, .../approve, .../lock,
+ *      .../rollback — none of these existed in any route file before this
+ *      phase, despite PayrollApprovalPanel.tsx calling equivalents since
+ *      its own phase. Gated with requirePermission() against the real
+ *      1-to-1 permission each action maps to (verified directly against
+ *      S/types/permissions.ts, not assumed): finance.runPayroll for
+ *      submit (the closest real match — there is no dedicated
+ *      "submit-for-approval" permission, and finance is the role that
+ *      owns the payroll run through to submission), finance.approvePayroll
+ *      (high_rank only), finance.lockPayroll (finance only),
+ *      finance.rollbackPayroll (finance only).
+ *   2. GET /: corrected the role list to ['finance','hr','high_rank'] —
+ *      removing admin (does not hold finance.viewPayrollRuns) and adding
+ *      high_rank (does, but was excluded).
+ * [DEPENDS ON]: payrollApprovalService.ts (rebuilt, same phase)
  */
 
+import { Router } from 'express'
+import { verifyAuth, requireRole } from '@/lib/verifyAuth'
+import { requirePermission } from '@/server/middleware/verifyPermission'
+import * as payrollService from '@/server/services/payrollService'
+import * as payrollApprovalService from '@/server/services/payrollApprovalService'
+import { getDownloadUrl } from '@/lib/storage'
 import { prisma } from '@/lib/prisma'
-import { logger } from '@/lib/logger'
-import { generatePayslipPdf } from '@/server/services/receiptService'
-import * as settingsService from '@/server/services/settingsService'
-import * as hrService from '@/server/services/hrService'
-import { SETTING_KEYS } from '@shared/types/settings'
-import type { PayeBracket } from '@shared/types/settings'
 
-// Genuine marginal (bracket-by-bracket) PAYE calculation. Brackets are
-// configured in annual MWK (Settings > Finance); grossMonthly is
-// annualized, taxed bracket-by-bracket, then the resulting annual tax is
-// divided back down to a monthly deduction.
-function calculateMonthlyPAYE(grossMonthly: number, brackets: readonly PayeBracket[]): number {
-  const annualGross = grossMonthly * 12
-  const sorted = [...brackets].sort((a, b) => a.minAnnualMwk - b.minAnnualMwk)
+export const payrollRouter = Router()
 
-  let annualTax = 0
-  for (const bracket of sorted) {
-    if (annualGross <= bracket.minAnnualMwk) continue
-    const upper = bracket.maxAnnualMwk ?? annualGross
-    const taxableInBracket = Math.min(annualGross, upper) - bracket.minAnnualMwk
-    if (taxableInBracket > 0) {
-      annualTax += taxableInBracket * (bracket.ratePercent / 100)
-    }
+// GET /payroll?year=2026 — payroll run history
+payrollRouter.get('/', verifyAuth, requireRole(['finance', 'hr', 'high_rank']), async (req, res) => {
+  const year = Number(req.query.year ?? new Date().getFullYear())
+  res.json(await payrollService.getPayrollHistory(year))
+})
+
+// POST /payroll/run — trigger payroll for month/year
+// In production this should queue a Cloud Task instead of running inline
+payrollRouter.post('/run', verifyAuth, requireRole(['admin', 'finance']), async (req, res) => {
+  const { month, year } = req.body as { month: number; year: number }
+  if (!month || !year || month < 1 || month > 12) {
+    return res.status(400).json({ error: 'Valid month (1-12) and year required' })
   }
-  return annualTax / 12
-}
+  // For development: run inline. For production: enqueue Cloud Task
+  const runId = await payrollService.processMonthlyPayroll(month, year, req.user!.uid)
+  res.status(201).json({ runId, status: 'COMPLETED' })
+})
 
-export async function processMonthlyPayroll(
-  month: number,
-  year: number,
-  runByUid: string
-): Promise<string> {
-  // Prevent duplicate payroll runs
-  const existing = await prisma.payrollRun.findUnique({
-    where: { month_year: { month, year } },
+// GET /payroll/my-payslips — staff view their own payslips
+payrollRouter.get('/my-payslips', verifyAuth, async (req, res) => {
+  const payslips = await payrollService.getStaffPayslips(req.user!.uid)
+  res.json(payslips)
+})
+
+// GET /payroll/payslips/:id/download — get signed URL
+payrollRouter.get('/payslips/:id/download', verifyAuth, async (req, res) => {
+  const payslip = await prisma.payslip.findUniqueOrThrow({
+    where: { id: String(req.params.id) },
   })
-  if (existing) throw new Error(`Payroll for ${month}/${year} already exists`)
-
-  // Get all active salary structures
-  const salaries = await prisma.salaryStructure.findMany()
-  if (salaries.length === 0) throw new Error('No salary structures found')
-
-  // [R10 fix 1] Real, configured PAYE brackets and pension rate instead
-  // of hardcoded constants.
-  const { finance_paye_brackets: payeBrackets, finance_pension_percent: pensionPercent } =
-    await settingsService.getMany([
-      SETTING_KEYS.FINANCE_PAYE_BRACKETS,
-      SETTING_KEYS.FINANCE_PENSION_PERCENT,
-    ])
-
-  // [R10 fix 3] Real staff names — SalaryStructure.staffUid is a Firebase
-  // UID plain string with no Prisma relation, so this is a manual
-  // StaffProfile lookup, not an `include`.
-  const staffUids = salaries.map((s) => s.staffUid)
-  const staffProfiles = await prisma.staffProfile.findMany({
-    where: { uid: { in: staffUids } },
-    select: { id: true, uid: true, firstName: true, lastName: true },
-  })
-  const staffNameByUid = new Map(
-    staffProfiles.map((s) => [s.uid, `${s.firstName} ${s.lastName}`])
-  )
-  const staffIdByUid = new Map(staffProfiles.map((s) => [s.uid, s.id]))
-
-  // [PRODUCTION FIX] Allowances are itemized now (StaffAllowance) — a
-  // recurring one counts every month; a one-time one only counts for the
-  // specific (paidMonth, paidYear) it names. sal.allowances (the old flat
-  // field) is no longer read here.
-  const allowances = await prisma.staffAllowance.findMany({
-    where: {
-      staffUid: { in: staffUids },
-      OR: [
-        { recurring: true },
-        { recurring: false, paidMonth: month, paidYear: year },
-      ],
-    },
-  })
-  const allowanceTotalByUid = new Map<string, number>()
-  for (const a of allowances) {
-    allowanceTotalByUid.set(a.staffUid, (allowanceTotalByUid.get(a.staffUid) ?? 0) + Number(a.amount))
+  // Staff can only download their own payslip (admin can download any)
+  if (req.user!.role !== 'admin' && payslip.staffUid !== req.user!.uid) {
+    return res.status(403).json({ error: 'Access denied' })
   }
+  if (!payslip.payslipKey) return res.status(404).json({ error: 'Payslip PDF not ready' })
+  const url = await getDownloadUrl('sms-payslips', payslip.payslipKey)
+  res.json({ url })
+})
 
-  let totalGross = 0
-  let totalNet = 0
-  const payslipData: {
-    staffUid: string
-    staffName: string
-    grossSalary: number
-    paye: number
-    pension: number
-    loanDeduction: number
-    netSalary: number
-  }[] = []
-
-  for (const sal of salaries) {
-    const gross = Number(sal.baseSalary) + (allowanceTotalByUid.get(sal.staffUid) ?? 0)
-    const paye = calculateMonthlyPAYE(gross, payeBrackets)
-    const pension = gross * (pensionPercent / 100)
-    const loanDeduction = Number(sal.monthlyLoanDeduction)
-    const net = gross - paye - pension - loanDeduction
-
-    totalGross += gross
-    totalNet += net
-
-    payslipData.push({
-      staffUid: sal.staffUid,
-      staffName: staffNameByUid.get(sal.staffUid) ?? sal.staffUid,
-      grossSalary: gross,
-      paye,
-      pension,
-      loanDeduction,
-      netSalary: net,
-    })
+// ── PAYROLL APPROVAL WORKFLOW (R10 — new)
+payrollRouter.post(
+  '/runs/:id/submit-for-approval',
+  verifyAuth,
+  requirePermission('finance.runPayroll'),
+  async (req, res) => {
+    const run = await payrollApprovalService.submitForApproval(
+      String(req.params.id), req.user!.uid, req.user!.role
+    )
+    res.json(run)
   }
+)
 
-  // [R10 fix 2] Single transaction across run creation, per-staff payslip
-  // creation + loan-balance decrement, PDF generation, and the final
-  // status update — a mid-run crash now rolls back entirely (no stuck
-  // PROCESSING row blocking retry) rather than leaving partial state.
-  const runId = await prisma.$transaction(
-    async (tx) => {
-      const run = await tx.payrollRun.create({
-        data: { month, year, totalGross, totalNet, runByUid, status: 'PROCESSING' },
-      })
-
-      for (const ps of payslipData) {
-        const payslip = await tx.payslip.create({
-          data: { payrollRunId: run.id, ...ps },
-        })
-
-        // Generate payslip PDF → store in Appwrite
-        const pdfKey = await generatePayslipPdf(payslip.id, { ...ps, pensionPercent }, month, year)
-        await tx.payslip.update({ where: { id: payslip.id }, data: { payslipKey: pdfKey } })
-      }
-
-      await tx.payrollRun.update({
-        where: { id: run.id },
-        data: { status: 'COMPLETED', completedAt: new Date() },
-      })
-
-      return run.id
-    },
-    { timeout: 120_000, maxWait: 10_000 }
-  )
-
-  logger.info({ event: 'payroll.completed', runId, month, year, totalGross, totalNet })
-
-  // [POST-R11] Reconcile this run's loan deductions against the real,
-  // UI-connected StaffLoan.balance — hrService.recordLoanRepayment()
-  // also settles the loan and resets SalaryStructure.monthlyLoanDeduction
-  // to 0 once the balance reaches zero. Runs after the transaction (not
-  // inside it — recordLoanRepayment() uses the global prisma client, not
-  // this transaction's `tx`, the same constraint R9/R10 hit for
-  // accountingService calls); a single staff member's reconciliation
-  // failure is logged and does not roll back the already-committed,
-  // real payroll run.
-  for (const ps of payslipData) {
-    if (ps.loanDeduction <= 0) continue
-    const staffId = staffIdByUid.get(ps.staffUid)
-    if (!staffId) continue
-    try {
-      const activeLoan = await prisma.staffLoan.findFirst({
-        where: { staffId, status: { in: ['DISBURSED', 'REPAYING'] } },
-      })
-      if (activeLoan) {
-        await hrService.recordLoanRepayment(activeLoan.id, ps.loanDeduction)
-      } else {
-        logger.warn({ event: 'payroll.loan_deduction_no_active_loan', staffId, runId })
-      }
-    } catch (err) {
-      logger.error({ event: 'payroll.loan_repayment_failed', staffId, runId, err })
-    }
+payrollRouter.post(
+  '/runs/:id/approve',
+  verifyAuth,
+  requirePermission('finance.approvePayroll'),
+  async (req, res) => {
+    const run = await payrollApprovalService.approve(
+      String(req.params.id), req.user!.uid, req.user!.role
+    )
+    res.json(run)
   }
+)
 
-  return runId
-}
+payrollRouter.post(
+  '/runs/:id/lock',
+  verifyAuth,
+  requirePermission('finance.lockPayroll'),
+  async (req, res) => {
+    const run = await payrollApprovalService.lock(
+      String(req.params.id), req.user!.uid, req.user!.role
+    )
+    res.json(run)
+  }
+)
 
-export async function getPayrollHistory(year: number) {
-  return prisma.payrollRun.findMany({
-    where: { year },
-    orderBy: { month: 'desc' },
-    include: { _count: { select: { payslips: true } } },
-  })
-}
-
-export async function getStaffPayslips(staffUid: string) {
-  return prisma.payslip.findMany({
-    where: { staffUid },
-    orderBy: { createdAt: 'desc' },
-    include: { payrollRun: { select: { month: true, year: true } } },
-  })
-}
+payrollRouter.post(
+  '/runs/:id/rollback',
+  verifyAuth,
+  requirePermission('finance.rollbackPayroll'),
+  async (req, res) => {
+    const { reason } = req.body as { reason: string }
+    if (!reason?.trim()) return res.status(400).json({ error: 'A rollback reason is required.' })
+    const run = await payrollApprovalService.rollback(
+      String(req.params.id), reason.trim(), req.user!.uid, req.user!.role
+    )
+    res.json(run)
+  }
+)

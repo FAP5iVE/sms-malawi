@@ -52,6 +52,12 @@ export const GenerateInvoiceSchema = z.object({
   academicYear: z.string().regex(/^\d{4}\/\d{4}$/),
   term: z.number().int().min(1).max(3),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  // [PRODUCTION FIX] Manual, additional discount on top of whatever an
+  // active scholarship already applies — for one-off cases (a hardship
+  // waiver, a goodwill adjustment) that aren't modeled as a Scholarship
+  // record. Optional; feeService.generateInvoice() adds it to the
+  // scholarship discount if both are present.
+  manualDiscount: z.number().min(0).optional(),
 })
 
 // ─── EXPENSE ─────────────────────────────────────────────
