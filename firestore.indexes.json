@@ -30,6 +30,35 @@
       "collectionGroup": "announcements",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "status",        "order": "ASCENDING"  },
+        { "fieldPath": "publicWebsite", "order": "ASCENDING"  },
+        { "fieldPath": "postType",      "order": "ASCENDING"  },
+        { "fieldPath": "createdAt",     "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "announcements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",        "order": "ASCENDING" },
+        { "fieldPath": "publicWebsite", "order": "ASCENDING" },
+        { "fieldPath": "postType",      "order": "ASCENDING" },
+        { "fieldPath": "eventDate",     "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "announcements",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",        "order": "ASCENDING"  },
+        { "fieldPath": "createdByUid",  "order": "ASCENDING"  },
+        { "fieldPath": "updatedAt",     "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "announcements",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "status",      "order": "ASCENDING" },
         { "fieldPath": "scheduledAt", "order": "ASCENDING" }
       ]

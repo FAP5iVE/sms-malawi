@@ -50,9 +50,18 @@ export default function LeadershipPage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...team].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((m) => (
               <div key={m.name} className="border border-base rounded-2xl bg-surface p-6">
-                <div className="w-14 h-14 rounded-full bg-brand-navy/10 flex items-center justify-center mb-4">
-                  <Users className="w-6 h-6 text-brand-navy" aria-hidden />
-                </div>
+                {m.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- Appwrite-hosted photo, not a local Next asset
+                  <img
+                    src={m.photoUrl}
+                    alt={m.name}
+                    className="w-14 h-14 rounded-full object-cover mb-4"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-full bg-brand-navy/10 flex items-center justify-center mb-4">
+                    <Users className="w-6 h-6 text-brand-navy" aria-hidden />
+                  </div>
+                )}
                 <h3 className="font-heading font-bold text-lg text-brand-navy dark:text-white">{m.name}</h3>
                 <p className="text-sm text-brand-teal font-semibold mb-3">{m.title}</p>
                 {m.bio && <p className="text-sm text-muted leading-relaxed">{m.bio}</p>}

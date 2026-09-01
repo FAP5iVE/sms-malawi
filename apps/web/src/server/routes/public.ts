@@ -141,106 +141,154 @@ publicRouter.get('/maneb-stats', async (req, res) => {
   })
 })
 
-// ─── PUBLIC ANNOUNCEMENTS ─────────────────────────────────────────────────────
-// GET /public/announcements?limit=6
-// Returns recent published announcements for the landing page news section.
+// ─── PUBLIC POSTS (ANNOUNCEMENT / NEWS / EVENT / ADVERTISEMENT) ───────────────
+// [PRODUCTION FIX] These four sections previously shared ONE undifferentiated
+// feed (/public/announcements, filtered only on status+publicWebsite, with no
+// postType check at all) — the exact bug behind Announcements/News/Ads/Events
+// bleeding into each other on the public site. announcementService's four
+// postType values (see @shared/schemas/announcement) are now the single
+// source of truth for which section a post belongs to; every route below
+// filters on postType explicitly rather than inferring it from other fields
+// (e.g. "has an eventDate" for Events, which nothing actually prevented a
+// plain announcement from also having).
+//
+// listPublicPosts()/mapPublicPost()/getPublicPostById() are shared by all
+// four sections' list + detail routes so the shape, pagination, and
+// imageKey->imageUrl resolution logic exists once rather than four times.
 
-publicRouter.get('/announcements', async (req, res) => {
-  // [PRODUCTION FIX 2026-07-28] page/pageSize added for a real "browse all
-  // news/announcements" page (previously every caller was capped at 12,
-  // fine for a homepage teaser strip but not for actually browsing the
-  // full archive). Homepage callers are unaffected — they just don't pass
-  // `page`, so page defaults to 1 and behaviour is unchanged for them.
-  const pageSize = Math.min(Number(req.query.limit ?? 6), 100)
-  const page = Math.max(1, Number(req.query.page ?? 1))
-  // [PRODUCTION FIX 2026-07-28] Was filtering on targetAll, which conflates
-  // "addressed to everyone inside the school" with "safe to publish on the
-  // public marketing site" — an internal all-staff notice could leak here
-  // with no way to opt out. publicWebsite is a distinct, explicit opt-in
-  // (see announcementService.ts's CreateAnnouncementInput comment).
+interface PublicPostData {
+  title: string
+  body: string
+  eventDate?: string | null
+  imageKey?: string | null
+  postType?: string
+  createdAt: FirebaseFirestore.Timestamp
+}
+
+async function mapPublicPost(id: string, data: PublicPostData) {
+  return {
+    id,
+    title: data.title,
+    body: data.body,
+    eventDate: data.eventDate ?? null,
+    // Resolve to a real, directly-usable view URL here (same
+    // getPublicViewUrl() pattern as /public/gallery) rather than handing
+    // back the raw Appwrite file ID and leaving the frontend with no way
+    // to turn it into an <img src>.
+    imageUrl: data.imageKey ? await getPublicViewUrl('', data.imageKey) : null,
+    createdAt: data.createdAt.toDate(),
+  }
+}
+
+async function listPublicPosts(
+  postType: 'ANNOUNCEMENT' | 'NEWS' | 'EVENT' | 'ADVERTISEMENT',
+  pageSize: number,
+  page: number,
+  orderBy: 'createdAt' | 'eventDate' = 'createdAt',
+) {
   const baseQuery = getFirestore(getAdminApp())
     .collection(COLLECTIONS.ANNOUNCEMENTS)
     .where('status', '==', 'PUBLISHED')
     .where('publicWebsite', '==', true)
-    .orderBy('createdAt', 'desc')
+    .where('postType', '==', postType)
+    .orderBy(orderBy, orderBy === 'eventDate' ? 'asc' : 'desc')
 
   const [snap, countSnap] = await Promise.all([
     baseQuery.offset((page - 1) * pageSize).limit(pageSize).get(),
     baseQuery.count().get(),
   ])
 
-  const announcements = await Promise.all(
-    snap.docs.map(async (d) => {
-      const data = d.data() as {
-        title: string
-        body: string
-        eventDate?: string | null
-        imageKey?: string | null
-        createdAt: FirebaseFirestore.Timestamp
-      }
-      return {
-        id: d.id,
-        title: data.title,
-        body: data.body,
-        eventDate: data.eventDate ?? null,
-        // [PRODUCTION FIX 2026-07-28] Resolve to a real, directly-usable
-        // view URL here (same getPublicViewUrl() pattern as /public/gallery)
-        // rather than handing back the raw Appwrite file ID and leaving the
-        // frontend with no way to turn it into an <img src>.
-        imageUrl: data.imageKey ? await getPublicViewUrl('', data.imageKey) : null,
-        createdAt: data.createdAt.toDate(),
-      }
-    }),
-  )
+  const posts = await Promise.all(snap.docs.map((d) => mapPublicPost(d.id, d.data() as PublicPostData)))
+  return { posts, total: countSnap.data().count, page, pageSize }
+}
 
-  res.json({ announcements, total: countSnap.data().count, page, pageSize })
+/** A single PUBLISHED, public-website post by id, scoped to `postType` — a
+ *  news detail URL can never accidentally resolve an announcement or ad
+ *  (and vice versa), even though all four share one Firestore collection. */
+async function getPublicPostById(id: string, postType: 'ANNOUNCEMENT' | 'NEWS' | 'EVENT' | 'ADVERTISEMENT') {
+  const snap = await getFirestore(getAdminApp()).collection(COLLECTIONS.ANNOUNCEMENTS).doc(id).get()
+  if (!snap.exists) return null
+  const data = snap.data() as PublicPostData & { status?: string; publicWebsite?: boolean }
+  if (data.status !== 'PUBLISHED' || data.publicWebsite !== true || (data.postType ?? 'ANNOUNCEMENT') !== postType) {
+    return null
+  }
+  return mapPublicPost(snap.id, data)
+}
+
+// GET /public/announcements?limit=6&page=1
+// Public, general-audience announcements (postType ANNOUNCEMENT) — the
+// homepage "Announcements" rail and the /announcements archive page.
+publicRouter.get('/announcements', async (req, res) => {
+  const pageSize = Math.min(Number(req.query.limit ?? 6), 100)
+  const page = Math.max(1, Number(req.query.page ?? 1))
+  const { posts, total } = await listPublicPosts('ANNOUNCEMENT', pageSize, page)
+  res.json({ announcements: posts, total, page, pageSize })
+})
+
+// GET /public/announcements/:id
+publicRouter.get('/announcements/:id', async (req, res) => {
+  const post = await getPublicPostById(String(req.params.id), 'ANNOUNCEMENT')
+  if (!post) return res.status(404).json({ error: 'Announcement not found.' })
+  res.json(post)
+})
+
+// GET /public/news?limit=6&page=1
+// [NEW] Real news articles (postType NEWS) only — previously indistinguishable
+// from plain announcements on the same feed. The "Latest News" homepage
+// section and the /news archive page.
+publicRouter.get('/news', async (req, res) => {
+  const pageSize = Math.min(Number(req.query.limit ?? 6), 100)
+  const page = Math.max(1, Number(req.query.page ?? 1))
+  const { posts, total } = await listPublicPosts('NEWS', pageSize, page)
+  res.json({ news: posts, total, page, pageSize })
+})
+
+// GET /public/news/:id
+publicRouter.get('/news/:id', async (req, res) => {
+  const post = await getPublicPostById(String(req.params.id), 'NEWS')
+  if (!post) return res.status(404).json({ error: 'Article not found.' })
+  res.json(post)
+})
+
+// GET /public/academic-advertisements?limit=6&page=1
+// [NEW] Calls for applications, intake notices, examination circulars
+// (postType ADVERTISEMENT) — a genuinely standalone module: its own
+// postType, its own auth-side creation flow, its own public section, never
+// mixed with News or general Announcements.
+publicRouter.get('/academic-advertisements', async (req, res) => {
+  const pageSize = Math.min(Number(req.query.limit ?? 8), 100)
+  const page = Math.max(1, Number(req.query.page ?? 1))
+  const { posts, total } = await listPublicPosts('ADVERTISEMENT', pageSize, page)
+  res.json({ adverts: posts, total, page, pageSize })
+})
+
+// GET /public/academic-advertisements/:id
+publicRouter.get('/academic-advertisements/:id', async (req, res) => {
+  const post = await getPublicPostById(String(req.params.id), 'ADVERTISEMENT')
+  if (!post) return res.status(404).json({ error: 'Advertisement not found.' })
+  res.json(post)
 })
 
 // ─── PUBLIC EVENTS ────────────────────────────────────────────────────────────
 // GET /public/events?limit=20&page=1
-// [N6] Returns published, public-website announcements that have an eventDate,
-// ordered by eventDate. Previously the public Events page fetched a page of
-// /public/announcements and filtered eventDate CLIENT-SIDE — so a page of 20
-// announcements could contain zero events, `total` counted all announcements
-// (not events), and some events were unreachable. Filtering server-side with
-// a correct count fixes pagination. orderBy('eventDate') inherently excludes
-// documents that don't have the field set.
+// [N6, tightened] postType EVENT is now an explicit tag set only by the
+// auth-side "New Event" flow (see AnnouncementForm.tsx) — previously an
+// item became an "Event" purely by having an eventDate set on an ordinary
+// ANNOUNCEMENT-postType doc, with nothing stopping a plain announcement or
+// news article from also carrying one. Filtering on postType as well as
+// orderBy('eventDate') closes that gap for good.
 publicRouter.get('/events', async (req, res) => {
   const pageSize = Math.min(Number(req.query.limit ?? 20), 100)
   const page = Math.max(1, Number(req.query.page ?? 1))
+  const { posts, total } = await listPublicPosts('EVENT', pageSize, page, 'eventDate')
+  res.json({ events: posts, total, page, pageSize })
+})
 
-  const baseQuery = getFirestore(getAdminApp())
-    .collection(COLLECTIONS.ANNOUNCEMENTS)
-    .where('status', '==', 'PUBLISHED')
-    .where('publicWebsite', '==', true)
-    .orderBy('eventDate', 'asc')
-
-  const [snap, countSnap] = await Promise.all([
-    baseQuery.offset((page - 1) * pageSize).limit(pageSize).get(),
-    baseQuery.count().get(),
-  ])
-
-  const events = await Promise.all(
-    snap.docs.map(async (d) => {
-      const data = d.data() as {
-        title: string
-        body: string
-        eventDate?: string | null
-        imageKey?: string | null
-        createdAt: FirebaseFirestore.Timestamp
-      }
-      return {
-        id: d.id,
-        title: data.title,
-        body: data.body,
-        eventDate: data.eventDate ?? null,
-        imageUrl: data.imageKey ? await getPublicViewUrl('', data.imageKey) : null,
-        createdAt: data.createdAt.toDate(),
-      }
-    }),
-  )
-
-  res.json({ events, total: countSnap.data().count, page, pageSize })
+// GET /public/events/:id
+publicRouter.get('/events/:id', async (req, res) => {
+  const post = await getPublicPostById(String(req.params.id), 'EVENT')
+  if (!post) return res.status(404).json({ error: 'Event not found.' })
+  res.json(post)
 })
 
 // ─── NEWSLETTER SUBSCRIBE ─────────────────────────────────────────────────────
@@ -442,8 +490,26 @@ publicRouter.get('/gallery', async (req, res) => {
 
 publicRouter.get('/leadership', async (_req, res) => {
   const settings = await settingsService.getPublicSettings()
-  const team = settings[SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM] ?? []
-  res.json({ team })
+  const team = (settings[SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM] ?? []) as Array<{
+    name: string
+    title: string
+    bio?: string
+    photoKey?: string
+    order?: number
+  }>
+
+  // [PRODUCTION FIX] Previously returned the raw photoKey (an Appwrite file
+  // ID) with no way for the public page to turn it into an <img src> — same
+  // getPublicViewUrl() resolution as announcements/gallery/adverts above,
+  // so the client only ever deals in ready-to-use URLs.
+  const resolved = await Promise.all(
+    team.map(async (member) => ({
+      ...member,
+      photoUrl: member.photoKey ? await getPublicViewUrl('', member.photoKey) : null,
+    })),
+  )
+
+  res.json({ team: resolved })
 })
 
 // ─── PUBLIC FEE STRUCTURE ──────────────────────────────────────────────────

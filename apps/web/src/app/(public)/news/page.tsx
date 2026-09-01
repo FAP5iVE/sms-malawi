@@ -2,99 +2,51 @@
 
 /**
  * apps/web/src/app/(public)/news/page.tsx
- * [CHANGE TYPE]: NEW FILE (production fix, 2026-07-28)
- * [PURPOSE]: Full news/announcements archive. The landing page's "All News"
- *   and "More Announcements" buttons link here — both draw from the same
- *   real usePublicAnnouncements() feed (see page.tsx's file header for why
- *   there is only one real content source), filtered to items without an
- *   eventDate (dated ones are Events, at /events).
- * [DEPENDS ON]: usePublicAnnouncements (GET /public/announcements)
+ * [CHANGE TYPE]: MAJOR REWRITE
+ * [PURPOSE]: [PRODUCTION FIX] Real news archive — postType NEWS only (via
+ *   usePublicNews / GET /public/news), no longer a client-side
+ *   `!a.eventDate` slice of the general /public/announcements feed shared
+ *   with plain announcements. Cards are now collapsed (3-line excerpt) with
+ *   a "Read more" link to a real detail page (/news/[id]) instead of
+ *   showing the full body inline — clicking through and pressing Back
+ *   returns to this same list. See PublicArchiveList/PublicArchiveDetail in
+ *   components/shared/PublicArchive.tsx, shared with the /announcements and
+ *   /academic-advertisements archives.
+ * [DEPENDS ON]: usePublicNews (GET /public/news)
  */
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { ArrowLeft, Newspaper } from 'lucide-react'
-import { usePublicAnnouncements } from '@/hooks/usePublic'
+import { Newspaper } from 'lucide-react'
+import { usePublicNews } from '@/hooks/usePublic'
+import { PublicArchiveList } from '@/components/shared/PublicArchive'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
 
 const PAGE_SIZE = 12
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
 export default function NewsPage() {
   const [page, setPage] = useState(1)
-  const { data, isLoading } = usePublicAnnouncements(PAGE_SIZE, page)
-  const allItems = data?.announcements ?? []
-  const newsItems = allItems.filter((a) => !a.eventDate)
+  const { data, isLoading } = usePublicNews(PAGE_SIZE, page)
+  const items = data?.news ?? []
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1
 
   return (
-    <div className="min-h-screen bg-page">
+    <>
       <PublicAmbientBackground />
-      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="flex items-center justify-between mb-6">
-          <Link href="/#news" className="inline-flex items-center gap-2 text-sm text-brand-teal hover:underline">
-            <ArrowLeft className="w-4 h-4" /> Back to home
-          </Link>
-          <PublicThemeToggle />
-        </div>
-        <h1 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white mb-2">
-          News &amp; Announcements
-        </h1>
-        <p className="text-muted mb-8">All published news and academic advertisements from the school.</p>
-
-        {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => <div key={i} className="h-32 rounded-xl bg-surface animate-pulse" />)}
-          </div>
-        ) : newsItems.length === 0 ? (
-          <div className="text-center py-20 text-muted flex flex-col items-center gap-3">
-            <Newspaper className="w-10 h-10 text-muted/40" aria-hidden />
-            No announcements have been published yet.
-          </div>
-        ) : (
-          <>
-            <div className="space-y-5">
-              {newsItems.map((a) => (
-                <article key={a.id} className="border border-base rounded-2xl overflow-hidden bg-surface sm:flex">
-                  {a.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
-                    <img src={a.imageUrl} alt="" className="sm:w-56 h-40 sm:h-auto object-cover shrink-0" />
-                  ) : null}
-                  <div className="p-6">
-                    <div className="font-mono text-xs text-muted mb-2">{formatDate(a.createdAt)}</div>
-                    <h2 className="font-heading font-bold text-xl text-brand-navy dark:text-white mb-2">{a.title}</h2>
-                    <p className="text-sm text-muted leading-relaxed">{a.body}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-3 mt-10">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  className="px-4 py-2 rounded-lg border border-base text-sm font-semibold disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <span className="text-sm text-muted">Page {page} of {totalPages}</span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                  className="px-4 py-2 rounded-lg border border-base text-sm font-semibold disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+      <PublicArchiveList
+        title="Latest News"
+        subtitle="News and stories from around the school."
+        basePath="/news"
+        backHref="/#news"
+        items={items}
+        isLoading={isLoading}
+        emptyIcon={Newspaper}
+        emptyText="No news articles have been published yet."
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        headerRight={<PublicThemeToggle />}
+      />
+    </>
   )
 }

@@ -55,6 +55,7 @@
 import 'server-only'
 import { Router }            from 'express'
 import { z }                 from 'zod'
+import multer                from 'multer'
 import { prisma }            from '@/lib/prisma'
 import { requireRole }       from '@/lib/verifyAuth'
 import {
@@ -68,6 +69,9 @@ import { SETTING_KEYS, SETTING_META } from '@shared/types/settings'
 import type { SettingKey, DepartmentTitles } from '@shared/types/settings'
 import { logger }            from '@/lib/logger'
 import { sendError } from '@/server/lib/sendError'
+import { uploadFile, FILE_PREFIX, getPublicViewUrl } from '@/lib/storage'
+
+const leadershipPhotoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }) // 8MB
 
 export const settingsRouter = Router()
 
@@ -384,7 +388,17 @@ settingsRouter
       // the generic string-only readSettings/writeSettings helpers.
       settingsService.get(SETTING_KEYS.SCHOOL_FOUNDED_YEAR),
     ])
-    return res.json({ ...scalars, coreValues, leadershipTeam, foundedYear })
+    // [NEW] Resolve each member's photoKey to a displayable URL for the
+    // editor preview — same getPublicViewUrl() resolution as
+    // /public/leadership, just also exposed here so the admin form doesn't
+    // need to duplicate that logic client-side.
+    const leadershipTeamWithPhotos = await Promise.all(
+      leadershipTeam.map(async (m) => ({
+        ...m,
+        photoUrl: m.photoKey ? await getPublicViewUrl('', m.photoKey) : null,
+      })),
+    )
+    return res.json({ ...scalars, coreValues, leadershipTeam: leadershipTeamWithPhotos, foundedYear })
   })
   .patch(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
     const body = req.body as Record<string, unknown>
@@ -410,6 +424,35 @@ settingsRouter
     }
     return res.json({ ok: true })
   })
+
+// POST /settings/leadership-photo
+// [NEW] Uploads a leadership team member's photo ahead of saving the
+// LeadershipMember record — same "upload first, get back a fileId, then
+// include that id in the JSON PATCH" pattern as POST /announcements/image,
+// since a photo file can't travel inside the /school PATCH's JSON body.
+// Same admin/hr/high_rank gating as GET/PATCH /school itself.
+settingsRouter.post(
+  '/leadership-photo',
+  requireRole(['admin', 'hr', 'high_rank']),
+  leadershipPhotoUpload.single('file'),
+  async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
+      if (!req.file.mimetype.startsWith('image/')) {
+        return res.status(400).json({ error: 'Only image files are allowed.' })
+      }
+      const uploaded = await uploadFile(
+        FILE_PREFIX.LEADERSHIP_PHOTO,
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+      )
+      res.status(201).json({ photoKey: uploaded.fileId })
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'settings', route: 'leadership-photo' } })
+    }
+  },
+)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LIBRARY SETTINGS  (admin | library)

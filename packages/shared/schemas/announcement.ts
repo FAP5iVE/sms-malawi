@@ -93,6 +93,36 @@ export const AnnouncementSchema = z.object({
   // opt-in to public website visibility.
   publicWebsite: z.boolean().default(false),
   imageKey: z.string().optional(),
-  postType: z.enum(['ANNOUNCEMENT', 'NEWS']).default('ANNOUNCEMENT'),
+  // [PRODUCTION FIX] EVENT and ADVERTISEMENT added alongside the existing
+  // ANNOUNCEMENT/NEWS pair — see announcementService.ts's postType comment
+  // for the full explanation. Each of the four is now an explicit,
+  // server-trusted tag rather than something a public page has to infer
+  // (e.g. "has an eventDate" or "shares the same feed as News") — that
+  // inference was the root cause of Announcements/News/Ads/Events bleeding
+  // into each other's public sections.
+  postType: z.enum(['ANNOUNCEMENT', 'NEWS', 'EVENT', 'ADVERTISEMENT']).default('ANNOUNCEMENT'),
 })
 export type CreateAnnouncementFormInput = z.infer<typeof AnnouncementSchema>
+export type AnnouncementPostType = CreateAnnouncementFormInput['postType']
+
+// ─── DRAFT ──────────────────────────────────────────────────
+// [NEW] A draft is deliberately incomplete work-in-progress — the strict
+// title.min(3)/body.min(10) constraints above exist to guard a real
+// submission, not a scratchpad the author may save with only a headline
+// typed so far. AnnouncementDraftSchema relaxes those two fields only;
+// every other field keeps the same shape as AnnouncementSchema so a draft
+// can be promoted to a real submission (re-validated against the strict
+// schema at that point — see announcementService.publishDraft()) without a
+// reshape.
+export const AnnouncementDraftSchema = z.object({
+  title: z.string().max(200).default(''),
+  body: z.string().default(''),
+  targetAll: z.boolean().optional(),
+  targetRoles: z.array(z.string()).optional(),
+  targetClassId: z.string().optional(),
+  eventDate: z.string().datetime().optional(),
+  publicWebsite: z.boolean().optional(),
+  imageKey: z.string().optional(),
+  postType: z.enum(['ANNOUNCEMENT', 'NEWS', 'EVENT', 'ADVERTISEMENT']).default('ANNOUNCEMENT'),
+})
+export type AnnouncementDraftInput = z.infer<typeof AnnouncementDraftSchema>

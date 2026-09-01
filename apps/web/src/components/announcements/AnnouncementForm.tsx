@@ -21,74 +21,192 @@
  *   announcement.publishDirect permission, which the server now enforces.
  *   The image upload already correctly went through the backend and is
  *   unchanged.
- * [DEPENDS ON]: W/server/routes/announcements.ts (POST /), W/hooks/
- *   usePermissions.ts, @shared/constants/malawi (COLLECTIONS.ANNOUNCEMENTS
- *   — no longer used here, kept for reference in useAnnouncements.ts),
- *   @shared/schemas/announcement (AnnouncementSchema — relocated this
- *   phase from @shared/schemas/student)
+ *
+ *   [PRODUCTION FIX, this phase]: added the 'ads' (Academic Advertisement)
+ *   mode — a standalone public-only post type alongside News, plus real
+ *   Save-Draft / continue-a-draft support for all four modes. Previously
+ *   there was no way to save incomplete work: every submit had to be a
+ *   complete, valid, ready-to-publish item in one sitting.
+ * [DEPENDS ON]: W/server/routes/announcements.ts (POST /, POST /draft,
+ *   PATCH /:id/draft, PATCH /:id/publish), W/hooks/usePermissions.ts,
+ *   @shared/schemas/announcement (AnnouncementSchema, AnnouncementDraftSchema)
  */
 'use client'
 import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
-import { AnnouncementSchema } from '@shared/schemas/announcement'
+import { AnnouncementSchema, AnnouncementDraftSchema } from '@shared/schemas/announcement'
 import { apiFetch } from '@/lib/api-client'
-import { X, Loader2, ImagePlus } from 'lucide-react'
+import { X, Loader2, ImagePlus, Save } from 'lucide-react'
 import { USER_ROLES } from '@shared/types/roles'
+import type { Announcement } from '@/hooks/useAnnouncements'
+
+type FormMode = 'announcement' | 'event' | 'news' | 'ads'
 
 interface Props {
   onClose: () => void
-  /** 'event' collects an event date and defaults publicWebsite on — the
-   *  exact fields the public Events page (usePublicAnnouncements, filtered
-   *  to items with eventDate set) reads. Everything else — validation,
-   *  the POST /announcements call, the approval workflow — is identical
-   *  to a plain announcement; an event is just an announcement with a
-   *  date attached, not a separate system.
+  /** 'event' collects an event date and posts postType: 'EVENT' — the
+   *  explicit tag the public /events page (and nothing else) filters on.
    *
-   *  'news' posts with postType: 'NEWS' — see AnnouncementSchema and
-   *  announcementService.createAnnouncement() for what that enforces
-   *  server-side (forced publicWebsite=true, cleared internal targeting).
-   *  It never appears in any user's internal /announcements tab; it is
-   *  public-website content only. The same publishDirect/createWithApproval
-   *  permission check as a normal announcement still applies — a role that
-   *  requires approval for announcements requires it for news too. */
-  mode?: 'announcement' | 'event' | 'news'
+   *  'news' posts postType: 'NEWS' — public-website content only, forced
+   *  publicWebsite=true and cleared internal targeting server-side (see
+   *  announcementService.ts's PUBLIC_ONLY_POST_TYPES). Never appears in
+   *  anyone's internal /announcements tab.
+   *
+   *  'ads' (Academic Advertisement) posts postType: 'ADVERTISEMENT' — for
+   *  calls for applications, intake notices, examination circulars. A
+   *  standalone module the same way News is: same create/approval
+   *  permission, same public-only forcing, but its own postType, its own
+   *  public section, and — like every mode here — never shown as a plain
+   *  Announcement, News article, or Event.
+   *
+   *  Everything else — validation, the POST /announcements call, the
+   *  approval workflow — is identical across all four modes. */
+  mode?: FormMode
+  /** [NEW] When present, the form opens pre-filled with an existing DRAFT
+   *  document (see useMyDrafts()/GET /announcements/drafts) instead of a
+   *  blank form — "continue writing later". Saving continues to PATCH the
+   *  same draft id; Publish promotes it via PATCH /:id/publish instead of
+   *  creating a new document. */
+  draft?: Announcement
 }
 
-export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
+const POST_TYPE: Record<FormMode, 'ANNOUNCEMENT' | 'NEWS' | 'EVENT' | 'ADVERTISEMENT'> = {
+  announcement: 'ANNOUNCEMENT',
+  event: 'EVENT',
+  news: 'NEWS',
+  ads: 'ADVERTISEMENT',
+}
+
+const NOUN: Record<FormMode, string> = {
+  announcement: 'announcement',
+  event: 'event',
+  news: 'news article',
+  ads: 'academic advertisement',
+}
+
+function toDateInputValue(iso?: string | null) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toISOString().slice(0, 10)
+}
+
+export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Props) {
   const isEvent = mode === 'event'
   const isNews = mode === 'news'
-  const noun = isEvent ? 'event' : isNews ? 'news article' : 'announcement'
+  const isAds = mode === 'ads'
+  // News and Academic Advertisements are both public-website-only content —
+  // no internal audience concept, always publicWebsite=true server-side
+  // (announcementService.ts's PUBLIC_ONLY_POST_TYPES). Events keep the
+  // ANNOUNCEMENT-style internal-targeting option.
+  const isPublicOnly = isNews || isAds
+  const noun = NOUN[mode]
   const { user } = useAuthStore()
   const { can } = usePermissions()
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-  // News never targets an internal audience — see the postType comment
-  // above — so it starts with no internal targeting rather than the
-  // "everyone" default a real announcement uses.
-  const [targetAll, setTargetAll] = useState(!isNews)
-  const [targetRoles, setTargetRoles] = useState<string[]>([])
+
+  const [title, setTitle] = useState(draft?.title ?? '')
+  const [body, setBody] = useState(draft?.body ?? '')
+  const [targetAll, setTargetAll] = useState(draft ? (draft.targetAll ?? false) : !isPublicOnly)
+  const [targetRoles, setTargetRoles] = useState<string[]>(draft?.targetRoles ?? [])
   // [PRODUCTION FIX 2026-07-28] publicWebsite is a separate opt-in from
   // targetAll — see announcementService.ts's CreateAnnouncementInput
-  // comment for why these must not be conflated. Defaults on for event
-  // and news mode since that's the whole point of creating either.
-  const [publicWebsite, setPublicWebsite] = useState(isEvent || isNews)
-  const [eventDate, setEventDate] = useState('')
+  // comment for why these must not be conflated. Defaults on for event,
+  // news, and ads mode since that's the whole point of creating any of them.
+  const [publicWebsite, setPublicWebsite] = useState(
+    draft ? (draft.publicWebsite ?? false) : (isEvent || isPublicOnly),
+  )
+  const [eventDate, setEventDate] = useState(toDateInputValue(draft?.eventDate))
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  // [NEW] The already-uploaded imageKey carried over from a draft being
+  // continued — kept unless the user picks a new file (handleImageChange
+  // clears it) or removes the image outright.
+  const [persistedImageKey, setPersistedImageKey] = useState<string | null>(draft?.imageKey ?? null)
   const [loading, setLoading] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Display-only — the server independently re-derives this from the real
   // announcement.publishDirect permission (announcements.ts's POST /
-  // route) and is the actual authority. This only decides which message
-  // and button label to show before submitting.
+  // and PATCH /:id/publish routes) and is the actual authority. This only
+  // decides which message and button label to show before submitting.
   const canPublishDirectly = can('announcement.publishDirect')
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null
     setImageFile(file)
     setImagePreview(file ? URL.createObjectURL(file) : null)
+    if (file) setPersistedImageKey(null)
+  }
+
+  function removeImage() {
+    setImageFile(null)
+    setImagePreview(null)
+    setPersistedImageKey(null)
+  }
+
+  /** Uploads a newly-picked image (if any) and returns whichever imageKey
+   *  should be saved — the freshly uploaded one, the persisted one carried
+   *  over from a draft, or undefined if there's no image at all. */
+  async function resolveImageKey(): Promise<string | undefined> {
+    if (imageFile) {
+      const fd = new FormData()
+      fd.append('file', imageFile)
+      const uploaded = await apiFetch<{ imageKey: string }>('/announcements/image', {
+        method: 'POST',
+        body: fd,
+      })
+      return uploaded.imageKey
+    }
+    return persistedImageKey ?? undefined
+  }
+
+  /** [NEW] Save (or update) this as a DRAFT — deliberately lenient: only a
+   *  non-empty title is required, everything else (including the whole
+   *  body) may be left blank and finished later. Does not close the form
+   *  unless the save succeeds, so the author can keep typing right after. */
+  async function handleSaveDraft() {
+    setError(null)
+    if (!title.trim()) {
+      setError('Give it at least a title before saving as a draft.')
+      return
+    }
+    if (!user?.uid) {
+      setError('You must be signed in to save a draft. Please refresh and try again.')
+      return
+    }
+    const parsed = AnnouncementDraftSchema.safeParse({
+      title,
+      body,
+      targetAll,
+      targetRoles,
+      publicWebsite,
+      eventDate: isEvent && eventDate ? new Date(eventDate).toISOString() : undefined,
+      postType: POST_TYPE[mode],
+    })
+    if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Validation error')
+    setSavingDraft(true)
+    try {
+      const imageKey = await resolveImageKey()
+      if (draft) {
+        await apiFetch(`/announcements/${draft.id}/draft`, {
+          method: 'PATCH',
+          body: JSON.stringify({ ...parsed.data, imageKey }),
+        })
+      } else {
+        await apiFetch('/announcements/draft', {
+          method: 'POST',
+          body: JSON.stringify({ ...parsed.data, imageKey }),
+        })
+      }
+      onClose()
+    } catch (err) {
+      console.error(`Failed to save ${noun} draft:`, err)
+      setError(err instanceof Error ? err.message : `Failed to save draft. Please try again.`)
+    } finally {
+      setSavingDraft(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -109,36 +227,34 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
       targetRoles,
       publicWebsite,
       eventDate: isEvent && eventDate ? new Date(eventDate).toISOString() : undefined,
-      postType: isNews ? 'NEWS' : 'ANNOUNCEMENT',
+      postType: POST_TYPE[mode],
     })
     if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Validation error')
     setLoading(true)
     try {
-      // Upload the cover image first (if any) to get back a fileId to
-      // include in the announcement create call below.
-      let imageKey: string | undefined
-      if (imageFile) {
-        const fd = new FormData()
-        fd.append('file', imageFile)
-        const uploaded = await apiFetch<{ imageKey: string }>('/announcements/image', {
-          method: 'POST',
-          body: fd,
-        })
-        imageKey = uploaded.imageKey
+      const imageKey = await resolveImageKey()
+      const payload = {
+        title: parsed.data.title,
+        body: parsed.data.body,
+        targetAll: parsed.data.targetAll,
+        targetRoles: parsed.data.targetRoles,
+        publicWebsite: parsed.data.publicWebsite,
+        eventDate: parsed.data.eventDate,
+        postType: parsed.data.postType,
+        imageKey,
       }
-      await apiFetch<{ id: string; status: string }>('/announcements', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: parsed.data.title,
-          body: parsed.data.body,
-          targetAll: parsed.data.targetAll,
-          targetRoles: parsed.data.targetRoles,
-          publicWebsite: parsed.data.publicWebsite,
-          eventDate: parsed.data.eventDate,
-          postType: parsed.data.postType,
-          imageKey,
-        }),
-      })
+      if (draft) {
+        // Promote the existing DRAFT document rather than create a new one.
+        await apiFetch<{ id: string; status: string }>(`/announcements/${draft.id}/publish`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        })
+      } else {
+        await apiFetch<{ id: string; status: string }>('/announcements', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        })
+      }
       onClose()
     } catch (err) {
       console.error(`Failed to post ${noun}:`, err)
@@ -146,6 +262,13 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const HEADING: Record<FormMode, string> = {
+    announcement: draft ? 'Continue Draft — Announcement' : 'New Announcement',
+    event: draft ? 'Continue Draft — Event' : 'New Event',
+    news: draft ? 'Continue Draft — News Article' : 'Write News Article',
+    ads: draft ? 'Continue Draft — Academic Advertisement' : 'New Academic Advertisement',
   }
 
   return (
@@ -158,9 +281,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
           the close button stays reachable no matter how far you've scrolled. */}
       <div className="bg-surface rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">
-            {isEvent ? 'New Event' : isNews ? 'Write News Article' : 'New Announcement'}
-          </h2>
+          <h2 className="font-heading font-bold text-brand-navy">{HEADING[mode]}</h2>
           <button
             onClick={onClose}
             className="p-1.5 hover:bg-page rounded-lg"
@@ -172,14 +293,19 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label htmlFor="announcement-title" className="block text-sm font-medium text-body mb-1.5">
-              {isNews ? 'Headline' : 'Title'}
+              {isNews ? 'Headline' : isAds ? 'Advertisement title' : 'Title'}
             </label>
             <input
               id="announcement-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              placeholder={isEvent ? 'Event title' : isNews ? 'Article headline' : 'Announcement title'}
+              placeholder={
+                isEvent ? 'Event title'
+                : isNews ? 'Article headline'
+                : isAds ? 'e.g. Call for Applications — 2027 Intake'
+                : 'Announcement title'
+              }
               maxLength={200}
               className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             />
@@ -199,24 +325,30 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
           )}
           <div>
             <label htmlFor="announcement-body" className="block text-sm font-medium text-body mb-1.5">
-              {isEvent ? 'Details' : isNews ? 'Article' : 'Message'}
+              {isEvent ? 'Details' : isNews ? 'Article' : isAds ? 'Notice details' : 'Message'}
             </label>
             <textarea
               id="announcement-body"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               required
-              rows={isNews ? 10 : 4}
-              placeholder={isEvent ? 'Describe the event…' : isNews ? 'Write the full article…' : 'Write your announcement here…'}
+              rows={isNews ? 10 : isAds ? 8 : 4}
+              placeholder={
+                isEvent ? 'Describe the event…'
+                : isNews ? 'Write the full article…'
+                : isAds ? 'Intake dates, eligibility, how and where to apply…'
+                : 'Write your announcement here…'
+              }
               className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page resize-none focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             />
           </div>
-          {/* [PRODUCTION FIX] News is public-site-only content by design —
-              see the postType comment on the Props interface above. There
-              is no internal targeting to configure and nothing to opt into,
-              so this whole block (and the publicWebsite toggle right after
-              it) is skipped entirely in news mode. */}
-          {!isNews && (
+          {/* [PRODUCTION FIX] News and Academic Advertisements are
+              public-site-only content by design — see the postType comment
+              on the Props interface above. There is no internal targeting
+              to configure and nothing to opt into, so this whole block (and
+              the publicWebsite toggle right after it) is skipped entirely
+              for both. */}
+          {!isPublicOnly && (
             <div>
               <label className="flex items-center gap-2 text-sm mb-2">
                 <input
@@ -254,11 +386,11 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
           )}
           {/* [PRODUCTION FIX 2026-07-28] Public website opt-in — independent
               of "Send to everyone" above, which only controls internal
-              visibility. News is always public, so the toggle itself is
-              hidden for it (nothing to opt into), but the cover-image
-              picker below still applies. */}
+              visibility. News and Ads are always public, so the toggle
+              itself is hidden for both (nothing to opt into), but the
+              cover-image picker below still applies. */}
           <div className="border-t border-base pt-4">
-            {!isNews && (
+            {!isPublicOnly && (
               <>
                 <label className="flex items-center gap-2 text-sm mb-1">
                   <input
@@ -270,16 +402,18 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
                   Publish to public website
                 </label>
                 <p className="text-xs text-muted mb-3">
-                  Shows on the public landing page (News, Events, or Academic Advertisements). Separate from
-                  &quot;Send to everyone&quot; above — that only controls who inside the school sees it.
+                  Shows on the public landing page, in its own section — never mixed with News,
+                  Academic Advertisements, or each other. Separate from &quot;Send to everyone&quot;
+                  above — that only controls who inside the school sees it.
                   {isEvent && ' Events are typically public — leave this checked unless this is an internal-only event.'}
                 </p>
               </>
             )}
-            {isNews && (
+            {isPublicOnly && (
               <p className="text-xs text-muted mb-3">
-                News articles are public-website content only — this never appears in anyone&apos;s
-                internal Announcements tab.
+                {isNews
+                  ? 'News articles are public-website content only — this never appears in anyone\u2019s internal Announcements tab.'
+                  : 'Academic Advertisements are a standalone, public-website-only section — this never appears in anyone\u2019s internal Announcements tab, and never as a News article or Event.'}
               </p>
             )}
 
@@ -288,13 +422,19 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
                 <label className="block text-sm font-medium text-body mb-1.5">
                   {isNews ? 'Photo' : 'Cover image'} <span className="text-muted font-normal">(optional)</span>
                 </label>
-                {imagePreview ? (
+                {imagePreview || persistedImageKey ? (
                   <div className="relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview, not a remote asset */}
-                    <img src={imagePreview} alt="Selected cover" className="w-full h-32 object-cover rounded-xl border border-base" />
+                    {imagePreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- local blob: preview, not a remote asset
+                      <img src={imagePreview} alt="Selected cover" className="w-full h-32 object-cover rounded-xl border border-base" />
+                    ) : (
+                      <div className="w-full h-32 rounded-xl border border-base bg-page flex items-center justify-center text-xs text-muted">
+                        Image attached from your draft
+                      </div>
+                    )}
                     <button
                       type="button"
-                      onClick={() => { setImageFile(null); setImagePreview(null) }}
+                      onClick={removeImage}
                       className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
                       aria-label="Remove image"
                     >
@@ -321,7 +461,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
               {error}
             </p>
           )}
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex flex-wrap justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
@@ -329,15 +469,27 @@ export function AnnouncementForm({ onClose, mode = 'announcement' }: Props) {
             >
               Cancel
             </button>
+            {/* [NEW] Save as draft — lenient validation, doesn't require the
+                item to be complete. Lets an author keep several drafts of
+                any of the four types going before committing to Publish. */}
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={savingDraft || loading}
+              className="px-5 py-2 text-sm border border-brand-teal text-brand-teal rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 min-h-[44px] hover:bg-brand-teal/5"
+            >
+              {savingDraft ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" aria-hidden />}
+              {draft ? 'Save Draft' : 'Save as Draft'}
+            </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || savingDraft}
               className="px-5 py-2 text-sm bg-brand-navy text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 min-h-[44px]"
             >
               {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {canPublishDirectly
-                ? (isEvent ? 'Publish Event' : isNews ? 'Publish Article' : 'Publish')
-                : (isEvent ? 'Submit Event for Approval' : isNews ? 'Submit Article for Approval' : 'Submit for Approval')}
+                ? (isEvent ? 'Publish Event' : isNews ? 'Publish Article' : isAds ? 'Publish Advertisement' : 'Publish')
+                : (isEvent ? 'Submit Event for Approval' : isNews ? 'Submit Article for Approval' : isAds ? 'Submit Advertisement for Approval' : 'Submit for Approval')}
             </button>
           </div>
         </form>

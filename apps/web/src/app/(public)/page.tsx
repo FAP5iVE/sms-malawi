@@ -12,17 +12,22 @@
  *      useHasMounted), not the original design mockup's manual DOM
  *      color-swapping — dark mode works via the existing bg-page/bg-surface/
  *      text-body/border-base token system everywhere in this file.
- *   2. News, the announcement rail, and "Academic Advertisements" all draw
- *      from the single real usePublicAnnouncements() feed. The backend
- *      never actually returns `category` despite the type declaring one
- *      (confirmed dead field in public.ts's /announcements handler), so
- *      category-based sectioning was never possible. Instead: announcements
- *      WITH an eventDate power a genuine Events section (eventDate existed
- *      on PublicAnnouncement and was fetched by the previous page, but never
- *      used this way); announcements WITHOUT eventDate power the rail and
- *      News/Academic Advertisements (same feed, different slices — there is
- *      only one real content source, so both sections are honest about
- *      sharing it rather than a fabricated second feed).
+ *   2. [PRODUCTION FIX, this phase] News, Announcements, Academic
+ *      Advertisements, and Events are now four genuinely separate feeds —
+ *      usePublicNews()/usePublicAnnouncements()/usePublicAdverts()/
+ *      usePublicEvents() — each backed by its own /public/* route filtered
+ *      on the server by an explicit postType tag (see
+ *      server/routes/public.ts and @shared/schemas/announcement). Previously
+ *      all three non-Event sections drew from one usePublicAnnouncements()
+ *      feed with no postType distinction at all (announcements WITHOUT an
+ *      eventDate powered the rail, News, AND Academic Advertisements as
+ *      three different slices of the exact same items), and Events was only
+ *      inferred from eventDate being set rather than a real tag — nothing
+ *      stopped a plain announcement or news article from also carrying one.
+ *      Each section's "Read more"/"See all" links now go to that section's
+ *      own archive + detail pages (/news, /announcements,
+ *      /academic-advertisements, /events, each with a matching [id] detail
+ *      route) instead of every "See all" pointing at /news.
  *   3. Performance stats map generically over usePublicManebStats().stats
  *      (works for however many exam types exist, not hardcoded to MSCE+JCE),
  *      plus a real University Placement card from the new
@@ -98,6 +103,9 @@ import {
   usePublicManebStats,
   usePublicPlacementStats,
   usePublicAnnouncements,
+  usePublicNews,
+  usePublicAdverts,
+  usePublicEvents,
   usePublicGallery,
   useNewsletterSubscribe,
   useContactForm,
@@ -247,30 +255,24 @@ export default function LandingPage() {
   const { data: schoolInfo }   = usePublicSchoolInfo()
   const { data: manebStats }   = usePublicManebStats()
   const { data: placementStats } = usePublicPlacementStats()
-  // 12 is the backend's own max (Math.min(limit, 12) in public.ts) — pull
-  // the full allowance once and slice client-side for the rail/news/
-  // advertisements/events sections rather than four separate network calls.
-  const { data: announcementsPage, isLoading: announcementsLoading } = usePublicAnnouncements(12)
-  const announcements = announcementsPage?.announcements ?? []
+  // [PRODUCTION FIX] Four genuinely separate feeds now, each postType-
+  // filtered server-side (see public.ts) — previously all four sections
+  // below shared one usePublicAnnouncements() call and were sliced apart
+  // client-side with no real distinction between them.
+  const { data: announcementsPage, isLoading: announcementsLoading } = usePublicAnnouncements(2)
+  const { data: newsPage,          isLoading: newsLoading }          = usePublicNews(4)
+  const { data: advertsPage,       isLoading: advertsLoading }       = usePublicAdverts(4)
+  const { data: eventsPage,        isLoading: eventsLoading }        = usePublicEvents(3)
   const { data: galleryPage, isLoading: galleryLoading } = usePublicGallery(5)
   const galleryPhotos = galleryPage?.photos ?? []
 
   const currentYearNum = new Date().getFullYear()
   const yearsOfExcellence = schoolInfo ? currentYearNum - schoolInfo.founded : null
 
-  // Real split: eventDate present -> Events; absent -> News/Advertisements/rail.
-  // See file header note 2 — there is only one real announcements feed.
-  const datedAnnouncements = announcements
-    .filter((a) => a.eventDate)
-    .sort((a, b) => new Date(a.eventDate!).getTime() - new Date(b.eventDate!).getTime())
-  const undatedAnnouncements = announcements.filter((a) => !a.eventDate)
-
-  const railItems = undatedAnnouncements.slice(0, 2)
-  const newsItems  = undatedAnnouncements.slice(0, 4)
-  const adItems     = undatedAnnouncements.length > 4
-    ? undatedAnnouncements.slice(4, 8)
-    : undatedAnnouncements.slice(0, 4)
-  const eventItems = datedAnnouncements.slice(0, 3)
+  const railItems  = announcementsPage?.announcements ?? []
+  const newsItems  = newsPage?.news ?? []
+  const adItems     = advertsPage?.adverts ?? []
+  const eventItems = eventsPage?.events ?? []
 
   // [PRODUCTION FIX 2026-07-28] Search previously only matched announcements
   // — the new static pages (Academics, Admissions, Student Life, Leadership,
@@ -298,12 +300,23 @@ export default function LandingPage() {
 
   const searchResults = searchQuery.trim().length >= 2
     ? [
-        ...announcements
-          .filter((a) =>
-            a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            a.body.toLowerCase().includes(searchQuery.toLowerCase()),
-          )
-          .map((a) => ({ kind: 'announcement' as const, title: a.title, href: a.eventDate ? '/events' : '/news', tag: a.eventDate ? 'Event' : 'News' })),
+        // [PRODUCTION FIX] Now searches across all four real, separate
+        // feeds (previously one combined announcements array with the
+        // News/Event distinction merely inferred from eventDate) and links
+        // straight to each item's own detail page rather than just its
+        // section root.
+        ...railItems
+          .filter((a) => `${a.title} ${a.body}`.toLowerCase().includes(searchQuery.toLowerCase()))
+          .map((a) => ({ kind: 'announcement' as const, title: a.title, href: `/announcements/${a.id}`, tag: 'Announcement' })),
+        ...newsItems
+          .filter((a) => `${a.title} ${a.body}`.toLowerCase().includes(searchQuery.toLowerCase()))
+          .map((a) => ({ kind: 'announcement' as const, title: a.title, href: `/news/${a.id}`, tag: 'News' })),
+        ...adItems
+          .filter((a) => `${a.title} ${a.body}`.toLowerCase().includes(searchQuery.toLowerCase()))
+          .map((a) => ({ kind: 'announcement' as const, title: a.title, href: `/academic-advertisements/${a.id}`, tag: 'Advertisement' })),
+        ...eventItems
+          .filter((a) => `${a.title} ${a.body}`.toLowerCase().includes(searchQuery.toLowerCase()))
+          .map((a) => ({ kind: 'announcement' as const, title: a.title, href: `/events/${a.id}`, tag: 'Event' })),
         ...SEARCHABLE_PAGES
           .filter((p) => `${p.title} ${p.keywords}`.toLowerCase().includes(searchQuery.toLowerCase()))
           .map((p) => ({ kind: 'page' as const, title: p.title, href: p.href, tag: 'Page' })),
@@ -661,31 +674,38 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════════
-            ANNOUNCEMENT RAIL — latest 2 undated announcements
+            ANNOUNCEMENT RAIL — id="announcements", latest 2 general
+            announcements (postType ANNOUNCEMENT — its own feed, see
+            usePublicAnnouncements above)
         ══════════════════════════════════════════════════════════════ */}
-        <section className="relative overflow-hidden bg-brand-navy">
+        <section id="announcements" className="relative overflow-hidden bg-brand-navy">
           <ScribbleArt variant={1} className="opacity-[0.16]" />
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 grid md:grid-cols-[200px_1fr] gap-8 items-center">
             <div>
               <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal-light mb-1.5">
                 Announcements
               </div>
-              <Link href="/news" className="text-[13px] text-white/50 hover:text-white transition-colors">
+              <Link href="/announcements" className="text-[13px] text-white/50 hover:text-white transition-colors">
                 View all →
               </Link>
             </div>
             <div className="grid sm:grid-cols-2 gap-5">
-              {railItems.length === 0 ? (
+              {announcementsLoading ? (
+                <>
+                  <div className="h-20 bg-white/5 rounded-lg animate-pulse" />
+                  <div className="h-20 bg-white/5 rounded-lg animate-pulse" />
+                </>
+              ) : railItems.length === 0 ? (
                 <p className="text-sm text-white/40 sm:col-span-2">No announcements yet — check back soon.</p>
               ) : (
                 railItems.map((a) => (
-                  <article key={a.id} className="border-l-2 border-brand-teal-light/55 pl-4.5">
-                    <h4 className="font-heading font-bold text-[15px] text-white mb-1.5 leading-snug line-clamp-2">
+                  <Link href={`/announcements/${a.id}`} key={a.id} className="border-l-2 border-brand-teal-light/55 pl-4.5 block group">
+                    <h4 className="font-heading font-bold text-[15px] text-white mb-1.5 leading-snug line-clamp-2 group-hover:underline">
                       {a.title}
                     </h4>
                     <p className="text-[13.5px] text-white/50 mb-2 leading-relaxed line-clamp-2">{a.body}</p>
                     <span className="font-mono text-[11px] text-white/35">{formatRelativeDate(a.createdAt)}</span>
-                  </article>
+                  </Link>
                 ))
               )}
             </div>
@@ -709,7 +729,7 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            {announcementsLoading ? (
+            {newsLoading ? (
               <div className="grid lg:grid-cols-2 gap-10" role="status" aria-label="Loading news">
                 <div className="h-96 bg-page rounded-2xl animate-pulse" />
                 <div className="space-y-5">
@@ -717,7 +737,7 @@ export default function LandingPage() {
                 </div>
               </div>
             ) : newsItems.length === 0 ? (
-              <div className="text-center py-14 text-muted text-sm">No announcements have been published yet — check back soon.</div>
+              <div className="text-center py-14 text-muted text-sm">No news articles have been published yet — check back soon.</div>
             ) : (
               <div className="grid lg:grid-cols-[1.15fr_1fr] gap-10">
                 {/* Featured */}
@@ -728,7 +748,7 @@ export default function LandingPage() {
                   </h3>
                   <div className="font-mono text-[11.5px] text-muted mb-3">{formatRelativeDate(newsItems[0]!.createdAt)}</div>
                   <p className="text-[15.5px] leading-relaxed text-muted mb-4 line-clamp-4">{newsItems[0]!.body}</p>
-                  <Link href="/news" className="font-heading font-bold text-[13.5px] text-brand-teal hover:underline">
+                  <Link href={`/news/${newsItems[0]!.id}`} className="font-heading font-bold text-[13.5px] text-brand-teal hover:underline">
                     Read more →
                   </Link>
                 </article>
@@ -743,7 +763,7 @@ export default function LandingPage() {
                           {a.title}
                         </h4>
                         <div className="font-mono text-[11px] text-muted mb-2">{formatRelativeDate(a.createdAt)}</div>
-                        <Link href="/news" className="font-heading font-bold text-xs text-brand-teal hover:underline">
+                        <Link href={`/news/${a.id}`} className="font-heading font-bold text-xs text-brand-teal hover:underline">
                           Read more →
                         </Link>
                       </div>
@@ -756,9 +776,14 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════════
-            ACADEMIC ADVERTISEMENTS
+            ACADEMIC ADVERTISEMENTS — id="ads"
+            [PRODUCTION FIX] Now a genuinely standalone section: its own
+            postType (ADVERTISEMENT), its own /public/academic-advertisements
+            feed, its own archive + detail pages — previously this was just
+            another slice of the same feed as News, and every link here
+            (section "See all" and every item) pointed at /news.
         ══════════════════════════════════════════════════════════════ */}
-        <section className="relative overflow-hidden bg-page py-16 sm:py-18 border-y border-base">
+        <section id="ads" className="relative overflow-hidden bg-page py-16 sm:py-18 border-y border-base">
           <ScribbleArt variant={2} className="opacity-[0.08] dark:opacity-[0.14]" />
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[300px_1fr] gap-12">
             <div>
@@ -769,20 +794,24 @@ export default function LandingPage() {
                 Calls for applications, intake notices and examination circulars, published as they are issued.
               </p>
               <Link
-                href="/news"
+                href="/academic-advertisements"
                 className="inline-flex items-center gap-2 border border-base bg-surface text-body px-4.5 py-2.5 rounded-full font-heading font-bold text-[13px] hover:border-brand-teal hover:text-brand-teal transition-colors"
               >
-                More Announcements →
+                All Advertisements →
               </Link>
             </div>
             <div className="flex flex-col">
-              {adItems.length === 0 ? (
+              {advertsLoading ? (
+                <div className="space-y-5 py-2" role="status" aria-label="Loading advertisements">
+                  {[1, 2, 3].map((i) => <div key={i} className="h-10 bg-surface rounded-lg animate-pulse" />)}
+                </div>
+              ) : adItems.length === 0 ? (
                 <p className="text-sm text-muted py-5">No circulars published yet.</p>
               ) : (
                 adItems.map((a, i) => (
                   <Link
                     key={a.id}
-                    href="/news"
+                    href={`/academic-advertisements/${a.id}`}
                     className={`flex items-baseline justify-between gap-6 py-5 text-left text-body hover:text-brand-teal transition-colors ${i < adItems.length - 1 ? 'border-b border-base' : ''}`}
                   >
                     <span className="font-heading font-semibold text-base sm:text-[16.5px] leading-snug">{a.title}</span>
@@ -1047,7 +1076,11 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            {eventItems.length === 0 ? (
+            {eventsLoading ? (
+              <div className="grid md:grid-cols-3 gap-6" role="status" aria-label="Loading events">
+                {[1, 2, 3].map((i) => <div key={i} className="h-64 bg-page rounded-2xl animate-pulse" />)}
+              </div>
+            ) : eventItems.length === 0 ? (
               <div className="text-center py-14 text-muted text-sm flex flex-col items-center gap-3">
                 <CalendarDays className="w-8 h-8 text-muted/40" aria-hidden />
                 No upcoming events have been scheduled yet — check back soon.
@@ -1068,7 +1101,7 @@ export default function LandingPage() {
                           {ev.title}
                         </h3>
                         <p className="text-[13.5px] text-muted mb-3.5 line-clamp-2">{ev.body}</p>
-                        <Link href="/events" className="font-heading font-bold text-xs text-brand-teal hover:underline">
+                        <Link href={`/events/${ev.id}`} className="font-heading font-bold text-xs text-brand-teal hover:underline">
                           Read more →
                         </Link>
                       </div>
@@ -1369,7 +1402,10 @@ export default function LandingPage() {
                   title: 'Get in Touch',
                   links: [
                     { label: 'Map & Directions', anchor: 'map' },
-                    { label: 'News & Announcements', anchor: 'news' },
+                    { label: 'News', href: '/news' },
+                    { label: 'Announcements', href: '/announcements' },
+                    { label: 'Academic Advertisements', href: '/academic-advertisements' },
+                    { label: 'Events', href: '/events' },
                     { label: 'MANEB Portal', href: 'https://www.maneb.edu.mw/', external: true },
                   ],
                 },

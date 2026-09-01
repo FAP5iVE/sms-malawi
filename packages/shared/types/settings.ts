@@ -69,7 +69,7 @@ export interface LeadershipMember {
   name:     string
   title:    string
   bio?:     string
-  photoKey?: string // Appwrite file ID, FILE_PREFIX.STAFF_PHOTO or a public one
+  photoKey?: string // Appwrite file ID — FILE_PREFIX.LEADERSHIP_PHOTO
   order?:   number
 }
 

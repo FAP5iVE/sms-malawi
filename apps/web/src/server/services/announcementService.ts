@@ -58,6 +58,7 @@ import { sendBatchEmails } from '@/lib/email'
 import * as notificationService from '@/server/services/notificationService'
 import * as notificationFeedService from '@/server/services/notificationFeedService'
 import { deriveAudience } from '@shared/schemas/announcement'
+import type { AnnouncementPostType } from '@shared/schemas/announcement'
 import { COLLECTIONS } from '@shared/constants/storage'
 import { STAFF_ROLES } from '@shared/types/roles'
 
@@ -89,10 +90,23 @@ export interface CreateAnnouncementInput {
   // Appwrite file ID (FILE_PREFIX.ANNOUNCEMENT_IMAGE) — optional cover
   // image, primarily for the public News section.
   imageKey?: string
-  // [PRODUCTION FIX] See AnnouncementSchema in @shared/schemas/announcement
-  // for the full explanation of ANNOUNCEMENT vs NEWS.
-  postType?: 'ANNOUNCEMENT' | 'NEWS'
+  // [PRODUCTION FIX] EVENT/ADVERTISEMENT added — see AnnouncementSchema in
+  // @shared/schemas/announcement and the PUBLIC_ONLY_POST_TYPES comment
+  // below for the full explanation.
+  postType?: AnnouncementPostType
 }
+
+/**
+ * [NEW] Post types that are public-website content only, mirroring NEWS's
+ * existing, already-correct behaviour: never internally targeted, always
+ * publicWebsite=true regardless of what the client sent, and excluded from
+ * the internal /announcements viewer feed (listForViewer below). ADVERTISEMENT
+ * (Academic Advertisements) is public-only for the same reason NEWS is — it
+ * has no internal audience concept at all, unlike EVENT, which keeps
+ * ANNOUNCEMENT's existing behaviour (can be internally targeted AND
+ * optionally opted into the public site).
+ */
+const PUBLIC_ONLY_POST_TYPES: readonly AnnouncementPostType[] = ['NEWS', 'ADVERTISEMENT']
 
 // ─── AUDIENCE RESOLUTION ──────────────────────────────────
 
@@ -327,18 +341,20 @@ async function notifyAudience(announcementId: string, payload: NotifyPayload): P
  * announcement.publishDirect/createWithApproval permission) — never
  * trusted from client input.
  */
-export async function createAnnouncement(data: CreateAnnouncementInput, directPublish: boolean) {
+/**
+ * [NEW] Shared normalization for the four post types, factored out of
+ * createAnnouncement() so publishDraft() (a draft's DRAFT -> real-status
+ * transition) applies the exact same NEWS/ADVERTISEMENT public-only
+ * forcing and the same PENDING_APPROVAL/SCHEDULED/PUBLISHED resolution,
+ * rather than re-implementing (and risking drifting from) this logic.
+ */
+function resolveCreateFields(data: CreateAnnouncementInput, directPublish: boolean) {
   const postType = data.postType ?? 'ANNOUNCEMENT'
-  // [PRODUCTION FIX] NEWS is public-site content only — it must never
-  // appear in anyone's internal /announcements tab. Rather than trust the
-  // client to leave targetAll/targetRoles empty and publicWebsite on, force
-  // it server-side so a NEWS item can never accidentally leak into internal
-  // targeting, and so listForViewer()'s postType filter below is always
-  // sufficient on its own without relying on this invariant elsewhere.
-  const targetAll    = postType === 'NEWS' ? false : (data.targetAll ?? false)
-  const targetRoles  = postType === 'NEWS' ? [] : (data.targetRoles ?? [])
-  const targetClassId = postType === 'NEWS' ? null : (data.targetClassId ?? null)
-  const publicWebsite = postType === 'NEWS' ? true : (data.publicWebsite ?? false)
+  const publicOnly = PUBLIC_ONLY_POST_TYPES.includes(postType)
+  const targetAll    = publicOnly ? false : (data.targetAll ?? false)
+  const targetRoles  = publicOnly ? [] : (data.targetRoles ?? [])
+  const targetClassId = publicOnly ? null : (data.targetClassId ?? null)
+  const publicWebsite = publicOnly ? true : (data.publicWebsite ?? false)
 
   const scheduledForDate = data.scheduledFor ? new Date(data.scheduledFor) : null
   const isFutureScheduled = !!scheduledForDate && scheduledForDate.getTime() > Date.now()
@@ -348,6 +364,13 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
     : isFutureScheduled
       ? 'SCHEDULED'
       : 'PUBLISHED'
+
+  return { postType, targetAll, targetRoles, targetClassId, publicWebsite, status }
+}
+
+export async function createAnnouncement(data: CreateAnnouncementInput, directPublish: boolean) {
+  const { postType, targetAll, targetRoles, targetClassId, publicWebsite, status } =
+    resolveCreateFields(data, directPublish)
 
   const ref = getFirestore(getAdminApp()).collection(COLLECTIONS.ANNOUNCEMENTS).doc()
   await ref.set({
@@ -388,6 +411,151 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
   }
 
   return { id: ref.id, title: data.title, body: data.body, status }
+}
+
+// ─── DRAFTS ─────────────────────────────────────────────────
+// [NEW] Lets any of the four post types (announcement/event/news/ad) be
+// saved as an incomplete work-in-progress and continued later, instead of
+// forcing a submitter to finish and commit to Publish/Submit-for-approval
+// in one sitting. A draft is a real document in the same collection with
+// status: 'DRAFT' — it never triggers notifyAudience() and is excluded
+// from every viewer/pending/public query by virtue of not matching those
+// queries' status filters.
+
+export interface DraftInput {
+  title?: string
+  body?: string
+  targetAll?: boolean
+  targetRoles?: string[]
+  targetClassId?: string
+  eventDate?: string
+  publicWebsite?: boolean
+  imageKey?: string
+  postType?: AnnouncementPostType
+}
+
+/** Create a new draft. Never notifies; status is always DRAFT. */
+export async function createDraft(data: DraftInput, createdByUid: string, createdByRole: string) {
+  const ref = getFirestore(getAdminApp()).collection(COLLECTIONS.ANNOUNCEMENTS).doc()
+  await ref.set({
+    title: data.title ?? '',
+    body: data.body ?? '',
+    targetAll: data.targetAll ?? false,
+    targetRoles: data.targetRoles ?? [],
+    targetClassId: data.targetClassId ?? null,
+    scheduledFor: null,
+    eventDate: data.eventDate ?? null,
+    publicWebsite: data.publicWebsite ?? false,
+    imageKey: data.imageKey ?? null,
+    postType: data.postType ?? 'ANNOUNCEMENT',
+    createdByUid,
+    createdByRole,
+    status: 'DRAFT' as AnnouncementStatus,
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  })
+  return { id: ref.id, status: 'DRAFT' as const }
+}
+
+/** Update an existing draft in place. Ownership- and DRAFT-status-scoped. */
+export async function updateDraft(id: string, uid: string, data: DraftInput) {
+  const ref = getFirestore(getAdminApp()).collection(COLLECTIONS.ANNOUNCEMENTS).doc(id)
+  const snap = await ref.get()
+  if (!snap.exists) throw Object.assign(new Error('Draft not found.'), { status: 404 })
+  const existing = snap.data() as DocumentData
+  if (existing.createdByUid !== uid) {
+    throw Object.assign(new Error('You can only edit your own drafts.'), { status: 403 })
+  }
+  if (existing.status !== 'DRAFT') {
+    throw Object.assign(new Error('Only drafts can be edited this way — this item has already been submitted.'), { status: 409 })
+  }
+
+  const update: Record<string, unknown> = { updatedAt: Timestamp.now() }
+  if (data.title !== undefined) update.title = data.title
+  if (data.body !== undefined) update.body = data.body
+  if (data.targetAll !== undefined) update.targetAll = data.targetAll
+  if (data.targetRoles !== undefined) update.targetRoles = data.targetRoles
+  if (data.targetClassId !== undefined) update.targetClassId = data.targetClassId
+  if (data.eventDate !== undefined) update.eventDate = data.eventDate
+  if (data.publicWebsite !== undefined) update.publicWebsite = data.publicWebsite
+  if (data.imageKey !== undefined) update.imageKey = data.imageKey
+  if (data.postType !== undefined) update.postType = data.postType
+
+  await ref.update(update)
+  return { id, status: 'DRAFT' as const }
+}
+
+/** The caller's own DRAFT documents, across all four post types. */
+export async function listMyDrafts(uid: string): Promise<ViewerAnnouncement[]> {
+  const snap = await getFirestore(getAdminApp())
+    .collection(COLLECTIONS.ANNOUNCEMENTS)
+    .where('status', '==', 'DRAFT')
+    .where('createdByUid', '==', uid)
+    .orderBy('updatedAt', 'desc')
+    .limit(100)
+    .get()
+
+  return snap.docs.map((d) => mapViewer(d.id, d.data()))
+}
+
+/**
+ * Promote a DRAFT to a real submission — the same PENDING_APPROVAL/
+ * SCHEDULED/PUBLISHED resolution and NEWS/ADVERTISEMENT public-only
+ * forcing as createAnnouncement(), applied to the existing draft document
+ * instead of creating a new one. `data` is the draft's current field
+ * values as re-submitted by the client (already re-validated against the
+ * strict AnnouncementSchema by the route before this is called — a draft's
+ * lenient constraints no longer apply once it's being published).
+ */
+export async function publishDraft(
+  id: string,
+  uid: string,
+  data: CreateAnnouncementInput,
+  directPublish: boolean,
+) {
+  const ref = getFirestore(getAdminApp()).collection(COLLECTIONS.ANNOUNCEMENTS).doc(id)
+  const snap = await ref.get()
+  if (!snap.exists) throw Object.assign(new Error('Draft not found.'), { status: 404 })
+  const existing = snap.data() as DocumentData
+  if (existing.createdByUid !== uid) {
+    throw Object.assign(new Error('You can only publish your own drafts.'), { status: 403 })
+  }
+  if (existing.status !== 'DRAFT') {
+    throw Object.assign(new Error('This item has already been submitted.'), { status: 409 })
+  }
+
+  const { postType, targetAll, targetRoles, targetClassId, publicWebsite, status } =
+    resolveCreateFields(data, directPublish)
+
+  await ref.update({
+    title: data.title,
+    body: data.body,
+    targetAll,
+    targetRoles,
+    targetClassId,
+    scheduledFor: data.scheduledFor ?? null,
+    eventDate: data.eventDate ?? null,
+    publicWebsite,
+    imageKey: data.imageKey ?? null,
+    postType,
+    status,
+    updatedAt: Timestamp.now(),
+  })
+
+  if (status === 'PUBLISHED') {
+    void notifyAudience(id, {
+      title: data.title,
+      body: data.body,
+      targetAll,
+      targetRoles,
+      targetClassId,
+      eventDate: data.eventDate,
+      createdByUid: uid,
+      publicWebsite,
+    })
+  }
+
+  return { id, title: data.title, body: data.body, status }
 }
 
 /** Approve a PENDING_APPROVAL announcement and publish it. */
@@ -552,7 +720,7 @@ export interface ViewerAnnouncement {
   createdByUid: string
   createdByRole: string | null
   createdAt: string | null
-  postType: 'ANNOUNCEMENT' | 'NEWS'
+  postType: AnnouncementPostType
 }
 
 /** Coerce a stored createdAt (Firestore Timestamp | string | null) to ISO. */
@@ -581,7 +749,9 @@ function mapViewer(id: string, data: DocumentData): ViewerAnnouncement {
     createdByUid: (data.createdByUid as string) ?? '',
     createdByRole: (data.createdByRole as string | null | undefined) ?? null,
     createdAt: toIso(data.createdAt),
-    postType: ((data.postType as string | undefined) === 'NEWS' ? 'NEWS' : 'ANNOUNCEMENT'),
+    postType: (['NEWS', 'EVENT', 'ADVERTISEMENT'].includes(data.postType as string)
+      ? (data.postType as AnnouncementPostType)
+      : 'ANNOUNCEMENT'),
   }
 }
 
@@ -605,10 +775,11 @@ export async function listForViewer(viewer: { uid: string; role: string }): Prom
     .map((d) => mapViewer(d.id, d.data()))
     .filter(
       (a) =>
-        // [PRODUCTION FIX] NEWS is public-site-only content — it must
-        // never surface in a user's internal /announcements tab, no
-        // matter what targetAll/targetRoles happen to be on the doc.
-        a.postType !== 'NEWS' &&
+        // [PRODUCTION FIX] NEWS and ADVERTISEMENT are public-site-only
+        // content (PUBLIC_ONLY_POST_TYPES) — neither must ever surface in
+        // a user's internal /announcements tab, no matter what
+        // targetAll/targetRoles happen to be on the doc.
+        !PUBLIC_ONLY_POST_TYPES.includes(a.postType) &&
         (a.targetAll ||
           a.targetRoles.includes(viewer.role) ||
           a.createdByUid === viewer.uid),

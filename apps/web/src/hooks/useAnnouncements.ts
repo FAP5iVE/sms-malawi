@@ -41,6 +41,12 @@ export interface Announcement {
   createdByRole?: string | null
   /** ISO string (normalized server-side; no Firestore Timestamp on the client). */
   createdAt: string | null
+  /** [NEW] ANNOUNCEMENT | NEWS | EVENT | ADVERTISEMENT — see
+   *  @shared/schemas/announcement. Previously missing from the client type
+   *  even though the server always sent it, which is how the auth
+   *  Announcements page had no way to tell an Event apart from a plain
+   *  Announcement in its own list. */
+  postType: 'ANNOUNCEMENT' | 'NEWS' | 'EVENT' | 'ADVERTISEMENT'
 }
 
 interface AnnouncementsResponse {
@@ -77,6 +83,26 @@ export function usePendingAnnouncements() {
 
   return {
     pending: query.data?.announcements ?? [],
+    loading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
+  }
+}
+
+/**
+ * [NEW] The caller's own DRAFT documents, across all four post types
+ * (announcement/event/news/ad) — GET /announcements/drafts. Backs the
+ * "Drafts" tab: continue writing later, and keep several drafts before
+ * committing to Publish.
+ */
+export function useMyDrafts() {
+  const query = useQuery({
+    queryKey: queryKeys.announcements.drafts(),
+    queryFn: () => apiFetch<AnnouncementsResponse>('/announcements/drafts'),
+    staleTime: 15_000,
+  })
+
+  return {
+    drafts: query.data?.announcements ?? [],
     loading: query.isLoading,
     error: query.error ? (query.error as Error).message : null,
   }

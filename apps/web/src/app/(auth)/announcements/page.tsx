@@ -26,14 +26,14 @@
 
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useAnnouncements, usePendingAnnouncements } from '@/hooks/useAnnouncements'
+import { useAnnouncements, usePendingAnnouncements, useMyDrafts, type Announcement } from '@/hooks/useAnnouncements'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { AnnouncementForm } from '@/components/announcements/AnnouncementForm'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useAuthStore } from '@/store/authStore'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Bell, PlusCircle, Megaphone, Check, Loader2, CalendarDays, X, Trash2, Newspaper } from 'lucide-react'
+import { Bell, PlusCircle, Megaphone, Check, Loader2, CalendarDays, X, Trash2, Newspaper, Landmark, FileEdit, PencilLine } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -340,13 +340,168 @@ function PendingApprovalList() {
   )
 }
 
+const POST_TYPE_LABEL: Record<Announcement['postType'], string> = {
+  ANNOUNCEMENT: 'Announcement',
+  EVENT: 'Event',
+  NEWS: 'News',
+  ADVERTISEMENT: 'Academic Advertisement',
+}
+const POST_TYPE_TO_FORM_MODE: Record<Announcement['postType'], 'announcement' | 'event' | 'news' | 'ads'> = {
+  ANNOUNCEMENT: 'announcement',
+  EVENT: 'event',
+  NEWS: 'news',
+  ADVERTISEMENT: 'ads',
+}
+
+/** [NEW] "Save the draft and continue writing later" — every draft the
+ *  caller has saved, across all four post types, with a way to resume
+ *  editing (opens AnnouncementForm pre-filled) or discard it. */
+function DraftsList({ onContinue }: { onContinue: (draft: Announcement) => void }) {
+  const { drafts, loading, error } = useMyDrafts()
+  const queryClient = useQueryClient()
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  async function handleDelete(id: string) {
+    setDeletingId(id)
+    setDeleteError(null)
+    try {
+      await apiFetch(`/announcements/${id}`, { method: 'DELETE' })
+      await queryClient.invalidateQueries({ queryKey: queryKeys.announcements.drafts() })
+      setConfirmId(null)
+    } catch {
+      setDeleteError('Failed to delete draft. Please try again.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2].map((i) => (
+          <div key={i} className="h-24 rounded-xl bg-surface animate-pulse" />
+        ))}
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-brand-coral">
+        <FileEdit className="w-10 h-10 mb-3 opacity-40" aria-hidden="true" />
+        <p className="text-sm">{error}</p>
+      </div>
+    )
+  }
+
+  if (drafts.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-muted">
+        <FileEdit className="w-10 h-10 mb-3 opacity-30" aria-hidden="true" />
+        <p className="text-sm">No drafts yet. Start writing and save one for later.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {deleteError && (
+        <p role="alert" className="text-xs text-brand-coral">
+          {deleteError}
+        </p>
+      )}
+      {drafts.map((d) => (
+        <div key={d.id} className="bg-surface border border-base rounded-2xl p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-heading font-semibold text-body">{d.title || 'Untitled draft'}</h3>
+                <span className="text-[10px] font-heading font-bold px-2.5 py-1 rounded-full bg-base text-muted">
+                  {POST_TYPE_LABEL[d.postType]}
+                </span>
+              </div>
+              {d.body && <p className="text-sm text-muted mt-1 leading-relaxed line-clamp-2">{d.body}</p>}
+            </div>
+            <div className="shrink-0 flex items-center gap-2">
+              <button
+                onClick={() => onContinue(d)}
+                className="flex items-center gap-1.5 bg-brand-teal text-white px-3 py-2 rounded-xl text-xs font-heading font-semibold hover:bg-brand-teal-light transition-colors min-h-[40px]"
+              >
+                <PencilLine className="w-3.5 h-3.5" aria-hidden="true" />
+                Continue
+              </button>
+              <button
+                onClick={() => setConfirmId(confirmId === d.id ? null : d.id)}
+                disabled={deletingId === d.id}
+                aria-label="Delete draft"
+                className="p-2 rounded-lg text-muted hover:text-brand-coral hover:bg-brand-coral/8 transition-colors disabled:opacity-60 min-h-[40px] min-w-[40px] flex items-center justify-center"
+              >
+                <Trash2 className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+          {confirmId === d.id && (
+            <div className="mt-4 border-t border-base pt-4 flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-xs text-muted">Discard this draft permanently?</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmId(null)}
+                  className="px-4 py-2 text-xs border border-base rounded-xl hover:bg-page min-h-[40px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(d.id)}
+                  disabled={deletingId === d.id}
+                  className="flex items-center gap-1.5 bg-brand-coral text-white px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-60 min-h-[40px]"
+                >
+                  {deletingId === d.id && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
+                  Delete
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function AnnouncementsContent() {
   const { announcements, loading: isLoading, error: announcementsError } = useAnnouncements()
   const { can } = usePermissions()
-  const [formMode, setFormMode] = useState<'announcement' | 'event' | 'news' | null>(null)
+  const queryClient = useQueryClient()
+  const [formMode, setFormMode] = useState<'announcement' | 'event' | 'news' | 'ads' | null>(null)
+  // [NEW] Set when opening the form via DraftsList's "Continue" button —
+  // pre-fills AnnouncementForm and switches its Publish action to
+  // PATCH /:id/publish instead of creating a new document.
+  const [editingDraft, setEditingDraft] = useState<Announcement | null>(null)
 
   const canCreate = can('announcement.create') || can('announcement.createWithApproval')
   const canApprove = can('announcement.approvePublish')
+
+  function openCreate(mode: 'announcement' | 'event' | 'news' | 'ads') {
+    setEditingDraft(null)
+    setFormMode(mode)
+  }
+
+  function continueDraft(draft: Announcement) {
+    setEditingDraft(draft)
+    setFormMode(POST_TYPE_TO_FORM_MODE[draft.postType])
+  }
+
+  function closeForm() {
+    setFormMode(null)
+    setEditingDraft(null)
+    // A save (draft or publish) may have changed either list — the
+    // published feed, the pending-approval feed, or the drafts list.
+    // Invalidating both up front is simpler and cheaper than tracking
+    // which one just changed.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.announcements.all() })
+    void queryClient.invalidateQueries({ queryKey: queryKeys.announcements.drafts() })
+  }
 
   return (
     <div className="p-6">
@@ -357,26 +512,36 @@ function AnnouncementsContent() {
           <h1 className="font-heading font-bold text-xl text-brand-navy">Announcements</h1>
         </div>
         {canCreate && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* [PRODUCTION FIX] "Write News Article" — same create/approval
                 permission as a regular announcement (postType: 'NEWS' is
                 what makes this different, not who can press the button).
                 Publishes public-website-only content; see AnnouncementForm's
                 postType comment. */}
             <button
-              onClick={() => setFormMode('news')}
+              onClick={() => openCreate('news')}
               className="flex items-center gap-2 border border-base text-body px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-page transition-colors min-h-[44px]"
             >
               <Newspaper className="w-4 h-4" aria-hidden="true" /> Write News Article
             </button>
+            {/* [NEW] "New Academic Advertisement" — a standalone module,
+                same create/approval permission cluster as the rest, but its
+                own postType (ADVERTISEMENT), its own public section, and
+                never shown as a plain Announcement/News/Event. */}
             <button
-              onClick={() => setFormMode('event')}
+              onClick={() => openCreate('ads')}
+              className="flex items-center gap-2 border border-base text-body px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-page transition-colors min-h-[44px]"
+            >
+              <Landmark className="w-4 h-4" aria-hidden="true" /> New Academic Advertisement
+            </button>
+            <button
+              onClick={() => openCreate('event')}
               className="flex items-center gap-2 border border-base text-body px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-page transition-colors min-h-[44px]"
             >
               <CalendarDays className="w-4 h-4" aria-hidden="true" /> New Event
             </button>
             <button
-              onClick={() => setFormMode('announcement')}
+              onClick={() => openCreate('announcement')}
               className="flex items-center gap-2 bg-brand-teal text-white px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-brand-teal-light transition-colors min-h-[44px]"
             >
               <PlusCircle className="w-4 h-4" aria-hidden="true" /> New Announcement
@@ -385,25 +550,38 @@ function AnnouncementsContent() {
         )}
       </div>
 
-      {canApprove ? (
+      {canApprove || canCreate ? (
         <Tabs defaultValue="published">
           <TabsList>
             <TabsTrigger value="published">Published</TabsTrigger>
-            <TabsTrigger value="pending">Pending Approval</TabsTrigger>
+            {canApprove && <TabsTrigger value="pending">Pending Approval</TabsTrigger>}
+            {/* [NEW] "Save the draft and continue writing later" — visible to
+                anyone who can create content in the first place, same gate
+                as the create buttons above. */}
+            {canCreate && <TabsTrigger value="drafts">Drafts</TabsTrigger>}
           </TabsList>
           <TabsContent value="published" className="mt-4">
             <PublishedList announcements={announcements} isLoading={isLoading} error={announcementsError} />
           </TabsContent>
-          <TabsContent value="pending" className="mt-4">
-            <PendingApprovalList />
-          </TabsContent>
+          {canApprove && (
+            <TabsContent value="pending" className="mt-4">
+              <PendingApprovalList />
+            </TabsContent>
+          )}
+          {canCreate && (
+            <TabsContent value="drafts" className="mt-4">
+              <DraftsList onContinue={continueDraft} />
+            </TabsContent>
+          )}
         </Tabs>
       ) : (
         <PublishedList announcements={announcements} isLoading={isLoading} error={announcementsError} />
       )}
 
       {/* Form modal */}
-      {formMode && <AnnouncementForm mode={formMode} onClose={() => setFormMode(null)} />}
+      {formMode && (
+        <AnnouncementForm mode={formMode} draft={editingDraft ?? undefined} onClose={closeForm} />
+      )}
     </div>
   )
 }

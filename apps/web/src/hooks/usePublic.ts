@@ -95,9 +95,29 @@ export interface PublicAnnouncementsPage {
   pageSize:      number
 }
 
+/** GET /public/news — [NEW] real news articles (postType NEWS) only, a
+ *  genuinely separate feed from /public/announcements (see public.ts). */
+export interface PublicNewsPage {
+  news:     PublicAnnouncement[]
+  total:    number
+  page:     number
+  pageSize: number
+}
+
+/** GET /public/academic-advertisements — [NEW] calls for applications,
+ *  intake notices, examination circulars (postType ADVERTISEMENT) — its
+ *  own standalone feed, never mixed with News or general Announcements. */
+export interface PublicAdvertsPage {
+  adverts:  PublicAnnouncement[]
+  total:    number
+  page:     number
+  pageSize: number
+}
+
 /** GET /public/events — [N6] server-side eventDate-filtered, ordered by
  *  eventDate ascending, with a correct total (fixes the old client-side
- *  filter that broke pagination). */
+ *  filter that broke pagination). [Tightened] Also filtered on the explicit
+ *  postType EVENT tag now — see public.ts. */
 export interface PublicEventsPage {
   events:   PublicAnnouncement[]
   total:    number
@@ -125,6 +145,9 @@ export function usePublicManebStats(year?: string) {
   })
 }
 
+/** Public, general-audience Announcements (postType ANNOUNCEMENT) — the
+ *  homepage rail and the /announcements archive page. No longer includes
+ *  News or Ads — each now has its own hook/endpoint below. */
 export function usePublicAnnouncements(limit = 6, page = 1) {
   return useQuery({
     queryKey: [...queryKeys.public.announcements(limit), page] as const,
@@ -133,11 +156,52 @@ export function usePublicAnnouncements(limit = 6, page = 1) {
   })
 }
 
-/** [N6] Public events — server-side filtered by eventDate with correct total. */
+/** [NEW] Real news articles only — the "Latest News" homepage section and
+ *  the /news archive page. */
+export function usePublicNews(limit = 6, page = 1) {
+  return useQuery({
+    queryKey: [...queryKeys.public.news(limit), page] as const,
+    queryFn:  () => apiFetch<PublicNewsPage>(`/public/news?limit=${limit}&page=${page}`),
+    staleTime: STALE.MEDIUM,
+  })
+}
+
+/** [NEW] Academic Advertisements — a standalone module: its own postType,
+ *  its own auth-side creation flow, its own public section. The homepage
+ *  "Academic Advertisements" section and the /academic-advertisements
+ *  archive page. */
+export function usePublicAdverts(limit = 8, page = 1) {
+  return useQuery({
+    queryKey: [...queryKeys.public.adverts(limit), page] as const,
+    queryFn:  () => apiFetch<PublicAdvertsPage>(`/public/academic-advertisements?limit=${limit}&page=${page}`),
+    staleTime: STALE.MEDIUM,
+  })
+}
+
+/** [N6, tightened] Public events — server-side filtered by postType EVENT
+ *  and eventDate with a correct total. */
 export function usePublicEvents(limit = 20, page = 1) {
   return useQuery({
     queryKey: ['public', 'events', limit, page] as const,
     queryFn:  () => apiFetch<PublicEventsPage>(`/public/events?limit=${limit}&page=${page}`),
+    staleTime: STALE.MEDIUM,
+  })
+}
+
+/** [NEW] A single published post by id, scoped to its section — used by
+ *  each of the four detail pages (/news/[id], /announcements/[id],
+ *  /academic-advertisements/[id], /events/[id]). `section` picks which
+ *  /public/* base path to hit; the server independently re-checks the
+ *  post's real postType matches, so a news id can never resolve on the
+ *  /announcements/:id path or vice versa. */
+export function usePublicPost(
+  section: 'news' | 'announcements' | 'academic-advertisements' | 'events',
+  id: string | undefined,
+) {
+  return useQuery({
+    queryKey: ['public', section, 'detail', id] as const,
+    queryFn:  () => apiFetch<PublicAnnouncement>(`/public/${section}/${id}`),
+    enabled:  !!id,
     staleTime: STALE.MEDIUM,
   })
 }
@@ -192,6 +256,10 @@ export interface PublicLeadershipMember {
   title:    string
   bio?:     string
   photoKey?: string
+  /** [NEW] Direct, ready-to-use view URL — resolved server-side from
+   *  photoKey via getPublicViewUrl(), same pattern as PublicAnnouncement's
+   *  imageUrl. null if no photo was attached. */
+  photoUrl: string | null
   order?:   number
 }
 

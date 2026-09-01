@@ -71,7 +71,13 @@ export default function EventsPage() {
                         {d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                       </div>
                       <h2 className="font-heading font-bold text-lg text-brand-navy dark:text-white mb-1.5">{ev.title}</h2>
-                      <p className="text-sm text-muted leading-relaxed">{ev.body}</p>
+                      <p className="text-sm text-muted leading-relaxed line-clamp-2">{ev.body}</p>
+                      <Link
+                        href={`/events/${ev.id}`}
+                        className="inline-block mt-2 text-sm font-heading font-bold text-brand-teal hover:underline"
+                      >
+                        Read more →
+                      </Link>
                     </div>
                   </article>
                 )

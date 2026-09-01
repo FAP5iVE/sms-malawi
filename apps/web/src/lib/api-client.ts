@@ -349,6 +349,8 @@ export const queryKeys = {
       ['announcements', 'list', filters ?? {}] as const,
     pending: () => ['announcements', 'pending'] as const,
     detail: (id: string) => ['announcements', 'detail', id] as const,
+    // [NEW] The caller's own DRAFT documents — GET /announcements/drafts.
+    drafts: () => ['announcements', 'drafts'] as const,
   },
 
   // ── Gallery (admin management list — apps/web/src/app/(auth)/gallery)
@@ -514,6 +516,11 @@ export const queryKeys = {
     schoolInfo: () => ['public', 'school-info'] as const,
     manebStats: (year?: string) => ['public', 'maneb-stats', year ?? null] as const,
     announcements: (limit?: number) => ['public', 'announcements', limit ?? null] as const,
+    // [NEW] News and Academic Advertisements are now genuinely separate
+    // /public/* endpoints (postType-filtered) — see public.ts — rather
+    // than slices of the announcements() feed above.
+    news: (limit?: number) => ['public', 'news', limit ?? null] as const,
+    adverts: (limit?: number) => ['public', 'academic-advertisements', limit ?? null] as const,
     placementStats: (year?: string) => ['public', 'placement-stats', year ?? null] as const,
     placements: (year?: string) => ['public', 'placements', year ?? null] as const,
   },

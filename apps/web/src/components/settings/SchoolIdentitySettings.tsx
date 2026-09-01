@@ -14,13 +14,21 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Loader2, Save, Plus, X, Building2 } from 'lucide-react'
+import { Loader2, Save, Plus, X, Building2, ImagePlus } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 
 interface LeadershipMember {
   name:  string
   title: string
   bio?:  string
+  // [NEW] Appwrite file ID — FILE_PREFIX.LEADERSHIP_PHOTO. Set via the
+  // upload picker below (POST /settings/leadership-photo), then carried in
+  // the LeadershipMember record saved with the rest of /school's PATCH.
+  photoKey?: string
+  /** Resolved by GET /school for the editor preview only — never sent back
+   *  on save (the Zod schema on the server strips it; photoKey is what's
+   *  actually persisted). */
+  photoUrl?: string | null
   order?: number
 }
 
@@ -57,7 +65,8 @@ export function SchoolIdentitySettings() {
   const [saved, setSaved]     = useState(false)
   const [error, setError]     = useState<string | null>(null)
   const [newValue, setNewValue] = useState('')
-  const [newLeader, setNewLeader] = useState({ name: '', title: '', bio: '' })
+  const [newLeader, setNewLeader] = useState({ name: '', title: '', bio: '', photoKey: '', photoPreview: '' })
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
   useEffect(() => {
     apiFetch<SchoolIdentityData>('/settings/school')
@@ -84,12 +93,46 @@ export function SchoolIdentitySettings() {
     if (!newLeader.name.trim() || !newLeader.title.trim()) return
     setField('leadershipTeam', [
       ...data.leadershipTeam,
-      { name: newLeader.name.trim(), title: newLeader.title.trim(), bio: newLeader.bio.trim() || undefined, order: data.leadershipTeam.length },
+      {
+        name: newLeader.name.trim(),
+        title: newLeader.title.trim(),
+        bio: newLeader.bio.trim() || undefined,
+        photoKey: newLeader.photoKey || undefined,
+        photoUrl: newLeader.photoPreview || null,
+        order: data.leadershipTeam.length,
+      },
     ])
-    setNewLeader({ name: '', title: '', bio: '' })
+    setNewLeader({ name: '', title: '', bio: '', photoKey: '', photoPreview: '' })
   }
   function removeLeader(i: number) {
     setField('leadershipTeam', data.leadershipTeam.filter((_, idx) => idx !== i))
+  }
+
+  /** [NEW] Uploads immediately on file pick (same "upload first, attach the
+   *  returned fileId" pattern as AnnouncementForm's cover image) so the
+   *  photo is ready to include the moment "Add to team" is pressed. */
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Only image files are allowed for a leadership photo.')
+      return
+    }
+    setUploadingPhoto(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const uploaded = await apiFetch<{ photoKey: string }>('/settings/leadership-photo', {
+        method: 'POST',
+        body: fd,
+      })
+      setNewLeader((p) => ({ ...p, photoKey: uploaded.photoKey, photoPreview: URL.createObjectURL(file) }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload photo.')
+    } finally {
+      setUploadingPhoto(false)
+    }
   }
 
   async function handleSave() {
@@ -254,9 +297,14 @@ export function SchoolIdentitySettings() {
             data.leadershipTeam.map((m, i) => (
               <div key={`${m.name}-${i}`} className="flex items-center justify-between border border-base rounded-xl p-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-brand-navy/10 flex items-center justify-center shrink-0">
-                    <Building2 className="w-4 h-4 text-brand-navy" />
-                  </div>
+                  {m.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- Appwrite-hosted photo, not a local Next asset
+                    <img src={m.photoUrl} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-lg bg-brand-navy/10 flex items-center justify-center shrink-0">
+                      <Building2 className="w-4 h-4 text-brand-navy" />
+                    </div>
+                  )}
                   <div>
                     <p className="text-sm font-heading font-semibold text-body">{m.name}</p>
                     <p className="text-xs text-muted">{m.title}</p>
@@ -275,10 +323,26 @@ export function SchoolIdentitySettings() {
             <input value={newLeader.title} onChange={(e) => setNewLeader((p) => ({ ...p, title: e.target.value }))} placeholder="Title (e.g. Head Teacher)" className={`${inputCls} min-h-[36px] text-xs`} />
           </div>
           <textarea value={newLeader.bio} onChange={(e) => setNewLeader((p) => ({ ...p, bio: e.target.value }))} placeholder="Short bio (optional)" className={`${inputCls} min-h-[60px] text-xs`} />
+          {/* [NEW] Photo attach — displayed on the public Leadership page. */}
+          <div className="flex items-center gap-3">
+            {newLeader.photoPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element -- local blob: preview, not a remote asset
+              <img src={newLeader.photoPreview} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 border border-base" />
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-page border border-dashed border-base flex items-center justify-center shrink-0">
+                <ImagePlus className="w-4 h-4 text-muted" aria-hidden />
+              </div>
+            )}
+            <label className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-page cursor-pointer">
+              {uploadingPhoto ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
+              {newLeader.photoKey ? 'Change photo' : 'Add photo'}
+              <input type="file" accept="image/*" onChange={handlePhotoChange} disabled={uploadingPhoto} className="hidden" />
+            </label>
+          </div>
           <button
             type="button"
             onClick={addLeader}
-            disabled={!newLeader.name.trim() || !newLeader.title.trim()}
+            disabled={!newLeader.name.trim() || !newLeader.title.trim() || uploadingPhoto}
             className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-page disabled:opacity-40"
           >
             <Plus className="w-3.5 h-3.5" /> Add to team

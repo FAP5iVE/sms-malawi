@@ -84,6 +84,11 @@ export const FILE_PREFIX = {
   // Never put anything sensitive under these two prefixes.
   ANNOUNCEMENT_IMAGE: 'announcement_image',
   SCHOOL_GALLERY:     'school_gallery',
+  // [NEW] Leadership team member photo — SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM
+  // entries reference this via LeadershipMember.photoKey, resolved to a
+  // view URL by /public/leadership the same way ANNOUNCEMENT_IMAGE/
+  // SCHOOL_GALLERY already are. Same public, no-signed-proxy pattern.
+  LEADERSHIP_PHOTO:   'leadership_photo',
 } as const
 
 export type FilePrefix = typeof FILE_PREFIX[keyof typeof FILE_PREFIX]
@@ -115,6 +120,7 @@ const READ_ROLES: Record<FilePrefix, string[]> = {
   // getPublicViewUrl() directly.
   announcement_image: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
   school_gallery:     ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
+  leadership_photo:   ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
 }
 
 export function canReadFile(fileId: string, userRole: string, userUid: string, ownerUid?: string): boolean {

@@ -53,7 +53,7 @@ import { verifyAuth, getAdminApp } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import { hasPermission } from '@shared/types/permissions'
 import { COLLECTIONS } from '@shared/constants/storage'
-import { AnnouncementSchema } from '@shared/schemas/announcement'
+import { AnnouncementSchema, AnnouncementDraftSchema } from '@shared/schemas/announcement'
 import * as announcementService from '@/server/services/announcementService'
 import { uploadFile, FILE_PREFIX } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
@@ -97,6 +97,120 @@ announcementsRouter.get(
       return res.json({ announcements })
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'announcements' } })
+    }
+  }
+)
+
+// GET /announcements/drafts — the caller's own DRAFT documents, across all
+// four post types (announcement/event/news/ad). [NEW] Same actors who can
+// create any of the four content types can save and resume a draft of it.
+announcementsRouter.get(
+  '/drafts',
+  verifyAuth,
+  requireAnyPermission(['announcement.create', 'announcement.createWithApproval']),
+  async (req, res) => {
+    const { user } = req
+    if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+    try {
+      const announcements = await announcementService.listMyDrafts(user.uid)
+      return res.json({ announcements })
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'announcements', route: 'drafts' } })
+    }
+  }
+)
+
+// POST /announcements/draft — save a new draft. Deliberately lenient
+// (AnnouncementDraftSchema) — a draft may have just a headline typed so
+// far, unlike AnnouncementSchema's real title.min(3)/body.min(10)
+// submission constraints.
+announcementsRouter.post(
+  '/draft',
+  verifyAuth,
+  requireAnyPermission(['announcement.create', 'announcement.createWithApproval']),
+  async (req, res) => {
+    const parsed = AnnouncementDraftSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    const { user } = req
+    if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+    try {
+      const created = await announcementService.createDraft(parsed.data, user.uid, user.role)
+      return res.status(201).json(created)
+    } catch (err: unknown) {
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'announcements', route: 'draft' } })
+    }
+  }
+)
+
+// PATCH /announcements/:id/draft — update an existing draft in place
+// (continue writing later). Ownership- and DRAFT-status-scoped in the
+// service; ownership here is the author's, same as editOwn, but this is
+// deliberately a separate route/permission pairing from PATCH /:id since
+// it accepts the lenient draft schema rather than AnnouncementSchema.
+announcementsRouter.patch(
+  '/:id/draft',
+  verifyAuth,
+  requireAnyPermission(['announcement.create', 'announcement.createWithApproval']),
+  async (req, res) => {
+    const { id } = req.params as { id: string }
+    const { user } = req
+    if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+    const parsed = AnnouncementDraftSchema.partial().safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    try {
+      const result = await announcementService.updateDraft(id, user.uid, parsed.data)
+      return res.json(result)
+    } catch (err: unknown) {
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'announcements', route: 'draft' } })
+    }
+  }
+)
+
+// PATCH /announcements/:id/publish — promote a DRAFT to a real submission.
+// Re-validated against the strict AnnouncementSchema (unlike the draft
+// save routes above) since this is the point a draft actually becomes a
+// real, rule-following submission. directPublish is decided server-side
+// from the actor's real permission, exactly like POST / — never trusted
+// from the client.
+announcementsRouter.patch(
+  '/:id/publish',
+  verifyAuth,
+  requireAnyPermission(['announcement.create', 'announcement.createWithApproval']),
+  async (req, res) => {
+    const parsed = AnnouncementSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    const { id } = req.params as { id: string }
+    const { user } = req
+    if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+
+    const directPublish = hasPermission(user.role, 'announcement.publishDirect')
+    const scheduledFor = hasPermission(user.role, 'announcement.schedule')
+      ? parsed.data.scheduledFor
+      : undefined
+
+    try {
+      const result = await announcementService.publishDraft(
+        id,
+        user.uid,
+        {
+          title: parsed.data.title,
+          body: parsed.data.body,
+          targetAll: parsed.data.targetAll,
+          targetRoles: parsed.data.targetRoles,
+          targetClassId: parsed.data.targetClassId,
+          scheduledFor,
+          eventDate: parsed.data.eventDate,
+          publicWebsite: parsed.data.publicWebsite,
+          imageKey: parsed.data.imageKey,
+          postType: parsed.data.postType,
+          createdByUid: user.uid,
+          createdByRole: user.role,
+        },
+        directPublish,
+      )
+      return res.json(result)
+    } catch (err: unknown) {
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'announcements', route: 'publish' } })
     }
   }
 )
