@@ -1,11 +1,13 @@
 'use client'
 
 /**
- * apps/web/src/app/(public)/announcements/[id]/page.tsx
+ * apps/web/src/app/(public)/notices/[id]/page.tsx
  * [CHANGE TYPE]: NEW FILE
  * [PURPOSE]: The full announcement — only reachable via "Read more" from
- *   /announcements. GET /public/announcements/:id is postType-scoped
- *   server-side, so this URL can never resolve a News article or an Ad.
+ *   /notices (see /notices/page.tsx's ROUTING NOTE for why this lives at
+ *   /notices rather than /announcements). GET /public/announcements/:id is
+ *   postType-scoped server-side, so this URL can never resolve a News
+ *   article or an Ad.
  * [DEPENDS ON]: usePublicPost('announcements', id)
  */
 
@@ -25,8 +27,8 @@ export default function AnnouncementDetailPage() {
         post={data}
         isLoading={isLoading}
         notFoundText="This announcement is unavailable or has been unpublished."
-        backHref="/announcements"
-        backLabel="Back to Announcements"
+        backHref="/notices"
+        backLabel="Back to Notices"
       />
     </>
   )

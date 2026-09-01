@@ -25,7 +25,7 @@
  *      inferred from eventDate being set rather than a real tag — nothing
  *      stopped a plain announcement or news article from also carrying one.
  *      Each section's "Read more"/"See all" links now go to that section's
- *      own archive + detail pages (/news, /announcements,
+ *      own archive + detail pages (/news, /notices,
  *      /academic-advertisements, /events, each with a matching [id] detail
  *      route) instead of every "See all" pointing at /news.
  *   3. Performance stats map generically over usePublicManebStats().stats
@@ -307,7 +307,7 @@ export default function LandingPage() {
         // section root.
         ...railItems
           .filter((a) => `${a.title} ${a.body}`.toLowerCase().includes(searchQuery.toLowerCase()))
-          .map((a) => ({ kind: 'announcement' as const, title: a.title, href: `/announcements/${a.id}`, tag: 'Announcement' })),
+          .map((a) => ({ kind: 'announcement' as const, title: a.title, href: `/notices/${a.id}`, tag: 'Announcement' })),
         ...newsItems
           .filter((a) => `${a.title} ${a.body}`.toLowerCase().includes(searchQuery.toLowerCase()))
           .map((a) => ({ kind: 'announcement' as const, title: a.title, href: `/news/${a.id}`, tag: 'News' })),
@@ -685,7 +685,7 @@ export default function LandingPage() {
               <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal-light mb-1.5">
                 Announcements
               </div>
-              <Link href="/announcements" className="text-[13px] text-white/50 hover:text-white transition-colors">
+              <Link href="/notices" className="text-[13px] text-white/50 hover:text-white transition-colors">
                 View all →
               </Link>
             </div>
@@ -699,7 +699,7 @@ export default function LandingPage() {
                 <p className="text-sm text-white/40 sm:col-span-2">No announcements yet — check back soon.</p>
               ) : (
                 railItems.map((a) => (
-                  <Link href={`/announcements/${a.id}`} key={a.id} className="border-l-2 border-brand-teal-light/55 pl-4.5 block group">
+                  <Link href={`/notices/${a.id}`} key={a.id} className="border-l-2 border-brand-teal-light/55 pl-4.5 block group">
                     <h4 className="font-heading font-bold text-[15px] text-white mb-1.5 leading-snug line-clamp-2 group-hover:underline">
                       {a.title}
                     </h4>
@@ -1403,7 +1403,7 @@ export default function LandingPage() {
                   links: [
                     { label: 'Map & Directions', anchor: 'map' },
                     { label: 'News', href: '/news' },
-                    { label: 'Announcements', href: '/announcements' },
+                    { label: 'Announcements', href: '/notices' },
                     { label: 'Academic Advertisements', href: '/academic-advertisements' },
                     { label: 'Events', href: '/events' },
                     { label: 'MANEB Portal', href: 'https://www.maneb.edu.mw/', external: true },
