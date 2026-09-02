@@ -97,7 +97,9 @@ import { logger }            from '@/lib/logger'
 import { uploadFile, getSignedViewUrl, FILE_PREFIX } from '@/lib/storage'
 import * as settingsService  from '@/server/services/settingsService'
 import * as attendanceService from '@/server/services/attendanceService'
-import type { ReportCardData, SubjectGrade } from '@/components/shared/PrintableReportCard'
+import { getManebExamType }  from '@shared/constants/malawi'
+import { computeManebAggregate, getGradeInfo } from '@/server/services/gradeService'
+import type { ReportCardData, SubjectGrade, ManebResultData, ManebSubjectRow } from '@/components/shared/PrintableReportCard'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
@@ -109,30 +111,134 @@ const CONCURRENT_LIMIT = 5          // max concurrent DB+PDF+upload per batch
 // DATA ASSEMBLY
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GR-2: MANEB RESULT ASSEMBLY — Form 2 Term 3 (JCE) / Form 4 Term 3 (MSCE)
+// have no internal exam; the report card for those terms is built from the
+// student's ManebRecord instead of TermResult. Recomputes the outcome via
+// gradeService.computeManebAggregate() (the same function that produced the
+// record's stored overallGrade/aggregatePoints) so the card can show detail
+// that ManebRecord itself doesn't persist — which subjects counted, which
+// certificate option.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function buildManebResult(
+  studentId:    string,
+  examType:     'JCE' | 'MSCE',
+  academicYear: string,
+): Promise<ManebResultData | null> {
+  const record = await prisma.manebRecord.findFirst({ where: { studentId, examType, academicYear } })
+  if (!record) return null
+
+  const subjectGrades = (record.subjectGrades ?? {}) as Record<string, string>
+  const outcome = await computeManebAggregate(examType, subjectGrades)
+
+  const subjects: ManebSubjectRow[] = await Promise.all(
+    Object.entries(subjectGrades).map(async ([subject, grade]) => {
+      const info = await getGradeInfo(examType, grade)
+      return {
+        subject,
+        grade,
+        label: info?.label ?? null,
+        pass:  info?.pass ?? false,
+        inAggregate: outcome.examType === 'MSCE' ? outcome.aggregateSubjects.includes(subject) : undefined,
+      }
+    }),
+  )
+
+  return {
+    examType,
+    candidateNo: record.candidateNo,
+    centerNo:    record.centerNo,
+    centerName:  record.centerName,
+    status:      record.status,
+    subjects,
+    classification:     outcome.classification,
+    pass:               outcome.pass,
+    points:             outcome.points,
+    certificateOption:  outcome.examType === 'MSCE' ? outcome.certificateOption : null,
+    englishInAggregate: outcome.examType === 'MSCE' ? outcome.englishInAggregate : null,
+  }
+}
+
 export async function getReportCardData(
   studentId:    string,
   term:         1 | 2 | 3,
   academicYear: string,
 ): Promise<ReportCardData> {
-  const [student, termResult, annualResult, identity] = await Promise.all([
+  const [student, identity] = await Promise.all([
     prisma.student.findUniqueOrThrow({
       where:   { id: studentId },
       include: { class: { select: { id: true, name: true, form: true, teacherId: true } } },
-    }),
-    prisma.termResult.findFirst({
-      where: { studentId, term, academicYear },
-    }),
-    prisma.annualResult.findFirst({
-      where: { studentId, academicYear },
     }),
     settingsService.getIdentitySettings(),
   ])
 
   const classForm = student.class?.form ?? 1
 
-  // Attendance — real Attendance model (R6), via the shared term-summary helper
+  // Attendance — real Attendance model (R6), via the shared term-summary
+  // helper. Fetched regardless of exam type — attendance during a MANEB
+  // sitting term is still meaningful context on the card.
   const { daysPresent, daysAbsent, totalDays: totalSchoolDays } =
     await attendanceService.getAttendanceSummaryForTerm(studentId, academicYear, term)
+
+  const baseFields = {
+    schoolName:    identity.schoolName,
+    schoolMotto:   identity.schoolSlogan || undefined,
+    schoolAddress: identity.schoolAddress,
+    schoolPhone:   identity.schoolPhone,
+    schoolEmail:   identity.schoolEmail || undefined,
+    schoolLogoUrl: identity.schoolLogoUrl || undefined,
+    student: {
+      registrationNo: student.registrationNo,
+      firstName:      student.firstName,
+      lastName:       student.lastName,
+      sex:            student.sex as string,
+      dateOfBirth:    student.dateOfBirth?.toISOString(),
+      className:      student.class?.name ?? '—',
+    },
+    classForm,
+    academicYear,
+    term,
+    daysPresent,
+    daysAbsent,
+    totalSchoolDays,
+    issueDate:     new Date().toISOString(),
+    nextTermDate:  new Date(Date.now() + 60 * 24 * 3600_000).toISOString(),
+  }
+
+  // GR-2: Form 2 Term 3 (JCE) / Form 4 Term 3 (MSCE) — no TermResult ever
+  // exists for these (examService.computeTermResults() deliberately refuses
+  // to run for them; see gradeService.ts). Source the card from ManebRecord
+  // instead — a fundamentally different result shape, not the CA/Exam/Total
+  // grades table.
+  const manebExamType = getManebExamType(classForm, term)
+  if (manebExamType) {
+    const manebResult = await buildManebResult(studentId, manebExamType, academicYear)
+    return {
+      ...baseFields,
+      subjects:        [],
+      classPosition:   0,
+      classTotal:      0,
+      totalMarks:      0,
+      averagePercent:  0,
+      classTeacher:        '—',
+      classTeacherComment: '',
+      headTeacher:         '—',
+      headTeacherComment:  '',
+      promotionStatus: null,   // MSCE (Form 4) has no further promotion; JCE (Form 2→3) promotion is a separate school decision, not shown here
+      nextClass:       undefined,
+      manebResult:     manebResult ?? undefined,
+    }
+  }
+
+  const [termResult, annualResult] = await Promise.all([
+    prisma.termResult.findFirst({
+      where: { studentId, term, academicYear },
+    }),
+    prisma.annualResult.findFirst({
+      where: { studentId, academicYear },
+    }),
+  ])
 
   // Teacher comments — real TeacherComment model (this phase). "Class
   // teacher" = comment authored by this class's assigned teacher; any
@@ -175,41 +281,21 @@ export async function getReportCardData(
   const nextClass = nextForm && nextForm <= 4 ? `Form ${nextForm}` : undefined
 
   return {
-    schoolName:    identity.schoolName,
-    schoolMotto:   identity.schoolSlogan || undefined,
-    schoolAddress: identity.schoolAddress,
-    schoolPhone:   identity.schoolPhone,
-    schoolEmail:   identity.schoolEmail || undefined,
-    schoolLogoUrl: identity.schoolLogoUrl || undefined,
-    student: {
-      registrationNo: student.registrationNo,
-      firstName:      student.firstName,
-      lastName:       student.lastName,
-      sex:            student.sex as string,
-      dateOfBirth:    student.dateOfBirth?.toISOString(),
-      className:      student.class?.name ?? '—',
-    },
-    classForm,
-    academicYear,
-    term,
+    ...baseFields,
     subjects,
     classPosition:   termResult?.classPosition  ?? 0,
     classTotal:      termResult?.classTotal     ?? 0,
     totalMarks:      Number(termResult?.totalMark    ?? 0),
     averagePercent:  Number(termResult?.average      ?? 0),
-    daysPresent,
-    daysAbsent,
-    totalSchoolDays,
     classTeacher:        student.class?.teacherId ? 'Class Teacher' : '—',
     classTeacherComment: classTeacherEntry?.comment ?? '',
     headTeacher:         headTeacherEntry ? 'Head Teacher' : '—',
     headTeacherComment:  headTeacherEntry?.comment ?? '',
     promotionStatus,
     nextClass,
-    issueDate:     new Date().toISOString(),
-    nextTermDate:  new Date(Date.now() + 60 * 24 * 3600_000).toISOString(),
   }
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PDF GENERATION (jsPDF v4)
@@ -252,7 +338,7 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   setFont(14, 'bold')
   text(data.schoolName.toUpperCase(), W / 2, y + 8, { align: 'center' })
   setFont(8)
-  text('STUDENT REPORT CARD', W / 2, y + 14, { align: 'center' })
+  text(data.manebResult ? `MANEB ${data.manebResult.examType} EXAMINATION RESULT` : 'STUDENT REPORT CARD', W / 2, y + 14, { align: 'center' })
   y += 22
 
   setColor(0, 0, 0)
@@ -301,7 +387,112 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   })
   y += infoRows.length * 8 + 4
 
-  // ── 3. Grades table ───────────────────────────────────────────────────────
+  // ── 3. Grades table (internal terms) / MANEB result (national terms) ──────
+  let cx = ML
+  if (data.manebResult) {
+    const mr = data.manebResult
+
+    // Candidate info row
+    setFill(249, 250, 251)
+    doc.rect(ML, y, CW, 8, 'FD')
+    setFont(7, 'bold')
+    setColor(80, 80, 80)
+    text('Candidate No.', ML + 2, y + 5)
+    setFont(8, 'bold')
+    setColor(0, 0, 0)
+    text(mr.candidateNo || '—', ML + 32, y + 5)
+    setFont(7, 'bold')
+    setColor(80, 80, 80)
+    text('Examination Centre', ML + halfCW + 2, y + 5)
+    setFont(8)
+    setColor(0, 0, 0)
+    text(mr.centerNo ? `${mr.centerNo} — ${mr.centerName || '—'}` : '—', ML + halfCW + 40, y + 5)
+    y += 8 + 4
+
+    // Subject grades table
+    const mCols = mr.examType === 'MSCE'
+      ? [70, 20, 60, CW - 70 - 20 - 60]
+      : [70, 20, CW - 70 - 20]
+    const mHeaders = mr.examType === 'MSCE'
+      ? ['Subject', 'Grade', 'Classification', 'In Aggregate']
+      : ['Subject', 'Grade', 'Classification']
+
+    setFill(30, 58, 95)
+    doc.rect(ML, y, CW, 7, 'F')
+    setColor(255, 255, 255)
+    setFont(7, 'bold')
+    cx = ML
+    mHeaders.forEach((h, i) => {
+      text(h, cx + 1.5, y + 5)
+      cx += mCols[i]!
+    })
+    y += 7
+
+    mr.subjects.forEach((s, idx) => {
+      const rowH = 7
+      if (idx % 2 === 0) { setFill(255, 255, 255); doc.rect(ML, y, CW, rowH, 'D') }
+      else { setFill(249, 250, 251); doc.rect(ML, y, CW, rowH, 'FD') }
+      setColor(0, 0, 0)
+      cx = ML
+      setFont(7)
+      text(s.subject, cx + 1.5, y + 5)
+      cx += mCols[0]!
+      setFont(8, 'bold')
+      setColor(s.pass ? 21 : 220, s.pass ? 128 : 38, s.pass ? 61 : 38)
+      text(s.grade, cx + 1.5, y + 5)
+      cx += mCols[1]!
+      setFont(7)
+      setColor(0, 0, 0)
+      text(s.label ?? '—', cx + 1.5, y + 5)
+      cx += mCols[2]!
+      if (mr.examType === 'MSCE') {
+        setFont(7, 'bold')
+        setColor(30, 58, 95)
+        text(s.inAggregate ? 'Yes' : '—', cx + 1.5, y + 5)
+      }
+      y += rowH
+    })
+    y += 4
+
+    // Outcome box
+    setFill(240, 244, 248)
+    setDraw(30, 58, 95)
+    doc.setLineWidth(0.5)
+    const outH = mr.examType === 'MSCE' ? 20 : 12
+    doc.rect(ML, y, CW, outH, 'FD')
+    doc.setLineWidth(0.2)
+    if (mr.examType === 'MSCE') {
+      setFont(8, 'bold')
+      setColor(30, 58, 95)
+      text('AGGREGATE (best six subjects)', ML + 2, y + 6)
+      setFont(11, 'bold')
+      text(mr.points != null ? `${mr.points} points` : 'Not available — fewer than 6 subjects', ML + CW - 2, y + 6, { align: 'right' })
+      setFont(8, 'bold')
+      setColor(30, 58, 95)
+      text('CERTIFICATE STATUS', ML + 2, y + 13)
+      setFont(9, 'bold')
+      setColor(mr.pass ? 21 : 220, mr.pass ? 128 : 38, mr.pass ? 61 : 38)
+      text(mr.classification, ML + CW - 2, y + 13, { align: 'right' })
+      setFont(6)
+      setColor(100, 100, 100)
+      const note = doc.splitTextToSize(
+        `Certificate eligibility (Option A: 6 passed incl. English, ≥1 Distinction/Credit; Option B: 5 passed incl. English, ≥3 Distinction/Credit) is assessed separately from the aggregate above.`,
+        CW - 4,
+      )
+      doc.text(note.slice(0, 2), ML + 2, y + 18)
+    } else {
+      setFont(8, 'bold')
+      setColor(30, 58, 95)
+      text('OVERALL RESULT', ML + 2, y + 6)
+      setFont(11, 'bold')
+      setColor(mr.pass ? 21 : 220, mr.pass ? 128 : 38, mr.pass ? 61 : 38)
+      text(mr.classification, ML + CW - 2, y + 6, { align: 'right' })
+      setFont(6)
+      setColor(100, 100, 100)
+      text('JCE reports letter grades and a pass/fail outcome only — no numeric aggregate.', ML + 2, y + 11)
+    }
+    y += outH + 4
+  } else {
   const colWidths = [50, 22, 22, 22, 14, CW - 50 - 22 - 22 - 22 - 14]
   const headers   = ['Subject', 'C.A. (%)', 'Exam (%)', 'Total (%)', 'Grade', 'Remarks']
 
@@ -310,7 +501,7 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   doc.rect(ML, y, CW, 7, 'F')
   setColor(255, 255, 255)
   setFont(7, 'bold')
-  let cx = ML
+  cx = ML
   headers.forEach((h, i) => {
     text(h, cx + 1.5, y + 5)
     cx += colWidths[i]!
@@ -358,6 +549,7 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   text(`Average: ${data.averagePercent.toFixed(1)}%`, ML + 96, y + 5)
   text(`Position: ${data.classPosition} / ${data.classTotal}`, ML + 135, y + 5)
   y += 7 + 4
+  }
 
   // ── 4. Attendance ─────────────────────────────────────────────────────────
   setFill(55, 65, 81)
@@ -376,7 +568,9 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   text(`Days Present: ${data.daysPresent}   Days Absent: ${data.daysAbsent}   Total Days: ${data.totalSchoolDays}   Attendance: ${attPct}%`, ML + 2, y + 5)
   y += 7 + 4
 
-  // ── 5. Comments ───────────────────────────────────────────────────────────
+  // ── 5. Comments (internal terms only — no TeacherComment exists for a
+  //      MANEB national term, since it has no TermResult to attach to) ──────
+  if (!data.manebResult) {
   const commentH = 24
   setFill(249, 250, 251)
   doc.rect(ML, y, CW / 2, commentH, 'FD')
@@ -396,6 +590,7 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   text(`Signature: _____________`, ML + 1.5, y + commentH - 2)
   text(`Signature: _____________`, ML + CW / 2 + 1.5, y + commentH - 2)
   y += commentH + 4
+  }
 
   // ── 6. Promotion status (annual — only once committed at Term 3) ───────────
   if (data.promotionStatus) {

@@ -351,82 +351,158 @@ export async function getPassMarkThreshold(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GR-1: MANEB AGGREGATE (MSCE/JCE points)
-// The MSCE/JCE aggregate is the SUM of the grade-POINTS of the best six
-// subjects, English compulsory — NOT a most-frequent or single overall grade.
+// GR-2 [MANEB CORRECTION]: MANEB OUTCOME — JCE and MSCE never share a
+// calculation path (each exam produces a fundamentally different result
+// shape), per MANEB's official rules:
+//
+//   JCE  — letter grades only. MANEB computes NO numeric aggregate, total,
+//          average, or points for JCE — there is no JCE equivalent of the
+//          MSCE 6–54 point aggregate. A JCE result is a letter grade per
+//          subject plus an overall PASS/FAIL (≥6 subjects passed, English
+//          among them). `points` is always null for JCE.
+//
+//   MSCE — two DISTINCT, independent computations that must not be
+//          conflated:
+//            1. Aggregate points: the sum of the point values of the
+//               candidate's best six PERFORMED subjects (lowest points =
+//               best), full stop. English is included in that sum only if
+//               it naturally lands among those six lowest — it is never
+//               force-included. If a candidate performed fewer than six
+//               subjects, no six-subject aggregate exists (points = null).
+//            2. Certificate eligibility: a subject-count/pass-fail gate,
+//               independent of point ranking. Awarded when EITHER
+//                 Option A — 6 subjects passed (incl. English), ≥1 of them
+//                            Distinction/Credit (grade 1–6), or
+//                 Option B — 5 subjects passed (incl. English), ≥3 of them
+//                            Distinction/Credit (grade 1–6)
+//               is satisfied. This uses ALL of the candidate's passed
+//               subjects, not just the six in the aggregate sum — a
+//               candidate can qualify under Option B on exactly 5 subjects
+//               even though that's one short of a valid 6-subject
+//               aggregate.
+//
 // A grade's point value is its 1-based rank on the scale (MSCE 1–9 → 1..9;
 // JCE A–F → 1..5), sourced from the same DB-backed grading scale calcGrade()
-// uses. Lower is better: six grade-1s = 6 points (the best possible).
-// Certificate pass requires English to pass AND all six counted subjects to
-// pass; otherwise the overall classification is Fail regardless of average.
+// uses. Lower is better.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface ManebAggregate {
-  /** Sum of best-6 grade points (incl. English); null if English missing or <6 subjects. */
-  points:          number | null
-  /** points / 6; null when points is null. */
-  average:         number | null
-  /** Overall classification label (scale label, or 'Fail'/'Incomplete'). */
+export interface JceOutcome {
+  examType:        'JCE'
+  /** JCE has no numeric aggregate — always null. Field kept so callers can
+   *  read `.points`/`.classification` across both outcome shapes uniformly. */
+  points:          null
+  /** 'PASS' | 'FAIL' | 'Incomplete' (no subject grades recorded at all). */
   classification:  string
-  /** Certificate-level pass (English passes AND all six counted subjects pass). */
+  /** Overall PASS/FAIL — ≥6 subjects passed, English among them. */
   pass:            boolean
-  subjectsCounted: number
-  englishIncluded: boolean
+  passedSubjects:  number
+  totalSubjects:   number
+  englishPassed:   boolean
 }
+
+export interface MsceOutcome {
+  examType:            'MSCE'
+  /** Sum of the best-six PERFORMED subjects' points (range 6–54); null if
+   *  fewer than six subjects were performed — no six-subject sum exists. */
+  points:              number | null
+  /** 'MSCE Awarded — Option A' | 'MSCE Awarded — Option B' |
+   *  'MSCE Not Awarded' | 'Incomplete' (no subject grades recorded at all). */
+  classification:      string
+  /** Certificate awarded — Option A or Option B satisfied (§4.3). */
+  pass:                boolean
+  certificateOption:   'A' | 'B' | null
+  /** Names of the (up to 6) subjects whose points make up the aggregate
+   *  sum — empty when points is null. */
+  aggregateSubjects:   string[]
+  /** Whether English happened to be one of the best-six subjects — NOT
+   *  whether English was passed (that's a separate, eligibility-only fact). */
+  englishInAggregate:  boolean
+  totalSubjects:       number
+}
+
+export type ManebOutcome = JceOutcome | MsceOutcome
 
 function isEnglishSubject(subject: string): boolean {
   return /english/i.test(subject)
 }
 
-export async function computeManebAggregate(
-  examType:      'JCE' | 'MSCE',
-  subjectGrades: Record<string, string>,
-): Promise<ManebAggregate> {
+async function computeJceOutcome(subjectGrades: Record<string, string>): Promise<JceOutcome> {
   const scales = await loadScales()
-  const table  = scales.get(examType) ?? []   // ordered by displayOrder asc
+  const table  = scales.get('JCE') ?? []
+  const passOf = (grade: string): boolean => table.find((g) => g.grade === grade)?.pass ?? false
+  const isKnownGrade = (grade: string): boolean => table.some((g) => g.grade === grade)
+
+  const entries       = Object.entries(subjectGrades).filter(([, grade]) => isKnownGrade(grade))
+  const totalSubjects = entries.length
+  const passedEntries = entries.filter(([, grade]) => passOf(grade))
+  const passedSubjects = passedEntries.length
+  const englishPassed  = passedEntries.some(([subject]) => isEnglishSubject(subject))
+
+  const pass = passedSubjects >= 6 && englishPassed
+  const classification = totalSubjects === 0 ? 'Incomplete' : (pass ? 'PASS' : 'FAIL')
+
+  return { examType: 'JCE', points: null, classification, pass, passedSubjects, totalSubjects, englishPassed }
+}
+
+async function computeMsceOutcome(subjectGrades: Record<string, string>): Promise<MsceOutcome> {
+  const scales = await loadScales()
+  const table  = scales.get('MSCE') ?? []   // ordered by displayOrder asc — index+1 is the grade's point value
 
   const pointOf = (grade: string): number | null => {
     const idx = table.findIndex((g) => g.grade === grade)
     return idx === -1 ? null : idx + 1
   }
+  const isCreditTier = (grade: string): boolean => {
+    const row = table.find((g) => g.grade === grade)
+    if (!row || !row.pass) return false
+    return (row.label ?? '').trim().toLowerCase() !== 'pass'   // Distinction (1–2) or Credit (3–6); excludes bare "Pass" (7–8)
+  }
   const passOf = (grade: string): boolean => table.find((g) => g.grade === grade)?.pass ?? false
 
-  const entries      = Object.entries(subjectGrades)
-  const englishEntry = entries.find(([subject]) => isEnglishSubject(subject))
-  const others       = entries.filter(([subject]) => !isEnglishSubject(subject))
+  const performed = Object.entries(subjectGrades)
+    .map(([subject, grade]) => ({ subject, grade, points: pointOf(grade) }))
+    .filter((x): x is { subject: string; grade: string; points: number } => x.points !== null)
+  const totalSubjects = performed.length
 
-  const englishPoints   = englishEntry ? pointOf(englishEntry[1]) : null
-  const englishIncluded = englishPoints !== null
-
-  // Best five of the remaining subjects (lowest points first).
-  const rankedOthers = others
-    .map(([, g]) => ({ grade: g, p: pointOf(g) }))
-    .filter((x): x is { grade: string; p: number } => x.p !== null)
-    .sort((a, b) => a.p - b.p)
-    .slice(0, 5)
-
-  const subjectsCounted = (englishIncluded ? 1 : 0) + rankedOthers.length
-
-  // A valid aggregate needs six subjects INCLUDING English.
-  if (!englishIncluded || subjectsCounted < 6) {
-    return { points: null, average: null, classification: 'Incomplete', pass: false, subjectsCounted, englishIncluded }
+  // ── 1. Aggregate: sum of the best six PERFORMED subjects, no English
+  //      carve-out. English lands in the sum only if it's genuinely there.
+  let points: number | null = null
+  let aggregateSubjects: string[] = []
+  let englishInAggregate = false
+  if (totalSubjects >= 6) {
+    const ranked = [...performed].sort((a, b) => a.points - b.points).slice(0, 6)
+    points             = ranked.reduce((sum, x) => sum + x.points, 0)
+    aggregateSubjects  = ranked.map((x) => x.subject)
+    englishInAggregate = ranked.some((x) => isEnglishSubject(x.subject))
   }
 
-  const points  = (englishPoints as number) + rankedOthers.reduce((sum, x) => sum + x.p, 0)
-  const average = points / 6
+  // ── 2. Certificate eligibility: Option A / Option B over ALL passed
+  //      subjects — a wholly separate subject set from the aggregate above.
+  const passed         = performed.filter((x) => passOf(x.grade))
+  const englishPassed  = passed.some((x) => isEnglishSubject(x.subject))
+  const creditOrBetter = passed.filter((x) => isCreditTier(x.grade)).length
 
-  // Certificate pass: English + all six counted subjects pass.
-  const englishPass = englishEntry ? passOf(englishEntry[1]) : false
-  const allPass     = englishPass && rankedOthers.every((x) => passOf(x.grade))
+  let certificateOption: 'A' | 'B' | null = null
+  if (englishPassed) {
+    if (passed.length >= 6 && creditOrBetter >= 1) certificateOption = 'A'
+    else if (passed.length >= 5 && creditOrBetter >= 3) certificateOption = 'B'
+  }
+  const pass = certificateOption !== null
 
-  // Classification from the per-subject tier applied to the rounded average
-  // grade — reuses the scale's own labels (admin-configurable). If the
-  // certificate rule fails, the overall classification is Fail regardless.
-  const avgPosition   = Math.min(Math.max(Math.round(average), 1), table.length)
-  const avgLabel      = table[avgPosition - 1]?.label ?? 'Fail'
-  const classification = allPass ? avgLabel : 'Fail'
+  const classification =
+    totalSubjects === 0 ? 'Incomplete' : (pass ? `MSCE Awarded — Option ${certificateOption}` : 'MSCE Not Awarded')
 
-  return { points, average, classification, pass: allPass, subjectsCounted: 6, englishIncluded }
+  return {
+    examType: 'MSCE', points, classification, pass, certificateOption,
+    aggregateSubjects, englishInAggregate, totalSubjects,
+  }
+}
+
+export async function computeManebAggregate(
+  examType:      'JCE' | 'MSCE',
+  subjectGrades: Record<string, string>,
+): Promise<ManebOutcome> {
+  return examType === 'JCE' ? computeJceOutcome(subjectGrades) : computeMsceOutcome(subjectGrades)
 }
 
 /** The set of passing grade strings for an exam type (subject-level pass
@@ -436,9 +512,24 @@ export async function getPassingGrades(examType: ExamTypeKey): Promise<Set<strin
   return new Set((scales.get(examType) ?? []).filter((g) => g.pass).map((g) => g.grade))
 }
 
-/** Whether an overall MANEB classification label counts as a pass. */
+/** True if the grade is specifically Distinction-tier (MSCE/INTERNAL_F3F4
+ *  grades 1–2, label "Distinction") — stricter than isDistinctionOrCredit,
+ *  which also counts Credit (3–6). Used for "at least one distinction"
+ *  style analytics, kept separate from certificate-eligibility logic above. */
+export async function isDistinctionGrade(examType: ExamTypeKey, grade: string): Promise<boolean> {
+  const info = await getGradeInfo(examType, grade)
+  if (!info || !info.pass) return false
+  return (info.label ?? '').trim().toLowerCase() === 'distinction'
+}
+
+/** Whether an overall MANEB classification label counts as a pass. Handles
+ *  both JCE ('PASS' / 'FAIL') and MSCE ('MSCE Awarded — Option A/B' /
+ *  'MSCE Not Awarded') vocabularies, plus the shared 'Incomplete'. */
 export function isPassingClassification(label: string | null | undefined): boolean {
   if (!label) return false
   const l = label.trim().toLowerCase()
-  return l !== 'fail' && l !== 'incomplete'
+  if (l === 'incomplete') return false
+  if (l === 'fail') return false
+  if (l.includes('not awarded')) return false
+  return true
 }

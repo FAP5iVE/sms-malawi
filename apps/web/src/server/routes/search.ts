@@ -17,16 +17,25 @@
 import { Router }             from 'express'
 import { verifyAuth }         from '@/lib/verifyAuth'
 import { requirePermission }  from '@/server/middleware/verifyPermission'
-import { fallbackSearch }     from '@/server/services/algoliaService'
+import { algoliaSearch, fallbackSearch } from '@/server/services/algoliaService'
 
 export const searchRouter = Router()
 
+// [FIX] This route previously called fallbackSearch() (Postgres `contains`)
+// unconditionally — Algolia was fully wired for indexing (writes) but had
+// no consumer on the read side, so every search in the app bypassed Algolia
+// entirely regardless of how well the indices were seeded. Now Algolia is
+// queried first; fallbackSearch() only runs when Algolia isn't configured
+// or the request to it fails, so it's an actual fallback again rather than
+// the only path. Route name/path kept as `/fallback` to avoid touching the
+// two existing call sites (GlobalSearch.tsx, library page BorrowerPicker).
 searchRouter.get('/fallback',
   verifyAuth,
   requirePermission('search.globalSearch'),
   async (req, res) => {
     const query = String(req.query.q ?? '').trim()
     if (query.length < 2) return res.json({ students: [], staff: [], books: [] })
-    res.json(await fallbackSearch(query, 8))
+    const viaAlgolia = await algoliaSearch(query, 8)
+    res.json(viaAlgolia ?? await fallbackSearch(query, 8))
   },
 )

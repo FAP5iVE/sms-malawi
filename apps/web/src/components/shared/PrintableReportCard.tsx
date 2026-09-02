@@ -78,6 +78,41 @@ export interface SubjectGrade {
   remarks?:    string   // e.g. "Improving", "Needs attention"
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GR-2: MANEB NATIONAL RESULT (JCE/MSCE) — Form 2 Term 3 and Form 4 Term 3
+// have no internal exam (MANEB administers JCE/MSCE nationally for those
+// slots — see @shared/constants/malawi's getManebExamType()), so a report
+// card for those terms carries a manebResult instead of the usual
+// CA/Exam/Total subjects table. JCE and MSCE are intentionally different
+// shapes here too — see gradeService.ts's JceOutcome/MsceOutcome.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ManebSubjectRow {
+  subject:      string
+  grade:        string
+  label:        string | null   // e.g. "Distinction", "Credit", "Excellent" — scale-driven, admin-editable
+  pass:         boolean
+  /** MSCE only — true if this subject's points are one of the six counted
+   *  in the aggregate sum. Always undefined for JCE (no aggregate exists). */
+  inAggregate?: boolean
+}
+
+export interface ManebResultData {
+  examType:            'JCE' | 'MSCE'
+  candidateNo:         string
+  centerNo:             string
+  centerName:           string
+  status:               string
+  subjects:             ManebSubjectRow[]
+  classification:       string
+  pass:                 boolean
+  /** MSCE only — sum of the best-six performed subjects (6–54); null if
+   *  fewer than six subjects were performed. Always null for JCE. */
+  points:               number | null
+  certificateOption:    'A' | 'B' | null
+  englishInAggregate:   boolean | null
+}
+
 export interface ReportCardData {
   // School identity
   schoolName:    string
@@ -111,6 +146,12 @@ export interface ReportCardData {
   classTotal:      number     // e.g. 45  → "5 / 45"
   totalMarks:      number
   averagePercent:  number
+
+  /** GR-2: present only for Form 2 Term 3 (JCE) / Form 4 Term 3 (MSCE) —
+   *  when set, the card renders the MANEB result section instead of the
+   *  internal CA/Exam/Total grades table above (subjects/classPosition/
+   *  classTotal/totalMarks/averagePercent are left at empty defaults). */
+  manebResult?:    ManebResultData
 
   // Attendance
   daysPresent:     number
@@ -177,7 +218,9 @@ function ordinal(n: number): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
-  const examTypeKey = data.classForm >= 3 ? 'INTERNAL_F3F4' : 'INTERNAL_F1F2'
+  const examTypeKey = data.manebResult
+    ? data.manebResult.examType
+    : (data.classForm >= 3 ? 'INTERNAL_F3F4' : 'INTERNAL_F1F2')
   const { data: gradingScale = [] } = useGradingScales(examTypeKey)
   const gradeRow = (grade: string) => gradingScale.find((g) => g.grade === grade)
 
@@ -274,7 +317,7 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
             textTransform: 'uppercase',
           }}
         >
-          STUDENT REPORT CARD
+          {data.manebResult ? `MANEB ${data.manebResult.examType} EXAMINATION RESULT` : 'STUDENT REPORT CARD'}
         </div>
 
         <div style={{ fontSize: '9pt', color: '#374151', marginTop: '2pt' }}>
@@ -335,7 +378,9 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
         </tbody>
       </table>
 
-      {/* ── 3. GRADES TABLE ──────────────────────────────────────────────── */}
+      {/* ── 3. GRADES TABLE (internal terms only — MANEB terms render the
+             result section below instead) ──────────────────────────────── */}
+      {!data.manebResult && (
       <table
         style={{
           width: '100%', borderCollapse: 'collapse',
@@ -422,6 +467,9 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
           </tr>
         </tfoot>
       </table>
+      )}
+
+      {data.manebResult && <ManebResultSection result={data.manebResult} />}
 
       {/* ── 4. ATTENDANCE ────────────────────────────────────────────────── */}
       <table
@@ -456,7 +504,9 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
         </tbody>
       </table>
 
-      {/* ── 5. COMMENTS ──────────────────────────────────────────────────── */}
+      {/* ── 5. COMMENTS (internal terms only — no TeacherComment exists for
+             a MANEB national term, since it has no TermResult to attach to) */}
+      {!data.manebResult && (
       <table
         style={{
           width: '100%', borderCollapse: 'collapse',
@@ -508,6 +558,7 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
           </tr>
         </tbody>
       </table>
+      )}
 
       {/* ── 6. PROMOTION STATUS (annual — only once committed at Term 3) ── */}
       {data.promotionStatus && (
@@ -569,6 +620,116 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GR-2: MANEB RESULT SECTION — Form 2 Term 3 (JCE) / Form 4 Term 3 (MSCE).
+// Deliberately does NOT reuse the CA/Exam/Total grades table above: JCE and
+// MSCE are letter/point-based national results, not internally-marked
+// percentage results, and JCE vs MSCE render meaningfully different content
+// (JCE has no aggregate to show at all).
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ManebResultSection({ result }: { result: ManebResultData }) {
+  const outcomeColor = result.pass ? '#15803d' : '#dc2626'
+  return (
+    <div style={{ marginBottom: '6pt' }}>
+      {/* Candidate details */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6pt', border: '1pt solid #d1d5db' }}>
+        <tbody>
+          <tr>
+            <td style={{ padding: '3pt 6pt', width: '25%', background: '#f9fafb', fontWeight: 600, fontSize: '8.5pt', color: '#374151', borderRight: '1pt solid #d1d5db', borderBottom: '1pt solid #d1d5db' }}>
+              Candidate No.
+            </td>
+            <td style={{ padding: '3pt 6pt', width: '25%', fontWeight: 700, color: '#1e3a5f', borderRight: '1pt solid #e5e7eb', borderBottom: '1pt solid #d1d5db' }}>
+              {result.candidateNo || '—'}
+            </td>
+            <td style={{ padding: '3pt 6pt', width: '25%', background: '#f9fafb', fontWeight: 600, fontSize: '8.5pt', color: '#374151', borderRight: '1pt solid #d1d5db', borderBottom: '1pt solid #d1d5db' }}>
+              Examination Centre
+            </td>
+            <td style={{ padding: '3pt 6pt', fontWeight: 600, borderBottom: '1pt solid #d1d5db' }}>
+              {result.centerNo ? `${result.centerNo} — ${result.centerName || '—'}` : '—'}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Subject grades */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '6pt', border: '1pt solid #d1d5db' }}>
+        <thead>
+          <tr style={{ background: '#1e3a5f', color: '#ffffff' }}>
+            {[
+              { label: 'Subject',        w: '38%', align: 'left'   },
+              { label: 'Grade',          w: '14%', align: 'center' },
+              { label: 'Classification', w: '28%', align: 'left'   },
+              ...(result.examType === 'MSCE' ? [{ label: 'In Aggregate', w: '20%', align: 'center' as const }] : []),
+            ].map(({ label, w, align }) => (
+              <th key={label} style={{ padding: '4pt 5pt', fontSize: '8pt', fontWeight: 700, letterSpacing: '0.04em', width: w, textAlign: align as React.CSSProperties['textAlign'], borderRight: '1pt solid #2d5186' }}>
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {result.subjects.map((s, i) => (
+            <tr key={s.subject} style={{ background: i % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
+              <td style={{ padding: '3pt 5pt', fontWeight: 600, fontSize: '8.5pt', borderRight: '1pt solid #e5e7eb', borderBottom: '0.5pt solid #e5e7eb' }}>
+                {s.subject}
+              </td>
+              <td style={{ padding: '3pt 5pt', textAlign: 'center', fontWeight: 800, fontSize: '10pt', color: s.pass ? '#15803d' : '#dc2626', borderRight: '1pt solid #e5e7eb', borderBottom: '0.5pt solid #e5e7eb' }}>
+                {s.grade}
+              </td>
+              <td style={{ padding: '3pt 5pt', fontSize: '8pt', color: '#4b5563', borderRight: result.examType === 'MSCE' ? '1pt solid #e5e7eb' : undefined, borderBottom: '0.5pt solid #e5e7eb' }}>
+                {s.label ?? '—'}
+              </td>
+              {result.examType === 'MSCE' && (
+                <td style={{ padding: '3pt 5pt', textAlign: 'center', fontWeight: 700, color: s.inAggregate ? '#1e3a5f' : '#9ca3af', borderBottom: '0.5pt solid #e5e7eb' }}>
+                  {s.inAggregate ? '✓' : '—'}
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Outcome */}
+      <div style={{ border: '1.5pt solid #1e3a5f', borderRadius: '2pt', padding: '6pt 8pt', background: '#f0f4f8' }}>
+        {result.examType === 'MSCE' ? (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '3pt' }}>
+              <span style={{ fontWeight: 700, fontSize: '8.5pt', color: '#1e3a5f' }}>
+                AGGREGATE {result.points != null && '(best six subjects)'}
+              </span>
+              <span style={{ fontWeight: 800, fontSize: '13pt', color: '#1e3a5f' }}>
+                {result.points != null ? `${result.points} points` : 'Not available — fewer than 6 subjects recorded'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span style={{ fontWeight: 700, fontSize: '8.5pt', color: '#1e3a5f' }}>CERTIFICATE STATUS</span>
+              <span style={{ fontWeight: 800, fontSize: '10pt', color: outcomeColor }}>{result.classification}</span>
+            </div>
+            <div style={{ marginTop: '4pt', fontSize: '7pt', color: '#6b7280' }}>
+              {result.points != null
+                ? `English ${result.englishInAggregate ? 'was' : 'was not'} among the best six subjects and ${result.englishInAggregate ? 'is' : 'is not'} counted in the aggregate above.`
+                : ''}
+              {' '}Certificate eligibility is assessed separately from the aggregate — Option A (6 subjects passed incl. English, ≥1 Distinction/Credit) or Option B (5 subjects passed incl. English, ≥3 Distinction/Credit).
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span style={{ fontWeight: 700, fontSize: '8.5pt', color: '#1e3a5f' }}>OVERALL RESULT</span>
+              <span style={{ fontWeight: 800, fontSize: '13pt', color: outcomeColor }}>{result.classification}</span>
+            </div>
+            <div style={{ marginTop: '4pt', fontSize: '7pt', color: '#6b7280' }}>
+              JCE reports letter grades and a pass/fail outcome only — MANEB does not compute a numeric
+              aggregate or point total for the Junior Certificate of Education.
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GRADING KEY TABLE (rendered on screen only, hidden on print)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -609,7 +770,9 @@ interface PrintableReportCardProps {
 
 export function PrintableReportCard({ data, onClose }: PrintableReportCardProps) {
   const printRef = useRef<HTMLDivElement>(null)
-  const examTypeKey = data.classForm >= 3 ? 'INTERNAL_F3F4' : 'INTERNAL_F1F2'
+  const examTypeKey = data.manebResult
+    ? data.manebResult.examType
+    : (data.classForm >= 3 ? 'INTERNAL_F3F4' : 'INTERNAL_F1F2')
   const { data: gradingScale = [] } = useGradingScales(examTypeKey)
 
   // react-to-print v3 API

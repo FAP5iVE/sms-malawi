@@ -133,29 +133,151 @@ export async function syncAlerts() {
   logger.info({ event: 'sentry.sync.alerts', count: res.data?.length ?? 0 })
 }
 
+// ── Apdex — best-effort. Apdex is a performance/transactions metric, not
+// part of the Sessions API used below, and is served off the Discover /
+// events-stats surface instead. Unlike the sessions/releases calls in
+// syncRollupStats, this exact endpoint + response shape is NOT confirmed
+// against a live 5ivestack-labs payload — if de.sentry.io rejects this
+// query or returns a different shape, we log once and return null so the
+// caller just skips writing 'apdex:24h' (the KPI tile keeps its existing
+// "—" empty state) instead of failing the whole rollup sync. Re-verify
+// against Sentry's current API docs if this keeps coming back null.
+async function fetchApdex(): Promise<number | null> {
+  try {
+    const res = await sentryFetch<{ data?: { 'apdex()'?: number }[] }>(
+      `/organizations/${SENTRY_ORG}/events-stats/?field=apdex()&statsPeriod=24h&project=-1&dataset=metrics`,
+    )
+    const value = res.data?.[0]?.['apdex()']
+    return typeof value === 'number' ? value : null
+  } catch (err) {
+    logger.warn({ event: 'sentry.sync.apdex_unavailable', err: err instanceof Error ? err.message : String(err) })
+    return null
+  }
+}
+
 // ── Rollup stats: Crash-Free Sessions/Users, Apdex, Releases count ──
+// Each metric is fetched independently via allSettled and fault-isolated:
+// if one call fails (most likely Apdex, given the caveat above), the
+// others still sync and update their KPI tiles rather than one bad
+// endpoint blanking the whole rollup.
 export async function syncRollupStats() {
-  const [sessionHealth, releases] = await Promise.all([
+  const [sessionHealthResult, releasesResult, apdexResult] = await Promise.allSettled([
     sentryFetch<{ groups: { by: Record<string, string>; totals: Record<string, number> }[] }>(
       `/organizations/${SENTRY_ORG}/sessions/?field=crash_free_rate(session)&field=crash_free_rate(user)&statsPeriod=7d`,
     ),
     sentryFetch<unknown[]>(`/organizations/${SENTRY_ORG}/releases/?statsPeriod=30d`),
+    fetchApdex(),
   ])
 
-  const totals = sessionHealth.groups[0]?.totals ?? {}
-  const rows: { metricKey: string; value: number; windowLabel: string }[] = [
-    { metricKey: 'crash_free_sessions:7d', value: (totals['crash_free_rate(session)'] ?? 1) * 100, windowLabel: '7d' },
-    { metricKey: 'crash_free_users:7d', value: (totals['crash_free_rate(user)'] ?? 1) * 100, windowLabel: '7d' },
-    { metricKey: 'releases_count:30d', value: releases.length, windowLabel: '30d' },
-  ]
-  await Promise.all(
-    rows.map((r) => prisma.sentryRollupStat.upsert({ where: { metricKey: r.metricKey }, create: r, update: r })),
-  )
+  const rows: { metricKey: string; value: number; windowLabel: string }[] = []
+
+  if (sessionHealthResult.status === 'fulfilled') {
+    const totals = sessionHealthResult.value.groups[0]?.totals ?? {}
+    rows.push(
+      { metricKey: 'crash_free_sessions:7d', value: (totals['crash_free_rate(session)'] ?? 1) * 100, windowLabel: '7d' },
+      { metricKey: 'crash_free_users:7d', value: (totals['crash_free_rate(user)'] ?? 1) * 100, windowLabel: '7d' },
+    )
+  } else {
+    logger.error({ event: 'sentry.sync.rollup.session_health_failed', err: sessionHealthResult.reason instanceof Error ? sessionHealthResult.reason.message : String(sessionHealthResult.reason) })
+  }
+
+  if (releasesResult.status === 'fulfilled') {
+    rows.push({ metricKey: 'releases_count:30d', value: releasesResult.value.length, windowLabel: '30d' })
+  } else {
+    logger.error({ event: 'sentry.sync.rollup.releases_failed', err: releasesResult.reason instanceof Error ? releasesResult.reason.message : String(releasesResult.reason) })
+  }
+
+  if (apdexResult.status === 'fulfilled' && apdexResult.value != null) {
+    rows.push({ metricKey: 'apdex:24h', value: apdexResult.value, windowLabel: '24h' })
+  }
+  // A rejected/null apdexResult is expected-possible (see fetchApdex) and
+  // already logged in there — no duplicate log here.
+
+  if (rows.length > 0) {
+    await Promise.all(
+      rows.map((r) => prisma.sentryRollupStat.upsert({ where: { metricKey: r.metricKey }, create: r, update: r })),
+    )
+  }
   logger.info({ event: 'sentry.sync.rollup', rows: rows.length })
+
+  // If every metric failed, surface that to ensureFresh() as a real error
+  // (recorded in MonitoringSyncState.lastError) instead of a silent no-op
+  // "successful" sync.
+  if (rows.length === 0) {
+    throw new Error('sentry.sync.rollup: all rollup metrics failed to fetch')
+  }
+}
+
+// ── On-demand ("lazy") sync — replaces depending on a cron schedule ──
+// Vercel's Hobby-tier cron can only fire once a day (confirmed against
+// current Vercel docs, 2026), which isn't enough for a dashboard meant to
+// show "live" system health. Instead, the read paths below each claim and
+// run their own sync whenever their slice of the cache is older than
+// SYNC_STALE_MS, so data self-heals on the next admin page view and never
+// depends on any external scheduler or plan tier.
+//
+// MonitoringSyncState.lastSyncedAt (NOT the cache tables' own updatedAt)
+// is the source of truth for staleness, because a sync can legitimately
+// write zero rows — e.g. no alerts configured yet — and that must still
+// count as "synced just now", or every request would re-trigger a sync
+// forever.
+const SYNC_STALE_MS = {
+  issues: 3 * 60_000,  // webhook is the primary path; this is a safety net + backfill for anything the webhook missed
+  alerts: 3 * 60_000,  // there is no webhook for alerts at all — this on-demand sync IS the only path
+  rollup: 3 * 60_000,  // crash-free %, releases count, Apdex
+} as const
+
+type SyncType = keyof typeof SYNC_STALE_MS
+
+/**
+ * Atomically claims the right to run `type`'s sync right now. Returns
+ * true at most once per stale window — a concurrent request that loses
+ * the race gets false back and just reads whatever's cached, which the
+ * winning request is in the middle of refreshing.
+ */
+async function claimSync(type: SyncType): Promise<boolean> {
+  const staleBefore = new Date(Date.now() - SYNC_STALE_MS[type])
+  const claimed = await prisma.monitoringSyncState.updateMany({
+    where: { syncType: type, lastSyncedAt: { lt: staleBefore } },
+    data: { lastSyncedAt: new Date() },
+  })
+  if (claimed.count > 0) return true
+
+  // No row at all yet — first sync ever for this type on this install.
+  try {
+    await prisma.monitoringSyncState.create({ data: { syncType: type, lastSyncedAt: new Date() } })
+    return true
+  } catch {
+    return false // lost the race to a concurrent request that created it first
+  }
+}
+
+async function ensureFresh(type: SyncType, fn: () => Promise<void>): Promise<void> {
+  if (!(await claimSync(type))) return
+  try {
+    await fn()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    logger.error({ event: 'sentry.sync.on_demand_failed', type, err: message })
+    // Leave lastSyncedAt claimed as-is — retrying on every request while
+    // Sentry itself is down would just add load to an outage. The next
+    // request past the stale window will retry naturally.
+    await prisma.monitoringSyncState.update({ where: { syncType: type }, data: { lastError: message } }).catch(() => {})
+  }
 }
 
 // ── Reads — what the routes actually serve to the frontend ──
 export async function getSummary() {
+  // Refresh whichever slices are stale before reading — see "On-demand
+  // sync" above. Each type claims/skips independently, so this is a
+  // no-op (fast) on the vast majority of requests that land inside the
+  // 3-minute freshness window.
+  await Promise.all([
+    ensureFresh('issues', syncIssues),
+    ensureFresh('alerts', syncAlerts),
+    ensureFresh('rollup', syncRollupStats),
+  ])
+
   const [stats, unresolvedCount, uptimeCount, latestAlerts] = await Promise.all([
     prisma.sentryRollupStat.findMany(),
     prisma.sentryIssueCache.count({ where: { status: 'unresolved', isUptimeIssue: false } }),
@@ -171,6 +293,7 @@ export async function getSummary() {
 }
 
 export async function listIssues(opts: { status?: string; level?: string; uptimeOnly?: boolean; limit?: number }) {
+  await ensureFresh('issues', syncIssues)
   return prisma.sentryIssueCache.findMany({
     where: {
       ...(opts.status ? { status: opts.status } : {}),
@@ -183,6 +306,7 @@ export async function listIssues(opts: { status?: string; level?: string; uptime
 }
 
 export async function listAlerts() {
+  await ensureFresh('alerts', syncAlerts)
   return prisma.sentryAlertCache.findMany({ orderBy: { updatedAt: 'desc' } })
 }
 

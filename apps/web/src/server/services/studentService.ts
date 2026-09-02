@@ -919,6 +919,12 @@ export async function changeStatus(
     },
   })
 
+  // [FIX] This was the one student mutation path that never synced to
+  // Algolia — create/update/archive all call the algolia service, but a
+  // plain status change (e.g. promotion, suspension) silently left the
+  // index showing the old status indefinitely.
+  void algolia.updateStudent({ objectID: id, status: newStatus })
+
   return getById(id) as Promise<ApiStudentDetail>
 }
 

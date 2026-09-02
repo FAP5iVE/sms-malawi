@@ -865,8 +865,8 @@ model ManebRecord {
   centerName    String
   academicYear  String
   subjectGrades Json
-  overallGrade  String?       // GR-1: MSCE/JCE aggregate classification (Distinction/Credit/Pass/Fail/Incomplete)
-  aggregatePoints Int?          // GR-1: sum of best-6 subject grade-points incl. English (6 = six grade-1s)
+  overallGrade  String?       // GR-2: JCE = 'PASS'/'FAIL'/'Incomplete'; MSCE = 'MSCE Awarded — Option A/B'/'MSCE Not Awarded'/'Incomplete'
+  aggregatePoints Int?          // GR-2: MSCE only — sum of best-6 PERFORMED subjects' points (English incl. only if naturally in the best 6). Always null for JCE — JCE has no numeric aggregate.
   status        ManebStatus   @default(REGISTERED)
   universityPlacement UniversityPlacement?   // R18 — placement derived from this MSCE record
   createdAt     DateTime      @default(now())
@@ -1453,6 +1453,7 @@ model CalendarEvent {
   id            String   @id @default(cuid())
   title         String
   description   String?
+  location      String?  // Venue/room — Interactive Calendar UI adoption; surfaced as meta.venue on GET /calendar/events (see routes/calendar.ts source 10)
   startDate     DateTime
   endDate       DateTime?
   category      String   // CalendarEventCategory union — see @shared/types/calendar
@@ -1587,4 +1588,10 @@ model SentryRollupStat {
   value       Float
   windowLabel String              // "7d", "24h", "30d" — for display only
   syncedAt    DateTime  @default(now())
+}
+
+model MonitoringSyncState {
+  syncType     String    @id   // "issues" | "alerts" | "rollup"
+  lastSyncedAt DateTime
+  lastError    String?
 }

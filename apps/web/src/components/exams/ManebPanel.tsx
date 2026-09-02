@@ -166,10 +166,21 @@ export function ManebPanel({ academicYear }: Props) {
       <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
         <GraduationCap className="w-4 h-4 mt-0.5 shrink-0" />
         <span>
-          Grading follows official MANEB standards.{' '}
-          {examType === 'MSCE'
-            ? 'MSCE (Form 3 & 4): Grade 1 (80–100%) through Grade 9 (0–24%). Pass = Grade 1–6 (35%+).'
-            : 'JCE (Form 1 & 2): Grade A (80–100%) through Grade F (0–34%). Pass = A–E (35%+).'}
+          {examType === 'MSCE' ? (
+            <>
+              MSCE grades (1–9, as reported by MANEB) are entered directly — 1–2 Distinction, 3–6 Credit, 7–8 Pass,
+              9 Fail. The <strong>aggregate</strong> is the sum of the candidate&apos;s best six subjects (English
+              counted only if it lands among them); the <strong>certificate award</strong> is a separate check —
+              Option A (6 subjects passed incl. English, ≥1 Distinction/Credit) or Option B (5 passed incl. English,
+              ≥3 Distinction/Credit).
+            </>
+          ) : (
+            <>
+              JCE grades (A–F, as reported by MANEB) are entered directly. JCE has <strong>no numeric aggregate</strong>
+              {' '}— MANEB does not compute points or a total for the Junior Certificate. The overall result shown is
+              simply PASS (≥6 subjects passed, English among them) or FAIL.
+            </>
+          )}
           {' '}Verify at{' '}
           <a href="https://www.maneb.edu.mw/" target="_blank" rel="noopener noreferrer" className="underline">maneb.edu.mw</a>.
         </span>

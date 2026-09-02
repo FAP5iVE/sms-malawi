@@ -8,9 +8,32 @@ import {
   type AlgoliaStudent,
   type AlgoliaStaff,
   type AlgoliaBook,
+  type BulkIndexResult,
 } from '@/server/services/algoliaService'
 
 export const algoliaAdminRouter = Router()
+
+// [FIX] These routes used to respond `{ indexed: records.length }`
+// unconditionally — that's the Postgres record count, not a confirmation
+// that Algolia actually received anything. bulkIndexStudents/Staff/Books
+// silently no-op when ALGOLIA_APP_ID/ALGOLIA_ADMIN_KEY aren't set, so the
+// old code reported "125 records indexed" even when zero records reached
+// Algolia. This helper turns the accurate BulkIndexResult into a response
+// that distinguishes "not configured" from "configured but the write
+// failed" so the admin panel (and the person reading it) can tell what's
+// actually wrong instead of getting a false success.
+function respondSeed(res: import('express').Response, result: BulkIndexResult) {
+  if (!result.configured) {
+    return res.status(503).json({
+      indexed: 0,
+      error: 'Algolia is not configured on the server (ALGOLIA_APP_ID / ALGOLIA_ADMIN_KEY missing).',
+    })
+  }
+  if (result.error) {
+    return res.status(502).json({ indexed: 0, error: result.error })
+  }
+  res.json({ indexed: result.indexed })
+}
 
 /**
  * POST /algolia-admin/seed-students
@@ -48,8 +71,7 @@ algoliaAdminRouter.post('/seed-students',
       academicYear:   s.class?.academicYear ?? null,
     }))
 
-    await bulkIndexStudents(records)
-    res.json({ indexed: records.length })
+    respondSeed(res, await bulkIndexStudents(records))
   },
 )
 
@@ -86,8 +108,7 @@ algoliaAdminRouter.post('/seed-staff',
       email:      s.email ?? null,
     }))
 
-    await bulkIndexStaff(records)
-    res.json({ indexed: records.length })
+    respondSeed(res, await bulkIndexStaff(records))
   },
 )
 
@@ -120,8 +141,7 @@ algoliaAdminRouter.post('/seed-books',
       totalCopies:     b.totalCopies,
     }))
 
-    await bulkIndexBooks(records)
-    res.json({ indexed: records.length })
+    respondSeed(res, await bulkIndexBooks(records))
   },
 )
 

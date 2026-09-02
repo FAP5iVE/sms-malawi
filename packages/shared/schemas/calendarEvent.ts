@@ -14,6 +14,17 @@
  *   category union the aggregated GET /calendar/events response already
  *   uses, so a manually-created event renders through the identical
  *   frontend legend/filter/color pipeline as every other source)
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (Interactive Calendar UI adoption)
+ * [PURPOSE]: Added optional `location` — the new calendar UI's create/edit
+ *   form collects a "Location / Room" field (matching every other domain
+ *   source's own venue-style field: Exam.venue, LabBooking.labName). Wired
+ *   through to CalendarEvent.location (schema.prisma, same change) and
+ *   surfaced on the aggregated GET /calendar/events response as
+ *   meta.venue — the same meta key EventListItem/detail rendering already
+ *   reads for exams (see routes/calendar.ts source 3), so a manually
+ *   created event's location renders through the identical existing
+ *   MapPin-icon display path as every other source, no new meta key.
  */
 import { z } from 'zod'
 
@@ -32,6 +43,7 @@ export const CreateCalendarEventSchema = z
   .object({
     title: z.string().min(2).max(200),
     description: z.string().max(2000).optional(),
+    location: z.string().max(200).optional(),
     startDate: z.string().datetime(),
     endDate: z.string().datetime().optional(),
     category: CalendarEventCategorySchema,
@@ -44,6 +56,7 @@ export const CreateCalendarEventSchema = z
 export const UpdateCalendarEventSchema = z.object({
   title: z.string().min(2).max(200).optional(),
   description: z.string().max(2000).optional(),
+  location: z.string().max(200).optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
   category: CalendarEventCategorySchema.optional(),

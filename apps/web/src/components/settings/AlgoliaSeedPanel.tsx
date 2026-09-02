@@ -23,8 +23,14 @@ async function seedEntity(entity: Entity): Promise<{ indexed: number }> {
     method:  'POST',
     headers: { Authorization: `Bearer ${token ?? ''}` },
   })
-  if (!res.ok) throw new Error(`Seed failed: ${res.status}`)
-  return res.json() as Promise<{ indexed: number }>
+  const body = await res.json().catch(() => null) as { indexed?: number; error?: string } | null
+  // [FIX] The route now distinguishes "Algolia not configured" (503) from
+  // "configured but the write failed" (502) and sends a real `error`
+  // message in the body for both — surface it instead of a bare status
+  // code, so a misconfigured server env is diagnosable from this panel
+  // rather than looking like an unexplained failure.
+  if (!res.ok) throw new Error(body?.error ?? `Seed failed: ${res.status}`)
+  return { indexed: body?.indexed ?? 0 }
 }
 
 async function getStatus(): Promise<{ postgres: Record<Entity, number> }> {

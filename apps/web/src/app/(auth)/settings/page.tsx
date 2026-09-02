@@ -318,9 +318,6 @@ function SettingsPageInner() {
        {/* ── Content panel ─────────────────────────────────────────────── */}
         <div className="flex-1 min-w-0 bg-surface border border-base rounded-2xl p-6 space-y-6">
           <SectionContent sectionId={active} />
-          {role === 'admin' && (
-            <AlgoliaSeedPanel />
-          )}
         </div>
       </div>
     </div>

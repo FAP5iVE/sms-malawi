@@ -52,7 +52,7 @@ import { prisma } from '@/lib/prisma'
 import type { ExpenseCategory, ApplicationStatus } from '@prisma/client'
 import { subDays, subMonths, startOfDay, endOfDay, format, startOfWeek, endOfWeek, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfMonth, endOfMonth } from 'date-fns'
 import { getAttendanceSummaryForTerm, getTermDateRange } from '@/server/services/attendanceService'
-import { getPassingGrades, isPassingClassification, type ExamTypeKey } from '@/server/services/gradeService'
+import { getPassingGrades, isPassingClassification, isDistinctionGrade, type ExamTypeKey } from '@/server/services/gradeService'
 import { findUniversity } from '@shared/constants/universities'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1548,7 +1548,21 @@ export async function getManebSchoolStats(
       const g = r.overallGrade ?? 'Incomplete'
       gradeMap[g] = (gradeMap[g] ?? 0) + 1
       if (isPassingClassification(r.overallGrade)) passCount += 1
-      if ((r.overallGrade ?? '').trim().toLowerCase() === 'distinction') distinctionCount += 1
+
+      // GR-2: "distinction" is a per-subject tier (MSCE grades 1–2), not an
+      // overall classification label any more (MSCE's overall label now
+      // reads "MSCE Awarded — Option A/B", never "Distinction"; JCE has no
+      // Distinction tier at all). A candidate counts here if ANY of their
+      // subject grades is Distinction-tier.
+      const sgs = r.subjectGrades as Record<string, string> | null
+      if (sgs) {
+        for (const grade of Object.values(sgs)) {
+          if (await isDistinctionGrade(examType as ExamTypeKey, grade)) {
+            distinctionCount += 1
+            break
+          }
+        }
+      }
     }
 
     const total = typeRecords.length

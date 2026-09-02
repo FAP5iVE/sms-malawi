@@ -102,7 +102,20 @@ export async function getBook(id: string) {
 // edit/archive path at all — confirmed missing at schema, service, and
 // route layers.
 export async function updateBook(id: string, data: import('@shared/schemas/library').UpdateBookInput) {
-  return prisma.book.update({ where: { id }, data })
+  const book = await prisma.book.update({ where: { id }, data })
+  // [FIX] createBook indexes to Algolia but updateBook never did — an
+  // edited title/author/category/isbn would keep showing the pre-edit
+  // values in search indefinitely.
+  void algolia.updateBook({
+    objectID:        book.id,
+    title:           book.title,
+    author:          book.author,
+    isbn:            book.isbn ?? null,
+    category:        book.category,
+    availableCopies: book.availableCopies,
+    totalCopies:     book.totalCopies,
+  })
+  return book
 }
 
 /** "Archive" reduces totalCopies/availableCopies to 0 rather than a hard
@@ -110,7 +123,15 @@ export async function updateBook(id: string, data: import('@shared/schemas/libra
  *  orphaning those records, and the catalog convention elsewhere in this
  *  codebase is soft-removal, not destructive delete. */
 export async function archiveBook(id: string) {
-  return prisma.book.update({ where: { id }, data: { totalCopies: 0, availableCopies: 0 } })
+  const book = await prisma.book.update({ where: { id }, data: { totalCopies: 0, availableCopies: 0 } })
+  // [FIX] Same gap as updateBook — an archived book (0 copies) stayed
+  // indexed in Algolia as if it were still available.
+  void algolia.updateBook({
+    objectID:        book.id,
+    availableCopies: book.availableCopies,
+    totalCopies:     book.totalCopies,
+  })
+  return book
 }
 
 // [PRODUCTION FIX 2026-07-28] LibraryFine rows were created automatically

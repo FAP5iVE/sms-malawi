@@ -74,6 +74,14 @@
  *   (COLLECTIONS.ANNOUNCEMENTS), @shared/schemas/calendarEvent (new,
  *   same phase)
  * [DEPENDS ON (added)]: @shared/types/settings (SETTING_KEYS)
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (Interactive Calendar UI adoption)
+ * [PURPOSE]: Source 10's aggregated event now carries the manually-created
+ *   row's new `location` field (schema.prisma + calendarEventService.ts,
+ *   same change) as `meta.venue` — the identical meta key source 3 (exams)
+ *   already writes for its own venue field, so the frontend's existing
+ *   MapPin-icon location display (CalendarEventListItem) renders a manual
+ *   event's location with zero new frontend meta-key branching.
  */
 import 'server-only'
 
@@ -397,6 +405,9 @@ calendarRouter.get('/events',
     })
     for (const ev of manualEvents) {
       const category = ev.category as CalendarEvent['category']
+      const meta: Record<string, string> = {}
+      if (ev.description) meta.description = ev.description
+      if (ev.location) meta.venue = ev.location
       events.push({
         id:       `calevent-${ev.id}`,
         title:    ev.title,
@@ -405,7 +416,7 @@ calendarRouter.get('/events',
         allDay:   !ev.endDate,
         color:    CALENDAR_COLORS[category] ?? CALENDAR_COLORS.term,
         category,
-        meta:     ev.description ? { description: ev.description } : undefined,
+        meta:     Object.keys(meta).length > 0 ? meta : undefined,
       })
     }
 

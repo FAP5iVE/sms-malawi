@@ -186,10 +186,25 @@ export async function deleteBook(bookId: string): Promise<void> {
 // ─── BULK SEED ───────────────────────────────────────────────────────────────
 // Called once from admin panel or CLI to populate indices from Postgres.
 
-export async function bulkIndexStudents(records: AlgoliaStudent[]): Promise<void> {
-  if (records.length === 0) return
+// BulkIndexResult distinguishes two very different failure modes that a
+// caller (the admin seed routes) needs to report differently:
+//  - configured: false  → ALGOLIA_APP_ID/ALGOLIA_ADMIN_KEY aren't set, so
+//    nothing was ever attempted. This used to be silently swallowed and the
+//    route reported `indexed: records.length` anyway, which is how the
+//    Algolia dashboard could show 0 records while the admin UI claimed
+//    success.
+//  - configured: true, error set → client existed but the Algolia API call
+//    itself failed (bad key, network, index perms, etc).
+export interface BulkIndexResult {
+  indexed:    number
+  configured: boolean
+  error?:     string
+}
+
+export async function bulkIndexStudents(records: AlgoliaStudent[]): Promise<BulkIndexResult> {
   const client = getAlgoliaAdminClient()
-  if (!client) return
+  if (!client) return { indexed: 0, configured: false }
+  if (records.length === 0) return { indexed: 0, configured: true }
   try {
     // AlgoliaStudent (and AlgoliaStaff / AlgoliaBook below) is a plain,
     // JSON-serializable interface — string/number/null fields only, no
@@ -199,32 +214,103 @@ export async function bulkIndexStudents(records: AlgoliaStudent[]): Promise<void
     // its field types — a nominal-typing gap in the SDK's own types, not a
     // real safety concern here, so the cast below is safe.
     await client.saveObjects({ indexName: STUDENTS_INDEX, objects: records as unknown as Record<string, unknown>[] })
+    return { indexed: records.length, configured: true }
   } catch (err) {
     console.error('[algoliaService] bulkIndexStudents failed', err)
+    return { indexed: 0, configured: true, error: err instanceof Error ? err.message : 'Algolia write failed' }
   }
 }
 
-export async function bulkIndexStaff(records: AlgoliaStaff[]): Promise<void> {
-  if (records.length === 0) return
+export async function bulkIndexStaff(records: AlgoliaStaff[]): Promise<BulkIndexResult> {
   const client = getAlgoliaAdminClient()
-  if (!client) return
+  if (!client) return { indexed: 0, configured: false }
+  if (records.length === 0) return { indexed: 0, configured: true }
   try {
     // See the comment on bulkIndexStudents above — same nominal-typing gap.
     await client.saveObjects({ indexName: STAFF_INDEX, objects: records as unknown as Record<string, unknown>[] })
+    return { indexed: records.length, configured: true }
   } catch (err) {
     console.error('[algoliaService] bulkIndexStaff failed', err)
+    return { indexed: 0, configured: true, error: err instanceof Error ? err.message : 'Algolia write failed' }
   }
 }
 
-export async function bulkIndexBooks(records: AlgoliaBook[]): Promise<void> {
-  if (records.length === 0) return
+export async function bulkIndexBooks(records: AlgoliaBook[]): Promise<BulkIndexResult> {
   const client = getAlgoliaAdminClient()
-  if (!client) return
+  if (!client) return { indexed: 0, configured: false }
+  if (records.length === 0) return { indexed: 0, configured: true }
   try {
     // See the comment on bulkIndexStudents above — same nominal-typing gap.
     await client.saveObjects({ indexName: BOOKS_INDEX, objects: records as unknown as Record<string, unknown>[] })
+    return { indexed: records.length, configured: true }
   } catch (err) {
     console.error('[algoliaService] bulkIndexBooks failed', err)
+    return { indexed: 0, configured: true, error: err instanceof Error ? err.message : 'Algolia write failed' }
+  }
+}
+
+// ─── LIVE SEARCH ─────────────────────────────────────────────────────────────
+// This is the actual read path GlobalSearch.tsx / library BorrowerPicker hit.
+//
+// Historically nothing in the app ever called search()/searchSingleIndex()
+// on the Algolia client — indexStudent/indexStaff/indexBook etc. only ever
+// WROTE to Algolia. The route at server/routes/search.ts always called
+// fallbackSearch() (Postgres `contains`) unconditionally, so despite records
+// being indexed, no query ever reached Algolia. algoliaSearch() below is the
+// missing read side; the route now tries this first and only drops to
+// fallbackSearch() when Algolia is unconfigured or the request fails.
+//
+// Uses the admin client rather than a public search-only key: there is no
+// NEXT_PUBLIC_ALGOLIA_SEARCH_KEY configured for this project, this call is
+// server-side only (the admin key never reaches the browser), and the route
+// calling it is already gated by verifyAuth + 'search.globalSearch'.
+export interface SearchAllResult {
+  students: { id: string; fullName: string; registrationNo: string; className: string | null }[]
+  staff:    { id: string; fullName: string; role: string; department: string }[]
+  books:    { id: string; title: string; author: string; category: string }[]
+}
+
+export async function algoliaSearch(query: string, limit = 8): Promise<SearchAllResult | null> {
+  const client = getAlgoliaAdminClient()
+  if (!client) return null
+  try {
+    const { results } = await client.search<Record<string, unknown>>({
+      requests: [
+        { indexName: STUDENTS_INDEX, query, hitsPerPage: limit },
+        { indexName: STAFF_INDEX,    query, hitsPerPage: limit },
+        { indexName: BOOKS_INDEX,    query, hitsPerPage: limit },
+      ],
+    })
+
+    // v5 SDK: each entry in `results` is a per-request result carrying its
+    // own `hits` array, in the same order the requests were submitted.
+    const [studentRes, staffRes, bookRes] = results as unknown as {
+      hits: Record<string, unknown>[]
+    }[]
+
+    return {
+      students: (studentRes?.hits ?? []).map((h) => ({
+        id:             String(h.objectID),
+        fullName:       String(h.fullName ?? ''),
+        registrationNo: String(h.registrationNo ?? ''),
+        className:      (h.className as string | null) ?? null,
+      })),
+      staff: (staffRes?.hits ?? []).map((h) => ({
+        id:         String(h.objectID),
+        fullName:   String(h.fullName ?? ''),
+        role:       String(h.role ?? ''),
+        department: String(h.department ?? ''),
+      })),
+      books: (bookRes?.hits ?? []).map((h) => ({
+        id:       String(h.objectID),
+        title:    String(h.title ?? ''),
+        author:   String(h.author ?? ''),
+        category: String(h.category ?? ''),
+      })),
+    }
+  } catch (err) {
+    console.error('[algoliaService] algoliaSearch failed', err)
+    return null
   }
 }
 

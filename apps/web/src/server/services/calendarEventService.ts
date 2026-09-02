@@ -11,6 +11,11 @@
  * [DEPENDS ON]: apps/web/src/lib/prisma.ts, apps/web/src/server/services/
  *   auditService.ts, @shared/schemas/calendarEvent (CreateCalendarEventInput/
  *   UpdateCalendarEventInput — same phase)
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (Interactive Calendar UI adoption)
+ * [PURPOSE]: Thread the new optional `location` field (schema.prisma +
+ *   @shared/schemas/calendarEvent, same change) through createEvent()/
+ *   updateEvent() exactly like `description` — no other behaviour change.
  */
 import 'server-only'
 
@@ -30,6 +35,7 @@ export async function createEvent(
     data: {
       title: input.title,
       description: input.description ?? null,
+      location: input.location ?? null,
       startDate: new Date(input.startDate),
       endDate: input.endDate ? new Date(input.endDate) : null,
       category: input.category,
@@ -65,6 +71,7 @@ export async function updateEvent(
     data: {
       ...(input.title !== undefined ? { title: input.title } : {}),
       ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.location !== undefined ? { location: input.location } : {}),
       ...(input.startDate !== undefined ? { startDate: new Date(input.startDate) } : {}),
       ...(input.endDate !== undefined ? { endDate: new Date(input.endDate) } : {}),
       ...(input.category !== undefined ? { category: input.category } : {}),
