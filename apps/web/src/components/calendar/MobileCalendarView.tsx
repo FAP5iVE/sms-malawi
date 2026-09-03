@@ -26,21 +26,51 @@
  *   reference's cramped inline strip, and day-cell event bars are sized
  *   for a touch grid (rounded-full, 3–4px thick, 44px+ tall cells) rather
  *   than the reference's 1px slivers.
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (feedback round — "add an Add Event button
+ *   and a Month/Agenda switch without disturbing the current clean look")
+ * [PURPOSE]: The approved top bar (Today/nav/search/filter) is untouched —
+ *   pixel-identical to what was already approved. Both new controls landed
+ *   in a new, second slim row directly beneath it instead of crowding into
+ *   the same row: a compact Month/Agenda segmented toggle (left) and an
+ *   Add Event button (right, canCreate-gated) that opens the same full
+ *   CalendarEventFormDialog the desktop view uses — a distinct, more
+ *   capable entry point than the quick-add bar's title-only creation.
+ *   Agenda mode replaces the grid + selected-day list with a single
+ *   scrollable list of the month's events, grouped under date headings
+ *   (groupEventsByDate) since a whole month flattened into one list
+ *   without date breaks isn't scannable on a narrow screen — the quick-add
+ *   bar hides in this mode since "add for this day" doesn't apply to a
+ *   day-agnostic list.
  * [DEPENDS ON]: ./calendarUtils, ./calendarConfig, ./CategoryFilterBar,
  *   ./CalendarEventListItem, @/components/shared/MotionBottomSheet
  */
 'use client'
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Filter, Plus, CalendarDays, Search, X } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Plus,
+  CalendarDays,
+  Search,
+  X,
+  ListChecks,
+  LayoutGrid,
+} from 'lucide-react'
 import type { CalendarEvent, CalendarEventCategory } from '@shared/types/calendar'
 import { CATEGORY_LEGEND, categoryColor } from './calendarConfig'
 import { CategoryFilterBar } from './CategoryFilterBar'
 import { CalendarEventListItem } from './CalendarEventListItem'
 import { MotionBottomSheet } from '@/components/shared/MotionBottomSheet'
+import type { CalendarViewMode } from './DesktopCalendarView'
 import {
   WEEK_HEADERS_SHORT,
   formatMonthShort,
+  formatMonthYear,
   formatDisplayDate,
+  formatGroupHeading,
+  groupEventsByDate,
   type CalendarDayCell,
 } from './calendarUtils'
 
@@ -51,6 +81,9 @@ interface MobileCalendarViewProps {
   selectedDateKey: string
   onSelectDate: (dateKey: string) => void
   days: CalendarDayCell[]
+  /** All filtered events in the visible grid range — only needed for
+   *  Agenda mode's date-grouped list; Month mode uses `days`/`selectedDayEvents`. */
+  filteredEvents: CalendarEvent[]
   selectedDayEvents: CalendarEvent[]
   activeCategories: Set<CalendarEventCategory>
   onToggleCategory: (category: CalendarEventCategory) => void
@@ -58,6 +91,8 @@ interface MobileCalendarViewProps {
   onClearAllCategories: () => void
   searchQuery: string
   onSearchChange: (q: string) => void
+  viewMode: CalendarViewMode
+  onViewModeChange: (mode: CalendarViewMode) => void
   canCreate: boolean
   canEdit: boolean
   canDelete: boolean
@@ -67,6 +102,10 @@ interface MobileCalendarViewProps {
    *  Full detail can always be added afterwards via the row's Edit action,
    *  which opens the same CalendarEventFormDialog the desktop view uses. */
   onQuickAdd: (title: string) => void
+  /** Opens the full CalendarEventFormDialog (category/time/location) on
+   *  the selected day — the sub-header's Add Event button, distinct from
+   *  the quick-add bar's title-only creation. */
+  onOpenCreate: (dateKey?: string) => void
   onEditEvent: (event: CalendarEvent) => void
   onRequestDelete: (event: CalendarEvent) => void
   isLoading: boolean
@@ -80,6 +119,7 @@ export function MobileCalendarView({
   selectedDateKey,
   onSelectDate,
   days,
+  filteredEvents,
   selectedDayEvents,
   activeCategories,
   onToggleCategory,
@@ -87,10 +127,13 @@ export function MobileCalendarView({
   onClearAllCategories,
   searchQuery,
   onSearchChange,
+  viewMode,
+  onViewModeChange,
   canCreate,
   canEdit,
   canDelete,
   onQuickAdd,
+  onOpenCreate,
   onEditEvent,
   onRequestDelete,
   isLoading,
@@ -213,110 +256,195 @@ export function MobileCalendarView({
         </div>
       )}
 
-      {/* ── MONTH GRID ───────────────────────────────────────────── */}
-      <div className="px-2.5 pt-2 shrink-0">
-        <div className="grid grid-cols-7 mb-1">
-          {WEEK_HEADERS_SHORT.map((d, i) => (
-            <span key={i} className="text-[10px] font-bold text-muted text-center py-1">
-              {d}
-            </span>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {days.map((cell) => {
-            const isSelected = cell.dateKey === selectedDateKey
+      {/* ── VIEW / CREATE SUB-HEADER ─────────────────────────────── */}
+      {/* New row, kept deliberately separate from the top bar above so the
+          approved nav row stays pixel-identical. */}
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-base shrink-0">
+        <div className="flex items-center bg-page border border-base rounded-lg p-0.5">
+          {(['month', 'agenda'] as CalendarViewMode[]).map((mode) => {
+            const Icon = mode === 'month' ? LayoutGrid : ListChecks
             return (
               <button
-                key={cell.dateKey}
+                key={mode}
                 type="button"
-                onClick={() => onSelectDate(cell.dateKey)}
-                aria-label={cell.dateKey}
-                aria-pressed={isSelected}
-                className={`min-h-[46px] rounded-xl flex flex-col items-center justify-start gap-1 pt-1.5 pb-1 transition-colors ${
-                  isSelected
-                    ? 'bg-brand-teal text-white shadow-sm'
-                    : cell.isToday
-                      ? 'bg-brand-teal/10 ring-1 ring-brand-teal/50'
-                      : cell.isCurrentMonth
-                        ? 'hover:bg-page'
-                        : 'opacity-35 hover:bg-page'
+                onClick={() => onViewModeChange(mode)}
+                aria-pressed={viewMode === mode}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-md text-xs font-heading font-medium capitalize transition-colors ${
+                  viewMode === mode
+                    ? 'bg-brand-navy text-white font-semibold shadow-sm'
+                    : 'text-muted'
                 }`}
               >
-                <span
-                  className={`text-xs font-semibold ${
-                    isSelected ? 'text-white' : cell.isToday ? 'text-brand-teal' : 'text-body'
-                  }`}
-                >
-                  {cell.dayNumber}
-                </span>
-                <div className="flex flex-col gap-[3px] w-full px-1.5">
-                  {cell.events.slice(0, 3).map((evt) => (
-                    <span
-                      key={evt.id}
-                      className="h-[3px] w-full rounded-full"
-                      style={{
-                        backgroundColor: isSelected ? 'rgba(255,255,255,0.85)' : categoryColor(evt.category),
-                      }}
-                    />
-                  ))}
-                </div>
+                <Icon className="w-3.5 h-3.5" aria-hidden="true" />
+                {mode}
               </button>
             )
           })}
         </div>
-      </div>
 
-      {/* ── SELECTED DAY LIST ────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-3.5 pt-3.5 pb-1.5 shrink-0">
-        <h3 className="text-sm font-heading font-bold text-body truncate">
-          {formatDisplayDate(selectedDateKey)}
-        </h3>
-        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-page text-muted border border-base shrink-0">
-          {selectedDayEvents.length}
-        </span>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-3.5 pb-2 divide-y divide-base">
-        {selectedDayEvents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-center py-8 text-muted">
-            <CalendarDays className="w-8 h-8 mb-2 opacity-60" aria-hidden="true" />
-            <p className="text-sm font-medium">No events for this date</p>
-            <p className="text-xs mt-1">Use the input below to quickly add a schedule item.</p>
-          </div>
-        ) : (
-          selectedDayEvents.map((evt) => (
-            <CalendarEventListItem
-              key={evt.id}
-              event={evt}
-              variant="row"
-              onEdit={canEdit ? onEditEvent : undefined}
-              onDelete={canDelete ? onRequestDelete : undefined}
-            />
-          ))
+        {canCreate && (
+          <button
+            type="button"
+            onClick={() => onOpenCreate(selectedDateKey)}
+            className="flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg bg-brand-teal hover:bg-brand-teal-light text-white font-heading font-semibold text-xs transition-colors shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+            Add Event
+          </button>
         )}
       </div>
 
-      {/* ── QUICK-ADD BAR ────────────────────────────────────────── */}
-      {canCreate && (
-        <form
-          onSubmit={handleQuickAdd}
-          className="flex items-center gap-2 p-2.5 border-t border-base bg-page/60 shrink-0"
-        >
-          <input
-            type="text"
-            value={quickTitle}
-            onChange={(e) => setQuickTitle(e.target.value)}
-            placeholder={`Add event on ${formatMonthShort(monthDate)} ${Number(selectedDateKey.split('-')[2])}`}
-            className="flex-1 min-w-0 px-4 py-2.5 min-h-[44px] text-sm bg-surface border border-base rounded-full text-body placeholder-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-          />
-          <button
-            type="submit"
-            aria-label="Add event"
-            className="w-11 h-11 shrink-0 rounded-full bg-brand-teal hover:bg-brand-teal-light text-white flex items-center justify-center transition-colors shadow-sm"
-          >
-            <Plus className="w-5 h-5" aria-hidden="true" />
-          </button>
-        </form>
+      {viewMode === 'month' ? (
+        <>
+          {/* ── MONTH GRID ───────────────────────────────────────────── */}
+          <div className="px-2.5 pt-2 shrink-0">
+            <div className="grid grid-cols-7 mb-1">
+              {WEEK_HEADERS_SHORT.map((d, i) => (
+                <span key={i} className="text-[10px] font-bold text-muted text-center py-1">
+                  {d}
+                </span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {days.map((cell) => {
+                const isSelected = cell.dateKey === selectedDateKey
+                return (
+                  <button
+                    key={cell.dateKey}
+                    type="button"
+                    onClick={() => onSelectDate(cell.dateKey)}
+                    aria-label={cell.dateKey}
+                    aria-pressed={isSelected}
+                    className={`min-h-[46px] rounded-xl flex flex-col items-center justify-start gap-1 pt-1.5 pb-1 transition-colors ${
+                      isSelected
+                        ? 'bg-brand-teal text-white shadow-sm'
+                        : cell.isToday
+                          ? 'bg-brand-teal/10 ring-1 ring-brand-teal/50'
+                          : cell.isCurrentMonth
+                            ? 'hover:bg-page'
+                            : 'opacity-35 hover:bg-page'
+                    }`}
+                  >
+                    <span
+                      className={`text-xs font-semibold ${
+                        isSelected ? 'text-white' : cell.isToday ? 'text-brand-teal' : 'text-body'
+                      }`}
+                    >
+                      {cell.dayNumber}
+                    </span>
+                    <div className="flex flex-col gap-[3px] w-full px-1.5">
+                      {cell.events.slice(0, 3).map((evt) => (
+                        <span
+                          key={evt.id}
+                          className="h-[3px] w-full rounded-full"
+                          style={{
+                            backgroundColor: isSelected ? 'rgba(255,255,255,0.85)' : categoryColor(evt.category),
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ── SELECTED DAY LIST ────────────────────────────────────── */}
+          <div className="flex items-center justify-between px-3.5 pt-3.5 pb-1.5 shrink-0">
+            <h3 className="text-sm font-heading font-bold text-body truncate">
+              {formatDisplayDate(selectedDateKey)}
+            </h3>
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-page text-muted border border-base shrink-0">
+              {selectedDayEvents.length}
+            </span>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-3.5 pb-2 divide-y divide-base">
+            {selectedDayEvents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-center py-8 text-muted">
+                <CalendarDays className="w-8 h-8 mb-2 opacity-60" aria-hidden="true" />
+                <p className="text-sm font-medium">No events for this date</p>
+                <p className="text-xs mt-1">Use the input below to quickly add a schedule item.</p>
+              </div>
+            ) : (
+              selectedDayEvents.map((evt) => (
+                <CalendarEventListItem
+                  key={evt.id}
+                  event={evt}
+                  variant="row"
+                  onEdit={canEdit ? onEditEvent : undefined}
+                  onDelete={canDelete ? onRequestDelete : undefined}
+                />
+              ))
+            )}
+          </div>
+
+          {/* ── QUICK-ADD BAR ────────────────────────────────────────── */}
+          {canCreate && (
+            <form
+              onSubmit={handleQuickAdd}
+              className="flex items-center gap-2 p-2.5 border-t border-base bg-page/60 shrink-0"
+            >
+              <input
+                type="text"
+                value={quickTitle}
+                onChange={(e) => setQuickTitle(e.target.value)}
+                placeholder={`Add event on ${formatMonthShort(monthDate)} ${Number(selectedDateKey.split('-')[2])}`}
+                className="flex-1 min-w-0 px-4 py-2.5 min-h-[44px] text-sm bg-surface border border-base rounded-full text-body placeholder-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              />
+              <button
+                type="submit"
+                aria-label="Add event"
+                className="w-11 h-11 shrink-0 rounded-full bg-brand-teal hover:bg-brand-teal-light text-white flex items-center justify-center transition-colors shadow-sm"
+              >
+                <Plus className="w-5 h-5" aria-hidden="true" />
+              </button>
+            </form>
+          )}
+        </>
+      ) : (
+        /* ── AGENDA LIST ──────────────────────────────────────────── */
+        <div className="flex-1 overflow-y-auto px-3.5 py-3">
+          <p className="text-xs text-muted mb-2">
+            {formatMonthYear(monthDate)} · {filteredEvents.length}{' '}
+            {filteredEvents.length === 1 ? 'event' : 'events'}
+          </p>
+          {filteredEvents.length === 0 ? (
+            <div className="flex flex-col items-center justify-center text-center py-12 text-muted">
+              <ListChecks className="w-8 h-8 mb-2 opacity-60" aria-hidden="true" />
+              <p className="text-sm font-medium">No events found</p>
+              <p className="text-xs mt-1">Try adjusting your filters or search.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {groupEventsByDate(filteredEvents).map((group) => (
+                <div key={group.dateKey}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelectDate(group.dateKey)
+                      onViewModeChange('month')
+                    }}
+                    className="text-xs font-heading font-bold text-brand-teal uppercase tracking-wide mb-1.5 hover:underline"
+                  >
+                    {formatGroupHeading(group.dateKey)}
+                  </button>
+                  <div className="divide-y divide-base">
+                    {group.events.map((evt) => (
+                      <CalendarEventListItem
+                        key={evt.id}
+                        event={evt}
+                        variant="row"
+                        onEdit={canEdit ? onEditEvent : undefined}
+                        onDelete={canDelete ? onRequestDelete : undefined}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       <MotionBottomSheet

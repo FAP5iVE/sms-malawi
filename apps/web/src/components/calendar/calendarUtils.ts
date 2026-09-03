@@ -60,6 +60,31 @@ export function getEventsForDate(events: CalendarEvent[], dateKey: string): Cale
   return events.filter((e) => isEventOnDate(e, dateKey))
 }
 
+export interface EventDateGroup {
+  dateKey: string
+  events: CalendarEvent[]
+}
+
+/** Groups events by their own start date and sorts both the groups (by
+ *  date) and each group's events (by start time) — used by
+ *  MobileCalendarView's Agenda mode, where a flat list of a whole month's
+ *  events needs date headers to stay scannable on a narrow screen. */
+export function groupEventsByDate(events: CalendarEvent[]): EventDateGroup[] {
+  const byDate = new Map<string, CalendarEvent[]>()
+  for (const e of events) {
+    const key = eventDateKey(e.start)
+    const bucket = byDate.get(key)
+    if (bucket) bucket.push(e)
+    else byDate.set(key, [e])
+  }
+  return Array.from(byDate.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dateKey, dayEvents]) => ({
+      dateKey,
+      events: [...dayEvents].sort((a, b) => a.start.localeCompare(b.start)),
+    }))
+}
+
 /** The month grid's own start/end dates for a given displayed month —
  *  computed independently of any event data so the calendar page can
  *  request exactly this range from the API before events exist yet. */
@@ -118,6 +143,12 @@ export function formatDisplayDate(dateKey: string): string {
 
 export function formatShortDate(dateKey: string): string {
   return format(parseISO(`${dateKey}T00:00:00`), 'MMM d')
+}
+
+/** "Fri, Sep 4" — used as the sticky date-group heading in the mobile
+ *  Agenda list, where full weekday names (formatDisplayDate) would wrap. */
+export function formatGroupHeading(dateKey: string): string {
+  return format(parseISO(`${dateKey}T00:00:00`), 'EEE, MMM d')
 }
 
 /** Renders an event's time range, e.g. "8:00 AM – 5:00 PM", or "All day"

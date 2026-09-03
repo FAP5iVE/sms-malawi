@@ -44,6 +44,17 @@
  *   apps/web/src/components/shared/ConfirmDialog.tsx,
  *   apps/web/src/components/calendar/* (new, this change),
  *   @shared/types/calendar, date-fns
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (feedback round)
+ * [PURPOSE]: `viewMode` (month/agenda) and `filteredEvents` — previously
+ *   only threaded to DesktopCalendarView — now also go to
+ *   MobileCalendarView, which grew its own Month/Agenda toggle and a
+ *   dedicated Add Event entry point (see MobileCalendarView.tsx's own
+ *   header comment). `openCreate` is now passed to both views instead of
+ *   just Desktop's. No new state was added here — the same single
+ *   viewMode/filteredEvents values just now drive both mounted views
+ *   instead of one, keeping desktop and mobile in sync if the viewport
+ *   crosses the md breakpoint mid-session.
  */
 'use client'
 import { useCallback, useMemo, useState } from 'react'
@@ -259,6 +270,7 @@ function CalendarContent() {
         selectedDateKey={selectedDateKey}
         onSelectDate={selectDate}
         days={days}
+        filteredEvents={filteredEvents}
         selectedDayEvents={selectedDayEvents}
         activeCategories={activeCategories}
         onToggleCategory={toggleCategory}
@@ -266,10 +278,13 @@ function CalendarContent() {
         onClearAllCategories={clearAllCategories}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
         canCreate={canCreate}
         canEdit={canEdit}
         canDelete={canDelete}
         onQuickAdd={quickAdd}
+        onOpenCreate={openCreate}
         onEditEvent={openEdit}
         onRequestDelete={requestDelete}
         isLoading={isLoading}

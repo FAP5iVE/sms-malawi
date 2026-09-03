@@ -14,11 +14,24 @@
  *   data is fetched once and passed down, matching this codebase's
  *   established CSS-controlled-visibility responsive pattern (see
  *   app/(auth)/layout.tsx's own header comment on that convention).
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (feedback round — sidebar/main divider
+ *   annotated as needing to be a draggable resizer)
+ * [PURPOSE]: The sidebar width was a fixed `w-80 xl:w-96`. Replaced with a
+ *   Pointer-Events-driven drag handle on the border between `<aside>` and
+ *   `<main>` — drag left/right to resize, clamped to SIDEBAR_MIN/MAX so
+ *   neither pane can be crushed unreadably. The chosen width persists to
+ *   localStorage (SIDEBAR_STORAGE_KEY) so it survives navigation/reload —
+ *   this is real app code rendered in the browser, not a chat artifact, so
+ *   localStorage is the correct, normal tool here (unlike Claude-authored
+ *   chat artifacts, which can't use it). Pointer Events (not separate
+ *   mouse/touch handlers) so the same handle works with mouse, touch, and
+ *   pen on any md+ viewport.
  * [DEPENDS ON]: ./calendarUtils, ./calendarConfig, ./MiniMonthCalendar,
  *   ./CategoryFilterBar, ./CalendarEventListItem, @shared/types/calendar
  */
 'use client'
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -26,6 +39,7 @@ import {
   Plus,
   Calendar as CalendarIcon,
   Layers,
+  GripVertical,
 } from 'lucide-react'
 import type { CalendarEvent, CalendarEventCategory } from '@shared/types/calendar'
 import { CATEGORY_LEGEND, categoryColor } from './calendarConfig'
@@ -40,6 +54,15 @@ import {
 } from './calendarUtils'
 
 export type CalendarViewMode = 'month' | 'agenda'
+
+const SIDEBAR_MIN = 280
+const SIDEBAR_MAX = 520
+const SIDEBAR_DEFAULT = 336
+const SIDEBAR_STORAGE_KEY = 'sms:calendar:sidebarWidth'
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
 
 interface DesktopCalendarViewProps {
   monthDate: Date
@@ -97,11 +120,66 @@ export function DesktopCalendarView({
   academicYearLabel,
 }: DesktopCalendarViewProps) {
   const [hoveredDateKey, setHoveredDateKey] = useState<string | null>(null)
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
+  const [isResizing, setIsResizing] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const widthRef = useRef(SIDEBAR_DEFAULT)
+
+  // Restore the person's last chosen sidebar width, if any.
+  useEffect(() => {
+    const stored = window.localStorage.getItem(SIDEBAR_STORAGE_KEY)
+    const parsed = stored ? Number(stored) : NaN
+    if (!Number.isNaN(parsed)) {
+      const clamped = clamp(parsed, SIDEBAR_MIN, SIDEBAR_MAX)
+      setSidebarWidth(clamped)
+      widthRef.current = clamped
+    }
+  }, [])
+
+  const handleResizePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault()
+      setIsResizing(true)
+      const startX = e.clientX
+      const startWidth = widthRef.current
+      const containerWidth = containerRef.current?.getBoundingClientRect().width ?? Infinity
+      // Leave room for the main pane so it can never be crushed unusable,
+      // regardless of how wide the sidebar is dragged.
+      const maxForContainer = Math.min(SIDEBAR_MAX, containerWidth - 420)
+
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+
+      function onPointerMove(ev: PointerEvent) {
+        const next = clamp(startWidth + (ev.clientX - startX), SIDEBAR_MIN, maxForContainer)
+        widthRef.current = next
+        setSidebarWidth(next)
+      }
+      function onPointerUp() {
+        setIsResizing(false)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(widthRef.current))
+        window.removeEventListener('pointermove', onPointerMove)
+        window.removeEventListener('pointerup', onPointerUp)
+      }
+
+      window.addEventListener('pointermove', onPointerMove)
+      window.addEventListener('pointerup', onPointerUp)
+    },
+    []
+  )
 
   return (
-    <div className="hidden md:flex h-[calc(100vh-8.5rem)] min-h-[560px] w-full bg-surface border border-base rounded-2xl overflow-hidden">
+    <div
+      ref={containerRef}
+      className="hidden md:flex h-[calc(100vh-8.5rem)] min-h-[560px] w-full bg-surface border border-base rounded-2xl overflow-hidden"
+    >
       {/* ── LEFT SIDEBAR ─────────────────────────────────────────── */}
-      <aside className="w-80 xl:w-96 shrink-0 bg-page/60 border-r border-base flex flex-col h-full overflow-hidden">
+      <aside
+        style={{ width: sidebarWidth }}
+        className="shrink-0 bg-page/60 flex flex-col h-full overflow-hidden"
+      >
         <div className="p-4 pb-3 border-b border-base flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-brand-teal/15 border border-brand-teal/30 flex items-center justify-center text-brand-teal shrink-0">
@@ -193,6 +271,34 @@ export function DesktopCalendarView({
           </span>
         </div>
       </aside>
+
+      {/* ── RESIZE HANDLE ────────────────────────────────────────── */}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize sidebar"
+        onPointerDown={handleResizePointerDown}
+        className={`group relative w-2.5 shrink-0 cursor-col-resize flex items-center justify-center touch-none ${
+          isResizing ? 'bg-brand-teal/15' : 'hover:bg-brand-teal/10'
+        }`}
+      >
+        <div
+          className={`absolute inset-y-0 left-1/2 -translate-x-1/2 w-px transition-colors ${
+            isResizing ? 'bg-brand-teal' : 'bg-base group-hover:bg-brand-teal/60'
+          }`}
+          aria-hidden="true"
+        />
+        <div
+          className={`relative z-10 w-4 h-9 rounded-full border flex items-center justify-center bg-surface transition-colors ${
+            isResizing
+              ? 'border-brand-teal text-brand-teal'
+              : 'border-base text-muted opacity-0 group-hover:opacity-100'
+          }`}
+          aria-hidden="true"
+        >
+          <GripVertical className="w-3 h-3" aria-hidden="true" />
+        </div>
+      </div>
 
       {/* ── MAIN PANE ────────────────────────────────────────────── */}
       <main className="flex-1 flex flex-col h-full overflow-hidden bg-surface">
