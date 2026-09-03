@@ -17,6 +17,7 @@ import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { env } from '@/lib/env'
+import { ensureFresh as sharedEnsureFresh } from './syncState'
 
 const SENTRY_BASE = 'https://de.sentry.io/api/0'   // DE region — confirmed, not the default sentry.io host
 const SENTRY_ORG = '5ivestack-labs'                 // matches the literal already hardcoded in next.config.ts
@@ -214,56 +215,18 @@ export async function syncRollupStats() {
 // show "live" system health. Instead, the read paths below each claim and
 // run their own sync whenever their slice of the cache is older than
 // SYNC_STALE_MS, so data self-heals on the next admin page view and never
-// depends on any external scheduler or plan tier.
-//
-// MonitoringSyncState.lastSyncedAt (NOT the cache tables' own updatedAt)
-// is the source of truth for staleness, because a sync can legitimately
-// write zero rows — e.g. no alerts configured yet — and that must still
-// count as "synced just now", or every request would re-trigger a sync
-// forever.
+// depends on any external scheduler or plan tier. The claim/run mechanics
+// live in ./syncState.ts (shared with vercelMonitoringService.ts) — this
+// is just the Sentry-specific staleness durations and which sync fn goes
+// with which type.
 const SYNC_STALE_MS = {
   issues: 3 * 60_000,  // webhook is the primary path; this is a safety net + backfill for anything the webhook missed
   alerts: 3 * 60_000,  // there is no webhook for alerts at all — this on-demand sync IS the only path
   rollup: 3 * 60_000,  // crash-free %, releases count, Apdex
 } as const
 
-type SyncType = keyof typeof SYNC_STALE_MS
-
-/**
- * Atomically claims the right to run `type`'s sync right now. Returns
- * true at most once per stale window — a concurrent request that loses
- * the race gets false back and just reads whatever's cached, which the
- * winning request is in the middle of refreshing.
- */
-async function claimSync(type: SyncType): Promise<boolean> {
-  const staleBefore = new Date(Date.now() - SYNC_STALE_MS[type])
-  const claimed = await prisma.monitoringSyncState.updateMany({
-    where: { syncType: type, lastSyncedAt: { lt: staleBefore } },
-    data: { lastSyncedAt: new Date() },
-  })
-  if (claimed.count > 0) return true
-
-  // No row at all yet — first sync ever for this type on this install.
-  try {
-    await prisma.monitoringSyncState.create({ data: { syncType: type, lastSyncedAt: new Date() } })
-    return true
-  } catch {
-    return false // lost the race to a concurrent request that created it first
-  }
-}
-
-async function ensureFresh(type: SyncType, fn: () => Promise<void>): Promise<void> {
-  if (!(await claimSync(type))) return
-  try {
-    await fn()
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    logger.error({ event: 'sentry.sync.on_demand_failed', type, err: message })
-    // Leave lastSyncedAt claimed as-is — retrying on every request while
-    // Sentry itself is down would just add load to an outage. The next
-    // request past the stale window will retry naturally.
-    await prisma.monitoringSyncState.update({ where: { syncType: type }, data: { lastError: message } }).catch(() => {})
-  }
+function ensureFresh(type: keyof typeof SYNC_STALE_MS, fn: () => Promise<void>): Promise<void> {
+  return sharedEnsureFresh(type, SYNC_STALE_MS[type], fn)
 }
 
 // ── Reads — what the routes actually serve to the frontend ──

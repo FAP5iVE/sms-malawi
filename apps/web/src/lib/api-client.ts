@@ -551,4 +551,10 @@ export const queryKeys = {
     logs: (level?: string) => ['monitoring', 'logs', level ?? null] as const,
     feedback: () => ['monitoring', 'feedback'] as const,
   },
+  vercelMonitoring: {
+    summary: () => ['vercelMonitoring', 'summary'] as const,
+    deployments: (limit?: number) => ['vercelMonitoring', 'deployments', limit ?? null] as const,
+    errors: (level?: string) => ['vercelMonitoring', 'errors', level ?? null] as const,
+    alerts: () => ['vercelMonitoring', 'alerts'] as const,
+  },
 } as const

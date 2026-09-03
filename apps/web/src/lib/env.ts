@@ -40,6 +40,13 @@ const serverSchema = z.object({
   SENTRY_WEBHOOK_SECRET: z
     .string()
     .min(1, 'SENTRY_WEBHOOK_SECRET is required to verify Sentry webhooks'),
+  // Vercel-native monitoring (deployments, runtime logs, Web Analytics) —
+  // see docs/vercel-native-monitoring-research.md. All optional: this
+  // panel degrades to "not configured" rather than breaking the rest of
+  // /monitoring if these aren't set yet.
+  VERCEL_API_TOKEN: z.string().optional(),
+  VERCEL_PROJECT_ID: z.string().optional(),
+  VERCEL_TEAM_ID: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   ALGOLIA_APP_ID: z.string().optional(),
   ALGOLIA_ADMIN_KEY: z.string().optional(),
@@ -152,6 +159,9 @@ export const env = {
   // ── Sentry monitoring
   get SENTRY_API_TOKEN()      { return getServerEnv().SENTRY_API_TOKEN },
   get SENTRY_WEBHOOK_SECRET() { return getServerEnv().SENTRY_WEBHOOK_SECRET },
+  get VERCEL_API_TOKEN()      { return getServerEnv().VERCEL_API_TOKEN },
+  get VERCEL_PROJECT_ID()     { return getServerEnv().VERCEL_PROJECT_ID },
+  get VERCEL_TEAM_ID()        { return getServerEnv().VERCEL_TEAM_ID },
 
   // ── Optional
   get RESEND_API_KEY()  { return getServerEnv().RESEND_API_KEY },

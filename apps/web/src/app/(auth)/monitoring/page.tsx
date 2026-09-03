@@ -1,19 +1,24 @@
 /**
- * [CHANGE TYPE]: NEW FILE
+ * [CHANGE TYPE]: TARGETED EDIT
  * [FILE]: apps/web/src/app/(auth)/monitoring/page.tsx
- * [PURPOSE]: The Sentry-backed admin monitoring dashboard — KPI strip + 6
+ * [PURPOSE]: The admin monitoring dashboard — Sentry KPI strip + 7
  *   ModuleTabs panels (Errors & Outages, Logs, Alerts, Replays, Releases,
- *   Feedback). Route-level access is already enforced twice before this
- *   component renders (proxy.ts edge check + NAV_ITEMS visibility, both
- *   from PAGE_ACCESS['/monitoring']) — RoleGuard here is defense-in-depth,
- *   matching the real pattern used by exams/page.tsx.
- * [DEPENDS ON]: @/hooks/useMonitoring, @/hooks/usePermissions,
+ *   Feedback, Vercel Platform). The 7th tab (Vercel Platform, added
+ *   2026-09-02) is backed by a completely separate service
+ *   (vercelMonitoringService, not Sentry) — see
+ *   docs/vercel-native-monitoring-research.md for why it's a distinct
+ *   section rather than folded into the panels above. Route-level access
+ *   is already enforced twice before this component renders (proxy.ts
+ *   edge check + NAV_ITEMS visibility, both from PAGE_ACCESS['/monitoring'])
+ *   — RoleGuard here is defense-in-depth, matching the real pattern used
+ *   by exams/page.tsx.
+ * [DEPENDS ON]: @/hooks/{useMonitoring,useVercelMonitoring}, @/hooks/usePermissions,
  *   @/components/shared/{RoleGuard,ModuleTabs}, @/components/monitoring/*
  */
 'use client'
 
 import { useState } from 'react'
-import { Activity, AlertTriangle, ScrollText, Bell, Video, GitBranch, MessageSquareWarning } from 'lucide-react'
+import { Activity, AlertTriangle, ScrollText, Bell, Video, GitBranch, MessageSquareWarning, Cloud } from 'lucide-react'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { ModuleTabs } from '@/components/shared/ModuleTabs'
 import type { TabItem } from '@/components/shared/ModuleTabs'
@@ -26,8 +31,9 @@ import { AlertsPanel } from '@/components/monitoring/AlertsPanel'
 import { ReplaysPanel } from '@/components/monitoring/ReplaysPanel'
 import { ReleasesPanel } from '@/components/monitoring/ReleasesPanel'
 import { FeedbackPanel } from '@/components/monitoring/FeedbackPanel'
+import { VercelPlatformPanel } from '@/components/monitoring/VercelPlatformPanel'
 
-type Tab = 'errors' | 'logs' | 'alerts' | 'replays' | 'releases' | 'feedback'
+type Tab = 'errors' | 'logs' | 'alerts' | 'replays' | 'releases' | 'feedback' | 'vercel'
 
 export default function MonitoringPage() {
   const { can } = usePermissions()
@@ -41,6 +47,7 @@ export default function MonitoringPage() {
     { id: 'replays',  label: 'Replays',           icon: Video },
     { id: 'releases', label: 'Releases',          icon: GitBranch },
     { id: 'feedback', label: 'Feedback',          icon: MessageSquareWarning },
+    { id: 'vercel',   label: 'Vercel Platform',   icon: Cloud },
   ]
 
   return (
@@ -69,6 +76,7 @@ export default function MonitoringPage() {
           {tab === 'replays'  && <ReplaysPanel />}
           {tab === 'releases' && <ReleasesPanel summary={summary} />}
           {tab === 'feedback' && <FeedbackPanel />}
+          {tab === 'vercel'   && <VercelPlatformPanel />}
         </div>
       </div>
     </RoleGuard>

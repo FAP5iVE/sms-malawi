@@ -124,8 +124,7 @@ enum SubmissionStatus {
   MISSING
 }
 
-// ─── ATTENDANCE (R6 — Postgres rebuild, replacing unmediated Firestore
-// access per the R3 Option B decision) ─────────────────────
+// ─── ATTENDANCE  ─────────────────────
 model Attendance {
   id        String   @id @default(cuid())
   studentId String
@@ -249,13 +248,6 @@ enum TimetableType {
 }
 
 // ─── CLASS SUBJECT ASSIGNMENT ─────────────────────────────
-// Canonical "teacher T teaches subject S in class C for year Y" record —
-// the single authority for exam/marks ownership (AC-2/3/4/5/6). Distinct
-// from Class.teacherId (the form teacher) and from TimetableSlot (a
-// scheduling row): a teacher is authorised to schedule/enter/finalize an
-// exam only for the (classId, subject) pairs they hold here. teacherUid is
-// a Firebase UID (no Prisma FK across the identity boundary — same
-// convention as Class.teacherId / Exam.createdByUid).
 model ClassSubjectAssignment {
   id           String   @id @default(cuid())
   classId      String
@@ -266,7 +258,6 @@ model ClassSubjectAssignment {
   createdByUid String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
   @@unique([classId, subject, academicYear])
   @@index([teacherUid, academicYear])
   @@index([classId, academicYear])
@@ -393,16 +384,6 @@ model Expense {
   recordedByUid String
   incurredAt   DateTime
   createdAt    DateTime        @default(now())
-  // [PRODUCTION FIX 2026-07-27] Vendor/company debt tracking. An APPROVED
-  // expense with paidAt = null is money the school owes but has not yet
-  // paid — posted to the ledger's 2000 Accounts Payable account instead of
-  // 1000 Cash at approval time (see PATCH /finances/expenses/:id/approve's
-  // paidImmediately flag). paidAt is set either immediately (paid-in-cash
-  // approval) or later via PATCH /finances/expenses/:id/mark-paid, which
-  // clears the payable with a DR 2000 / CR 1000 entry. Both nullable so
-  // existing rows (created before this fix) read as "unpaid" by default
-  // rather than requiring a backfill — a conservative default for a
-  // money-owed field.
   paidAt       DateTime?
   paidByUid    String?
 
@@ -480,12 +461,6 @@ model SalaryStructure {
   id           String   @id @default(cuid())
   staffUid     String   @unique
   baseSalary   Decimal  @db.Decimal(12, 2)
-  // [PRODUCTION FIX] Deprecated — a single flat number couldn't represent
-  // allowances that differ by type or arrive at different times, which is
-  // how they actually work. Replaced by StaffAllowance below (itemized,
-  // one row per allowance). Left in place for existing data/backward
-  // compatibility; the new salary UI and payrollService.ts's gross
-  // calculation both read StaffAllowance now, not this field.
   allowances   Decimal  @db.Decimal(12, 2) @default(0)
   loanBalance  Decimal  @db.Decimal(12, 2) @default(0)
   monthlyLoanDeduction Decimal @db.Decimal(12, 2) @default(0)
@@ -494,12 +469,6 @@ model SalaryStructure {
   @@map("salary_structures")
 }
 
-// [PRODUCTION FIX] New model — allowances genuinely differ by type (housing,
-// transport, responsibility, one-off bonus, etc.) and don't all arrive on
-// the same monthly cycle as base salary. `recurring: true` rows are
-// included in every payroll run automatically; `recurring: false` rows are
-// one-time and only apply to the specific (paidMonth, paidYear) they name —
-// payrollService.ts's gross calculation sums both kinds correctly per run.
 model StaffAllowance {
   id           String   @id @default(cuid())
   staffUid     String
@@ -523,12 +492,6 @@ model Budget {
   academicYear String
   term         Int?     // null = annual budget
   department   String
-  // [R14] Was a free-text String with no enforced relationship to the
-  // ExpenseCategory enum that Expense.category actually uses — so
-  // analyticsService.getFinanceBudgetVsActual()'s Budget↔Expense join key
-  // never matched for any real budget, silently falling back to the stale
-  // cached Budget.spent column instead of live expense data. Constraining
-  // it to the same enum resolves the mismatch at its source.
   category     ExpenseCategory
   description  String?
   allocated    Decimal  @db.Decimal(12, 2)
@@ -593,7 +556,7 @@ enum InstallmentStatus {
   OVERDUE 
   }
 
-// ─── LIBRARY FINE (bridge between Library and Finance) ────
+// ─── LIBRARY FINE  ───────────────────────────────────────
 model LibraryFine {
   id              String          @id @default(cuid())
   studentId       String?         // R12: made optional — a staff borrower's fine has no studentId (see staffId below)
@@ -818,15 +781,6 @@ model TermResult {
 }
 
 // ─── TEACHER COMMENT (R8) ─────────────────────────────────
-// Minimal model so report cards can carry a real comment instead of a
-// permanently-null lookup against a Prisma model that never existed
-// (reportCardService.ts previously queried prisma.teacherComment with no
-// TeacherComment model behind it at all). One row per comment; a
-// TermResult may have more than one (e.g. one from the class's assigned
-// teacher, one from another staff member reviewing/approving) —
-// reportCardService.ts distinguishes "class teacher" vs "head teacher" by
-// checking authorUid against the student's Class.teacherId, not a stored
-// role field, keeping this model deliberately minimal.
 model TeacherComment {
   id           String     @id @default(cuid())
   termResultId String
@@ -888,14 +842,6 @@ enum ManebStatus   {
  }
 
 // ─── HR MODULE ────────────────────────────────────────────
-
-// [PRODUCTION FIX 2026-07-28] Real gallery storage — "Life at our school" on
-// the public landing page previously had no live source at all (placeholder
-// icon blocks only). Files themselves live in Appwrite under
-// FILE_PREFIX.SCHOOL_GALLERY (public.ts's file-storage skill/pattern); this
-// table is just the ordered, captioned index of which files are the gallery,
-// with a caption/category and simple ordering for the homepage's 5-photo
-// preview vs the full /gallery page.
 model GalleryPhoto {
   id           String   @id @default(cuid())
   fileKey      String   @unique // Appwrite file ID, FILE_PREFIX.SCHOOL_GALLERY
@@ -939,10 +885,6 @@ model StaffProfile {
   @@map("staff_profiles")
 }
 
-// R11 — mirrors packages/shared/types/roles.ts's USER_ROLES exactly (lowercase/
-// snake_case member names, not this schema's usual UPPER_CASE convention) —
-// StaffProfile.role's stored values, Firebase custom claims, the permissions
-// matrix, and RoleGuard all compare against these exact lowercase strings.
 enum StaffRole {
   admin
   high_rank
@@ -1205,12 +1147,6 @@ model UserNotificationPref {
 } 
 
 // ─── PENDING ACTIONS (Approval Workflow) ─────────────────
-// Stores actions initiated by lower_rank or academic staff that
-// require admin / high_rank approval before taking effect.
-// entityType + entityId point to the Prisma record being acted on.
-// targetState holds the intended payload as JSON (diff or new values).
-// The executing service reads targetState and applies it on approval.
-
 model PendingAction {
   id              String              @id @default(cuid())
   entityType      String
@@ -1244,11 +1180,6 @@ enum PendingActionStatus {
 }
 
 // ─── SYSTEM SETTINGS ─────────────────────────────────────
-// Generic key-value store for all configurable system parameters.
-// Each key maps to a typed JSON value; the application layer
-// enforces type safety — PostgreSQL stores raw JSON.
-// category is a plain string (not an enum) to allow new categories
-// without Prisma migrations.
 model SystemSettings {
   key          String   @id
   value        Json
@@ -1262,7 +1193,7 @@ model SystemSettings {
   @@map("system_settings")
 }
 
-// ─── CONFIGURABLE GRADING ENGINE (Phase D4) ──────────────
+// ─── CONFIGURABLE GRADING ENGINE  ──────────────
 
 model GradingScale {
   id           String   @id @default(cuid())
@@ -1375,7 +1306,7 @@ model PerformanceReviewCompetency {
   @@map("performance_review_competencies")
 }
 
-// ─── MALAWI PUBLIC HOLIDAYS (Phase F10) ──────────────────
+// ─── MALAWI PUBLIC HOLIDAYS  ──────────────────
 
 model MalawiPublicHoliday {
   id        String   @id @default(cuid())
@@ -1391,7 +1322,7 @@ model MalawiPublicHoliday {
   @@map("malawi_public_holidays")
 }
 
-// ─── NEWSLETTER SUBSCRIBERS (Phase F1) ───────────────────
+// ─── NEWSLETTER SUBSCRIBERS  ───────────────────
 
 model NewsletterSubscriber {
   id          String   @id @default(cuid())
@@ -1407,24 +1338,6 @@ model NewsletterSubscriber {
 }
 
 // ─── ANNOUNCEMENT ─────────────────────────────────────────
-// Minimal shape — makes public.ts's GET /public/announcements and
-// calendar.ts's calendar-feed query (both pre-existing, both referencing
-// prisma.announcement with no Prisma model behind it at all — a confirmed
-// build-breaking defect, since neither could have typechecked against the
-// generated Prisma client) compile and function correctly. A full
-// Announcements domain (create/publish workflow, role/class targeting,
-// approval, S/schemas/student.ts's AnnouncementSchema reconciliation) is
-// its own dedicated roadmap phase and is not built out here — this model
-// only covers the two read-only call sites that already exist.
-// ─── Announcement (DEPRECATED — DO NOT USE) ───────────────
-// [N1] Live announcements are stored in FIRESTORE (collection
-// `announcements`), not here. Nothing in the application reads or writes
-// this Prisma table — the read path is useAnnouncements.ts (client) and
-// announcementService.ts / public.ts (server), all Firestore. This model
-// is retained only to avoid a destructive migration on an existing
-// database; it holds no live data and must not be seeded or queried.
-// Safe to drop in a future dedicated migration once confirmed unused in
-// any external tooling.
 model Announcement {
   id             String    @id @default(cuid())
   title          String
@@ -1440,15 +1353,7 @@ model Announcement {
   @@map("announcements")
 }
 
-// ─── CALENDAR EVENT (R13) ─────────────────────────────────
-// Generic, manually-created calendar events — distinct from the other
-// eight aggregated sources GET /calendar/events already computes
-// (holidays, terms, exams, lab bookings, leave, timetable,
-// announcements, assignments), none of which are rows in this table.
-// No such model existed anywhere despite calendar.createEvent/editEvent/
-// deleteEvent/manageAcademicCalendar being formally granted to seven and
-// two roles respectively per the permission matrix — a genuine,
-// previously-unimplementable capability, not a defect in existing code.
+// ─── CALENDAR EVENT ─────────────────────────────────
 model CalendarEvent {
   id            String   @id @default(cuid())
   title         String
@@ -1466,18 +1371,7 @@ model CalendarEvent {
   @@map("calendar_events")
 }
 
-// ─── UNIVERSITY PLACEMENT (R18 — advisory placement module) ──────────
-// Advisory-only: computes MSCE-eligibility against the git-versioned
-// @shared/constants/universities catalogue, records self-reported and
-// staff-verified placement outcomes, and feeds cohort analytics. It NEVER
-// grades — MSCE results arrive already-graded via ManebRecord. A placement
-// is keyed to exactly one certified MSCE ManebRecord (manebRecordId @unique).
-// Catalogue references (placedUniversityId/placedProgrammeId, and the same
-// pair on PlacementChoice) are plain string keys into the constants file, not
-// DB foreign keys — the catalogue is not a table. Free-text fields carry
-// universities/programmes outside the curated catalogue (private/foreign).
-// Actor UIDs are Firebase UIDs — plain strings, no @relation (sms-erp-schema
-// Rule 2), matching the CalendarEvent.createdByUid convention above.
+// ─── UNIVERSITY PLACEMENT ──────────
 enum PlacementStatus {
   NOT_STARTED             // no eligibility computed yet
   ELIGIBILITY_COMPUTED    // recommendations generated, no choices recorded
@@ -1492,16 +1386,10 @@ model UniversityPlacement {
   id                   String          @id @default(cuid())
   studentId            String
   student              Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  // The certified MSCE record this placement is derived from. Unique: one
-  // placement per MSCE sitting. Nullable relation is not needed — a placement
-  // always originates from a specific MSCE record.
   manebRecordId        String          @unique
   manebRecord          ManebRecord     @relation(fields: [manebRecordId], references: [id], onDelete: Cascade)
   status               PlacementStatus @default(NOT_STARTED)
   eligibilityComputedAt DateTime?
-  // Catalogue keys (into @shared/constants/universities) OR free-text — the
-  // service layer enforces that exactly one of the two pairs is populated for
-  // a recorded outcome.
   placedUniversityId   String?
   placedProgrammeId    String?
   placedUniversityName String?         // free-text (private/foreign, or off-catalogue)
@@ -1539,12 +1427,7 @@ model PlacementChoice {
   @@map("placement_choices")
 }
 
-// ─────────────────────────────────────────────────────────
-// SENTRY MONITORING CACHE (webhook-populated + periodic rollup sync)
-// Populated by apps/web/src/server/services/monitoringService.ts.
-// Never holds student/staff PII — Sentry-side scrubbing (Section 6) already
-// keeps that out of the events themselves.
-// ─────────────────────────────────────────────────────────
+// ─────────────────SENTRY MONITORING CACHE ───────────────────────────────────────────────
 
 model SentryIssueCache {
   id              String    @id @default(cuid())
@@ -1570,7 +1453,6 @@ model SentryIssueCache {
   @@index([lastSeenAt])
   @@index([isUptimeIssue])
 }
-
 model SentryAlertCache {
   id              String    @id @default(cuid())
   sentryAlertId   String    @unique
@@ -1581,7 +1463,6 @@ model SentryAlertCache {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }
-
 model SentryRollupStat {
   id          String    @id @default(cuid())
   metricKey   String    @unique   // e.g. "crash_free_sessions:7d", "apdex:24h", "releases_count:30d", "crash_free_users:7d"
@@ -1594,4 +1475,57 @@ model MonitoringSyncState {
   syncType     String    @id   // "issues" | "alerts" | "rollup"
   lastSyncedAt DateTime
   lastError    String?
+}
+
+// ─── Vercel-native platform monitoring ──────────────────────────────────
+model VercelDeploymentCache {
+  id              String    @id @default(cuid())
+  deploymentId    String    @unique   // Vercel's own deployment "uid"
+  state           String              // BUILDING | ERROR | INITIALIZING | QUEUED | READY | CANCELED | BLOCKED
+  target          String?             // "production" | "staging" | null (preview)
+  url             String?
+  errorMessage    String?
+  createdAtVercel DateTime            // Vercel's own deployment creation timestamp
+  readyAtVercel   DateTime?
+  syncedAt        DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([state])
+}
+model VercelRuntimeLogCache {
+  id                 String    @id @default(cuid())
+  rowId              String    @unique
+  level              String              // debug | error | fatal | info | trace | warning
+  message            String    @db.Text
+  source             String?             // serverless | edge-function | edge-middleware | request | delimiter
+  deploymentId       String?
+  domain             String?
+  requestMethod      String?
+  requestPath        String?
+  responseStatusCode Int?
+  timestamp          DateTime
+  createdAt          DateTime  @default(now())
+
+  @@index([level, timestamp])
+}
+
+model VercelRollupStat {
+  id          String    @id @default(cuid())
+  metricKey   String    @unique   // e.g. "pageviews:24h", "visitors:24h"
+  value       Float
+  windowLabel String
+  syncedAt    DateTime  @default(now())
+}
+
+model VercelAlertEvent {
+  id           String    @id @default(cuid())
+  kind         String              // "deployment_failed" | "error_spike"
+  severity     String    @default("warning")   // "warning" | "critical"
+  message      String
+  deploymentId String?
+  occurredAt   DateTime  @default(now())
+  acknowledged Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  @@index([kind, acknowledged])
 }
