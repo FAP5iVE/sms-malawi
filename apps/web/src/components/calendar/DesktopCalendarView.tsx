@@ -27,11 +27,35 @@
  *   chat artifacts, which can't use it). Pointer Events (not separate
  *   mouse/touch handlers) so the same handle works with mouse, touch, and
  *   pen on any md+ viewport.
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (second feedback round)
+ * [PURPOSE]: (1) SIDEBAR_MIN lowered 280 → 240 — "the slider should go
+ *   left a little more." (2) The full-width category-chip strip
+ *   (CategoryFilterBar, its own row under the header) is gone, replaced by
+ *   CategoryFilterDropdown sitting in the header row itself, right after
+ *   Add Event, per the round's annotation. See CategoryFilterDropdown.tsx
+ *   for why multi-select filtering was kept rather than narrowed to
+ *   single-select.
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (lint fix — react-hooks/set-state-in-effect)
+ * [PURPOSE]: The localStorage restore used to live in a mount-only
+ *   useEffect that called setSidebarWidth — flagged because a setState
+ *   call inside an effect body forces an extra render pass right after
+ *   mount (render with the default width, commit, effect fires, setState,
+ *   re-render with the real width). Moved the same read into useState's
+ *   lazy initializer (getInitialSidebarWidth) instead, which React only
+ *   ever calls once, during the first render itself — no second pass, no
+ *   effect needed. Guards on `typeof window === 'undefined'` because this
+ *   Client Component still renders once on the server before hydration,
+ *   where `window`/`localStorage` don't exist yet; that server pass (and
+ *   the client's first hydration pass, before localStorage is checked)
+ *   render at SIDEBAR_DEFAULT, then the real stored width — if different —
+ *   takes over during hydration itself, not after.
  * [DEPENDS ON]: ./calendarUtils, ./calendarConfig, ./MiniMonthCalendar,
- *   ./CategoryFilterBar, ./CalendarEventListItem, @shared/types/calendar
+ *   ./CategoryFilterDropdown, ./CalendarEventListItem, @shared/types/calendar
  */
 'use client'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -43,7 +67,7 @@ import {
 } from 'lucide-react'
 import type { CalendarEvent, CalendarEventCategory } from '@shared/types/calendar'
 import { CATEGORY_LEGEND, categoryColor } from './calendarConfig'
-import { CategoryFilterBar } from './CategoryFilterBar'
+import { CategoryFilterDropdown } from './CategoryFilterDropdown'
 import { CalendarEventListItem } from './CalendarEventListItem'
 import { MiniMonthCalendar } from './MiniMonthCalendar'
 import {
@@ -55,13 +79,23 @@ import {
 
 export type CalendarViewMode = 'month' | 'agenda'
 
-const SIDEBAR_MIN = 280
+const SIDEBAR_MIN = 240
 const SIDEBAR_MAX = 520
 const SIDEBAR_DEFAULT = 336
 const SIDEBAR_STORAGE_KEY = 'sms:calendar:sidebarWidth'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
+}
+
+/** Resolved once, in useState's lazy initializer — see the file header
+ *  comment on the react-hooks/set-state-in-effect fix for why this isn't
+ *  a mount effect instead. */
+function getInitialSidebarWidth(): number {
+  if (typeof window === 'undefined') return SIDEBAR_DEFAULT
+  const stored = window.localStorage.getItem(SIDEBAR_STORAGE_KEY)
+  const parsed = stored ? Number(stored) : NaN
+  return Number.isNaN(parsed) ? SIDEBAR_DEFAULT : clamp(parsed, SIDEBAR_MIN, SIDEBAR_MAX)
 }
 
 interface DesktopCalendarViewProps {
@@ -120,21 +154,10 @@ export function DesktopCalendarView({
   academicYearLabel,
 }: DesktopCalendarViewProps) {
   const [hoveredDateKey, setHoveredDateKey] = useState<string | null>(null)
-  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
+  const [sidebarWidth, setSidebarWidth] = useState(getInitialSidebarWidth)
   const [isResizing, setIsResizing] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  const widthRef = useRef(SIDEBAR_DEFAULT)
-
-  // Restore the person's last chosen sidebar width, if any.
-  useEffect(() => {
-    const stored = window.localStorage.getItem(SIDEBAR_STORAGE_KEY)
-    const parsed = stored ? Number(stored) : NaN
-    if (!Number.isNaN(parsed)) {
-      const clamped = clamp(parsed, SIDEBAR_MIN, SIDEBAR_MAX)
-      setSidebarWidth(clamped)
-      widthRef.current = clamped
-    }
-  }, [])
+  const widthRef = useRef(sidebarWidth)
 
   const handleResizePointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -380,17 +403,15 @@ export function DesktopCalendarView({
                 Add Event
               </button>
             )}
+
+            <CategoryFilterDropdown
+              activeCategories={activeCategories}
+              onToggleCategory={onToggleCategory}
+              onSelectAll={onSelectAllCategories}
+              onClearAll={onClearAllCategories}
+            />
           </div>
         </header>
-
-        <div className="px-6 py-2.5 bg-page/50 border-b border-base shrink-0">
-          <CategoryFilterBar
-            activeCategories={activeCategories}
-            onToggle={onToggleCategory}
-            onSelectAll={onSelectAllCategories}
-            onClearAll={onClearAllCategories}
-          />
-        </div>
 
         {isLoading && (
           <div className="px-6 py-2 text-xs text-muted flex items-center gap-2 shrink-0">
