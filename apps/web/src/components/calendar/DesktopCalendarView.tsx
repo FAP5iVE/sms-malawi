@@ -51,6 +51,17 @@
  *   the client's first hydration pass, before localStorage is checked)
  *   render at SIDEBAR_DEFAULT, then the real stored width — if different —
  *   takes over during hydration itself, not after.
+ * [CHANGE TYPE]: TARGETED EDIT (third feedback round — redundant button)
+ * [PURPOSE]: Removed the header's own "Add Event" button. The sidebar
+ *   already has two create-event entry points (the + icon next to
+ *   Calendar Hub, and the empty-state "Add Event for this Day" button
+ *   shown when the selected day has none) — a third button doing the
+ *   exact same thing, just sitting next to CategoryFilterDropdown in the
+ *   header, was pure redundancy. Both `onOpenCreate` calls in the sidebar
+ *   are untouched; only the header's copy is gone. Desktop-only per the
+ *   request — MobileCalendarView.tsx's own Add Event button (in its
+ *   Month/Agenda sub-header) is a separate, non-redundant control there
+ *   and is unaffected.
  * [DEPENDS ON]: ./calendarUtils, ./calendarConfig, ./MiniMonthCalendar,
  *   ./CategoryFilterDropdown, ./CalendarEventListItem, @shared/types/calendar
  */
@@ -196,7 +207,7 @@ export function DesktopCalendarView({
   return (
     <div
       ref={containerRef}
-      className="hidden md:flex h-[calc(100vh-8.5rem)] min-h-[560px] w-full bg-surface border border-base rounded-2xl overflow-hidden"
+      className="hidden md:flex h-[calc(100vh-8.5rem)] min-h-140 w-full bg-surface border border-base rounded-2xl overflow-hidden"
     >
       {/* ── LEFT SIDEBAR ─────────────────────────────────────────── */}
       <aside
@@ -221,7 +232,7 @@ export function DesktopCalendarView({
               onClick={() => onOpenCreate(selectedDateKey)}
               title="Create Event"
               aria-label="Create event"
-              className="p-2 min-h-[36px] min-w-[36px] rounded-xl bg-brand-teal hover:bg-brand-teal-light text-white transition-colors shadow-sm flex items-center justify-center shrink-0"
+              className="p-2 min-h-9 min-w-9 rounded-xl bg-brand-teal hover:bg-brand-teal-light text-white transition-colors shadow-sm flex items-center justify-center shrink-0"
             >
               <Plus className="w-4 h-4" aria-hidden="true" />
             </button>
@@ -259,7 +270,7 @@ export function DesktopCalendarView({
                 <CalendarIcon className="w-6 h-6" aria-hidden="true" />
               </div>
               <p className="text-sm font-medium">No events scheduled</p>
-              <p className="text-xs mt-1 max-w-[200px]">
+              <p className="text-xs mt-1 max-w-50">
                 {canCreate
                   ? 'Click below to add a lecture, deadline, holiday, or schedule item.'
                   : 'Nothing on the calendar for this day yet.'}
@@ -268,7 +279,7 @@ export function DesktopCalendarView({
                 <button
                   type="button"
                   onClick={() => onOpenCreate(selectedDateKey)}
-                  className="mt-3 px-3.5 py-2 min-h-[40px] rounded-lg bg-page hover:bg-base/60 text-xs font-heading font-semibold text-body border border-base flex items-center gap-1.5 transition-colors"
+                  className="mt-3 px-3.5 py-2 min-h-10 rounded-lg bg-page hover:bg-base/60 text-xs font-heading font-semibold text-body border border-base flex items-center gap-1.5 transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5 text-brand-teal" aria-hidden="true" />
                   Add Event for this Day
@@ -333,14 +344,14 @@ export function DesktopCalendarView({
                 onClick={() => onNavigateMonth(-1)}
                 title="Previous month"
                 aria-label="Previous month"
-                className="p-1.5 min-h-[36px] min-w-[36px] rounded-lg text-muted hover:text-body hover:bg-surface transition-colors"
+                className="p-1.5 min-h-9 min-w-9 rounded-lg text-muted hover:text-body hover:bg-surface transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" aria-hidden="true" />
               </button>
               <button
                 type="button"
                 onClick={onGoToToday}
-                className="px-3 py-1.5 min-h-[36px] rounded-lg text-xs font-heading font-semibold text-body hover:bg-surface transition-colors"
+                className="px-3 py-1.5 min-h-9 rounded-lg text-xs font-heading font-semibold text-body hover:bg-surface transition-colors"
               >
                 Today
               </button>
@@ -349,7 +360,7 @@ export function DesktopCalendarView({
                 onClick={() => onNavigateMonth(1)}
                 title="Next month"
                 aria-label="Next month"
-                className="p-1.5 min-h-[36px] min-w-[36px] rounded-lg text-muted hover:text-body hover:bg-surface transition-colors"
+                className="p-1.5 min-h-9 min-w-9 rounded-lg text-muted hover:text-body hover:bg-surface transition-colors"
               >
                 <ChevronRight className="w-4 h-4" aria-hidden="true" />
               </button>
@@ -371,7 +382,7 @@ export function DesktopCalendarView({
                 onChange={(e) => onSearchChange(e.target.value)}
                 placeholder="Search events..."
                 aria-label="Search events"
-                className="pl-9 pr-3 py-2 min-h-[36px] text-xs bg-page border border-base rounded-xl text-body placeholder-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25 w-44 lg:w-60 transition-all"
+                className="pl-9 pr-3 py-2 min-h-9 text-xs bg-page border border-base rounded-xl text-body placeholder-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25 w-44 lg:w-60 transition-all"
               />
             </div>
 
@@ -382,7 +393,7 @@ export function DesktopCalendarView({
                   type="button"
                   onClick={() => onViewModeChange(mode)}
                   aria-pressed={viewMode === mode}
-                  className={`px-3 py-1.5 min-h-[36px] rounded-lg text-xs font-heading font-medium capitalize transition-colors ${
+                  className={`px-3 py-1.5 min-h-9 rounded-lg text-xs font-heading font-medium capitalize transition-colors ${
                     viewMode === mode
                       ? 'bg-brand-navy text-white font-semibold shadow-sm'
                       : 'text-muted hover:text-body'
@@ -392,17 +403,6 @@ export function DesktopCalendarView({
                 </button>
               ))}
             </div>
-
-            {canCreate && (
-              <button
-                type="button"
-                onClick={() => onOpenCreate(selectedDateKey)}
-                className="px-3.5 py-2 min-h-[36px] rounded-xl bg-brand-teal hover:bg-brand-teal-light text-white font-heading font-semibold text-xs transition-colors shadow-sm flex items-center gap-1.5"
-              >
-                <Plus className="w-4 h-4" aria-hidden="true" />
-                Add Event
-              </button>
-            )}
 
             <CategoryFilterDropdown
               activeCategories={activeCategories}

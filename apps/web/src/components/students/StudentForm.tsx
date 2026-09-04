@@ -67,6 +67,7 @@ import type { CreateStudentInput }  from '@shared/schemas/student'
 type StudentFormValues = z.input<typeof CreateStudentSchema>
 import type { ApiStudent }          from '@shared/types/api'
 import { useCreateStudent, useUpdateStudent, useStudent } from '@/hooks/useStudents'
+import { StudentFeeStructure } from '@/components/students/StudentFeeStructure'
 import { buildApiUrl }              from '@/lib/api-client'
 import { useMotionEnabled }         from '@/store/motionStore'
 import {
@@ -547,6 +548,17 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                   </AnimatePresence>
                 </div>
 
+                {/* [PRODUCTION FIX] Mirrors StaffForm.tsx's SalarySection
+                    for students — shown on the final mobile step only,
+                    same gating pattern as the submit-error message right
+                    below (isEdit + last step), so it doesn't compete with
+                    the personal/academic fields on earlier steps. */}
+                {isEdit && studentId && currentStep === STEP_COUNT - 1 && (
+                  <div className="mx-5 mb-3">
+                    <StudentFeeStructure studentId={studentId} />
+                  </div>
+                )}
+
                 {/* Submit error */}
                 {submitError && currentStep === STEP_COUNT - 1 && (
                   <p
@@ -691,6 +703,18 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                   <FieldDivider title="Contact Details" />
                 </div>
                 <ContactSection {...sectionProps} />
+
+                {/* [PRODUCTION FIX] Mirrors StaffForm.tsx's SalarySection
+                    for students — "how staff has a salary structure,
+                    student should also have a tab of all the fees
+                    structure." Only shown once a student record exists
+                    (needs the studentId to look up invoices/fee
+                    structures against). */}
+                {isEdit && studentId && (
+                  <div className="mt-2">
+                    <StudentFeeStructure studentId={studentId} />
+                  </div>
+                )}
 
                 {submitError && (
                   <p
