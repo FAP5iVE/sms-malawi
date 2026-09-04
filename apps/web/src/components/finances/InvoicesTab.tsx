@@ -24,19 +24,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useInvoices, useStudentBalance, useRecordPayment, useGenerateInvoice } from '@/hooks/useFinances'
+import { useInvoices, useInvoiceDetail, useStudentBalance, useRecordPayment, useGenerateInvoice, useFeeStructures } from '@/hooks/useFinances'
 import { useStudents } from '@/hooks/useStudents'
 import { useClasses } from '@/hooks/useClasses'
 import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
 import { formatMWK } from '@shared/constants/malawi'
-import { PlusCircle, Loader2, X as XIcon, FileText, Search } from 'lucide-react'
+import { PlusCircle, Loader2, X as XIcon, FileText, Search, AlertTriangle } from 'lucide-react'
 import { InvoiceNotes } from '@/components/finances/InvoiceNotes'
 import { BulkInvoiceGenerator } from '@/components/finances/BulkInvoiceGenerator'
 import type { ApiInvoice, ApiStudent } from '@shared/types/api'
-import { apiFetch, queryKeys } from '@/lib/api-client'
+import { apiFetch, queryKeys, ApiError } from '@/lib/api-client'
 import { useQueryClient } from '@tanstack/react-query'
-import { PaymentMethodSchema, GenerateInvoiceSchema } from '@shared/schemas/finance'
+import { PaymentMethodSchema, GenerateInvoiceSchema, RecordPaymentSchema } from '@shared/schemas/finance'
 import { useSearchParams } from 'next/navigation'
 import { z } from 'zod'
 
@@ -85,28 +85,8 @@ export function InvoicesTab({ academicYear, term }: { academicYear: string; term
   const invoices = isStudent ? (balanceData?.invoices ?? []) : staffInvoices
   const isLoading = isStudent ? balanceLoading : staffLoading
 
-  const { mutate: recordPayment, isPending } = useRecordPayment()
-  const [payAmount, setPayAmount] = useState('')
-  const [payMethod, setPayMethod] = useState<PaymentMethodType>('CASH')
-  const [payRef, setPayRef] = useState('')
-  function submitPayment() {
-    if (!payingInvoice || !payAmount) return
-    recordPayment(
-      {
-        invoiceId: payingInvoice.id,
-        amount: Number(payAmount),
-        method: payMethod,
-        reference: payRef || undefined,
-      },
-      {
-        onSuccess: () => {
-          setPayingInvoice(null)
-          setPayAmount('')
-          setPayRef('')
-        },
-      }
-    )
-  }
+  // Payment recording now lives entirely in PaymentModal below, which
+  // manages its own useRecordPayment() call and the full allocation flow.
   return (
     <div className="space-y-4">
       {/* Status chips + New Invoice */}
@@ -269,69 +249,7 @@ export function InvoicesTab({ academicYear, term }: { academicYear: string; term
       </div>
       {/* Record Payment Modal */}
       {payingInvoice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h3 className="font-heading font-bold text-lg text-brand-navy">Record Payment</h3>
-            <p className="text-sm text-muted">
-              Balance:{' '}
-              <strong className="text-brand-coral">{formatMWK(payingInvoice.balance)}</strong>
-            </p>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Amount (MWK)</label>
-                <input
-                  type="number"
-                  value={payAmount}
-                  onChange={(e) => setPayAmount(e.target.value)}
-                  className="input w-full"
-                  placeholder="Enter amount"
-                  max={payingInvoice.balance}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Payment Method</label>
-                <select
-                  value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value as PaymentMethodType)}
-                  className="input w-full"
-                  aria-label="Payment method"
-                >
-                  <option value="CASH">Cash</option>
-                  <option value="BANK_TRANSFER">Bank Transfer</option>
-                  <option value="MOBILE_MONEY">Mobile Money</option>
-                  <option value="CHEQUE">Cheque</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Reference (optional)</label>
-                <input
-                  value={payRef}
-                  onChange={(e) => setPayRef(e.target.value)}
-                  className="input w-full"
-                  placeholder="Transaction ID, receipt number…"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setPayingInvoice(null)}
-                className="flex-1 border border-base px-4 py-2 rounded-lg text-sm hover:bg-page"
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={submitPayment}
-                disabled={isPending || !payAmount}
-                className="flex-1 bg-brand-teal text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
-                type="button"
-              >
-                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Record Payment
-              </button>
-            </div>
-          </div>
-        </div>
+        <PaymentModal invoice={payingInvoice} onClose={() => setPayingInvoice(null)} />
       )}
 
       {showNewInvoice && (
@@ -445,6 +363,17 @@ function StudentSearchPanel({
 // they're genuinely computed server-side from the student's fee structure
 // and any active scholarship — exposing fake editable copies of those
 // would just let the form lie about what's actually going to happen.
+// [PRODUCTION FIX] Full rewrite of the fee-selection part of this modal.
+// Previously the "amount" was computed silently server-side from every
+// fee structure that happened to apply to the student's class/term, with
+// no way to choose which fee types this particular invoice should cover.
+// Fee types are now a real multi-select sourced from active FeeStructure
+// rows for this student (useFeeStructures) — School Fee, Transport,
+// Uniform, etc. — matching how they're actually configured in Settings,
+// and several can be selected onto one invoice at once. Due Date is
+// removed entirely: it never represented a real negotiated payment term
+// in this system, and feeService.generateInvoice() now sets it
+// automatically (net-30).
 function NewInvoiceModal({
   defaultAcademicYear, defaultTerm, onClose,
 }: {
@@ -457,20 +386,33 @@ function NewInvoiceModal({
   const [student, setStudent] = useState<ApiStudent | null>(null)
   const [academicYear, setAcademicYear] = useState(defaultAcademicYear)
   const [term, setTerm] = useState(defaultTerm)
-  const [dueDate, setDueDate] = useState('')
+  const [selectedFeeIds, setSelectedFeeIds] = useState<string[]>([])
   const [manualDiscount, setManualDiscount] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [savingNote, setSavingNote] = useState(false)
 
+  const { data: feeStructures = [], isLoading: feesLoading } = useFeeStructures(
+    academicYear, student?.id, term,
+  )
+
+  function toggleFee(id: string) {
+    setSelectedFeeIds((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]))
+  }
+
+  const selectedFees = feeStructures.filter((f) => selectedFeeIds.includes(f.id))
+  const subtotal = selectedFees.reduce((sum, f) => sum + f.amount, 0)
+  const discountNum = manualDiscount ? Number(manualDiscount) : 0
+  const estimatedTotal = Math.max(0, subtotal - discountNum)
+
   async function handleSubmit() {
     setError(null)
-    if (!student || !dueDate) return
+    if (!student || selectedFeeIds.length === 0) return
     const parsed = GenerateInvoiceSchema.safeParse({
       studentId: student.id,
       academicYear,
       term,
-      dueDate,
+      feeStructureIds: selectedFeeIds,
       manualDiscount: manualDiscount ? Number(manualDiscount) : undefined,
     })
     if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Please check the form.')
@@ -519,7 +461,7 @@ function NewInvoiceModal({
                   <p className="text-sm font-medium text-body">{student.firstName} {student.lastName}</p>
                   <p className="text-xs text-muted">{student.registrationNo}{student.class ? ` · ${student.class.name}` : ''}</p>
                 </div>
-                <button type="button" onClick={() => setStudent(null)} className="text-xs font-semibold text-brand-teal hover:underline shrink-0">
+                <button type="button" onClick={() => { setStudent(null); setSelectedFeeIds([]) }} className="text-xs font-semibold text-brand-teal hover:underline shrink-0">
                   Change
                 </button>
               </div>
@@ -534,28 +476,59 @@ function NewInvoiceModal({
               <input
                 id="inv-year"
                 value={academicYear}
-                onChange={(e) => setAcademicYear(e.target.value)}
+                onChange={(e) => { setAcademicYear(e.target.value); setSelectedFeeIds([]) }}
                 placeholder="2025/2026"
                 className="input w-full"
               />
             </div>
             <div>
               <label htmlFor="inv-term" className="text-xs text-muted mb-1 block">Term</label>
-              <select id="inv-term" value={term} onChange={(e) => setTerm(Number(e.target.value))} className="input w-full">
+              <select
+                id="inv-term"
+                value={term}
+                onChange={(e) => { setTerm(Number(e.target.value)); setSelectedFeeIds([]) }}
+                className="input w-full"
+              >
                 {[1, 2, 3].map((t) => <option key={t} value={t}>Term {t}</option>)}
               </select>
             </div>
           </div>
 
+          {/* [PRODUCTION FIX] Fee types — sourced from active FeeStructure
+              rows for this student's class/term (set up under Settings →
+              Fee Structures), not free text. Several can be selected onto
+              one invoice — e.g. School Fee + Transport in the same
+              transaction. */}
           <div>
-            <label htmlFor="inv-due" className="text-xs text-muted mb-1 block">Due Date</label>
-            <input
-              id="inv-due"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="input w-full"
-            />
+            <label className="text-xs text-muted mb-1 block">Fee Types</label>
+            {!student ? (
+              <p className="text-xs text-muted border border-base rounded-xl px-3 py-2.5">
+                Select a student first to see the fee types that apply to them.
+              </p>
+            ) : feesLoading ? (
+              <p className="text-xs text-muted border border-base rounded-xl px-3 py-2.5">Loading fee types…</p>
+            ) : feeStructures.length === 0 ? (
+              <p className="text-xs text-muted border border-base rounded-xl px-3 py-2.5">
+                No fee types are configured for this student&apos;s class/term yet — set them up under Settings → Fee Structures.
+              </p>
+            ) : (
+              <div className="border border-base rounded-xl divide-y divide-base overflow-hidden">
+                {feeStructures.map((f) => (
+                  <label key={f.id} className="flex items-center justify-between gap-3 px-3 py-2.5 cursor-pointer hover:bg-page">
+                    <span className="flex items-center gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedFeeIds.includes(f.id)}
+                        onChange={() => toggleFee(f.id)}
+                        className="accent-brand-teal"
+                      />
+                      <span className="text-sm text-body">{f.name}</span>
+                    </span>
+                    <span className="text-sm font-medium text-muted">{formatMWK(f.amount)}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
@@ -589,23 +562,319 @@ function NewInvoiceModal({
             />
           </div>
 
-          <p className="text-xs text-muted">
-            The invoice amount is calculated automatically from this student&apos;s class fee structure for the
-            selected year and term, minus any active scholarship and the discount above.
-          </p>
+          {/* [PRODUCTION FIX] Real-time total, not just descriptive text —
+              recalculates instantly as fee types and discount change. Any
+              active scholarship is applied server-side on top of this
+              estimate (not known client-side until submission), so this
+              is labelled as an estimate rather than the final figure. */}
+          {selectedFees.length > 0 && (
+            <div className="border-t border-base pt-3 text-sm space-y-1">
+              {selectedFees.map((f) => (
+                <div key={f.id} className="flex justify-between text-muted">
+                  <span>{f.name}</span>
+                  <span>{formatMWK(f.amount)}</span>
+                </div>
+              ))}
+              {discountNum > 0 && (
+                <div className="flex justify-between text-brand-coral">
+                  <span>Discount</span>
+                  <span>-{formatMWK(discountNum)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-heading font-semibold text-body pt-1 border-t border-base mt-1">
+                <span>Estimated Total</span>
+                <span>{formatMWK(estimatedTotal)}</span>
+              </div>
+              <p className="text-xs text-muted pt-1">
+                Final total may differ slightly if an active scholarship applies — calculated automatically on generation.
+              </p>
+            </div>
+          )}
 
           {error && <p className="text-sm text-brand-coral">{error}</p>}
 
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isBusy || !student || !dueDate}
+            disabled={isBusy || !student || selectedFeeIds.length === 0}
             className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 min-h-11"
           >
             {isBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {isBusy ? 'Generating…' : 'Generate Invoice'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+// [PRODUCTION FIX] New component — previously "Record Payment" was one
+// undifferentiated amount against the whole invoice. This allocates a
+// single payment transaction across the invoice's own fee-type line items
+// (School Fee, Transport, ...), validates in real time as amounts are
+// typed, and enforces the two accounting rules requested:
+//   1. What's allocated across fee types can never exceed the total
+//      amount actually being paid (hard block, not just a warning).
+//   2. If one fee type's allocation exceeds ITS OWN remaining balance,
+//      that's allowed but requires explicit confirmation first — the
+//      excess becomes a credit on the student's account (see
+//      OverpaymentConfirmationRequiredError in feeService.ts), carried
+//      forward and auto-applied to their next invoice.
+function PaymentModal({ invoice: invoiceSummary, onClose }: { invoice: ApiInvoice; onClose: () => void }) {
+  const { data: invoice, isLoading } = useInvoiceDetail(invoiceSummary.id)
+  const recordPayment = useRecordPayment()
+
+  const [amount, setAmount] = useState('')
+  const [method, setMethod] = useState<PaymentMethodType>('CASH')
+  const [reference, setReference] = useState('')
+  const [notes, setNotes] = useState('')
+  const [allocations, setAllocations] = useState<Record<string, string>>({})
+  const [error, setError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<{ lineItemId: string; feeName: string; excess: number }[] | null>(null)
+
+  const lineItems = invoice?.lineItems ?? []
+  const totalAmount = Number(amount) || 0
+
+  function setAllocation(lineItemId: string, value: string) {
+    setAllocations((prev) => ({ ...prev, [lineItemId]: value }))
+    setError(null)
+  }
+
+  // [PRODUCTION FIX] Instant calculation as amounts are typed — no submit
+  // step needed to see whether allocations add up.
+  const allocatedTotal = lineItems.reduce((sum, li) => sum + (Number(allocations[li.id]) || 0), 0)
+  const remaining = Math.round((totalAmount - allocatedTotal) * 100) / 100
+  const overAllocated = remaining < -0.01
+
+  function buildAllocationsPayload() {
+    return lineItems
+      .map((li) => ({ lineItemId: li.id, amount: Number(allocations[li.id]) || 0 }))
+      .filter((a) => a.amount > 0)
+  }
+
+  function submit(confirmOverpayment: boolean) {
+    if (!invoice) return
+    setError(null)
+    const allocationsPayload = buildAllocationsPayload()
+    if (allocationsPayload.length === 0) {
+      setError('Enter an amount against at least one fee.')
+      return
+    }
+    if (overAllocated) {
+      setError('The amount allocated to fees cannot be more than the total payment.')
+      return
+    }
+    const parsed = RecordPaymentSchema.safeParse({
+      invoiceId: invoice.id,
+      amount: totalAmount,
+      method,
+      reference: reference || undefined,
+      notes: notes || undefined,
+      allocations: allocationsPayload,
+      confirmOverpayment,
+    })
+    if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Please check the form.')
+
+    recordPayment.mutate(parsed.data, {
+      onSuccess: () => {
+        setConfirming(null)
+        onClose()
+      },
+      onError: (err) => {
+        // [PRODUCTION FIX] 409 here means "needs confirmation," not a
+        // failure — see api-client.ts's ApiError.details and
+        // OverpaymentConfirmationRequiredError in feeService.ts. Show the
+        // breakdown and let the person explicitly accept it rather than
+        // silently retrying or just showing a generic error.
+        if (err instanceof ApiError && err.status === 409) {
+          const details = err.details as { overpayments?: { lineItemId: string; feeName: string; excess: number }[] }
+          setConfirming(details.overpayments ?? [])
+          return
+        }
+        setError(err instanceof Error ? err.message : 'Failed to record payment.')
+      },
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
+        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
+          <h2 className="font-heading font-bold text-brand-navy">Record Payment</h2>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
+            <XIcon className="w-4 h-4 text-muted" />
+          </button>
+        </div>
+
+        {isLoading || !invoice ? (
+          <p className="text-sm text-muted text-center py-10">Loading invoice…</p>
+        ) : confirming ? (
+          // ── Overpayment confirmation step ─────────────────────────────
+          <div className="p-6 space-y-4">
+            <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+              <div className="text-sm space-y-1.5">
+                <p className="font-medium">This payment is more than what&apos;s owed:</p>
+                <ul className="space-y-0.5">
+                  {confirming.map((o) => (
+                    <li key={o.lineItemId || 'unallocated'}>
+                      {o.feeName}: <strong>{formatMWK(o.excess)}</strong> over balance
+                    </li>
+                  ))}
+                </ul>
+                <p>
+                  The extra {formatMWK(confirming.reduce((s, o) => s + o.excess, 0))} will be saved as credit on this
+                  student&apos;s account and used automatically on their next invoice.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirming(null)}
+                className="flex-1 border border-base px-4 py-2.5 rounded-lg text-sm hover:bg-page min-h-11"
+              >
+                Go Back
+              </button>
+              <button
+                type="button"
+                onClick={() => submit(true)}
+                disabled={recordPayment.isPending}
+                className="flex-1 bg-brand-navy text-white px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 min-h-11"
+              >
+                {recordPayment.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Confirm &amp; Record
+              </button>
+            </div>
+          </div>
+        ) : (
+          // ── Main entry form ────────────────────────────────────────────
+          <div className="p-6 space-y-4">
+            <div className="text-sm text-body">
+              {invoice.student && <p className="font-medium">{invoice.student.firstName} {invoice.student.lastName}</p>}
+              <p className="text-muted">{invoice.academicYear} · Term {invoice.term} · Balance owed: <strong className="text-brand-coral">{formatMWK(invoice.balance)}</strong></p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="pay-amount" className="text-xs text-muted mb-1 block">Total Amount Paid (MWK)</label>
+                <input
+                  id="pay-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="input w-full"
+                  placeholder="0.00"
+                />
+              </div>
+              <div>
+                <label htmlFor="pay-method" className="text-xs text-muted mb-1 block">Payment Method</label>
+                <select
+                  id="pay-method"
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value as PaymentMethodType)}
+                  className="input w-full"
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
+                  <option value="MOBILE_MONEY">Mobile Money</option>
+                  <option value="CHEQUE">Cheque</option>
+                </select>
+              </div>
+            </div>
+
+            {/* [PRODUCTION FIX] Allocation table — split this one payment
+                across the invoice's fee types, with each field's own
+                remaining balance shown for reference and instant
+                per-field over-balance flagging. */}
+            <div>
+              <label className="text-xs text-muted mb-1 block">Allocate To</label>
+              <div className="border border-base rounded-xl divide-y divide-base overflow-hidden">
+                {lineItems.map((li) => {
+                  const allocated = Number(allocations[li.id]) || 0
+                  const exceedsBalance = allocated > li.balance + 0.01
+                  return (
+                    <div key={li.id} className="px-3 py-2.5 space-y-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm text-body">{li.feeName}</p>
+                          <p className="text-xs text-muted">Balance: {formatMWK(li.balance)}</p>
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={allocations[li.id] ?? ''}
+                          onChange={(e) => setAllocation(li.id, e.target.value)}
+                          placeholder="0.00"
+                          className="input w-32 text-right"
+                        />
+                      </div>
+                      {exceedsBalance && (
+                        <p className="text-xs text-brand-amber">
+                          Exceeds balance by {formatMWK(allocated - li.balance)} — will be saved as credit.
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+                {lineItems.length === 0 && (
+                  <p className="text-xs text-muted px-3 py-4 text-center">This invoice has no fee lines.</p>
+                )}
+              </div>
+            </div>
+
+            {/* [PRODUCTION FIX] Real-time running total — updates on every
+                keystroke, no submit needed to see it. */}
+            <div className="flex items-center justify-between text-sm px-1">
+              <span className="text-muted">Allocated: {formatMWK(allocatedTotal)} of {formatMWK(totalAmount)}</span>
+              <span className={overAllocated ? 'font-semibold text-brand-coral' : 'text-muted'}>
+                {overAllocated
+                  ? `${formatMWK(Math.abs(remaining))} over — reduce an allocation`
+                  : `${formatMWK(remaining)} unallocated`}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="pay-ref" className="text-xs text-muted mb-1 block">Reference (optional)</label>
+                <input
+                  id="pay-ref"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  className="input w-full"
+                  placeholder="Transaction ID…"
+                />
+              </div>
+              <div>
+                <label htmlFor="pay-notes" className="text-xs text-muted mb-1 block">Note (optional)</label>
+                <input
+                  id="pay-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="input w-full"
+                />
+              </div>
+            </div>
+
+            {error && <p className="text-sm text-brand-coral">{error}</p>}
+
+            <button
+              type="button"
+              onClick={() => submit(false)}
+              disabled={recordPayment.isPending || !amount || overAllocated || allocatedTotal === 0}
+              className="w-full bg-brand-teal text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 min-h-11"
+            >
+              {recordPayment.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Record Payment
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

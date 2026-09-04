@@ -38,25 +38,51 @@ export const CreateFeeStructureSchema = z.object({
 })
 
 // ─── RECORD PAYMENT ──────────────────────────────────────
+// [PRODUCTION FIX] A payment now allocates across the invoice's fee-type
+// line items instead of being one undifferentiated amount against the
+// whole invoice -- see InvoiceLineItem/PaymentAllocation/StudentCredit in
+// schema.prisma and feeService.recordPayment() for the full accounting
+// model this supports (per-fee-type balances, and overpayment on any one
+// fee type becoming a credit rather than an invalid negative balance).
+export const PaymentAllocationSchema = z.object({
+  lineItemId: z.string().min(1),
+  amount: z.number().positive('Allocation amount must be positive'),
+})
+
 export const RecordPaymentSchema = z.object({
   invoiceId: z.string().min(1),
   amount: z.number().positive('Amount must be positive'),
   method: PaymentMethodSchema,
   reference: z.string().optional(),
   notes: z.string().optional(),
+  allocations: z.array(PaymentAllocationSchema).min(1, 'Allocate this payment to at least one fee.'),
+  // Set true only on a resubmission after the user has seen and confirmed
+  // an overpayment warning (see feeService.recordPayment()'s
+  // OverpaymentConfirmationRequired error) -- the first submission always
+  // omits or leaves this false so the warning is never silently skipped.
+  confirmOverpayment: z.boolean().optional().default(false),
 })
 
 // ─── GENERATE INVOICE ────────────────────────────────────
+// [PRODUCTION FIX] Replaced the old single-lump-sum model -- an invoice now
+// covers one or more specific fee types (School Fee, Transport, Uniform,
+// ...), each sourced from an actual active FeeStructure row rather than
+// blindly summing every fee structure that happens to apply to the
+// student's class/term. dueDate removed entirely: it was a free-typed date
+// with no real meaning in this system (no per-invoice payment terms are
+// negotiated) -- feeService.generateInvoice() now sets it automatically
+// (net-30 from generation) rather than asking for a manual, arbitrary value.
 export const GenerateInvoiceSchema = z.object({
   studentId: z.string().min(1),
   academicYear: z.string().regex(/^\d{4}\/\d{4}$/),
   term: z.number().int().min(1).max(3),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  // [PRODUCTION FIX] Manual, additional discount on top of whatever an
-  // active scholarship already applies — for one-off cases (a hardship
-  // waiver, a goodwill adjustment) that aren't modeled as a Scholarship
-  // record. Optional; feeService.generateInvoice() adds it to the
-  // scholarship discount if both are present.
+  feeStructureIds: z.array(z.string().min(1)).min(1, 'Select at least one fee type.'),
+  // Manual, additional discount on top of whatever an active scholarship
+  // already applies -- for one-off cases (a hardship waiver, a goodwill
+  // adjustment) that aren't modeled as a Scholarship record.
+  // feeService.generateInvoice() adds it to the scholarship discount if
+  // both are present, and distributes the total discount proportionally
+  // across the selected fee types' line items.
   manualDiscount: z.number().min(0).optional(),
 })
 
@@ -114,6 +140,7 @@ export const CreateLibraryFineSchema = z.object({
 
 // ─── INFERRED TYPES ──────────────────────────────────────
 export type RecordPaymentInput = z.infer<typeof RecordPaymentSchema>
+export type PaymentAllocationInput = z.infer<typeof PaymentAllocationSchema>
 export type GenerateInvoiceInput = z.infer<typeof GenerateInvoiceSchema>
 export type CreateExpenseInput = z.infer<typeof CreateExpenseSchema>
 export type CreateFeeStructureInput = z.infer<typeof CreateFeeStructureSchema>

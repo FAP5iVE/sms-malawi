@@ -173,6 +173,18 @@ export interface ApiApplicationListResponse {
 
 // ─── FINANCE API TYPES ────────────────────────────────────
 
+// [PRODUCTION FIX] One row per fee type on an invoice -- see
+// InvoiceLineItem in schema.prisma.
+export interface ApiInvoiceLineItem {
+  id: string
+  invoiceId: string
+  feeStructureId: string | null
+  feeName: string
+  amount: number
+  paidAmount: number
+  balance: number
+}
+
 export interface ApiInvoice {
   id: string
   studentId: string
@@ -189,6 +201,23 @@ export interface ApiInvoice {
   payments?: ApiPayment[]
   /** Joined from Invoice.student — R9: replaces the raw studentId truncation the UI previously showed. */
   student?: { firstName: string; lastName: string }
+  // [PRODUCTION FIX] The fee-type breakdown this invoice covers — see
+  // ApiInvoiceLineItem above. Always present now; an invoice with no line
+  // items is not a valid state under the new generation flow.
+  lineItems: ApiInvoiceLineItem[]
+}
+
+// [PRODUCTION FIX] A student's unapplied credit from a prior overpayment
+// -- see StudentCredit in schema.prisma. Auto-applied to their next
+// invoice at generation time; shown read-only here for transparency.
+export interface ApiStudentCredit {
+  id: string
+  studentId: string
+  amount: number
+  originalAmount: number
+  reason: string | null
+  createdAt: string
+  lastAppliedAt: string | null
 }
 
 export interface ApiInvoiceNote {

@@ -120,12 +120,32 @@ financesRouter.get(
   verifyAuth,
   requireRole([...FINANCE_ROLES, 'high_rank']),
   async (req, res) => {
-    const { academicYear = '2025/2026' } = req.query
-    const fees = await prisma.feeStructure.findMany({
-      where: { academicYear: academicYear as string, isActive: true },
-      orderBy: { name: 'asc' },
-    })
-    res.json(fees)
+    try {
+      const { academicYear = '2025/2026', studentId, term } = req.query
+      const where: Prisma.FeeStructureWhereInput = {
+        academicYear: academicYear as string,
+        isActive: true,
+      }
+      // [PRODUCTION FIX] When building a New Invoice, the picker needs the
+      // fee types that actually apply to THIS student (their class, and
+      // this term specifically) -- not every active fee structure in the
+      // school. Mirrors the inclusion logic feeService.generateInvoice()
+      // used to compute inline before line items existed.
+      if (studentId) {
+        const student = await prisma.student.findUnique({
+          where: { id: String(studentId) },
+          select: { classId: true },
+        })
+        where.OR = [{ classId: null }, ...(student?.classId ? [{ classId: student.classId }] : [])]
+      }
+      if (term) {
+        where.AND = [{ OR: [{ term: null }, { term: Number(term) }] }]
+      }
+      const fees = await prisma.feeStructure.findMany({ where, orderBy: { name: 'asc' } })
+      res.json(fees)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'fee-structures-list' } })
+    }
   }
 )
 
@@ -168,9 +188,33 @@ financesRouter.get('/invoices', verifyAuth, requireRole([...FINANCE_ROLES]), asy
     take: 100,
     // [R9] Joined student name — the frontend never resolves a raw
     // studentId to a name itself (InvoicesTab.tsx's "Student" column).
-    include: { student: { select: { firstName: true, lastName: true } } },
+    // [PRODUCTION FIX] lineItems included — the payment modal needs each
+    // fee type's own balance to build the allocation table.
+    include: {
+      student: { select: { firstName: true, lastName: true } },
+      lineItems: true,
+    },
   })
   res.json(invoices)
+})
+
+// [PRODUCTION FIX] Single-invoice fetch with line items — needed when
+// opening the Record Payment modal for one specific invoice, rather than
+// relying on whatever was in the already-loaded list (which may be a
+// filtered/paged subset).
+financesRouter.get('/invoices/:id', verifyAuth, requireRole([...FINANCE_ROLES, 'student']), async (req, res) => {
+  try {
+    const invoice = await prisma.invoice.findUniqueOrThrow({
+      where: { id: String(req.params.id) },
+      include: { student: { select: { firstName: true, lastName: true } }, lineItems: true },
+    })
+    if (req.user!.role === 'student') {
+      await studentService.assertStudentOwnership(req.user!.uid, invoice.studentId)
+    }
+    res.json(invoice)
+  } catch (err: unknown) {
+    return sendError(res, err, { tags: { module: 'finances', route: 'invoice-detail' } })
+  }
 })
 
 financesRouter.post(
@@ -180,8 +224,18 @@ financesRouter.post(
   async (req, res) => {
     const parsed = GenerateInvoiceSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    const invoice = await feeService.generateInvoice(parsed.data, req.user!.uid, req.user!.role)
-    res.status(201).json(invoice)
+    // [PRODUCTION FIX] No try/catch — same systemic bug found and fixed
+    // across every other route this session (announcements, gallery,
+    // assignments, library, hr, exams): an error thrown by
+    // generateInvoice() (e.g. "Invoice already exists for this term",
+    // "Select at least one fee type") became an unhandled rejection with
+    // no response ever sent, hanging the client's fetch indefinitely.
+    try {
+      const invoice = await feeService.generateInvoice(parsed.data, req.user!.uid, req.user!.role)
+      return res.status(201).json(invoice)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'invoice-generate' } })
+    }
   }
 )
 
@@ -210,6 +264,31 @@ financesRouter.get(
   }
 )
 
+// [PRODUCTION FIX] Read-only view of a student's unapplied overpayment
+// credit — see StudentCredit in schema.prisma. Students can view their
+// own; staff need finance role.
+financesRouter.get('/credits/:studentId', verifyAuth, async (req, res) => {
+  const studentId = String(req.params.studentId)
+  if (req.user!.role === 'student') {
+    try {
+      await studentService.assertStudentOwnership(req.user!.uid, studentId)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'credits' } })
+    }
+  } else if (!FINANCE_ROLES.includes(req.user!.role as typeof FINANCE_ROLES[number])) {
+    return res.status(403).json({ error: 'Not authorized to view this.' })
+  }
+  try {
+    const credits = await prisma.studentCredit.findMany({
+      where: { studentId },
+      orderBy: { createdAt: 'desc' },
+    })
+    return res.json(credits)
+  } catch (err: unknown) {
+    return sendError(res, err, { tags: { module: 'finances', route: 'credits' } })
+  }
+})
+
 // ── RECORD PAYMENT
 financesRouter.post(
   '/payments',
@@ -218,8 +297,20 @@ financesRouter.post(
   async (req, res) => {
     const parsed = RecordPaymentSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    const result = await feeService.recordPayment(parsed.data, req.user!.uid, req.user!.role)
-    res.status(201).json(result)
+    try {
+      const result = await feeService.recordPayment(parsed.data, req.user!.uid, req.user!.role)
+      return res.status(201).json(result)
+    } catch (err: unknown) {
+      // [PRODUCTION FIX] Distinguish "needs a confirmation the client
+      // hasn't given yet" (409 — a normal, expected step in the flow, not
+      // a failure) from every other error (500/etc via sendError). The
+      // client shows the overpayment breakdown from this response and
+      // resubmits with confirmOverpayment: true once the person accepts it.
+      if (err instanceof feeService.OverpaymentConfirmationRequiredError) {
+        return res.status(409).json({ error: err.message, overpayments: err.overpayments })
+      }
+      return sendError(res, err, { tags: { module: 'finances', route: 'record-payment' } })
+    }
   }
 )
 

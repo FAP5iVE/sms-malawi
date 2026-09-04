@@ -156,7 +156,8 @@ export async function apiFetch<T>(
           }
           throw new ApiError(
             body.error ?? `API error ${retryRes.status}`,
-            retryRes.status
+            retryRes.status,
+            body,
           )
         }
 
@@ -171,7 +172,7 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string }
-    throw new ApiError(body.error ?? `API error ${res.status}`, res.status)
+    throw new ApiError(body.error ?? `API error ${res.status}`, res.status, body)
   }
 
   return res.json() as Promise<T>
@@ -179,10 +180,18 @@ export async function apiFetch<T>(
 
 // ─── TYPED API ERROR ──────────────────────────────────────
 
+// [PRODUCTION FIX] `details` carries the full parsed response body, not
+// just `error` -- a handler like the payment route's 409 "overpayment
+// needs confirmation" response includes extra structured data
+// (overpayments: [...]) alongside the message, and this used to be
+// silently discarded, leaving no way for a caller to actually act on it
+// (e.g. show the breakdown in a confirmation dialog) rather than just
+// display the message text.
 export class ApiError extends Error {
   constructor(
     message: string,
-    public readonly status: number
+    public readonly status: number,
+    public readonly details?: unknown,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -234,8 +243,8 @@ export const queryKeys = {
     all: () => ['finances'] as const,
     summary: (year: string, term: number) =>
       ['finances', 'summary', year, term] as const,
-    feeStructures: (year: string) =>
-      ['finances', 'fee-structures', year] as const,
+    feeStructures: (year: string, studentId?: string, term?: number) =>
+      ['finances', 'fee-structures', year, studentId ?? null, term ?? null] as const,
     invoices: (filters: Record<string, unknown>) =>
       ['finances', 'invoices', filters] as const,
     invoice: (id: string) => ['finances', 'invoice', id] as const,

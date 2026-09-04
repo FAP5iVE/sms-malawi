@@ -11,7 +11,7 @@
  */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { ApiFinanceSummary, ApiInvoice, ApiExpense, ApiScholarship, ApiDebtsSummary } from '@shared/types/api'
+import type { ApiFinanceSummary, ApiInvoice, ApiExpense, ApiScholarship, ApiDebtsSummary, ApiStudentCredit } from '@shared/types/api'
 import type { RecordPaymentInput, CreateExpenseInput, CreateBudgetInput, CreateFeeStructureInput, GenerateInvoiceInput } from '@shared/schemas/finance'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 
@@ -40,6 +40,17 @@ export function useInvoices(
     queryKey: queryKeys.finances.invoices(filters),
     queryFn: () => apiFetch<ApiInvoice[]>(`/finances/invoices?${params}`),
     enabled,
+  })
+}
+
+// [PRODUCTION FIX] Single-invoice fetch (with lineItems) — the payment
+// modal needs one specific invoice's own fee-type breakdown to build the
+// allocation table, rather than relying on a possibly-filtered/paged list.
+export function useInvoiceDetail(id: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.finances.invoice(id),
+    queryFn: () => apiFetch<ApiInvoice>(`/finances/invoices/${id}`),
+    enabled: enabled && !!id,
   })
 }
 
@@ -73,7 +84,10 @@ export function useRecordPayment() {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
+    onSuccess: (_result, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.finances.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.finances.invoice(variables.invoiceId) })
+    },
   })
 }
 
@@ -233,10 +247,28 @@ export interface ApiFeeStructure {
   term: number | null
   isActive: boolean
 }
-export function useFeeStructures(academicYear: string) {
+// [PRODUCTION FIX] Added studentId/term — the New Invoice fee-type picker
+// needs the fee structures that actually apply to THIS student (their
+// class) and THIS term, not every active fee structure in the school.
+export function useFeeStructures(academicYear: string, studentId?: string, term?: number) {
+  const params = new URLSearchParams({ academicYear })
+  if (studentId) params.set('studentId', studentId)
+  if (term) params.set('term', String(term))
   return useQuery({
-    queryKey: ['finances', 'fee-structures', academicYear] as const,
-    queryFn: () => apiFetch<ApiFeeStructure[]>(`/finances/fee-structures?academicYear=${academicYear}`),
+    queryKey: queryKeys.finances.feeStructures(academicYear, studentId, term),
+    queryFn: () => apiFetch<ApiFeeStructure[]>(`/finances/fee-structures?${params}`),
+    enabled: !!academicYear,
+  })
+}
+
+// [PRODUCTION FIX] A student's unapplied overpayment credit — see
+// StudentCredit in schema.prisma. Read-only display; application happens
+// automatically server-side at next invoice generation.
+export function useStudentCredits(studentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['finances', 'credits', studentId] as const,
+    queryFn: () => apiFetch<ApiStudentCredit[]>(`/finances/credits/${studentId}`),
+    enabled: enabled && !!studentId,
   })
 }
 export function useCreateFeeStructure() {

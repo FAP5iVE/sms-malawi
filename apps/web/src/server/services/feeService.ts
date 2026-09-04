@@ -80,6 +80,27 @@ export async function getStudentBalance(studentId: string, academicYear: string)
   return { invoices, totalBalance }
 }
 
+// [PRODUCTION FIX] Full rewrite. Previously this summed every fee
+// structure that happened to apply to the student's class/term into one
+// undifferentiated total -- there was no way to know which fee types an
+// invoice covered, pay some and not others, or track a balance per fee
+// type. Now:
+//   1. The caller picks specific fee types (feeStructureIds) -- sourced
+//      from actual active FeeStructure rows in the UI, not free text.
+//   2. Each becomes its own InvoiceLineItem, so "School Fee" and
+//      "Transport" on the same invoice have independent balances.
+//   3. Any scholarship + manual discount is distributed proportionally
+//      across the selected line items (by each fee's share of the
+//      subtotal) so sum(lineItem.amount) reconciles exactly with
+//      invoice.totalAmount -- the last line item absorbs the rounding
+//      remainder rather than leaving a stray kobo unaccounted for.
+//   4. dueDate is no longer a manual input (it never represented real
+//      negotiated payment terms) -- set automatically, net-30.
+//   5. Any unapplied StudentCredit for this student (from a previous
+//      overpayment -- see recordPayment()) is automatically applied here,
+//      reducing the new invoice's total/balance -- this is what "carries
+//      an overpayment to the next term" in practice: it's consumed the
+//      next time that student is invoiced, not left inert.
 export async function generateInvoice(
   data: GenerateInvoiceInput,
   actorUid: string,
@@ -90,24 +111,17 @@ export async function generateInvoice(
   })
   if (existing) throw new Error('Invoice already exists for this term')
 
-  const student = await prisma.student.findUniqueOrThrow({
-    where: { id: data.studentId },
-    select: { classId: true },
-  })
-
   const feeStructures = await prisma.feeStructure.findMany({
-    where: {
-      academicYear: data.academicYear,
-      isActive: true,
-      ...(student.classId
-        ? { OR: [{ classId: null }, { classId: student.classId }] }
-        : { classId: null }),
-      AND: [{ OR: [{ term: null }, { term: data.term }] }],
-    },
+    where: { id: { in: data.feeStructureIds }, isActive: true },
   })
-  const subtotal = feeStructures.reduce(
-    (sum: number, f: { amount: unknown }) => sum + Number(f.amount), 0
-  )
+  if (feeStructures.length === 0) {
+    throw new Error('Select at least one fee type.')
+  }
+  if (feeStructures.length !== data.feeStructureIds.length) {
+    throw new Error('One or more selected fee types could not be found or are no longer active.')
+  }
+
+  const subtotal = feeStructures.reduce((sum, f) => sum + Number(f.amount), 0)
 
   const scholarship = await prisma.scholarship.findFirst({
     where: { studentId: data.studentId, academicYear: data.academicYear, isActive: true },
@@ -118,45 +132,171 @@ export async function generateInvoice(
       ? subtotal * (Number(scholarship.value) / 100)
       : Number(scholarship.value)
   }
-  // [PRODUCTION FIX] Manual discount stacks on top of any scholarship
-  // discount rather than replacing it — a scholarship and a one-off
-  // manual adjustment are independent reasons a family might owe less,
-  // and there's no reason entering one should silently discard the other.
+  // Manual discount stacks on top of any scholarship discount rather than
+  // replacing it -- a scholarship and a one-off manual adjustment are
+  // independent reasons a family might owe less.
   if (data.manualDiscount) discount += data.manualDiscount
-  const totalAmount = Math.max(0, subtotal - discount)
+  discount = Math.min(discount, subtotal) // never a negative total from discount alone
 
-  const invoice = await prisma.invoice.create({
-    data: {
-      studentId: data.studentId,
-      academicYear: data.academicYear,
-      term: data.term,
-      subtotal,
-      discount,
-      latePenalty: 0,
-      totalAmount,
+  // Distribute the discount proportionally across line items so each
+  // fee type's own "amount owed" reflects its fair share -- the last
+  // item absorbs whatever rounding remainder is left so the sum is exact.
+  let allocatedDiscount = 0
+  const lineItemsData = feeStructures.map((f, idx) => {
+    const full = Number(f.amount)
+    const isLast = idx === feeStructures.length - 1
+    let share = subtotal > 0 ? Math.round((full / subtotal) * discount * 100) / 100 : 0
+    if (isLast) share = Math.round((discount - allocatedDiscount) * 100) / 100
+    allocatedDiscount += share
+    const amount = Math.max(0, Math.round((full - share) * 100) / 100)
+    return {
+      feeStructureId: f.id,
+      feeName: f.name,
+      amount,
       paidAmount: 0,
-      balance: totalAmount,
-      status: 'UNPAID',
-      dueDate: new Date(data.dueDate),
-      scholarshipId: scholarship?.id ?? null,
-    },
+      balance: amount,
+    }
   })
-  logger.info({ event: 'invoice.generated', invoiceId: invoice.id, studentId: data.studentId, totalAmount, actorUid, actorRole })
+
+  let totalAmount = Math.max(0, subtotal - discount)
+
+  // [PRODUCTION FIX] Auto-apply any unapplied credit from a prior
+  // overpayment (see recordPayment()) -- oldest first, applied against
+  // this new invoice's total before it's even created, so a family that
+  // overpaid last term sees it reflected immediately rather than needing
+  // a separate manual step.
+  const availableCredits = await prisma.studentCredit.findMany({
+    where: { studentId: data.studentId, amount: { gt: 0 } },
+    orderBy: { createdAt: 'asc' },
+  })
+  const creditApplications: { id: string; amountUsed: number; remaining: number }[] = []
+  let remainingToCover = totalAmount
+  for (const credit of availableCredits) {
+    if (remainingToCover <= 0) break
+    const available = Number(credit.amount)
+    const used = Math.min(available, remainingToCover)
+    remainingToCover -= used
+    creditApplications.push({ id: credit.id, amountUsed: used, remaining: available - used })
+  }
+  const creditApplied = creditApplications.reduce((sum, c) => sum + c.amountUsed, 0)
+  totalAmount = Math.max(0, Math.round((totalAmount - creditApplied) * 100) / 100)
+
+  const dueDate = new Date()
+  dueDate.setDate(dueDate.getDate() + 30) // net-30, not user-configurable per invoice
+
+  const invoice = await prisma.$transaction(async (tx) => {
+    const created = await tx.invoice.create({
+      data: {
+        studentId: data.studentId,
+        academicYear: data.academicYear,
+        term: data.term,
+        subtotal,
+        discount,
+        latePenalty: 0,
+        totalAmount,
+        paidAmount: 0,
+        balance: totalAmount,
+        status: totalAmount <= 0 ? 'PAID' : 'UNPAID',
+        dueDate,
+        scholarshipId: scholarship?.id ?? null,
+        lineItems: { create: lineItemsData },
+      },
+      include: { lineItems: true },
+    })
+    for (const c of creditApplications) {
+      await tx.studentCredit.update({
+        where: { id: c.id },
+        data: { amount: c.remaining, lastAppliedAt: new Date() },
+      })
+    }
+    return created
+  })
+
+  logger.info({
+    event: 'invoice.generated', invoiceId: invoice.id, studentId: data.studentId,
+    totalAmount, feeTypes: feeStructures.map((f) => f.name), creditApplied, actorUid, actorRole,
+  })
   return invoice
 }
 
+// [PRODUCTION FIX] Thrown when one or more allocations in a payment would
+// exceed that specific line item's own remaining balance. The route layer
+// catches this by name and returns it as a 409 with the overpayment
+// breakdown, rather than a generic 500/400 -- the client shows a
+// confirmation dialog ("this pays off Transport and leaves MWK X as
+// credit -- continue?") and resubmits with confirmOverpayment: true once
+// the person has actually seen and accepted that.
+export class OverpaymentConfirmationRequiredError extends Error {
+  constructor(public readonly overpayments: { lineItemId: string; feeName: string; excess: number }[]) {
+    super('This payment exceeds the balance on one or more fees and will create a credit. Confirmation required.')
+    this.name = 'OverpaymentConfirmationRequiredError'
+  }
+}
+
+// [PRODUCTION FIX] Full rewrite. A payment previously applied as one
+// undifferentiated amount against the whole invoice. It now allocates
+// across specific fee-type line items (data.allocations), which is what
+// makes "pay MWK 30,000 toward School Fee and MWK 5,000 toward Transport
+// in the same transaction" possible, and what makes overpayment on one
+// specific fee (rather than the invoice as a whole) detectable at all.
+//
+// Accounting rules enforced here, matching the actual request:
+//   1. sum(allocations) must not exceed data.amount (the total actually
+//      being paid in this transaction) -- you cannot allocate money you
+//      are not paying. Any genuine unallocated remainder (amount minus
+//      what was allocated to real line items) becomes a StudentCredit,
+//      same as case 2 below, since it isn't tied to any specific fee.
+//   2. If one allocation exceeds that line item's own remaining balance,
+//      the excess does NOT create a negative balance or silently
+//      overpay -- it becomes a StudentCredit against the student's
+//      account, auto-applied to their next invoice (see
+//      generateInvoice()). This requires confirmOverpayment: true on the
+//      request; the first submission without it throws
+//      OverpaymentConfirmationRequiredError so the client can warn and
+//      get explicit confirmation first, exactly as requested.
 export async function recordPayment(data: RecordPaymentInput, actorUid: string, actorRole: string) {
   const invoice = await prisma.invoice.findUniqueOrThrow({
     where: { id: data.invoiceId },
-    include: { payments: true },
+    include: { payments: true, lineItems: true },
   })
 
-  if (data.amount > Number(invoice.balance)) {
-    throw new Error(`Payment MWK ${data.amount} exceeds outstanding balance MWK ${invoice.balance}`)
+  const allocationTotal = Math.round(data.allocations.reduce((sum, a) => sum + a.amount, 0) * 100) / 100
+  if (allocationTotal > data.amount + 0.01) {
+    throw new Error(
+      `Allocated amount MWK ${allocationTotal.toLocaleString()} cannot exceed the total payment MWK ${data.amount.toLocaleString()}.`
+    )
   }
 
-  // No explicit return type annotation on $transaction — let TypeScript infer
-  // (explicit Promise<> with wrong generics was causing the TS2314 error)
+  const lineItemsById = new Map(invoice.lineItems.map((li) => [li.id, li]))
+  for (const a of data.allocations) {
+    const li = lineItemsById.get(a.lineItemId)
+    if (!li) throw new Error('One or more allocated fees do not belong to this invoice.')
+    if (li.invoiceId !== invoice.id) throw new Error('One or more allocated fees do not belong to this invoice.')
+  }
+
+  // Detect per-line-item overpayment (allocation > that fee's own balance).
+  const overpayments = data.allocations
+    .map((a) => {
+      const li = lineItemsById.get(a.lineItemId)!
+      const excess = Math.round((a.amount - Number(li.balance)) * 100) / 100
+      return excess > 0.01 ? { lineItemId: a.lineItemId, feeName: li.feeName, excess } : null
+    })
+    .filter((x): x is { lineItemId: string; feeName: string; excess: number } => x !== null)
+
+  // The unallocated remainder (paid but not assigned to any fee) is also
+  // effectively an overpayment against nothing in particular.
+  const unallocatedRemainder = Math.round((data.amount - allocationTotal) * 100) / 100
+  if (unallocatedRemainder > 0.01) {
+    overpayments.push({ lineItemId: '', feeName: 'Unallocated', excess: unallocatedRemainder })
+  }
+
+  if (overpayments.length > 0 && !data.confirmOverpayment) {
+    throw new OverpaymentConfirmationRequiredError(overpayments)
+  }
+
+  const totalCreditToCreate = overpayments.reduce((sum, o) => sum + o.excess, 0)
+  const appliedToInvoice = Math.round((data.amount - totalCreditToCreate) * 100) / 100
+
   const [payment, updatedInvoice] = await prisma.$transaction(async (tx) => {
     const p = await tx.payment.create({
       data: {
@@ -168,8 +308,39 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
         recordedByUid: actorUid,
       },
     })
-    const newPaid = Number(invoice.paidAmount) + data.amount
-    const newBalance = Number(invoice.totalAmount) - newPaid
+
+    // Apply each allocation to its line item, capped at that item's own
+    // balance -- the capped portion is what actually reduces the
+    // invoice's total balance; anything beyond the cap became credit above.
+    for (const a of data.allocations) {
+      const li = lineItemsById.get(a.lineItemId)!
+      const appliedToLine = Math.min(a.amount, Number(li.balance))
+      await tx.paymentAllocation.create({
+        data: { paymentId: p.id, lineItemId: a.lineItemId, amount: a.amount },
+      })
+      await tx.invoiceLineItem.update({
+        where: { id: a.lineItemId },
+        data: {
+          paidAmount: Number(li.paidAmount) + appliedToLine,
+          balance: Math.max(0, Number(li.balance) - appliedToLine),
+        },
+      })
+    }
+
+    if (totalCreditToCreate > 0) {
+      await tx.studentCredit.create({
+        data: {
+          studentId: invoice.studentId,
+          amount: totalCreditToCreate,
+          originalAmount: totalCreditToCreate,
+          sourcePaymentId: p.id,
+          reason: `Overpayment on ${invoice.academicYear} Term ${invoice.term}: ${overpayments.map((o) => o.feeName).join(', ')}`,
+        },
+      })
+    }
+
+    const newPaid = Number(invoice.paidAmount) + appliedToInvoice
+    const newBalance = Math.max(0, Number(invoice.totalAmount) - newPaid)
     const newStatus = newBalance <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIAL' : 'UNPAID'
     const inv = await tx.invoice.update({
       where: { id: data.invoiceId },

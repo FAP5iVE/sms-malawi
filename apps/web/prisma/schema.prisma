@@ -34,6 +34,7 @@ model Student {
   transcriptKey    String?    // Appwrite file ID for latest transcript
   borrowings       Borrowing[]
   invoices         Invoice[]
+  credits          StudentCredit[]
   attendanceRecords Attendance[]
   universityPlacements UniversityPlacement[]   // R18 — advisory university placements
   createdAt        DateTime  @default(now())
@@ -316,6 +317,7 @@ model Invoice {
   student         Student       @relation(fields: [studentId], references: [id])
   payments        Payment[]
   notes           InvoiceNote[]
+  lineItems       InvoiceLineItem[]
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
@@ -333,6 +335,55 @@ enum InvoiceStatus {
     OVERDUE
      }
 
+
+model InvoiceLineItem {
+  id             String   @id @default(cuid())
+  invoiceId      String
+  invoice        Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  feeStructureId String?  // nullable: the source fee structure, for reference only
+  feeName        String
+  amount         Decimal  @db.Decimal(12, 2)   // owed for this fee type
+  paidAmount     Decimal  @db.Decimal(12, 2) @default(0)
+  balance        Decimal  @db.Decimal(12, 2)   // amount - paidAmount
+  allocations    PaymentAllocation[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([invoiceId])
+  @@map("invoice_line_items")
+}
+
+
+model PaymentAllocation {
+  id         String          @id @default(cuid())
+  paymentId  String
+  payment    Payment         @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  lineItemId String
+  lineItem   InvoiceLineItem @relation(fields: [lineItemId], references: [id])
+  amount     Decimal         @db.Decimal(12, 2)
+  createdAt  DateTime        @default(now())
+
+  @@index([paymentId])
+  @@index([lineItemId])
+  @@map("payment_allocations")
+}
+
+
+model StudentCredit {
+  id              String    @id @default(cuid())
+  studentId       String
+  student         Student   @relation(fields: [studentId], references: [id])
+  amount          Decimal   @db.Decimal(12, 2)   // remaining unapplied balance
+  originalAmount  Decimal   @db.Decimal(12, 2)   // what it started as, for the audit trail
+  sourcePaymentId String?
+  reason          String?
+  createdAt       DateTime  @default(now())
+  lastAppliedAt   DateTime?
+
+  @@index([studentId])
+  @@map("student_credits")
+}
+
 // ─── PAYMENT RECORD ──────────────────────────────────────
 model Payment {
   id           String        @id @default(cuid())
@@ -345,6 +396,7 @@ model Payment {
   recordedByUid String
   notes        String?
   paidAt       DateTime      @default(now())
+  allocations  PaymentAllocation[]
 
   @@index([invoiceId])
   @@map("payments")
@@ -1412,8 +1464,6 @@ model PlacementChoice {
   placementId           String
   placement             UniversityPlacement @relation(fields: [placementId], references: [id], onDelete: Cascade)
   rank                  Int                 // 1 = first choice
-  // Catalogue keys OR free-text (private/foreign). Eligibility is computed for
-  // catalogue programmes; free-text choices carry no computed eligibility.
   universityId          String?
   programmeId           String?
   universityNameFreeText String?
