@@ -45,7 +45,7 @@ export function MonitoringKpiStrip({ summary, isLoading }: Props) {
         <ChartCard title="Crash-Free Sessions" isLoading={isLoading} height={160}>
           <Chart
             type="radial"
-            data={[{ x: '7d', value: crashFreeSessions ?? 0 }]}
+            data={crashFreeSessions != null ? [{ x: '7d', value: crashFreeSessions }] : []}
             series={[{ key: 'value', label: 'Crash-Free %' }]}
             ariaLabel="Crash-free sessions percentage, last 7 days"
             emptyStateMessage="No session data yet."
@@ -54,7 +54,7 @@ export function MonitoringKpiStrip({ summary, isLoading }: Props) {
         <ChartCard title="Crash-Free Users" isLoading={isLoading} height={160}>
           <Chart
             type="radial"
-            data={[{ x: '7d', value: crashFreeUsers ?? 0 }]}
+            data={crashFreeUsers != null ? [{ x: '7d', value: crashFreeUsers }] : []}
             series={[{ key: 'value', label: 'Crash-Free %' }]}
             ariaLabel="Crash-free users percentage, last 7 days"
             emptyStateMessage="No user session data yet."
@@ -63,7 +63,7 @@ export function MonitoringKpiStrip({ summary, isLoading }: Props) {
         <ChartCard title="Apdex" isLoading={isLoading} height={160}>
           <Chart
             type="radial"
-            data={[{ x: '24h', value: (apdex ?? 0) * 100 }]}
+            data={apdex != null ? [{ x: '24h', value: apdex * 100 }] : []}
             series={[{ key: 'value', label: 'Apdex score' }]}
             ariaLabel="Apdex performance score, last 24 hours"
             emptyStateMessage="No performance data yet."

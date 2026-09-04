@@ -174,10 +174,31 @@ export async function syncRollupStats() {
 
   if (sessionHealthResult.status === 'fulfilled') {
     const totals = sessionHealthResult.value.groups[0]?.totals ?? {}
-    rows.push(
-      { metricKey: 'crash_free_sessions:7d', value: (totals['crash_free_rate(session)'] ?? 1) * 100, windowLabel: '7d' },
-      { metricKey: 'crash_free_users:7d', value: (totals['crash_free_rate(user)'] ?? 1) * 100, windowLabel: '7d' },
-    )
+    const crashFreeSessionRate = totals['crash_free_rate(session)']
+    const crashFreeUserRate = totals['crash_free_rate(user)']
+
+    // BUG FIX: this used to default a missing rate to `1` (i.e. write
+    // 100%) whenever the request succeeded but returned no usable data —
+    // e.g. Session Health / Release Health isn't enabled on the Sentry
+    // project, or the org genuinely has zero sessions in the window. That
+    // made "we have no data" and "you're at a real, perfect 100%"
+    // indistinguishable in the UI. Now: only write a stat when Sentry
+    // actually returned a number for it. A missing value means no row
+    // gets written this cycle — same "no data yet" treatment Apdex
+    // already gets, rather than a fabricated reading.
+    if (typeof crashFreeSessionRate === 'number') {
+      rows.push({ metricKey: 'crash_free_sessions:7d', value: crashFreeSessionRate * 100, windowLabel: '7d' })
+    }
+    if (typeof crashFreeUserRate === 'number') {
+      rows.push({ metricKey: 'crash_free_users:7d', value: crashFreeUserRate * 100, windowLabel: '7d' })
+    }
+    if (typeof crashFreeSessionRate !== 'number' && typeof crashFreeUserRate !== 'number') {
+      // Request succeeded but the response had nothing usable — most
+      // likely Session Health isn't enabled on this Sentry project.
+      // Logged (not thrown) since this is diagnosable-but-not-fatal, same
+      // as fetchApdex()'s own soft-failure.
+      logger.warn({ event: 'sentry.sync.rollup.session_health_empty' })
+    }
   } else {
     logger.error({ event: 'sentry.sync.rollup.session_health_failed', err: sessionHealthResult.reason instanceof Error ? sessionHealthResult.reason.message : String(sessionHealthResult.reason) })
   }
@@ -336,7 +357,22 @@ export async function submitFeedback(input: { message: string; uid: string; role
     { message: input.message },
     { captureContext: { user: { id: input.uid }, tags: { role: input.role, ...(input.associatedIssueId ? { associatedIssueId: input.associatedIssueId } : {}) } } },
   )
-  logger.info({ event: 'monitoring.feedback_submitted', uid: input.uid, eventId })
+  // BUG FIX: captureFeedback only queues the event in the SDK's internal
+  // transport buffer — it does not send it. On a normal long-running
+  // server that's fine, a background timer flushes it eventually. On
+  // Vercel's serverless functions it is NOT fine: once this route's
+  // response is sent, the execution environment can be frozen/torn down
+  // before that queued event is actually delivered over the network, and
+  // it's silently lost. That's why submissions were "succeeding" (a real
+  // eventId came back, the toast showed, the list query re-fetched) while
+  // nothing ever actually reached Sentry for listFeedback() to read back.
+  // Explicitly awaiting flush() here blocks the response until the event
+  // is really sent (or the timeout hits), which is the fix.
+  const delivered = await Sentry.flush(2000)
+  if (!delivered) {
+    logger.warn({ event: 'monitoring.feedback_flush_timeout', uid: input.uid, eventId })
+  }
+  logger.info({ event: 'monitoring.feedback_submitted', uid: input.uid, eventId, delivered })
   return { eventId }
 }
 

@@ -48,6 +48,7 @@ export function VercelPlatformPanel() {
   const unacknowledgedAlerts = summary && summary.configured ? summary.unacknowledgedAlerts : 0
   const errorCount24h = summary && summary.configured ? summary.errorCount24h : 0
   const pageviews24h = summary && summary.configured ? summary.stats['pageviews:24h'] : undefined
+  const visitors24h = summary && summary.configured ? summary.stats['visitors:24h'] : undefined
 
   const tabs: TabItem<InnerTab>[] = [
     { id: 'deployments', label: 'Deployments', icon: Rocket },
@@ -69,7 +70,7 @@ export function VercelPlatformPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <StatTile
           label="Latest Deploy"
           value={isConfigured ? (latestDeploymentState ?? '\u2014') : '\u2014'}
@@ -88,6 +89,10 @@ export function VercelPlatformPanel() {
         <StatTile
           label="Pageviews (24h)"
           value={isConfigured ? String(pageviews24h ?? '\u2014') : '\u2014'}
+        />
+        <StatTile
+          label="Visitors (24h)"
+          value={isConfigured ? String(visitors24h ?? '\u2014') : '\u2014'}
         />
       </div>
 
