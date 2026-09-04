@@ -37,8 +37,38 @@ import 'server-only'
  *   cron     — Cron supplementary guard (per-route):  3 req / 10 min
  */
 
-import rateLimit, { type Options } from 'express-rate-limit'
-import type { RequestHandler } from 'express'
+import rateLimit, { ipKeyGenerator, type Options } from 'express-rate-limit'
+import type { Request, RequestHandler } from 'express'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLIENT IP EXTRACTION
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Vercel puts the real client IP first in the `x-forwarded-for` chain on
+ * every request that reaches this Lambda. express-rate-limit's own default
+ * IP detection doesn't trust that automatically — and as of v8, when it
+ * also sees the standardized `Forwarded` header (RFC 9110) present and
+ * unused, it throws ERR_ERL_FORWARDED_HEADER instead of silently guessing
+ * (rightly so: guessing wrong here could mean either rate-limiting every
+ * visitor behind Vercel's edge as one shared bucket, or keying on
+ * `undefined` and not limiting anyone at all).
+ *
+ * This extracts the client IP ourselves instead of relying on the
+ * library's automatic detection, which sidesteps that check entirely (it
+ * only runs inside the library's own default keyGenerator). ipKeyGenerator
+ * is express-rate-limit's own helper for normalizing the result — plain
+ * IPv6 addresses are unsafe to use as rate-limit keys unnormalized, since
+ * a single client can trivially cycle through addresses within its /64.
+ *
+ * See https://express-rate-limit.github.io/ERR_ERL_FORWARDED_HEADER/
+ */
+function clientIpKeyGenerator(req: Request): string {
+  const forwardedFor = req.headers['x-forwarded-for']
+  const first = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor?.split(',')[0]
+  const ip = first?.trim() || req.ip || req.socket.remoteAddress || 'unknown'
+  return ipKeyGenerator(ip)
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIER CONFIG
@@ -104,6 +134,8 @@ export function createRateLimiter(tier: RateLimitTier = 'standard'): RequestHand
     legacyHeaders: false,
     // Suppress the express-rate-limit creation-stack warning in production
     validate: { creationStack: false },
+    // See clientIpKeyGenerator's own comment above — fixes ERR_ERL_FORWARDED_HEADER
+    keyGenerator: clientIpKeyGenerator,
     // Return JSON-formatted error consistent with all other API error responses
     message: { error: errorMessage },
     // Skip rate limiting in test environment to avoid flaky tests
