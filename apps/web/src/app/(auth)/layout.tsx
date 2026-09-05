@@ -211,8 +211,27 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             `overflow-y-auto` — scrolling is on this container, not the body.
             `relative`        — establishes stacking context for PageTransitionWrapper.
             `h-dvh` fallback  — the parent already constrains height via overflow-hidden.
+
+            [FE-003] `min-h-0` — DO NOT REMOVE. This is a flex column child
+            (this <main> sits below <PageHeader> inside a `flex flex-col`
+            parent) with `flex-1` + `overflow-y-auto`. Flex items default to
+            `min-height: auto`, which means the browser refuses to shrink
+            this element below the height its own content wants — so instead
+            of `<main>` locking to the remaining column space and scrolling
+            *internally* (where main-scroll-pad's bottom padding actually
+            does something), it just kept growing to fit all of its content,
+            pushing the real bottom of the page past the device viewport.
+            That's the ACTUAL cause of content (e.g. the last dashboard
+            card) rendering behind MobileBottomNav on mobile — confirmed by
+            DevTools: main-scroll-pad's computed padding-bottom was already
+            correct (76px), but the highlighted box for <main> didn't cover
+            all of its own visible content, the textbook symptom of a
+            flex item overflowing instead of scrolling. `min-h-0` overrides
+            the default `min-height: auto` so `flex-1` can actually shrink
+            this element to its allotted space and `overflow-y-auto` takes
+            over as intended.
           */}
-          <main className="flex-1 overflow-y-auto pt-4 px-4 main-scroll-pad md:p-6 relative">
+          <main className="flex-1 min-h-0 overflow-y-auto pt-4 px-4 main-scroll-pad md:p-6 relative">
             <ErrorBoundary>
               <PageTransitionWrapper>{children}</PageTransitionWrapper>
             </ErrorBoundary>
