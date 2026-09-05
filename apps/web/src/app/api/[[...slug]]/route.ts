@@ -20,6 +20,7 @@
  *   is told to trust it.
  */
 import { type NextRequest, NextResponse } from 'next/server'
+import { Readable } from 'node:stream'
 import { createApiApp } from '@/lib/api-app'
 
 export const runtime = 'nodejs'
@@ -68,33 +69,52 @@ async function handleRequest(req: NextRequest): Promise<NextResponse> {
     const forwardedFor = req.headers.get('x-forwarded-for')
     const remoteAddress = forwardedFor?.split(',')[0]?.trim() || '127.0.0.1'
 
-    // Build a minimal mock of Node's IncomingMessage
-    const mockReq = {
-      method: req.method,
-      url: path + (url.search || ''),
-      headers: Object.fromEntries(req.headers.entries()),
-      socket: { remoteAddress },
-      // Make it readable-stream compatible
-      _readableState: { objectMode: false },
-      readable: true,
-      on: function(event: string, listener: (...args: unknown[]) => void) {
-        if (event === 'data' && bodyBuffer) {
-          // Emit body data synchronously — Express reads it immediately
-          Promise.resolve().then(() => listener(bodyBuffer!))
-        }
-        if (event === 'end') {
-          Promise.resolve().then(() => {
-            if (bodyBuffer) listener()
-            else listener()
-          })
-        }
-        return this
-      },
-      removeListener: function() { return this },
-      pipe: function() { return this },
-      resume: function() { return this },
-      destroy: function() {},
+    // Build a mock of Node's IncomingMessage backed by a REAL Readable
+    // stream — not a hand-rolled event emitter.
+    //
+    // [PRODUCTION FIX] The previous mock only implemented one of the two
+    // ways middleware in this app consumes the request body:
+    //   - express.json() (via body-parser/raw-body) calls
+    //     req.on('data', ...) / req.on('end', ...)          — WAS handled
+    //   - multer's busboy-based multipart parser calls
+    //     req.pipe(busboy)                                   — WAS a no-op
+    // `pipe` was stubbed as `function() { return this }` — it never wrote
+    // anything to its destination. So for every route that uploads an
+    // actual file (announcements, gallery, school-gallery, HR/staff photos,
+    // leadership photos, library/eBook resources, assignment submissions,
+    // expense receipts — every `upload.single(...)` route in this
+    // codebase), busboy sat waiting forever for a 'data' event that would
+    // never come. upload.single()'s next() was never called, so the route
+    // handler itself never ran — the client's fetch just spun until
+    // cancelled.
+    //
+    // This is NOT the "unhandled promise rejection" bug the try/catch
+    // additions elsewhere in this codebase (announcements.ts, gallery.ts,
+    // hr.ts, finances.ts, library.ts, ...) were fixing — that was a real,
+    // separate issue, but its fix runs *inside* the route handler, and this
+    // hang happens *before* the handler is ever invoked, so no downstream
+    // try/catch could ever have caught it. Report-card generation was
+    // unaffected because it never receives an uploaded file at all — the
+    // server generates the PDF itself and uploads it directly via
+    // uploadFile(), so no multer/busboy parsing is involved.
+    //
+    // A real Readable implements .pipe()/.on()/.unpipe()/.pause()/.resume()/
+    // .destroy() correctly out of the box, so this fixes both consumption
+    // patterns at once instead of re-simulating each library's expectations
+    // by hand. We already have the full body in `bodyBuffer` (read once,
+    // above), so we just push it and signal EOF immediately.
+    const mockReq = new Readable({ read() {} }) as Readable & {
+      method:  string
+      url:     string
+      headers: Record<string, string>
+      socket:  { remoteAddress: string }
     }
+    mockReq.method  = req.method
+    mockReq.url     = path + (url.search || '')
+    mockReq.headers = Object.fromEntries(req.headers.entries())
+    mockReq.socket  = { remoteAddress }
+    if (bodyBuffer && bodyBuffer.length > 0) mockReq.push(bodyBuffer)
+    mockReq.push(null) // EOF — mirrors a real IncomingMessage once Vercel has fully received the request
 
     // Build a minimal mock of Node's ServerResponse
     const mockRes = {
