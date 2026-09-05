@@ -243,6 +243,34 @@ export function globalErrorHandler(
     return
   }
 
+  // ── multer / busboy: file-upload parsing errors ────────────────────────────
+  // [PRODUCTION FIX] Every upload.single(...) route in this codebase runs
+  // multer BEFORE the route handler's own try/catch — so any error multer
+  // or its busboy parser throws (wrong field name, oversized file, a
+  // malformed multipart body) skips the handler entirely and lands here.
+  // With no case for it, it fell through to the generic 500 branch below,
+  // which in production suppresses err.message — so every upload failure
+  // of this kind, for every upload route in the app, showed the client
+  // nothing but "An internal server error occurred.", with the real reason
+  // visible only in server-side logs. multer's own messages don't leak
+  // anything sensitive (they describe the request's own shape — a missing
+  // field, a size limit, a bad boundary), so they're safe to pass straight
+  // through, the same way entity.parse.failed's message already is above.
+  if (err.name === 'MulterError') {
+    const code = (err as AppError & { code?: string }).code
+    const status = code === 'LIMIT_FILE_SIZE' ? 413 : 400
+    res.status(status).json({ error: err.message || 'File upload failed.' })
+    return
+  }
+  // busboy itself (not multer) throws a plain Error — not a MulterError —
+  // when it can't even start parsing, e.g. a missing/garbled multipart
+  // boundary or an unsupported Content-Type. Recognisable by message
+  // prefix; also safe to surface verbatim for the same reason as above.
+  if (typeof err.message === 'string' && /^(Multipart: |Unsupported content type)/.test(err.message)) {
+    res.status(400).json({ error: err.message })
+    return
+  }
+
   // ── All other errors ───────────────────────────────────────────────────────
   // Determine HTTP status:
   //   • Use err.status if set by the route handler (e.g., next(Object.assign(new Error(...), { status: 403 })))
