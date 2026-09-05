@@ -12,14 +12,12 @@
  * [DEPENDS ON]: W/lib/storage.ts, P/schema.prisma's GalleryPhoto model
  */
 import { Router } from 'express'
-import multer from 'multer'
 import { prisma } from '@/lib/prisma'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
-import { uploadFile, getPublicViewUrl, FILE_PREFIX } from '@/lib/storage'
+import { getPublicViewUrl, createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
 
 export const galleryRouter = Router()
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
 
 // GET /gallery — internal management list (all photos, most recent first).
 // [PRODUCTION FIX] Previously returned raw rows with only fileKey — the
@@ -41,34 +39,48 @@ galleryRouter.get('/', verifyAuth, requireRole(['admin', 'high_rank', 'lower_ran
   }
 })
 
-// POST /gallery — upload a new photo.
-// [PRODUCTION FIX] This handler had no try/catch at all — any error thrown
-// by uploadFile() (e.g. Appwrite rejecting the request) became an
-// unhandled promise rejection in Express 4, which never sends a response.
-// The client's fetch then hangs indefinitely — this is the "upload just
-// spins forever" bug reported for the gallery admin page.
+// POST /gallery/upload-ticket — mint a one-time Appwrite upload credential.
+// The browser exchanges this for a session (Appwrite Web SDK
+// account.createSession) and uploads the file bytes DIRECTLY to Appwrite —
+// never through this Vercel function. See storage.ts's
+// createDirectUploadTicket() for why: Vercel Functions hard-cap request
+// bodies at 4.5MB, and a single large request has no retry if the
+// connection drops mid-upload ("Request aborted" in production logs for
+// this exact route); neither limit applies to Appwrite's own chunked,
+// retrying client upload.
+galleryRouter.post(
+  '/upload-ticket',
+  verifyAuth,
+  requireRole(['admin', 'high_rank', 'lower_rank']),
+  async (_req, res) => {
+    try {
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.SCHOOL_GALLERY)
+      res.json(ticket)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'gallery', route: 'upload-ticket' } })
+    }
+  },
+)
+
+// POST /gallery — records a photo the browser has ALREADY uploaded directly
+// to Appwrite via /gallery/upload-ticket. Takes the resulting fileId (JSON
+// body), not the file itself — see the comment on /upload-ticket above for
+// why file bytes no longer come through this route.
 galleryRouter.post(
   '/',
   verifyAuth,
   requireRole(['admin', 'high_rank', 'lower_rank']),
-  upload.single('file'),
   async (req, res) => {
     try {
-      if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
-      if (!req.file.mimetype.startsWith('image/')) {
-        return res.status(400).json({ error: 'Only image files are allowed.' })
+      const fileId = typeof req.body?.fileId === 'string' ? req.body.fileId : undefined
+      if (!fileId || !fileId.startsWith(`${FILE_PREFIX.SCHOOL_GALLERY}_`)) {
+        return res.status(400).json({ error: 'Missing or invalid fileId — upload the photo via /gallery/upload-ticket first.' })
       }
-      const uploaded = await uploadFile(
-        FILE_PREFIX.SCHOOL_GALLERY,
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype,
-      )
       const caption  = typeof req.body?.caption === 'string' ? req.body.caption : undefined
       const category = typeof req.body?.category === 'string' ? req.body.category : undefined
       const photo = await prisma.galleryPhoto.create({
         data: {
-          fileKey: uploaded.fileId,
+          fileKey: fileId,
           caption,
           category,
           uploadedByUid: req.user!.uid,

@@ -1,5 +1,5 @@
 /*
- * apps/web/src/app/(auth)/gallery/page.tsx
+ * apps/web/src/app/(auth)/gallery-admin/page.tsx
  *
  * [CHANGE TYPE]: NEW FILE
  * [PURPOSE]: [Issue #6] The public "Life at our school" gallery page and its
@@ -23,6 +23,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { apiFetch, queryKeys } from '@/lib/api-client'
+import { uploadFileDirectly } from '@/lib/directUpload'
 import { Images, ImagePlus, Loader2, Trash2, X } from 'lucide-react'
 
 interface GalleryPhoto {
@@ -68,8 +69,6 @@ function UploadForm({ onDone }: { onDone: () => void }) {
     }
     setLoading(true)
     try {
-      const fd = new FormData()
-      fd.append('file', file)
       // Description is required at the product level even though the
       // backend field itself is optional — a gallery photo with no
       // caption at all isn't useful on the public page.
@@ -78,9 +77,15 @@ function UploadForm({ onDone }: { onDone: () => void }) {
         setLoading(false)
         return
       }
-      fd.append('caption', caption.trim())
-      if (category.trim()) fd.append('category', category.trim())
-      await apiFetch('/gallery', { method: 'POST', body: fd })
+      const fileId = await uploadFileDirectly('/gallery/upload-ticket', file)
+      await apiFetch('/gallery', {
+        method: 'POST',
+        body: JSON.stringify({
+          fileId,
+          caption: caption.trim(),
+          ...(category.trim() ? { category: category.trim() } : {}),
+        }),
+      })
       onDone()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload photo. Please try again.')

@@ -193,6 +193,70 @@ export async function uploadFile(
   return { fileId: file.$id, fileSize: file.sizeOriginal, mimeType: file.mimeType }
 }
 
+// ─── DIRECT-FROM-BROWSER UPLOAD TICKET ───────────────────────────────────────
+// [NEW] Lets the browser upload file bytes straight to Appwrite instead of
+// through this app's own API/Vercel function. Investigating the gallery/
+// leadership-photo/announcement-image "upload just fails" reports surfaced
+// two hard limits neither multer config nor Express config can move:
+//   - Vercel Functions cap a request body at 4.5MB, full stop, before this
+//     app's own code even runs (413: FUNCTION_PAYLOAD_TOO_LARGE).
+//   - Below that cap, a single giant request has no retry if the
+//     connection drops mid-upload — the exact "Request aborted" seen in
+//     production logs for these routes.
+// Appwrite's own client SDKs upload large files in chunks with built-in
+// retry per chunk, and talk to Appwrite's servers directly — neither limit
+// applies once the bytes never pass through our Vercel function at all.
+//
+// This does NOT hand the browser the project's real APPWRITE_API_KEY —
+// that key has full read/write/delete on every file in the bucket and must
+// never leave the server. Instead, a dedicated Appwrite Auth user exists
+// ONLY for this purpose (its id in APPWRITE_UPLOADER_USER_ID), and the
+// bucket grants that one user id Create-only permission — no read, no
+// update, no delete (set this up once in the Appwrite Console: Storage →
+// this bucket → Settings → Permissions → add that user id with only
+// "Create" checked). This function mints a short-lived, single-use custom
+// token for that identity; the browser exchanges it for a session via the
+// Appwrite Web SDK's account.createSession(), uploads the one file it was
+// issued a fileId for, and that session has nothing further it's allowed
+// to do.
+//
+// Callers MUST already have run their own requireRole/verifyAuth checks —
+// this function does no authorization itself, it assumes the caller has
+// already decided this specific request may upload into this prefix.
+export interface DirectUploadTicket {
+  secret:    string
+  userId:    string
+  endpoint:  string
+  projectId: string
+  bucketId:  string
+  fileId:    string
+}
+
+export async function createDirectUploadTicket(
+  prefix:    FilePrefix,
+  customId?: string,
+): Promise<DirectUploadTicket> {
+  const uploaderUserId = process.env.APPWRITE_UPLOADER_USER_ID
+  if (!uploaderUserId) {
+    throw new Error(
+      '[storage] Missing APPWRITE_UPLOADER_USER_ID — see the Appwrite Console ' +
+      'setup notes on createDirectUploadTicket() in storage.ts.',
+    )
+  }
+  const client = getClient() // throws if APPWRITE_ENDPOINT/PROJECT_ID/API_KEY are missing
+  const users  = new sdk.Users(client)
+  const token  = await users.createToken({ userId: uploaderUserId })
+  const fileId = customId ?? `${prefix}_${sdk.ID.unique()}`
+  return {
+    secret:    token.secret,
+    userId:    uploaderUserId,
+    endpoint:  process.env.APPWRITE_ENDPOINT!,
+    projectId: process.env.APPWRITE_PROJECT_ID!,
+    bucketId:  SCHOOL_BUCKET,
+    fileId,
+  }
+}
+
 // ─── SIGNED / PRESIGNED VIEW URL ─────────────────────────────────────────────
 
 const SIGNED_URL_TTL_SECONDS = 3600 // 1 hour
