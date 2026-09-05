@@ -97,7 +97,22 @@ function PageTransitionWrapper({ children }: { children: React.ReactNode }) {
         initial="initial"
         animate="animate"
         exit="exit"
-        className="h-full"
+        // [FE-004] `min-h-full`, NOT `h-full` — DO NOT change back.
+        // `h-full` (height: 100%) locks this div to exactly <main>'s content-box
+        // height (main's own height minus its pt-4/main-scroll-pad padding).
+        // Since this div has no overflow set (defaults to visible), taller page
+        // content doesn't get clipped OR grow this box — it just paints past this
+        // div's artificially short boundary, right through where main's bottom
+        // padding was reserved. Net effect: the padding never actually appears
+        // after the real end of the content, so the last item on tall pages
+        // renders almost flush to the screen edge, behind MobileBottomNav —
+        // confirmed via getBoundingClientRect showing ~60px of real overlap even
+        // though main's computed padding-bottom was correctly 76px. `min-h-full`
+        // keeps short pages filling the available space (e.g. for centered empty
+        // states) while letting this div grow to its real content height on long
+        // pages, so main's padding-bottom lands after the actual last pixel of
+        // content instead of after an artificial cutoff.
+        className="min-h-full"
       >
         {children}
       </motion.div>
