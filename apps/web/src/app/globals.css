@@ -811,13 +811,32 @@
    md+ (768px, matching the layout's breakpoint) resets to the
    layout's own md:p-6 (1.5rem) since no fixed bottom bar exists
    at that breakpoint — this class must not add extra padding there.
+
+   [FE-002] DELIBERATELY UNLAYERED — DO NOT wrap this in `@layer utilities`.
+   Tailwind v4 (`@import 'tailwindcss'` above) ships its own utilities
+   (p-4, md:p-6, etc.) inside a named `@layer utilities`. Per the CSS
+   Cascade Layers spec, ANY unlayered rule beats ANY layered rule
+   regardless of source order or specificity — that's what lets this
+   class win over the layout's `p-4`/`md:p-6` without a specificity
+   fight. The "CUSTOM UTILITIES" block above (line ~407) intentionally
+   uses `@layer utilities` for tree-shaking, but doing the same here
+   would drop this class into the SAME layer as Tailwind's own utilities,
+   where plain source order decides ties — reintroducing the exact bug
+   this class exists to fix. The `!important` below is a second,
+   independent safeguard against the same failure mode (e.g. a build
+   step that flattens/reorders `@layer` blocks): even if the layering
+   protection above were ever lost, `!important` still wins against
+   Tailwind's non-`!important` utility output. The layout's `<main>`
+   also avoids the shorthand `p-4` on mobile (uses `pt-4 px-4` instead)
+   so there's no competing padding-bottom declaration at all — belt and
+   suspenders, not either/or.
    ───────────────────────────────────────────────────────── */
 .main-scroll-pad {
-  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 1rem);
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 1rem) !important;
 }
 
 @media (min-width: 768px) {
   .main-scroll-pad {
-    padding-bottom: 1.5rem;
+    padding-bottom: 1.5rem !important;
   }
 }

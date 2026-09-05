@@ -171,13 +171,36 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
             Padding strategy:
               Mobile (< md):
-                p-4              → 1rem on all sides (tighter on small screens)
+                pt-4 px-4        → 1rem top/sides only. Deliberately NOT `p-4`.
+                                   `p-4` also sets padding-bottom: 1rem, which is
+                                   a second, competing declaration for the same
+                                   property main-scroll-pad is trying to own.
+                                   [FE-002] Even though main-scroll-pad currently
+                                   wins that fight (it's unlayered plain CSS in
+                                   globals.css, and Tailwind v4 ships its own
+                                   utilities inside a named `@layer utilities` —
+                                   unlayered CSS always beats layered CSS
+                                   regardless of source order, per the CSS
+                                   Cascade Layers spec), leaving `p-4` in place
+                                   meant the real bottom padding depended on that
+                                   layering fact holding forever. Any future
+                                   change that wraps main-scroll-pad in
+                                   `@layer utilities` (the pattern this codebase
+                                   already uses for its other custom classes —
+                                   see globals.css "CUSTOM UTILITIES") would
+                                   silently reintroduce the bug by putting both
+                                   declarations in the same layer, where plain
+                                   source order decides the winner. Splitting the
+                                   shorthand removes the competing declaration
+                                   entirely so there is nothing left to win.
                 main-scroll-pad  → clears MobileBottomNav's real height via a
                                    plain CSS class in globals.css (env()/calc(),
                                    no inline style, no Tailwind arbitrary value —
                                    the earlier inline-custom-property version
                                    broke the authenticated shell at runtime and
-                                   was reverted). [FE-001]
+                                   was reverted). [FE-001] Now also `!important`
+                                   (see globals.css) as a second, independent
+                                   safeguard against the layering issue above.
 
               Desktop (md+):
                 md:p-6           → 1.5rem on all sides (standard dashboard spacing)
@@ -189,7 +212,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             `relative`        — establishes stacking context for PageTransitionWrapper.
             `h-dvh` fallback  — the parent already constrains height via overflow-hidden.
           */}
-          <main className="flex-1 overflow-y-auto p-4 main-scroll-pad md:p-6 relative">
+          <main className="flex-1 overflow-y-auto pt-4 px-4 main-scroll-pad md:p-6 relative">
             <ErrorBoundary>
               <PageTransitionWrapper>{children}</PageTransitionWrapper>
             </ErrorBoundary>
