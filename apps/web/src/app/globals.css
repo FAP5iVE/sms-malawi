@@ -794,42 +794,39 @@
 }
 
 /* ─────────────────────────────────────────────────────────
-   MOBILE SCROLL BOTTOM CLEARANCE [PRODUCTION FIX]
-   Referenced by apps/web/src/app/(auth)/layout.tsx's <main> as
-   `main-scroll-pad` (see that file's comment, [FE-001]) but never
-   actually defined anywhere in the codebase — the class applied
-   zero padding, so on mobile the last item of any scrollable list
-   sat directly behind MobileBottomNav.tsx's fixed bar instead of
-   above it.
+   MOBILE BOTTOM-CLEARANCE PADDING
+   Applied to <main> in apps/web/src/app/(auth)/layout.tsx as
+   `main-scroll-pad`. Reserves space at the bottom of the scrollable
+   page content on mobile so the last item clears MobileBottomNav's
+   fixed bar instead of rendering behind it.
 
-   Must match MobileBottomNav.tsx's real total height exactly:
-   60px content + env(safe-area-inset-bottom) for the iOS home
-   indicator (see that file's own comment, same numbers). The extra
-   1rem is breathing room so the last item isn't flush against the
-   bar's top edge, not part of the clearance calculation itself.
+   Must match MobileBottomNav.tsx's real total height: 60px content +
+   env(safe-area-inset-bottom) for the iOS home indicator (see that
+   file's own comment, same numbers). The extra 1rem is breathing room
+   so the last item isn't flush against the bar's top edge — not part
+   of the clearance calculation itself.
 
-   md+ (768px, matching the layout's breakpoint) resets to the
-   layout's own md:p-6 (1.5rem) since no fixed bottom bar exists
-   at that breakpoint — this class must not add extra padding there.
+   md+ (768px, matching the layout's breakpoint) resets to 1.5rem to
+   match the layout's own `md:p-6` — no fixed bottom bar exists at
+   that breakpoint, so this class must not add anything extra there.
 
-   [FE-002] DELIBERATELY UNLAYERED — DO NOT wrap this in `@layer utilities`.
-   Tailwind v4 (`@import 'tailwindcss'` above) ships its own utilities
-   (p-4, md:p-6, etc.) inside a named `@layer utilities`. Per the CSS
-   Cascade Layers spec, ANY unlayered rule beats ANY layered rule
-   regardless of source order or specificity — that's what lets this
-   class win over the layout's `p-4`/`md:p-6` without a specificity
-   fight. The "CUSTOM UTILITIES" block above (line ~407) intentionally
-   uses `@layer utilities` for tree-shaking, but doing the same here
-   would drop this class into the SAME layer as Tailwind's own utilities,
-   where plain source order decides ties — reintroducing the exact bug
-   this class exists to fix. The `!important` below is a second,
-   independent safeguard against the same failure mode (e.g. a build
-   step that flattens/reorders `@layer` blocks): even if the layering
-   protection above were ever lost, `!important` still wins against
-   Tailwind's non-`!important` utility output. The layout's `<main>`
-   also avoids the shorthand `p-4` on mobile (uses `pt-4 px-4` instead)
-   so there's no competing padding-bottom declaration at all — belt and
-   suspenders, not either/or.
+   [FE-008] DO NOT wrap this in `@layer utilities`. Tailwind v4
+   (`@import 'tailwindcss'` above) ships its own utilities (p-4,
+   md:p-6, etc.) inside a named `@layer utilities`. Per the CSS
+   Cascade Layers spec, any unlayered rule beats any layered rule
+   regardless of source order — that's what lets this class override
+   the layout's own padding utilities without a specificity fight.
+   The "CUSTOM UTILITIES" block above (line ~407) intentionally uses
+   `@layer utilities` for tree-shaking, but doing the same here would
+   drop this class into the SAME layer as Tailwind's utilities, where
+   plain source order decides ties instead. The `!important` below is
+   a second, independent safeguard against the same failure mode, e.g.
+   a build step that flattens/reorders `@layer` blocks.
+
+   Note: this padding value was already computing correctly the whole
+   time this bug was being investigated. The actual cause of items
+   rendering behind the nav was elsewhere — see [FE-008] on <main>'s
+   className in layout.tsx for the full story.
    ───────────────────────────────────────────────────────── */
 .main-scroll-pad {
   padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 1rem) !important;

@@ -16,10 +16,12 @@
  *     When its <nav> ancestor has `display: none` (via md:hidden), the fixed element
  *     is also hidden — standard CSS behaviour for `display: none` parent → all
  *     descendants are removed from the rendered tree including fixed children.
- *   • Main content reserves dynamic bottom clearance on mobile — see the `<main>`
- *     padding comment below (Rule FE-001 fix) — clearing MobileBottomNav's real,
- *     safe-area-inclusive height rather than a flat px value. On desktop, `md:pb-6`
- *     resets to 24px since no fixed bottom bar exists at that breakpoint.
+ *   • Main content reserves dynamic bottom clearance on mobile so the last item
+ *     never renders behind MobileBottomNav — see [FE-008] at the `<main>` element
+ *     below for the full story. The actual root cause was in PageTransitionWrapper,
+ *     not in the padding itself — read that note first if this regresses. On
+ *     desktop, `md:p-6` resets to 1.5rem on all sides since no fixed bottom bar
+ *     exists at that breakpoint.
  *
  * Phase B8 AnimatePresence page transitions are fully preserved.
  *
@@ -97,21 +99,15 @@ function PageTransitionWrapper({ children }: { children: React.ReactNode }) {
         initial="initial"
         animate="animate"
         exit="exit"
-        // [FE-004] `min-h-full`, NOT `h-full` — DO NOT change back.
-        // `h-full` (height: 100%) locks this div to exactly <main>'s content-box
-        // height (main's own height minus its pt-4/main-scroll-pad padding).
-        // Since this div has no overflow set (defaults to visible), taller page
-        // content doesn't get clipped OR grow this box — it just paints past this
-        // div's artificially short boundary, right through where main's bottom
-        // padding was reserved. Net effect: the padding never actually appears
-        // after the real end of the content, so the last item on tall pages
-        // renders almost flush to the screen edge, behind MobileBottomNav —
-        // confirmed via getBoundingClientRect showing ~60px of real overlap even
-        // though main's computed padding-bottom was correctly 76px. `min-h-full`
-        // keeps short pages filling the available space (e.g. for centered empty
-        // states) while letting this div grow to its real content height on long
-        // pages, so main's padding-bottom lands after the actual last pixel of
-        // content instead of after an artificial cutoff.
+        // [FE-008] `min-h-full`, NOT `h-full` — this is the fix for the mobile
+        // bottom-clearance overlap bug (last page item rendering behind
+        // MobileBottomNav). `h-full` locked this div to exactly <main>'s
+        // content-box height; since it sets no overflow, taller page content
+        // painted straight past that fixed boundary instead of growing it, so
+        // <main>'s reserved bottom padding never appeared after the real end
+        // of the content. `min-h-full` lets this div grow with its content
+        // (while still filling the space on short pages). Full root-cause
+        // writeup: see the [FE-008] comment on <main>'s className below.
         className="min-h-full"
       >
         {children}
@@ -184,67 +180,43 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           {/*
             Scrollable page content area.
 
-            Padding strategy:
-              Mobile (< md):
-                pt-4 px-4        → 1rem top/sides only. Deliberately NOT `p-4`.
-                                   `p-4` also sets padding-bottom: 1rem, which is
-                                   a second, competing declaration for the same
-                                   property main-scroll-pad is trying to own.
-                                   [FE-002] Even though main-scroll-pad currently
-                                   wins that fight (it's unlayered plain CSS in
-                                   globals.css, and Tailwind v4 ships its own
-                                   utilities inside a named `@layer utilities` —
-                                   unlayered CSS always beats layered CSS
-                                   regardless of source order, per the CSS
-                                   Cascade Layers spec), leaving `p-4` in place
-                                   meant the real bottom padding depended on that
-                                   layering fact holding forever. Any future
-                                   change that wraps main-scroll-pad in
-                                   `@layer utilities` (the pattern this codebase
-                                   already uses for its other custom classes —
-                                   see globals.css "CUSTOM UTILITIES") would
-                                   silently reintroduce the bug by putting both
-                                   declarations in the same layer, where plain
-                                   source order decides the winner. Splitting the
-                                   shorthand removes the competing declaration
-                                   entirely so there is nothing left to win.
-                main-scroll-pad  → clears MobileBottomNav's real height via a
-                                   plain CSS class in globals.css (env()/calc(),
-                                   no inline style, no Tailwind arbitrary value —
-                                   the earlier inline-custom-property version
-                                   broke the authenticated shell at runtime and
-                                   was reverted). [FE-001] Now also `!important`
-                                   (see globals.css) as a second, independent
-                                   safeguard against the layering issue above.
+            Padding: pt-4 px-4 + main-scroll-pad on mobile (main-scroll-pad sets
+            the real bottom value — see its definition in globals.css); md:p-6
+            on desktop. `overflow-y-auto` — scrolling happens on this element,
+            not the body. `relative` establishes a stacking context for
+            PageTransitionWrapper. `min-h-0` lets this flex-1 child actually
+            shrink to its allotted space instead of growing to fit its content
+            (flex items default to `min-height: auto`) — required for
+            `overflow-y-auto` to take effect at all.
 
-              Desktop (md+):
-                md:p-6           → 1.5rem on all sides (standard dashboard spacing)
-                                   main-scroll-pad's own media query resets its
-                                   bottom padding to 1.5rem here — no fixed bottom
-                                   bar exists at this breakpoint.
+            ───────────────────────────────────────────────────────────────
+            [FE-008] MOBILE BOTTOM-CLEARANCE OVERLAP — fixed 2026-09-05.
 
-            `overflow-y-auto` — scrolling is on this container, not the body.
-            `relative`        — establishes stacking context for PageTransitionWrapper.
-            `h-dvh` fallback  — the parent already constrains height via overflow-hidden.
+            Symptom: on mobile (< md), the last item on a scrollable page
+            rendered behind MobileBottomNav's fixed bar instead of above it.
 
-            [FE-003] `min-h-0` — DO NOT REMOVE. This is a flex column child
-            (this <main> sits below <PageHeader> inside a `flex flex-col`
-            parent) with `flex-1` + `overflow-y-auto`. Flex items default to
-            `min-height: auto`, which means the browser refuses to shrink
-            this element below the height its own content wants — so instead
-            of `<main>` locking to the remaining column space and scrolling
-            *internally* (where main-scroll-pad's bottom padding actually
-            does something), it just kept growing to fit all of its content,
-            pushing the real bottom of the page past the device viewport.
-            That's the ACTUAL cause of content (e.g. the last dashboard
-            card) rendering behind MobileBottomNav on mobile — confirmed by
-            DevTools: main-scroll-pad's computed padding-bottom was already
-            correct (76px), but the highlighted box for <main> didn't cover
-            all of its own visible content, the textbook symptom of a
-            flex item overflowing instead of scrolling. `min-h-0` overrides
-            the default `min-height: auto` so `flex-1` can actually shrink
-            this element to its allotted space and `overflow-y-auto` takes
-            over as intended.
+            Root cause, and the actual fix: PageTransitionWrapper's
+            motion.div (below) used `h-full`, capping it at exactly this
+            <main>'s content-box height. That div sets no overflow, so
+            taller page content painted straight past that fixed cap
+            instead of growing it — meaning this element's bottom padding
+            never actually appeared after the real end of the content, no
+            matter how correct the padding value itself was. Changed to
+            `min-h-full` — see PageTransitionWrapper's className comment.
+            If this bug ever comes back, check that div first.
+
+            Three more things below are correct, worthwhile hardening found
+            while investigating this bug, but none of them were the actual
+            cause — don't assume reverting the min-h-full fix above is safe
+            just because these are still in place:
+
+              • `pt-4 px-4` instead of `p-4` — avoids a second, competing
+                padding-bottom declaration alongside main-scroll-pad.
+              • `main-scroll-pad` uses `!important` and deliberately avoids
+                `@layer utilities` — see its comment in globals.css.
+              • `min-h-0` above — needed for overflow-y-auto to function on
+                a flex-1 child at all, independent of the bug above.
+            ───────────────────────────────────────────────────────────────
           */}
           <main className="flex-1 min-h-0 overflow-y-auto pt-4 px-4 main-scroll-pad md:p-6 relative">
             <ErrorBoundary>
