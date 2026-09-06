@@ -223,13 +223,24 @@ export async function uploadFile(
 // Callers MUST already have run their own requireRole/verifyAuth checks —
 // this function does no authorization itself, it assumes the caller has
 // already decided this specific request may upload into this prefix.
+// Prefixes whose files are meant to be viewed directly (getPublicViewUrl(),
+// no signed-proxy — see the FILE_PREFIX comments above). Everything else
+// must NOT get public read here — those rely on getSignedViewUrl()'s
+// server-side role check instead, and must stay creator-only in Appwrite.
+const PUBLIC_FILE_PREFIXES: readonly FilePrefix[] = [
+  FILE_PREFIX.ANNOUNCEMENT_IMAGE,
+  FILE_PREFIX.SCHOOL_GALLERY,
+  FILE_PREFIX.LEADERSHIP_PHOTO,
+]
+
 export interface DirectUploadTicket {
-  secret:    string
-  userId:    string
-  endpoint:  string
-  projectId: string
-  bucketId:  string
-  fileId:    string
+  secret:          string
+  userId:          string
+  endpoint:        string
+  projectId:       string
+  bucketId:        string
+  fileId:          string
+  filePermissions: string[]
 }
 
 export async function createDirectUploadTicket(
@@ -247,6 +258,19 @@ export async function createDirectUploadTicket(
   const users  = new sdk.Users(client)
   const token  = await users.createToken({ userId: uploaderUserId })
   const fileId = customId ?? `${prefix}_${sdk.ID.unique()}`
+  // [PRODUCTION FIX] A file created via a real Appwrite user session (as
+  // this "uploader" identity is) defaults to being readable only by its
+  // creator — unlike the old path, where uploadFile() ran under the full-
+  // access API key. Without this, every direct-uploaded public asset
+  // (gallery photos, announcement images, leadership photos) would upload
+  // successfully but then 401/403 the moment getPublicViewUrl()'s raw
+  // Appwrite URL is hit by an anonymous visitor — which is exactly the
+  // "broken image" symptom this fixes. Only the three known-public
+  // prefixes get this; everything else stays creator-only, matching what
+  // the old path effectively enforced through role checks instead.
+  const filePermissions = PUBLIC_FILE_PREFIXES.includes(prefix)
+    ? [sdk.Permission.read(sdk.Role.any())]
+    : []
   return {
     secret:    token.secret,
     userId:    uploaderUserId,
@@ -254,6 +278,7 @@ export async function createDirectUploadTicket(
     projectId: process.env.APPWRITE_PROJECT_ID!,
     bucketId:  SCHOOL_BUCKET,
     fileId,
+    filePermissions,
   }
 }
 

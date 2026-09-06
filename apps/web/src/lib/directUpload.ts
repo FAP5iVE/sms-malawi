@@ -35,12 +35,13 @@ import { Client, Account, Storage } from 'appwrite'
 import { apiFetch } from '@/lib/api-client'
 
 interface DirectUploadTicket {
-  secret:    string
-  userId:    string
-  endpoint:  string
-  projectId: string
-  bucketId:  string
-  fileId:    string
+  secret:          string
+  userId:          string
+  endpoint:        string
+  projectId:       string
+  bucketId:        string
+  fileId:          string
+  filePermissions: string[]
 }
 
 /**
@@ -54,7 +55,12 @@ export async function uploadFileDirectly(ticketPath: string, file: File): Promis
 
   const client = new Client().setEndpoint(ticket.endpoint).setProject(ticket.projectId)
   await new Account(client).createSession(ticket.userId, ticket.secret)
-  await new Storage(client).createFile(ticket.bucketId, ticket.fileId, file)
+  // filePermissions is decided server-side, per upload prefix — see
+  // storage.ts's createDirectUploadTicket(). Public assets (gallery,
+  // announcements, leadership photos) get read("any") here so anonymous
+  // visitors can actually load the image; anything else gets none, same
+  // as before.
+  await new Storage(client).createFile(ticket.bucketId, ticket.fileId, file, ticket.filePermissions)
 
   return ticket.fileId
 }

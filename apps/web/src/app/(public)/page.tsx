@@ -932,7 +932,7 @@ export default function LandingPage() {
                       key={p.id}
                       src={p.url}
                       alt={p.caption ?? p.category ?? 'School photo'}
-                      className="h-32 w-full object-cover rounded-xl border border-base"
+                      className="h-32 w-full object-contain bg-page rounded-xl border border-base"
                     />
                   ))}
                 </div>

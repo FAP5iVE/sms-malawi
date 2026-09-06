@@ -53,9 +53,9 @@ export default function GalleryPage() {
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {photos.map((p) => (
-                <div key={p.id} className="group relative aspect-square rounded-xl overflow-hidden border border-base">
+                <div key={p.id} className="group relative aspect-square rounded-xl overflow-hidden border border-base bg-page">
                   {/* eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL */}
-                  <img src={p.url} alt={p.caption ?? p.category ?? 'School photo'} className="w-full h-full object-cover" />
+                  <img src={p.url} alt={p.caption ?? p.category ?? 'School photo'} className="w-full h-full object-contain" />
                   {(p.caption || p.category) && (
                     <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
                       <p className="text-xs text-white font-heading font-semibold">{p.caption ?? p.category}</p>
