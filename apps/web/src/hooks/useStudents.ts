@@ -29,7 +29,7 @@
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { CreateStudentInput, UpdateStudentInput } from '@shared/schemas/student'
-import type { ApiStudent, ApiStudentListResponse } from '@shared/types/api'
+import type { ApiStudent, ApiStudentListResponse, ApiHighRiskStudentsResponse } from '@shared/types/api'
 import type { ApiStudentDetail } from '@/server/services/studentService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { useAuthStore } from '@/store/authStore'
@@ -80,6 +80,21 @@ export function useStudentMe() {
     queryKey: queryKeys.students.me(),
     queryFn:  () => apiFetch<ApiStudentDetail>('/students/me'),
     enabled:  role === 'student',
+  })
+}
+
+/**
+ * [PRODUCTION FIX] Real HIGH-risk active students for the "Students
+ * Needing Attention" dashboard widget — see riskService.
+ * getHighRiskStudents()'s header comment for why filtering GET /students'
+ * riskLevel client-side could never surface anyone (that route's
+ * riskLevel is computed by a 2-factor heuristic whose HIGH branch is
+ * unreachable without a term average).
+ */
+export function useHighRiskStudents(limit = 6) {
+  return useQuery({
+    queryKey: queryKeys.students.atRisk(limit),
+    queryFn: () => apiFetch<ApiHighRiskStudentsResponse>(`/students/at-risk?limit=${limit}`),
   })
 }
 

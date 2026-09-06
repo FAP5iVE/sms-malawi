@@ -20,7 +20,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput, CreateAllowanceInput } from '@shared/schemas/hr'
-import type { ApiStaffLoan, ApiLeaveRequest } from '@shared/types/api'
+import type { ApiStaffLoan, ApiLeaveRequest, ApiContractAlert } from '@shared/types/api'
 import type { ConflictCheckResult } from '@/server/services/leaveConflictService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { STALE } from '@/components/providers/QueryProvider'
@@ -249,6 +249,20 @@ export function useContractAlerts(days = 60) {
   return useQuery({
     queryKey: queryKeys.hr.contractAlerts(days),
     queryFn: () => apiFetch(`/hr/alerts/contracts?days=${days}`),
+  })
+}
+
+/**
+ * [PRODUCTION FIX] Range version of useContractAlerts() — contracts
+ * expiring any time in the next `days` days, not just on that exact day.
+ * See hrService.getUpcomingContractExpiries()'s header comment. This is
+ * what HRDashboard.tsx's stat card and widget actually want; the exact-day
+ * useContractAlerts() above stays as-is for contractExpiryJob.ts's use case.
+ */
+export function useUpcomingContractExpiries(days = 60) {
+  return useQuery({
+    queryKey: queryKeys.hr.contractAlertsUpcoming(days),
+    queryFn: () => apiFetch<ApiContractAlert[]>(`/hr/alerts/contracts-upcoming?days=${days}`),
   })
 }
 

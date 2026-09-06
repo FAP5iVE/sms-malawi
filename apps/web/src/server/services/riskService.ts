@@ -300,3 +300,67 @@ export async function getSchoolRiskSummary(
   for (const r of results) summary[r.riskLevel]++
   return summary
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HIGH-RISK STUDENT LIST (for the "Students Needing Attention" dashboard widget)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface HighRiskStudentSummary {
+  id:        string
+  firstName: string
+  lastName:  string
+  className: string | null
+  riskLevel: RiskLevel
+  topFactor: string | null   // the most severe factor's detail, for a one-line reason
+}
+
+/**
+ * [PRODUCTION FIX] The teacher dashboard's "Students Needing Attention"
+ * widget used to filter GET /students' riskLevel client-side — but that
+ * list route computes risk via studentService.ts's local computeRiskLevel(),
+ * a lightweight 2-factor heuristic called with only feeBalance/feeTotal (no
+ * termAverage — R7's grading domain was still pending when it was written).
+ * Its HIGH branch requires poor grades AND high fee debt; with termAverage
+ * permanently undefined, that branch is unreachable, so riskLevel could
+ * never be 'HIGH' — the widget was empty regardless of which page of
+ * students it looked at, or how the roster was sorted.
+ *
+ * This reuses the real, already-shipped multi-factor assessStudentRisk()
+ * instead of that heuristic (same cost pattern already accepted by
+ * getSchoolRiskSummary() above — one query set per active student). Same
+ * whole-roster + in-memory filter approach, but returns names, not just a
+ * count.
+ */
+export async function getHighRiskStudents(
+  academicTerm: number,
+  academicYear: string,
+  limit = 6,
+): Promise<HighRiskStudentSummary[]> {
+  const students = await prisma.student.findMany({
+    where:  { status: 'ACTIVE' },
+    select: { id: true, firstName: true, lastName: true, class: { select: { name: true } } },
+  })
+
+  const assessed = await Promise.all(
+    students.map(async (s) => ({
+      student:    s,
+      assessment: await assessStudentRisk(s.id, academicTerm, academicYear),
+    })),
+  )
+
+  return assessed
+    .filter((a) => a.assessment.riskLevel === 'HIGH')
+    // Most concurrent risk factors first — the students needing the most
+    // urgent attention surface at the top of a widget that only shows a
+    // handful of rows.
+    .sort((a, b) => b.assessment.factors.length - a.assessment.factors.length)
+    .slice(0, limit)
+    .map((a) => ({
+      id:        a.student.id,
+      firstName: a.student.firstName,
+      lastName:  a.student.lastName,
+      className: a.student.class?.name ?? null,
+      riskLevel: a.assessment.riskLevel,
+      topFactor: a.assessment.factors[0]?.detail ?? null,
+    }))
+}

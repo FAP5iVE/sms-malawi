@@ -189,6 +189,16 @@ hrRouter.get('/alerts/contracts', verifyAuth, requireRole([...HR_ADMIN]),
     return res.json(await hrService.getContractExpiryAlert(days))
   })
 
+// [PRODUCTION FIX] Range version of the above for the HR dashboard's
+// "Contract Expiry Alerts" widget — see getUpcomingContractExpiries()'s
+// header comment for why the exact-day /alerts/contracts route above is
+// the wrong data source for a "what's coming up" display.
+hrRouter.get('/alerts/contracts-upcoming', verifyAuth, requireRole([...HR_ADMIN]),
+  async (req, res) => {
+    const days = Number(req.query.days ?? 60)
+    return res.json(await hrService.getUpcomingContractExpiries(days))
+  })
+
 // ── LEAVE ──
 hrRouter.get('/leave/requests', verifyAuth, requireRole([...REVIEWERS]),
   async (req, res) => {

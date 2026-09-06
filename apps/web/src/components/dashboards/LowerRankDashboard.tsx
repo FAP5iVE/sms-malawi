@@ -39,7 +39,7 @@ import {
 } from 'lucide-react'
 import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
-import { PlaceholderWidget } from '@/components/shared/PlaceholderWidget'
+import { ListCard } from '@/components/shared/ListCard'
 import { useStudents } from '@/hooks/useStudents'
 import { useApplications } from '@/hooks/useApplications'
 import { useExams } from '@/hooks/useExams'
@@ -95,7 +95,8 @@ export function LowerRankDashboard() {
     term ?? 0,
   )
 
-  const examsThisWeek = examsInNextSevenDays(examsData ?? []).length
+  const examsThisWeekList = examsInNextSevenDays(examsData ?? [])
+  const recentApplications = (pendingApps?.applications ?? []).slice(0, 5)
 
   return (
     <div className="space-y-6">
@@ -129,7 +130,7 @@ export function LowerRankDashboard() {
         />
         <StatCard
           label="Exams This Week"
-          value={statValue(periodLoading || examsLoading, examsThisWeek)}
+          value={statValue(periodLoading || examsLoading, examsThisWeekList.length)}
           icon={GraduationCap}
           trend="neutral"
           trendLabel="scheduled"
@@ -139,16 +140,52 @@ export function LowerRankDashboard() {
       </StatCardGrid>
       <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-4">
-        <PlaceholderWidget
+        <ListCard
           title="Exam Schedule This Week"
-          sub="Timetable widget"
-          h="h-32 md:h-40"
-        />
-        <PlaceholderWidget
+          sub="Next 7 days"
+          isLoading={periodLoading || examsLoading}
+          isEmpty={examsThisWeekList.length === 0}
+          emptyMessage="No exams scheduled in the next 7 days."
+        >
+          <ul className="divide-y divide-base">
+            {examsThisWeekList.map((exam) => (
+              <li key={exam.id} className="py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-brand-navy truncate">{exam.subject}</p>
+                  <p className="text-xs text-muted truncate">
+                    {exam.className ?? 'Class'} · {exam.type}
+                  </p>
+                </div>
+                <span className="text-xs text-muted whitespace-nowrap shrink-0">
+                  {new Date(exam.date).toLocaleDateString('en-MW')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </ListCard>
+        <ListCard
           title="Recent Applications"
-          sub="Admissions queue"
-          h="h-32 md:h-40"
-        />
+          sub="Pending review"
+          isLoading={pendingLoading}
+          isEmpty={recentApplications.length === 0}
+          emptyMessage="No pending applications right now."
+        >
+          <ul className="divide-y divide-base">
+            {recentApplications.map((app) => (
+              <li key={app.id} className="py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-brand-navy truncate">
+                    {app.firstName} {app.lastName}
+                  </p>
+                  <p className="text-xs text-muted truncate">Form {app.applyingForForm}</p>
+                </div>
+                <span className="text-xs text-muted whitespace-nowrap shrink-0">
+                  {new Date(app.createdAt).toLocaleDateString('en-MW')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </ListCard>
       </div>
     </div>
   )

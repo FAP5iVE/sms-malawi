@@ -42,6 +42,7 @@ import { CreateClassSchema, UpdateClassSchema, CreateTimetableSlotSchema, Create
 import * as classService         from '@/server/services/classService'
 import * as pendingActionService from '@/server/services/pendingActionService'
 import * as settingsService      from '@/server/services/settingsService'
+import { resolveStudentFromUid } from '@/server/services/studentService'
 import { SETTING_KEYS }          from '@shared/types/settings'
 import { prisma }                from '@/lib/prisma'
 import { assignmentsRouter }     from './assignments'
@@ -202,6 +203,13 @@ classesRouter.delete('/subject-assignments/:assignmentId', requirePermission('cl
 // Self-scoped by teacherUid — no special permission needed beyond being a
 // signed-in staff member. Weekends resolve to no slots (Weekday enum only
 // has Monday–Friday) rather than an error.
+//
+// [PRODUCTION FIX] Extended to cover the student dashboard's identical
+// "Today's Timetable" PlaceholderWidget. A student has no teacherUid, so
+// they're resolved to their own classId (studentService.
+// resolveStudentFromUid — the same UID→Student.id lookup GET /students/me
+// uses) and matched on classId instead. One endpoint, self-scoped either
+// way, rather than a near-duplicate route per role.
 classesRouter.get('/my-timetable/today', verifyAuth, async (req, res) => {
   const ISO_TO_WEEKDAY: Record<number, string> = {
     1: 'MONDAY', 2: 'TUESDAY', 3: 'WEDNESDAY', 4: 'THURSDAY', 5: 'FRIDAY',
@@ -211,6 +219,23 @@ classesRouter.get('/my-timetable/today', verifyAuth, async (req, res) => {
 
   const academicYear = await settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
   const term = await settingsService.get(SETTING_KEYS.CURRENT_TERM)
+
+  if (req.user!.role === 'student') {
+    const student = await resolveStudentFromUid(req.user!.uid)
+    if (!student?.classId) return res.json([])
+
+    const slots = await prisma.timetableSlot.findMany({
+      where: {
+        classId: student.classId,
+        day: today as never,
+        academicYear,
+        term: Number(term),
+      },
+      include: { class: { select: { name: true } } },
+      orderBy: { periodStart: 'asc' },
+    })
+    return res.json(slots)
+  }
 
   const slots = await prisma.timetableSlot.findMany({
     where: {

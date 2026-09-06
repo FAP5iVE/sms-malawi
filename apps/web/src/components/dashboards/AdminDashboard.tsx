@@ -46,13 +46,14 @@ import {
 import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions }           from '@/components/shared/QuickActions'
 import type { QuickAction }       from '@/components/shared/QuickActions'
-import { PlaceholderWidget }      from '@/components/shared/PlaceholderWidget'
 import { ChartCard }              from '@/components/shared/ChartCard'
+import { ListCard }               from '@/components/shared/ListCard'
 import { Chart }                  from '@/components/shared/chart'
 import type { ChartDataPoint }    from '@/components/shared/chart'
 import { useUsers }               from '@/hooks/useAdmin'
 import { useAdminLoginTrend }     from '@/hooks/useAnalytics'
 import { useSystemHealth }        from '@/hooks/useReports'
+import { useAnnouncements }       from '@/hooks/useAnnouncements'
 import type { ApiUserListResponse, ApiSystemHealth } from '@shared/types/api'
 
 const QUICK_ACTIONS: QuickAction[] = [
@@ -113,6 +114,9 @@ export function AdminDashboard() {
     successful: p.successful,
     failed: p.failed,
   }))
+
+  const { announcements, loading: announcementsLoading } = useAnnouncements()
+  const recentAnnouncements = announcements.slice(0, 5)
 
   return (
     <div className="space-y-6">
@@ -178,11 +182,25 @@ export function AdminDashboard() {
             ariaLabel="Login activity over the last 30 days, showing successful versus failed sign-in attempts"
           />
         </ChartCard>
-        <PlaceholderWidget
+        <ListCard
           title="Recent Announcements"
           sub="Latest posts — see the header bell or /announcements"
-          h="h-36 md:h-48"
-        />
+          isLoading={announcementsLoading}
+          isEmpty={recentAnnouncements.length === 0}
+          emptyMessage="No announcements have been posted yet."
+        >
+          <ul className="divide-y divide-base">
+            {recentAnnouncements.map((a) => (
+              <li key={a.id} className="py-2.5">
+                <p className="text-sm font-medium text-brand-navy truncate">{a.title}</p>
+                <p className="text-xs text-muted mt-0.5">
+                  {a.postType.charAt(0) + a.postType.slice(1).toLowerCase()}
+                  {a.createdAt ? ` · ${new Date(a.createdAt).toLocaleDateString('en-MW')}` : ''}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </ListCard>
       </div>
     </div>
   )

@@ -54,7 +54,8 @@ import {
 } from 'lucide-react'
 import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
-import { PlaceholderWidget } from '@/components/shared/PlaceholderWidget'
+import { ListCard } from '@/components/shared/ListCard'
+import { TodaysTimetableList } from '@/components/shared/TodaysTimetableList'
 import { ChartCard } from '@/components/shared/ChartCard'
 import { Chart } from '@/components/shared/chart'
 import type { ChartDataPoint } from '@/components/shared/chart'
@@ -63,6 +64,7 @@ import { StudentResultsView } from '@/components/exams/StudentResultsView'
 import { useStudentMe } from '@/hooks/useStudents'
 import { useStudentPerformanceTrend, useOwnAttendance } from '@/hooks/useAnalytics'
 import { useExams } from '@/hooks/useExams'
+import { useMyTimetableToday } from '@/hooks/useClasses'
 import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
 import { examsInNextSevenDays } from '@/lib/examFilters'
 import { formatMWK } from '@shared/constants/malawi'
@@ -130,6 +132,8 @@ export function StudentDashboard() {
     : []
   const attendanceLoadingAll = periodLoading || meLoading || attendanceLoading
   const perfLoadingAll = meLoading || perfLoading
+
+  const { data: timetableToday, isLoading: timetableLoading } = useMyTimetableToday()
 
   return (
     <div className="space-y-6">
@@ -232,11 +236,15 @@ export function StudentDashboard() {
           />
         </ChartCard>
       </div>
-      <PlaceholderWidget
+      <ListCard
         title="Today's Timetable"
-        sub="Daily schedule"
-        h="h-32 md:h-40"
-      />
+        sub="Your schedule today"
+        isLoading={timetableLoading}
+        isEmpty={(timetableToday ?? []).length === 0}
+        emptyMessage="No classes on your timetable today."
+      >
+        <TodaysTimetableList slots={timetableToday ?? []} />
+      </ListCard>
       <div className="bg-surface border border-base rounded-2xl p-5">
         <h3 className="font-heading font-semibold text-brand-navy mb-4">My Exam Results</h3>
         {/* R15: the real Student.id from /students/me — not the Firebase UID */}

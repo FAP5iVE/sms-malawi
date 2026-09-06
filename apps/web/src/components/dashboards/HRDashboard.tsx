@@ -19,10 +19,21 @@
  *   /hr?tab=directory (staff creation lives in the Directory tab; the
  *   page reads ?tab= as of this phase). PlaceholderWidget import moved to
  *   its new shared home.
- * [DEPENDS ON]: W/hooks/useHR.ts, W/components/shared/PlaceholderWidget.tsx
- *   (same phase), W/components/shared/StatCard.tsx (statValue, same phase)
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (production fix).
+ * [PURPOSE]: "Contract Expiries" stat card and "Contract Expiry Alerts" /
+ *   "Staff Leave Calendar" widgets. The stat card's useContractAlerts(60)
+ *   was an exact-day match (only ever true for a contract expiring on
+ *   precisely day 60), so it — and the widget, then still a
+ *   PlaceholderWidget — could show almost nothing; repointed at the new
+ *   range-based useUpcomingContractExpiries(). Staff Leave Calendar is new:
+ *   useLeaveRequests({status:'APPROVED'}) filtered client-side to leave
+ *   overlapping the current week.
+ * [DEPENDS ON]: W/hooks/useHR.ts (useUpcomingContractExpiries, same phase),
+ *   W/components/shared/ListCard.tsx (same phase), W/components/shared/StatCard.tsx (statValue, same phase)
  */
 
+import { useState } from 'react'
 import {
   Users,
   Clock,
@@ -35,11 +46,11 @@ import {
 } from 'lucide-react'
 import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
-import { PlaceholderWidget } from '@/components/shared/PlaceholderWidget'
+import { ListCard } from '@/components/shared/ListCard'
 import {
   useStaffDirectory,
   useLeaveRequests,
-  useContractAlerts,
+  useUpcomingContractExpiries,
   useLoans,
 } from '@/hooks/useHR'
 import type { QuickAction } from '@/components/shared/QuickActions'
@@ -86,16 +97,43 @@ const QUICK_ACTIONS: QuickAction[] = [
 /** Matches useContractAlerts()'s documented default lookahead window. */
 const CONTRACT_ALERT_DAYS = 60
 
+/** Msec in a day — for the "who is off this week" leave-window check. */
+const DAY_MS = 24 * 60 * 60 * 1000
+
 export function HRDashboard() {
   const { data: staffData, isLoading: staffLoading }       = useStaffDirectory()
   const { data: leaveData, isLoading: leaveLoading }       = useLeaveRequests({ status: 'PENDING' })
-  const { data: contractData, isLoading: contractLoading } = useContractAlerts(CONTRACT_ALERT_DAYS)
+  // [PRODUCTION FIX] was useContractAlerts() — an exact-day match (see
+  // hrService.getUpcomingContractExpiries()'s header comment) that could
+  // only ever show a contract expiring exactly 60 days from today. Both
+  // this stat card and the widget below need a genuine "next 60 days" range.
+  const { data: contractData, isLoading: contractLoading } = useUpcomingContractExpiries(CONTRACT_ALERT_DAYS)
   const { data: loansData, isLoading: loansLoading }       = useLoans('PENDING')
+  // "Who is off this week" — every APPROVED leave request, filtered to
+  // whichever ones overlap the current week.
+  const { data: approvedLeaveData, isLoading: approvedLeaveLoading } = useLeaveRequests({ status: 'APPROVED' })
 
   const staff     = staffData    as ApiStaffProfile[]  | undefined
   const leave     = leaveData    as ApiLeaveRequest[]  | undefined
   const contracts = contractData as ApiContractAlert[] | undefined
   const loans     = loansData    as ApiStaffLoan[]     | undefined
+  const approvedLeave = approvedLeaveData as ApiLeaveRequest[] | undefined
+
+  // [PRODUCTION FIX] react-hooks/purity — Date.now() called directly in the
+  // render body is an impure call (react.dev/reference/rules/components-and-
+  // hooks-must-be-pure#components-and-hooks-must-be-idempotent). Reading it
+  // through a lazy useState initializer keeps the render body pure: React
+  // only ever invokes the initializer function once, on mount, rather than
+  // on every render — which is also the right *behaviour* here, since this
+  // widget doesn't need "this week" to shift mid-session as real time ticks
+  // past a boundary.
+  const [weekStart] = useState(() => Date.now())
+  const weekEnd = weekStart + 7 * DAY_MS
+  const offThisWeek = (approvedLeave ?? []).filter((lr) => {
+    const start = new Date(lr.startDate).getTime()
+    const end   = new Date(lr.endDate).getTime()
+    return Number.isFinite(start) && Number.isFinite(end) && start <= weekEnd && end >= weekStart - DAY_MS
+  })
 
   return (
     <div className="space-y-6">
@@ -139,16 +177,52 @@ export function HRDashboard() {
       </StatCardGrid>
       <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-4">
-        <PlaceholderWidget
+        <ListCard
           title="Contract Expiry Alerts"
-          sub="60 / 30 / 7 day warnings"
-          h="h-32 md:h-40"
-        />
-        <PlaceholderWidget
+          sub={`Expiring in the next ${CONTRACT_ALERT_DAYS} days`}
+          isLoading={contractLoading}
+          isEmpty={(contracts ?? []).length === 0}
+          emptyMessage={`No contracts expiring in the next ${CONTRACT_ALERT_DAYS} days.`}
+        >
+          <ul className="divide-y divide-base">
+            {(contracts ?? []).map((c) => (
+              <li key={c.id} className="py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-brand-navy truncate">
+                    {c.firstName} {c.lastName}
+                  </p>
+                  <p className="text-xs text-muted truncate">{c.department}</p>
+                </div>
+                <span className="text-xs text-brand-coral whitespace-nowrap shrink-0">
+                  {new Date(c.contractExpiry).toLocaleDateString('en-MW')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </ListCard>
+        <ListCard
           title="Staff Leave Calendar"
           sub="Who is off this week"
-          h="h-32 md:h-40"
-        />
+          isLoading={approvedLeaveLoading}
+          isEmpty={offThisWeek.length === 0}
+          emptyMessage="No staff are on approved leave this week."
+        >
+          <ul className="divide-y divide-base">
+            {offThisWeek.map((lr) => (
+              <li key={lr.id} className="py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-brand-navy truncate">
+                    {lr.staff ? `${lr.staff.firstName} ${lr.staff.lastName}` : 'Staff member'}
+                  </p>
+                  <p className="text-xs text-muted truncate">{lr.leaveType}</p>
+                </div>
+                <span className="text-xs text-muted whitespace-nowrap shrink-0">
+                  {new Date(lr.startDate).toLocaleDateString('en-MW')} – {new Date(lr.endDate).toLocaleDateString('en-MW')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </ListCard>
       </div>
     </div>
   )

@@ -24,6 +24,9 @@ import {
 } from '@/server/middleware/verifyPermission'
 import * as studentService             from '@/server/services/studentService'
 import * as pendingActionService       from '@/server/services/pendingActionService'
+import * as riskService                from '@/server/services/riskService'
+import * as settingsService            from '@/server/services/settingsService'
+import { SETTING_KEYS }                from '@shared/types/settings'
 import { StudentStatusSchema }         from '@shared/schemas/student'
 import type { StudentStatus, Sex }     from '@prisma/client'
 import type { UserRole }               from '@shared/types/roles'
@@ -133,6 +136,32 @@ studentsRouter.get(
     }
 
     res.json(detail)
+  }
+)
+
+// ─────────────────────────────────────────────────────────
+//  GET /students/at-risk
+//  [PRODUCTION FIX] Real HIGH-risk active students (via riskService's
+//  multi-factor assessStudentRisk()) for the teacher dashboard's "Students
+//  Needing Attention" widget — see riskService.getHighRiskStudents()'s
+//  header comment for why filtering GET /students' riskLevel client-side
+//  could never surface anyone. Placed before GET /:id so Express doesn't
+//  swallow "at-risk" as an :id param.
+// ─────────────────────────────────────────────────────────
+
+studentsRouter.get(
+  '/at-risk',
+  requirePermission('student.viewRiskStatus'),
+  async (req: Request, res: Response) => {
+    try {
+      const academicYear = await settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
+      const term = Number(await settingsService.get(SETTING_KEYS.CURRENT_TERM))
+      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 6
+      const students = await riskService.getHighRiskStudents(term, academicYear, limit)
+      res.json({ students })
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'students', route: 'at-risk' } })
+    }
   }
 )
 

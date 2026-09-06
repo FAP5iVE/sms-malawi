@@ -147,7 +147,7 @@ export type Permission =
   | 'report.viewBackupStatus'        // Backup run history and status
   | 'report.viewSchoolPerformance'   // Overall school pass rates, averages (high_rank)
   | 'report.viewTeacherEffectiveness'// Teacher effectiveness analytics
-  | 'report.viewFinanceSummary'      // High-level financial summary (high_rank)
+  | 'report.viewFinanceSummary'      // High-level financial summary (high_rank, finance)
   | 'report.viewFeeCollection'       // Fee collection reports (finance)
   | 'report.viewOutstandingBalances' // Outstanding balances per student/class
   | 'report.viewExpenseBreakdown'    // Categorised expense breakdown
@@ -702,6 +702,14 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'timetable.view',
 
     // Reports — finance-specific
+    // [PRODUCTION FIX] report.viewFinanceSummary was missing — GET
+    // /analytics/finance/cash-flow (the Income vs Expense chart every
+    // finance-role dashboard depends on) requires this permission and had
+    // only ever been granted to high_rank. The finance role could load
+    // every other report on this list but got a 403 on its own cash-flow
+    // chart, which the frontend then rendered as "no data" rather than an
+    // error — looked like empty books, was actually an access gap.
+    'report.viewFinanceSummary',
     'report.viewFeeCollection',
     'report.viewOutstandingBalances',
     'report.viewExpenseBreakdown',

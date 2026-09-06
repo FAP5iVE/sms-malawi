@@ -45,9 +45,10 @@ import {
 } from 'lucide-react'
 import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
-import { PlaceholderWidget } from '@/components/shared/PlaceholderWidget'
-import { useStudents } from '@/hooks/useStudents'
-import { useClasses } from '@/hooks/useClasses'
+import { ListCard } from '@/components/shared/ListCard'
+import { TodaysTimetableList } from '@/components/shared/TodaysTimetableList'
+import { useStudents, useHighRiskStudents } from '@/hooks/useStudents'
+import { useClasses, useMyTimetableToday } from '@/hooks/useClasses'
 import { useExams } from '@/hooks/useExams'
 import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
@@ -104,9 +105,9 @@ export function AcademicDashboard() {
   const classes = classesData as ApiClass[] | undefined
   const exams   = examsData ?? []
 
-  const highRiskStudents = (studentsData?.students ?? []).filter(
-    (s) => s.riskLevel === 'HIGH',
-  )
+  const { data: timetableToday, isLoading: timetableLoading } = useMyTimetableToday()
+  const { data: riskData, isLoading: riskLoading } = useHighRiskStudents(6)
+  const highRiskStudents = riskData?.students ?? []
 
   const examsThisWeek = examsInNextSevenDays(exams).length
   const marksPending  = examsAwaitingMarks(exams).length
@@ -154,35 +155,39 @@ export function AcademicDashboard() {
       </StatCardGrid>
       <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-4">
-        <PlaceholderWidget
+        <ListCard
           title="Today's Timetable"
-          sub="Daily schedule widget — wired in R17"
-          h="h-40 md:h-56"
-        />
-        <div className="bg-surface border border-base rounded-xl p-4 h-40 md:h-56 flex flex-col">
-          <p className="font-heading font-semibold text-sm text-brand-navy mb-3">
-            Students Needing Attention
-          </p>
-          {highRiskStudents.length === 0 ? (
-            <p className="text-sm text-muted flex-1 flex items-center justify-center text-center">
-              No high-risk students right now.
-            </p>
-          ) : (
-            <ul className="space-y-2 overflow-y-auto flex-1">
-              {highRiskStudents.slice(0, 6).map((s) => (
-                <li key={s.id}>
-                  <Link
-                    href={`/students/${s.id}`}
-                    className="flex items-center justify-between gap-2 text-sm hover:bg-page rounded-lg px-2 py-1.5 -mx-2 transition-colors"
-                  >
-                    <span className="text-body">{s.firstName} {s.lastName}</span>
-                    <StudentRiskBadge riskLevel="HIGH" variant="dot" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+          sub="Your classes today"
+          isLoading={timetableLoading}
+          isEmpty={(timetableToday ?? []).length === 0}
+          emptyMessage="No classes on your timetable today."
+        >
+          <TodaysTimetableList slots={timetableToday ?? []} />
+        </ListCard>
+        <ListCard
+          title="Students Needing Attention"
+          sub="High-risk active students"
+          isLoading={riskLoading}
+          isEmpty={highRiskStudents.length === 0}
+          emptyMessage="No high-risk students right now."
+        >
+          <ul className="space-y-2">
+            {highRiskStudents.map((s) => (
+              <li key={s.id}>
+                <Link
+                  href={`/students/${s.id}`}
+                  className="flex items-center justify-between gap-2 text-sm hover:bg-page rounded-lg px-2 py-1.5 -mx-2 transition-colors"
+                >
+                  <span className="text-body truncate">
+                    {s.firstName} {s.lastName}
+                    {s.className ? <span className="text-muted"> · {s.className}</span> : null}
+                  </span>
+                  <StudentRiskBadge riskLevel="HIGH" variant="dot" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </ListCard>
       </div>
     </div>
   )

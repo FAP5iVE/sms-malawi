@@ -625,3 +625,28 @@ export async function getContractExpiryAlert(daysAhead: number) {
     },
   })
 }
+
+/**
+ * [PRODUCTION FIX] Contracts expiring at any point in the next `daysAhead`
+ * days — a genuine range query, unlike getContractExpiryAlert() above.
+ * That function intentionally checks a single exact day (today + N) so
+ * contractExpiryJob.ts's sequential 7/30/60 cron calls never re-email the
+ * same staff member — correct for its job, but wrong for a dashboard
+ * "Contract Expiry Alerts" widget: reused as-is, the widget would only
+ * ever show a contract expiring exactly N days from today, which is
+ * empty on almost every visit. This is the range version HRDashboard.tsx's
+ * widget (and its "Contract Expiries" stat card, which had the identical
+ * mismatch) actually need. Ordered soonest-first for display.
+ */
+export async function getUpcomingContractExpiries(daysAhead: number) {
+  const today  = startOfDay(new Date())
+  const target = endOfDay(addDays(new Date(), daysAhead))
+  return prisma.staffProfile.findMany({
+    where: { contractExpiry: { gte: today, lte: target }, status: 'ACTIVE' },
+    select: {
+      id: true, firstName: true, lastName: true, email: true, contractExpiry: true,
+      department: true, jobTitle: true, employeeNo: true,
+    },
+    orderBy: { contractExpiry: 'asc' },
+  })
+}

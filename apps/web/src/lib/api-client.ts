@@ -220,6 +220,8 @@ export const queryKeys = {
     feeStatus: (id: string) => ['students', id, 'fee-status'] as const,
     libraryStatus: (id: string) => ['students', id, 'library-status'] as const,
     riskFlags: (id: string) => ['students', id, 'risk'] as const,
+    /** GET /students/at-risk, useHighRiskStudents(). */
+    atRisk: (limit?: number) => ['students', 'at-risk', limit ?? 6] as const,
     transcript: (id: string) => ['students', id, 'transcript'] as const,
     photo: (id: string) => ['students', id, 'photo'] as const,
   },
@@ -236,6 +238,8 @@ export const queryKeys = {
     subjectAssignmentsMine: (academicYear?: string) => ['classes', 'subject-assignments', 'mine', academicYear ?? null] as const,
     analytics: (id: string) => ['classes', id, 'analytics'] as const,
     labBookings: (id: string) => ['classes', id, 'lab-bookings'] as const,
+    /** GET /classes/my-timetable/today, useMyTimetableToday(). */
+    myTimetableToday: () => ['classes', 'my-timetable', 'today'] as const,
   },
 
   // ── Finances
@@ -320,6 +324,7 @@ export const queryKeys = {
     salaryStructure: (staffUid: string) =>
       ['hr', 'salary-structure', staffUid] as const,
     contractAlerts: (days?: number) => ['hr', 'contract-alerts', days ?? 60] as const,
+    contractAlertsUpcoming: (days?: number) => ['hr', 'contract-alerts-upcoming', days ?? 60] as const,
   },
 
   // ── Library

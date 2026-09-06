@@ -50,6 +50,20 @@ export function useClassTimetable(classId: string, term: number) {
   })
 }
 
+/**
+ * [PRODUCTION FIX] The signed-in user's own schedule for today — backs
+ * the "Today's Timetable" widget on both the teacher (Academic) and
+ * Student dashboards, previously a permanent PlaceholderWidget on each.
+ * Self-scoped server-side (by teacherUid for staff, by classId for a
+ * student) — see the GET /classes/my-timetable/today route for details.
+ */
+export function useMyTimetableToday() {
+  return useQuery({
+    queryKey: queryKeys.classes.myTimetableToday(),
+    queryFn: () => apiFetch<ApiTimetableSlot[]>('/classes/my-timetable/today'),
+  })
+}
+
 // The signed-in teacher's own subject-teacher assignments for a year —
 // backs subject/class scoping in the exam scheduling form (AC-4).
 export function useMySubjectAssignments(academicYear?: string) {
