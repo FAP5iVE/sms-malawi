@@ -114,7 +114,7 @@ importers:
         specifier: ^8.5.2
         version: 8.6.2(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)
       firebase:
-        specifier: ^12.13.0
+        specifier: ^12.18.0
         version: 12.18.0
       firebase-admin:
         specifier: ^13.9.0

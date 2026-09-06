@@ -552,7 +552,6 @@ export const queryKeys = {
     queue:     (academicYear?: string) => ['placements', 'queue', academicYear ?? null] as const,
     eligible:  (academicYear: string) => ['placements', 'eligible', academicYear] as const,
     catalogue: () => ['placements', 'catalogue'] as const,
-    eligible: (academicYear: string) => ['placements', 'eligible', academicYear] as const,
     analytics: (academicYear?: string) => ['placements', 'analytics', academicYear ?? null] as const,
   },
   monitoring: {

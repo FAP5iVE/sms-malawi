@@ -43,7 +43,7 @@
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
-    "firebase": "^12.13.0",
+    "firebase": "^12.18.0",
     "firebase-admin": "^13.9.0",
     "framer-motion": "^12.43.0",
     "helmet": "^8.2.0",
