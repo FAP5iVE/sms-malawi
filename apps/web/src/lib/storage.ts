@@ -306,8 +306,22 @@ export async function getSignedViewUrl(fileId: string): Promise<string> {
  * Do NOT use for payslips, report cards, or any protected documents.
  */
 export async function getPublicViewUrl(_bucket: string, fileId: string): Promise<string> {
-  const storage = new sdk.Storage(getClient())
-  return storage.getFileView(SCHOOL_BUCKET, fileId).toString()
+  // [PRODUCTION FIX] storage.getFileView() no longer returns a URL in
+  // current node-appwrite — it downloads the file's actual bytes instead
+  // (an SDK behavior change; getFileDownload/getFilePreview changed the
+  // same way — see Appwrite's own community reports). Calling .toString()
+  // on that produced something like "[object ArrayBuffer]" instead of a
+  // URL — not a valid absolute URL, so the browser resolved it as a
+  // *relative* path back into our own app, which is why every gallery/
+  // announcement/leadership photo showed as broken, and why opening that
+  // "image" directly landed on our own login page instead of Appwrite.
+  // The file-view REST route itself is stable and documented, so we build
+  // it directly rather than trust a helper whose return type moved under us.
+  const client    = getClient() // throws if APPWRITE_ENDPOINT/PROJECT_ID/API_KEY are missing
+  void client
+  const endpoint  = process.env.APPWRITE_ENDPOINT!
+  const projectId = process.env.APPWRITE_PROJECT_ID!
+  return `${endpoint}/storage/buckets/${SCHOOL_BUCKET}/files/${encodeURIComponent(fileId)}/view?project=${projectId}`
 }
 
 /**
@@ -315,8 +329,17 @@ export async function getPublicViewUrl(_bucket: string, fileId: string): Promise
  * Internal use only — callers should prefer getSignedViewUrl for client-facing URLs.
  */
 export async function getDownloadUrl(_bucket: string, fileId: string): Promise<string> {
-  const storage = new sdk.Storage(getClient())
-  return storage.getFileDownload(SCHOOL_BUCKET, fileId).toString()
+  // [PRODUCTION FIX] Same issue as getPublicViewUrl() above —
+  // storage.getFileDownload() now returns the file's raw bytes, not a
+  // URL, in current node-appwrite. This is what payroll.ts's payslip
+  // download link and reportExportService.ts's financial report link
+  // both depend on, so both were silently broken the same way gallery/
+  // announcement/leadership photos were.
+  const client    = getClient() // throws if APPWRITE_ENDPOINT/PROJECT_ID/API_KEY are missing
+  void client
+  const endpoint  = process.env.APPWRITE_ENDPOINT!
+  const projectId = process.env.APPWRITE_PROJECT_ID!
+  return `${endpoint}/storage/buckets/${SCHOOL_BUCKET}/files/${encodeURIComponent(fileId)}/download?project=${projectId}`
 }
 
 // ─── STREAM FILE (for proxy route) ───────────────────────────────────────────
