@@ -14,7 +14,7 @@
 import { Router } from 'express'
 import { prisma } from '@/lib/prisma'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
-import { getPublicViewUrl, createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
+import { getPublicViewUrl, createDirectUploadTicket, deleteFile, FILE_PREFIX } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
 
 export const galleryRouter = Router()
@@ -93,12 +93,28 @@ galleryRouter.post(
   },
 )
 
-// DELETE /gallery/:id — removes the index row (Appwrite file is left in
-// place; matches the codebase's existing convention of not hard-deleting
-// storage objects on row removal elsewhere).
+// DELETE /gallery/:id — removes the index row AND the underlying Appwrite
+// file.
+// [PRODUCTION FIX] Previously removed only the Prisma row, on the stated
+// assumption that this matched a codebase-wide convention of leaving
+// storage objects in place on row deletion — checked that against every
+// other hard-delete route in the app (students, library) and that
+// assumption doesn't hold: both of those are soft-deletes/archives, which
+// correctly keep the file since the record can still be restored later.
+// This route does a real hard delete with no restore path, so the file
+// should go with it — otherwise every deleted photo permanently wastes
+// space in the single free-tier bucket this whole app shares.
+// A storage-side failure here (e.g. the file was already removed some
+// other way) doesn't block the response — the row is already gone either
+// way, which is what the UI reflects.
 galleryRouter.delete('/:id', verifyAuth, requireRole(['admin', 'high_rank', 'lower_rank']), async (req, res) => {
   try {
-    await prisma.galleryPhoto.delete({ where: { id: String(req.params.id) } }).catch(() => null)
+    const photo = await prisma.galleryPhoto.delete({ where: { id: String(req.params.id) } }).catch(() => null)
+    if (photo) {
+      await deleteFile('', photo.fileKey).catch((err: unknown) => {
+        console.error('[gallery] Failed to delete Appwrite file', photo.fileKey, err)
+      })
+    }
     res.json({ ok: true })
   } catch (err: unknown) {
     return sendError(res, err, { tags: { module: 'gallery', route: 'delete' } })
