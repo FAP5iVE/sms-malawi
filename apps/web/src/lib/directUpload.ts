@@ -53,14 +53,35 @@ interface DirectUploadTicket {
 export async function uploadFileDirectly(ticketPath: string, file: File): Promise<string> {
   const ticket = await apiFetch<DirectUploadTicket>(ticketPath, { method: 'POST' })
 
-  const client = new Client().setEndpoint(ticket.endpoint).setProject(ticket.projectId)
-  await new Account(client).createSession(ticket.userId, ticket.secret)
-  // filePermissions is decided server-side, per upload prefix — see
-  // storage.ts's createDirectUploadTicket(). Public assets (gallery,
-  // announcements, leadership photos) get read("any") here so anonymous
-  // visitors can actually load the image; anything else gets none, same
-  // as before.
-  await new Storage(client).createFile(ticket.bucketId, ticket.fileId, file, ticket.filePermissions)
+  const client  = new Client().setEndpoint(ticket.endpoint).setProject(ticket.projectId)
+  const account = new Account(client)
+
+  // [PRODUCTION FIX] "Creation of a session is prohibited when a session is
+  // active" — the browser keeps this project's session as a cookie, so it
+  // survives across separate calls to this function. The first upload in a
+  // browser worked; every one after it failed here, because a session from
+  // the previous upload was still sitting there when this one tried to
+  // create a new one. Clear it first (a no-op, safely ignored, on the very
+  // first upload where none exists yet).
+  try {
+    await account.deleteSession('current')
+  } catch {
+    // No existing session to clear — expected on the first upload.
+  }
+  await account.createSession(ticket.userId, ticket.secret)
+
+  try {
+    // filePermissions is decided server-side, per upload prefix — see
+    // storage.ts's createDirectUploadTicket(). Public assets (gallery,
+    // announcements, leadership photos) get read("any") here so anonymous
+    // visitors can actually load the image; anything else gets none, same
+    // as before.
+    await new Storage(client).createFile(ticket.bucketId, ticket.fileId, file, ticket.filePermissions)
+  } finally {
+    // Don't leave this session sitting in the browser until the next
+    // upload — clear it as soon as this one is done, success or failure.
+    await account.deleteSession('current').catch(() => {})
+  }
 
   return ticket.fileId
 }
