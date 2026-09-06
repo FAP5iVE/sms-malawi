@@ -47,7 +47,6 @@
 import 'server-only'
 
 import { Router } from 'express'
-import multer from 'multer'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { verifyAuth, getAdminApp } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
@@ -55,11 +54,10 @@ import { hasPermission } from '@shared/types/permissions'
 import { COLLECTIONS } from '@shared/constants/storage'
 import { AnnouncementSchema, AnnouncementDraftSchema } from '@shared/schemas/announcement'
 import * as announcementService from '@/server/services/announcementService'
-import { uploadFile, FILE_PREFIX } from '@/lib/storage'
+import { createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
 
 export const announcementsRouter = Router()
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }) // 8MB
 
 // GET /announcements — PUBLISHED announcements visible to the caller's role.
 // [N2] Replaces useAnnouncements.ts's direct client Firestore read. Gated by
@@ -215,39 +213,30 @@ announcementsRouter.patch(
   }
 )
 
-// POST /announcements/image — uploads a cover image ahead of the Firestore
-// write. AnnouncementForm.tsx writes the announcement document directly to
-// Firestore from the client (see its own header comment) rather than
-// through POST /, so this is a small standalone endpoint the form calls
-// first to get back a fileId to include in that write. Gated on the same
-// permission as creating an announcement at all — no separate elevated
-// permission needed to attach an image to your own announcement.
+// POST /announcements/image/upload-ticket — mints a one-time Appwrite
+// upload credential. AnnouncementForm.tsx exchanges this for a session
+// (Appwrite Web SDK) and uploads the image bytes DIRECTLY to Appwrite,
+// then writes the announcement document to Firestore itself with the
+// resulting fileId (see that form's own header comment) — there's no
+// second call into this API the way gallery's flow needs, since nothing
+// here needs to write to our own database.
+// [PRODUCTION FIX] The old multer-based /image route went through this
+// app's own Vercel function for the raw file bytes, which hits two hard
+// limits no server config can move: Vercel Functions cap a request body
+// at 4.5MB, and a single large request has no retry if the connection
+// drops mid-upload. Neither applies once the browser talks to Appwrite
+// directly — see storage.ts's createDirectUploadTicket() for the full
+// explanation.
 announcementsRouter.post(
-  '/image',
+  '/image/upload-ticket',
   verifyAuth,
   requireAnyPermission(['announcement.create', 'announcement.createWithApproval']),
-  upload.single('file'),
-  async (req, res) => {
-    // [PRODUCTION FIX] This handler had no try/catch at all — any error
-    // thrown by uploadFile() (Appwrite rejecting the request, a transient
-    // network error, etc.) became an unhandled promise rejection in
-    // Express 4, which never sends a response. The client's fetch then
-    // hangs indefinitely — this is the "publish just spins forever" bug
-    // for every image-attached Announcement/Event/News submission.
+  async (_req, res) => {
     try {
-      if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
-      if (!req.file.mimetype.startsWith('image/')) {
-        return res.status(400).json({ error: 'Only image files are allowed.' })
-      }
-      const uploaded = await uploadFile(
-        FILE_PREFIX.ANNOUNCEMENT_IMAGE,
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype,
-      )
-      res.status(201).json({ imageKey: uploaded.fileId })
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.ANNOUNCEMENT_IMAGE)
+      res.json(ticket)
     } catch (err: unknown) {
-      return sendError(res, err, { tags: { module: 'announcements', route: 'image-upload' } })
+      return sendError(res, err, { tags: { module: 'announcements', route: 'image-upload-ticket' } })
     }
   },
 )

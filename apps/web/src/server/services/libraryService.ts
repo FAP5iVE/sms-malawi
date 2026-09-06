@@ -56,7 +56,7 @@
 import 'server-only'
 import { prisma }   from '@/lib/prisma'
 import { logger }   from '@/lib/logger'
-import { uploadFile, getSignedViewUrl, FILE_PREFIX } from '@/lib/storage'
+import { getSignedViewUrl } from '@/lib/storage'
 import { differenceInDays }   from 'date-fns'
 import type { CreateBookInput, IssueBorrowingInput, ReturnBorrowingInput, CreateDigitalResourceInput } from '@shared/schemas/library'
 import * as algolia from '@/server/services/algoliaService'
@@ -338,15 +338,19 @@ export async function listDigitalResources(filters: {
   })
 }
 
-export async function uploadDigitalResource(
+// [PRODUCTION FIX] Was uploadDigitalResource(data, buffer, filename,
+// mimeType, fileSize, uploaderUid) — took the raw file bytes and called
+// uploadFile() itself. The route now uploads directly to Appwrite from
+// the browser (see library.ts's /digital/upload-ticket and storage.ts's
+// createDirectUploadTicket()), so this only needs to record the already-
+// uploaded file's id/size/mimeType against a new DigitalResource row.
+export async function recordDigitalResource(
   data: CreateDigitalResourceInput,
-  buffer: Buffer,
-  filename: string,
-  mimeType: string,
+  fileId: string,
   fileSize: number,
+  mimeType: string,
   uploaderUid: string
 ) {
-  const uploaded = await uploadFile(FILE_PREFIX.DIGITAL_RESOURCE, buffer, filename, mimeType)
   const resource = await prisma.digitalResource.create({
     data: {
       title:        data.title,
@@ -354,7 +358,7 @@ export async function uploadDigitalResource(
       subject:      data.subject ?? null,
       form:         data.form ?? null,
       academicYear: data.academicYear ?? null,
-      fileKey:      uploaded.fileId,
+      fileKey:      fileId,
       fileSize,
       mimeType,
       uploadedByUid: uploaderUid,

@@ -21,6 +21,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { CreateClassInput, UpdateClassInput, CreateAssignmentInput, CreateTimetableSlotInput } from '@shared/schemas/student'
 import type { ApiClass, ApiTimetableSlot, ApiAssignment, ApiSubjectAssignment } from '@shared/types/api'
 import { apiFetch, queryKeys } from '@/lib/api-client'
+import { uploadFileDirectly } from '@/lib/directUpload'
 
 export function useClasses(academicYear?: string, includeArchived?: boolean) {
   const params = new URLSearchParams()
@@ -161,12 +162,19 @@ export function useCreateAssignment() {
 export function useSubmitAssignment() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ classId, assignmentId, file }: { classId: string; assignmentId: string; file: File }) => {
-      const formData = new FormData()
-      formData.append('file', file)
+    mutationFn: async ({ classId, assignmentId, file }: { classId: string; assignmentId: string; file: File }) => {
+      // [PRODUCTION FIX] Was FormData → POST .../submit (multer, 25MB
+      // limit) — going through this app's own Vercel function for the raw
+      // file bytes, hitting the same two hard limits as every other
+      // upload in this codebase (Vercel's 4.5MB request-body cap, and no
+      // retry on a dropped connection mid-upload). The file now goes
+      // straight to Appwrite; this call only sends the resulting fileId.
+      const fileId = await uploadFileDirectly(
+        `/classes/${classId}/assignments/${assignmentId}/submit/upload-ticket`, file,
+      )
       return apiFetch<{ id: string }>(`/classes/${classId}/assignments/${assignmentId}/submit`, {
         method: 'POST',
-        body:   formData,
+        body:   JSON.stringify({ fileId }),
       })
     },
     onSuccess: (_data, variables) => {

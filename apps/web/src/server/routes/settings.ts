@@ -55,7 +55,6 @@
 import 'server-only'
 import { Router }            from 'express'
 import { z }                 from 'zod'
-import multer                from 'multer'
 import { prisma }            from '@/lib/prisma'
 import { requireRole }       from '@/lib/verifyAuth'
 import {
@@ -69,9 +68,7 @@ import { SETTING_KEYS, SETTING_META } from '@shared/types/settings'
 import type { SettingKey, DepartmentTitles } from '@shared/types/settings'
 import { logger }            from '@/lib/logger'
 import { sendError } from '@/server/lib/sendError'
-import { uploadFile, FILE_PREFIX, getPublicViewUrl } from '@/lib/storage'
-
-const leadershipPhotoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } }) // 8MB
+import { createDirectUploadTicket, FILE_PREFIX, getPublicViewUrl } from '@/lib/storage'
 
 export const settingsRouter = Router()
 
@@ -425,31 +422,24 @@ settingsRouter
     return res.json({ ok: true })
   })
 
-// POST /settings/leadership-photo
-// [NEW] Uploads a leadership team member's photo ahead of saving the
-// LeadershipMember record — same "upload first, get back a fileId, then
-// include that id in the JSON PATCH" pattern as POST /announcements/image,
-// since a photo file can't travel inside the /school PATCH's JSON body.
-// Same admin/hr/high_rank gating as GET/PATCH /school itself.
+// POST /settings/leadership-photo/upload-ticket
+// [PRODUCTION FIX] Was multer-based, going through this app's own Vercel
+// function for the raw file bytes — hitting the same two hard limits as
+// every other upload in this codebase (Vercel's 4.5MB request-body cap,
+// and no retry on a dropped connection mid-upload). Same "upload first,
+// get back a fileId, then include that id in the JSON PATCH" pattern as
+// before — the client now uploads straight to Appwrite and only calls
+// this to get authorized first. Same admin/hr/high_rank gating as
+// GET/PATCH /school itself.
 settingsRouter.post(
-  '/leadership-photo',
+  '/leadership-photo/upload-ticket',
   requireRole(['admin', 'hr', 'high_rank']),
-  leadershipPhotoUpload.single('file'),
-  async (req, res) => {
+  async (_req, res) => {
     try {
-      if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
-      if (!req.file.mimetype.startsWith('image/')) {
-        return res.status(400).json({ error: 'Only image files are allowed.' })
-      }
-      const uploaded = await uploadFile(
-        FILE_PREFIX.LEADERSHIP_PHOTO,
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype,
-      )
-      res.status(201).json({ photoKey: uploaded.fileId })
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.LEADERSHIP_PHOTO)
+      res.json(ticket)
     } catch (err: unknown) {
-      return sendError(res, err, { tags: { module: 'settings', route: 'leadership-photo' } })
+      return sendError(res, err, { tags: { module: 'settings', route: 'leadership-photo-ticket' } })
     }
   },
 )

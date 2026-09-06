@@ -26,6 +26,7 @@ import type {
 } from '@shared/schemas/library'
 import type { ApiResourceRecommendation, ApiFineWaiverRequest } from '@shared/types/api'
 import { apiFetch, queryKeys } from '@/lib/api-client'
+import { uploadFileDirectly } from '@/lib/directUpload'
 
 /**
  * Response shape of GET /library/stats — mirrors
@@ -76,16 +77,20 @@ export function useCreateBook() {
 export function useUploadDigitalResource() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (input: CreateDigitalResourceInput & { file: File }) => {
+    mutationFn: async (input: CreateDigitalResourceInput & { file: File }) => {
       const { file, ...meta } = input
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('title', meta.title)
-      formData.append('type', meta.type)
-      if (meta.subject) formData.append('subject', meta.subject)
-      if (meta.form !== undefined) formData.append('form', String(meta.form))
-      if (meta.academicYear) formData.append('academicYear', meta.academicYear)
-      return apiFetch('/library/digital/upload', { method: 'POST', body: formData })
+      // [PRODUCTION FIX] Was FormData → POST /library/digital/upload
+      // (multer, 100MB limit for eBooks/past papers) — going through this
+      // app's own Vercel function for the raw file bytes, which hits a
+      // hard 4.5MB cap far below what this route was meant to allow, and
+      // has no retry if the connection drops mid-upload. The file now
+      // goes straight to Appwrite; this call only sends the small
+      // metadata + the resulting fileId.
+      const fileId = await uploadFileDirectly('/library/digital/upload-ticket', file)
+      return apiFetch('/library/digital/upload', {
+        method: 'POST',
+        body: JSON.stringify({ ...meta, fileId, fileSize: file.size, mimeType: file.type }),
+      })
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
   })

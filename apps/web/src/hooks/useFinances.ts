@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ApiFinanceSummary, ApiInvoice, ApiExpense, ApiScholarship, ApiDebtsSummary, ApiStudentCredit } from '@shared/types/api'
 import type { RecordPaymentInput, CreateExpenseInput, CreateBudgetInput, CreateFeeStructureInput, GenerateInvoiceInput } from '@shared/schemas/finance'
 import { apiFetch, queryKeys } from '@/lib/api-client'
+import { uploadFileDirectly } from '@/lib/directUpload'
 
 export function useFinanceSummary(academicYear: string, term: number) {
   return useQuery({
@@ -139,12 +140,17 @@ export function useCreateExpense() {
 export function useUploadExpenseReceipt() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ expenseId, file }: { expenseId: string; file: File }) => {
-      const formData = new FormData()
-      formData.append('file', file)
+    mutationFn: async ({ expenseId, file }: { expenseId: string; file: File }) => {
+      // [PRODUCTION FIX] Was FormData → POST .../receipt (multer) — going
+      // through this app's own Vercel function for the raw file bytes,
+      // hitting the same two hard limits as every other upload in this
+      // codebase (Vercel's 4.5MB request-body cap, and no retry on a
+      // dropped connection mid-upload). The file now goes straight to
+      // Appwrite; this call only sends the resulting fileId.
+      const fileId = await uploadFileDirectly(`/finances/expenses/${expenseId}/receipt/upload-ticket`, file)
       return apiFetch<{ receiptKey: string }>(`/finances/expenses/${expenseId}/receipt`, {
         method: 'POST',
-        body: formData,
+        body: JSON.stringify({ fileId }),
       })
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),

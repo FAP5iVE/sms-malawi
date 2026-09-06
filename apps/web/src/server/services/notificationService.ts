@@ -5,7 +5,6 @@ import { logger } from '@/lib/logger'
 import { sendEmail, sendBatchEmails, type EmailResult, type SendEmailInput } from '@/lib/email'
 import {
   sendToUser,
-  sendToUsers,
   sendToTopic,
   type PushResult,
   type PushNotificationPayload,

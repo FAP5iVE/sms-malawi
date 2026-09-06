@@ -37,6 +37,7 @@ import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
 import { AnnouncementSchema, AnnouncementDraftSchema } from '@shared/schemas/announcement'
 import { apiFetch } from '@/lib/api-client'
+import { uploadFileDirectly } from '@/lib/directUpload'
 import { X, Loader2, ImagePlus, Save } from 'lucide-react'
 import { USER_ROLES } from '@shared/types/roles'
 import type { Announcement } from '@/hooks/useAnnouncements'
@@ -151,13 +152,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
    *  over from a draft, or undefined if there's no image at all. */
   async function resolveImageKey(): Promise<string | undefined> {
     if (imageFile) {
-      const fd = new FormData()
-      fd.append('file', imageFile)
-      const uploaded = await apiFetch<{ imageKey: string }>('/announcements/image', {
-        method: 'POST',
-        body: fd,
-      })
-      return uploaded.imageKey
+      return uploadFileDirectly('/announcements/image/upload-ticket', imageFile)
     }
     return persistedImageKey ?? undefined
   }
@@ -465,7 +460,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2 text-sm border border-base rounded-xl hover:bg-page min-h-[44px]"
+              className="px-5 py-2 text-sm border border-base rounded-xl hover:bg-page min-h-11"
             >
               Cancel
             </button>
@@ -476,7 +471,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
               type="button"
               onClick={handleSaveDraft}
               disabled={savingDraft || loading}
-              className="px-5 py-2 text-sm border border-brand-teal text-brand-teal rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 min-h-[44px] hover:bg-brand-teal/5"
+              className="px-5 py-2 text-sm border border-brand-teal text-brand-teal rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 min-h-11 hover:bg-brand-teal/5"
             >
               {savingDraft ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" aria-hidden />}
               {draft ? 'Save Draft' : 'Save as Draft'}
@@ -484,7 +479,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
             <button
               type="submit"
               disabled={loading || savingDraft}
-              className="px-5 py-2 text-sm bg-brand-navy text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 min-h-[44px]"
+              className="px-5 py-2 text-sm bg-brand-navy text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 min-h-11"
             >
               {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {canPublishDirectly

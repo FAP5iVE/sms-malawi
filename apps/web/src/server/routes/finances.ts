@@ -67,7 +67,6 @@
 
 import 'server-only'
 import { Router } from 'express'
-import multer from 'multer'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission } from '@/server/middleware/verifyPermission'
 import {
@@ -88,14 +87,13 @@ import * as studentService from '@/server/services/studentService'
 import * as accountingService from '@/server/services/accountingService'
 import * as forecastService from '@/server/services/forecastService'
 import { generateFinancialReport } from '@/server/services/reportExportService'
-import { getSignedViewUrl, uploadFile, FILE_PREFIX } from '@/lib/storage'
+import { getSignedViewUrl, createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
 import { prisma } from '@/lib/prisma'
 import { bulkGenerateInvoices } from '@/server/services/bulkInvoiceService'
 import * as Sentry from '@sentry/nextjs'
 import { logger } from '@/lib/logger'
 import { sendError } from '@/server/lib/sendError'
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
 
 export const financesRouter = Router()
 
@@ -378,28 +376,45 @@ const EXPENSE_CATEGORY_ACCOUNT: Record<string, string> = {
 // matching the field this session's schema.prisma comment fix corrects
 // from a stale "R2 object key" reference. Mirrors assignments.ts's
 // confirmed POST /:id/submit multer + uploadFile() pattern.
+// POST /expenses/:id/receipt/upload-ticket — mints a one-time Appwrite
+// upload credential. Expense receipts are private (FILE_PREFIX.
+// EXPENSE_RECEIPT is not one of the public prefixes), so the file gets no
+// public read permission; viewing still goes through getSignedViewUrl()'s
+// role-checked proxy, same as before.
+financesRouter.post(
+  '/expenses/:id/receipt/upload-ticket',
+  verifyAuth,
+  requireRole(['admin', 'finance']),
+  async (_req, res) => {
+    try {
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.EXPENSE_RECEIPT)
+      res.json(ticket)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'receipt-upload-ticket' } })
+    }
+  }
+)
+
+// POST /expenses/:id/receipt — records a receipt the browser has ALREADY
+// uploaded directly to Appwrite via .../receipt/upload-ticket. Takes the
+// resulting fileId (JSON body), not the file itself.
+// [PRODUCTION FIX] Was multer-based, going through this app's own Vercel
+// function for the raw file bytes — hitting the same two hard limits as
+// every other upload in this codebase (Vercel's 4.5MB request-body cap,
+// and no retry on a dropped connection mid-upload).
 financesRouter.post(
   '/expenses/:id/receipt',
   verifyAuth,
   requireRole(['admin', 'finance']),
-  upload.single('file'),
   async (req, res) => {
-    // [PRODUCTION FIX] No try/catch — same systemic bug as the other
-    // upload.single() handlers across this codebase (announcements.ts,
-    // gallery.ts, assignments.ts, hr.ts, library.ts): an error from
-    // uploadFile() became an unhandled rejection with no response sent,
-    // hanging the client's fetch indefinitely.
     try {
-      if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
-      const uploaded = await uploadFile(
-        FILE_PREFIX.EXPENSE_RECEIPT,
-        req.file.buffer,
-        req.file.originalname,
-        req.file.mimetype
-      )
+      const fileId = typeof req.body?.fileId === 'string' ? req.body.fileId : undefined
+      if (!fileId || !fileId.startsWith(`${FILE_PREFIX.EXPENSE_RECEIPT}_`)) {
+        return res.status(400).json({ error: 'Missing or invalid fileId — upload the receipt via .../receipt/upload-ticket first.' })
+      }
       const expense = await prisma.expense.update({
         where: { id: String(req.params.id) },
-        data: { receiptKey: uploaded.fileId },
+        data: { receiptKey: fileId },
       })
       res.status(201).json({ receiptKey: expense.receiptKey })
     } catch (err: unknown) {

@@ -49,17 +49,15 @@
  */
 import 'server-only'
 import { Router } from 'express'
-import multer from 'multer'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import { CreateStaffSchema, UpdateStaffSchema, LeaveRequestSchema, ReviewLeaveSchema, LoanRequestSchema, PerformanceNoteSchema, UpdateSalarySchema, CreateAllowanceSchema } from '@shared/schemas/hr'
 import * as hrService from '@/server/services/hrService'
-import { getSignedViewUrl } from '@/lib/storage'
+import { getSignedViewUrl, createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
 import { prisma } from '@/lib/prisma'
 
 export const hrRouter = Router()
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } })
 
 const HR_ADMIN = ['admin', 'hr'] as const
 const REVIEWERS = ['admin', 'hr', 'high_rank'] as const
@@ -166,15 +164,36 @@ hrRouter.post('/', verifyAuth, requireRole([...HR_ADMIN]),
     return res.status(201).json(await hrService.createStaff(parsed.data, req.user!.uid))
   })
 
-hrRouter.post('/:id/photo', verifyAuth, requireRole([...HR_ADMIN]), upload.single('photo'),
-  async (req, res) => {
-    // [PRODUCTION FIX] No try/catch — same systemic bug as the other
-    // upload.single() handlers across this codebase: an error from
-    // uploadStaffPhoto()/getSignedViewUrl() became an unhandled rejection
-    // with no response ever sent, hanging the client's fetch indefinitely.
+// POST /hr/:id/photo/upload-ticket — mints a one-time Appwrite upload
+// credential for this staff member's photo. Staff photos are private
+// (FILE_PREFIX.STAFF_PHOTO is not one of the public prefixes), so the
+// resulting file gets no public read permission — viewing it still goes
+// through getSignedViewUrl()'s role-checked proxy, same as before.
+hrRouter.post('/:id/photo/upload-ticket', verifyAuth, requireRole([...HR_ADMIN]),
+  async (_req, res) => {
     try {
-      if (!req.file) return res.status(400).json({ error: 'No photo uploaded.' })
-      const fileId = await hrService.uploadStaffPhoto(String(req.params.id), req.file.buffer, req.file.originalname)
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.STAFF_PHOTO)
+      res.json(ticket)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'hr', route: 'photo-upload-ticket' } })
+    }
+  })
+
+// POST /hr/:id/photo — records a photo the browser has ALREADY uploaded
+// directly to Appwrite via /:id/photo/upload-ticket. Takes the resulting
+// fileId (JSON body), not the file itself.
+// [PRODUCTION FIX] Was multer-based, going through this app's own Vercel
+// function for the raw file bytes — hitting the same two hard limits as
+// every other upload in this codebase (Vercel's 4.5MB request-body cap,
+// and no retry on a dropped connection mid-upload).
+hrRouter.post('/:id/photo', verifyAuth, requireRole([...HR_ADMIN]),
+  async (req, res) => {
+    try {
+      const fileId = typeof req.body?.fileId === 'string' ? req.body.fileId : undefined
+      if (!fileId || !fileId.startsWith(`${FILE_PREFIX.STAFF_PHOTO}_`)) {
+        return res.status(400).json({ error: 'Missing or invalid fileId — upload the photo via /:id/photo/upload-ticket first.' })
+      }
+      await hrService.attachStaffPhoto(String(req.params.id), fileId)
       const url = await getSignedViewUrl(fileId)
       return res.json({ fileId, url })
     } catch (err: unknown) {

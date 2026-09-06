@@ -41,7 +41,6 @@
  *   read directly from source this phase)
  */
 import { Router } from 'express'
-import multer from 'multer'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import {
@@ -58,10 +57,10 @@ import {
 } from '@shared/schemas/library'
 import * as libService from '@/server/services/libraryService'
 import * as workflowService from '@/server/services/libraryWorkflowService'
+import { createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
 
 export const libraryRouter = Router()
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } }) // 100MB for eBooks
 
 const LIB_STAFF = ['admin', 'library'] as const
 
@@ -144,18 +143,48 @@ libraryRouter.get('/digital', verifyAuth, requirePermission('library.viewDigital
     }))
   })
 
-libraryRouter.post('/digital/upload', verifyAuth, requirePermission('library.uploadDigitalResource'),
-  upload.single('file'), async (req, res) => {
-    // [PRODUCTION FIX] No try/catch — same systemic bug as the other
-    // upload.single() handlers across this codebase: an error from
-    // uploadDigitalResource() became an unhandled rejection with no
-    // response ever sent, hanging the client's fetch indefinitely.
+// POST /digital/upload-ticket — mints a one-time Appwrite upload
+// credential. Digital resources (eBooks, past papers, notes) are private —
+// FILE_PREFIX.DIGITAL_RESOURCE is not one of the public prefixes — so the
+// file gets no public read permission; viewing still goes through
+// GET /digital/:id/view's role-checked signed URL, same as before.
+libraryRouter.post('/digital/upload-ticket', verifyAuth, requirePermission('library.uploadDigitalResource'),
+  async (_req, res) => {
     try {
-      if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.DIGITAL_RESOURCE)
+      res.json(ticket)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'library', route: 'digital-upload-ticket' } })
+    }
+  })
+
+// POST /digital/upload — records a resource the browser has ALREADY
+// uploaded directly to Appwrite via /digital/upload-ticket. Takes the
+// resulting fileId/fileSize/mimeType (JSON body) instead of the file
+// itself.
+// [PRODUCTION FIX] Was multer-based (100MB limit, for eBooks/past papers),
+// going through this app's own Vercel function for the raw file bytes —
+// hitting the same two hard limits as every other upload in this
+// codebase: Vercel's 4.5MB request-body cap (far below the 100MB this
+// route was actually meant to allow) and no retry on a dropped connection
+// mid-upload. This was the specific "PDF resources don't go through" bug
+// reported at the very start of this investigation.
+libraryRouter.post('/digital/upload', verifyAuth, requirePermission('library.uploadDigitalResource'),
+  async (req, res) => {
+    try {
+      const fileId = typeof req.body?.fileId === 'string' ? req.body.fileId : undefined
+      if (!fileId || !fileId.startsWith(`${FILE_PREFIX.DIGITAL_RESOURCE}_`)) {
+        return res.status(400).json({ error: 'Missing or invalid fileId — upload the file via /digital/upload-ticket first.' })
+      }
+      const fileSize = typeof req.body?.fileSize === 'number' ? req.body.fileSize : undefined
+      const mimeType = typeof req.body?.mimeType === 'string' ? req.body.mimeType : undefined
+      if (!fileSize || !mimeType) {
+        return res.status(400).json({ error: 'Missing fileSize or mimeType.' })
+      }
       const parsed = CreateDigitalResourceSchema.safeParse(req.body)
       if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-      const resource = await libService.uploadDigitalResource(
-        parsed.data, req.file.buffer, req.file.originalname, req.file.mimetype, req.file.size, req.user!.uid
+      const resource = await libService.recordDigitalResource(
+        parsed.data, fileId, fileSize, mimeType, req.user!.uid
       )
       return res.status(201).json(resource)
     } catch (err: unknown) {

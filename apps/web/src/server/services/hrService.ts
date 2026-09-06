@@ -58,7 +58,6 @@ import 'server-only'
 import * as admin from 'firebase-admin'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { uploadFile, FILE_PREFIX } from '@/lib/storage'
 import { sendEmail } from '@/lib/email'
 import { generateTempPassword } from '@/lib/tempPassword'
 import { differenceInBusinessDays, isWeekend, addDays, startOfDay, endOfDay } from 'date-fns'
@@ -361,10 +360,14 @@ export async function createStaff(data: CreateStaffInput, actorUid: string) {
   return { ...staff, tempPassword }
 }
 
-export async function uploadStaffPhoto(staffId: string, buffer: Buffer, filename: string): Promise<string> {
-  const uploaded = await uploadFile(FILE_PREFIX.STAFF_PHOTO, buffer, filename, 'image/jpeg')
-  await prisma.staffProfile.update({ where: { id: staffId }, data: { photoKey: uploaded.fileId } })
-  return uploaded.fileId
+// [PRODUCTION FIX] Was uploadStaffPhoto(staffId, buffer, filename) — took
+// the raw file bytes and called uploadFile() itself. The route now uploads
+// directly to Appwrite from the browser (see hr.ts's /:id/photo/upload-ticket
+// and storage.ts's createDirectUploadTicket()), so this only needs to
+// record the resulting fileId against the staff profile.
+export async function attachStaffPhoto(staffId: string, fileId: string): Promise<string> {
+  await prisma.staffProfile.update({ where: { id: staffId }, data: { photoKey: fileId } })
+  return fileId
 }
 
 // ─── LEAVE MANAGEMENT ────────────────────────────────────

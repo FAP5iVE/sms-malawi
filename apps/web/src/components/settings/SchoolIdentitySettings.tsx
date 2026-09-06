@@ -16,6 +16,7 @@
 import { useState, useEffect } from 'react'
 import { Loader2, Save, Plus, X, Building2, ImagePlus } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
+import { uploadFileDirectly } from '@/lib/directUpload'
 
 interface LeadershipMember {
   name:  string
@@ -121,13 +122,8 @@ export function SchoolIdentitySettings() {
     setUploadingPhoto(true)
     setError(null)
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const uploaded = await apiFetch<{ photoKey: string }>('/settings/leadership-photo', {
-        method: 'POST',
-        body: fd,
-      })
-      setNewLeader((p) => ({ ...p, photoKey: uploaded.photoKey, photoPreview: URL.createObjectURL(file) }))
+      const photoKey = await uploadFileDirectly('/settings/leadership-photo/upload-ticket', file)
+      setNewLeader((p) => ({ ...p, photoKey, photoPreview: URL.createObjectURL(file) }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload photo.')
     } finally {
@@ -219,7 +215,7 @@ export function SchoolIdentitySettings() {
             value={newValue}
             onChange={(e) => setNewValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCoreValue() } }}
-            className={`${inputCls} min-h-[36px] text-xs`}
+            className={`${inputCls} min-h-9 text-xs`}
             placeholder="Add a core value…"
           />
           <button type="button" onClick={addCoreValue} disabled={!newValue.trim()} className="shrink-0 border border-base rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-page disabled:opacity-40">
@@ -319,10 +315,10 @@ export function SchoolIdentitySettings() {
         </div>
         <div className="border border-base rounded-xl p-4 space-y-2">
           <div className="grid sm:grid-cols-2 gap-2">
-            <input value={newLeader.name} onChange={(e) => setNewLeader((p) => ({ ...p, name: e.target.value }))} placeholder="Full name" className={`${inputCls} min-h-[36px] text-xs`} />
-            <input value={newLeader.title} onChange={(e) => setNewLeader((p) => ({ ...p, title: e.target.value }))} placeholder="Title (e.g. Head Teacher)" className={`${inputCls} min-h-[36px] text-xs`} />
+            <input value={newLeader.name} onChange={(e) => setNewLeader((p) => ({ ...p, name: e.target.value }))} placeholder="Full name" className={`${inputCls} min-h-9 text-xs`} />
+            <input value={newLeader.title} onChange={(e) => setNewLeader((p) => ({ ...p, title: e.target.value }))} placeholder="Title (e.g. Head Teacher)" className={`${inputCls} min-h-9 text-xs`} />
           </div>
-          <textarea value={newLeader.bio} onChange={(e) => setNewLeader((p) => ({ ...p, bio: e.target.value }))} placeholder="Short bio (optional)" className={`${inputCls} min-h-[60px] text-xs`} />
+          <textarea value={newLeader.bio} onChange={(e) => setNewLeader((p) => ({ ...p, bio: e.target.value }))} placeholder="Short bio (optional)" className={`${inputCls} min-h-15 text-xs`} />
           {/* [NEW] Photo attach — displayed on the public Leadership page. */}
           <div className="flex items-center gap-3">
             {newLeader.photoPreview ? (
@@ -356,7 +352,7 @@ export function SchoolIdentitySettings() {
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2"
+          className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2"
         >
           {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Changes</>}
         </button>

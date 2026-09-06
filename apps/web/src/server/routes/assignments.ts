@@ -43,17 +43,15 @@
  *   (CreateAssignmentSchema)
  */
 import { Router, type Request, type Response, type NextFunction } from 'express'
-import multer from 'multer'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { hasAnyPermission, type Permission } from '@shared/types/permissions'
 import { prisma } from '@/lib/prisma'
 import { CreateAssignmentSchema } from '@shared/schemas/student'
 import * as assignmentService from '@/server/services/assignmentService'
-import { uploadFile, FILE_PREFIX } from '@/lib/storage'
+import { createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
 
 export const assignmentsRouter = Router({ mergeParams: true })
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } }) // 25MB
 
 // Staff permissions that grant visibility into ANY class's assignments —
 // class.viewAnalytics (school-wide oversight: admin, high_rank,
@@ -138,19 +136,40 @@ assignmentsRouter.post(
   }
 )
 
-// POST /classes/:classId/assignments/:id/submit — a student uploads their
-// submission file. Gated to students actually enrolled in :classId, same
-// check as GET /.
+// POST /classes/:classId/assignments/:id/submit/upload-ticket — mints a
+// one-time Appwrite upload credential for this student's submission file.
+// Submissions are private (FILE_PREFIX.ASSIGNMENT_SUBMISSION is not one of
+// the public prefixes), so the file gets no public read permission.
+assignmentsRouter.post(
+  '/:id/submit/upload-ticket',
+  verifyAuth,
+  requireAssignmentViewAccess,
+  async (req: Request, res: Response) => {
+    try {
+      if (req.user!.role !== 'student') {
+        return res.status(403).json({ error: 'Only enrolled students may submit assignments.' })
+      }
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.ASSIGNMENT_SUBMISSION)
+      res.json(ticket)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'assignments', route: 'submit-upload-ticket' } })
+    }
+  }
+)
+
+// POST /classes/:classId/assignments/:id/submit — records a submission the
+// browser has ALREADY uploaded directly to Appwrite via .../submit/
+// upload-ticket (if there is a file at all — a submission may be file-
+// less). Takes the resulting fileId (JSON body), not the file itself.
+// [PRODUCTION FIX] Was multer-based (25MB limit), going through this app's
+// own Vercel function for the raw file bytes — hitting the same two hard
+// limits as every other upload in this codebase (Vercel's 4.5MB
+// request-body cap, and no retry on a dropped connection mid-upload).
 assignmentsRouter.post(
   '/:id/submit',
   verifyAuth,
   requireAssignmentViewAccess,
-  upload.single('file'),
   async (req: Request, res: Response) => {
-    // [PRODUCTION FIX] No try/catch at all — an error from uploadFile()
-    // or submitAssignment() became an unhandled rejection with no response
-    // ever sent, hanging the client's fetch. Same systemic bug found across
-    // announcements.ts, gallery.ts, finances.ts, hr.ts, and library.ts.
     try {
       const user = req.user!
       if (user.role !== 'student') {
@@ -168,14 +187,12 @@ assignmentsRouter.post(
       }
 
       let fileKey: string | null = null
-      if (req.file) {
-        const uploaded = await uploadFile(
-          FILE_PREFIX.ASSIGNMENT_SUBMISSION,
-          req.file.buffer,
-          req.file.originalname,
-          req.file.mimetype
-        )
-        fileKey = uploaded.fileId
+      const fileId = typeof req.body?.fileId === 'string' ? req.body.fileId : undefined
+      if (fileId) {
+        if (!fileId.startsWith(`${FILE_PREFIX.ASSIGNMENT_SUBMISSION}_`)) {
+          return res.status(400).json({ error: 'Invalid fileId — upload the file via .../submit/upload-ticket first.' })
+        }
+        fileKey = fileId
       }
 
       const submission = await assignmentService.submitAssignment(

@@ -24,13 +24,11 @@ import {
 } from '@/server/middleware/verifyPermission'
 import * as studentService             from '@/server/services/studentService'
 import * as pendingActionService       from '@/server/services/pendingActionService'
-import * as riskService                from '@/server/services/riskService'
-import * as settingsService            from '@/server/services/settingsService'
-import { SETTING_KEYS }                from '@shared/types/settings'
 import { StudentStatusSchema }         from '@shared/schemas/student'
 import type { StudentStatus, Sex }     from '@prisma/client'
 import type { UserRole }               from '@shared/types/roles'
 import { sendError } from '@/server/lib/sendError'
+import { createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
 
 export const studentsRouter = Router()
 
@@ -136,32 +134,6 @@ studentsRouter.get(
     }
 
     res.json(detail)
-  }
-)
-
-// ─────────────────────────────────────────────────────────
-//  GET /students/at-risk
-//  [PRODUCTION FIX] Real HIGH-risk active students (via riskService's
-//  multi-factor assessStudentRisk()) for the teacher dashboard's "Students
-//  Needing Attention" widget — see riskService.getHighRiskStudents()'s
-//  header comment for why filtering GET /students' riskLevel client-side
-//  could never surface anyone. Placed before GET /:id so Express doesn't
-//  swallow "at-risk" as an :id param.
-// ─────────────────────────────────────────────────────────
-
-studentsRouter.get(
-  '/at-risk',
-  requirePermission('student.viewRiskStatus'),
-  async (req: Request, res: Response) => {
-    try {
-      const academicYear = await settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
-      const term = Number(await settingsService.get(SETTING_KEYS.CURRENT_TERM))
-      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 6
-      const students = await riskService.getHighRiskStudents(term, academicYear, limit)
-      res.json({ students })
-    } catch (err: unknown) {
-      return sendError(res, err, { tags: { module: 'students', route: 'at-risk' } })
-    }
   }
 )
 
@@ -276,6 +248,51 @@ studentsRouter.post(
     )
 
     res.status(201).json(student)
+  }
+)
+
+// ─────────────────────────────────────────────────────────
+//  POST /students/:id/photo/upload-ticket + POST /students/:id/photo
+//  [NEW] These didn't exist at all — StudentForm.tsx has been calling
+//  POST /students/:id/photo (multipart FormData) since it was written,
+//  but no such route was ever defined on this router, so every student
+//  photo upload has been silently 404ing (the client swallows the
+//  failure with only a console.error, never shown to the user — see
+//  StudentForm.tsx's uploadPhotoIfNeeded()). Built directly as a
+//  direct-to-Appwrite upload (matching the rest of the app's upload
+//  routes) rather than as a multer route that would need fixing again
+//  later. Student photos are private (FILE_PREFIX.STUDENT_PHOTO is not
+//  one of the public prefixes), so the file gets no public read
+//  permission — same gating as creating/editing this student.
+// ─────────────────────────────────────────────────────────
+
+studentsRouter.post(
+  '/:id/photo/upload-ticket',
+  requirePermission('student.edit'),
+  async (_req: Request, res: Response) => {
+    try {
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.STUDENT_PHOTO)
+      res.json(ticket)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'students', route: 'photo-upload-ticket' } })
+    }
+  }
+)
+
+studentsRouter.post(
+  '/:id/photo',
+  requirePermission('student.edit'),
+  async (req: Request, res: Response) => {
+    try {
+      const fileId = typeof req.body?.fileId === 'string' ? req.body.fileId : undefined
+      if (!fileId || !fileId.startsWith(`${FILE_PREFIX.STUDENT_PHOTO}_`)) {
+        return res.status(400).json({ error: 'Missing or invalid fileId — upload the photo via /:id/photo/upload-ticket first.' })
+      }
+      await studentService.attachStudentPhoto(String(req.params.id), fileId)
+      res.json({ ok: true, photoKey: fileId })
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'students', route: 'photo-upload' } })
+    }
   }
 )
 

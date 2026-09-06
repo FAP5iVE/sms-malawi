@@ -55,7 +55,6 @@ import { zodResolver }              from '@hookform/resolvers/zod'
 import { AnimatePresence, motion }  from 'framer-motion'
 import { Check, ChevronLeft, ChevronRight, Loader2, User, X, AlertCircle } from 'lucide-react'
 import Image                        from 'next/image'
-import { getAuth }                  from 'firebase/auth'
 import { CreateStudentSchema }      from '@shared/schemas/student'
 import type { CreateStudentInput }  from '@shared/schemas/student'
 
@@ -68,7 +67,7 @@ type StudentFormValues = z.input<typeof CreateStudentSchema>
 import type { ApiStudent }          from '@shared/types/api'
 import { useCreateStudent, useUpdateStudent, useStudent } from '@/hooks/useStudents'
 import { StudentFeeStructure } from '@/components/students/StudentFeeStructure'
-import { buildApiUrl }              from '@/lib/api-client'
+import { uploadFileDirectly } from '@/lib/directUpload'
 import { useMotionEnabled }         from '@/store/motionStore'
 import {
   SHEET_UP_VARIANTS,
@@ -352,17 +351,19 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
 
   async function uploadPhotoIfNeeded(id: string) {
     if (!photoFile) return
-    const formData = new FormData()
-    formData.append('photo', photoFile)
-    const token = await getAuth().currentUser?.getIdToken()
-    await fetch(
-      buildApiUrl(`/students/${id}/photo`),
-      {
-        method:  'POST',
-        headers: { Authorization: `Bearer ${token ?? ''}` },
-        body:    formData,
-      },
-    ).catch((e) => console.error('Photo upload failed:', e))
+    // [PRODUCTION FIX] This called POST /students/:id/photo, a route that
+    // was never actually defined anywhere on the backend — every student
+    // photo upload has been silently 404ing since this form was written
+    // (the failure was swallowed by .catch(console.error) below, never
+    // shown to the user). Built as a direct-to-Appwrite upload against the
+    // newly-added backend route, matching the rest of the app's upload
+    // flows, rather than fixing the old multipart route and having to
+    // convert it again later.
+    try {
+      await uploadFileDirectly(`/students/${id}/photo/upload-ticket`, photoFile)
+    } catch (e) {
+      console.error('Photo upload failed:', e)
+    }
   }
 
   async function onSubmit(data: CreateStudentInput) {
