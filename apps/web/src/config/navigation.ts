@@ -238,6 +238,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     roles:       rolesFor('/monitoring'),
     permission:  'monitoring.view',
   },
+  // [OVERHAUL] The old split between a universal "Placements" cohort console
+  // and a student-only "My Placement" page is gone — one merged page with
+  // internal tabs (Registry & Analytics, MSCE Advisory, Staff Entry, Claims
+  // Verification, Student Claim Portal), each tab gated by its own
+  // permission inside the page. Universally visible because the Registry &
+  // Analytics and MSCE Advisory tabs are open to every role.
   {
     label:       'Placements',
     mobileLabel: 'Placement',
@@ -245,14 +251,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon:        Award,
     roles:       rolesFor('/placements'),
     permission:  'placement.view',
-  },
-  {
-    label:       'My Placement',
-    mobileLabel: 'MyPlace',
-    href:        '/my-placement',
-    icon:        Award,
-    roles:       rolesFor('/my-placement'),
-    permission:  'placement.viewOwn',
   },
 
   // ── Administration ────────────────────────────────────────────────────────

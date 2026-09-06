@@ -350,7 +350,7 @@ export async function sendPlacementUpdate(params: PlacementUpdateParams): Promis
         params.data.programmeName && params.data.universityName
           ? `${params.data.programmeName} — ${params.data.universityName}`
           : 'Your university placement has been updated.',
-      clickAction: '/my-placement',
+      clickAction: '/placements',
       tag: 'placement_update',
       data: { type: 'placement_update' },
     }

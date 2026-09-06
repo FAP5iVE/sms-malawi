@@ -545,12 +545,12 @@ export const queryKeys = {
     student: (studentId: string) => ['attendance', 'student', studentId] as const,
   },
 
-  // ── Placements (advisory university placement, R18)
+  // ── Placements (university placement & advisory, R18 — redesigned) ──
   placements: {
-    all: () => ['placements'] as const,
-    me: () => ['placements', 'me'] as const,
-    student: (studentId: string) => ['placements', 'student', studentId] as const,
-    cohort: (status?: string) => ['placements', 'cohort', status ?? null] as const,
+    me:        () => ['placements', 'me'] as const,
+    registry:  (academicYear?: string) => ['placements', 'registry', academicYear ?? null] as const,
+    queue:     (academicYear?: string) => ['placements', 'queue', academicYear ?? null] as const,
+    eligible:  (academicYear: string) => ['placements', 'eligible', academicYear] as const,
     catalogue: () => ['placements', 'catalogue'] as const,
     eligible: (academicYear: string) => ['placements', 'eligible', academicYear] as const,
     analytics: (academicYear?: string) => ['placements', 'analytics', academicYear ?? null] as const,

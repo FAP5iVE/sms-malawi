@@ -1,29 +1,41 @@
 /**
  * apps/web/src/server/services/placementService.ts
  *
- * [CHANGE TYPE]: NEW FILE
- * [R-PHASE]: R18 — University Placement Module (Phase 11 Blueprint)
+ * [CHANGE TYPE]: TARGETED EDIT (OVERHAUL)
+ * [R-PHASE]: R18 — University Placement Module, redesigned against the
+ *   "Malawi Higher Education Placement & Advisory" reference module.
  * [PURPOSE]: The placement domain's data/orchestration layer. Owns every
- *   UniversityPlacement / PlacementChoice read and write, delegates all
- *   eligibility maths to the pure placementMatchingService, and validates
- *   every catalogue reference against @shared/constants/universities before
- *   it is persisted. Every mutation writes an auditService.log entry.
+ *   UniversityPlacement read and write, delegates all eligibility maths to
+ *   the pure placementMatchingService, and validates every catalogue
+ *   reference against @shared/constants/universities before it is
+ *   persisted. Every mutation writes an auditService.log entry.
  *
- *   ADVISORY, MSCE-ONLY. A placement is only ever generated from a certified
- *   MSCE ManebRecord (isManebRecordPlacementReady gate). Form 2 / JCE records
- *   never yield a placement — attempting to generate one for a JCE record
- *   throws, and listPlacementEligibleStudents restricts the cohort to Form 4
- *   students holding a placement-ready MSCE record (never Student.status
- *   alone, which is a coarse lifecycle flag, not proof of a certificate).
+ *   [OVERHAUL] The old ranked-choices pipeline (PlacementChoice,
+ *   generateForStudent/batchGenerate/setChoices, the NOT_STARTED →
+ *   ELIGIBILITY_COMPUTED → CHOICES_RECORDED → PLACED state machine) is gone
+ *   — the reference module doesn't have that workflow at all. It is
+ *   replaced by a much simpler three-status model:
+ *     - recordStaffPlacement — staff cross-reference the official NCHE
+ *       gazette against a graduating candidate and record an immediately
+ *       CONFIRMED placement (entrySource STAFF_OFFICIAL). Upserted by
+ *       manebRecordId, so re-submitting the same candidate edits their entry.
+ *     - submitClaim           — a GRADUATED student self-reports their own
+ *       selection (entrySource STUDENT_CLAIM); always lands PENDING_APPROVAL.
+ *     - approveClaim/rejectClaim — a staff member with placement.verifyOutcome
+ *       confirms or rejects a pending claim.
+ *   Every record is still keyed 1:1 on a certified MSCE ManebRecord
+ *   (manebRecordId, unique) via isManebRecordPlacementReady — the exam-module
+ *   integration is unchanged.
  *
- *   CATALOGUE-VS-FREE-TEXT INVARIANT. For any recorded choice or outcome,
- *   exactly one of {catalogue id pair, free-text name pair} is populated. The
- *   Zod schema enforces the shape; this service additionally verifies that
- *   catalogue ids actually resolve in the constants file (a schema can't see
- *   the catalogue), rejecting stale/typo'd ids before they reach the DB.
+ *   CATALOGUE-VS-FREE-TEXT INVARIANT (unchanged). For any recorded
+ *   destination, exactly one of {catalogue id pair, free-text name pair} is
+ *   populated. The Zod schema enforces the shape; this service additionally
+ *   verifies that catalogue ids actually resolve in the constants file.
  * [DEPENDS ON]: @/lib/prisma, @/lib/logger, @/server/services/auditService,
- *   @/server/services/placementMatchingService, @/server/services/studentService,
- *   @shared/constants/universities, @shared/schemas/placement
+ *   @/server/services/notificationService,
+ *   @/server/services/placementMatchingService,
+ *   @/server/services/studentService, @shared/constants/universities,
+ *   @shared/schemas/placement
  */
 import 'server-only'
 
@@ -31,9 +43,9 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import * as auditService from '@/server/services/auditService'
 import * as notificationService from '@/server/services/notificationService'
+import { resolveStudentFromUid } from '@/server/services/studentService'
 import {
   isManebRecordPlacementReady,
-  parseMsceGrades,
   computeEligibility,
   generateRecommendations,
 } from '@/server/services/placementMatchingService'
@@ -45,9 +57,9 @@ import {
   getAllPrograms,
 } from '@shared/constants/universities'
 import type {
-  SetChoicesInput,
-  RecordOutcomeInput,
-  VerifyOutcomeInput,
+  StaffPlacementEntryInput,
+  StudentClaimInput,
+  RejectClaimInput,
 } from '@shared/schemas/placement'
 import type { UserRole } from '@shared/types/roles'
 
@@ -72,38 +84,413 @@ function assertCataloguePairResolves(universityId: string, programmeId: string):
 }
 
 // ─────────────────────────────────────────────────────────
-//  READS
+//  SHARED READ HELPERS
 // ─────────────────────────────────────────────────────────
 
-const placementInclude = {
-  choices: { orderBy: { rank: 'asc' } },
+const placementStudentSelect = {
+  id:             true,
+  firstName:      true,
+  lastName:       true,
+  otherNames:     true,
+  registrationNo: true,
+  sex:            true,
 } as const
 
-export async function getPlacementForStudent(studentId: string) {
-  return prisma.universityPlacement.findFirst({
-    where: { studentId },
+const placementInclude = {
+  student: { select: placementStudentSelect },
+} as const
+
+/**
+ * The student's most recent certified/results-received MSCE record, or null.
+ * NEVER keys off Student.status alone — that is a coarse lifecycle flag, not
+ * proof of a certificate.
+ */
+async function findCertifiedMsceRecord(studentId: string) {
+  const records = await prisma.manebRecord.findMany({
+    where:  { studentId, examType: 'MSCE' },
+    select: { id: true, status: true, examType: true, subjectGrades: true, academicYear: true },
+    orderBy: { academicYear: 'desc' },
+  })
+  return (
+    records.find((r) =>
+      isManebRecordPlacementReady({
+        examType: r.examType,
+        status: r.status,
+        subjectGrades: r.subjectGrades as Record<string, string> | null,
+      }),
+    ) ?? null
+  )
+}
+
+// ─────────────────────────────────────────────────────────
+//  STUDENT SELF-SERVICE (/me)
+// ─────────────────────────────────────────────────────────
+
+/**
+ * The signed-in student's own claim/placement, plus whether the Student
+ * Claim Portal tab should even be shown to them (isGraduated) and whether
+ * they have a certified MSCE record yet (hasCertifiedMsce).
+ */
+export async function getMyPlacement(firebaseUid: string) {
+  const student = await resolveStudentFromUid(firebaseUid)
+  if (!student) throw httpError('No student record is linked to this account.', 403)
+
+  const record = await prisma.universityPlacement.findFirst({
+    where:   { studentId: student.id },
     orderBy: { createdAt: 'desc' },
     include: placementInclude,
   })
+  const certified = await findCertifiedMsceRecord(student.id)
+
+  return {
+    record,
+    isGraduated:      student.status === 'GRADUATED',
+    hasCertifiedMsce: certified !== null,
+  }
 }
 
-export async function getPlacementById(id: string) {
-  return prisma.universityPlacement.findUnique({
-    where: { id },
+/**
+ * A graduated student self-reports that they were selected. Always lands as
+ * PENDING_APPROVAL — never auto-confirmed. Gated on Student.status ===
+ * 'GRADUATED' and a certified MSCE record existing; refuses to overwrite an
+ * already-CONFIRMED placement (that requires a staff correction instead).
+ */
+export async function submitClaim(firebaseUid: string, input: StudentClaimInput) {
+  const student = await resolveStudentFromUid(firebaseUid)
+  if (!student) throw httpError('No student record is linked to this account.', 403)
+  if (student.status !== 'GRADUATED') {
+    throw httpError('The placement claim portal is only available to graduated students.', 403)
+  }
+
+  const manebRecord = await findCertifiedMsceRecord(student.id)
+  if (!manebRecord) {
+    throw httpError('No certified MSCE record was found for your account yet.', 400)
+  }
+
+  const existing = await prisma.universityPlacement.findUnique({
+    where:  { manebRecordId: manebRecord.id },
+    select: { status: true },
+  })
+  if (existing?.status === 'CONFIRMED') {
+    throw httpError('You already have a confirmed placement on file. Contact the admissions office to correct it.', 400)
+  }
+
+  const isCatalogue = Boolean(input.placedUniversityId && input.placedProgrammeId)
+  if (isCatalogue) assertCataloguePairResolves(input.placedUniversityId!, input.placedProgrammeId!)
+
+  const data = {
+    studentId:            student.id,
+    manebRecordId:        manebRecord.id,
+    status:               'PENDING_APPROVAL' as const,
+    entrySource:          'STUDENT_CLAIM' as const,
+    admissionYear:        input.admissionYear,
+    placedUniversityId:   isCatalogue ? input.placedUniversityId! : null,
+    placedProgrammeId:    isCatalogue ? input.placedProgrammeId! : null,
+    placedUniversityName: isCatalogue ? null : input.placedUniversityName ?? null,
+    placedProgrammeName:  isCatalogue ? null : input.placedProgrammeName ?? null,
+    ncheBatchRef:         input.ncheBatchRef,
+    claimProofNote:       input.claimProofNote ?? null,
+    recordedByUid:        firebaseUid,
+    verifiedByUid:        null,
+    verifiedAt:           null,
+    rejectionReason:      null,
+  }
+
+  const updated = await prisma.universityPlacement.upsert({
+    where:   { manebRecordId: manebRecord.id },
+    create:  data,
+    update:  data,
     include: placementInclude,
+  })
+
+  await auditService.log({
+    action:     'placement.claim.submitted',
+    entityType: 'UniversityPlacement',
+    entityId:   updated.id,
+    actorUid:   firebaseUid,
+    actorRole:  'student',
+    metadata:   { context: { admissionYear: input.admissionYear, catalogue: isCatalogue } },
+  })
+  logger.info({ event: 'placement.claim.submitted', placementId: updated.id, studentId: student.id })
+
+  return updated
+}
+
+// ─────────────────────────────────────────────────────────
+//  STAFF PLACEMENT ENTRY
+// ─────────────────────────────────────────────────────────
+
+/**
+ * The graduating cohort available to be given an official placement: Form 4
+ * students holding a placement-ready (certified/results-received) MSCE
+ * ManebRecord for the given academic year, each annotated with their
+ * existing placement status (if any) so the Staff Entry picker can flag
+ * "already placed" candidates.
+ */
+export async function listGraduatingCohort(academicYear: string) {
+  const records = await prisma.manebRecord.findMany({
+    where:  { academicYear, examType: 'MSCE' },
+    select: { id: true, studentId: true, status: true, examType: true, subjectGrades: true },
+  })
+
+  const readyByStudent = new Map<string, (typeof records)[number]>()
+  for (const r of records) {
+    if (
+      isManebRecordPlacementReady({
+        examType: r.examType,
+        status: r.status,
+        subjectGrades: r.subjectGrades as Record<string, string> | null,
+      })
+    ) {
+      readyByStudent.set(r.studentId, r)
+    }
+  }
+  if (readyByStudent.size === 0) return []
+
+  const students = await prisma.student.findMany({
+    where: {
+      id:    { in: [...readyByStudent.keys()] },
+      class: { form: 4 },
+    },
+    select: { id: true, registrationNo: true, firstName: true, lastName: true, sex: true },
+  })
+
+  const manebRecordIds = [...readyByStudent.values()].map((r) => r.id)
+  const existingPlacements = await prisma.universityPlacement.findMany({
+    where:  { manebRecordId: { in: manebRecordIds } },
+    select: { manebRecordId: true, status: true },
+  })
+  const statusByRecord = new Map(existingPlacements.map((p) => [p.manebRecordId, p.status as string]))
+
+  return students.map((s) => {
+    const rec = readyByStudent.get(s.id)!
+    return {
+      studentId:      s.id,
+      registrationNo: s.registrationNo,
+      firstName:      s.firstName,
+      lastName:       s.lastName,
+      sex:            s.sex,
+      manebRecordId:  rec.id,
+      existingStatus: statusByRecord.get(rec.id) ?? null,
+    }
   })
 }
 
-// PUBLIC listing — this IS public information (NCHE selection results are
-// published), so it deliberately carries NO auth. Only VERIFIED placements
-// with an actual outcome are returned — never a pending student self-claim,
-// and never anyone still NOT_STARTED/awaiting eligibility. Field set is
+/**
+ * Staff record (or edit) an official, immediately CONFIRMED placement for a
+ * graduating candidate, resolved from a certified MSCE record. Trusted
+ * staff data-entry is authoritative and appears immediately — the same
+ * treatment a MANEB import gets. Upserted by manebRecordId, so calling this
+ * again for the same candidate edits their existing entry (e.g. correcting
+ * a typo'd programme).
+ */
+export async function recordStaffPlacement(
+  input: StaffPlacementEntryInput,
+  actorUid: string,
+  actorRole: UserRole | string,
+) {
+  const manebRecord = await prisma.manebRecord.findUnique({
+    where:  { id: input.manebRecordId },
+    select: { id: true, studentId: true, status: true, examType: true, subjectGrades: true },
+  })
+  if (!manebRecord) throw httpError('MSCE record not found.', 404)
+  if (
+    !isManebRecordPlacementReady({
+      examType: manebRecord.examType,
+      status: manebRecord.status,
+      subjectGrades: manebRecord.subjectGrades as Record<string, string> | null,
+    })
+  ) {
+    throw httpError('This candidate does not yet have a certified MSCE record.', 400)
+  }
+
+  const isCatalogue = Boolean(input.placedUniversityId && input.placedProgrammeId)
+  if (isCatalogue) assertCataloguePairResolves(input.placedUniversityId!, input.placedProgrammeId!)
+
+  const data = {
+    studentId:            manebRecord.studentId,
+    manebRecordId:        manebRecord.id,
+    status:               'CONFIRMED' as const,
+    entrySource:          'STAFF_OFFICIAL' as const,
+    admissionYear:        input.admissionYear,
+    placedUniversityId:   isCatalogue ? input.placedUniversityId! : null,
+    placedProgrammeId:    isCatalogue ? input.placedProgrammeId! : null,
+    placedUniversityName: isCatalogue ? null : input.placedUniversityName ?? null,
+    placedProgrammeName:  isCatalogue ? null : input.placedProgrammeName ?? null,
+    ncheBatchRef:         input.ncheBatchRef,
+    notes:                input.notes ?? null,
+    recordedByUid:        actorUid,
+    verifiedByUid:        actorUid,
+    verifiedAt:           new Date(),
+    rejectionReason:      null,
+    claimProofNote:       null,
+  }
+
+  const updated = await prisma.universityPlacement.upsert({
+    where:   { manebRecordId: manebRecord.id },
+    create:  data,
+    update:  data,
+    include: placementInclude,
+  })
+
+  await auditService.log({
+    action:     'placement.staffEntry.recorded',
+    entityType: 'UniversityPlacement',
+    entityId:   updated.id,
+    actorUid,
+    actorRole,
+    metadata:   { context: { catalogue: isCatalogue, admissionYear: input.admissionYear } },
+  })
+  logger.info({ event: 'placement.staffEntry.recorded', placementId: updated.id, actorUid })
+
+  await notifyPlacementOutcome(updated.id, 'Confirmed')
+  return updated
+}
+
+// ─────────────────────────────────────────────────────────
+//  REGISTRY & CLAIMS QUEUE (reads)
+// ─────────────────────────────────────────────────────────
+
+/** The Registry & Analytics tab: CONFIRMED placements only, open to everyone. */
+export async function listConfirmedPlacements(opts: { academicYear?: string } = {}) {
+  return prisma.universityPlacement.findMany({
+    where: {
+      status: 'CONFIRMED',
+      ...(opts.academicYear ? { manebRecord: { academicYear: opts.academicYear } } : {}),
+    },
+    include: placementInclude,
+    orderBy: [{ placedUniversityId: 'asc' }, { student: { lastName: 'asc' } }],
+  })
+}
+
+/** The Claims Verification Desk queue: pending + previously-rejected claims. */
+export async function listClaimsQueue(opts: { academicYear?: string } = {}) {
+  return prisma.universityPlacement.findMany({
+    where: {
+      status: { in: ['PENDING_APPROVAL', 'REJECTED'] },
+      ...(opts.academicYear ? { manebRecord: { academicYear: opts.academicYear } } : {}),
+    },
+    include: placementInclude,
+    orderBy: { createdAt: 'desc' },
+  })
+}
+
+// ─────────────────────────────────────────────────────────
+//  CLAIMS VERIFICATION DESK
+// ─────────────────────────────────────────────────────────
+
+export async function approveClaim(id: string, actorUid: string, actorRole: UserRole | string) {
+  const placement = await prisma.universityPlacement.findUnique({ where: { id }, select: { id: true, status: true } })
+  if (!placement) throw httpError('Placement claim not found.', 404)
+  if (placement.status === 'CONFIRMED') throw httpError('This claim has already been confirmed.', 400)
+
+  const updated = await prisma.universityPlacement.update({
+    where:   { id },
+    data:    { status: 'CONFIRMED', verifiedByUid: actorUid, verifiedAt: new Date(), rejectionReason: null },
+    include: placementInclude,
+  })
+
+  await auditService.log({
+    action: 'placement.claim.approved', entityType: 'UniversityPlacement', entityId: id, actorUid, actorRole,
+  })
+  logger.info({ event: 'placement.claim.approved', placementId: id, actorUid })
+
+  await notifyPlacementOutcome(id, 'Confirmed')
+  return updated
+}
+
+export async function rejectClaim(
+  id: string,
+  input: RejectClaimInput,
+  actorUid: string,
+  actorRole: UserRole | string,
+) {
+  const placement = await prisma.universityPlacement.findUnique({ where: { id }, select: { id: true, status: true } })
+  if (!placement) throw httpError('Placement claim not found.', 404)
+  if (placement.status === 'CONFIRMED') {
+    throw httpError('A confirmed placement cannot be rejected here — record a fresh staff entry instead.', 400)
+  }
+
+  const updated = await prisma.universityPlacement.update({
+    where:   { id },
+    data:    { status: 'REJECTED', rejectionReason: input.reason, verifiedByUid: actorUid, verifiedAt: new Date() },
+    include: placementInclude,
+  })
+
+  await auditService.log({
+    action:     'placement.claim.rejected',
+    entityType: 'UniversityPlacement',
+    entityId:   id,
+    actorUid,
+    actorRole,
+    metadata:   { context: { reason: input.reason } },
+  })
+  logger.info({ event: 'placement.claim.rejected', placementId: id, actorUid })
+
+  await notifyPlacementOutcome(id, 'Rejected', input.reason)
+  return updated
+}
+
+// ─────────────────────────────────────────────────────────
+//  NOTIFICATIONS
+// ─────────────────────────────────────────────────────────
+
+async function notifyPlacementOutcome(
+  placementId: string,
+  statusLabel: 'Confirmed' | 'Rejected',
+  rejectionReason?: string,
+): Promise<void> {
+  try {
+    const placement = await prisma.universityPlacement.findUnique({
+      where:  { id: placementId },
+      select: {
+        placedUniversityId: true,
+        placedProgrammeId: true,
+        placedUniversityName: true,
+        placedProgrammeName: true,
+        student: { select: { firstName: true, lastName: true, email: true, firebaseUid: true } },
+      },
+    })
+    if (!placement || !placement.student.email) return
+
+    const universityName =
+      placement.placedUniversityName ??
+      (placement.placedUniversityId ? findUniversity(placement.placedUniversityId)?.name : undefined)
+    const programmeName =
+      placement.placedProgrammeName ??
+      (placement.placedUniversityId && placement.placedProgrammeId
+        ? findProgram(placement.placedUniversityId, placement.placedProgrammeId)?.name
+        : undefined)
+
+    await notificationService.sendPlacementUpdate({
+      to: placement.student.email,
+      studentUid: placement.student.firebaseUid ?? undefined,
+      data: {
+        studentName: `${placement.student.firstName} ${placement.student.lastName}`,
+        statusLabel,
+        programmeName,
+        universityName,
+        verified: statusLabel === 'Confirmed',
+        rejectionReason,
+      },
+    })
+  } catch (err) {
+    logger.error({ err, placementId }, '[placementService] placement-update notification failed')
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+//  PUBLIC LISTING (unauthenticated)
+// ─────────────────────────────────────────────────────────
+
+// This IS public information (NCHE selection results are published), so it
+// deliberately carries NO auth. Only CONFIRMED placements are returned —
+// never a pending student self-claim, and never a rejected one. Field set is
 // minimal (name + where + what programme), no exam grades, no internal ids.
 export async function listPublicPlacements(opts: { academicYear?: string } = {}) {
   const rows = await prisma.universityPlacement.findMany({
     where: {
-      isVerified: true,
-      status: { in: ['PLACED', 'CONFIRMED'] },
+      status: 'CONFIRMED',
       ...(opts.academicYear ? { manebRecord: { academicYear: opts.academicYear } } : {}),
     },
     select: {
@@ -133,485 +520,6 @@ export async function listPublicPlacements(opts: { academicYear?: string } = {})
   })
 }
 
-export async function listPlacements(opts: { status?: string } = {}) {
-  return prisma.universityPlacement.findMany({
-    where: opts.status ? { status: opts.status as never } : {},
-    orderBy: { updatedAt: 'desc' },
-    include: placementInclude,
-  })
-}
-
-/**
- * The cohort eligible to be placed: Form 4 students holding a placement-ready
- * (certified/results-received) MSCE ManebRecord for the given academic year.
- * NEVER keys off Student.status alone.
- */
-export async function listPlacementEligibleStudents(academicYear: string) {
-  const records = await prisma.manebRecord.findMany({
-    where: { academicYear, examType: 'MSCE' },
-    select: {
-      id: true,
-      studentId: true,
-      status: true,
-      examType: true,
-      subjectGrades: true,
-    },
-  })
-
-  const readyByStudent = new Map<string, (typeof records)[number]>()
-  for (const r of records) {
-    if (
-      isManebRecordPlacementReady({
-        examType: r.examType,
-        status: r.status,
-        subjectGrades: r.subjectGrades as Record<string, string> | null,
-      })
-    ) {
-      readyByStudent.set(r.studentId, r)
-    }
-  }
-
-  if (readyByStudent.size === 0) return []
-
-  const students = await prisma.student.findMany({
-    where: {
-      id: { in: [...readyByStudent.keys()] },
-      class: { form: 4 },
-    },
-    select: {
-      id: true,
-      registrationNo: true,
-      firstName: true,
-      lastName: true,
-      class: { select: { form: true, academicYear: true } },
-    },
-  })
-
-  return students.map((s) => ({
-    studentId: s.id,
-    registrationNo: s.registrationNo,
-    firstName: s.firstName,
-    lastName: s.lastName,
-    manebRecordId: readyByStudent.get(s.id)!.id,
-  }))
-}
-
-// ─────────────────────────────────────────────────────────
-//  ELIGIBILITY GENERATION
-// ─────────────────────────────────────────────────────────
-
-/**
- * Generate (or refresh) eligibility for one student from their certified MSCE
- * record, upserting the UniversityPlacement keyed on that record. Returns the
- * placement plus the ranked recommendations. Throws 400 if the student has no
- * placement-ready MSCE record.
- */
-export async function generateForStudent(
-  studentId: string,
-  academicYear: string,
-  actorUid: string,
-  actorRole: UserRole | string,
-) {
-  const record = await prisma.manebRecord.findFirst({
-    where: { studentId, academicYear, examType: 'MSCE' },
-    orderBy: { updatedAt: 'desc' },
-    select: { id: true, status: true, examType: true, subjectGrades: true },
-  })
-
-  if (
-    !record ||
-    !isManebRecordPlacementReady({
-      examType: record.examType,
-      status: record.status,
-      subjectGrades: record.subjectGrades as Record<string, string> | null,
-    })
-  ) {
-    throw httpError(
-      'Student has no certified MSCE record — eligibility cannot be computed. (Form 2 / JCE records are never eligible for university placement.)',
-      400,
-    )
-  }
-
-  const grades = parseMsceGrades(record.subjectGrades as Record<string, string> | null)
-  const recommendations = generateRecommendations(
-    grades,
-    getAllPrograms().map(({ university, program }) => ({
-      universityId: university.id,
-      universityName: university.name,
-      program,
-    })),
-  )
-
-  const now = new Date()
-  // Only advance a not-yet-started placement to ELIGIBILITY_COMPUTED on refresh;
-  // never regress one that already holds choices or an outcome. (New placements
-  // are created straight into ELIGIBILITY_COMPUTED by the `create` branch.)
-  const advanceExisting = await shouldAdvanceToComputed(record.id)
-  const placement = await prisma.universityPlacement.upsert({
-    where: { manebRecordId: record.id },
-    create: {
-      studentId,
-      manebRecordId: record.id,
-      status: 'ELIGIBILITY_COMPUTED',
-      eligibilityComputedAt: now,
-    },
-    update: {
-      eligibilityComputedAt: now,
-      ...(advanceExisting ? { status: 'ELIGIBILITY_COMPUTED' as const } : {}),
-    },
-    include: placementInclude,
-  })
-
-  await auditService.log({
-    action: 'placement.eligibility.generated',
-    entityType: 'UniversityPlacement',
-    entityId: placement.id,
-    actorUid,
-    actorRole,
-    metadata: {
-      context: {
-        studentId,
-        academicYear,
-        eligibleCount: recommendations.filter((r) => r.eligible).length,
-        totalConsidered: recommendations.length,
-      },
-    },
-  })
-
-  logger.info({ event: 'placement.generated', placementId: placement.id, studentId, actorUid })
-  return { placement, recommendations }
-}
-
-/** Only advance to ELIGIBILITY_COMPUTED from NOT_STARTED — never clobber a
- *  placement that already holds recorded choices or an outcome. */
-async function shouldAdvanceToComputed(manebRecordId: string): Promise<boolean> {
-  const existing = await prisma.universityPlacement.findUnique({
-    where: { manebRecordId },
-    select: { status: true },
-  })
-  return !existing || existing.status === 'NOT_STARTED'
-}
-
-/**
- * Batch-generate eligibility for the whole Form 4 / certified-MSCE cohort of
- * an academic year. Returns per-student created/failed counts.
- */
-export async function batchGenerate(
-  academicYear: string,
-  actorUid: string,
-  actorRole: UserRole | string,
-) {
-  const cohort = await listPlacementEligibleStudents(academicYear)
-  let generated = 0
-  const errors: Array<{ studentId: string; error: string }> = []
-
-  for (const member of cohort) {
-    try {
-      await generateForStudent(member.studentId, academicYear, actorUid, actorRole)
-      generated += 1
-    } catch (err) {
-      errors.push({ studentId: member.studentId, error: err instanceof Error ? err.message : 'unknown error' })
-    }
-  }
-
-  await auditService.log({
-    action: 'placement.eligibility.batch_generated',
-    entityType: 'UniversityPlacement',
-    entityId: `cohort:${academicYear}`,
-    actorUid,
-    actorRole,
-    metadata: { context: { academicYear, cohortSize: cohort.length, generated, failed: errors.length } },
-  })
-
-  logger.info({ event: 'placement.batch_generated', academicYear, generated, failed: errors.length, actorUid })
-  return { cohortSize: cohort.length, generated, errors }
-}
-
-// ─────────────────────────────────────────────────────────
-//  RECOMMENDATIONS (recompute for an existing placement, no write)
-// ─────────────────────────────────────────────────────────
-
-/** Recompute the ranked recommendations for an existing placement's MSCE
- *  record without mutating anything — used by the read endpoints to show a
- *  fresh recommendation list beside the stored placement. */
-export async function getRecommendationsForPlacement(placementId: string) {
-  const placement = await prisma.universityPlacement.findUnique({
-    where: { id: placementId },
-    select: { manebRecord: { select: { subjectGrades: true } } },
-  })
-  if (!placement) throw httpError('Placement not found.', 404)
-
-  const grades = parseMsceGrades(placement.manebRecord.subjectGrades as Record<string, string> | null)
-  return generateRecommendations(
-    grades,
-    getAllPrograms().map(({ university, program }) => ({
-      universityId: university.id,
-      universityName: university.name,
-      program,
-    })),
-  )
-}
-
-// ─────────────────────────────────────────────────────────
-//  CHOICES
-// ─────────────────────────────────────────────────────────
-
-/**
- * Replace a placement's ranked choices. Catalogue choices are validated
- * against the constants file and have their eligibility computed and stored;
- * free-text choices carry no computed eligibility.
- */
-export async function setChoices(
-  placementId: string,
-  input: SetChoicesInput,
-  actorUid: string,
-  actorRole: UserRole | string,
-) {
-  const placement = await prisma.universityPlacement.findUnique({
-    where: { id: placementId },
-    select: { id: true, manebRecord: { select: { subjectGrades: true } } },
-  })
-  if (!placement) throw httpError('Placement not found.', 404)
-
-  const grades = parseMsceGrades(placement.manebRecord.subjectGrades as Record<string, string> | null)
-
-  // Validate every catalogue reference up-front, before any write.
-  for (const choice of input.choices) {
-    if (choice.universityId && choice.programmeId) {
-      assertCataloguePairResolves(choice.universityId, choice.programmeId)
-    }
-  }
-
-  const rows = input.choices.map((choice) => {
-    if (choice.universityId && choice.programmeId) {
-      const program = findProgram(choice.universityId, choice.programmeId)!
-      const result = computeEligibility(grades, program)
-      return {
-        rank: choice.rank,
-        universityId: choice.universityId,
-        programmeId: choice.programmeId,
-        universityNameFreeText: null,
-        programmeNameFreeText: null,
-        isEligible: result.eligible,
-        score: result.score,
-        missingSubjects: result.missingSubjects,
-      }
-    }
-    return {
-      rank: choice.rank,
-      universityId: null,
-      programmeId: null,
-      universityNameFreeText: choice.universityNameFreeText ?? null,
-      programmeNameFreeText: choice.programmeNameFreeText ?? null,
-      isEligible: false,
-      score: null,
-      missingSubjects: [],
-    }
-  })
-
-  // Decide the status transition before opening the transaction: recording
-  // choices advances a fresh placement to CHOICES_RECORDED, but never regresses
-  // one already PLACED/CONFIRMED/DECLINED/NOT_PLACED.
-  const current = await prisma.universityPlacement.findUnique({
-    where: { id: placementId },
-    select: { status: true },
-  })
-  const advance =
-    current !== null &&
-    (current.status === 'NOT_STARTED' || current.status === 'ELIGIBILITY_COMPUTED')
-
-  const updated = await prisma.$transaction(async (tx) => {
-    await tx.placementChoice.deleteMany({ where: { placementId } })
-    await tx.placementChoice.createMany({
-      data: rows.map((r) => ({ ...r, placementId })),
-    })
-    return tx.universityPlacement.update({
-      where: { id: placementId },
-      data: advance ? { status: 'CHOICES_RECORDED' } : {},
-      include: placementInclude,
-    })
-  })
-
-  await auditService.log({
-    action: 'placement.choices.set',
-    entityType: 'UniversityPlacement',
-    entityId: placementId,
-    actorUid,
-    actorRole,
-    metadata: { context: { count: rows.length } },
-  })
-
-  logger.info({ event: 'placement.choices.set', placementId, count: rows.length, actorUid })
-  return updated
-}
-
-// ─────────────────────────────────────────────────────────
-//  OUTCOME (record / verify)
-// ─────────────────────────────────────────────────────────
-
-/**
- * Best-effort placement-outcome notification. Resolves the student's contact
- * details and the (catalogue or free-text) destination names, then fires the
- * placement-update email/push. Never throws into the caller — a notification
- * failure must not fail the outcome write (mirrors how other services treat
- * notificationService as fire-and-forget).
- */
-async function notifyPlacementOutcome(placementId: string, statusLabel: string, verified: boolean): Promise<void> {
-  try {
-    const placement = await prisma.universityPlacement.findUnique({
-      where: { id: placementId },
-      select: {
-        placedUniversityId: true,
-        placedProgrammeId: true,
-        placedUniversityName: true,
-        placedProgrammeName: true,
-        student: { select: { firstName: true, lastName: true, email: true, firebaseUid: true } },
-      },
-    })
-    if (!placement || !placement.student.email) return
-
-    const universityName =
-      placement.placedUniversityName ??
-      (placement.placedUniversityId ? findUniversity(placement.placedUniversityId)?.name : undefined)
-    const programmeName =
-      placement.placedProgrammeName ??
-      (placement.placedUniversityId && placement.placedProgrammeId
-        ? findProgram(placement.placedUniversityId, placement.placedProgrammeId)?.name
-        : undefined)
-
-    await notificationService.sendPlacementUpdate({
-      to: placement.student.email,
-      studentUid: placement.student.firebaseUid ?? undefined,
-      data: {
-        studentName: `${placement.student.firstName} ${placement.student.lastName}`,
-        statusLabel,
-        programmeName,
-        universityName,
-        verified,
-      },
-    })
-  } catch (err) {
-    logger.error({ err, placementId }, '[placementService] placement-update notification failed')
-  }
-}
-
-/**
- * Record (or update) a placement outcome. When status names a destination
- * (everything but NOT_PLACED), exactly one of the catalogue pair / free-text
- * pair is persisted; catalogue ids are validated against the constants file.
- * Recording a new outcome always clears any prior verification.
- */
-export async function recordOutcome(
-  placementId: string,
-  input: RecordOutcomeInput,
-  actorUid: string,
-  actorRole: UserRole | string,
-) {
-  const placement = await prisma.universityPlacement.findUnique({
-    where: { id: placementId },
-    select: { id: true },
-  })
-  if (!placement) throw httpError('Placement not found.', 404)
-
-  const isCatalogue = Boolean(input.placedUniversityId && input.placedProgrammeId)
-  if (isCatalogue) {
-    assertCataloguePairResolves(input.placedUniversityId!, input.placedProgrammeId!)
-  }
-
-  // Trusted staff data-entry (admin / high_rank / lower_rank) is authoritative
-  // and appears immediately, exactly like a MANEB import. A STUDENT self-report
-  // stays UNVERIFIED until an approver confirms it — a student can wrongly claim
-  // a place, so their entry is pending-approval by design.
-  const staffWrite = actorRole === 'admin' || actorRole === 'high_rank' || actorRole === 'lower_rank'
-
-  const updated = await prisma.universityPlacement.update({
-    where: { id: placementId },
-    data: {
-      status: input.status,
-      placedUniversityId: input.status === 'NOT_PLACED' ? null : (isCatalogue ? input.placedUniversityId! : null),
-      placedProgrammeId: input.status === 'NOT_PLACED' ? null : (isCatalogue ? input.placedProgrammeId! : null),
-      placedUniversityName: input.status === 'NOT_PLACED' ? null : (isCatalogue ? null : input.placedUniversityName ?? null),
-      placedProgrammeName: input.status === 'NOT_PLACED' ? null : (isCatalogue ? null : input.placedProgrammeName ?? null),
-      notes: input.notes ?? null,
-      recordedByUid: actorUid,
-      // Staff writes are self-verified; a student self-report is pending approval.
-      isVerified:    staffWrite,
-      verifiedByUid: staffWrite ? actorUid : null,
-      verifiedAt:    staffWrite ? new Date() : null,
-    },
-    include: placementInclude,
-  })
-
-  await auditService.log({
-    action: 'placement.outcome.recorded',
-    entityType: 'UniversityPlacement',
-    entityId: placementId,
-    actorUid,
-    actorRole,
-    metadata: {
-      context: {
-        status: input.status,
-        catalogue: isCatalogue,
-      },
-    },
-  })
-
-  logger.info({ event: 'placement.outcome.recorded', placementId, status: input.status, actorUid })
-
-  // A confirmed placement is the milestone worth notifying the student about.
-  if (input.status === 'CONFIRMED') {
-    await notifyPlacementOutcome(placementId, 'Confirmed', updated.isVerified)
-  }
-
-  return updated
-}
-
-/** High-rank verification (or un-verification) of a recorded outcome. */
-export async function verifyOutcome(
-  placementId: string,
-  input: VerifyOutcomeInput,
-  actorUid: string,
-  actorRole: UserRole | string,
-) {
-  const placement = await prisma.universityPlacement.findUnique({
-    where: { id: placementId },
-    select: { id: true, status: true },
-  })
-  if (!placement) throw httpError('Placement not found.', 404)
-  if (placement.status === 'NOT_STARTED' || placement.status === 'ELIGIBILITY_COMPUTED' || placement.status === 'CHOICES_RECORDED') {
-    throw httpError('Cannot verify a placement that has no recorded outcome yet.', 400)
-  }
-
-  const updated = await prisma.universityPlacement.update({
-    where: { id: placementId },
-    data: {
-      isVerified: input.isVerified,
-      verifiedByUid: input.isVerified ? actorUid : null,
-      verifiedAt: input.isVerified ? new Date() : null,
-      ...(input.notes !== undefined ? { notes: input.notes } : {}),
-    },
-    include: placementInclude,
-  })
-
-  await auditService.log({
-    action: input.isVerified ? 'placement.outcome.verified' : 'placement.outcome.unverified',
-    entityType: 'UniversityPlacement',
-    entityId: placementId,
-    actorUid,
-    actorRole,
-    metadata: { context: { isVerified: input.isVerified } },
-  })
-
-  logger.info({ event: 'placement.outcome.verified', placementId, isVerified: input.isVerified, actorUid })
-
-  // Notify the student when the school verifies their placement.
-  if (input.isVerified) {
-    await notifyPlacementOutcome(placementId, 'Verified', true)
-  }
-
-  return updated
-}
-
 // ─────────────────────────────────────────────────────────
 //  CATALOGUE (read-only exposure for the UI's programme pickers)
 // ─────────────────────────────────────────────────────────
@@ -622,13 +530,15 @@ export function getCatalogue() {
 }
 
 // ─────────────────────────────────────────────────────────
-//  ADVISORY QUALIFICATION CHECKER (self-service, pre-placement)
+//  ADVISORY QUALIFICATION CHECKER (all roles, pure calculator)
 // ─────────────────────────────────────────────────────────
-// Pure calculator over MANUALLY-entered MSCE grades — it never reads the
-// student's internal exam marks or their ManebRecord. Before results a student
-// types their expected/mock grades; after results they type their real MSCE
-// grades. Either way the engine only ever sees the numbers the student gave it,
-// which is precisely the "ignore internal exams, use MSCE" rule.
+// Anyone — a graduate checking their own options, or a staff member helping
+// a student who's asking in person — types a set of MSCE grades and gets the
+// programmes that qualify. It never reads internal exam marks or any
+// student's real ManebRecord; the engine only ever sees the numbers passed
+// in here, which is what makes this "ignore internal exams, use MSCE" by
+// construction rather than a rule that has to be remembered elsewhere. Not
+// gated by any placement record or status — it's a standalone calculator.
 export interface AdvisoryResponse {
   top:          ProgramRecommendation[]
   chosen?:      (ProgramRecommendation & { rank: number })[]

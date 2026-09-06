@@ -991,40 +991,42 @@ export interface ApiSystemHealth {
   activeUsersLastHr:  number
   services:           ApiServiceHealth[]
 }
-// ─── PLACEMENTS (R18 — advisory university placement) ────────────────────────
-
-export interface ApiPlacementChoice {
-  id:                     string
-  placementId:            string
-  rank:                   number
-  universityId:           string | null
-  programmeId:            string | null
-  universityNameFreeText: string | null
-  programmeNameFreeText:  string | null
-  isEligible:             boolean
-  score:                  number | null
-  missingSubjects:        string[]
-  createdAt:              string
-}
+// ─── PLACEMENTS (R18 — university placement & advisory, redesigned) ──────────
+// Matches the "Malawi Higher Education Placement & Advisory" reference
+// module's three-status workflow: a placement is either entered directly by
+// staff (immediately CONFIRMED) or claimed by a graduated student
+// (PENDING_APPROVAL until a staff member approves or rejects it).
 
 export interface ApiUniversityPlacement {
   id:                    string
   studentId:             string
   manebRecordId:         string
-  status:                string
-  eligibilityComputedAt: string | null
+  status:                string   // PlacementStatus: PENDING_APPROVAL | CONFIRMED | REJECTED
+  entrySource:           string   // PlacementEntrySource: STAFF_OFFICIAL | STUDENT_CLAIM
+  admissionYear:         string
   placedUniversityId:    string | null
   placedProgrammeId:     string | null
   placedUniversityName:  string | null
   placedProgrammeName:   string | null
-  isVerified:            boolean
+  ncheBatchRef:          string | null
+  claimProofNote:        string | null
+  rejectionReason:       string | null
   recordedByUid:         string | null
   verifiedByUid:         string | null
   verifiedAt:            string | null
   notes:                 string | null
-  choices:               ApiPlacementChoice[]
   createdAt:             string
   updatedAt:             string
+  // Denormalized for staff list views (registry / eligible cohort / claims
+  // queue) so the UI never needs a second round-trip per row.
+  student?: {
+    id:              string
+    firstName:       string
+    lastName:        string
+    otherNames:      string | null
+    registrationNo:  string
+    sex:             string
+  }
 }
 
 export interface ApiPlacementRecommendation {
@@ -1038,12 +1040,19 @@ export interface ApiPlacementRecommendation {
   score:           number
 }
 
-export interface ApiPlacementResponse {
-  placement:       ApiUniversityPlacement | null
-  recommendations: ApiPlacementRecommendation[]
+// The signed-in student's own claim/placement + graduation eligibility.
+export interface ApiMyPlacementResponse {
+  record:            ApiUniversityPlacement | null
+  // True once Student.status === 'GRADUATED' — the Student Claim Portal tab
+  // only ever renders when this is true (below-MSCE / still-enrolled
+  // students never see it).
+  isGraduated:       boolean
+  // True once a certified MSCE ManebRecord exists for this student — a
+  // graduate cannot submit a claim before their MSCE record is certified.
+  hasCertifiedMsce:  boolean
 }
 
-// Self-service qualification checker (pre-placement advisory).
+// Self-service qualification checker (advisory calculator, all roles).
 export interface ApiAdvisoryChosenResult extends ApiPlacementRecommendation {
   rank: number
 }
@@ -1064,29 +1073,25 @@ export interface ApiPublicPlacement {
   academicYear:   string
 }
 
+// A Form 4 / certified-MSCE candidate available to be given an official
+// placement (GET /placements/eligible) — carries their existing placement
+// status, if any, so the Staff Entry picker can show "already placed".
 export interface ApiPlacementEligibleStudent {
-  studentId:      string
-  registrationNo: string
-  firstName:      string
-  lastName:       string
-  manebRecordId:  string
+  studentId:       string
+  registrationNo:  string
+  firstName:       string
+  lastName:        string
+  sex:             string
+  manebRecordId:   string
+  existingStatus:  string | null   // this candidate's current PlacementStatus, if any
 }
 
 export interface ApiPlacementAnalytics {
-  academicYear:      string
-  cohortSize:        number
-  placementsStarted: number
-  byStatus:          Record<string, number>
-  verifiedCount:     number
-  placedCount:       number
-  confirmedCount:    number
-  declinedCount:     number
-  notPlacedCount:    number
-  topUniversities:   Array<{ universityId: string; universityName: string; count: number }>
-}
-
-export interface ApiPlacementBatchResult {
-  cohortSize: number
-  generated:  number
-  errors:     Array<{ studentId: string; error: string }>
+  academicYear:         string
+  cohortSize:            number   // certified-MSCE graduates this year (the whole cohort)
+  confirmedCount:        number   // officially placed (staff entry or approved claim)
+  pendingApprovalCount:  number   // student claims awaiting verification
+  rejectedCount:         number
+  genderBreakdown:       { male: number; female: number }   // among CONFIRMED placements
+  topUniversities:       Array<{ universityId: string; universityName: string; count: number }>
 }

@@ -50,6 +50,7 @@ import { getSchoolBranding } from '@/server/services/notificationService'
 import { renderNewsletterConfirm } from '@/server/templates/emails/newsletter-confirm'
 import { getPublicViewUrl } from '@/lib/storage'
 import * as placementService from '@/server/services/placementService'
+import { getManebCandidateList } from '@/server/services/analyticsService'
 
 export const publicRouter = Router()
 
@@ -416,13 +417,16 @@ publicRouter.post('/contact', async (req, res) => {
 // requires auth — nothing was ever exposed publicly for the landing page's
 // "University Placement" performance card. Mirrors /public/maneb-stats'
 // pattern exactly: same default academic year, same aggregate-and-round shape.
-// "Qualified" = MSCE leavers who reached the placement process (one
-// UniversityPlacement row is created per certified MSCE record); "selected"
-// = those whose placement outcome is PLACED or CONFIRMED.
+// [OVERHAUL] "Qualified" now means the whole certified-MSCE cohort for the
+// year (getManebCandidateList — the reference module's `cohort.length`),
+// not "everyone who has a placement row": under the redesigned workflow a
+// row is only created when staff record an official placement or a student
+// submits a claim, so most of the cohort never gets a row at all. "Selected"
+// = CONFIRMED placements only (a pending or rejected claim never counts).
 
 // GET /public/placements — the actual NCHE selection list: student name,
 // university, programme, status. This IS public information (results are
-// published), so it's deliberately unauthenticated — but only VERIFIED
+// published), so it's deliberately unauthenticated — but only CONFIRMED
 // outcomes are ever returned; a pending student self-claim never appears here.
 publicRouter.get('/placements', async (req, res) => {
   const academicYear = typeof req.query.year === 'string' ? req.query.year : undefined
@@ -433,13 +437,16 @@ publicRouter.get('/placements', async (req, res) => {
 publicRouter.get('/placement-stats', async (req, res) => {
   const year = String(req.query.year ?? '2025/2026')
 
-  const placements = await prisma.universityPlacement.findMany({
-    where:  { manebRecord: { academicYear: year } },
-    select: { status: true },
-  })
+  const [candidates, placements] = await Promise.all([
+    getManebCandidateList(year, 'MSCE'),
+    prisma.universityPlacement.findMany({
+      where:  { manebRecord: { academicYear: year }, status: 'CONFIRMED' },
+      select: { status: true },
+    }),
+  ])
 
-  const qualified = placements.length
-  const selected = placements.filter((p) => p.status === 'PLACED' || p.status === 'CONFIRMED').length
+  const qualified = new Set(candidates.map((c) => c.studentId)).size
+  const selected = placements.length
 
   res.json({
     year,

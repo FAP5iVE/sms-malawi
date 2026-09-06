@@ -1,26 +1,23 @@
 /**
- * [CHANGE TYPE]: NEW FILE
+ * [CHANGE TYPE]: TARGETED EDIT (doc comment only — logic unchanged)
  * [FILE]: apps/web/src/components/placements/PlacementAdvisoryChecker.tsx
- * [PURPOSE]: Self-service, PRE-PLACEMENT qualification calculator for a Form 4
- *   student. The student types their own MSCE subject grades — before results
- *   this is an advisory "what if" entry (their expected grades); once MSCE
- *   results exist and a placement record has been generated, the same tool
- *   still works exactly the same way, taking whatever the student types. It
- *   NEVER reads internal exam marks or the student's ManebRecord — the
+ * [PURPOSE]: Self-service qualification calculator, open to EVERY role
+ *   (placement.view is universal) — a graduate checking their own options,
+ *   or a staff member helping a student who's asking in person, types a set
+ *   of MSCE subject grades and gets back the best-matching programmes. It
+ *   NEVER reads internal exam marks or any student's real ManebRecord — the
  *   calculation is purely over the numbers entered here, which is what makes
- *   this "ignore internal exams, use MSCE" by construction rather than a rule
- *   that has to be remembered elsewhere.
+ *   this "ignore internal exams, use MSCE" by construction rather than a
+ *   rule that has to be remembered elsewhere. Not tied to any placement
+ *   record or status — it is a standalone calculator, not a pre-placement
+ *   step in a pipeline.
  *
  *   Subjects are constrained to the canonical MALAWI_SUBJECTS list (a select,
  *   not free text) and grades to the MSCE 1–9 scale — matching what MANEB
- *   entry already enforces elsewhere in the system. The student may optionally
+ *   entry already enforces elsewhere in the system. Anyone may optionally
  *   pick 3+ specific catalogue programmes to get a direct qualify/not-yet
  *   verdict on each; either way, submitting always also returns the top 10
  *   best-matching programmes across the whole catalogue.
- *
- *   This component is deliberately dumb about placement STATE — the parent
- *   page (my-placement) decides whether to render it at all (it's a
- *   pre-placement tool; the server also enforces the same lock).
  * [DEPENDS ON]: @/hooks/usePlacements (useAdvisoryCheck, usePlacementCatalogue),
  *   @shared/constants/malawi (MALAWI_SUBJECTS), @/components/placements/
  *   PlacementRecommendationCard
@@ -122,15 +119,15 @@ export function PlacementAdvisoryChecker() {
       <div className="bg-brand-navy/5 border border-brand-navy/15 rounded-xl px-4 py-3 text-sm text-body flex items-start gap-2">
         <Calculator className="w-4 h-4 mt-0.5 shrink-0 text-brand-navy" />
         <span>
-          Type your subject grades — your <strong>expected</strong> grades now, or your real <strong>MSCE</strong> grades
-          once you have them. This is advisory only: it never looks at your internal school exam marks, only the
-          numbers you enter here.
+          Type a set of subject grades — expected or real MSCE grades — for yourself or on behalf of a student
+          you are advising. This is advisory only: it never looks at internal school exam marks, only the numbers
+          entered here.
         </span>
       </div>
 
       {/* Grades entry */}
       <section>
-        <h3 className="font-heading font-semibold text-sm mb-3">Your subject grades</h3>
+        <h3 className="font-heading font-semibold text-sm mb-3">Subject grades</h3>
         <div className="space-y-2">
           {grades.map((row, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -265,7 +262,7 @@ export function PlacementAdvisoryChecker() {
         <div className="space-y-6 pt-2">
           {result.chosen && result.chosen.length > 0 && (
             <section>
-              <h3 className="font-heading font-semibold text-sm mb-3">Your chosen programmes</h3>
+              <h3 className="font-heading font-semibold text-sm mb-3">Chosen programmes</h3>
               <div className="grid gap-3 sm:grid-cols-2">
                 {[...result.chosen].sort((a, b) => a.rank - b.rank).map((r) => (
                   <PlacementRecommendationCard key={`${r.universityId}-${r.programmeId}`} recommendation={r} />
@@ -275,7 +272,7 @@ export function PlacementAdvisoryChecker() {
           )}
 
           <section>
-            <h3 className="font-heading font-semibold text-sm mb-3">Top 10 programmes for your grades</h3>
+            <h3 className="font-heading font-semibold text-sm mb-3">Top 10 matching programmes</h3>
             {result.top.length === 0 ? (
               <p className="text-sm text-muted">No matching programmes found for the grades entered.</p>
             ) : (

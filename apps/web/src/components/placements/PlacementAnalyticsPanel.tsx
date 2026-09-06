@@ -1,90 +1,96 @@
 /**
- * [CHANGE TYPE]: NEW FILE
+ * [CHANGE TYPE]: TARGETED EDIT (OVERHAUL)
  * [FILE]: apps/web/src/components/placements/PlacementAnalyticsPanel.tsx
- * [R-PHASE]: R18 — University Placement Module (Phase 11 Blueprint)
- * [PURPOSE]: Cohort university-placement analytics for an academic year — the
- *   panel the Reports page mounts for its Placements tab. Reads the server-
- *   computed getPlacementAnalytics via usePlacementAnalytics and shows the
- *   headline counts (cohort size, started, placed, confirmed, verified) plus
- *   the status breakdown and the most-common destination universities.
- * [DEPENDS ON]: @/hooks/usePlacements (usePlacementAnalytics), @shared/types/api
+ * [PURPOSE]: Cohort placement analytics summary cards, redesigned around the
+ *   reference module's three-status workflow (the old byStatus/verifiedCount/
+ *   declinedCount/notPlacedCount breakdown is gone). Used two places: inside
+ *   the merged Placement Registry & Analytics tab, and standalone on the
+ *   Reports page (high_rank / exam_officer) — same component, same
+ *   `academicYear` prop, so neither caller needed to change.
+ * [DEPENDS ON]: @/hooks/usePlacements (usePlacementAnalytics)
  */
 'use client'
 
 import { usePlacementAnalytics } from '@/hooks/usePlacements'
-import { PlacementStatusBadge } from './PlacementStatusBadge'
+import { GraduationCap, CheckCircle2, Clock, XCircle, Users, Building2 } from 'lucide-react'
 
-function Stat({ label, value }: { label: string; value: number }) {
+interface StatCardProps {
+  icon: React.ElementType
+  label: string
+  value: string | number
+  accent: string
+}
+
+function StatCard({ icon: Icon, label, value, accent }: StatCardProps) {
   return (
-    <div className="rounded-xl border border-base p-4">
-      <p className="text-2xl font-heading font-bold text-brand-navy">{value}</p>
-      <p className="text-xs text-muted mt-0.5">{label}</p>
+    <div className="bg-surface border border-base rounded-xl p-4 flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${accent}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xl font-heading font-bold text-body leading-tight">{value}</p>
+        <p className="text-xs text-muted truncate">{label}</p>
+      </div>
     </div>
   )
 }
 
-export function PlacementAnalyticsPanel({ academicYear }: { academicYear?: string }) {
+export function PlacementAnalyticsPanel({ academicYear }: { academicYear: string }) {
   const { data, isLoading } = usePlacementAnalytics(academicYear)
 
   if (isLoading) {
-    return <div className="text-center py-12 text-muted text-sm animate-pulse">Loading placement analytics…</div>
-  }
-  if (!data) {
-    return <div className="text-center py-12 text-muted text-sm">No placement analytics available.</div>
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-17 rounded-xl bg-page animate-pulse" />
+        ))}
+      </div>
+    )
   }
 
-  const statusEntries = Object.entries(data.byStatus).sort((a, b) => b[1] - a[1])
-  const maxStatus = statusEntries.reduce((m, [, n]) => Math.max(m, n), 0)
+  if (!data) {
+    return <p className="text-sm text-muted">No placement analytics available for {academicYear} yet.</p>
+  }
+
+  const placementRate = data.cohortSize > 0 ? Math.round((data.confirmedCount / data.cohortSize) * 100) : 0
+  const { male, female } = data.genderBreakdown
+  const genderTotal = male + female
+  const femalePct = genderTotal > 0 ? Math.round((female / genderTotal) * 100) : 0
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
-        <Stat label="MSCE cohort" value={data.cohortSize} />
-        <Stat label="Placements started" value={data.placementsStarted} />
-        <Stat label="Placed" value={data.placedCount} />
-        <Stat label="Confirmed" value={data.confirmedCount} />
-        <Stat label="Verified" value={data.verifiedCount} />
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <StatCard icon={GraduationCap} label={`${academicYear} MSCE cohort`} value={data.cohortSize} accent="bg-brand-navy/10 text-brand-navy" />
+        <StatCard icon={CheckCircle2} label="Confirmed placements" value={data.confirmedCount} accent="bg-brand-teal/10 text-brand-teal" />
+        <StatCard icon={Clock} label="Pending approval" value={data.pendingApprovalCount} accent="bg-brand-amber/10 text-brand-amber" />
+        <StatCard icon={XCircle} label="Rejected claims" value={data.rejectedCount} accent="bg-brand-coral/10 text-brand-coral" />
+        <StatCard icon={Users} label="Placement rate" value={`${placementRate}%`} accent="bg-brand-navy/10 text-brand-navy" />
+        <StatCard
+          icon={Users}
+          label="Female share of placements"
+          value={genderTotal > 0 ? `${femalePct}%` : '—'}
+          accent="bg-brand-teal/10 text-brand-teal"
+        />
       </div>
 
-      <section>
-        <h3 className="font-heading font-semibold text-sm mb-3">Status breakdown</h3>
-        {statusEntries.length === 0 ? (
-          <p className="text-sm text-muted">No placements generated yet for {data.academicYear}.</p>
-        ) : (
-          <div className="space-y-2">
-            {statusEntries.map(([status, count]) => (
-              <div key={status} className="flex items-center gap-3">
-                <div className="w-40 shrink-0">
-                  <PlacementStatusBadge status={status} />
-                </div>
-                <div className="flex-1 bg-base rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-brand-teal h-full rounded-full"
-                    style={{ width: maxStatus > 0 ? `${(count / maxStatus) * 100}%` : '0%' }}
-                  />
-                </div>
-                <span className="text-sm font-semibold w-8 text-right">{count}</span>
-              </div>
+      {data.topUniversities.length > 0 && (
+        <div>
+          <h4 className="font-heading font-semibold text-sm mb-2 flex items-center gap-1.5">
+            <Building2 className="w-4 h-4 text-muted" /> Where students were placed
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {data.topUniversities.map((u) => (
+              <span
+                key={u.universityId}
+                className="inline-flex items-center gap-1.5 rounded-full border border-base bg-page px-3 py-1 text-xs font-medium text-body"
+              >
+                {u.universityName}
+                <span className="text-muted">·</span>
+                <span className="font-semibold">{u.count}</span>
+              </span>
             ))}
           </div>
-        )}
-      </section>
-
-      {data.topUniversities.length > 0 && (
-        <section>
-          <h3 className="font-heading font-semibold text-sm mb-3">Most common destinations</h3>
-          <ol className="space-y-1.5">
-            {data.topUniversities.map((u, i) => (
-              <li key={u.universityId} className="flex items-center gap-3 text-sm">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-brand-navy text-white text-xs font-bold shrink-0">
-                  {i + 1}
-                </span>
-                <span className="flex-1">{u.universityName}</span>
-                <span className="text-muted">{u.count}</span>
-              </li>
-            ))}
-          </ol>
-        </section>
+        </div>
       )}
     </div>
   )

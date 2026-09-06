@@ -334,14 +334,15 @@ export type Permission =
   // ── SEARCH (new domain) ──────────────────────────────────
   | 'search.globalSearch'           // Unscoped school-wide lookup across students and staff
 
-  // ── PLACEMENT (R18 — advisory university placement) ──────────
-  | 'placement.viewOwn'             // A student views their own placement + recommendations
-  | 'placement.recordOwnChoice'     // A student records their own ranked choices / self-reports outcome
-  | 'placement.view'                // View any student's placement + the cohort (all roles, incl. student)
+  // ── PLACEMENT (R18 — university placement & advisory, redesigned to match
+  //    the "Malawi Higher Education Placement & Advisory" reference module) ──
+  | 'placement.viewOwn'             // A graduated student views their own claim/placement status
+  | 'placement.recordOwnChoice'     // A graduated student submits their own placement claim (Student Claim Portal)
+  | 'placement.view'                // View the Placement Registry & Analytics tab, and run the MSCE Advisory calculator (ALL roles, incl. student)
   | 'placement.viewAnalytics'       // View cohort placement analytics (all roles, incl. student)
-  | 'placement.manage'              // Generate eligibility, set choices for a student (high_rank, exam_officer)
-  | 'placement.recordOutcome'       // Record a placement outcome for a student (high_rank, exam_officer)
-  | 'placement.verifyOutcome'       // Verify a recorded placement outcome (high_rank only)
+  | 'placement.manage'              // Record an official staff placement entry (Staff Placement Entry tab) (admin, high_rank)
+  | 'placement.recordOutcome'       // Record an official staff placement entry (Staff Placement Entry tab) (also lower_rank — admissions-desk clerks)
+  | 'placement.verifyOutcome'       // Approve or reject a student's claim (Claims Verification Desk) (admin, high_rank only)
 
    // ── MONITORING (Sentry-backed admin dashboard) ─────────
   | 'monitoring.view'                // View the Sentry-backed monitoring dashboard (admin/high_rank only)

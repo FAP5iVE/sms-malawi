@@ -1922,24 +1922,23 @@ export async function getOwnAttendanceSummary(
   }
 }
 
-// ─── PLACEMENT ANALYTICS (R18) ───────────────────────────────────────────────
-// Cohort placement outcomes for an academic year. The eligible cohort is the
-// certified-MSCE candidate pool (getManebCandidateList — the same source the
-// MANEB analytics use, so the two can never disagree about who sat MSCE), and
-// the outcome distribution is read from the UniversityPlacement table. Purely
-// advisory reporting — it never grades and never gates anything.
+// ─── PLACEMENT ANALYTICS (R18, redesigned) ───────────────────────────────────
+// [OVERHAUL] Cohort placement outcomes for an academic year, rebuilt around
+// the reference module's three-status workflow. The eligible cohort is still
+// the certified-MSCE candidate pool (getManebCandidateList — the same source
+// the MANEB analytics use, so the two can never disagree about who sat
+// MSCE); the outcome distribution now reads status/entrySource/gender
+// instead of the old isVerified flag + 7-value status enum. Purely advisory
+// reporting — it never grades and never gates anything.
 
 export interface PlacementAnalytics {
-  academicYear: string
-  cohortSize: number           // certified/received MSCE candidates this year
-  placementsStarted: number    // students with any UniversityPlacement row
-  byStatus: Record<string, number>
-  verifiedCount: number
-  placedCount: number          // PLACED + CONFIRMED
-  confirmedCount: number
-  declinedCount: number
-  notPlacedCount: number
-  topUniversities: Array<{ universityId: string; universityName: string; count: number }>
+  academicYear:         string
+  cohortSize:           number   // certified/received MSCE candidates this year
+  confirmedCount:       number   // officially placed (staff entry or approved claim)
+  pendingApprovalCount: number   // student claims awaiting verification
+  rejectedCount:        number
+  genderBreakdown:      { male: number; female: number }   // among CONFIRMED placements
+  topUniversities:      Array<{ universityId: string; universityName: string; count: number }>
 }
 
 export async function getPlacementAnalytics(academicYear: string): Promise<PlacementAnalytics> {
@@ -1952,31 +1951,30 @@ export async function getPlacementAnalytics(academicYear: string): Promise<Place
     where: { manebRecord: { academicYear, examType: 'MSCE' } },
     select: {
       status: true,
-      isVerified: true,
       placedUniversityId: true,
       placedUniversityName: true,
-      studentId: true,
+      student: { select: { sex: true } },
     },
   })
 
-  const byStatus: Record<string, number> = {}
-  let verifiedCount = 0
   let confirmedCount = 0
-  let declinedCount = 0
-  let notPlacedCount = 0
-  let placedCount = 0
+  let pendingApprovalCount = 0
+  let rejectedCount = 0
+  let male = 0
+  let female = 0
   const uniCounts = new Map<string, number>()
 
   for (const p of placements) {
-    byStatus[p.status] = (byStatus[p.status] ?? 0) + 1
-    if (p.isVerified) verifiedCount += 1
-    if (p.status === 'CONFIRMED') confirmedCount += 1
-    if (p.status === 'DECLINED') declinedCount += 1
-    if (p.status === 'NOT_PLACED') notPlacedCount += 1
-    if (p.status === 'PLACED' || p.status === 'CONFIRMED') {
-      placedCount += 1
+    if (p.status === 'CONFIRMED') {
+      confirmedCount += 1
+      if (p.student.sex === 'MALE') male += 1
+      else if (p.student.sex === 'FEMALE') female += 1
       const key = p.placedUniversityId ?? (p.placedUniversityName ? `free:${p.placedUniversityName}` : 'unknown')
       uniCounts.set(key, (uniCounts.get(key) ?? 0) + 1)
+    } else if (p.status === 'PENDING_APPROVAL') {
+      pendingApprovalCount += 1
+    } else if (p.status === 'REJECTED') {
+      rejectedCount += 1
     }
   }
 
@@ -1995,13 +1993,10 @@ export async function getPlacementAnalytics(academicYear: string): Promise<Place
   return {
     academicYear,
     cohortSize: cohortStudentIds.size,
-    placementsStarted: placements.length,
-    byStatus,
-    verifiedCount,
-    placedCount,
     confirmedCount,
-    declinedCount,
-    notPlacedCount,
+    pendingApprovalCount,
+    rejectedCount,
+    genderBreakdown: { male, female },
     topUniversities,
   }
 }

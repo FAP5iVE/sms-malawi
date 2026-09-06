@@ -1,6 +1,3 @@
--- CreateSchema
-CREATE SCHEMA IF NOT EXISTS "public";
-
 -- CreateEnum
 CREATE TYPE "StudentStatus" AS ENUM ('ACTIVE', 'AWAITING_MANEB_RESULTS', 'GRADUATED', 'ARCHIVED');
 
@@ -8,7 +5,13 @@ CREATE TYPE "StudentStatus" AS ENUM ('ACTIVE', 'AWAITING_MANEB_RESULTS', 'GRADUA
 CREATE TYPE "Sex" AS ENUM ('MALE', 'FEMALE');
 
 -- CreateEnum
+CREATE TYPE "ClassStatus" AS ENUM ('ACTIVE', 'ARCHIVED');
+
+-- CreateEnum
 CREATE TYPE "SubmissionStatus" AS ENUM ('SUBMITTED', 'LATE', 'MISSING');
+
+-- CreateEnum
+CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'ABSENT', 'LATE');
 
 -- CreateEnum
 CREATE TYPE "ApplicationStatus" AS ENUM ('PENDING', 'APPROVED', 'DENIED', 'AWAITING_ADMISSION', 'ADMITTED');
@@ -32,7 +35,7 @@ CREATE TYPE "ExpenseCategory" AS ENUM ('SALARIES', 'UTILITIES', 'MAINTENANCE', '
 CREATE TYPE "ExpenseStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
 
 -- CreateEnum
-CREATE TYPE "PayrollStatus" AS ENUM ('PROCESSING', 'COMPLETED', 'FAILED');
+CREATE TYPE "PayrollStatus" AS ENUM ('PROCESSING', 'PENDING_APPROVAL', 'APPROVED', 'LOCKED', 'COMPLETED', 'FAILED');
 
 -- CreateEnum
 CREATE TYPE "DiscountType" AS ENUM ('PERCENTAGE', 'FIXED_AMOUNT');
@@ -42,6 +45,9 @@ CREATE TYPE "InstallmentStatus" AS ENUM ('PENDING', 'PAID', 'OVERDUE');
 
 -- CreateEnum
 CREATE TYPE "FineStatus" AS ENUM ('PENDING', 'PAID', 'WAIVED');
+
+-- CreateEnum
+CREATE TYPE "AccountType" AS ENUM ('ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE');
 
 -- CreateEnum
 CREATE TYPE "ExamType" AS ENUM ('WEEKLY_TEST', 'ASSIGNMENT', 'QUIZ', 'MIDTERM', 'END_TERM', 'MANEB_JCE', 'MANEB_MSCE');
@@ -54,6 +60,9 @@ CREATE TYPE "ManebExamType" AS ENUM ('JCE', 'MSCE');
 
 -- CreateEnum
 CREATE TYPE "ManebStatus" AS ENUM ('REGISTERED', 'SITTING', 'RESULTS_RECEIVED', 'CERTIFIED');
+
+-- CreateEnum
+CREATE TYPE "StaffRole" AS ENUM ('admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student');
 
 -- CreateEnum
 CREATE TYPE "EmploymentType" AS ENUM ('FULL_TIME', 'PART_TIME', 'CONTRACT', 'TEMPORARY');
@@ -80,10 +89,28 @@ CREATE TYPE "BorrowerType" AS ENUM ('STUDENT', 'STAFF');
 CREATE TYPE "BorrowStatus" AS ENUM ('ACTIVE', 'RETURNED', 'OVERDUE', 'LOST');
 
 -- CreateEnum
+CREATE TYPE "BorrowCondition" AS ENUM ('GOOD', 'DAMAGED', 'LOST');
+
+-- CreateEnum
 CREATE TYPE "DigitalResType" AS ENUM ('EBOOK', 'PAST_PAPER', 'REFERENCE', 'STUDY_GUIDE');
 
 -- CreateEnum
 CREATE TYPE "PendingActionStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED');
+
+-- CreateEnum
+CREATE TYPE "PromotionStatus" AS ENUM ('PREVIEW', 'COMMITTED', 'ROLLED_BACK');
+
+-- CreateEnum
+CREATE TYPE "StaffPromotionStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+
+-- CreateEnum
+CREATE TYPE "ReviewStatus" AS ENUM ('DRAFT', 'SUBMITTED', 'ACKNOWLEDGED');
+
+-- CreateEnum
+CREATE TYPE "PlacementStatus" AS ENUM ('PENDING_APPROVAL', 'CONFIRMED', 'REJECTED');
+
+-- CreateEnum
+CREATE TYPE "PlacementEntrySource" AS ENUM ('STAFF_OFFICIAL', 'STUDENT_CLAIM');
 
 -- CreateTable
 CREATE TABLE "students" (
@@ -91,6 +118,7 @@ CREATE TABLE "students" (
     "registrationNo" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
     "lastName" TEXT NOT NULL,
+    "otherNames" TEXT,
     "dateOfBirth" TIMESTAMP(3) NOT NULL,
     "sex" "Sex" NOT NULL,
     "nationality" TEXT NOT NULL DEFAULT 'Malawian',
@@ -98,6 +126,7 @@ CREATE TABLE "students" (
     "village" TEXT,
     "address" TEXT,
     "phone" TEXT,
+    "email" TEXT,
     "guardianName" TEXT NOT NULL,
     "guardianPhone" TEXT NOT NULL,
     "guardianRelation" TEXT NOT NULL,
@@ -105,6 +134,7 @@ CREATE TABLE "students" (
     "firebaseUid" TEXT,
     "status" "StudentStatus" NOT NULL DEFAULT 'ACTIVE',
     "classId" TEXT,
+    "transcriptKey" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -119,6 +149,7 @@ CREATE TABLE "classes" (
     "stream" TEXT,
     "teacherId" TEXT,
     "room" TEXT,
+    "status" "ClassStatus" NOT NULL DEFAULT 'ACTIVE',
     "academicYear" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -153,6 +184,19 @@ CREATE TABLE "assignment_submissions" (
 );
 
 -- CreateTable
+CREATE TABLE "attendance_records" (
+    "id" TEXT NOT NULL,
+    "studentId" TEXT NOT NULL,
+    "classId" TEXT NOT NULL,
+    "date" TIMESTAMP(3) NOT NULL,
+    "status" "AttendanceStatus" NOT NULL,
+    "markedBy" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "attendance_records_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "lab_bookings" (
     "id" TEXT NOT NULL,
     "classId" TEXT NOT NULL,
@@ -172,6 +216,7 @@ CREATE TABLE "applications" (
     "id" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
     "lastName" TEXT NOT NULL,
+    "otherNames" TEXT,
     "dateOfBirth" TIMESTAMP(3) NOT NULL,
     "sex" "Sex" NOT NULL,
     "nationality" TEXT NOT NULL,
@@ -179,6 +224,14 @@ CREATE TABLE "applications" (
     "village" TEXT,
     "guardianName" TEXT NOT NULL,
     "guardianPhone" TEXT NOT NULL,
+    "email" TEXT,
+    "phone" TEXT,
+    "address" TEXT,
+    "previousSchool" TEXT,
+    "reasonForTransfer" TEXT,
+    "academicYear" TEXT,
+    "guardianEmail" TEXT,
+    "guardianAddress" TEXT,
     "guardianRelation" TEXT NOT NULL,
     "applyingForForm" INTEGER NOT NULL,
     "status" "ApplicationStatus" NOT NULL DEFAULT 'PENDING',
@@ -209,6 +262,20 @@ CREATE TABLE "timetable_slots" (
     "approvedByUid" TEXT,
 
     CONSTRAINT "timetable_slots_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "class_subject_assignments" (
+    "id" TEXT NOT NULL,
+    "classId" TEXT NOT NULL,
+    "subject" TEXT NOT NULL,
+    "teacherUid" TEXT NOT NULL,
+    "academicYear" TEXT NOT NULL,
+    "createdByUid" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "class_subject_assignments_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -262,6 +329,46 @@ CREATE TABLE "invoices" (
 );
 
 -- CreateTable
+CREATE TABLE "invoice_line_items" (
+    "id" TEXT NOT NULL,
+    "invoiceId" TEXT NOT NULL,
+    "feeStructureId" TEXT,
+    "feeName" TEXT NOT NULL,
+    "amount" DECIMAL(12,2) NOT NULL,
+    "paidAmount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "balance" DECIMAL(12,2) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "invoice_line_items_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "payment_allocations" (
+    "id" TEXT NOT NULL,
+    "paymentId" TEXT NOT NULL,
+    "lineItemId" TEXT NOT NULL,
+    "amount" DECIMAL(12,2) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "payment_allocations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "student_credits" (
+    "id" TEXT NOT NULL,
+    "studentId" TEXT NOT NULL,
+    "amount" DECIMAL(12,2) NOT NULL,
+    "originalAmount" DECIMAL(12,2) NOT NULL,
+    "sourcePaymentId" TEXT,
+    "reason" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastAppliedAt" TIMESTAMP(3),
+
+    CONSTRAINT "student_credits_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "payments" (
     "id" TEXT NOT NULL,
     "invoiceId" TEXT NOT NULL,
@@ -302,6 +409,8 @@ CREATE TABLE "expenses" (
     "recordedByUid" TEXT NOT NULL,
     "incurredAt" TIMESTAMP(3) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "paidAt" TIMESTAMP(3),
+    "paidByUid" TEXT,
 
     CONSTRAINT "expenses_pkey" PRIMARY KEY ("id")
 );
@@ -315,6 +424,9 @@ CREATE TABLE "payroll_runs" (
     "totalGross" DECIMAL(12,2) NOT NULL,
     "totalNet" DECIMAL(12,2) NOT NULL,
     "runByUid" TEXT NOT NULL,
+    "submittedByUid" TEXT,
+    "approvedByUid" TEXT,
+    "approvedAt" TIMESTAMP(3),
     "completedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -352,12 +464,28 @@ CREATE TABLE "salary_structures" (
 );
 
 -- CreateTable
+CREATE TABLE "staff_allowances" (
+    "id" TEXT NOT NULL,
+    "staffUid" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "amount" DECIMAL(12,2) NOT NULL,
+    "recurring" BOOLEAN NOT NULL DEFAULT true,
+    "paidMonth" INTEGER,
+    "paidYear" INTEGER,
+    "notes" TEXT,
+    "createdByUid" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "staff_allowances_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "budgets" (
     "id" TEXT NOT NULL,
     "academicYear" TEXT NOT NULL,
     "term" INTEGER,
     "department" TEXT NOT NULL,
-    "category" TEXT NOT NULL,
+    "category" "ExpenseCategory" NOT NULL,
     "description" TEXT,
     "allocated" DECIMAL(12,2) NOT NULL,
     "spent" DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -409,9 +537,11 @@ CREATE TABLE "installments" (
 -- CreateTable
 CREATE TABLE "library_fines" (
     "id" TEXT NOT NULL,
-    "studentId" TEXT NOT NULL,
+    "studentId" TEXT,
+    "staffId" TEXT,
     "bookTitle" TEXT NOT NULL,
-    "firestoreDocId" TEXT NOT NULL,
+    "borrowingId" TEXT,
+    "firestoreDocId" TEXT,
     "amount" DECIMAL(10,2) NOT NULL,
     "reason" TEXT NOT NULL,
     "status" "FineStatus" NOT NULL DEFAULT 'PENDING',
@@ -419,8 +549,86 @@ CREATE TABLE "library_fines" (
     "paidAt" TIMESTAMP(3),
     "clearedByUid" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "waivedAt" TIMESTAMP(3),
+    "waivedByUid" TEXT,
 
     CONSTRAINT "library_fines_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "chart_of_accounts" (
+    "id" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "type" "AccountType" NOT NULL,
+    "category" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "balance" DECIMAL(14,2) NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "chart_of_accounts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "journal_entries" (
+    "id" TEXT NOT NULL,
+    "reference" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "entryDate" TIMESTAMP(3) NOT NULL,
+    "isPosted" BOOLEAN NOT NULL DEFAULT false,
+    "postedAt" TIMESTAMP(3),
+    "postedByUid" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "journal_entries_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "journal_lines" (
+    "id" TEXT NOT NULL,
+    "journalEntryId" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "debit" DECIMAL(14,2) NOT NULL DEFAULT 0,
+    "credit" DECIMAL(14,2) NOT NULL DEFAULT 0,
+    "description" TEXT,
+
+    CONSTRAINT "journal_lines_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "resource_recommendations" (
+    "id" TEXT NOT NULL,
+    "requestedByUid" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "author" TEXT,
+    "isbn" TEXT,
+    "type" TEXT NOT NULL,
+    "subject" TEXT,
+    "reason" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "reviewedByUid" TEXT,
+    "reviewNotes" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "resource_recommendations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "fine_waiver_requests" (
+    "id" TEXT NOT NULL,
+    "fineId" TEXT NOT NULL,
+    "requestedByUid" TEXT NOT NULL,
+    "reason" TEXT NOT NULL,
+    "amount" DECIMAL(10,2) NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "reviewedByUid" TEXT,
+    "reviewNotes" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "fine_waiver_requests_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -481,11 +689,24 @@ CREATE TABLE "term_results" (
     "teacherComment" TEXT,
     "headComment" TEXT,
     "reportCardKey" TEXT,
+    "classPosition" INTEGER NOT NULL DEFAULT 0,
+    "classTotal" INTEGER NOT NULL DEFAULT 0,
     "releasedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "term_results_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "teacher_comments" (
+    "id" TEXT NOT NULL,
+    "termResultId" TEXT NOT NULL,
+    "authorUid" TEXT NOT NULL,
+    "comment" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "teacher_comments_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -516,11 +737,25 @@ CREATE TABLE "maneb_records" (
     "academicYear" TEXT NOT NULL,
     "subjectGrades" JSONB NOT NULL,
     "overallGrade" TEXT,
+    "aggregatePoints" INTEGER,
     "status" "ManebStatus" NOT NULL DEFAULT 'REGISTERED',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "maneb_records_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "gallery_photos" (
+    "id" TEXT NOT NULL,
+    "fileKey" TEXT NOT NULL,
+    "caption" TEXT,
+    "category" TEXT,
+    "displayOrder" INTEGER NOT NULL DEFAULT 0,
+    "uploadedByUid" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "gallery_photos_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -532,7 +767,7 @@ CREATE TABLE "staff_profiles" (
     "lastName" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "phone" TEXT,
-    "role" TEXT NOT NULL,
+    "role" "StaffRole" NOT NULL,
     "department" TEXT NOT NULL,
     "jobTitle" TEXT NOT NULL,
     "employmentType" "EmploymentType" NOT NULL DEFAULT 'FULL_TIME',
@@ -641,6 +876,7 @@ CREATE TABLE "borrowings" (
     "dueDate" TIMESTAMP(3) NOT NULL,
     "returnedAt" TIMESTAMP(3),
     "status" "BorrowStatus" NOT NULL DEFAULT 'ACTIVE',
+    "condition" "BorrowCondition" NOT NULL DEFAULT 'GOOD',
     "fineAmount" DECIMAL(8,2),
     "fineId" TEXT,
     "notes" TEXT,
@@ -673,6 +909,16 @@ CREATE TABLE "digital_resources" (
 );
 
 -- CreateTable
+CREATE TABLE "digital_resource_views" (
+    "id" TEXT NOT NULL,
+    "resourceId" TEXT NOT NULL,
+    "viewerUid" TEXT NOT NULL,
+    "viewedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "digital_resource_views_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "user_notification_prefs" (
     "id" TEXT NOT NULL,
     "uid" TEXT NOT NULL,
@@ -681,6 +927,7 @@ CREATE TABLE "user_notification_prefs" (
     "emailResultRelease" BOOLEAN NOT NULL DEFAULT true,
     "emailContractAlert" BOOLEAN NOT NULL DEFAULT true,
     "emailAnnouncement" BOOLEAN NOT NULL DEFAULT true,
+    "emailPlacementUpdate" BOOLEAN NOT NULL DEFAULT true,
     "smsFeeReminder" BOOLEAN NOT NULL DEFAULT false,
     "smsResultRelease" BOOLEAN NOT NULL DEFAULT false,
     "pushAnnouncement" BOOLEAN NOT NULL DEFAULT true,
@@ -724,6 +971,287 @@ CREATE TABLE "system_settings" (
     CONSTRAINT "system_settings_pkey" PRIMARY KEY ("key")
 );
 
+-- CreateTable
+CREATE TABLE "grading_scales" (
+    "id" TEXT NOT NULL,
+    "examType" TEXT NOT NULL,
+    "grade" TEXT NOT NULL,
+    "minPercent" INTEGER NOT NULL,
+    "maxPercent" INTEGER NOT NULL,
+    "pass" BOOLEAN NOT NULL,
+    "label" TEXT,
+    "displayOrder" INTEGER NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "updatedByUid" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "grading_scales_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "promotion_runs" (
+    "id" TEXT NOT NULL,
+    "academicYear" TEXT NOT NULL,
+    "status" "PromotionStatus" NOT NULL DEFAULT 'PREVIEW',
+    "totalStudents" INTEGER NOT NULL DEFAULT 0,
+    "promoted" INTEGER NOT NULL DEFAULT 0,
+    "repeated" INTEGER NOT NULL DEFAULT 0,
+    "graduated" INTEGER NOT NULL DEFAULT 0,
+    "log" JSONB NOT NULL DEFAULT '[]',
+    "triggeredBy" TEXT NOT NULL,
+    "committedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "promotion_runs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "staff_promotions" (
+    "id" TEXT NOT NULL,
+    "staffId" TEXT NOT NULL,
+    "fromJobTitle" TEXT NOT NULL,
+    "toJobTitle" TEXT NOT NULL,
+    "fromSalaryGrade" TEXT,
+    "toSalaryGrade" TEXT,
+    "fromDepartment" TEXT,
+    "toDepartment" TEXT,
+    "effectiveDate" TIMESTAMP(3) NOT NULL,
+    "status" "StaffPromotionStatus" NOT NULL DEFAULT 'PENDING',
+    "approvedByUid" TEXT,
+    "approvedAt" TIMESTAMP(3),
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "staff_promotions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "performance_reviews" (
+    "id" TEXT NOT NULL,
+    "staffId" TEXT NOT NULL,
+    "reviewerUid" TEXT NOT NULL,
+    "academicYear" TEXT NOT NULL,
+    "term" INTEGER,
+    "overallScore" DECIMAL(5,2) NOT NULL DEFAULT 0,
+    "status" "ReviewStatus" NOT NULL DEFAULT 'DRAFT',
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "performance_reviews_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "performance_review_competencies" (
+    "id" TEXT NOT NULL,
+    "reviewId" TEXT NOT NULL,
+    "competency" TEXT NOT NULL,
+    "score" INTEGER NOT NULL,
+    "comment" TEXT,
+
+    CONSTRAINT "performance_review_competencies_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "malawi_public_holidays" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "date" TIMESTAMP(3) NOT NULL,
+    "year" INTEGER NOT NULL,
+    "isRecurring" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "malawi_public_holidays_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "newsletter_subscribers" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "name" TEXT,
+    "subscribedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "confirmed" BOOLEAN NOT NULL DEFAULT false,
+    "token" TEXT,
+    "unsubscribedAt" TIMESTAMP(3),
+
+    CONSTRAINT "newsletter_subscribers_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "announcements" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "body" TEXT NOT NULL,
+    "category" TEXT,
+    "published" BOOLEAN NOT NULL DEFAULT false,
+    "targetAudience" TEXT NOT NULL DEFAULT 'ALL',
+    "eventDate" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "announcements_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "calendar_events" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "location" TEXT,
+    "startDate" TIMESTAMP(3) NOT NULL,
+    "endDate" TIMESTAMP(3),
+    "category" TEXT NOT NULL,
+    "createdByUid" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "calendar_events_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "university_placements" (
+    "id" TEXT NOT NULL,
+    "studentId" TEXT NOT NULL,
+    "manebRecordId" TEXT NOT NULL,
+    "status" "PlacementStatus" NOT NULL DEFAULT 'PENDING_APPROVAL',
+    "entrySource" "PlacementEntrySource" NOT NULL DEFAULT 'STUDENT_CLAIM',
+    "admissionYear" TEXT NOT NULL DEFAULT '2026',
+    "placedUniversityId" TEXT,
+    "placedProgrammeId" TEXT,
+    "placedUniversityName" TEXT,
+    "placedProgrammeName" TEXT,
+    "ncheBatchRef" TEXT,
+    "claimProofNote" TEXT,
+    "rejectionReason" TEXT,
+    "recordedByUid" TEXT,
+    "verifiedByUid" TEXT,
+    "verifiedAt" TIMESTAMP(3),
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "university_placements_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "SentryIssueCache" (
+    "id" TEXT NOT NULL,
+    "sentryIssueId" TEXT NOT NULL,
+    "shortId" TEXT,
+    "title" TEXT NOT NULL,
+    "culprit" TEXT,
+    "level" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "substatus" TEXT,
+    "issueCategory" TEXT,
+    "isUptimeIssue" BOOLEAN NOT NULL DEFAULT false,
+    "eventCount" INTEGER NOT NULL DEFAULT 0,
+    "userCount" INTEGER NOT NULL DEFAULT 0,
+    "firstSeenAt" TIMESTAMP(3),
+    "lastSeenAt" TIMESTAMP(3),
+    "permalink" TEXT,
+    "raw" JSONB NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SentryIssueCache_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "SentryAlertCache" (
+    "id" TEXT NOT NULL,
+    "sentryAlertId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "enabled" BOOLEAN NOT NULL DEFAULT true,
+    "lastTriggeredAt" TIMESTAMP(3),
+    "raw" JSONB NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SentryAlertCache_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "SentryRollupStat" (
+    "id" TEXT NOT NULL,
+    "metricKey" TEXT NOT NULL,
+    "value" DOUBLE PRECISION NOT NULL,
+    "windowLabel" TEXT NOT NULL,
+    "syncedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "SentryRollupStat_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "MonitoringSyncState" (
+    "syncType" TEXT NOT NULL,
+    "lastSyncedAt" TIMESTAMP(3) NOT NULL,
+    "lastError" TEXT,
+
+    CONSTRAINT "MonitoringSyncState_pkey" PRIMARY KEY ("syncType")
+);
+
+-- CreateTable
+CREATE TABLE "VercelDeploymentCache" (
+    "id" TEXT NOT NULL,
+    "deploymentId" TEXT NOT NULL,
+    "state" TEXT NOT NULL,
+    "target" TEXT,
+    "url" TEXT,
+    "errorMessage" TEXT,
+    "createdAtVercel" TIMESTAMP(3) NOT NULL,
+    "readyAtVercel" TIMESTAMP(3),
+    "syncedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "VercelDeploymentCache_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VercelRuntimeLogCache" (
+    "id" TEXT NOT NULL,
+    "rowId" TEXT NOT NULL,
+    "level" TEXT NOT NULL,
+    "message" TEXT NOT NULL,
+    "source" TEXT,
+    "deploymentId" TEXT,
+    "domain" TEXT,
+    "requestMethod" TEXT,
+    "requestPath" TEXT,
+    "responseStatusCode" INTEGER,
+    "timestamp" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "VercelRuntimeLogCache_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VercelRollupStat" (
+    "id" TEXT NOT NULL,
+    "metricKey" TEXT NOT NULL,
+    "value" DOUBLE PRECISION NOT NULL,
+    "windowLabel" TEXT NOT NULL,
+    "syncedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "VercelRollupStat_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VercelAlertEvent" (
+    "id" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "severity" TEXT NOT NULL DEFAULT 'warning',
+    "message" TEXT NOT NULL,
+    "deploymentId" TEXT,
+    "occurredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "acknowledged" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "VercelAlertEvent_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "students_registrationNo_key" ON "students"("registrationNo");
 
@@ -746,10 +1274,22 @@ CREATE INDEX "classes_form_idx" ON "classes"("form");
 CREATE INDEX "classes_academicYear_idx" ON "classes"("academicYear");
 
 -- CreateIndex
+CREATE INDEX "classes_status_idx" ON "classes"("status");
+
+-- CreateIndex
 CREATE INDEX "assignments_classId_idx" ON "assignments"("classId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "assignment_submissions_assignmentId_studentId_key" ON "assignment_submissions"("assignmentId", "studentId");
+
+-- CreateIndex
+CREATE INDEX "attendance_records_classId_date_idx" ON "attendance_records"("classId", "date");
+
+-- CreateIndex
+CREATE INDEX "attendance_records_studentId_idx" ON "attendance_records"("studentId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "attendance_records_studentId_classId_date_key" ON "attendance_records"("studentId", "classId", "date");
 
 -- CreateIndex
 CREATE INDEX "lab_bookings_date_idx" ON "lab_bookings"("date");
@@ -762,6 +1302,15 @@ CREATE INDEX "timetable_slots_classId_day_idx" ON "timetable_slots"("classId", "
 
 -- CreateIndex
 CREATE INDEX "timetable_slots_academicYear_term_idx" ON "timetable_slots"("academicYear", "term");
+
+-- CreateIndex
+CREATE INDEX "class_subject_assignments_teacherUid_academicYear_idx" ON "class_subject_assignments"("teacherUid", "academicYear");
+
+-- CreateIndex
+CREATE INDEX "class_subject_assignments_classId_academicYear_idx" ON "class_subject_assignments"("classId", "academicYear");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "class_subject_assignments_classId_subject_academicYear_key" ON "class_subject_assignments"("classId", "subject", "academicYear");
 
 -- CreateIndex
 CREATE INDEX "audit_logs_entityType_entityId_idx" ON "audit_logs"("entityType", "entityId");
@@ -785,6 +1334,18 @@ CREATE INDEX "invoices_academicYear_term_idx" ON "invoices"("academicYear", "ter
 CREATE UNIQUE INDEX "invoices_studentId_academicYear_term_key" ON "invoices"("studentId", "academicYear", "term");
 
 -- CreateIndex
+CREATE INDEX "invoice_line_items_invoiceId_idx" ON "invoice_line_items"("invoiceId");
+
+-- CreateIndex
+CREATE INDEX "payment_allocations_paymentId_idx" ON "payment_allocations"("paymentId");
+
+-- CreateIndex
+CREATE INDEX "payment_allocations_lineItemId_idx" ON "payment_allocations"("lineItemId");
+
+-- CreateIndex
+CREATE INDEX "student_credits_studentId_idx" ON "student_credits"("studentId");
+
+-- CreateIndex
 CREATE INDEX "payments_invoiceId_idx" ON "payments"("invoiceId");
 
 -- CreateIndex
@@ -806,6 +1367,12 @@ CREATE INDEX "payslips_payrollRunId_idx" ON "payslips"("payrollRunId");
 CREATE UNIQUE INDEX "salary_structures_staffUid_key" ON "salary_structures"("staffUid");
 
 -- CreateIndex
+CREATE INDEX "staff_allowances_staffUid_idx" ON "staff_allowances"("staffUid");
+
+-- CreateIndex
+CREATE INDEX "staff_allowances_staffUid_recurring_idx" ON "staff_allowances"("staffUid", "recurring");
+
+-- CreateIndex
 CREATE INDEX "budgets_academicYear_idx" ON "budgets"("academicYear");
 
 -- CreateIndex
@@ -818,13 +1385,46 @@ CREATE UNIQUE INDEX "installment_plans_invoiceId_key" ON "installment_plans"("in
 CREATE INDEX "installments_planId_idx" ON "installments"("planId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "library_fines_borrowingId_key" ON "library_fines"("borrowingId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "library_fines_firestoreDocId_key" ON "library_fines"("firestoreDocId");
 
 -- CreateIndex
 CREATE INDEX "library_fines_studentId_idx" ON "library_fines"("studentId");
 
 -- CreateIndex
+CREATE INDEX "library_fines_staffId_idx" ON "library_fines"("staffId");
+
+-- CreateIndex
 CREATE INDEX "library_fines_status_idx" ON "library_fines"("status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "chart_of_accounts_code_key" ON "chart_of_accounts"("code");
+
+-- CreateIndex
+CREATE INDEX "chart_of_accounts_type_isActive_idx" ON "chart_of_accounts"("type", "isActive");
+
+-- CreateIndex
+CREATE INDEX "journal_entries_entryDate_idx" ON "journal_entries"("entryDate");
+
+-- CreateIndex
+CREATE INDEX "journal_entries_isPosted_idx" ON "journal_entries"("isPosted");
+
+-- CreateIndex
+CREATE INDEX "journal_lines_journalEntryId_idx" ON "journal_lines"("journalEntryId");
+
+-- CreateIndex
+CREATE INDEX "journal_lines_accountId_idx" ON "journal_lines"("accountId");
+
+-- CreateIndex
+CREATE INDEX "resource_recommendations_status_idx" ON "resource_recommendations"("status");
+
+-- CreateIndex
+CREATE INDEX "fine_waiver_requests_fineId_idx" ON "fine_waiver_requests"("fineId");
+
+-- CreateIndex
+CREATE INDEX "fine_waiver_requests_status_idx" ON "fine_waiver_requests"("status");
 
 -- CreateIndex
 CREATE INDEX "exams_classId_term_idx" ON "exams"("classId", "term");
@@ -845,6 +1445,9 @@ CREATE INDEX "term_results_classId_academicYear_term_idx" ON "term_results"("cla
 CREATE UNIQUE INDEX "term_results_studentId_academicYear_term_key" ON "term_results"("studentId", "academicYear", "term");
 
 -- CreateIndex
+CREATE INDEX "teacher_comments_termResultId_idx" ON "teacher_comments"("termResultId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "annual_results_studentId_academicYear_key" ON "annual_results"("studentId", "academicYear");
 
 -- CreateIndex
@@ -852,6 +1455,12 @@ CREATE UNIQUE INDEX "maneb_records_candidateNo_key" ON "maneb_records"("candidat
 
 -- CreateIndex
 CREATE INDEX "maneb_records_studentId_idx" ON "maneb_records"("studentId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "gallery_photos_fileKey_key" ON "gallery_photos"("fileKey");
+
+-- CreateIndex
+CREATE INDEX "gallery_photos_displayOrder_idx" ON "gallery_photos"("displayOrder");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "staff_profiles_uid_key" ON "staff_profiles"("uid");
@@ -914,6 +1523,9 @@ CREATE INDEX "digital_resources_type_approved_idx" ON "digital_resources"("type"
 CREATE INDEX "digital_resources_form_subject_idx" ON "digital_resources"("form", "subject");
 
 -- CreateIndex
+CREATE INDEX "digital_resource_views_resourceId_idx" ON "digital_resource_views"("resourceId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "user_notification_prefs_uid_key" ON "user_notification_prefs"("uid");
 
 -- CreateIndex
@@ -931,6 +1543,99 @@ CREATE INDEX "pending_actions_createdAt_idx" ON "pending_actions"("createdAt");
 -- CreateIndex
 CREATE INDEX "system_settings_category_idx" ON "system_settings"("category");
 
+-- CreateIndex
+CREATE INDEX "grading_scales_examType_isActive_idx" ON "grading_scales"("examType", "isActive");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "grading_scales_examType_grade_key" ON "grading_scales"("examType", "grade");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "promotion_runs_academicYear_key" ON "promotion_runs"("academicYear");
+
+-- CreateIndex
+CREATE INDEX "staff_promotions_staffId_status_idx" ON "staff_promotions"("staffId", "status");
+
+-- CreateIndex
+CREATE INDEX "performance_reviews_staffId_status_idx" ON "performance_reviews"("staffId", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "performance_reviews_staffId_academicYear_term_key" ON "performance_reviews"("staffId", "academicYear", "term");
+
+-- CreateIndex
+CREATE INDEX "performance_review_competencies_reviewId_idx" ON "performance_review_competencies"("reviewId");
+
+-- CreateIndex
+CREATE INDEX "malawi_public_holidays_year_idx" ON "malawi_public_holidays"("year");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "malawi_public_holidays_date_key" ON "malawi_public_holidays"("date");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "newsletter_subscribers_email_key" ON "newsletter_subscribers"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "newsletter_subscribers_token_key" ON "newsletter_subscribers"("token");
+
+-- CreateIndex
+CREATE INDEX "newsletter_subscribers_email_idx" ON "newsletter_subscribers"("email");
+
+-- CreateIndex
+CREATE INDEX "announcements_published_idx" ON "announcements"("published");
+
+-- CreateIndex
+CREATE INDEX "announcements_eventDate_idx" ON "announcements"("eventDate");
+
+-- CreateIndex
+CREATE INDEX "calendar_events_startDate_idx" ON "calendar_events"("startDate");
+
+-- CreateIndex
+CREATE INDEX "calendar_events_createdByUid_idx" ON "calendar_events"("createdByUid");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "university_placements_manebRecordId_key" ON "university_placements"("manebRecordId");
+
+-- CreateIndex
+CREATE INDEX "university_placements_studentId_status_idx" ON "university_placements"("studentId", "status");
+
+-- CreateIndex
+CREATE INDEX "university_placements_status_entrySource_idx" ON "university_placements"("status", "entrySource");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SentryIssueCache_sentryIssueId_key" ON "SentryIssueCache"("sentryIssueId");
+
+-- CreateIndex
+CREATE INDEX "SentryIssueCache_status_level_idx" ON "SentryIssueCache"("status", "level");
+
+-- CreateIndex
+CREATE INDEX "SentryIssueCache_lastSeenAt_idx" ON "SentryIssueCache"("lastSeenAt");
+
+-- CreateIndex
+CREATE INDEX "SentryIssueCache_isUptimeIssue_idx" ON "SentryIssueCache"("isUptimeIssue");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SentryAlertCache_sentryAlertId_key" ON "SentryAlertCache"("sentryAlertId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SentryRollupStat_metricKey_key" ON "SentryRollupStat"("metricKey");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VercelDeploymentCache_deploymentId_key" ON "VercelDeploymentCache"("deploymentId");
+
+-- CreateIndex
+CREATE INDEX "VercelDeploymentCache_state_idx" ON "VercelDeploymentCache"("state");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VercelRuntimeLogCache_rowId_key" ON "VercelRuntimeLogCache"("rowId");
+
+-- CreateIndex
+CREATE INDEX "VercelRuntimeLogCache_level_timestamp_idx" ON "VercelRuntimeLogCache"("level", "timestamp");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VercelRollupStat_metricKey_key" ON "VercelRollupStat"("metricKey");
+
+-- CreateIndex
+CREATE INDEX "VercelAlertEvent_kind_acknowledged_idx" ON "VercelAlertEvent"("kind", "acknowledged");
+
 -- AddForeignKey
 ALTER TABLE "students" ADD CONSTRAINT "students_classId_fkey" FOREIGN KEY ("classId") REFERENCES "classes"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -941,10 +1646,34 @@ ALTER TABLE "assignments" ADD CONSTRAINT "assignments_classId_fkey" FOREIGN KEY 
 ALTER TABLE "assignment_submissions" ADD CONSTRAINT "assignment_submissions_assignmentId_fkey" FOREIGN KEY ("assignmentId") REFERENCES "assignments"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "attendance_records" ADD CONSTRAINT "attendance_records_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "students"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "attendance_records" ADD CONSTRAINT "attendance_records_classId_fkey" FOREIGN KEY ("classId") REFERENCES "classes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "lab_bookings" ADD CONSTRAINT "lab_bookings_classId_fkey" FOREIGN KEY ("classId") REFERENCES "classes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "timetable_slots" ADD CONSTRAINT "timetable_slots_classId_fkey" FOREIGN KEY ("classId") REFERENCES "classes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "class_subject_assignments" ADD CONSTRAINT "class_subject_assignments_classId_fkey" FOREIGN KEY ("classId") REFERENCES "classes"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "students"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "invoice_line_items" ADD CONSTRAINT "invoice_line_items_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "invoices"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payment_allocations" ADD CONSTRAINT "payment_allocations_paymentId_fkey" FOREIGN KEY ("paymentId") REFERENCES "payments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "payment_allocations" ADD CONSTRAINT "payment_allocations_lineItemId_fkey" FOREIGN KEY ("lineItemId") REFERENCES "invoice_line_items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "student_credits" ADD CONSTRAINT "student_credits_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "students"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "payments" ADD CONSTRAINT "payments_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "invoices"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -959,10 +1688,25 @@ ALTER TABLE "payslips" ADD CONSTRAINT "payslips_payrollRunId_fkey" FOREIGN KEY (
 ALTER TABLE "installments" ADD CONSTRAINT "installments_planId_fkey" FOREIGN KEY ("planId") REFERENCES "installment_plans"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "library_fines" ADD CONSTRAINT "library_fines_borrowingId_fkey" FOREIGN KEY ("borrowingId") REFERENCES "borrowings"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "journal_lines" ADD CONSTRAINT "journal_lines_journalEntryId_fkey" FOREIGN KEY ("journalEntryId") REFERENCES "journal_entries"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "journal_lines" ADD CONSTRAINT "journal_lines_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "chart_of_accounts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "fine_waiver_requests" ADD CONSTRAINT "fine_waiver_requests_fineId_fkey" FOREIGN KEY ("fineId") REFERENCES "library_fines"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "exams" ADD CONSTRAINT "exams_classId_fkey" FOREIGN KEY ("classId") REFERENCES "classes"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "exam_marks" ADD CONSTRAINT "exam_marks_examId_fkey" FOREIGN KEY ("examId") REFERENCES "exams"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "teacher_comments" ADD CONSTRAINT "teacher_comments_termResultId_fkey" FOREIGN KEY ("termResultId") REFERENCES "term_results"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "leave_balances" ADD CONSTRAINT "leave_balances_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "staff_profiles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -985,3 +1729,14 @@ ALTER TABLE "borrowings" ADD CONSTRAINT "borrowings_studentId_fkey" FOREIGN KEY 
 -- AddForeignKey
 ALTER TABLE "borrowings" ADD CONSTRAINT "borrowings_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "staff_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+-- AddForeignKey
+ALTER TABLE "digital_resource_views" ADD CONSTRAINT "digital_resource_views_resourceId_fkey" FOREIGN KEY ("resourceId") REFERENCES "digital_resources"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "performance_review_competencies" ADD CONSTRAINT "performance_review_competencies_reviewId_fkey" FOREIGN KEY ("reviewId") REFERENCES "performance_reviews"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "university_placements" ADD CONSTRAINT "university_placements_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "students"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "university_placements" ADD CONSTRAINT "university_placements_manebRecordId_fkey" FOREIGN KEY ("manebRecordId") REFERENCES "maneb_records"("id") ON DELETE CASCADE ON UPDATE CASCADE;

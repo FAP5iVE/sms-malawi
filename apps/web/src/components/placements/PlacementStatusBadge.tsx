@@ -1,30 +1,49 @@
 /**
- * [CHANGE TYPE]: NEW FILE
+ * [CHANGE TYPE]: TARGETED EDIT (OVERHAUL)
  * [FILE]: apps/web/src/components/placements/PlacementStatusBadge.tsx
- * [R-PHASE]: R18 — University Placement Module (Phase 11 Blueprint)
- * [PURPOSE]: A single, shared status pill for a UniversityPlacement.status
- *   value, so every placement surface (student view, cohort table, outcome
- *   form) renders the seven statuses identically. Colours follow the project's
- *   token palette (brand-navy/teal, amber for in-progress, muted for inert).
- * [DEPENDS ON]: none
+ * [PURPOSE]: A small colored pill for a PlacementStatus value. Redesigned
+ *   for the reference module's three-status workflow (PENDING_APPROVAL,
+ *   CONFIRMED, REJECTED) — the old seven-value pipeline states
+ *   (NOT_STARTED/ELIGIBILITY_COMPUTED/CHOICES_RECORDED/PLACED/DECLINED/
+ *   NOT_PLACED) no longer exist.
+ * [DEPENDS ON]: lucide-react
  */
-'use client'
+import { Clock, CheckCircle2, XCircle } from 'lucide-react'
 
-const STATUS_STYLES: Record<string, { label: string; className: string }> = {
-  NOT_STARTED:          { label: 'Not started',          className: 'bg-base text-muted' },
-  ELIGIBILITY_COMPUTED: { label: 'Eligibility ready',    className: 'bg-brand-teal/15 text-brand-teal' },
-  CHOICES_RECORDED:     { label: 'Choices recorded',     className: 'bg-amber-100 text-amber-800' },
-  PLACED:               { label: 'Placed',               className: 'bg-brand-navy/15 text-brand-navy' },
-  CONFIRMED:            { label: 'Confirmed',            className: 'bg-green-100 text-green-800' },
-  DECLINED:             { label: 'Declined',             className: 'bg-rose-100 text-rose-700' },
-  NOT_PLACED:           { label: 'Not placed',           className: 'bg-base text-muted' },
+type PlacementStatusValue = 'PENDING_APPROVAL' | 'CONFIRMED' | 'REJECTED'
+
+const STATUS_META: Record<PlacementStatusValue, { label: string; className: string; Icon: typeof Clock }> = {
+  PENDING_APPROVAL: {
+    label: 'Pending Approval',
+    className: 'bg-brand-amber/10 text-brand-amber border-brand-amber/25',
+    Icon: Clock,
+  },
+  CONFIRMED: {
+    label: 'Confirmed',
+    className: 'bg-brand-teal/10 text-brand-teal border-brand-teal/25',
+    Icon: CheckCircle2,
+  },
+  REJECTED: {
+    label: 'Rejected',
+    className: 'bg-brand-coral/10 text-brand-coral border-brand-coral/25',
+    Icon: XCircle,
+  },
 }
 
 export function PlacementStatusBadge({ status }: { status: string }) {
-  const style = STATUS_STYLES[status] ?? { label: status, className: 'bg-base text-muted' }
+  const meta = STATUS_META[status as PlacementStatusValue] ?? {
+    label: status,
+    className: 'bg-muted/10 text-muted border-muted/25',
+    Icon: Clock,
+  }
+  const { label, className, Icon } = meta
+
   return (
-    <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded-full ${style.className}`}>
-      {style.label}
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${className}`}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {label}
     </span>
   )
 }

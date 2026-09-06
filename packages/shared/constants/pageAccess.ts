@@ -60,12 +60,14 @@ export const PAGE_ACCESS: Record<string, readonly UserRole[]> = {
   '/applications': ['admin', 'high_rank', 'lower_rank'],
   '/user-management': ['admin'],
   '/settings': ALL_ROLES,
-  // R18 — University Placement Module. The cohort console is viewable by every
-  // role (placement.view / placement.viewAnalytics are universal; management
-  // controls inside are permission-gated). The student self-service page is
-  // student-only.
+  // R18 — University Placement Module. [OVERHAUL] The old two-page split
+  // (universal cohort console + a student-only /my-placement page) is gone —
+  // everything now lives on one page with internal tabs, each tab gated by
+  // its own permission (Registry & Analytics and MSCE Advisory are universal;
+  // Staff Entry, Claims Verification and the Student Claim Portal are
+  // permission/graduation-gated inside the page itself). /my-placement no
+  // longer exists; every former reference to it now points here.
   '/placements': ALL_ROLES,
-  '/my-placement': ['student'],
   // Monitoring — infra/error visibility, kept to the top two administrative
   // tiers only (same tier as /user-management), unlike /reports' ALL_ROLES:
   // error/outage data can incidentally reference internal identifiers or

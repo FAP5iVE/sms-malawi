@@ -1,178 +1,158 @@
 /**
- * [CHANGE TYPE]: NEW FILE
- * [FILE]: apps/web/src/hooks/usePlacements.ts
- * [R-PHASE]: R18 — University Placement Module (Phase 11 Blueprint)
- * [PURPOSE]: TanStack Query hooks for the placement domain, all pointed at the
- *   canonical apiFetch/queryKeys singleton. Every mutation carries both an
- *   onSuccess (invalidating the relevant queries) and an onError handler, per
- *   the frontend Rule 4 missing-onError defect this project tracks.
- * [DEPENDS ON]: W/lib/api-client.ts, @shared/types/api, @shared/schemas/placement
+ * apps/web/src/hooks/usePlacements.ts
+ *
+ * [CHANGE TYPE]: MAJOR REWRITE (OVERHAUL)
+ * [R-PHASE]: R18 — University Placement Module, redesigned against the
+ *   "Malawi Higher Education Placement & Advisory" reference module.
+ * [PURPOSE]: React Query hooks over the redesigned /placements/* surface.
+ *   The old cohort/student/generate/batch-generate/set-choices/verify hooks
+ *   are gone with the ranked-choices pipeline they served; replaced by
+ *   hooks matching the reference module's five tabs (Student Claim Portal,
+ *   MSCE Advisory, Registry & Analytics, Staff Entry, Claims Verification).
+ * [DEPENDS ON]: @/lib/api-client (apiFetch, queryKeys), @tanstack/react-query,
+ *   @shared/types/api, @shared/schemas/placement
  */
-'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiFetch, queryKeys } from '@/lib/api-client'
 import type {
-  ApiPlacementResponse,
+  ApiMyPlacementResponse,
   ApiUniversityPlacement,
   ApiPlacementEligibleStudent,
   ApiPlacementAnalytics,
-  ApiPlacementBatchResult,
   ApiAdvisoryResponse,
 } from '@shared/types/api'
+import type { StaffPlacementEntryInput, StudentClaimInput, RejectClaimInput, AdvisoryCheckInput } from '@shared/schemas/placement'
 import type { University } from '@shared/constants/universities'
-import type { SetChoicesInput, RecordOutcomeInput, VerifyOutcomeInput, AdvisoryCheckInput } from '@shared/schemas/placement'
+import { apiFetch, queryKeys } from '@/lib/api-client'
 
-// ── Reads ────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+//  STUDENT CLAIM PORTAL
+// ─────────────────────────────────────────────────────────
 
-/** The signed-in student's own placement + fresh recommendations. */
-export function useMyPlacement() {
+export function useMyPlacement(enabled: boolean = true) {
   return useQuery({
     queryKey: queryKeys.placements.me(),
-    queryFn:  () => apiFetch<ApiPlacementResponse>('/placements/me'),
+    queryFn:  () => apiFetch<ApiMyPlacementResponse>('/placements/me'),
+    enabled,
   })
 }
 
-/** A specific student's placement + recommendations (staff view). */
-export function useStudentPlacement(studentId: string | undefined) {
+export function useSubmitPlacementClaim() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: StudentClaimInput) =>
+      apiFetch<ApiUniversityPlacement>('/placements/me/claim', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.placements.me() })
+      qc.invalidateQueries({ queryKey: ['placements', 'registry'] })
+      qc.invalidateQueries({ queryKey: ['placements', 'analytics'] })
+    },
+  })
+}
+
+// ─────────────────────────────────────────────────────────
+//  MSCE ADVISORY — self-service calculator, all roles
+// ─────────────────────────────────────────────────────────
+
+export function useAdvisoryCheck() {
+  return useMutation({
+    mutationFn: (data: AdvisoryCheckInput) =>
+      apiFetch<ApiAdvisoryResponse>('/placements/advisory', { method: 'POST', body: JSON.stringify(data) }),
+  })
+}
+
+// ─────────────────────────────────────────────────────────
+//  PLACEMENT REGISTRY & ANALYTICS — everyone
+// ─────────────────────────────────────────────────────────
+
+export function usePlacementRegistry(academicYear?: string) {
   return useQuery({
-    queryKey: queryKeys.placements.student(studentId ?? ''),
-    queryFn:  () => apiFetch<ApiPlacementResponse>(`/placements/${studentId}`),
-    enabled:  !!studentId,
+    queryKey: queryKeys.placements.registry(academicYear),
+    queryFn:  () =>
+      apiFetch<ApiUniversityPlacement[]>(
+        `/placements/registry${academicYear ? `?academicYear=${academicYear}` : ''}`,
+      ),
   })
 }
 
-/** The whole placement cohort, optionally filtered by status. */
-export function usePlacementCohort(status?: string) {
-  return useQuery({
-    queryKey: queryKeys.placements.cohort(status),
-    queryFn:  () => apiFetch<ApiUniversityPlacement[]>(status ? `/placements/cohort?status=${status}` : '/placements/cohort'),
-  })
-}
-
-/** The university/programme catalogue, for pickers. */
-export function usePlacementCatalogue() {
-  return useQuery({
-    queryKey: queryKeys.placements.catalogue(),
-    queryFn:  () => apiFetch<University[]>('/placements/catalogue'),
-    staleTime: 1000 * 60 * 60, // catalogue is a static constants file
-  })
-}
-
-
-/** Form 4 / certified-MSCE students eligible to be placed for a year. */
-export function usePlacementEligible(academicYear: string | undefined) {
-  return useQuery({
-    queryKey: queryKeys.placements.eligible(academicYear ?? ''),
-    queryFn:  () => apiFetch<ApiPlacementEligibleStudent[]>(`/placements/eligible?academicYear=${academicYear}`),
-    enabled:  !!academicYear,
-  })
-}
-
-/** Cohort placement analytics for a year (defaults to current on server). */
 export function usePlacementAnalytics(academicYear?: string) {
   return useQuery({
     queryKey: queryKeys.placements.analytics(academicYear),
     queryFn:  () =>
       apiFetch<ApiPlacementAnalytics>(
-        academicYear ? `/analytics/placements?academicYear=${academicYear}` : '/analytics/placements',
+        `/analytics/placements${academicYear ? `?academicYear=${academicYear}` : ''}`,
       ),
+    enabled: Boolean(academicYear),
   })
 }
 
-// ── Mutations ────────────────────────────────────────────
+export function usePlacementCatalogue() {
+  return useQuery({
+    queryKey: queryKeys.placements.catalogue(),
+    queryFn:  () => apiFetch<University[]>('/placements/catalogue'),
+    staleTime: 60 * 60 * 1000, // the catalogue barely changes — cache for an hour
+  })
+}
 
-/** Student self-records their own ranked choices. */
-export function useSetMyChoices() {
+// ─────────────────────────────────────────────────────────
+//  STAFF PLACEMENT ENTRY
+// ─────────────────────────────────────────────────────────
+
+export function useEligibleCohort(academicYear: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.placements.eligible(academicYear ?? ''),
+    queryFn:  () => apiFetch<ApiPlacementEligibleStudent[]>(`/placements/eligible?academicYear=${academicYear}`),
+    enabled:  Boolean(academicYear),
+  })
+}
+
+export function useRecordStaffPlacement(academicYear?: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (input: SetChoicesInput) =>
-      apiFetch<ApiUniversityPlacement>('/placements/me/choices', { method: 'PATCH', body: JSON.stringify(input) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.placements.me() }),
-    onError:   (err) => console.error('Failed to save placement choices', err),
-  })
-}
-
-/** Student self-reports their own outcome. */
-export function useRecordMyOutcome() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (input: RecordOutcomeInput) =>
-      apiFetch<ApiUniversityPlacement>('/placements/me/outcome', { method: 'PATCH', body: JSON.stringify(input) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.placements.me() }),
-    onError:   (err) => console.error('Failed to record placement outcome', err),
-  })
-}
-
-/** Self-service qualification checker — pure calculator, never mutates the
-    student's real placement record. Locked server-side after PLACED/CONFIRMED. */
-export function useAdvisoryCheck() {
-  return useMutation({
-    mutationFn: (input: AdvisoryCheckInput) =>
-      apiFetch<ApiAdvisoryResponse>('/placements/advisory', { method: 'POST', body: JSON.stringify(input) }),
-    onError: (err) => console.error('Advisory check failed', err),
-  })
-}
-
-/** Staff (re)generate eligibility for one student. */
-export function useGeneratePlacement() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ studentId, academicYear }: { studentId: string; academicYear: string }) =>
-      apiFetch<ApiPlacementResponse>(`/placements/${studentId}/generate`, {
-        method: 'POST',
-        body: JSON.stringify({ academicYear }),
-      }),
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: queryKeys.placements.student(vars.studentId) })
-      qc.invalidateQueries({ queryKey: queryKeys.placements.all() })
+    mutationFn: (data: StaffPlacementEntryInput) =>
+      apiFetch<ApiUniversityPlacement>('/placements/staff-entry', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.placements.eligible(academicYear ?? '') })
+      qc.invalidateQueries({ queryKey: ['placements', 'registry'] })
+      qc.invalidateQueries({ queryKey: ['placements', 'analytics'] })
     },
-    onError: (err) => console.error('Failed to generate placement eligibility', err),
   })
 }
 
-/** Staff batch-generate eligibility for a whole cohort. */
-export function useBatchGeneratePlacements() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (academicYear: string) =>
-      apiFetch<ApiPlacementBatchResult>('/placements/batch-generate', {
-        method: 'POST',
-        body: JSON.stringify({ academicYear }),
-      }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.placements.all() }),
-    onError:   (err) => console.error('Failed to batch-generate placements', err),
+// ─────────────────────────────────────────────────────────
+//  CLAIMS VERIFICATION DESK
+// ─────────────────────────────────────────────────────────
+
+export function usePlacementsQueue(academicYear?: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: queryKeys.placements.queue(academicYear),
+    queryFn:  () =>
+      apiFetch<ApiUniversityPlacement[]>(
+        `/placements/queue${academicYear ? `?academicYear=${academicYear}` : ''}`,
+      ),
+    enabled,
   })
 }
 
-/** Staff set a placement's ranked choices. */
-export function useSetPlacementChoices() {
+function invalidateAfterVerification(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['placements', 'queue'] })
+  qc.invalidateQueries({ queryKey: ['placements', 'registry'] })
+  qc.invalidateQueries({ queryKey: ['placements', 'eligible'] })
+  qc.invalidateQueries({ queryKey: ['placements', 'analytics'] })
+}
+
+export function useApprovePlacementClaim() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: SetChoicesInput }) =>
-      apiFetch<ApiUniversityPlacement>(`/placements/${id}/choices`, { method: 'PATCH', body: JSON.stringify(input) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.placements.all() }),
-    onError:   (err) => console.error('Failed to set placement choices', err),
+    mutationFn: (id: string) => apiFetch<ApiUniversityPlacement>(`/placements/${id}/approve`, { method: 'PATCH' }),
+    onSuccess:  () => invalidateAfterVerification(qc),
   })
 }
 
-/** Staff record a placement outcome. */
-export function useRecordPlacementOutcome() {
+export function useRejectPlacementClaim() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: RecordOutcomeInput }) =>
-      apiFetch<ApiUniversityPlacement>(`/placements/${id}/outcome`, { method: 'PATCH', body: JSON.stringify(input) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.placements.all() }),
-    onError:   (err) => console.error('Failed to record placement outcome', err),
-  })
-}
-
-/** High-rank verify a recorded outcome. */
-export function useVerifyPlacementOutcome() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: VerifyOutcomeInput }) =>
-      apiFetch<ApiUniversityPlacement>(`/placements/${id}/verify`, { method: 'PATCH', body: JSON.stringify(input) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.placements.all() }),
-    onError:   (err) => console.error('Failed to verify placement outcome', err),
+    mutationFn: ({ id, ...data }: RejectClaimInput & { id: string }) =>
+      apiFetch<ApiUniversityPlacement>(`/placements/${id}/reject`, { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: () => invalidateAfterVerification(qc),
   })
 }

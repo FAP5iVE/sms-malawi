@@ -1425,56 +1425,51 @@ model CalendarEvent {
 
 // ─── UNIVERSITY PLACEMENT ──────────
 enum PlacementStatus {
-  NOT_STARTED             // no eligibility computed yet
-  ELIGIBILITY_COMPUTED    // recommendations generated, no choices recorded
-  CHOICES_RECORDED        // student/staff recorded ranked choices
-  PLACED                  // an outcome was recorded (self-reported or staff)
-  CONFIRMED               // student confirmed they are taking the place
-  DECLINED                // student declined the place
-  NOT_PLACED              // cycle closed with no placement
+  PENDING_APPROVAL        // a student claim awaiting staff verification
+  CONFIRMED               // an official, verified placement (staff entry or approved claim)
+  REJECTED                // a student claim the school rejected (see rejectionReason)
 }
 
+enum PlacementEntrySource {
+  STAFF_OFFICIAL          // entered directly by admissions staff from the NCHE gazette
+  STUDENT_CLAIM           // self-reported by the graduate, pending verification
+}
+
+// [OVERHAUL] Redesigned to match the "Malawi Higher Education Placement &
+// Advisory" reference module: a placement is either entered directly by
+// staff (immediately CONFIRMED) or claimed by a graduated student
+// (PENDING_APPROVAL until a staff member with placement.verifyOutcome
+// approves or rejects it). The old ranked-choices pre-results pipeline
+// (PlacementChoice, NOT_STARTED/ELIGIBILITY_COMPUTED/CHOICES_RECORDED) is
+// gone -- it modelled a different workflow the reference module does not
+// have. Still keyed 1:1 on a certified MSCE ManebRecord (manebRecordId),
+// preserving the exam-module integration exactly as before.
 model UniversityPlacement {
-  id                   String          @id @default(cuid())
+  id                   String               @id @default(cuid())
   studentId            String
-  student              Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  manebRecordId        String          @unique
-  manebRecord          ManebRecord     @relation(fields: [manebRecordId], references: [id], onDelete: Cascade)
-  status               PlacementStatus @default(NOT_STARTED)
-  eligibilityComputedAt DateTime?
+  student              Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  manebRecordId        String               @unique
+  manebRecord          ManebRecord          @relation(fields: [manebRecordId], references: [id], onDelete: Cascade)
+  status               PlacementStatus      @default(PENDING_APPROVAL)
+  entrySource          PlacementEntrySource @default(STUDENT_CLAIM)
+  admissionYear        String               @default("2026")// e.g. "2026" -- the intake year, distinct from the MSCE academicYear
   placedUniversityId   String?
   placedProgrammeId    String?
-  placedUniversityName String?         // free-text (private/foreign, or off-catalogue)
-  placedProgrammeName  String?         // free-text
-  isVerified           Boolean         @default(false)
-  recordedByUid        String?         // Firebase UID of student (self-report) or staff
-  verifiedByUid        String?         // Firebase UID of high_rank verifier
+  placedUniversityName String?              // free-text (private/foreign, or off-catalogue)
+  placedProgrammeName  String?              // free-text
+  ncheBatchRef         String?              // gazette / NCHE selection-batch citation
+  claimProofNote       String?              // evidence the student cited when self-claiming
+  rejectionReason      String?              // set when status = REJECTED
+  recordedByUid        String?              // Firebase UID of staff (official entry) or the student (claim)
+  verifiedByUid        String?              // Firebase UID of the staff member who approved/rejected
   verifiedAt           DateTime?
-  notes                String?
-  choices              PlacementChoice[]
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
+  notes                String?              // internal staff notes
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
 
   @@index([studentId, status])
+  @@index([status, entrySource])
   @@map("university_placements")
-}
-
-model PlacementChoice {
-  id                    String              @id @default(cuid())
-  placementId           String
-  placement             UniversityPlacement @relation(fields: [placementId], references: [id], onDelete: Cascade)
-  rank                  Int                 // 1 = first choice
-  universityId          String?
-  programmeId           String?
-  universityNameFreeText String?
-  programmeNameFreeText  String?
-  isEligible            Boolean             @default(false)
-  score                 Float?              // sort key only; never a pass/fail cutoff
-  missingSubjects       String[]            // subjects that blocked eligibility, if any
-  createdAt             DateTime            @default(now())
-
-  @@unique([placementId, rank])
-  @@map("placement_choices")
 }
 
 // ─────────────────SENTRY MONITORING CACHE ───────────────────────────────────────────────
