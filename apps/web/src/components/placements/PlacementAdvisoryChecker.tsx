@@ -263,9 +263,9 @@ export function PlacementAdvisoryChecker() {
           {result.chosen && result.chosen.length > 0 && (
             <section>
               <h3 className="font-heading font-semibold text-sm mb-3">Chosen programmes</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3">
                 {[...result.chosen].sort((a, b) => a.rank - b.rank).map((r) => (
-                  <PlacementRecommendationCard key={`${r.universityId}-${r.programmeId}`} recommendation={r} />
+                  <PlacementRecommendationCard key={`${r.universityId}-${r.programmeId}`} recommendation={r} rank={r.rank} />
                 ))}
               </div>
             </section>
@@ -276,9 +276,9 @@ export function PlacementAdvisoryChecker() {
             {result.top.length === 0 ? (
               <p className="text-sm text-muted">No matching programmes found for the grades entered.</p>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {result.top.map((r) => (
-                  <PlacementRecommendationCard key={`${r.universityId}-${r.programmeId}`} recommendation={r} />
+              <div className="grid gap-3">
+                {result.top.map((r, i) => (
+                  <PlacementRecommendationCard key={`${r.universityId}-${r.programmeId}`} recommendation={r} rank={i + 1} />
                 ))}
               </div>
             )}

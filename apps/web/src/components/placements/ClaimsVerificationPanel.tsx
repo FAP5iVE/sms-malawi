@@ -1,14 +1,18 @@
 /**
- * [CHANGE TYPE]: NEW FILE
+ * [CHANGE TYPE]: MAJOR REWRITE (matching the reference module's exact design)
  * [FILE]: apps/web/src/components/placements/ClaimsVerificationPanel.tsx
  * [PURPOSE]: The "Claims Verification Desk" tab from the reference module —
- *   staff holding placement.verifyOutcome (admin, high_rank only) review
- *   PENDING_APPROVAL student self-claims (plus previously REJECTED ones, for
- *   history/context) and approve or reject each. Approve is a single tap;
- *   reject requires a reason, which is shown to the student.
+ *   staff holding placement.verifyOutcome (admin, high_rank only) physically
+ *   inspect the printed NCHE gazette against each student-submitted claim
+ *   before approving or rejecting it. Two sub-tabs: Pending Verification and
+ *   Verification History (claims already approved-via-claim or rejected —
+ *   a staff-official entry is never a "claim" so it never appears here).
+ *   Each claim renders as a rich card: status pill, submitted date,
+ *   candidate name/exam-ID/gender/aggregate, the claimed destination, and
+ *   the gazette citation quoted back exactly as the student entered it.
  * [DEPENDS ON]: @/hooks/usePlacements (usePlacementsQueue,
  *   useApprovePlacementClaim, useRejectPlacementClaim), PlacementStatusBadge,
- *   @/components/shared/{AcademicYearSelect, DataTable, MotionBottomSheet}
+ *   @/components/shared/{AcademicYearSelect, MotionBottomSheet}
  */
 'use client'
 
@@ -16,17 +20,84 @@ import { useState } from 'react'
 import { usePublicSchoolInfo } from '@/hooks/usePublic'
 import { usePlacementsQueue, useApprovePlacementClaim, useRejectPlacementClaim } from '@/hooks/usePlacements'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
-import { DataTable, type DataColumn, type MobileAction } from '@/components/shared/DataTable'
 import { MotionBottomSheet } from '@/components/shared/MotionBottomSheet'
-import { PlacementStatusBadge } from '@/components/placements/PlacementStatusBadge'
+import { ShieldCheck, Clock, FileCheck, Check, X, Loader2 } from 'lucide-react'
 import type { ApiUniversityPlacement } from '@shared/types/api'
-import { Check, X, Loader2 } from 'lucide-react'
 
 const FALLBACK_YEAR = '2025/2026'
 
 function studentName(row: ApiUniversityPlacement): string {
   if (!row.student) return row.studentId
   return `${row.student.firstName} ${row.student.otherNames ? row.student.otherNames + ' ' : ''}${row.student.lastName}`
+}
+
+function ClaimCard({
+  row, onApprove, onReject, approving,
+}: {
+  row: ApiUniversityPlacement
+  onApprove?: () => void
+  onReject?: () => void
+  approving?: boolean
+}) {
+  const isPending = row.status === 'PENDING_APPROVAL'
+  return (
+    <div className={`rounded-xl border p-4 space-y-3 ${isPending ? 'border-brand-amber/40 bg-brand-amber/5' : 'border-base bg-page'}`}>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
+            isPending ? 'bg-brand-amber/15 text-brand-amber' : row.status === 'CONFIRMED' ? 'bg-brand-teal/15 text-brand-teal' : 'bg-brand-coral/15 text-brand-coral'
+          }`}>
+            {isPending ? 'Pending Physical Inspection' : row.status === 'CONFIRMED' ? 'Approved & Confirmed' : 'Rejected'}
+          </span>
+          <p className="text-xs text-muted mt-1">Submitted: {new Date(row.createdAt).toLocaleString()}</p>
+        </div>
+        {isPending && onApprove && onReject && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button" onClick={onReject}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-coral text-brand-coral text-xs font-semibold"
+            >
+              <X className="w-3.5 h-3.5" /> Reject
+            </button>
+            <button
+              type="button" onClick={onApprove} disabled={approving}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-teal text-white text-xs font-semibold disabled:opacity-60"
+            >
+              {approving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Approve Selection
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <p className="font-heading font-semibold text-sm">{studentName(row)}</p>
+        <p className="text-xs text-muted">
+          MSCE Candidate: {row.student?.candidateNo ?? '\u2014'} {'\u00b7'} Gender: {row.student?.sex === 'FEMALE' ? 'Female' : row.student?.sex === 'MALE' ? 'Male' : '\u2014'}
+          {typeof row.student?.aggregatePoints === 'number' && <> {'\u00b7'} Aggregate: {row.student.aggregatePoints} points</>}
+        </p>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div className="bg-surface border border-base rounded-lg p-3">
+          <p className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-1">Claimed University & Program</p>
+          <p className="text-sm font-medium">{row.placedProgrammeName ?? row.placedProgrammeId ?? '\u2014'}</p>
+          <p className="text-xs text-muted">{row.placedUniversityName ?? row.placedUniversityId ?? '\u2014'}</p>
+        </div>
+        <div className="bg-surface border border-base rounded-lg p-3">
+          <p className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-1">Physical Evidence / Gazette Citation</p>
+          <p className="text-xs font-medium">{row.ncheBatchRef ?? '\u2014'}</p>
+          {row.claimProofNote && <p className="text-xs text-muted italic mt-1">{row.claimProofNote}</p>}
+        </div>
+      </div>
+
+      {row.status === 'REJECTED' && row.rejectionReason && (
+        <p className="text-xs text-brand-coral"><span className="font-semibold">Reason given:</span> {row.rejectionReason}</p>
+      )}
+      {!isPending && row.verifiedByName && row.verifiedAt && (
+        <p className="text-[11px] text-muted">By: {row.verifiedByName} on {new Date(row.verifiedAt).toLocaleString()}</p>
+      )}
+    </div>
+  )
 }
 
 export function ClaimsVerificationPanel() {
@@ -38,96 +109,92 @@ export function ClaimsVerificationPanel() {
   const approve = useApprovePlacementClaim()
   const reject = useRejectPlacementClaim()
 
+  const pending = queue.filter((p) => p.status === 'PENDING_APPROVAL')
+  const history = queue.filter((p) => p.status !== 'PENDING_APPROVAL')
+
+  const [tab, setTab] = useState<'pending' | 'history'>('pending')
   const [rejectTarget, setRejectTarget] = useState<ApiUniversityPlacement | null>(null)
   const [reason, setReason] = useState('')
 
-  const pending = queue.filter((p) => p.status === 'PENDING_APPROVAL')
-  const history = queue.filter((p) => p.status === 'REJECTED')
-
   function handleReject() {
-    if (!rejectTarget) return
-    if (reason.trim().length < 5) return
+    if (!rejectTarget || reason.trim().length < 5) return
     reject.mutate(
       { id: rejectTarget.id, reason: reason.trim() },
       { onSuccess: () => { setRejectTarget(null); setReason('') } },
     )
   }
 
-  const columns: DataColumn<ApiUniversityPlacement>[] = [
-    { key: 'student', label: 'Student', priority: 'critical', render: studentName },
-    {
-      key: 'placedUniversityId', label: 'Claimed destination', priority: 'critical',
-      render: (row) => `${row.placedProgrammeName ?? row.placedProgrammeId ?? '—'} — ${row.placedUniversityName ?? row.placedUniversityId ?? '—'}`,
-    },
-    { key: 'ncheBatchRef', label: 'Gazette reference', priority: 'important', render: (row) => row.ncheBatchRef ?? '—' },
-    { key: 'claimProofNote', label: 'Evidence', priority: 'optional', render: (row) => row.claimProofNote ?? '—' },
-    {
-      key: 'actions', label: 'Actions', priority: 'critical',
-      render: (row) => (
-        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            onClick={() => approve.mutate(row.id)}
-            disabled={approve.isPending}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-teal text-white text-xs font-semibold disabled:opacity-60"
-          >
-            <Check className="w-3.5 h-3.5" /> Approve
-          </button>
-          <button
-            type="button"
-            onClick={() => { setRejectTarget(row); setReason('') }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand-coral text-brand-coral text-xs font-semibold"
-          >
-            <X className="w-3.5 h-3.5" /> Reject
-          </button>
-        </div>
-      ),
-    },
-  ]
-
-  // Mobile-only fallback: DataTable's mobile card list doesn't render custom
-  // column content inline the way the desktop table/card views do, so
-  // Approve/Reject are also offered as bottom-sheet actions on small screens.
-  const mobileActions: MobileAction<ApiUniversityPlacement>[] = [
-    { label: 'Approve', icon: Check, onClick: (row) => approve.mutate(row.id) },
-    { label: 'Reject', icon: X, variant: 'danger', onClick: (row) => { setRejectTarget(row); setReason('') } },
-  ]
-
-  const historyColumns: DataColumn<ApiUniversityPlacement>[] = [
-    { key: 'student', label: 'Student', priority: 'critical', render: studentName },
-    { key: 'rejectionReason', label: 'Reason', priority: 'critical', render: (row) => row.rejectionReason ?? '—' },
-    { key: 'status', label: 'Status', priority: 'important', render: (row) => <PlacementStatusBadge status={row.status} /> },
-  ]
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h3 className="font-heading font-semibold text-base">Claims awaiting verification</h3>
-          <p className="text-xs text-muted mt-0.5">{pending.length} student self-claim(s) pending for {effectiveYear}.</p>
+    <div className="space-y-4">
+      <div className="bg-surface border border-base rounded-xl p-4 flex items-start gap-3">
+        <div className="w-10 h-10 rounded-lg bg-brand-amber/10 text-brand-amber flex items-center justify-center shrink-0">
+          <ShieldCheck className="w-5 h-5" />
         </div>
-        <AcademicYearSelect
-          value={effectiveYear}
-          onChange={(e) => setAcademicYear(e.target.value)}
-          className="border border-base rounded-xl px-3 py-2 text-sm bg-surface"
-        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h3 className="font-heading font-semibold text-base">
+              Claims Verification &amp; Approval Desk
+              {pending.length > 0 && (
+                <span className="ml-2 inline-flex items-center rounded-full bg-brand-amber/15 text-brand-amber text-xs font-bold px-2 py-0.5 align-middle">
+                  {pending.length} Pending
+                </span>
+              )}
+            </h3>
+            <AcademicYearSelect
+              value={effectiveYear}
+              onChange={(e) => setAcademicYear(e.target.value)}
+              className="border border-base rounded-xl px-3 py-1.5 text-sm bg-page"
+            />
+          </div>
+          <p className="text-xs text-muted mt-0.5">
+            Physically inspect the printed NCHE Gazette against student-submitted placement claims before granting approval.
+          </p>
+        </div>
       </div>
 
-      <DataTable
-        data={pending}
-        isLoading={isLoading}
-        columns={columns}
-        rowKey="id"
-        mobileActions={mobileActions}
-        emptyMessage="No claims are waiting for verification."
-      />
+      <div className="flex items-center gap-1 border-b border-base">
+        <button
+          type="button"
+          onClick={() => setTab('pending')}
+          className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px ${
+            tab === 'pending' ? 'border-brand-amber text-brand-amber' : 'border-transparent text-muted hover:text-body'
+          }`}
+        >
+          <Clock className="w-4 h-4" /> Pending Verification ({pending.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('history')}
+          className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px ${
+            tab === 'history' ? 'border-brand-navy text-brand-navy' : 'border-transparent text-muted hover:text-body'
+          }`}
+        >
+          <FileCheck className="w-4 h-4" /> Verification History ({history.length})
+        </button>
+      </div>
 
-      {/* Mobile card list (DataTable's built-in) also gets these via mobileActions above */}
-
-      {history.length > 0 && (
-        <div>
-          <h4 className="font-heading font-semibold text-sm mb-2">Previously rejected</h4>
-          <DataTable data={history} isLoading={false} columns={historyColumns} rowKey="id" emptyMessage="" />
+      {isLoading ? (
+        <p className="text-sm text-muted py-8 text-center">Loading…</p>
+      ) : tab === 'pending' ? (
+        pending.length === 0 ? (
+          <p className="text-sm text-muted py-8 text-center">No claims are waiting for verification.</p>
+        ) : (
+          <div className="space-y-3">
+            {pending.map((row) => (
+              <ClaimCard
+                key={row.id} row={row}
+                onApprove={() => approve.mutate(row.id)}
+                onReject={() => { setRejectTarget(row); setReason('') }}
+                approving={approve.isPending}
+              />
+            ))}
+          </div>
+        )
+      ) : history.length === 0 ? (
+        <p className="text-sm text-muted py-8 text-center">No claims have been verified yet.</p>
+      ) : (
+        <div className="space-y-3">
+          {history.map((row) => <ClaimCard key={row.id} row={row} />)}
         </div>
       )}
 

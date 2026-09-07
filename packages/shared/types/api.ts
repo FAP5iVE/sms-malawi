@@ -1026,18 +1026,48 @@ export interface ApiUniversityPlacement {
     otherNames:      string | null
     registrationNo:  string
     sex:             string
+    /** The candidate's MSCE exam number (ManebRecord.candidateNo), e.g. 'M1042/009'. */
+    candidateNo?:    string
+    /** ManebRecord.aggregatePoints — the official best-6 aggregate MANEB/exams already computed. */
+    aggregatePoints?: number | null
   }
+  // Human-readable staff names resolved server-side from recordedByUid /
+  // verifiedByUid (StaffProfile lookup) — never make the UI show a raw
+  // Firebase UID for a "recorded/verified by" line.
+  recordedByName?:       string | null
+  verifiedByName?:       string | null
+}
+
+// One row of the "mandatory prerequisite audit" table — mirrors the
+// reference module's Prerequisite Subject / Required Grade / Your Grade /
+// Compliance Status columns. requiredGrade/yourGrade are null for a
+// group-choice or total-credit-count check (see `note` instead).
+export interface ApiPrerequisiteAuditRow {
+  label:          string
+  requiredGrade:  number | null
+  yourGrade:      number | null
+  satisfied:      boolean
+  note?:          string
 }
 
 export interface ApiPlacementRecommendation {
-  universityId:    string
-  universityName:  string
-  programmeId:     string
-  programmeName:   string
-  eligible:        boolean
-  meetsCutOff:     boolean | null
-  missingSubjects: string[]
-  score:           number
+  universityId:         string
+  universityName:       string
+  programmeId:          string
+  programmeName:        string
+  faculty:              string | null
+  durationYears:        number | null
+  cutOffPoints:          number | null
+  /** The published requirement text as transcribed from the source — real
+   *  catalogue data, shown in place of invented marketing copy. */
+  minimumRequirements:  string[]
+  eligible:             boolean
+  meetsCutOff:          boolean | null
+  missingSubjects:      string[]
+  prerequisiteAudit:    ApiPrerequisiteAuditRow[]
+  /** The grades-entered candidate's own best-six aggregate (advisory only). */
+  aggregate:            number
+  score:                number
 }
 
 // The signed-in student's own claim/placement + graduation eligibility.
@@ -1077,13 +1107,19 @@ export interface ApiPublicPlacement {
 // placement (GET /placements/eligible) — carries their existing placement
 // status, if any, so the Staff Entry picker can show "already placed".
 export interface ApiPlacementEligibleStudent {
-  studentId:       string
-  registrationNo:  string
-  firstName:       string
-  lastName:        string
-  sex:             string
-  manebRecordId:   string
-  existingStatus:  string | null   // this candidate's current PlacementStatus, if any
+  studentId:        string
+  registrationNo:   string
+  firstName:        string
+  lastName:         string
+  sex:              string
+  manebRecordId:    string
+  /** MSCE exam number (ManebRecord.candidateNo), e.g. 'M1042/009'. */
+  candidateNo:      string
+  /** ManebRecord.aggregatePoints — MANEB's own precomputed best-6 aggregate. */
+  aggregatePoints:  number | null
+  /** Parsed numeric subject grades, for the candidate-list grade pills. */
+  subjectGrades:    Record<string, number>
+  existingStatus:   string | null   // this candidate's current PlacementStatus, if any
 }
 
 export interface ApiPlacementAnalytics {

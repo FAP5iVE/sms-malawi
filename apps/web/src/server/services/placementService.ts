@@ -39,6 +39,7 @@
  */
 import 'server-only'
 
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import * as auditService from '@/server/services/auditService'
@@ -48,6 +49,7 @@ import {
   isManebRecordPlacementReady,
   computeEligibility,
   generateRecommendations,
+  parseMsceGrades,
 } from '@/server/services/placementMatchingService'
 import type { ProgramRecommendation } from '@/server/services/placementMatchingService'
 import {
@@ -98,7 +100,47 @@ const placementStudentSelect = {
 
 const placementInclude = {
   student: { select: placementStudentSelect },
+  manebRecord: { select: { candidateNo: true, aggregatePoints: true } },
 } as const
+
+type RawPlacement = Prisma.UniversityPlacementGetPayload<{ include: typeof placementInclude }>
+
+/**
+ * Batch-resolve a set of Firebase UIDs (recordedByUid / verifiedByUid) to
+ * human-readable "First Last" names via StaffProfile, so the UI never has to
+ * show a raw Firebase UID for a "recorded/verified by" line. Unknown or null
+ * uids are simply absent from the returned map — callers fall back to null.
+ */
+async function resolveStaffNames(uids: Array<string | null | undefined>): Promise<Map<string, string>> {
+  const unique = [...new Set(uids.filter((u): u is string => Boolean(u)))]
+  if (unique.length === 0) return new Map()
+  const staff = await prisma.staffProfile.findMany({
+    where:  { uid: { in: unique } },
+    select: { uid: true, firstName: true, lastName: true },
+  })
+  return new Map(staff.map((s) => [s.uid, `${s.firstName} ${s.lastName}`]))
+}
+
+/** Flattens the manebRecord include into `student.candidateNo`/`aggregatePoints`
+ *  and resolves recordedByName/verifiedByName — the shape every route returns. */
+function mapPlacementRecord(raw: RawPlacement, staffNames: Map<string, string>) {
+  const { manebRecord, ...rest } = raw
+  return {
+    ...rest,
+    student: {
+      ...rest.student,
+      candidateNo:     manebRecord?.candidateNo,
+      aggregatePoints: manebRecord?.aggregatePoints ?? null,
+    },
+    recordedByName: rest.recordedByUid ? staffNames.get(rest.recordedByUid) ?? null : null,
+    verifiedByName: rest.verifiedByUid ? staffNames.get(rest.verifiedByUid) ?? null : null,
+  }
+}
+
+async function mapPlacementRecords(raws: RawPlacement[]) {
+  const staffNames = await resolveStaffNames(raws.flatMap((r) => [r.recordedByUid, r.verifiedByUid]))
+  return raws.map((r) => mapPlacementRecord(r, staffNames))
+}
 
 /**
  * The student's most recent certified/results-received MSCE record, or null.
@@ -135,7 +177,7 @@ export async function getMyPlacement(firebaseUid: string) {
   const student = await resolveStudentFromUid(firebaseUid)
   if (!student) throw httpError('No student record is linked to this account.', 403)
 
-  const record = await prisma.universityPlacement.findFirst({
+  const raw = await prisma.universityPlacement.findFirst({
     where:   { studentId: student.id },
     orderBy: { createdAt: 'desc' },
     include: placementInclude,
@@ -143,7 +185,7 @@ export async function getMyPlacement(firebaseUid: string) {
   const certified = await findCertifiedMsceRecord(student.id)
 
   return {
-    record,
+    record: raw ? mapPlacementRecord(raw, await resolveStaffNames([raw.recordedByUid, raw.verifiedByUid])) : null,
     isGraduated:      student.status === 'GRADUATED',
     hasCertifiedMsce: certified !== null,
   }
@@ -213,7 +255,7 @@ export async function submitClaim(firebaseUid: string, input: StudentClaimInput)
   })
   logger.info({ event: 'placement.claim.submitted', placementId: updated.id, studentId: student.id })
 
-  return updated
+  return mapPlacementRecord(updated, await resolveStaffNames([updated.recordedByUid, updated.verifiedByUid]))
 }
 
 // ─────────────────────────────────────────────────────────
@@ -230,7 +272,7 @@ export async function submitClaim(firebaseUid: string, input: StudentClaimInput)
 export async function listGraduatingCohort(academicYear: string) {
   const records = await prisma.manebRecord.findMany({
     where:  { academicYear, examType: 'MSCE' },
-    select: { id: true, studentId: true, status: true, examType: true, subjectGrades: true },
+    select: { id: true, studentId: true, status: true, examType: true, subjectGrades: true, candidateNo: true, aggregatePoints: true },
   })
 
   const readyByStudent = new Map<string, (typeof records)[number]>()
@@ -265,13 +307,16 @@ export async function listGraduatingCohort(academicYear: string) {
   return students.map((s) => {
     const rec = readyByStudent.get(s.id)!
     return {
-      studentId:      s.id,
-      registrationNo: s.registrationNo,
-      firstName:      s.firstName,
-      lastName:       s.lastName,
-      sex:            s.sex,
-      manebRecordId:  rec.id,
-      existingStatus: statusByRecord.get(rec.id) ?? null,
+      studentId:       s.id,
+      registrationNo:  s.registrationNo,
+      firstName:       s.firstName,
+      lastName:        s.lastName,
+      sex:             s.sex,
+      manebRecordId:   rec.id,
+      candidateNo:     rec.candidateNo,
+      aggregatePoints: rec.aggregatePoints ?? null,
+      subjectGrades:   parseMsceGrades(rec.subjectGrades as Record<string, string> | null),
+      existingStatus:  statusByRecord.get(rec.id) ?? null,
     }
   })
 }
@@ -344,7 +389,7 @@ export async function recordStaffPlacement(
   logger.info({ event: 'placement.staffEntry.recorded', placementId: updated.id, actorUid })
 
   await notifyPlacementOutcome(updated.id, 'Confirmed')
-  return updated
+  return mapPlacementRecord(updated, await resolveStaffNames([updated.recordedByUid, updated.verifiedByUid]))
 }
 
 // ─────────────────────────────────────────────────────────
@@ -353,7 +398,7 @@ export async function recordStaffPlacement(
 
 /** The Registry & Analytics tab: CONFIRMED placements only, open to everyone. */
 export async function listConfirmedPlacements(opts: { academicYear?: string } = {}) {
-  return prisma.universityPlacement.findMany({
+  const raws = await prisma.universityPlacement.findMany({
     where: {
       status: 'CONFIRMED',
       ...(opts.academicYear ? { manebRecord: { academicYear: opts.academicYear } } : {}),
@@ -361,18 +406,27 @@ export async function listConfirmedPlacements(opts: { academicYear?: string } = 
     include: placementInclude,
     orderBy: [{ placedUniversityId: 'asc' }, { student: { lastName: 'asc' } }],
   })
+  return mapPlacementRecords(raws)
 }
 
-/** The Claims Verification Desk queue: pending + previously-rejected claims. */
+/** The Claims Verification Desk: pending claims, plus a verification history
+ *  of claims already acted on (approved-via-claim or rejected) — a
+ *  staff-official entry is never a "claim" so it never appears here even
+ *  though it's also CONFIRMED; only entrySource STUDENT_CLAIM history shows. */
 export async function listClaimsQueue(opts: { academicYear?: string } = {}) {
-  return prisma.universityPlacement.findMany({
+  const yearFilter = opts.academicYear ? { manebRecord: { academicYear: opts.academicYear } } : {}
+  const raws = await prisma.universityPlacement.findMany({
     where: {
-      status: { in: ['PENDING_APPROVAL', 'REJECTED'] },
-      ...(opts.academicYear ? { manebRecord: { academicYear: opts.academicYear } } : {}),
+      ...yearFilter,
+      OR: [
+        { status: { in: ['PENDING_APPROVAL', 'REJECTED'] } },
+        { status: 'CONFIRMED', entrySource: 'STUDENT_CLAIM' },
+      ],
     },
     include: placementInclude,
     orderBy: { createdAt: 'desc' },
   })
+  return mapPlacementRecords(raws)
 }
 
 // ─────────────────────────────────────────────────────────
@@ -396,7 +450,7 @@ export async function approveClaim(id: string, actorUid: string, actorRole: User
   logger.info({ event: 'placement.claim.approved', placementId: id, actorUid })
 
   await notifyPlacementOutcome(id, 'Confirmed')
-  return updated
+  return mapPlacementRecord(updated, await resolveStaffNames([updated.recordedByUid, updated.verifiedByUid]))
 }
 
 export async function rejectClaim(
@@ -428,7 +482,7 @@ export async function rejectClaim(
   logger.info({ event: 'placement.claim.rejected', placementId: id, actorUid })
 
   await notifyPlacementOutcome(id, 'Rejected', input.reason)
-  return updated
+  return mapPlacementRecord(updated, await resolveStaffNames([updated.recordedByUid, updated.verifiedByUid]))
 }
 
 // ─────────────────────────────────────────────────────────
@@ -566,16 +620,25 @@ export function advise(
         return {
           universityId: ref.universityId, universityName: '\u2014',
           programmeId: ref.programmeId, programmeName: 'Unknown programme',
+          faculty: null, durationYears: null, cutOffPoints: null, minimumRequirements: [],
           eligible: false, meetsCutOff: null,
-          missingSubjects: ['Programme not found in the catalogue'], score: 0, rank: i + 1,
+          missingSubjects: ['Programme not found in the catalogue'],
+          prerequisiteAudit: [], aggregate: 0, score: 0, rank: i + 1,
         }
       }
       const r = computeEligibility(grades, program)
       return {
         universityId: university.id, universityName: university.name,
         programmeId: program.id, programmeName: program.name,
+        faculty: program.faculty ?? null,
+        durationYears: program.durationYears ?? null,
+        cutOffPoints: program.cutOffPoints ?? null,
+        minimumRequirements: program.minimumRequirements ?? [],
         eligible: r.eligible, meetsCutOff: r.meetsCutOff,
-        missingSubjects: r.missingSubjects, score: r.score, rank: i + 1,
+        missingSubjects: r.missingSubjects,
+        prerequisiteAudit: r.prerequisiteAudit,
+        aggregate: r.aggregate,
+        score: r.score, rank: i + 1,
       }
     })
   }

@@ -31,6 +31,7 @@
  */
 import 'server-only'
 import * as sdk from 'node-appwrite'
+import crypto from 'node:crypto'
 
 // ─── BUCKET CONFIG ────────────────────────────────────────────────────────────
 // Single Appwrite bucket enforced by free-tier constraint.
@@ -243,6 +244,25 @@ export interface DirectUploadTicket {
   filePermissions: string[]
 }
 
+// [PRODUCTION FIX] Appwrite enforces a hard 36-character limit on fileIds.
+// This used to build fileIds as `${prefix}_${sdk.ID.unique()}` — fine for
+// short prefixes like school_gallery_ (15 chars), but announcement_image_
+// (20 chars) plus Appwrite's own generated id routinely pushed the total
+// past 36, which Appwrite rejects outright ("Invalid `fileId` param").
+// That's the literal cause of every upload failing except gallery/
+// leadership/staff-photo, whose shorter prefixes happened to survive the
+// same underlying flaw by luck rather than by design. A short, fixed-
+// length random suffix keeps every current and future prefix safely under
+// the limit — even the longest one, assignment_submission_ (22 chars incl.
+// the underscore), leaves comfortable room at 22 + 12 = 34.
+function shortUniqueId(length = 12): string {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  const bytes    = crypto.randomBytes(length)
+  let out = ''
+  for (let i = 0; i < length; i++) out += alphabet[bytes.readUInt8(i) % alphabet.length]
+  return out
+}
+
 export async function createDirectUploadTicket(
   prefix:    FilePrefix,
   customId?: string,
@@ -257,7 +277,7 @@ export async function createDirectUploadTicket(
   const client = getClient() // throws if APPWRITE_ENDPOINT/PROJECT_ID/API_KEY are missing
   const users  = new sdk.Users(client)
   const token  = await users.createToken({ userId: uploaderUserId })
-  const fileId = customId ?? `${prefix}_${sdk.ID.unique()}`
+  const fileId = customId ?? `${prefix}_${shortUniqueId()}`
   // [PRODUCTION FIX] A file created via a real Appwrite user session (as
   // this "uploader" identity is) defaults to being readable only by its
   // creator — unlike the old path, where uploadFile() ran under the full-
@@ -291,7 +311,7 @@ const SIGNED_URL_TTL_SECONDS = 3600 // 1 hour
  * All sensitive file access must go through this — never expose raw Appwrite URLs.
  */
 export async function getSignedViewUrl(fileId: string): Promise<string> {
-  const storage = new sdk.Storage(getClient())
+  getClient() // throws if APPWRITE_ENDPOINT/PROJECT_ID/API_KEY are missing
   // Appwrite Node SDK getFilePreview / getFileView returns a URL object.
   // For sensitive docs we use createFileDownload which allows TTL in newer SDKs.
   // Since Appwrite free tier doesn't support JWT-scoped URLs out of the box,

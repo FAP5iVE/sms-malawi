@@ -33,7 +33,6 @@ import 'server-only'
 import {
   MSCE_CREDIT_MAX_GRADE,
   type UniversityProgram,
-  type SubjectRequirement,
   type SubjectGroupRequirement,
 } from '@shared/constants/universities'
 
@@ -68,13 +67,6 @@ function bestGradeAmong(
   return best
 }
 
-/** True if the candidate satisfies a single mandatory subject requirement. */
-function satisfiesSubject(grades: Record<string, number>, req: SubjectRequirement): boolean {
-  const best = bestGradeAmong(grades, req.subject, req.alternatives)
-  if (best === null) return false
-  return best <= (req.maxGrade ?? MSCE_CREDIT_MAX_GRADE)
-}
-
 /** Count how many members of a group the candidate holds at the required level. */
 function countGroupSatisfied(grades: Record<string, number>, group: SubjectGroupRequirement): number {
   const ceiling = group.maxGrade ?? MSCE_CREDIT_MAX_GRADE
@@ -92,6 +84,18 @@ function countTotalCredits(grades: Record<string, number>): number {
   return Object.values(grades).filter((g) => g <= MSCE_CREDIT_MAX_GRADE).length
 }
 
+export interface PrerequisiteAuditRow {
+  /** Display label, e.g. 'Chemistry (or Physical Science)' or a group/credit-count check. */
+  label: string
+  /** Worst acceptable MANEB grade for a single-subject check; null for group/credit-count checks. */
+  requiredGrade: number | null
+  /** The candidate's best matching grade for a single-subject check; null if not sat or not applicable. */
+  yourGrade: number | null
+  satisfied: boolean
+  /** Extra context for group/credit-count checks, e.g. '1 of 2 satisfied'. */
+  note?: string
+}
+
 export interface EligibilityResult {
   eligible: boolean
   /** Null when the programme publishes no cut-off points; a comparison result
@@ -102,6 +106,10 @@ export interface EligibilityResult {
   /** Sort key for ordering recommendations — higher is a stronger match.
    *  Never a pass/fail threshold. */
   score: number
+  /** Per-requirement breakdown, in requirement order, for the compliance table. */
+  prerequisiteAudit: PrerequisiteAuditRow[]
+  /** The candidate's own best-six-grade aggregate (advisory display only). */
+  aggregate: number
 }
 
 /**
@@ -122,59 +130,78 @@ export function computeEligibility(
   grades: Record<string, number>,
   program: UniversityProgram,
 ): EligibilityResult {
-  const reqs = program.entryRequirements
-  // A catalogue programme with no structured requirements cannot be matched;
-  // treat as not-eligible with an explanatory marker rather than silently
-  // passing everyone.
-  if (!reqs) {
-    return { eligible: false, meetsCutOff: null, missingSubjects: ['No structured entry requirements available'], score: 0 }
-  }
-
-  const missing: string[] = []
-
-  for (const req of reqs.mandatorySubjects) {
-    if (!satisfiesSubject(grades, req)) {
-      const label = req.alternatives?.length
-        ? `${req.subject} (or ${req.alternatives.join(' / ')})`
-        : req.subject
-      missing.push(label)
-    }
-  }
-
-  for (const group of reqs.groupSubjects ?? []) {
-    const have = countGroupSatisfied(grades, group)
-    if (have < group.chooseAtLeast) {
-      missing.push(`at least ${group.chooseAtLeast} of: ${group.subjects.join(', ')}`)
-    }
-  }
-
-  const totalCredits = countTotalCredits(grades)
-  if (totalCredits < reqs.minTotalCredits) {
-    missing.push(`${reqs.minTotalCredits} credit passes (has ${totalCredits})`)
-  }
-
-  const eligible = missing.length === 0
-
-  // Aggregate of the best six credit grades (lower is better), used both for
-  // the advisory cut-off comparison and — inverted — as the display score.
   const bestSix = Object.values(grades)
     .slice()
     .sort((a, b) => a - b)
     .slice(0, 6)
   const aggregate = bestSix.reduce((sum, g) => sum + g, 0)
 
+  const reqs = program.entryRequirements
+  // A catalogue programme with no structured requirements cannot be matched;
+  // treat as not-eligible with an explanatory marker rather than silently
+  // passing everyone.
+  if (!reqs) {
+    return {
+      eligible: false, meetsCutOff: null,
+      missingSubjects: ['No structured entry requirements available'],
+      score: 0, prerequisiteAudit: [], aggregate,
+    }
+  }
+
+  const missing: string[] = []
+  const audit: PrerequisiteAuditRow[] = []
+
+  for (const req of reqs.mandatorySubjects) {
+    const ceiling = req.maxGrade ?? MSCE_CREDIT_MAX_GRADE
+    const yourGrade = bestGradeAmong(grades, req.subject, req.alternatives)
+    const satisfied = yourGrade !== null && yourGrade <= ceiling
+    const label = req.alternatives?.length
+      ? `${req.subject} (or ${req.alternatives.join(' / ')})`
+      : req.subject
+    audit.push({ label, requiredGrade: ceiling, yourGrade, satisfied })
+    if (!satisfied) missing.push(label)
+  }
+
+  for (const group of reqs.groupSubjects ?? []) {
+    const have = countGroupSatisfied(grades, group)
+    const satisfied = have >= group.chooseAtLeast
+    const label = `At least ${group.chooseAtLeast} of: ${group.subjects.join(', ')}`
+    audit.push({ label, requiredGrade: null, yourGrade: null, satisfied, note: `${have} of ${group.chooseAtLeast} satisfied` })
+    if (!satisfied) missing.push(`at least ${group.chooseAtLeast} of: ${group.subjects.join(', ')}`)
+  }
+
+  const totalCredits = countTotalCredits(grades)
+  const creditsSatisfied = totalCredits >= reqs.minTotalCredits
+  audit.push({
+    label: 'Minimum total credit passes', requiredGrade: null, yourGrade: null,
+    satisfied: creditsSatisfied, note: `${totalCredits} of ${reqs.minTotalCredits} required`,
+  })
+  if (!creditsSatisfied) missing.push(`${reqs.minTotalCredits} credit passes (has ${totalCredits})`)
+
+  const eligible = missing.length === 0
+
   let meetsCutOff: boolean | null = null
   if (typeof program.cutOffPoints === 'number' && bestSix.length === 6) {
     meetsCutOff = aggregate <= program.cutOffPoints
   }
 
-  // Score: eligible programmes always outrank ineligible ones; within each
-  // band, a stronger (lower) aggregate scores higher. Max aggregate for six
-  // grades on the 1–9 scale is 54, so (54 - aggregate) is a clean 0..48 key.
-  const strength = 54 - aggregate
-  const score = eligible ? 1000 + strength : strength
+  // Score: eligible programmes always outrank ineligible ones (the caller's
+  // sort also checks `eligible` directly, so this offset is a belt-and-braces
+  // safety net). Within the ineligible band, programmes the candidate is
+  // CLOSER to qualifying for must outrank ones they are far from — a program
+  // missing 1 of 5 checks is a better lead than one missing 5 of 5. Scoring
+  // every ineligible programme by the candidate's own aggregate alone (which
+  // does not vary per-programme) previously left the entire ineligible band
+  // tied, so the "top 10" collapsed to catalogue insertion order (which is
+  // why every apparently-random result kept coming back as MUST's first few
+  // programmes — MUST is simply first in the UNIVERSITIES array).
+  const totalChecks = audit.length || 1
+  const satisfiedChecks = audit.filter((row) => row.satisfied).length
+  const satisfiedRatio = satisfiedChecks / totalChecks
+  const strength = 54 - aggregate // 0..48, higher = a stronger own aggregate
+  const score = eligible ? 1000 + strength : Math.round(satisfiedRatio * 900) + strength
 
-  return { eligible, meetsCutOff, missingSubjects: missing, score }
+  return { eligible, meetsCutOff, missingSubjects: missing, score, prerequisiteAudit: audit, aggregate }
 }
 
 export interface ProgramRecommendation {
@@ -182,9 +209,15 @@ export interface ProgramRecommendation {
   universityName: string
   programmeId: string
   programmeName: string
+  faculty: string | null
+  durationYears: number | null
+  cutOffPoints: number | null
+  minimumRequirements: string[]
   eligible: boolean
   meetsCutOff: boolean | null
   missingSubjects: string[]
+  prerequisiteAudit: PrerequisiteAuditRow[]
+  aggregate: number
   score: number
 }
 
@@ -211,9 +244,15 @@ export function generateRecommendations(
         universityName,
         programmeId: program.id,
         programmeName: program.name,
+        faculty: program.faculty ?? null,
+        durationYears: program.durationYears ?? null,
+        cutOffPoints: program.cutOffPoints ?? null,
+        minimumRequirements: program.minimumRequirements ?? [],
         eligible: result.eligible,
         meetsCutOff: result.meetsCutOff,
         missingSubjects: result.missingSubjects,
+        prerequisiteAudit: result.prerequisiteAudit,
+        aggregate: result.aggregate,
         score: result.score,
       }
     })
