@@ -44,15 +44,17 @@ export function StudentPortalStatementTab({ academicYear, term }: { academicYear
   const { data: feeSchedule = [], isLoading: scheduleLoading } = useFeeStructures(academicYear, undefined, term)
   const fetchReceipt = useFetchReceipt()
 
-  const invoices = balanceData?.invoices ?? []
   const currentBalance = balanceData?.totalBalance ?? 0
 
   const payments = useMemo(
-    () =>
-      invoices
-        .flatMap((inv) => inv.payments.map((p) => ({ ...p, term: inv.term })))
-        .sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()),
-    [invoices]
+    () => {
+      const invoices = balanceData?.invoices ?? []
+
+      return invoices
+        .flatMap((inv) => (inv.payments ?? []).map((p) => ({ ...p, term: inv.term })))
+        .sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime())
+    },
+    [balanceData?.invoices]
   )
 
   const isLoading = meLoading || balanceLoading
@@ -121,7 +123,7 @@ export function StudentPortalStatementTab({ academicYear, term }: { academicYear
           <p className="p-8 text-sm text-muted text-center">No approved fee schedule found for this term yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[520px]">
+            <table className="w-full text-sm min-w-130">
               <thead>
                 <tr className="border-b border-base bg-page">
                   <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">Fee Line Particulars</th>

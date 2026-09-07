@@ -42,7 +42,7 @@
  *   useSettings (useCurrentAcademicPeriod), @shared/types/api
  */
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   FileText, CheckCircle2, AlertTriangle, SkipForward, XCircle, Loader2,
@@ -216,9 +216,9 @@ export function BulkInvoiceGenerator() {
 
   const [classId, setClassId] = useState('ALL')
   const [academicYear, setAcademicYear] = useState('')
-  const [term, setTerm] = useState(1)
-  useEffect(() => { if (currentYear && !academicYear) setAcademicYear(currentYear) }, [currentYear, academicYear])
-  useEffect(() => { if (currentTerm) setTerm((t) => (t === 1 ? currentTerm : t)) }, [currentTerm])
+  const [termOverride, setTermOverride] = useState<number | null>(null)
+  const selectedAcademicYear = academicYear || currentYear || ''
+  const term = termOverride ?? currentTerm ?? 1
 
   const [includeMandatory, setIncludeMandatory] = useState(true)
   const [includeEnrolledOptional, setIncludeEnrolledOptional] = useState(true)
@@ -236,7 +236,7 @@ export function BulkInvoiceGenerator() {
 
   function baseRequest(dryRun: boolean, studentIds?: string[]): BulkGenerateInvoicesInput {
     return {
-      classId, academicYear, term,
+      classId, academicYear: selectedAcademicYear, term,
       includeMandatory, includeEnrolledOptional, applyScholarships, consumeAdvanceCredit,
       dryRun, studentIds,
     }
@@ -310,8 +310,8 @@ export function BulkInvoiceGenerator() {
           </h3>
           <div>
             <label className="block text-xs text-muted mb-1">Academic Year</label>
-            <AcademicYearSelect
-              value={academicYear}
+              <AcademicYearSelect
+                value={selectedAcademicYear}
               onChange={(e) => setAcademicYear(e.target.value)}
               className="w-full min-h-11 border border-base rounded-lg px-3 py-2 text-sm bg-page"
             />
@@ -319,7 +319,7 @@ export function BulkInvoiceGenerator() {
           <div>
             <label className="block text-xs text-muted mb-1">Billing Term</label>
             <select
-              value={term} onChange={(e) => setTerm(Number(e.target.value))}
+              value={term} onChange={(e) => setTermOverride(Number(e.target.value))}
               className="w-full min-h-11 border border-base rounded-lg px-3 py-2 text-sm bg-page"
             >
               <option value={1}>Term 1</option>

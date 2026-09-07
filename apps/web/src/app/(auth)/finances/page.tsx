@@ -276,7 +276,7 @@ function SummaryCard({
         <Icon className={`w-5 h-5 ${color}`} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-lg sm:text-xl font-bold font-heading text-brand-navy tabular break-words">
+        <p className="text-lg sm:text-xl font-bold font-heading text-brand-navy tabular wrap-break-word">
           {value}
         </p>
         <p className="text-xs text-muted mt-0.5">{label}</p>

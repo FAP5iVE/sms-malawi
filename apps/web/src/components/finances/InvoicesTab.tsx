@@ -196,9 +196,9 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
   const initKey = selectedStudent ? `${selectedStudent.id}:${existingInvoice?.id ?? 'new'}` : null
   useEffect(() => {
     if (!selectedStudent || !initKey || initKey === rowsInitializedFor) return
-    if (existingInvoice) {
-      setRows(
-        existingInvoice.lineItems.map((li) => {
+    const initialize = () => {
+      if (existingInvoice) {
+        setRows(existingInvoice.lineItems.map((li) => {
           const fee = li.feeStructureId ? feesById.get(li.feeStructureId) : undefined
           return {
             key: li.id,
@@ -212,11 +212,9 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
             balance: li.balance,
             allocation: '',
           }
-        })
-      )
-    } else {
-      setRows(
-        eligibleFees.map((f) => ({
+        }))
+      } else {
+        setRows(eligibleFees.map((f) => ({
           key: f.id,
           feeStructureId: f.id,
           lineItemId: null,
@@ -227,16 +225,18 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
           fixedAmount: f.amount,
           balance: f.amount,
           allocation: '',
-        }))
-      )
+        })))
+      }
+      setPaymentAmount('')
+      setPaymentReference('')
+      setPaymentNotes('')
+      setAdditionalDiscount('')
+      setSubmitError(null)
+      setSuccessMessage(null)
+      setRowsInitializedFor(initKey)
     }
-    setPaymentAmount('')
-    setPaymentReference('')
-    setPaymentNotes('')
-    setAdditionalDiscount('')
-    setSubmitError(null)
-    setSuccessMessage(null)
-    setRowsInitializedFor(initKey)
+    const timer = window.setTimeout(initialize, 0)
+    return () => window.clearTimeout(timer)
   }, [initKey, selectedStudent, existingInvoice, eligibleFees, feesById, rowsInitializedFor])
 
   // ── Live totals — recalculate on every keystroke, exactly as requested ──
@@ -528,7 +528,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
               <div className="p-4"><div className="h-24 rounded-lg bg-page animate-pulse" /></div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[560px]">
+                <table className="w-full text-sm min-w-140">
                   <thead>
                     <tr className="border-b border-base bg-page">
                       <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">Fee (sourced from Settings)</th>
@@ -591,7 +591,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
             <div className="p-3 border-t border-base flex items-center gap-2 flex-wrap">
               <select
                 value={addLineValue} onChange={(e) => setAddLineValue(e.target.value)}
-                className="flex-1 min-w-[200px] border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+                className="flex-1 min-w-50 border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
               >
                 <option value="">+ Add a line…</option>
                 {addLineOptions.map((f) => <option key={f.id} value={f.id}>{f.name} — {formatMWK(f.amount)}</option>)}

@@ -138,7 +138,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
             </select>
           </div>
 
-          <div className="max-h-[520px] overflow-y-auto divide-y divide-base">
+          <div className="max-h-130 overflow-y-auto divide-y divide-base">
             {studentsLoading ? (
               <div className="p-4 space-y-2">
                 {[1, 2, 3].map((i) => <div key={i} className="h-12 rounded-lg bg-page animate-pulse" />)}
