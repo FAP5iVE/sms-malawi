@@ -107,12 +107,21 @@ async function handleRequest(req: NextRequest): Promise<NextResponse> {
       method:  string
       url:     string
       headers: Record<string, string>
-      socket:  { remoteAddress: string }
+      socket:  { remoteAddress: string; destroy: () => void; destroyed: boolean }
     }
     mockReq.method  = req.method
     mockReq.url     = path + (url.search || '')
     mockReq.headers = Object.fromEntries(req.headers.entries())
-    mockReq.socket  = { remoteAddress }
+    // [PRODUCTION FIX] Node's stream internals auto-destroy a Readable once it
+    // hits EOF (mockReq.push(null) below), and IncomingMessage-style teardown
+    // calls `this.socket.destroy(err)` as part of that. A bare
+    // `{ remoteAddress }` has no destroy() to call, so that throws
+    // `TypeError: this.socket.destroy is not a function` — as an UNCAUGHT
+    // exception outside any of Express's own error handling, which was
+    // killing the whole Node process (exit 129) on every request through
+    // this bridge, not just failing the one request. There's no real socket
+    // to tear down here, so destroy() is a safe no-op.
+    mockReq.socket  = { remoteAddress, destroy() {}, destroyed: false }
     if (bodyBuffer && bodyBuffer.length > 0) mockReq.push(bodyBuffer)
     mockReq.push(null) // EOF — mirrors a real IncomingMessage once Vercel has fully received the request
 

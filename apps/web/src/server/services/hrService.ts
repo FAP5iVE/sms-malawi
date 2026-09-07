@@ -254,18 +254,48 @@ export async function updateStaff(id: string, input: UpdateStaffInput) {
 export async function createStaff(data: CreateStaffInput, actorUid: string) {
   const tempPassword = generateTempPassword()
 
-  // 1. Firebase Auth account. StaffProfile.email is @unique and Firebase
-  //    rejects a duplicate email, so a second account can't be created for
-  //    an email that already has one — the P2002/auth-error surfaces to the
-  //    caller via globalErrorHandler.
-  const authUser = await getAuth().createUser({
-    email:         data.email,
-    password:      tempPassword,
-    displayName:   `${data.firstName} ${data.lastName}`,
-    ...(data.phone ? { phoneNumber: data.phone } : {}),
-    emailVerified: false,
-    disabled:      false,
-  })
+  // 1. Firebase Auth account.
+  //    [PRODUCTION FIX] This previously had no try/catch at all — any
+  //    Firebase createUser error (confirmed in prod logs: duplicate phone
+  //    number — auth/phone-number-already-exists) fell through as an
+  //    "Unhandled Express error" mapped to a generic, unhelpful 500 by
+  //    globalErrorHandler, instead of the clean 409/400 the equivalent
+  //    student flow (provisionStudentAuthAccount) already returns. Mirrors
+  //    that same mapping here.
+  let authUser: Awaited<ReturnType<ReturnType<typeof getAuth>['createUser']>>
+  try {
+    authUser = await getAuth().createUser({
+      email:         data.email,
+      password:      tempPassword,
+      displayName:   `${data.firstName} ${data.lastName}`,
+      ...(data.phone ? { phoneNumber: data.phone } : {}),
+      emailVerified: false,
+      disabled:      false,
+    })
+  } catch (err: unknown) {
+    const code = (err as { errorInfo?: { code?: string }; code?: string })?.errorInfo?.code
+      ?? (err as { code?: string })?.code
+    if (code === 'auth/email-already-exists') {
+      throw Object.assign(
+        new Error(`An account already exists for ${data.email}. Use a different email, or delete the existing Firebase account first.`),
+        { status: 409 },
+      )
+    }
+    if (code === 'auth/phone-number-already-exists') {
+      throw Object.assign(
+        new Error(`An account already exists with phone number ${data.phone}. Check for a duplicate/orphaned staff or student account, or use a different number.`),
+        { status: 409 },
+      )
+    }
+    if (code === 'auth/invalid-email') {
+      throw Object.assign(new Error(`"${data.email}" is not a valid email address.`), { status: 400 })
+    }
+    if (code === 'auth/invalid-phone-number') {
+      throw Object.assign(new Error(`"${data.phone}" is not a valid phone number — use E.164 format, e.g. +2659912345678.`), { status: 400 })
+    }
+    logger.error({ err, email: data.email }, '[hrService] Firebase createUser failed')
+    throw Object.assign(new Error('Failed to create the login account for this staff member.'), { status: 502 })
+  }
 
   // 2. Claims: role + subtitle (jobTitle) + first-login password change.
   //    setCustomUserClaims replaces the whole claims object, which is fine

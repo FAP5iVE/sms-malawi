@@ -595,9 +595,28 @@ export async function provisionStudentAuthAccount(params: {
     requiresPasswordChange: true,
   })
 
-  // Best-effort welcome email with the generated password. Wrapped so a mail
-  // failure (or unexpected throw from the mail layer) can never abort account
-  // creation — the temp password is returned to the caller for manual relay.
+  logger.info({ firebaseUid: fbUser.uid, email: params.email }, '[studentService] Firebase account provisioned for student')
+  return { firebaseUid: fbUser.uid, tempPassword }
+}
+
+// [PRODUCTION FIX] Was inlined at the end of provisionStudentAuthAccount(),
+// which meant the welcome email — containing a real, working password — went
+// out BEFORE the caller's Prisma write. If that write then failed for any
+// reason, the caller's rollback path (rollbackAuthAccount) deleted the
+// Firebase account the email had just pointed the student at: they'd receive
+// working-looking credentials for an account that no longer existed by the
+// time they tried to log in, surfaced by Firebase as a generic invalid-
+// credentials error with no indication anything had actually gone wrong on
+// our end. Extracted so every caller can call this only AFTER their own DB
+// write has committed — mirroring hrService.createStaff's (correct) ordering.
+// Still best-effort: a mail failure here never unwinds a write that already
+// succeeded — it's logged and the temp password stays available to the
+// caller for manual relay.
+export async function sendStudentWelcomeEmail(params: {
+  email:        string
+  displayName:  string
+  tempPassword: string
+}): Promise<void> {
   try {
     const emailResult = await sendEmail({
       to:      params.email,
@@ -605,7 +624,7 @@ export async function provisionStudentAuthAccount(params: {
       html: `<p>Dear ${params.displayName},</p>
         <p>A student account has been created for you on the School Management System.</p>
         <p><strong>Email:</strong> ${params.email}<br>
-           <strong>Temporary Password:</strong> <code>${tempPassword}</code></p>
+           <strong>Temporary Password:</strong> <code>${params.tempPassword}</code></p>
         <p>You will be required to change your password on first login.</p>
         <p><a href="${process.env.NEXT_PUBLIC_APP_URL ?? ''}/login">Login here</a></p>`,
       tags: [{ name: 'type', value: 'student-welcome' }],
@@ -619,9 +638,6 @@ export async function provisionStudentAuthAccount(params: {
   } catch (mailErr) {
     logger.warn({ email: params.email, mailErr }, '[studentService] student welcome email threw; continuing')
   }
-
-  logger.info({ firebaseUid: fbUser.uid, email: params.email }, '[studentService] Firebase account provisioned for student')
-  return { firebaseUid: fbUser.uid, tempPassword }
 }
 
 /** Delete an orphaned student Auth account after a failed DB write. */
@@ -658,12 +674,14 @@ export async function create(
   // resulting uid is written onto the Student row via input.firebaseUid below.
   // If the DB write then fails, the just-created Auth account is rolled back.
   let provisionedUid: string | null = null
+  let tempPassword:   string | null = null
   if (!input.firebaseUid && input.email) {
     const provisioned = await provisionStudentAuthAccount({
       email:       input.email,
       displayName: `${input.firstName} ${input.lastName}`,
     })
     provisionedUid   = provisioned.firebaseUid
+    tempPassword     = provisioned.tempPassword
     input.firebaseUid = provisioned.firebaseUid
   }
 
@@ -691,7 +709,7 @@ export async function create(
           guardianName:    input.guardianName,
           guardianPhone:   input.guardianPhone,
           guardianRelation:input.guardianRelation,
-          classId:         input.classId  ?? null,
+          classId:         input.classId ? input.classId : null,
           photoKey:        input.photoKey ?? null,
           firebaseUid:     input.firebaseUid ?? null,
           status:          input.status ?? 'ACTIVE',
@@ -718,6 +736,15 @@ export async function create(
     throw lastErr instanceof Error
       ? lastErr
       : new Error('Failed to generate a unique registration number after multiple attempts.')
+  }
+
+  // Student row committed successfully — safe to email the credentials now.
+  if (provisionedUid && tempPassword && input.email) {
+    await sendStudentWelcomeEmail({
+      email:        input.email,
+      displayName:  `${input.firstName} ${input.lastName}`,
+      tempPassword,
+    })
   }
 
   await auditService.log({
@@ -1137,7 +1164,7 @@ export async function createFromApplication(
             guardianName:    app.guardianName,
             guardianPhone:   app.guardianPhone,
             guardianRelation:app.guardianRelation,
-            classId:         classId ?? null,
+            classId:         classId ? classId : null,
             photoKey:        null,
             firebaseUid:     firebaseUid,
             status:          'ACTIVE',
@@ -1158,7 +1185,14 @@ export async function createFromApplication(
       student = createdStudent
       break
     } catch (err) {
-      if (!isUniqueConstraintError(err)) throw err
+      if (!isUniqueConstraintError(err)) {
+        // [PRODUCTION FIX] This branch previously rethrew without rolling
+        // back the Firebase account provisioned above (create()'s equivalent
+        // catch already did this — this path didn't), leaving an orphaned
+        // Auth account behind on any non-retryable DB failure.
+        if (firebaseUid) await rollbackAuthAccount(firebaseUid, { where: 'createFromApplication', email: app.email })
+        throw err
+      }
       lastErr = err
       logger.warn(
         { event: 'studentService.registrationNo_collision', attempt: attempt + 1, registrationNo },
@@ -1168,6 +1202,7 @@ export async function createFromApplication(
   }
 
   if (!student) {
+    if (firebaseUid) await rollbackAuthAccount(firebaseUid, { where: 'createFromApplication.exhausted', email: app.email })
     throw lastErr instanceof Error
       ? lastErr
       : new Error('Failed to generate a unique registration number after multiple attempts.')
@@ -1178,6 +1213,18 @@ export async function createFromApplication(
     where: { id: applicationId },
     data:  { convertedStudentId: student.id },
   })
+
+  // Student row committed successfully — safe to email the credentials now.
+  // [PRODUCTION FIX] Previously provisionStudentAuthAccount() sent this email
+  // itself, before this transaction ran — a failed conversion could leave an
+  // applicant emailed a password for an account that was about to be deleted.
+  if (createLoginAccount && firebaseUid && tempPassword && app.email) {
+    await sendStudentWelcomeEmail({
+      email:        app.email,
+      displayName:  `${app.firstName} ${app.lastName}`,
+      tempPassword,
+    })
+  }
 
   // ── 6. Audit log
   await auditService.log({
