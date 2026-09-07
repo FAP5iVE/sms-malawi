@@ -50,11 +50,14 @@ const QUICK_ACTIONS: QuickAction[] = [
     // [PRODUCTION FIX] Added — none of the four actions below actually
     // created an invoice; they all just landed on the tab passively
     // (Record Payment / Generate Receipt need an existing invoice to act
-    // on, Student Balances is read-only). ?action=new deep-links straight
-    // into the new-invoice modal InvoicesTab.tsx now has, same convention
-    // as the existing ?tab= deep-links on this page.
+    // on, Student Balances is read-only).
+    // [2026-09-05] Invoice Entry & Allocation replaced the old
+    // list-plus-two-modals design with one always-present entry screen —
+    // there's no longer a separate "new invoice" mode to deep-link into,
+    // so ?action=new was dropped; landing on the tab and searching for the
+    // student now IS the new-invoice flow.
     label: 'New Invoice',
-    href: '/finances?tab=invoices&action=new',
+    href: '/finances?tab=invoices',
     icon: FileText,
     color: 'bg-brand-navy/10',
     text: 'text-brand-navy',

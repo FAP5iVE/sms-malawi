@@ -5,16 +5,27 @@
  *   Finance I adds useStudentBalance() below; R15 — UI/UX Polish gates
  *   useFinanceSummary() on both arguments resolving, since callers now
  *   source year/term from useCurrentAcademicPeriod() (SETTING_KEYS)
- *   instead of hardcoding them.
+ *   instead of hardcoding them; 2026-09-05 — Invoice Entry & Allocation /
+ *   Bulk Invoice Generator / Finance Fee Structure / Settings & Fee
+ *   Catalog / Student Portal Statement redesign adds useUpdateFeeStructure,
+ *   useFeeCommitments/useUpsertFeeCommitment/useUpdateFeeCommitmentStatus,
+ *   useAddInvoiceLineItem, and useBulkGenerateInvoices below.
  * [PURPOSE]: Finance summary/invoices/expenses/budget/scholarship hooks — repointed at the canonical apiFetch/queryKeys singleton.
  * [DEPENDS ON]: W/lib/api-client.ts
  */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { ApiFinanceSummary, ApiInvoice, ApiExpense, ApiScholarship, ApiDebtsSummary, ApiStudentCredit } from '@shared/types/api'
-import type { RecordPaymentInput, CreateExpenseInput, CreateBudgetInput, CreateFeeStructureInput, GenerateInvoiceInput } from '@shared/schemas/finance'
+import type {
+  ApiFinanceSummary, ApiInvoice, ApiExpense, ApiScholarship, ApiDebtsSummary,
+  ApiStudentCredit, ApiFeeStructure, ApiStudentFeeCommitment, ApiBulkInvoiceResult,
+} from '@shared/types/api'
+import type {
+  RecordPaymentInput, CreateExpenseInput, CreateBudgetInput,
+  CreateFeeStructureInput, UpdateFeeStructureInput, GenerateInvoiceInput,
+  AddInvoiceLineItemInput, CreateStudentFeeCommitmentInput,
+  UpdateStudentFeeCommitmentInput, BulkGenerateInvoicesInput,
+} from '@shared/schemas/finance'
 import { apiFetch, queryKeys } from '@/lib/api-client'
-import { uploadFileDirectly } from '@/lib/directUpload'
 
 export function useFinanceSummary(academicYear: string, term: number) {
   return useQuery({
@@ -41,17 +52,6 @@ export function useInvoices(
     queryKey: queryKeys.finances.invoices(filters),
     queryFn: () => apiFetch<ApiInvoice[]>(`/finances/invoices?${params}`),
     enabled,
-  })
-}
-
-// [PRODUCTION FIX] Single-invoice fetch (with lineItems) — the payment
-// modal needs one specific invoice's own fee-type breakdown to build the
-// allocation table, rather than relying on a possibly-filtered/paged list.
-export function useInvoiceDetail(id: string, enabled = true) {
-  return useQuery({
-    queryKey: queryKeys.finances.invoice(id),
-    queryFn: () => apiFetch<ApiInvoice>(`/finances/invoices/${id}`),
-    enabled: enabled && !!id,
   })
 }
 
@@ -140,17 +140,12 @@ export function useCreateExpense() {
 export function useUploadExpenseReceipt() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ expenseId, file }: { expenseId: string; file: File }) => {
-      // [PRODUCTION FIX] Was FormData → POST .../receipt (multer) — going
-      // through this app's own Vercel function for the raw file bytes,
-      // hitting the same two hard limits as every other upload in this
-      // codebase (Vercel's 4.5MB request-body cap, and no retry on a
-      // dropped connection mid-upload). The file now goes straight to
-      // Appwrite; this call only sends the resulting fileId.
-      const fileId = await uploadFileDirectly(`/finances/expenses/${expenseId}/receipt/upload-ticket`, file)
+    mutationFn: ({ expenseId, file }: { expenseId: string; file: File }) => {
+      const formData = new FormData()
+      formData.append('file', file)
       return apiFetch<{ receiptKey: string }>(`/finances/expenses/${expenseId}/receipt`, {
         method: 'POST',
-        body: JSON.stringify({ fileId }),
+        body: formData,
       })
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
@@ -243,25 +238,31 @@ export function useCreateBudget() {
 
 /** GET /finances/fee-structures — [PRODUCTION FIX 2026-07-28] Both routes
  *  already existed and worked; there was no frontend hook or UI consuming
- *  either at all — confirmed zero callers anywhere. */
-export interface ApiFeeStructure {
-  id: string
-  name: string
-  amount: number
-  classId: string | null
-  academicYear: string
-  term: number | null
-  isActive: boolean
-}
+ *  either at all — confirmed zero callers anywhere. ApiFeeStructure itself
+ *  [PRODUCTION FIX 2026-09-05] moved to @shared/types/api.ts, alongside
+ *  every other finance Api* type, and extended with the fee-catalog fields
+ *  (code/category/mandatory/schedule/description) — imported above instead
+ *  of being declared here a second time. */
 // [PRODUCTION FIX] Added studentId/term — the New Invoice fee-type picker
 // needs the fee structures that actually apply to THIS student (their
 // class) and THIS term, not every active fee structure in the school.
-export function useFeeStructures(academicYear: string, studentId?: string, term?: number) {
+// [2026-09-05] Added includeArchived as a 4th, purely-additive parameter
+// (every existing positional call site is unaffected) — the Settings &
+// Fee Catalog screen fetches the full set (active + archived) once and
+// filters/counts the Active/Archived/All tabs client-side, rather than a
+// network round trip per tab switch.
+export function useFeeStructures(
+  academicYear: string,
+  studentId?: string,
+  term?: number,
+  includeArchived?: boolean
+) {
   const params = new URLSearchParams({ academicYear })
   if (studentId) params.set('studentId', studentId)
   if (term) params.set('term', String(term))
+  if (includeArchived) params.set('includeArchived', 'true')
   return useQuery({
-    queryKey: queryKeys.finances.feeStructures(academicYear, studentId, term),
+    queryKey: [...queryKeys.finances.feeStructures(academicYear, studentId, term), includeArchived ?? false] as const,
     queryFn: () => apiFetch<ApiFeeStructure[]>(`/finances/fee-structures?${params}`),
     enabled: !!academicYear,
   })
@@ -290,5 +291,118 @@ export function useScholarships() {
   return useQuery({
     queryKey: queryKeys.finances.scholarships(),
     queryFn: () => apiFetch<ApiScholarship[]>('/finances/scholarships'),
+  })
+}
+// [NEW] "Generate Receipt" / "View Receipt" — FinanceDashboard's own
+// quick action linked here already but nothing in this tab ever called
+// GET /finances/payments/:id/receipt; this closes that gap. Returns a
+// signed, short-lived view URL for the receipt generated at payment time
+// (see receiptService.generateReceipt()) — the caller opens it directly
+// rather than this hook caching a URL that would go stale.
+export function useFetchReceipt() {
+  return useMutation({
+    mutationFn: (paymentId: string) => apiFetch<{ url: string }>(`/finances/payments/${paymentId}/receipt`),
+  })
+}
+
+// [NEW] Settings & Fee Catalog's edit / archive / restore action — see
+// UpdateFeeStructureSchema in @shared/schemas/finance.
+export function useUpdateFeeStructure() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateFeeStructureInput }) =>
+      apiFetch<ApiFeeStructure>(`/finances/fee-structures/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
+  })
+}
+
+// [NEW] Finance Fee Structure workstation's "Enrolled Add-ons" list — see
+// StudentFeeCommitment in schema.prisma.
+export function useFeeCommitments(studentId: string, academicYear: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.finances.feeCommitments(studentId, academicYear),
+    queryFn: () =>
+      apiFetch<ApiStudentFeeCommitment[]>(
+        `/finances/fee-commitments?studentId=${studentId}&academicYear=${academicYear}`
+      ),
+    enabled: enabled && !!studentId && !!academicYear,
+  })
+}
+
+// [NEW] "Edit Add-on Commitments" — enroll a student in an optional fee
+// type (or reactivate a previously-waived one). See
+// feeService.upsertStudentFeeCommitment().
+export function useUpsertFeeCommitment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: CreateStudentFeeCommitmentInput) =>
+      apiFetch<ApiStudentFeeCommitment>('/finances/fee-commitments', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (_result, variables) => {
+      qc.invalidateQueries({
+        queryKey: queryKeys.finances.feeCommitments(variables.studentId, variables.academicYear),
+      })
+      qc.invalidateQueries({ queryKey: queryKeys.finances.all() })
+    },
+  })
+}
+
+// [NEW] Waive (or restore) a single add-on commitment without deleting its
+// row — see FeeCommitmentStatus in schema.prisma.
+export function useUpdateFeeCommitmentStatus() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateStudentFeeCommitmentInput }) =>
+      apiFetch<ApiStudentFeeCommitment>(`/finances/fee-commitments/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
+  })
+}
+
+// [NEW] Invoice Entry & Allocation screen's "+ Add a line" affordance — see
+// feeService.addInvoiceLineItem().
+export function useAddInvoiceLineItem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ invoiceId, feeStructureId }: AddInvoiceLineItemInput) =>
+      apiFetch<ApiInvoice>(`/finances/invoices/${invoiceId}/line-items`, {
+        method: 'POST',
+        body: JSON.stringify({ feeStructureId }),
+      }),
+    onSuccess: (_result, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.finances.invoice(variables.invoiceId) })
+      qc.invalidateQueries({ queryKey: queryKeys.finances.all() })
+    },
+  })
+}
+
+// [NEW] Bulk Invoice Generator's batch run — see
+// bulkInvoiceService.bulkGenerateInvoices(). Call with `dryRun: true` for
+// the "PRE-EXECUTION DRY RUN ROSTER" preview (nothing is created; the
+// response is the same shape either way, so the roster table renders
+// identically for a preview or a completed run), and `dryRun: false` to
+// actually commit. Only invalidates finance queries on a real commit --
+// a dry run reads current state but changes nothing, so there is nothing
+// to invalidate.
+export function useBulkGenerateInvoices() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: BulkGenerateInvoicesInput) =>
+      apiFetch<ApiBulkInvoiceResult>('/finances/invoices/bulk-generate', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (_result, variables) => {
+      if (!variables.dryRun) {
+        qc.invalidateQueries({ queryKey: queryKeys.finances.all() })
+      }
+    },
   })
 }

@@ -1,252 +1,256 @@
-/**
- * apps/web/src/server/services/bulkInvoiceService.ts — Phase D5
- *
- * Generates term invoices in bulk for all active students in a class
- * (or the entire school) based on active FeeStructure records.
- *
- * Logic per student:
- *   1. Fetch all active FeeStructures matching (academicYear, term | null, classId | null).
- *   2. Sum applicable line items → subtotal.
- *   3. Look up any active Scholarship for the student → compute discount.
- *   4. Upsert Invoice (unique: studentId + academicYear + term).
- *      Skip (EXISTING) if already exists with status != UNPAID to avoid
- *      overwriting a PARTIAL/PAID invoice.
- *   5. Return per-student outcome: CREATED | EXISTING | SKIPPED | ERROR.
- *
- * Fee structure matching priority:
- *   class-specific AND term-specific    → highest priority
- *   class-specific AND term = null      → applies to all terms for that class
- *   classId = null AND term-specific    → school-wide for that term
- *   classId = null AND term = null      → school-wide all-term fee
- */
-
+// apps/web/src/server/services/bulkInvoiceService.ts
+//
+// [CHANGE TYPE]: MAJOR REWRITE
+// [PURPOSE]: Fixes the confirmed defect flagged in the project's own audit:
+//   bulkGenerateInvoices() built Invoice rows directly with
+//   `prisma.invoice.create()` and NEVER created any InvoiceLineItem rows --
+//   every bulk-generated invoice had zero line items under the per-fee-type
+//   line-item architecture feeService.generateInvoice() already uses (see
+//   InvoiceLineItem/PaymentAllocation/StudentCredit in schema.prisma), so
+//   recordPayment() had nothing to allocate a payment against. It also
+//   picked applicable fees by manually filtering ALL active FeeStructure
+//   rows on classId only -- ignoring the mandatory/optional distinction
+//   entirely, so a student who never enrolled in Transport or Boarding
+//   would still have been billed for it the moment those fee types
+//   existed in the catalog.
+//
+//   This rewrite does not reimplement invoice creation: it calls
+//   feeService.generateInvoice() per eligible student -- the exact same
+//   function the Invoice Entry & Allocation screen uses -- so a
+//   bulk-generated invoice and a manually-generated one are, correctly,
+//   indistinguishable. What this file adds on top is pure orchestration:
+//     1. getEligibleFeeStructuresForStudent() (feeService) resolves the
+//        real per-student fee set -- mandatory-by-class/term, plus any
+//        actively COMMITTED optional add-on (see StudentFeeCommitment) --
+//        replacing the old manual classId-only filter.
+//     2. The four "Accounting Rules & Fee Automation" checkboxes map
+//        directly onto real options: includeMandatory/
+//        includeEnrolledOptional narrow which fee types are eligible;
+//        applyScholarships/consumeAdvanceCredit are passed straight
+//        through to feeService's chargeOptions, which already supported
+//        toggling both.
+//     3. dryRun: true computes the exact same figures via
+//        feeService.computeInvoiceCharges() (the same accounting engine
+//        generateInvoice() itself calls) without persisting anything --
+//        this is the "PRE-EXECUTION DRY RUN ROSTER" preview. dryRun:
+//        false (or omitted) actually calls generateInvoice() and commits.
+//     4. "Carry Forward Prior Arrears" is not a checkbox that changes what
+//        gets billed -- each term's Invoice is intentionally its own row
+//        (see schema.prisma's @@unique([studentId, academicYear, term])).
+//        It is a report-only figure: sumPriorArrears() adds up whatever
+//        balance is still outstanding on this student's OTHER invoices
+//        this academic year, so the roster shows the family's real total
+//        exposure without silently merging past-term debt into a new
+//        term's invoice total.
+//     5. "Double-Billing Safe": a student who already has an invoice for
+//        this exact (academicYear, term) is never billed again --
+//        reported as EXISTING (still UNPAID -- safe to leave alone) or
+//        SKIPPED (already PARTIAL/PAID/OVERDUE -- must not be touched),
+//        exactly as the original file's semantics already were; this
+//        rewrite keeps that distinction, it just fixes what happens on an
+//        actual CREATED row.
 import 'server-only'
-import { Decimal }    from '@prisma/client/runtime/library'
-import { prisma }     from '@/lib/prisma'
-import { logger }     from '@/lib/logger'
 
-// ─────────────────────────────────────────────────────────────────────────────
+import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
+import * as feeService from '@/server/services/feeService'
+import type { BulkGenerateInvoicesInput } from '@shared/schemas/finance'
+
+// ─────────────────────────────────────────────────────────────────────────
 // TYPES
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
 
 export type InvoiceOutcome = 'CREATED' | 'EXISTING' | 'SKIPPED' | 'ERROR'
 
 export interface StudentInvoiceResult {
-  studentId:      string
+  studentId: string
   registrationNo: string
-  fullName:       string
-  classId:        string
-  className:      string
-  outcome:        InvoiceOutcome
-  invoiceId?:     string
-  totalAmount?:   number
-  discount?:      number
-  error?:         string
+  fullName: string
+  classId: string
+  className: string
+  outcome: InvoiceOutcome
+  invoiceId?: string
+  totalAmount?: number
+  discount?: number
+  scholarshipAbsorbed?: number
+  advanceCreditConsumed?: number
+  priorArrears?: number
+  lineItemCount?: number
+  error?: string
 }
 
 export interface BulkInvoiceResult {
-  academicYear:  string
-  term:          number
-  created:       number
-  existing:      number
-  skipped:       number
-  errors:        number
-  totalRevenue:  number
-  students:      StudentInvoiceResult[]
+  academicYear: string
+  term: number
+  created: number
+  existing: number
+  skipped: number
+  errors: number
+  totalRevenue: number
+  students: StudentInvoiceResult[]
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
 // HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
 
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date)
-  d.setDate(d.getDate() + days)
-  return d
+/** Report-only figure -- see header note 4. Never merged into the new
+ *  invoice's own total; the roster shows it alongside so the bursar sees
+ *  the family's full picture. */
+async function sumPriorArrears(studentId: string, academicYear: string, term: number): Promise<number> {
+  const priorInvoices = await prisma.invoice.findMany({
+    where: { studentId, academicYear, term: { not: term }, balance: { gt: 0 } },
+    select: { balance: true },
+  })
+  return priorInvoices.reduce((sum, inv) => sum + Number(inv.balance), 0)
 }
 
-const INVOICE_DUE_DAYS = 30   // due 30 days after generation
-
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
 // CORE
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────
 
 export async function bulkGenerateInvoices(
-  classId:      string | 'ALL',
-  academicYear: string,
-  term:         number,
-  actorUid:     string,
+  input: BulkGenerateInvoicesInput,
+  actorUid: string,
+  actorRole: string
 ): Promise<BulkInvoiceResult> {
-  // Fetch all fee structures applicable to this year/term
-  const feeStructures = await prisma.feeStructure.findMany({
-    where: {
-      academicYear,
-      isActive: true,
-      OR: [
-        { term },
-        { term: null },
-      ],
-    },
-  })
+  const {
+    classId, academicYear, term,
+    includeMandatory, includeEnrolledOptional,
+    applyScholarships, consumeAdvanceCredit,
+    studentIds, dryRun,
+  } = input
 
-  if (feeStructures.length === 0) {
-    logger.warn(
-      { event: 'bulk-invoice.no-fee-structures', academicYear, term },
-      'No active fee structures found — cannot generate invoices',
-    )
-  }
-
-  // Fetch active students (optionally scoped to a class)
+  // An explicit studentIds list (the roster rows still checked after a
+  // dry-run preview) always narrows the run to exactly those students,
+  // regardless of the cohort classId that produced that preview.
   const students = await prisma.student.findMany({
     where: {
-      status:  'ACTIVE',
-      ...(classId !== 'ALL' ? { classId } : {}),
+      status: 'ACTIVE',
+      ...(studentIds?.length ? { id: { in: studentIds } } : classId !== 'ALL' ? { classId } : {}),
     },
-    include: {
-      class: { select: { id: true, name: true } },
-    },
+    include: { class: { select: { id: true, name: true } } },
   })
-
-  // Fetch all active scholarships keyed by studentId
-  const scholarships = await prisma.scholarship.findMany({
-    where: { isActive: true, academicYear },
-  })
-  const scholarshipByStudent = new Map(
-    scholarships.map((s) => [s.studentId, s]),
-  )
 
   const results: StudentInvoiceResult[] = []
-  let created = 0, existing = 0, skipped = 0, errors = 0, totalRevenue = 0
+  let created = 0
+  let existing = 0
+  let skipped = 0
+  let errors = 0
+  let totalRevenue = 0
 
   for (const student of students) {
+    const base = {
+      studentId: student.id,
+      registrationNo: student.registrationNo,
+      fullName: `${student.firstName} ${student.lastName}`,
+      classId: student.classId ?? '',
+      className: student.class?.name ?? '—',
+    }
+
     try {
-      const sClass = student.class
-      if (!sClass) {
-        results.push({
-          studentId:      student.id,
-          registrationNo: student.registrationNo,
-          fullName:       `${student.firstName} ${student.lastName}`,
-          classId:        '',
-          className:      '—',
-          outcome:        'SKIPPED',
-          error:          'No class assigned',
-        })
+      if (!student.class) {
+        results.push({ ...base, outcome: 'SKIPPED', error: 'No class assigned' })
         skipped++
         continue
       }
 
-      // Check for existing invoice
+      const priorArrears = await sumPriorArrears(student.id, academicYear, term)
+
+      // Double-billing guard -- see header note 5.
       const existingInvoice = await prisma.invoice.findUnique({
-        where: {
-          studentId_academicYear_term: {
-            studentId: student.id,
-            academicYear,
-            term,
-          },
-        },
+        where: { studentId_academicYear_term: { studentId: student.id, academicYear, term } },
       })
-
       if (existingInvoice) {
-        // Don't overwrite a partially/fully paid invoice
-        if (existingInvoice.status !== 'UNPAID') {
-          results.push({
-            studentId:      student.id,
-            registrationNo: student.registrationNo,
-            fullName:       `${student.firstName} ${student.lastName}`,
-            classId:        sClass.id,
-            className:      sClass.name,
-            outcome:        'SKIPPED',
-            invoiceId:      existingInvoice.id,
-          })
-          skipped++
-          continue
-        }
-
+        const outcome: InvoiceOutcome = existingInvoice.status !== 'UNPAID' ? 'SKIPPED' : 'EXISTING'
         results.push({
-          studentId:      student.id,
-          registrationNo: student.registrationNo,
-          fullName:       `${student.firstName} ${student.lastName}`,
-          classId:        sClass.id,
-          className:      sClass.name,
-          outcome:        'EXISTING',
-          invoiceId:      existingInvoice.id,
-          totalAmount:    Number(existingInvoice.totalAmount),
+          ...base,
+          outcome,
+          invoiceId: existingInvoice.id,
+          totalAmount: Number(existingInvoice.totalAmount),
+          priorArrears,
         })
-        existing++
+        if (outcome === 'SKIPPED') skipped++
+        else existing++
         continue
       }
 
-      // Calculate subtotal from applicable fee structures
-      const applicable = feeStructures.filter(
-        (f) => f.classId === null || f.classId === sClass.id,
-      )
-      const subtotal = applicable.reduce(
-        (sum, f) => sum + Number(f.amount),
-        0,
-      )
+      const eligibleFees = await feeService.getEligibleFeeStructuresForStudent(student.id, academicYear, term, {
+        includeMandatory,
+        includeOptionalCommitted: includeEnrolledOptional,
+      })
+      if (eligibleFees.length === 0) {
+        results.push({ ...base, outcome: 'SKIPPED', error: 'No applicable fees for this student', priorArrears })
+        skipped++
+        continue
+      }
+      const feeStructureIds = eligibleFees.map((f) => f.id)
 
-      // Apply scholarship discount
-      const scholarship = scholarshipByStudent.get(student.id)
-      let discount = 0
-      if (scholarship) {
-        if (scholarship.discountType === 'PERCENTAGE') {
-          discount = (subtotal * Number(scholarship.value)) / 100
-        } else {
-          discount = Math.min(Number(scholarship.value), subtotal)
-        }
+      if (dryRun) {
+        // Preview only -- the exact same accounting engine
+        // (feeService.computeInvoiceCharges()) generateInvoice() itself
+        // calls below, just without the persistence step.
+        const charges = await feeService.computeInvoiceCharges(student.id, academicYear, feeStructureIds, {
+          applyScholarship: applyScholarships,
+          consumeCredit: consumeAdvanceCredit,
+        })
+        results.push({
+          ...base,
+          outcome: 'CREATED',
+          totalAmount: charges.totalAmount,
+          discount: charges.discount,
+          scholarshipAbsorbed: charges.discount,
+          advanceCreditConsumed: charges.creditApplied,
+          priorArrears,
+          lineItemCount: eligibleFees.length,
+        })
+        created++
+        totalRevenue += charges.totalAmount
+        continue
       }
 
-      const totalAmount  = Math.max(0, subtotal - discount)
-      const balance      = totalAmount
-      const dueDate      = addDays(new Date(), INVOICE_DUE_DAYS)
+      const invoice = await feeService.generateInvoice(
+        { studentId: student.id, academicYear, term, feeStructureIds },
+        actorUid,
+        actorRole,
+        { applyScholarship: applyScholarships, consumeCredit: consumeAdvanceCredit }
+      )
 
-      const invoice = await prisma.invoice.create({
-        data: {
-          studentId:    student.id,
-          academicYear,
-          term,
-          subtotal:     new Decimal(subtotal),
-          discount:     new Decimal(discount),
-          totalAmount:  new Decimal(totalAmount),
-          balance:      new Decimal(balance),
-          paidAmount:   new Decimal(0),
-          status:       'UNPAID',
-          dueDate,
-          scholarshipId: scholarship?.id,
-        },
-      })
+      const scholarshipAbsorbed = Number(invoice.discount)
+      // subtotal - discount is "net fees due before credit"; the gap
+      // between that and the invoice's actual totalAmount is exactly how
+      // much StudentCredit was consumed (see feeService.generateInvoice()).
+      const advanceCreditConsumed = Math.max(
+        0,
+        Math.round((Number(invoice.subtotal) - Number(invoice.discount) - Number(invoice.totalAmount)) * 100) / 100
+      )
 
       results.push({
-        studentId:      student.id,
-        registrationNo: student.registrationNo,
-        fullName:       `${student.firstName} ${student.lastName}`,
-        classId:        sClass.id,
-        className:      sClass.name,
-        outcome:        'CREATED',
-        invoiceId:      invoice.id,
-        totalAmount,
-        discount,
+        ...base,
+        outcome: 'CREATED',
+        invoiceId: invoice.id,
+        totalAmount: Number(invoice.totalAmount),
+        discount: scholarshipAbsorbed,
+        scholarshipAbsorbed,
+        advanceCreditConsumed,
+        priorArrears,
+        lineItemCount: invoice.lineItems.length,
       })
       created++
-      totalRevenue += totalAmount
+      totalRevenue += Number(invoice.totalAmount)
     } catch (err) {
-      results.push({
-        studentId:      student.id,
-        registrationNo: student.registrationNo,
-        fullName:       `${student.firstName} ${student.lastName}`,
-        classId:        student.classId ?? '',
-        className:      student.class?.name ?? '—',
-        outcome:        'ERROR',
-        error:          err instanceof Error ? err.message : 'Unknown error',
-      })
+      results.push({ ...base, outcome: 'ERROR', error: err instanceof Error ? err.message : 'Unknown error' })
       errors++
       logger.error({ event: 'bulk-invoice.student-error', studentId: student.id, err })
     }
   }
 
   logger.info(
-    { event: 'bulk-invoice.done', academicYear, term, classId, created, existing, skipped, errors, totalRevenue, actorUid },
-    'Bulk invoice generation complete',
+    {
+      event: dryRun ? 'bulk-invoice.preview' : 'bulk-invoice.done',
+      academicYear, term, classId, created, existing, skipped, errors, totalRevenue, actorUid,
+    },
+    dryRun ? 'Bulk invoice dry-run preview complete' : 'Bulk invoice generation complete'
   )
 
   return { academicYear, term, created, existing, skipped, errors, totalRevenue, students: results }

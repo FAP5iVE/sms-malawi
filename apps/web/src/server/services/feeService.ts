@@ -35,15 +35,42 @@
 // Fixed: Promise on checkBalanceGate (was empty Promise<>)
 // Fixed: removed empty Promise<> from $transaction return (let TypeScript infer)
 // Fixed: payment.paidAt (not recordedAt — actual Prisma field name)
+//
+// [2026-09-05 ADDITION] Invoice Entry & Allocation / Bulk Invoice Generator /
+//   Finance Fee Structure redesign:
+//   - generateInvoice() now assigns a real, sequential, human-readable
+//     Invoice.invoiceNumber via invoiceNumberService.withInvoiceNumber()
+//     instead of the bare cuid id being the only identifier.
+//   - addInvoiceLineItem() (new) — append one more fee type to an
+//     EXISTING invoice (the "+ Add a line" case), recomputing the
+//     invoice's subtotal/totalAmount/balance/status in one transaction.
+//   - getEligibleFeeStructuresForStudent() (new) — the single source of
+//     truth for "which fee types apply to this student right now"
+//     (mandatory-by-class/term, plus any actively COMMITTED optional
+//     add-ons), now shared by GET /finances/fee-structures (when
+//     studentId is given) and bulkInvoiceService — previously each
+//     re-implemented the same where-clause independently.
+//   - listStudentFeeCommitments() / upsertStudentFeeCommitment() /
+//     updateStudentFeeCommitmentStatus() (new) — the Finance Fee
+//     Structure workstation's "Enrolled Add-ons" / "Edit Add-on
+//     Commitments" action.
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 import { logger } from '@/lib/logger'
-import type { GenerateInvoiceInput, RecordPaymentInput } from '@shared/schemas/finance'
+import type {
+  GenerateInvoiceInput,
+  RecordPaymentInput,
+  AddInvoiceLineItemInput,
+  CreateStudentFeeCommitmentInput,
+  UpdateStudentFeeCommitmentInput,
+} from '@shared/schemas/finance'
 import { generateReceipt } from '@/server/services/receiptService'
 import * as accountingService from '@/server/services/accountingService'
 import { resolveStudentFromUid } from '@/server/services/studentService'
 import { getSchoolBranding } from '@/server/services/notificationService'
 import * as settingsService from '@/server/services/settingsService'
 import { SETTING_KEYS } from '@shared/types/settings'
+import { withInvoiceNumber } from '@/server/services/invoiceNumberService'
 
 export async function checkBalanceGate(
   studentId: string,
@@ -68,10 +95,21 @@ export async function checkBalanceGate(
   return gateOpen
 }
 
+// [PRODUCTION FIX 2026-09-05] Now includes each invoice's lineItems (so a
+// caller can show per-fee-type status -- "Balance Cleared" vs still owing
+// -- without a second round trip) and payments (receiptKey included) so
+// the Student Portal Statement's "Student Invoices & Receipts" list has
+// everything it needs in this one call. Previously returned bare Invoice
+// rows with neither relation, which is what left that section of the
+// student finance view permanently empty.
 export async function getStudentBalance(studentId: string, academicYear: string) {
   const invoices = await prisma.invoice.findMany({
     where: { studentId, academicYear },
     orderBy: { term: 'asc' },
+    include: {
+      lineItems: true,
+      payments: { orderBy: { paidAt: 'desc' } },
+    },
   })
   const totalBalance = invoices.reduce(
     (sum: number, inv: { balance: unknown }) => sum + Number(inv.balance),
@@ -101,31 +139,50 @@ export async function getStudentBalance(studentId: string, academicYear: string)
 //      reducing the new invoice's total/balance -- this is what "carries
 //      an overpayment to the next term" in practice: it's consumed the
 //      next time that student is invoiced, not left inert.
-export async function generateInvoice(
-  data: GenerateInvoiceInput,
-  actorUid: string,
-  actorRole: string
+// [2026-09-05 REFACTOR] The subtotal/discount/credit math below used to
+// live inline in generateInvoice() only. Extracted into
+// computeInvoiceCharges() -- a pure read-and-compute step with no
+// persistence -- so the Bulk Invoice Generator's dry-run preview can call
+// the *exact same* accounting logic to show real projected figures
+// (scholarship absorbed, credit consumed, net payable) before anything is
+// actually committed, instead of a second, drifting reimplementation.
+// generateInvoice() itself now only adds the existing-invoice guard and
+// the actual persistence step.
+export interface InvoiceChargeOptions {
+  /** Default true. false skips the scholarship lookup entirely --
+   *  the Bulk Invoice Generator's "Apply Scholarship & Staff Discounts"
+   *  checkbox. */
+  applyScholarship?: boolean
+  /** Default true. false skips applying any prior StudentCredit -- the
+   *  Bulk Invoice Generator's "Consume Prior Advance Credit" checkbox. */
+  consumeCredit?: boolean
+  manualDiscount?: number
+}
+
+export async function computeInvoiceCharges(
+  studentId: string,
+  academicYear: string,
+  feeStructureIds: string[],
+  options?: InvoiceChargeOptions
 ) {
-  const existing = await prisma.invoice.findUnique({
-    where: { studentId_academicYear_term: { studentId: data.studentId, academicYear: data.academicYear, term: data.term } },
-  })
-  if (existing) throw new Error('Invoice already exists for this term')
+  const applyScholarship = options?.applyScholarship ?? true
+  const consumeCredit = options?.consumeCredit ?? true
 
   const feeStructures = await prisma.feeStructure.findMany({
-    where: { id: { in: data.feeStructureIds }, isActive: true },
+    where: { id: { in: feeStructureIds }, isActive: true },
   })
   if (feeStructures.length === 0) {
     throw new Error('Select at least one fee type.')
   }
-  if (feeStructures.length !== data.feeStructureIds.length) {
+  if (feeStructures.length !== feeStructureIds.length) {
     throw new Error('One or more selected fee types could not be found or are no longer active.')
   }
 
   const subtotal = feeStructures.reduce((sum, f) => sum + Number(f.amount), 0)
 
-  const scholarship = await prisma.scholarship.findFirst({
-    where: { studentId: data.studentId, academicYear: data.academicYear, isActive: true },
-  })
+  const scholarship = applyScholarship
+    ? await prisma.scholarship.findFirst({ where: { studentId, academicYear, isActive: true } })
+    : null
   let discount = 0
   if (scholarship) {
     discount = scholarship.discountType === 'PERCENTAGE'
@@ -135,7 +192,7 @@ export async function generateInvoice(
   // Manual discount stacks on top of any scholarship discount rather than
   // replacing it -- a scholarship and a one-off manual adjustment are
   // independent reasons a family might owe less.
-  if (data.manualDiscount) discount += data.manualDiscount
+  if (options?.manualDiscount) discount += options.manualDiscount
   discount = Math.min(discount, subtotal) // never a negative total from discount alone
 
   // Distribute the discount proportionally across line items so each
@@ -165,10 +222,12 @@ export async function generateInvoice(
   // this new invoice's total before it's even created, so a family that
   // overpaid last term sees it reflected immediately rather than needing
   // a separate manual step.
-  const availableCredits = await prisma.studentCredit.findMany({
-    where: { studentId: data.studentId, amount: { gt: 0 } },
-    orderBy: { createdAt: 'asc' },
-  })
+  const availableCredits = consumeCredit
+    ? await prisma.studentCredit.findMany({
+        where: { studentId, amount: { gt: 0 } },
+        orderBy: { createdAt: 'asc' },
+      })
+    : []
   const creditApplications: { id: string; amountUsed: number; remaining: number }[] = []
   let remainingToCover = totalAmount
   for (const credit of availableCredits) {
@@ -181,36 +240,62 @@ export async function generateInvoice(
   const creditApplied = creditApplications.reduce((sum, c) => sum + c.amountUsed, 0)
   totalAmount = Math.max(0, Math.round((totalAmount - creditApplied) * 100) / 100)
 
+  return { feeStructures, subtotal, scholarship, discount, lineItemsData, totalAmount, creditApplications, creditApplied }
+}
+
+export async function generateInvoice(
+  data: GenerateInvoiceInput,
+  actorUid: string,
+  actorRole: string,
+  chargeOptions?: Pick<InvoiceChargeOptions, 'applyScholarship' | 'consumeCredit'>
+) {
+  const existing = await prisma.invoice.findUnique({
+    where: { studentId_academicYear_term: { studentId: data.studentId, academicYear: data.academicYear, term: data.term } },
+  })
+  if (existing) throw new Error('Invoice already exists for this term')
+
+  const {
+    feeStructures, subtotal, scholarship, discount,
+    lineItemsData, totalAmount, creditApplications, creditApplied,
+  } = await computeInvoiceCharges(data.studentId, data.academicYear, data.feeStructureIds, {
+    applyScholarship: chargeOptions?.applyScholarship,
+    consumeCredit: chargeOptions?.consumeCredit,
+    manualDiscount: data.manualDiscount,
+  })
+
   const dueDate = new Date()
   dueDate.setDate(dueDate.getDate() + 30) // net-30, not user-configurable per invoice
 
-  const invoice = await prisma.$transaction(async (tx) => {
-    const created = await tx.invoice.create({
-      data: {
-        studentId: data.studentId,
-        academicYear: data.academicYear,
-        term: data.term,
-        subtotal,
-        discount,
-        latePenalty: 0,
-        totalAmount,
-        paidAmount: 0,
-        balance: totalAmount,
-        status: totalAmount <= 0 ? 'PAID' : 'UNPAID',
-        dueDate,
-        scholarshipId: scholarship?.id ?? null,
-        lineItems: { create: lineItemsData },
-      },
-      include: { lineItems: true },
-    })
-    for (const c of creditApplications) {
-      await tx.studentCredit.update({
-        where: { id: c.id },
-        data: { amount: c.remaining, lastAppliedAt: new Date() },
+  const invoice = await withInvoiceNumber(data.academicYear, (invoiceNumber) =>
+    prisma.$transaction(async (tx) => {
+      const created = await tx.invoice.create({
+        data: {
+          invoiceNumber,
+          studentId: data.studentId,
+          academicYear: data.academicYear,
+          term: data.term,
+          subtotal,
+          discount,
+          latePenalty: 0,
+          totalAmount,
+          paidAmount: 0,
+          balance: totalAmount,
+          status: totalAmount <= 0 ? 'PAID' : 'UNPAID',
+          dueDate,
+          scholarshipId: scholarship?.id ?? null,
+          lineItems: { create: lineItemsData },
+        },
+        include: { lineItems: true },
       })
-    }
-    return created
-  })
+      for (const c of creditApplications) {
+        await tx.studentCredit.update({
+          where: { id: c.id },
+          data: { amount: c.remaining, lastAppliedAt: new Date() },
+        })
+      }
+      return created
+    })
+  )
 
   logger.info({
     event: 'invoice.generated', invoiceId: invoice.id, studentId: data.studentId,
@@ -459,4 +544,199 @@ export async function getFinanceSummary(academicYear: string, term: number) {
     _sum: { amount: true },
   })
   return { totalCollected, totalOutstanding, totalExpenses: Number(expenses._sum.amount ?? 0), collectionTarget, collectionPercent }
+}
+// ─── ADD LINE TO EXISTING INVOICE ────────────────────────
+// [NEW] Append one more fee type to an EXISTING invoice -- the Invoice
+// Entry screen's "+ Add a line" affordance for a student who already has
+// an invoice this term (e.g. joining Transport partway through). Added at
+// the fee's full standard rate: the original invoice's scholarship/manual
+// discount was computed once, at generation time, over the line items
+// that existed then (see generateInvoice()) -- it is not retroactively
+// redistributed onto a line added afterward. A discount on this specific
+// addition would need its own adjustment, which is out of scope here,
+// exactly as GenerateInvoiceSchema documents for manualDiscount.
+export async function addInvoiceLineItem(
+  data: AddInvoiceLineItemInput,
+  actorUid: string,
+  actorRole: string
+) {
+  const invoice = await prisma.invoice.findUniqueOrThrow({
+    where: { id: data.invoiceId },
+    include: { lineItems: true },
+  })
+
+  if (invoice.lineItems.some((li) => li.feeStructureId === data.feeStructureId)) {
+    throw new Error('This fee type is already on this invoice.')
+  }
+
+  const feeStructure = await prisma.feeStructure.findUnique({ where: { id: data.feeStructureId } })
+  if (!feeStructure || !feeStructure.isActive) {
+    throw new Error('This fee type could not be found or is no longer active.')
+  }
+
+  const amount = Number(feeStructure.amount)
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.invoiceLineItem.create({
+      data: {
+        invoiceId: invoice.id,
+        feeStructureId: feeStructure.id,
+        feeName: feeStructure.name,
+        amount,
+        paidAmount: 0,
+        balance: amount,
+      },
+    })
+    const newSubtotal = Math.round((Number(invoice.subtotal) + amount) * 100) / 100
+    const newTotal = Math.round((Number(invoice.totalAmount) + amount) * 100) / 100
+    const newBalance = Math.round((Number(invoice.balance) + amount) * 100) / 100
+    const newStatus = newBalance <= 0 ? 'PAID' : Number(invoice.paidAmount) > 0 ? 'PARTIAL' : 'UNPAID'
+    return tx.invoice.update({
+      where: { id: invoice.id },
+      data: { subtotal: newSubtotal, totalAmount: newTotal, balance: newBalance, status: newStatus },
+      include: { lineItems: true },
+    })
+  })
+
+  logger.info({
+    event: 'invoice.line_item_added', invoiceId: invoice.id,
+    feeStructureId: feeStructure.id, amount, actorUid, actorRole,
+  })
+  return updated
+}
+
+// ─── ELIGIBLE FEE STRUCTURES FOR A STUDENT ───────────────
+// [NEW] Single source of truth for "which fee types apply to this student
+// right now": every active, mandatory FeeStructure matching their class
+// and this term (applies automatically -- no commitment row needed), plus
+// any OPTIONAL fee type they have an active COMMITTED StudentFeeCommitment
+// for this academic year. Replaces two independent, near-identical
+// where-clauses that used to live separately in GET
+// /finances/fee-structures (studentId branch) and bulkInvoiceService.ts --
+// both now call this instead. The `options` flags map directly onto the
+// Bulk Invoice Generator's "Include Mandatory Core Levies" / "Include
+// Enrolled Optional Services" checkboxes.
+export async function getEligibleFeeStructuresForStudent(
+  studentId: string,
+  academicYear: string,
+  term: number,
+  options?: { includeMandatory?: boolean; includeOptionalCommitted?: boolean }
+) {
+  const includeMandatory = options?.includeMandatory ?? true
+  const includeOptionalCommitted = options?.includeOptionalCommitted ?? true
+
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    select: { classId: true },
+  })
+
+  const results: Awaited<ReturnType<typeof prisma.feeStructure.findMany>> = []
+  const seen = new Set<string>()
+
+  if (includeMandatory) {
+    const where: Prisma.FeeStructureWhereInput = {
+      academicYear,
+      isActive: true,
+      mandatory: true,
+      OR: [{ classId: null }, ...(student?.classId ? [{ classId: student.classId }] : [])],
+      AND: [{ OR: [{ term: null }, { term }] }],
+    }
+    const mandatoryFees = await prisma.feeStructure.findMany({ where, orderBy: { name: 'asc' } })
+    for (const f of mandatoryFees) {
+      results.push(f)
+      seen.add(f.id)
+    }
+  }
+
+  if (includeOptionalCommitted) {
+    const commitments = await prisma.studentFeeCommitment.findMany({
+      where: { studentId, academicYear, status: 'COMMITTED' },
+      include: { feeStructure: true },
+    })
+    for (const c of commitments) {
+      const f = c.feeStructure
+      if (!seen.has(f.id) && f.isActive && f.academicYear === academicYear) {
+        results.push(f)
+        seen.add(f.id)
+      }
+    }
+  }
+
+  return results
+}
+
+// ─── STUDENT FEE COMMITMENTS (enrolled add-ons) ──────────
+// [NEW] The Finance Fee Structure workstation's "Enrolled Add-ons" list
+// and "Edit Add-on Commitments" action -- see StudentFeeCommitment in
+// schema.prisma.
+export async function listStudentFeeCommitments(studentId: string, academicYear: string) {
+  return prisma.studentFeeCommitment.findMany({
+    where: { studentId, academicYear },
+    include: {
+      feeStructure: {
+        select: { id: true, name: true, code: true, category: true, amount: true, mandatory: true, schedule: true },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+}
+
+export async function upsertStudentFeeCommitment(
+  data: CreateStudentFeeCommitmentInput,
+  actorUid: string
+) {
+  const feeStructure = await prisma.feeStructure.findUnique({ where: { id: data.feeStructureId } })
+  if (!feeStructure) throw new Error('Fee type not found.')
+  if (feeStructure.mandatory) {
+    throw new Error('Mandatory fees apply automatically and cannot be committed to individually.')
+  }
+  if (!feeStructure.isActive) {
+    throw new Error('This fee type has been archived and can no longer be committed to.')
+  }
+
+  // Reactivate an existing (possibly WAIVED) row for this exact triple
+  // instead of creating a duplicate -- see @@unique([studentId,
+  // feeStructureId, academicYear]) on StudentFeeCommitment.
+  const existing = await prisma.studentFeeCommitment.findUnique({
+    where: {
+      studentId_feeStructureId_academicYear: {
+        studentId: data.studentId,
+        feeStructureId: data.feeStructureId,
+        academicYear: data.academicYear,
+      },
+    },
+  })
+
+  const commitment = existing
+    ? await prisma.studentFeeCommitment.update({
+        where: { id: existing.id },
+        data: { status: 'COMMITTED', notes: data.notes ?? existing.notes },
+      })
+    : await prisma.studentFeeCommitment.create({
+        data: {
+          studentId: data.studentId,
+          feeStructureId: data.feeStructureId,
+          academicYear: data.academicYear,
+          notes: data.notes ?? null,
+          createdByUid: actorUid,
+        },
+      })
+
+  logger.info({
+    event: 'studentFeeCommitment.upserted', studentId: data.studentId,
+    feeStructureId: data.feeStructureId, academicYear: data.academicYear, actorUid,
+  })
+  return commitment
+}
+
+export async function updateStudentFeeCommitmentStatus(
+  id: string,
+  data: UpdateStudentFeeCommitmentInput
+) {
+  const commitment = await prisma.studentFeeCommitment.update({
+    where: { id },
+    data: { status: data.status, ...(data.notes !== undefined ? { notes: data.notes } : {}) },
+  })
+  logger.info({ event: 'studentFeeCommitment.statusChanged', id, status: data.status })
+  return commitment
 }

@@ -73,11 +73,16 @@ import {
   RecordPaymentSchema,
   GenerateInvoiceSchema,
   CreateFeeStructureSchema,
+  UpdateFeeStructureSchema,
   CreateExpenseSchema,
   CreateScholarshipSchema,
   CreateInstallmentPlanSchema,
   CreateLibraryFineSchema,
   CreateBudgetSchema,
+  AddInvoiceLineItemSchema,
+  BulkGenerateInvoicesSchema,
+  CreateStudentFeeCommitmentSchema,
+  UpdateStudentFeeCommitmentSchema,
 } from '@shared/schemas/finance'
 import { Prisma, InvoiceStatus, FineStatus } from '@prisma/client'
 import * as feeService from '@/server/services/feeService'
@@ -112,34 +117,63 @@ financesRouter.get('/summary', verifyAuth, requireRole([...FINANCE_ROLES]), asyn
   res.json(summary)
 })
 
-// ── FEE STRUCTURES
+// ── FEE STRUCTURES (Settings & Fee Catalog / Finance Fee Structure) ──────
 financesRouter.get(
   '/fee-structures',
   verifyAuth,
-  requireRole([...FINANCE_ROLES, 'high_rank']),
+  // [2026-09-05] Added 'student' -- the Student Portal Statement's
+  // "Approved Standard Term Fee Schedule" needs this same eligibility
+  // resolution for the signed-in student's own record. See the
+  // UID-resolution guard below, which mirrors GET /balance/:studentId's
+  // existing tamper-proof pattern exactly.
+  requireRole([...FINANCE_ROLES, 'high_rank', 'student']),
   async (req, res) => {
     try {
-      const { academicYear = '2025/2026', studentId, term } = req.query
+      const { academicYear = '2025/2026', studentId, term, includeArchived } = req.query
+
+      if (req.user!.role === 'student') {
+        // A student-role client only ever knows its own Firebase UID --
+        // resolve it server-side and ignore whatever (if anything) was in
+        // the studentId query param, exactly like GET /balance/:studentId.
+        const student = await studentService.resolveStudentFromUid(req.user!.uid)
+        if (!student) {
+          return res.status(403).json({ error: 'No student record linked to your account.' })
+        }
+        const fees = await feeService.getEligibleFeeStructuresForStudent(
+          student.id,
+          academicYear as string,
+          term ? Number(term) : 1,
+        )
+        return res.json(fees)
+      }
+
+      // [PRODUCTION FIX 2026-09-05] When a studentId is given, this now
+      // delegates to feeService.getEligibleFeeStructuresForStudent() -- the
+      // same eligibility resolution (mandatory-by-class/term plus actively
+      // COMMITTED optional add-ons) bulkInvoiceService uses, instead of a
+      // second, independently-drifting where-clause that used to live only
+      // here and never accounted for the mandatory/optional distinction at
+      // all (see FeeStructure.mandatory in schema.prisma).
+      if (studentId) {
+        const fees = await feeService.getEligibleFeeStructuresForStudent(
+          String(studentId),
+          academicYear as string,
+          term ? Number(term) : 1,
+        )
+        return res.json(fees)
+      }
+      // No studentId: the Settings & Fee Catalog screen's own listing --
+      // every fee type for the year, active by default, with an explicit
+      // opt-in to see archived ones too (the catalog's Active/Archived
+      // filter tabs).
       const where: Prisma.FeeStructureWhereInput = {
         academicYear: academicYear as string,
-        isActive: true,
-      }
-      // [PRODUCTION FIX] When building a New Invoice, the picker needs the
-      // fee types that actually apply to THIS student (their class, and
-      // this term specifically) -- not every active fee structure in the
-      // school. Mirrors the inclusion logic feeService.generateInvoice()
-      // used to compute inline before line items existed.
-      if (studentId) {
-        const student = await prisma.student.findUnique({
-          where: { id: String(studentId) },
-          select: { classId: true },
-        })
-        where.OR = [{ classId: null }, ...(student?.classId ? [{ classId: student.classId }] : [])]
+        ...(includeArchived === 'true' ? {} : { isActive: true }),
       }
       if (term) {
         where.AND = [{ OR: [{ term: null }, { term: Number(term) }] }]
       }
-      const fees = await prisma.feeStructure.findMany({ where, orderBy: { name: 'asc' } })
+      const fees = await prisma.feeStructure.findMany({ where, orderBy: { code: 'asc' } })
       res.json(fees)
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'finances', route: 'fee-structures-list' } })
@@ -154,19 +188,98 @@ financesRouter.post(
   async (req, res) => {
     const parsed = CreateFeeStructureSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    // CreateFeeStructureSchema only has: name, amount, classId, academicYear, term
-    // isActive has a Prisma default (true) — don't pass it
-    // description does NOT exist in the schema — don't pass it
-    const fee = await prisma.feeStructure.create({
-      data: {
-        name: parsed.data.name,
-        amount: parsed.data.amount,
-        academicYear: parsed.data.academicYear,
-        ...(parsed.data.term != null ? { term: parsed.data.term } : {}),
-        ...(parsed.data.classId ? { classId: parsed.data.classId } : {}),
-      },
-    })
-    res.status(201).json(fee)
+    try {
+      const fee = await prisma.feeStructure.create({
+        data: {
+          name: parsed.data.name,
+          code: parsed.data.code,
+          category: parsed.data.category,
+          amount: parsed.data.amount,
+          mandatory: parsed.data.mandatory,
+          schedule: parsed.data.schedule,
+          ...(parsed.data.description ? { description: parsed.data.description } : {}),
+          academicYear: parsed.data.academicYear,
+          ...(parsed.data.term != null ? { term: parsed.data.term } : {}),
+          ...(parsed.data.classId ? { classId: parsed.data.classId } : {}),
+        },
+      })
+      res.status(201).json(fee)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'fee-structure-create' } })
+    }
+  }
+)
+
+// [NEW] Edit a catalog entry's rate/metadata, or archive/restore it (the
+// Ledger Preservation Policy -- see schema.prisma's FeeStructure header
+// comment: archiving only hides it from new line-item pickers, every
+// existing invoice and line item keeps referencing it exactly as before).
+financesRouter.patch(
+  '/fee-structures/:id',
+  verifyAuth,
+  requireRole(['admin', 'finance']),
+  async (req, res) => {
+    const parsed = UpdateFeeStructureSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    try {
+      const fee = await prisma.feeStructure.update({
+        where: { id: String(req.params.id) },
+        data: parsed.data,
+      })
+      res.json(fee)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'fee-structure-update' } })
+    }
+  }
+)
+
+// ── STUDENT FEE COMMITMENTS (Finance Fee Structure workstation's
+//    "Enrolled Add-ons" / "Edit Add-on Commitments") ─────────────────────
+financesRouter.get(
+  '/fee-commitments',
+  verifyAuth,
+  requireRole([...FINANCE_ROLES, 'high_rank']),
+  async (req, res) => {
+    const { studentId, academicYear = '2025/2026' } = req.query
+    if (!studentId) return res.status(400).json({ error: 'studentId is required' })
+    try {
+      const commitments = await feeService.listStudentFeeCommitments(String(studentId), academicYear as string)
+      res.json(commitments)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'fee-commitments-list' } })
+    }
+  }
+)
+
+financesRouter.post(
+  '/fee-commitments',
+  verifyAuth,
+  requireRole(['admin', 'finance']),
+  async (req, res) => {
+    const parsed = CreateStudentFeeCommitmentSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    try {
+      const commitment = await feeService.upsertStudentFeeCommitment(parsed.data, req.user!.uid)
+      res.status(201).json(commitment)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'fee-commitment-create' } })
+    }
+  }
+)
+
+financesRouter.patch(
+  '/fee-commitments/:id',
+  verifyAuth,
+  requireRole(['admin', 'finance']),
+  async (req, res) => {
+    const parsed = UpdateStudentFeeCommitmentSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    try {
+      const commitment = await feeService.updateStudentFeeCommitmentStatus(String(req.params.id), parsed.data)
+      res.json(commitment)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'fee-commitment-update' } })
+    }
   }
 )
 
@@ -233,6 +346,26 @@ financesRouter.post(
       return res.status(201).json(invoice)
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'finances', route: 'invoice-generate' } })
+    }
+  }
+)
+
+// [NEW] Invoice Entry & Allocation screen's "+ Add a line" affordance --
+// append one more fee type to an EXISTING invoice (e.g. the student joins
+// Transport partway through the term). Distinct from /invoices/generate,
+// which only ever applies at an invoice's initial creation.
+financesRouter.post(
+  '/invoices/:id/line-items',
+  verifyAuth,
+  requireRole(['admin', 'finance']),
+  async (req, res) => {
+    const parsed = AddInvoiceLineItemSchema.safeParse({ ...req.body, invoiceId: req.params.id })
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    try {
+      const invoice = await feeService.addInvoiceLineItem(parsed.data, req.user!.uid, req.user!.role)
+      return res.status(201).json(invoice)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'invoice-add-line-item' } })
     }
   }
 )
@@ -797,29 +930,28 @@ financesRouter.post(
   }
 )
 
-// ── POST /finances/invoices/bulk-generate (admin | finance) ──────────────────
+// ── POST /finances/invoices/bulk-generate (admin | finance) ──────────────
+// [PRODUCTION FIX 2026-09-05] Was completely unvalidated (`req.body as
+// {...}` type assertion, no runtime check at all) and called a version of
+// bulkGenerateInvoices() with a confirmed bug -- see
+// bulkInvoiceService.ts's header comment. Now validates with
+// BulkGenerateInvoicesSchema and passes the whole parsed body straight
+// through -- `dryRun: true` returns the Bulk Invoice Generator's
+// pre-execution roster preview without creating anything; `dryRun: false`
+// (the schema's default) actually commits.
 financesRouter.post(
   '/invoices/bulk-generate',
   verifyAuth,
   requireRole(['admin', 'finance']),
   async (req, res) => {
-    const { classId = 'ALL', academicYear, term } = req.body as {
-      classId?: string
-      academicYear: string
-      term: number
+    const parsed = BulkGenerateInvoicesSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    try {
+      const result = await bulkGenerateInvoices(parsed.data, req.user!.uid, req.user!.role)
+      return res.status(parsed.data.dryRun ? 200 : 201).json(result)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'invoices-bulk-generate' } })
     }
-
-    if (!academicYear || !term) {
-      return res.status(400).json({ error: 'academicYear and term are required' })
-    }
-
-    const result = await bulkGenerateInvoices(
-      classId,
-      academicYear,
-      Number(term),
-      req.user!.uid,
-    )
-    return res.status(201).json(result)
   },
 )
 

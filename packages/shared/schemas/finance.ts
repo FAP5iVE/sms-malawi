@@ -1,22 +1,52 @@
 /**
  * packages/shared/schemas/finance.ts
  *
- * [CHANGE TYPE]: TARGETED EDIT
- * [R-PHASE]: R14 — Analytics & Reports Domain
- * [PURPOSE]: CreateBudgetSchema.category was `z.string().min(1)` — free
- *   text — while Expense.category has always been the ExpenseCategory
- *   enum. The two are the join key that
- *   analyticsService.getFinanceBudgetVsActual() relies on, so an
- *   unconstrained Budget.category meant that join never matched and the
- *   report silently fell back to the stale cached Budget.spent column.
- *   R14 constrains Budget.category to ExpenseCategory in schema.prisma;
- *   this schema is the request-validation half of the same fix, so an
- *   off-enum category can no longer be written in the first place.
- * [DEPENDS ON]: apps/web/prisma/schema.prisma (Budget.category enum)
+ * [CHANGE TYPE]: MAJOR REWRITE
+ * [PURPOSE]: Foundation for the Invoice Entry & Allocation / Bulk Invoice
+ *   Generator / Finance Fee Structure / Settings & Fee Catalog / Student
+ *   Portal Statement redesign (see apps/web/prisma/schema.prisma's
+ *   2026-09-05 schema extension for the matching data-model change):
+ *     1. PaymentMethodSchema gains AIRTEL_MONEY / TNM_MPAMBA / POS_CARD.
+ *     2. FeeCategorySchema / FeeScheduleSchema / FeeCommitmentStatusSchema
+ *        — new enums matching the Prisma additions of the same name.
+ *     3. CreateFeeStructureSchema now validates the full fee-catalog shape
+ *        (code, category, mandatory, schedule, description) instead of
+ *        just name/amount/classId/academicYear/term.
+ *     4. UpdateFeeStructureSchema — partial update, used both for editing
+ *        a catalog entry's rate/metadata and for the archive/restore
+ *        toggle (isActive).
+ *     5. CreateStudentFeeCommitmentSchema / UpdateStudentFeeCommitmentSchema
+ *        — the Finance Fee Structure workstation's "Edit Add-on
+ *        Commitments" action.
+ *     6. BulkGenerateInvoicesSchema — formalises what the Bulk Invoice
+ *        Generator actually submits (previously the route accepted raw,
+ *        unvalidated req.body fields — see finances.ts's POST
+ *        /invoices/bulk-generate). The four accounting-rule checkboxes on
+ *        that screen (mandatory levies / enrolled optional services /
+ *        scholarship & staff discounts / prior advance credit) map
+ *        directly to boolean options here; "carry forward prior arrears"
+ *        is a report-only figure (each term's Invoice is its own row —
+ *        see bulkInvoiceService.ts) and is not one of these flags.
+ *     7. AddInvoiceLineItemSchema — lets the bursar append one more fee
+ *        type to an EXISTING invoice (the Invoice Entry screen's "+ Add a
+ *        line" affordance when a student already has an invoice this
+ *        term), distinct from GenerateInvoiceSchema which only applies to
+ *        an invoice's initial creation.
+ * [DEPENDS ON]: apps/web/prisma/schema.prisma (FeeCategory, FeeSchedule,
+ *   FeeCommitmentStatus, PaymentMethod, FeeStructure.code/category/
+ *   mandatory/schedule/description, StudentFeeCommitment)
  */
 import { z } from 'zod'
 
-export const PaymentMethodSchema = z.enum(['CASH', 'BANK_TRANSFER', 'MOBILE_MONEY', 'CHEQUE'])
+export const PaymentMethodSchema = z.enum([
+  'CASH',
+  'BANK_TRANSFER',
+  'MOBILE_MONEY',
+  'CHEQUE',
+  'AIRTEL_MONEY',
+  'TNM_MPAMBA',
+  'POS_CARD',
+])
 
 export const ExpenseCategorySchema = z.enum([
   'SALARIES',
@@ -28,13 +58,87 @@ export const ExpenseCategorySchema = z.enum([
   'MISCELLANEOUS',
 ])
 
-// ─── FEE STRUCTURE ───────────────────────────────────────
+// ─── FEE CATALOG ──────────────────────────────────────────
+export const FeeCategorySchema = z.enum([
+  'TUITION',
+  'TRANSPORT',
+  'UNIFORM',
+  'BOARDING',
+  'LEVY',
+  'ACTIVITY',
+  'OTHER',
+])
+
+export const FeeScheduleSchema = z.enum(['PER_TERM', 'ANNUAL', 'ONE_TIME'])
+
+export const FeeCommitmentStatusSchema = z.enum(['COMMITTED', 'WAIVED'])
+
+// [PRODUCTION FIX] Full rewrite — previously just name/amount/classId/
+// academicYear/term. The Settings & Fee Catalog screen needs the full
+// accounting-metadata shape: a stable code, a category for grouping/
+// badges, whether it's mandatory or an optional enrolled add-on, and its
+// billing schedule. `code` is validated as uppercase-alnum-plus-hyphen so
+// it reads consistently in tables ("TUI-01") regardless of how it was
+// typed.
 export const CreateFeeStructureSchema = z.object({
   name: z.string().min(1),
+  code: z
+    .string()
+    .min(1)
+    .max(20)
+    .regex(/^[A-Za-z0-9-]+$/, 'Use letters, numbers, and hyphens only')
+    .transform((v) => v.toUpperCase()),
+  category: FeeCategorySchema,
   amount: z.number().positive('Amount must be positive'),
+  mandatory: z.boolean(),
+  schedule: FeeScheduleSchema,
+  description: z.string().max(500).optional(),
   classId: z.string().optional(),
   academicYear: z.string().regex(/^\d{4}\/\d{4}$/),
   term: z.number().int().min(1).max(3).optional(),
+})
+
+// Partial update — every field optional, plus the archive/restore toggle.
+// A fee's `code`/`academicYear` pairing is what invoices already reference
+// by name at generation time (InvoiceLineItem.feeStructureId is kept for
+// reference only — see schema.prisma), so archiving never touches
+// existing invoices or line items; it only removes the entry from new
+// line-item pickers (feeService's active-only queries).
+export const UpdateFeeStructureSchema = z.object({
+  name: z.string().min(1).optional(),
+  code: z
+    .string()
+    .min(1)
+    .max(20)
+    .regex(/^[A-Za-z0-9-]+$/, 'Use letters, numbers, and hyphens only')
+    .transform((v) => v.toUpperCase())
+    .optional(),
+  category: FeeCategorySchema.optional(),
+  amount: z.number().positive('Amount must be positive').optional(),
+  mandatory: z.boolean().optional(),
+  schedule: FeeScheduleSchema.optional(),
+  description: z.string().max(500).optional(),
+  classId: z.string().nullable().optional(),
+  term: z.number().int().min(1).max(3).nullable().optional(),
+  isActive: z.boolean().optional(),
+})
+
+// ─── STUDENT FEE COMMITMENTS (enrolled add-ons) ──────────
+// A student opting into (or being waived from) an OPTIONAL fee type for a
+// given academic year — see StudentFeeCommitment in schema.prisma. Only
+// meaningful for a `mandatory: false` FeeStructure; mandatory fees apply
+// to every student in the relevant class/term automatically and never
+// need a commitment row.
+export const CreateStudentFeeCommitmentSchema = z.object({
+  studentId: z.string().min(1),
+  feeStructureId: z.string().min(1),
+  academicYear: z.string().regex(/^\d{4}\/\d{4}$/),
+  notes: z.string().max(300).optional(),
+})
+
+export const UpdateStudentFeeCommitmentSchema = z.object({
+  status: FeeCommitmentStatusSchema,
+  notes: z.string().max(300).optional(),
 })
 
 // ─── RECORD PAYMENT ──────────────────────────────────────
@@ -84,6 +188,39 @@ export const GenerateInvoiceSchema = z.object({
   // both are present, and distributes the total discount proportionally
   // across the selected fee types' line items.
   manualDiscount: z.number().min(0).optional(),
+})
+
+// [NEW] Append one more fee type to an EXISTING invoice — the Invoice
+// Entry screen's "+ Add a line" affordance for a student who already has
+// an invoice this term (e.g. they join Transport partway through the
+// term). Distinct from GenerateInvoiceSchema, which only ever applies at
+// an invoice's initial creation. See feeService.addInvoiceLineItem().
+export const AddInvoiceLineItemSchema = z.object({
+  invoiceId: z.string().min(1),
+  feeStructureId: z.string().min(1),
+})
+
+// ─── BULK INVOICE GENERATOR ──────────────────────────────
+// [NEW] Formalises the Bulk Invoice Generator's batch-run request — see
+// bulkInvoiceService.bulkGenerateInvoices(). Each boolean option maps
+// directly to one of the screen's "Accounting Rules & Fee Automation"
+// checkboxes; `studentIds` narrows the run to the roster rows the person
+// actually left checked in the dry-run preview (omit to run against every
+// eligible student in the chosen cohort).
+export const BulkGenerateInvoicesSchema = z.object({
+  classId: z.union([z.literal('ALL'), z.string().min(1)]),
+  academicYear: z.string().regex(/^\d{4}\/\d{4}$/),
+  term: z.number().int().min(1).max(3),
+  includeMandatory: z.boolean().default(true),
+  includeEnrolledOptional: z.boolean().default(true),
+  applyScholarships: z.boolean().default(true),
+  consumeAdvanceCredit: z.boolean().default(true),
+  studentIds: z.array(z.string().min(1)).optional(),
+  // true = compute and return the roster preview (projected totals,
+  // scholarship/credit/arrears figures) without creating anything --
+  // the "PRE-EXECUTION DRY RUN ROSTER" step. false = actually create the
+  // invoices. See bulkInvoiceService.bulkGenerateInvoices().
+  dryRun: z.boolean().default(false),
 })
 
 // ─── EXPENSE ─────────────────────────────────────────────
@@ -142,8 +279,13 @@ export const CreateLibraryFineSchema = z.object({
 export type RecordPaymentInput = z.infer<typeof RecordPaymentSchema>
 export type PaymentAllocationInput = z.infer<typeof PaymentAllocationSchema>
 export type GenerateInvoiceInput = z.infer<typeof GenerateInvoiceSchema>
+export type AddInvoiceLineItemInput = z.infer<typeof AddInvoiceLineItemSchema>
+export type BulkGenerateInvoicesInput = z.infer<typeof BulkGenerateInvoicesSchema>
 export type CreateExpenseInput = z.infer<typeof CreateExpenseSchema>
 export type CreateFeeStructureInput = z.infer<typeof CreateFeeStructureSchema>
+export type UpdateFeeStructureInput = z.infer<typeof UpdateFeeStructureSchema>
+export type CreateStudentFeeCommitmentInput = z.infer<typeof CreateStudentFeeCommitmentSchema>
+export type UpdateStudentFeeCommitmentInput = z.infer<typeof UpdateStudentFeeCommitmentSchema>
 export type CreateScholarshipInput = z.infer<typeof CreateScholarshipSchema>
 export type CreateBudgetInput = z.infer<typeof CreateBudgetSchema>
 export type CreateInstallmentPlanInput = z.infer<typeof CreateInstallmentPlanSchema>

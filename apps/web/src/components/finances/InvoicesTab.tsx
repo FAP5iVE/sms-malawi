@@ -1,880 +1,773 @@
-/**
- * [CHANGE TYPE]: TARGETED EDIT, three fixes (listed below)
- * [FILE]: apps/web/src/components/finances/InvoicesTab.tsx
- * [R-PHASE]: R9 — Finance I: Invoicing, Fees & the Accounting Ledger
- *   Reconnection
- * [PURPOSE]:
- *   1. Student self-service invoice viewing now calls
- *      GET /finances/balance/:studentId (ownership-checked, reachable by
- *      the `student` role) via the new useStudentBalance() hook, instead
- *      of GET /finances/invoices (whose role list excludes `student`
- *      entirely, so a student rendering this tab under the old code
- *      always saw an empty table).
- *   2. "Student" column now renders the joined student name
- *      (inv.student.firstName/lastName, added to ApiInvoice this phase)
- *      instead of `inv.studentId.slice(-8)`.
- *   3. "Pay" button now gates on usePermissions().can('finance.recordPayment')
- *      instead of the previous `role !== 'student'` check, which
- *      incorrectly showed the button to every staff role (including
- *      admin, high_rank, library, hr — none of which hold this
- *      permission by design; recording a payment is a `finance`-role
- *      business operation) rather than just the one role that holds it.
- * [DEPENDS ON]: W/hooks/useFinances.ts (useStudentBalance), W/hooks/usePermissions.ts
- */
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import { useInvoices, useInvoiceDetail, useStudentBalance, useRecordPayment, useGenerateInvoice, useFeeStructures } from '@/hooks/useFinances'
-import { useStudents } from '@/hooks/useStudents'
-import { useClasses } from '@/hooks/useClasses'
+/**
+ * apps/web/src/components/finances/InvoicesTab.tsx
+ *
+ * [CHANGE TYPE]: MAJOR REWRITE
+ * [PURPOSE]: This is the "Invoice Entry & Allocation" screen from the
+ *   requested redesign — the centerpiece of this project. Replaces the
+ *   previous two-popup-modal flow (a bare invoice list + a separate "New
+ *   Invoice" modal + a separate "Record Payment" modal) with one unified,
+ *   QuickBooks-style entry screen: search/select a student, see (or build)
+ *   their fee line items, enter the payment being made today, allocate it
+ *   across those lines, and submit in one action — with every figure
+ *   (totals, balance, arrears) recalculating live as you type, exactly as
+ *   requested.
+ *
+ *   Table/section structure (Bill To, Payment Committed & Remittance
+ *   Particulars, Fee Line Items Ledger, auto-distribute, totals) is
+ *   adopted from the reference; visual styling is this app's own. The
+ *   underlying accounting model is NOT the reference's mock data — it is
+ *   this project's real, already-production feeService.ts engine:
+ *     - Invoice number: auto-generated only (INV-2026-0042 style, see
+ *       invoiceNumberService.ts) — no manual entry. A real accounting
+ *       ledger's numbering should never have manually-chosen gaps or
+ *       collisions; auto-only is standard internal-control practice for
+ *       exactly the reason a bursar can't accidentally reuse or skip one.
+ *     - Due date: intentionally absent (see GenerateInvoiceSchema — this
+ *       system doesn't negotiate per-invoice payment terms; every invoice
+ *       is net-30 from generation automatically).
+ *     - Fee type picker: sourced live from Settings & Fee Catalog via
+ *       getEligibleFeeStructuresForStudent() (mandatory fees for this
+ *       student's class/term, plus anything they're actively enrolled in
+ *       via Finance Fee Structure) — never hardcoded.
+ *     - Allocation cannot exceed the payment being made this transaction
+ *       (RecordPaymentSchema — sum(allocations) > amount is rejected
+ *       outright), and any amount allocated beyond a specific fee's own
+ *       balance becomes an advance credit — carried forward automatically
+ *       to that student's next invoice — but only after the person
+ *       explicitly confirms it (the real 409
+ *       OverpaymentConfirmationRequiredError flow, shown here with the
+ *       exact fee-by-fee breakdown the server computed, not a client-side
+ *       guess).
+ *     - The two real accounting cases this screen actually handles:
+ *       (a) no invoice exists yet for this student/term — the line items
+ *           chosen here create it (feeService.generateInvoice()) and the
+ *           payment is recorded against the fresh line items in the same
+ *           submit; (b) an invoice already exists — its real line items
+ *           and real remaining balances are shown, "+ Add a line" can
+ *           append one more fee type mid-term (addInvoiceLineItem()), and
+ *           the payment is recorded against real balances
+ *           (recordPayment()).
+ *
+ *   Student search/selection is preserved (and extended: a `studentId`
+ *   query param, e.g. from Finance Fee Structure's "Bill Now" button, now
+ *   pre-selects a student on load). The former ?action=new / ?action=bulk
+ *   deep-links are retired along with the modals they used to open — bulk
+ *   generation is now its own top-level tab (see finances/page.tsx).
+ *
+ * [DEPENDS ON]: useFinances.ts, useStudents.ts, usePermissions.ts,
+ *   InvoiceNotes.tsx (preserved, unchanged, re-mounted here)
+ */
+
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
-import { formatMWK } from '@shared/constants/malawi'
-import { PlusCircle, Loader2, X as XIcon, FileText, Search, AlertTriangle } from 'lucide-react'
+import { useStudents, useStudent } from '@/hooks/useStudents'
+import {
+  useInvoices,
+  useFeeStructures,
+  useGenerateInvoice,
+  useRecordPayment,
+  useAddInvoiceLineItem,
+  useFetchReceipt,
+} from '@/hooks/useFinances'
+import { ApiError } from '@/lib/api-client'
+import { formatMWK, FEE_CATEGORY_LABELS, PAYMENT_METHOD_OPTIONS } from '@shared/constants/malawi'
+import type { ApiInvoice, ApiFeeStructure } from '@shared/types/api'
 import { InvoiceNotes } from '@/components/finances/InvoiceNotes'
-import { BulkInvoiceGenerator } from '@/components/finances/BulkInvoiceGenerator'
-import type { ApiInvoice, ApiStudent } from '@shared/types/api'
-import { apiFetch, queryKeys, ApiError } from '@/lib/api-client'
-import { useQueryClient } from '@tanstack/react-query'
-import { PaymentMethodSchema, GenerateInvoiceSchema, RecordPaymentSchema } from '@shared/schemas/finance'
-import { useSearchParams } from 'next/navigation'
-import { z } from 'zod'
+import { StudentPortalStatementTab } from '@/components/finances/StudentPortalStatementTab'
+import {
+  Search, Loader2, Plus, Trash2, Wand2, AlertTriangle, CheckCircle2,
+  Receipt as ReceiptIcon, X, ExternalLink, Boxes, ArrowRight,
+} from 'lucide-react'
 
-type PaymentMethodType = z.infer<typeof PaymentMethodSchema>
 const STATUS_COLORS: Record<string, string> = {
-  PAID: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  PARTIAL: 'bg-blue-50 text-blue-700 border-blue-200',
-  UNPAID: 'bg-brand-amber/10 text-brand-amber border-brand-amber/30',
-  OVERDUE: 'bg-brand-coral/10 text-brand-coral border-brand-coral/30',
+  PAID: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/25 dark:text-emerald-400 dark:border-emerald-800/50',
+  PARTIAL: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/25 dark:text-blue-400 dark:border-blue-800/50',
+  UNPAID: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/25 dark:text-amber-400 dark:border-amber-800/50',
+  OVERDUE: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/25 dark:text-rose-400 dark:border-rose-800/50',
 }
 
-function studentDisplayName(inv: ApiInvoice, isOwnRecord: boolean): string {
-  if (inv.student) return `${inv.student.firstName} ${inv.student.lastName}`
-  return isOwnRecord ? 'You' : '—'
+type PaymentMethodValue = (typeof PAYMENT_METHOD_OPTIONS)[number]['value']
+
+interface Row {
+  key: string
+  feeStructureId: string
+  lineItemId: string | null
+  feeName: string
+  code: string
+  category: string
+  mandatory: boolean
+  fixedAmount: number
+  balance: number
+  allocation: string
 }
+
+interface OverpaymentItem {
+  lineItemId: string
+  feeName: string
+  excess: number
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ENTRY POINT — routes staff to Invoice Entry & Allocation, students to
+// the dedicated Student Portal Statement screen (this used to be a small
+// temporary bridge component pending that screen's build; now replaced
+// with the real thing).
+// ─────────────────────────────────────────────────────────────────────────
 
 export function InvoicesTab({ academicYear, term }: { academicYear: string; term: number }) {
-  const { role, user } = useAuthStore()
-  const { can } = usePermissions()
+  const { role } = useAuthStore()
   const isStudent = role === 'student'
+
+  if (isStudent) {
+    return <StudentPortalStatementTab academicYear={academicYear} term={term} />
+  }
+  return <InvoiceEntryAllocation academicYear={academicYear} term={term} />
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// INVOICE ENTRY & ALLOCATION — the real work.
+// ─────────────────────────────────────────────────────────────────────────
+
+function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; term: number }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { can } = usePermissions()
   const canRecordPayment = can('finance.recordPayment')
   const canGenerateInvoice = can('finance.generateInvoice')
 
-  const [statusFilter, setStatusFilter] = useState('')
-  const [payingInvoice, setPayingInvoice] = useState<ApiInvoice | null>(null)
-  const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null)
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(searchParams.get('studentId'))
+  const [studentSearch, setStudentSearch] = useState('')
 
-  // [PRODUCTION FIX] Dashboard's "Generate Invoice" quick action
-  // (FinanceDashboard.tsx) linked here with no way to actually act once
-  // arrived — deep-linking with ?action=new now opens this modal directly
-  // on load, same ?tab= convention finances/page.tsx already uses.
-  const searchParams = useSearchParams()
-  const [showNewInvoice, setShowNewInvoice] = useState(searchParams.get('action') === 'new')
-  const [showBulkGenerator, setShowBulkGenerator] = useState(searchParams.get('action') === 'bulk')
+  const [rows, setRows] = useState<Row[]>([])
+  const [rowsInitializedFor, setRowsInitializedFor] = useState<string | null>(null)
+  const [addLineValue, setAddLineValue] = useState('')
 
-  const filters: Record<string, string | number> = { academicYear, term }
-  if (statusFilter) filters.status = statusFilter
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodValue>('BANK_TRANSFER')
+  const [paymentReference, setPaymentReference] = useState('')
+  const [paymentNotes, setPaymentNotes] = useState('')
+  const [additionalDiscount, setAdditionalDiscount] = useState('')
 
-  const { data: staffInvoices = [], isLoading: staffLoading } = useInvoices(filters, !isStudent)
-  const { data: balanceData, isLoading: balanceLoading } = useStudentBalance(
-    user?.uid ?? '',
-    academicYear,
-    isStudent
+  const [overpaymentPrompt, setOverpaymentPrompt] = useState<OverpaymentItem[] | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  // ── Data ──
+  // useStudents() returns the paginated { students, total, page, pages }
+  // shape, not a bare array -- only fetch once the search string is
+  // actually meaningful, matching the debounce-free but query-length-gated
+  // convention GlobalSearch.tsx already uses elsewhere in this app.
+  const { data: searchData, isLoading: searchLoading } = useStudents(
+    { search: studentSearch, status: 'ACTIVE' },
   )
-
-  const invoices = isStudent ? (balanceData?.invoices ?? []) : staffInvoices
-  const isLoading = isStudent ? balanceLoading : staffLoading
-
-  // Payment recording now lives entirely in PaymentModal below, which
-  // manages its own useRecordPayment() call and the full allocation flow.
-  return (
-    <div className="space-y-4">
-      {/* Status chips + New Invoice */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex gap-2 flex-wrap">
-          {['', 'UNPAID', 'PARTIAL', 'PAID', 'OVERDUE'].map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={[
-                'px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors',
-                statusFilter === s
-                  ? 'bg-brand-navy text-white border-brand-navy'
-                  : 'bg-surface border-base text-muted hover:border-brand-navy',
-              ].join(' ')}
-              aria-label={s || 'All statuses'}
-            >
-              {s || 'All'}
-            </button>
-          ))}
-        </div>
-        {/* [PRODUCTION FIX] Neither of these existed — POST
-            /finances/invoices/generate and POST
-            /finances/invoices/bulk-generate both already worked (the
-            latter via BulkInvoiceGenerator.tsx, a fully-built component
-            that was never mounted on any page). Only student-fee-balance
-            invoices (auto-generated elsewhere) ever appeared in this tab
-            as a result. */}
-        {canGenerateInvoice && (
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setShowBulkGenerator(true)}
-              className="inline-flex items-center gap-2 border border-brand-navy text-brand-navy rounded-xl px-4 py-2 text-sm font-semibold hover:bg-brand-navy/5 transition-colors min-h-[40px]"
-            >
-              <FileText className="w-4 h-4" aria-hidden /> Bulk Generate
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowNewInvoice(true)}
-              className="inline-flex items-center gap-2 bg-brand-teal text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-brand-teal-light transition-colors min-h-[40px]"
-            >
-              <PlusCircle className="w-4 h-4" aria-hidden /> New Invoice
-            </button>
-          </div>
-        )}
-      </div>
-      {/* Invoices table */}
-      <div className="bg-surface border border-base rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[640px]">
-          <thead>
-            <tr className="border-b border-base bg-page">
-              <th className="text-left px-4 py-3 font-heading font-semibold text-xs uppercase tracking-wide text-muted">
-                Student
-              </th>
-              <th className="text-left px-4 py-3 font-heading font-semibold text-xs uppercase tracking-wide text-muted">
-                Term
-              </th>
-              <th className="text-right px-4 py-3 font-heading font-semibold text-xs uppercase tracking-wide text-muted">
-                Total
-              </th>
-              <th className="text-right px-4 py-3 font-heading font-semibold text-xs uppercase tracking-wide text-muted">
-                Paid
-              </th>
-              <th className="text-right px-4 py-3 font-heading font-semibold text-xs uppercase tracking-wide text-muted">
-                Balance
-              </th>
-              <th className="text-left px-4 py-3 font-heading font-semibold text-xs uppercase tracking-wide text-muted">
-                Status
-              </th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="border-b border-base">
-                  {Array.from({ length: 7 }).map((__, j) => (
-                    <td key={j} className="px-4 py-3">
-                      <div className="skeleton h-4 rounded w-3/4" />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : invoices.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-sm text-muted">
-                  No invoices found
-                </td>
-              </tr>
-            ) : (
-              invoices.map((inv) => (
-                <>
-                  <tr
-                    key={inv.id}
-                    onClick={() =>
-                      !isStudent &&
-                      setExpandedInvoiceId(expandedInvoiceId === inv.id ? null : inv.id)
-                    }
-                    className={[
-                      'border-b border-base hover:bg-page',
-                      !isStudent ? 'cursor-pointer' : '',
-                    ].join(' ')}
-                  >
-                    <td className="px-4 py-3 text-sm font-medium">
-                      {studentDisplayName(inv, isStudent)}
-                    </td>
-                    <td className="px-4 py-3">Term {inv.term}</td>
-                    <td className="px-4 py-3 text-right tabular font-medium">
-                      {formatMWK(inv.totalAmount)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular text-emerald-600">
-                      {formatMWK(inv.paidAmount)}
-                    </td>
-                    <td
-                      className="px-4 py-3 text-right tabular font-semibold"
-                      style={{
-                        color:
-                          inv.balance > 0 ? 'var(--color-brand-coral)' : 'var(--color-brand-teal)',
-                      }}
-                    >
-                      {formatMWK(inv.balance)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_COLORS[inv.status] ?? ''}`}
-                      >
-                        {inv.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {canRecordPayment && inv.status !== 'PAID' && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setPayingInvoice(inv)
-                          }}
-                          className="flex items-center gap-1 text-xs text-brand-teal hover:underline font-medium"
-                          aria-label={`Record payment for invoice ${inv.id}`}
-                        >
-                          <PlusCircle className="w-3.5 h-3.5" /> Pay
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                  {!isStudent && expandedInvoiceId === inv.id && (
-                    <tr key={`${inv.id}-notes`} className="border-b border-base bg-page">
-                      <td colSpan={7} className="px-6 py-4">
-                        <InvoiceNotes invoiceId={inv.id} />
-                      </td>
-                    </tr>
-                  )}
-                </>
-              ))
-            )}
-          </tbody>
-        </table>
-        </div>
-      </div>
-      {/* Record Payment Modal */}
-      {payingInvoice && (
-        <PaymentModal invoice={payingInvoice} onClose={() => setPayingInvoice(null)} />
-      )}
-
-      {showNewInvoice && (
-        <NewInvoiceModal
-          defaultAcademicYear={academicYear}
-          defaultTerm={term}
-          onClose={() => setShowNewInvoice(false)}
-        />
-      )}
-
-      {showBulkGenerator && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="absolute inset-0" onClick={() => setShowBulkGenerator(false)} />
-          <div className="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-            <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-              <h2 className="font-heading font-bold text-brand-navy">Bulk Generate Invoices</h2>
-              <button onClick={() => setShowBulkGenerator(false)} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-                <XIcon className="w-4 h-4 text-muted" />
-              </button>
-            </div>
-            <div className="p-6">
-              <BulkInvoiceGenerator />
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+  const searchResults = studentSearch.length >= 2 ? (searchData?.students ?? []) : []
+  const { data: selectedStudent } = useStudent(selectedStudentId ?? '')
+  const { data: studentInvoices = [] } = useInvoices(
+    { studentId: selectedStudentId ?? undefined, academicYear, term },
+    !!selectedStudentId
   )
-}
+  const existingInvoice: ApiInvoice | undefined = studentInvoices[0]
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-// [PRODUCTION FIX] Deliberately not the library page's autocomplete-dropdown
-// pattern — an invoice entry needs to find one specific student among
-// hundreds confidently, not just guess a name. This is a real search-and-
-// filter panel: registration number or name, narrowable by class, with
-// results shown as a proper list (including each student's current fee
-// balance for context) rather than a single-line typeahead.
-function StudentSearchPanel({
-  selectedId, onSelect,
-}: {
-  selectedId: string | null
-  onSelect: (student: ApiStudent) => void
-}) {
-  const [search, setSearch] = useState('')
-  const [classId, setClassId] = useState('')
-  const { data: classes = [] } = useClasses()
-  const { data, isLoading } = useStudents({
-    search: search.length >= 2 ? search : undefined,
-    classId: classId || undefined,
-    status: 'ACTIVE',
-  })
-  const students = data?.students ?? []
-
-  return (
-    <div className="border border-base rounded-xl overflow-hidden">
-      <div className="p-3 border-b border-base bg-page/50 space-y-2">
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 text-muted absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or registration number…"
-            className="input w-full pl-8"
-          />
-        </div>
-        <select value={classId} onChange={(e) => setClassId(e.target.value)} className="input w-full">
-          <option value="">All classes</option>
-          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-      </div>
-      <div className="max-h-56 overflow-y-auto divide-y divide-base">
-        {isLoading ? (
-          <p className="text-xs text-muted text-center py-6">Searching…</p>
-        ) : students.length === 0 ? (
-          <p className="text-xs text-muted text-center py-6">
-            {search.length >= 2 || classId ? 'No matching students.' : 'Type at least 2 characters or pick a class to search.'}
-          </p>
-        ) : (
-          students.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => onSelect(s)}
-              className={[
-                'w-full text-left px-3 py-2.5 hover:bg-page transition-colors flex items-center justify-between gap-3',
-                selectedId === s.id ? 'bg-brand-teal/10' : '',
-              ].join(' ')}
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-body truncate">{s.firstName} {s.lastName}</p>
-                <p className="text-xs text-muted">{s.registrationNo}{s.class ? ` · ${s.class.name}` : ''}</p>
-              </div>
-              {typeof s.feeBalance === 'number' && s.feeBalance > 0 && (
-                <span className="shrink-0 text-xs font-semibold text-brand-coral">{formatMWK(s.feeBalance)} due</span>
-              )}
-            </button>
-          ))
-        )}
-      </div>
-    </div>
+  const { data: eligibleFees = [], isLoading: eligibleLoading } = useFeeStructures(
+    academicYear, selectedStudentId ?? undefined, term
   )
-}
+  const { data: catalogFees = [] } = useFeeStructures(academicYear, undefined, term)
 
-// [PRODUCTION FIX] Every real field this endpoint accepts is wired here —
-// studentId/academicYear/term/dueDate (the original four), plus
-// manualDiscount (new — see GenerateInvoiceSchema/feeService.generateInvoice
-// this same phase) and an initial note (via the existing invoice-notes
-// endpoint, called right after creation succeeds). subtotal/discount-from-
-// scholarship/totalAmount/balance/status are NOT inputs here because
-// they're genuinely computed server-side from the student's fee structure
-// and any active scholarship — exposing fake editable copies of those
-// would just let the form lie about what's actually going to happen.
-// [PRODUCTION FIX] Full rewrite of the fee-selection part of this modal.
-// Previously the "amount" was computed silently server-side from every
-// fee structure that happened to apply to the student's class/term, with
-// no way to choose which fee types this particular invoice should cover.
-// Fee types are now a real multi-select sourced from active FeeStructure
-// rows for this student (useFeeStructures) — School Fee, Transport,
-// Uniform, etc. — matching how they're actually configured in Settings,
-// and several can be selected onto one invoice at once. Due Date is
-// removed entirely: it never represented a real negotiated payment term
-// in this system, and feeService.generateInvoice() now sets it
-// automatically (net-30).
-function NewInvoiceModal({
-  defaultAcademicYear, defaultTerm, onClose,
-}: {
-  defaultAcademicYear: string
-  defaultTerm: number
-  onClose: () => void
-}) {
-  const qc = useQueryClient()
+  const feesById = useMemo(() => {
+    const map = new Map<string, ApiFeeStructure>()
+    for (const f of [...eligibleFees, ...catalogFees]) map.set(f.id, f)
+    return map
+  }, [eligibleFees, catalogFees])
+
   const generateInvoice = useGenerateInvoice()
-  const [student, setStudent] = useState<ApiStudent | null>(null)
-  const [academicYear, setAcademicYear] = useState(defaultAcademicYear)
-  const [term, setTerm] = useState(defaultTerm)
-  const [selectedFeeIds, setSelectedFeeIds] = useState<string[]>([])
-  const [manualDiscount, setManualDiscount] = useState('')
-  const [notes, setNotes] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [savingNote, setSavingNote] = useState(false)
+  const recordPayment = useRecordPayment()
+  const addLineItem = useAddInvoiceLineItem()
+  const fetchReceipt = useFetchReceipt()
 
-  const { data: feeStructures = [], isLoading: feesLoading } = useFeeStructures(
-    academicYear, student?.id, term,
-  )
+  const isNewInvoice = !existingInvoice
+  const isBusy = generateInvoice.isPending || recordPayment.isPending || addLineItem.isPending
 
-  function toggleFee(id: string) {
-    setSelectedFeeIds((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]))
-  }
-
-  const selectedFees = feeStructures.filter((f) => selectedFeeIds.includes(f.id))
-  const subtotal = selectedFees.reduce((sum, f) => sum + f.amount, 0)
-  const discountNum = manualDiscount ? Number(manualDiscount) : 0
-  const estimatedTotal = Math.max(0, subtotal - discountNum)
-
-  async function handleSubmit() {
-    setError(null)
-    if (!student || selectedFeeIds.length === 0) return
-    const parsed = GenerateInvoiceSchema.safeParse({
-      studentId: student.id,
-      academicYear,
-      term,
-      feeStructureIds: selectedFeeIds,
-      manualDiscount: manualDiscount ? Number(manualDiscount) : undefined,
-    })
-    if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Please check the form.')
-
-    generateInvoice.mutate(parsed.data, {
-      onSuccess: async (invoice) => {
-        const created = invoice as ApiInvoice
-        if (notes.trim()) {
-          setSavingNote(true)
-          try {
-            await apiFetch(`/finances/invoices/${created.id}/notes`, {
-              method: 'POST',
-              body: JSON.stringify({ body: notes.trim() }),
-            })
-            void qc.invalidateQueries({ queryKey: queryKeys.finances.invoiceNotes(created.id) })
-          } finally {
-            setSavingNote(false)
+  // ── Reset the ledger whenever the selected student or their invoice
+  //    identity changes -- a fresh form for a fresh subject. ──
+  const initKey = selectedStudent ? `${selectedStudent.id}:${existingInvoice?.id ?? 'new'}` : null
+  useEffect(() => {
+    if (!selectedStudent || !initKey || initKey === rowsInitializedFor) return
+    if (existingInvoice) {
+      setRows(
+        existingInvoice.lineItems.map((li) => {
+          const fee = li.feeStructureId ? feesById.get(li.feeStructureId) : undefined
+          return {
+            key: li.id,
+            feeStructureId: li.feeStructureId ?? '',
+            lineItemId: li.id,
+            feeName: li.feeName,
+            code: fee?.code ?? '',
+            category: fee?.category ?? 'OTHER',
+            mandatory: fee?.mandatory ?? true,
+            fixedAmount: li.amount,
+            balance: li.balance,
+            allocation: '',
           }
-        }
-        onClose()
-      },
-      onError: (err) => setError(err instanceof Error ? err.message : 'Failed to generate invoice.'),
-    })
+        })
+      )
+    } else {
+      setRows(
+        eligibleFees.map((f) => ({
+          key: f.id,
+          feeStructureId: f.id,
+          lineItemId: null,
+          feeName: f.name,
+          code: f.code,
+          category: f.category,
+          mandatory: f.mandatory,
+          fixedAmount: f.amount,
+          balance: f.amount,
+          allocation: '',
+        }))
+      )
+    }
+    setPaymentAmount('')
+    setPaymentReference('')
+    setPaymentNotes('')
+    setAdditionalDiscount('')
+    setSubmitError(null)
+    setSuccessMessage(null)
+    setRowsInitializedFor(initKey)
+  }, [initKey, selectedStudent, existingInvoice, eligibleFees, feesById, rowsInitializedFor])
+
+  // ── Live totals — recalculate on every keystroke, exactly as requested ──
+  const totalFixedFees = rows.reduce((sum, r) => sum + r.fixedAmount, 0)
+  const totalAllocated = rows.reduce((sum, r) => sum + (Number(r.allocation) || 0), 0)
+  const totalBalanceOwed = rows.reduce((sum, r) => sum + r.balance, 0)
+
+  const scholarshipPreview = 0 // server computes the real figure at generateInvoice() time; see discountApplied below for the manual portion this screen actually controls
+  const manualDiscountValue = Number(additionalDiscount) || 0
+  const netFeesDue = isNewInvoice
+    ? Math.max(0, totalFixedFees - scholarshipPreview - manualDiscountValue)
+    : totalBalanceOwed
+
+  const paymentCommitted = Number(paymentAmount) || 0
+  const unallocatedCash = Math.max(0, Math.round((paymentCommitted - totalAllocated) * 100) / 100)
+  const allocationExceedsCommitted = totalAllocated > paymentCommitted + 0.01
+  const arrearsBalance = Math.max(0, Math.round((netFeesDue - paymentCommitted) * 100) / 100)
+
+  const canSubmit =
+    !!selectedStudent &&
+    rows.length > 0 &&
+    !allocationExceedsCommitted &&
+    !(paymentCommitted > 0 && totalAllocated <= 0) &&
+    !isBusy
+
+  function selectStudent(id: string) {
+    setSelectedStudentId(id)
+    setStudentSearch('')
+    setRowsInitializedFor(null)
   }
 
-  const isBusy = generateInvoice.isPending || savingNote
+  function changeStudent() {
+    setSelectedStudentId(null)
+    setRowsInitializedFor(null)
+    router.replace('/finances?tab=invoices')
+  }
+
+  function updateAllocation(key: string, value: string) {
+    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, allocation: value } : r)))
+  }
+
+  function removeRow(key: string) {
+    setRows((prev) => prev.filter((r) => r.key !== key))
+  }
+
+  function addLine() {
+    if (!addLineValue) return
+    const fee = feesById.get(addLineValue)
+    if (!fee || rows.some((r) => r.feeStructureId === fee.id)) return
+    setRows((prev) => [
+      ...prev,
+      {
+        key: fee.id, feeStructureId: fee.id, lineItemId: null, feeName: fee.name,
+        code: fee.code, category: fee.category, mandatory: fee.mandatory,
+        fixedAmount: fee.amount, balance: fee.amount, allocation: '',
+      },
+    ])
+    setAddLineValue('')
+  }
+
+  function autoDistribute() {
+    let pool = paymentCommitted
+    setRows((prev) =>
+      prev.map((r) => {
+        if (pool <= 0) return { ...r, allocation: '' }
+        const take = Math.min(r.balance, pool)
+        pool = Math.round((pool - take) * 100) / 100
+        return { ...r, allocation: take > 0 ? String(take) : '' }
+      })
+    )
+  }
+
+  async function submit(confirmOverpayment = false) {
+    if (!selectedStudent) return
+    setSubmitError(null)
+    try {
+      let invoiceId = existingInvoice?.id
+      const lineItemIdByFee = new Map(
+        (existingInvoice?.lineItems ?? []).map((li) => [li.feeStructureId ?? '', li.id])
+      )
+
+      if (!invoiceId) {
+        const created = await generateInvoice.mutateAsync({
+          studentId: selectedStudent.id,
+          academicYear,
+          term,
+          feeStructureIds: rows.map((r) => r.feeStructureId),
+          manualDiscount: manualDiscountValue > 0 ? manualDiscountValue : undefined,
+        })
+        invoiceId = created.id
+        for (const li of created.lineItems) lineItemIdByFee.set(li.feeStructureId ?? '', li.id)
+      } else {
+        for (const r of rows) {
+          if (r.lineItemId) continue
+          const updated = await addLineItem.mutateAsync({ invoiceId, feeStructureId: r.feeStructureId })
+          const newLi = updated.lineItems.find((li) => li.feeStructureId === r.feeStructureId)
+          if (newLi) lineItemIdByFee.set(r.feeStructureId, newLi.id)
+        }
+      }
+
+      // Defensive, and also what lets TypeScript narrow invoiceId to a
+      // definite string below -- it was assigned inside the `if
+      // (!invoiceId)` branch above, and this guard removes any ambiguity
+      // about that narrowing surviving the merge point after the if/else.
+      if (!invoiceId) throw new Error('Could not resolve an invoice to record this payment against.')
+
+      if (paymentCommitted > 0) {
+        const allocations = rows
+          .map((r) => ({ lineItemId: lineItemIdByFee.get(r.feeStructureId) ?? '', amount: Number(r.allocation) || 0 }))
+          .filter((a) => a.lineItemId && a.amount > 0)
+
+        await recordPayment.mutateAsync({
+          invoiceId,
+          amount: paymentCommitted,
+          method: paymentMethod,
+          reference: paymentReference || undefined,
+          notes: paymentNotes || undefined,
+          allocations,
+          confirmOverpayment,
+        })
+      }
+
+      setSuccessMessage(
+        paymentCommitted > 0
+          ? `Payment of ${formatMWK(paymentCommitted)} recorded for ${selectedStudent.firstName} ${selectedStudent.lastName}.`
+          : `Invoice created for ${selectedStudent.firstName} ${selectedStudent.lastName}.`
+      )
+      setOverpaymentPrompt(null)
+      setRowsInitializedFor(null) // reload real state (invoice now exists / balances updated)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409 && err.details && typeof err.details === 'object') {
+        const details = err.details as { overpayments?: OverpaymentItem[] }
+        setOverpaymentPrompt(details.overpayments ?? [])
+      } else {
+        setSubmitError(err instanceof Error ? err.message : 'Something went wrong recording this.')
+      }
+    }
+  }
+
+  const todayLabel = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const addLineOptions = catalogFees.filter((f) => !rows.some((r) => r.feeStructureId === f.id))
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy flex items-center gap-2">
-            <FileText className="w-4 h-4" aria-hidden /> New Invoice
-          </h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
-          </button>
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="font-heading font-semibold text-body">Invoice Entry &amp; Allocation</h2>
+          <p className="text-xs text-muted mt-0.5">Bill a student and record a payment in one step.</p>
         </div>
-        <div className="p-6 space-y-4">
-          <div>
-            <label className="text-xs text-muted mb-1 block">Student</label>
-            {student ? (
-              <div className="flex items-center justify-between gap-3 border border-brand-teal/30 bg-brand-teal/5 rounded-xl px-3 py-2.5">
-                <div>
-                  <p className="text-sm font-medium text-body">{student.firstName} {student.lastName}</p>
-                  <p className="text-xs text-muted">{student.registrationNo}{student.class ? ` · ${student.class.name}` : ''}</p>
-                </div>
-                <button type="button" onClick={() => { setStudent(null); setSelectedFeeIds([]) }} className="text-xs font-semibold text-brand-teal hover:underline shrink-0">
-                  Change
-                </button>
-              </div>
-            ) : (
-              <StudentSearchPanel selectedId={null} onSelect={setStudent} />
-            )}
-          </div>
+        {canGenerateInvoice && (
+          <button
+            type="button"
+            onClick={() => router.push('/finances?tab=bulkInvoiceGenerator')}
+            className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3.5 py-2 text-sm font-medium text-body hover:bg-page min-h-11"
+          >
+            <Boxes className="w-4 h-4" /> Bulk Invoice Generator
+          </button>
+        )}
+      </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="inv-year" className="text-xs text-muted mb-1 block">Academic Year</label>
-              <input
-                id="inv-year"
-                value={academicYear}
-                onChange={(e) => { setAcademicYear(e.target.value); setSelectedFeeIds([]) }}
-                placeholder="2025/2026"
-                className="input w-full"
-              />
-            </div>
-            <div>
-              <label htmlFor="inv-term" className="text-xs text-muted mb-1 block">Term</label>
-              <select
-                id="inv-term"
-                value={term}
-                onChange={(e) => { setTerm(Number(e.target.value)); setSelectedFeeIds([]) }}
-                className="input w-full"
-              >
-                {[1, 2, 3].map((t) => <option key={t} value={t}>Term {t}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* [PRODUCTION FIX] Fee types — sourced from active FeeStructure
-              rows for this student's class/term (set up under Settings →
-              Fee Structures), not free text. Several can be selected onto
-              one invoice — e.g. School Fee + Transport in the same
-              transaction. */}
-          <div>
-            <label className="text-xs text-muted mb-1 block">Fee Types</label>
-            {!student ? (
-              <p className="text-xs text-muted border border-base rounded-xl px-3 py-2.5">
-                Select a student first to see the fee types that apply to them.
-              </p>
-            ) : feesLoading ? (
-              <p className="text-xs text-muted border border-base rounded-xl px-3 py-2.5">Loading fee types…</p>
-            ) : feeStructures.length === 0 ? (
-              <p className="text-xs text-muted border border-base rounded-xl px-3 py-2.5">
-                No fee types are configured for this student&apos;s class/term yet — set them up under Settings → Fee Structures.
-              </p>
-            ) : (
-              <div className="border border-base rounded-xl divide-y divide-base overflow-hidden">
-                {feeStructures.map((f) => (
-                  <label key={f.id} className="flex items-center justify-between gap-3 px-3 py-2.5 cursor-pointer hover:bg-page">
-                    <span className="flex items-center gap-2.5">
-                      <input
-                        type="checkbox"
-                        checked={selectedFeeIds.includes(f.id)}
-                        onChange={() => toggleFee(f.id)}
-                        className="accent-brand-teal"
-                      />
-                      <span className="text-sm text-body">{f.name}</span>
-                    </span>
-                    <span className="text-sm font-medium text-muted">{formatMWK(f.amount)}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="inv-discount" className="text-xs text-muted mb-1 block">
-              Additional Discount (MWK, optional)
-            </label>
+      {/* BILL TO */}
+      <div className="bg-surface border border-base rounded-xl p-4">
+        <label className="text-xs text-muted mb-1 block font-semibold uppercase tracking-wide">Bill To (select student)</label>
+        {!selectedStudent ? (
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
             <input
-              id="inv-discount"
-              type="number"
-              min="0"
-              step="0.01"
-              value={manualDiscount}
-              onChange={(e) => setManualDiscount(e.target.value)}
-              placeholder="0"
-              className="input w-full"
+              value={studentSearch}
+              onChange={(e) => setStudentSearch(e.target.value)}
+              placeholder="Search by name or admission number…"
+              className="w-full border border-base rounded-lg pl-9 pr-3 py-2.5 text-sm bg-page min-h-11"
             />
-            <p className="text-xs text-muted mt-1">
-              Applied on top of any active scholarship — for a one-off adjustment, not a standing discount.
-            </p>
-          </div>
-
-          <div>
-            <label htmlFor="inv-notes" className="text-xs text-muted mb-1 block">Note (optional)</label>
-            <textarea
-              id="inv-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Visible to finance staff on this invoice"
-              className="input w-full resize-none"
-            />
-          </div>
-
-          {/* [PRODUCTION FIX] Real-time total, not just descriptive text —
-              recalculates instantly as fee types and discount change. Any
-              active scholarship is applied server-side on top of this
-              estimate (not known client-side until submission), so this
-              is labelled as an estimate rather than the final figure. */}
-          {selectedFees.length > 0 && (
-            <div className="border-t border-base pt-3 text-sm space-y-1">
-              {selectedFees.map((f) => (
-                <div key={f.id} className="flex justify-between text-muted">
-                  <span>{f.name}</span>
-                  <span>{formatMWK(f.amount)}</span>
-                </div>
-              ))}
-              {discountNum > 0 && (
-                <div className="flex justify-between text-brand-coral">
-                  <span>Discount</span>
-                  <span>-{formatMWK(discountNum)}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-heading font-semibold text-body pt-1 border-t border-base mt-1">
-                <span>Estimated Total</span>
-                <span>{formatMWK(estimatedTotal)}</span>
+            {studentSearch.length >= 2 && (
+              <div className="absolute z-10 mt-1 w-full bg-surface border border-base rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                {searchLoading ? (
+                  <div className="p-3 flex items-center gap-2 text-sm text-muted"><Loader2 className="w-4 h-4 animate-spin" /> Searching…</div>
+                ) : searchResults.length === 0 ? (
+                  <p className="p-3 text-sm text-muted">No students found.</p>
+                ) : (
+                  searchResults.map((s) => (
+                    <button
+                      key={s.id} type="button" onClick={() => selectStudent(s.id)}
+                      className="w-full text-left px-3 py-2.5 hover:bg-page border-b border-base last:border-0"
+                    >
+                      <p className="text-sm font-medium text-body">{s.firstName} {s.lastName}</p>
+                      <p className="text-xs text-muted">{s.registrationNo} &middot; {s.class?.name ?? 'Unassigned'}</p>
+                    </button>
+                  ))
+                )}
               </div>
-              <p className="text-xs text-muted pt-1">
-                Final total may differ slightly if an active scholarship applies — calculated automatically on generation.
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="font-medium text-body">
+                Currently: {selectedStudent.firstName} {selectedStudent.lastName}
+                <span className="text-muted font-normal"> ({selectedStudent.registrationNo} &middot; {selectedStudent.class?.name ?? 'Unassigned'})</span>
               </p>
+              <p className="text-xs text-muted">Guardian: {selectedStudent.guardianName}{selectedStudent.guardianPhone ? ` · ${selectedStudent.guardianPhone}` : ''}</p>
+            </div>
+            <button type="button" onClick={changeStudent} className="text-sm font-medium text-brand-teal hover:underline">Change</button>
+          </div>
+        )}
+      </div>
+
+      {selectedStudent && (
+        <>
+          <div className="grid sm:grid-cols-3 gap-3">
+            <MetaCard label="Invoice Number" value={existingInvoice ? existingInvoice.invoiceNumber : 'Auto-generated on save'} mono />
+            <MetaCard label="Invoice Date" value={todayLabel} />
+            <MetaCard label="Academic Year / Term" value={`${academicYear} · Term ${term}`} />
+          </div>
+
+          {existingInvoice && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border ${STATUS_COLORS[existingInvoice.status] ?? ''}`}>
+                {existingInvoice.status}
+              </span>
+              <span className="text-muted">Current balance: <strong className="text-body tabular">{formatMWK(existingInvoice.balance)}</strong></span>
             </div>
           )}
 
-          {error && <p className="text-sm text-brand-coral">{error}</p>}
+          {/* Payment Committed & Remittance Particulars */}
+          <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h3 className="font-heading text-sm font-semibold text-body">Payment Committed &amp; Remittance Particulars</h3>
+              <button
+                type="button" onClick={autoDistribute} disabled={paymentCommitted <= 0}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-teal hover:underline disabled:opacity-40 disabled:no-underline"
+              >
+                <Wand2 className="w-3.5 h-3.5" /> Auto-Distribute Payment
+              </button>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div>
+                <label htmlFor="pay-amount" className="text-xs text-muted mb-1 block">Amount of Payment Being Paid (MWK)</label>
+                <input
+                  id="pay-amount" type="number" min="0" value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 tabular"
+                />
+              </div>
+              <div>
+                <label htmlFor="pay-method" className="text-xs text-muted mb-1 block">Mode of Payment</label>
+                <select
+                  id="pay-method" value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value as PaymentMethodValue)}
+                  className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+                >
+                  {PAYMENT_METHOD_OPTIONS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="pay-ref" className="text-xs text-muted mb-1 block">Payment Reference <span className="text-muted/70">(optional)</span></label>
+                <input
+                  id="pay-ref" value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)}
+                  className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+                />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="pay-notes" className="text-xs text-muted mb-1 block">Notes / Remarks <span className="text-muted/70">(optional)</span></label>
+              <textarea
+                id="pay-notes" value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} rows={2}
+                placeholder="Add any specific notes, payment terms, or receipt remarks here…"
+                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page resize-none"
+              />
+            </div>
+            <p className="text-xs text-muted">
+              Committed: <strong className="text-body">{formatMWK(paymentCommitted)}</strong>
+              {' · '}Allocated: <strong className="text-body">{formatMWK(totalAllocated)}</strong>
+              {' · '}Unallocated: <strong className="text-body">{formatMWK(unallocatedCash)}</strong>
+            </p>
+            {allocationExceedsCommitted && (
+              <p className="text-brand-coral text-sm flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                Allocated amount exceeds the payment being made — reduce an allocation or increase the payment above.
+              </p>
+            )}
+          </div>
 
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isBusy || !student || selectedFeeIds.length === 0}
-            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 min-h-11"
-          >
-            {isBusy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {isBusy ? 'Generating…' : 'Generate Invoice'}
-          </button>
-        </div>
-      </div>
+          {/* Fee Line Items Ledger */}
+          <div className="bg-surface border border-base rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-base">
+              <h3 className="font-heading text-sm font-semibold text-body">Fee Line Items Ledger ({rows.length})</h3>
+            </div>
+            {eligibleLoading && isNewInvoice ? (
+              <div className="p-4"><div className="h-24 rounded-lg bg-page animate-pulse" /></div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[560px]">
+                  <thead>
+                    <tr className="border-b border-base bg-page">
+                      <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">Fee (sourced from Settings)</th>
+                      <th className="text-right px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">Fixed Amount</th>
+                      <th className="text-right px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">Allocated</th>
+                      <th className="text-right px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">Balance</th>
+                      <th className="px-2 py-2.5"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.length === 0 ? (
+                      <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">No fee lines yet — add one below.</td></tr>
+                    ) : (
+                      rows.map((row) => {
+                        const alloc = Number(row.allocation) || 0
+                        const overBalance = alloc > row.balance + 0.01
+                        return (
+                          <tr key={row.key} className="border-b border-base last:border-0">
+                            <td className="px-4 py-2.5">
+                              <p className="font-medium text-body">{row.feeName}</p>
+                              <p className="text-xs text-muted">
+                                {row.code && <span className="font-mono">{row.code}</span>}
+                                {row.code && ' · '}
+                                {FEE_CATEGORY_LABELS[row.category as keyof typeof FEE_CATEGORY_LABELS] ?? row.category}
+                                {!row.mandatory && ' · Enrolled add-on'}
+                              </p>
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular">{formatMWK(row.fixedAmount)}</td>
+                            <td className="px-4 py-2.5">
+                              <input
+                                type="number" min="0" value={row.allocation}
+                                onChange={(e) => updateAllocation(row.key, e.target.value)}
+                                placeholder="0"
+                                className={`w-28 border rounded-lg px-2 py-1.5 text-sm bg-page tabular text-right ml-auto block min-h-11 ${
+                                  overBalance ? 'border-amber-400 dark:border-amber-600' : 'border-base'
+                                }`}
+                              />
+                              {overBalance && (
+                                <p className="text-[11px] text-amber-600 dark:text-amber-400 text-right mt-0.5">exceeds balance — becomes credit</p>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular font-semibold">
+                              {formatMWK(Math.max(0, Math.round((row.balance - alloc) * 100) / 100))}
+                            </td>
+                            <td className="px-2 py-2.5 text-center">
+                              {!row.lineItemId && (
+                                <button type="button" onClick={() => removeRow(row.key)} className="p-1 rounded hover:bg-page text-muted hover:text-brand-coral" aria-label={`Remove ${row.feeName}`}>
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="p-3 border-t border-base flex items-center gap-2 flex-wrap">
+              <select
+                value={addLineValue} onChange={(e) => setAddLineValue(e.target.value)}
+                className="flex-1 min-w-[200px] border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+              >
+                <option value="">+ Add a line…</option>
+                {addLineOptions.map((f) => <option key={f.id} value={f.id}>{f.name} — {formatMWK(f.amount)}</option>)}
+              </select>
+              <button
+                type="button" onClick={addLine} disabled={!addLineValue}
+                className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3 py-2 text-sm font-medium text-body hover:bg-page disabled:opacity-40 min-h-11"
+              >
+                <Plus className="w-4 h-4" /> Add line
+              </button>
+            </div>
+          </div>
+
+          {/* Totals */}
+          <div className="bg-surface border border-base rounded-xl p-4 space-y-1.5 text-sm">
+            <TotalRow label="Total Fixed Fees" value={formatMWK(totalFixedFees)} />
+            {isNewInvoice && (
+              <div className="flex items-center justify-between py-0.5">
+                <label htmlFor="discount" className="text-muted">Additional Discount (MWK)</label>
+                <input
+                  id="discount" type="number" min="0" value={additionalDiscount}
+                  onChange={(e) => setAdditionalDiscount(e.target.value)}
+                  className="w-32 border border-base rounded-lg px-2 py-1 text-sm bg-page tabular text-right min-h-9"
+                />
+              </div>
+            )}
+            <TotalRow label="Net Total Fees Due" value={formatMWK(netFeesDue)} />
+            <TotalRow label="Total Payment Committed" value={formatMWK(paymentCommitted)} />
+            <TotalRow label="Total Payment Allocated" value={formatMWK(totalAllocated)} />
+            <div className="border-t border-base pt-2 mt-1 flex items-center justify-between">
+              <span className="font-heading font-semibold text-body">Arrears / Balance Due</span>
+              <span className={`font-heading font-bold text-lg tabular ${arrearsBalance > 0 ? 'text-brand-coral' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                {formatMWK(arrearsBalance)}
+              </span>
+            </div>
+          </div>
+
+          {submitError && (
+            <p className="text-brand-coral text-sm flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 shrink-0" /> {submitError}</p>
+          )}
+          {successMessage && (
+            <p className="text-emerald-600 dark:text-emerald-400 text-sm flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 shrink-0" /> {successMessage}</p>
+          )}
+
+          {canRecordPayment && (
+            <button
+              type="button" onClick={() => submit(false)} disabled={!canSubmit}
+              className="inline-flex items-center gap-2 bg-brand-navy text-white rounded-lg px-5 py-2.5 text-sm font-semibold disabled:opacity-50 min-h-11"
+            >
+              {isBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+              {isBusy
+                ? 'Saving…'
+                : existingInvoice
+                  ? paymentCommitted > 0 ? 'Record Payment' : 'Save Changes'
+                  : paymentCommitted > 0 ? 'Save Invoice & Record Payment' : 'Save Invoice'}
+            </button>
+          )}
+
+          {existingInvoice && (
+            <div className="space-y-4">
+              {existingInvoice.payments && existingInvoice.payments.length > 0 && (
+                <div className="bg-surface border border-base rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 border-b border-base">
+                    <h3 className="font-heading text-sm font-semibold text-body">Payments &amp; Receipts</h3>
+                  </div>
+                  <ul className="divide-y divide-base">
+                    {existingInvoice.payments.map((p) => (
+                      <li key={p.id} className="px-4 py-2.5 flex items-center justify-between gap-2">
+                        <div className="text-sm">
+                          <span className="tabular font-medium text-body">{formatMWK(p.amount)}</span>
+                          <span className="text-muted"> &middot; {new Date(p.paidAt).toLocaleDateString('en-GB')}</span>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={fetchReceipt.isPending}
+                          onClick={() =>
+                            fetchReceipt.mutate(p.id, { onSuccess: (r) => window.open(r.url, '_blank', 'noopener') })
+                          }
+                          className="inline-flex items-center gap-1 text-xs font-medium text-brand-teal hover:underline disabled:opacity-50"
+                        >
+                          <ReceiptIcon className="w-3.5 h-3.5" /> View Receipt <ExternalLink className="w-3 h-3" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <InvoiceNotes invoiceId={existingInvoice.id} />
+            </div>
+          )}
+        </>
+      )}
+
+      {overpaymentPrompt && (
+        <OverpaymentConfirmModal
+          items={overpaymentPrompt}
+          isPending={isBusy}
+          onCancel={() => setOverpaymentPrompt(null)}
+          onConfirm={() => submit(true)}
+        />
+      )}
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-// [PRODUCTION FIX] New component — previously "Record Payment" was one
-// undifferentiated amount against the whole invoice. This allocates a
-// single payment transaction across the invoice's own fee-type line items
-// (School Fee, Transport, ...), validates in real time as amounts are
-// typed, and enforces the two accounting rules requested:
-//   1. What's allocated across fee types can never exceed the total
-//      amount actually being paid (hard block, not just a warning).
-//   2. If one fee type's allocation exceeds ITS OWN remaining balance,
-//      that's allowed but requires explicit confirmation first — the
-//      excess becomes a credit on the student's account (see
-//      OverpaymentConfirmationRequiredError in feeService.ts), carried
-//      forward and auto-applied to their next invoice.
-function PaymentModal({ invoice: invoiceSummary, onClose }: { invoice: ApiInvoice; onClose: () => void }) {
-  const { data: invoice, isLoading } = useInvoiceDetail(invoiceSummary.id)
-  const recordPayment = useRecordPayment()
-
-  const [amount, setAmount] = useState('')
-  const [method, setMethod] = useState<PaymentMethodType>('CASH')
-  const [reference, setReference] = useState('')
-  const [notes, setNotes] = useState('')
-  const [allocations, setAllocations] = useState<Record<string, string>>({})
-  const [error, setError] = useState<string | null>(null)
-  const [confirming, setConfirming] = useState<{ lineItemId: string; feeName: string; excess: number }[] | null>(null)
-
-  const lineItems = invoice?.lineItems ?? []
-  const totalAmount = Number(amount) || 0
-
-  function setAllocation(lineItemId: string, value: string) {
-    setAllocations((prev) => ({ ...prev, [lineItemId]: value }))
-    setError(null)
-  }
-
-  // [PRODUCTION FIX] Instant calculation as amounts are typed — no submit
-  // step needed to see whether allocations add up.
-  const allocatedTotal = lineItems.reduce((sum, li) => sum + (Number(allocations[li.id]) || 0), 0)
-  const remaining = Math.round((totalAmount - allocatedTotal) * 100) / 100
-  const overAllocated = remaining < -0.01
-
-  function buildAllocationsPayload() {
-    return lineItems
-      .map((li) => ({ lineItemId: li.id, amount: Number(allocations[li.id]) || 0 }))
-      .filter((a) => a.amount > 0)
-  }
-
-  function submit(confirmOverpayment: boolean) {
-    if (!invoice) return
-    setError(null)
-    const allocationsPayload = buildAllocationsPayload()
-    if (allocationsPayload.length === 0) {
-      setError('Enter an amount against at least one fee.')
-      return
-    }
-    if (overAllocated) {
-      setError('The amount allocated to fees cannot be more than the total payment.')
-      return
-    }
-    const parsed = RecordPaymentSchema.safeParse({
-      invoiceId: invoice.id,
-      amount: totalAmount,
-      method,
-      reference: reference || undefined,
-      notes: notes || undefined,
-      allocations: allocationsPayload,
-      confirmOverpayment,
-    })
-    if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Please check the form.')
-
-    recordPayment.mutate(parsed.data, {
-      onSuccess: () => {
-        setConfirming(null)
-        onClose()
-      },
-      onError: (err) => {
-        // [PRODUCTION FIX] 409 here means "needs confirmation," not a
-        // failure — see api-client.ts's ApiError.details and
-        // OverpaymentConfirmationRequiredError in feeService.ts. Show the
-        // breakdown and let the person explicitly accept it rather than
-        // silently retrying or just showing a generic error.
-        if (err instanceof ApiError && err.status === 409) {
-          const details = err.details as { overpayments?: { lineItemId: string; feeName: string; excess: number }[] }
-          setConfirming(details.overpayments ?? [])
-          return
-        }
-        setError(err instanceof Error ? err.message : 'Failed to record payment.')
-      },
-    })
-  }
-
+function MetaCard({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Record Payment</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <div className="bg-surface border border-base rounded-xl p-3">
+      <p className="text-xs text-muted mb-0.5">{label}</p>
+      <p className={`text-sm font-semibold text-body ${mono ? 'font-mono' : ''}`}>{value}</p>
+    </div>
+  )
+}
+
+function TotalRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between py-0.5">
+      <span className="text-muted">{label}</span>
+      <span className="font-medium text-body tabular">{value}</span>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// OVERPAYMENT CONFIRMATION — shows the exact, server-computed breakdown
+// (never a client-side guess) of which fees would be overpaid and become
+// an advance credit, per feeService.recordPayment()'s
+// OverpaymentConfirmationRequiredError. "Unallocated" (lineItemId: '')
+// means money paid but not assigned to any specific fee.
+// ─────────────────────────────────────────────────────────────────────────
+
+function OverpaymentConfirmModal({
+  items, isPending, onCancel, onConfirm,
+}: { items: OverpaymentItem[]; isPending: boolean; onCancel: () => void; onConfirm: () => void }) {
+  const totalCredit = items.reduce((sum, i) => sum + i.excess, 0)
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
+      <div className="bg-surface rounded-xl shadow-xl max-w-sm w-full">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-base">
+          <h3 className="font-heading font-semibold text-body flex items-center gap-2">
+            <AlertTriangle className="w-4.5 h-4.5 text-amber-500" /> Confirm Overpayment
+          </h3>
+          <button type="button" onClick={onCancel} className="p-1 rounded-lg hover:bg-page text-muted" aria-label="Cancel">
+            <X className="w-5 h-5" />
           </button>
         </div>
-
-        {isLoading || !invoice ? (
-          <p className="text-sm text-muted text-center py-10">Loading invoice…</p>
-        ) : confirming ? (
-          // ── Overpayment confirmation step ─────────────────────────────
-          <div className="p-6 space-y-4">
-            <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
-              <div className="text-sm space-y-1.5">
-                <p className="font-medium">This payment is more than what&apos;s owed:</p>
-                <ul className="space-y-0.5">
-                  {confirming.map((o) => (
-                    <li key={o.lineItemId || 'unallocated'}>
-                      {o.feeName}: <strong>{formatMWK(o.excess)}</strong> over balance
-                    </li>
-                  ))}
-                </ul>
-                <p>
-                  The extra {formatMWK(confirming.reduce((s, o) => s + o.excess, 0))} will be saved as credit on this
-                  student&apos;s account and used automatically on their next invoice.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirming(null)}
-                className="flex-1 border border-base px-4 py-2.5 rounded-lg text-sm hover:bg-page min-h-11"
-              >
-                Go Back
-              </button>
-              <button
-                type="button"
-                onClick={() => submit(true)}
-                disabled={recordPayment.isPending}
-                className="flex-1 bg-brand-navy text-white px-4 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 min-h-11"
-              >
-                {recordPayment.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Confirm &amp; Record
-              </button>
-            </div>
+        <div className="p-5 space-y-3">
+          <p className="text-sm text-muted">
+            This payment exceeds the balance owed on the fee(s) below. The excess will be saved as an advance credit and
+            applied automatically to this student&rsquo;s next invoice.
+          </p>
+          <ul className="space-y-1.5">
+            {items.map((item, i) => (
+              <li key={item.lineItemId || i} className="flex items-center justify-between text-sm bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg px-3 py-2">
+                <span className="text-body">{item.feeName || 'Unallocated'}</span>
+                <span className="tabular font-semibold text-amber-700 dark:text-amber-400">+{formatMWK(item.excess)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex items-center justify-between text-sm font-semibold pt-1 border-t border-base">
+            <span className="text-body">Total advance credit</span>
+            <span className="tabular text-body">{formatMWK(totalCredit)}</span>
           </div>
-        ) : (
-          // ── Main entry form ────────────────────────────────────────────
-          <div className="p-6 space-y-4">
-            <div className="text-sm text-body">
-              {invoice.student && <p className="font-medium">{invoice.student.firstName} {invoice.student.lastName}</p>}
-              <p className="text-muted">{invoice.academicYear} · Term {invoice.term} · Balance owed: <strong className="text-brand-coral">{formatMWK(invoice.balance)}</strong></p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="pay-amount" className="text-xs text-muted mb-1 block">Total Amount Paid (MWK)</label>
-                <input
-                  id="pay-amount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="input w-full"
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <label htmlFor="pay-method" className="text-xs text-muted mb-1 block">Payment Method</label>
-                <select
-                  id="pay-method"
-                  value={method}
-                  onChange={(e) => setMethod(e.target.value as PaymentMethodType)}
-                  className="input w-full"
-                >
-                  <option value="CASH">Cash</option>
-                  <option value="BANK_TRANSFER">Bank Transfer</option>
-                  <option value="MOBILE_MONEY">Mobile Money</option>
-                  <option value="CHEQUE">Cheque</option>
-                </select>
-              </div>
-            </div>
-
-            {/* [PRODUCTION FIX] Allocation table — split this one payment
-                across the invoice's fee types, with each field's own
-                remaining balance shown for reference and instant
-                per-field over-balance flagging. */}
-            <div>
-              <label className="text-xs text-muted mb-1 block">Allocate To</label>
-              <div className="border border-base rounded-xl divide-y divide-base overflow-hidden">
-                {lineItems.map((li) => {
-                  const allocated = Number(allocations[li.id]) || 0
-                  const exceedsBalance = allocated > li.balance + 0.01
-                  return (
-                    <div key={li.id} className="px-3 py-2.5 space-y-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm text-body">{li.feeName}</p>
-                          <p className="text-xs text-muted">Balance: {formatMWK(li.balance)}</p>
-                        </div>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={allocations[li.id] ?? ''}
-                          onChange={(e) => setAllocation(li.id, e.target.value)}
-                          placeholder="0.00"
-                          className="input w-32 text-right"
-                        />
-                      </div>
-                      {exceedsBalance && (
-                        <p className="text-xs text-brand-amber">
-                          Exceeds balance by {formatMWK(allocated - li.balance)} — will be saved as credit.
-                        </p>
-                      )}
-                    </div>
-                  )
-                })}
-                {lineItems.length === 0 && (
-                  <p className="text-xs text-muted px-3 py-4 text-center">This invoice has no fee lines.</p>
-                )}
-              </div>
-            </div>
-
-            {/* [PRODUCTION FIX] Real-time running total — updates on every
-                keystroke, no submit needed to see it. */}
-            <div className="flex items-center justify-between text-sm px-1">
-              <span className="text-muted">Allocated: {formatMWK(allocatedTotal)} of {formatMWK(totalAmount)}</span>
-              <span className={overAllocated ? 'font-semibold text-brand-coral' : 'text-muted'}>
-                {overAllocated
-                  ? `${formatMWK(Math.abs(remaining))} over — reduce an allocation`
-                  : `${formatMWK(remaining)} unallocated`}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="pay-ref" className="text-xs text-muted mb-1 block">Reference (optional)</label>
-                <input
-                  id="pay-ref"
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  className="input w-full"
-                  placeholder="Transaction ID…"
-                />
-              </div>
-              <div>
-                <label htmlFor="pay-notes" className="text-xs text-muted mb-1 block">Note (optional)</label>
-                <input
-                  id="pay-notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="input w-full"
-                />
-              </div>
-            </div>
-
-            {error && <p className="text-sm text-brand-coral">{error}</p>}
-
-            <button
-              type="button"
-              onClick={() => submit(false)}
-              disabled={recordPayment.isPending || !amount || overAllocated || allocatedTotal === 0}
-              className="w-full bg-brand-teal text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 min-h-11"
-            >
-              {recordPayment.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              Record Payment
-            </button>
-          </div>
-        )}
+        </div>
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-base">
+          <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium text-muted hover:text-body min-h-11">
+            Cancel
+          </button>
+          <button
+            type="button" onClick={onConfirm} disabled={isPending}
+            className="inline-flex items-center gap-2 bg-amber-500 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-amber-600 disabled:opacity-60 min-h-11"
+          >
+            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            Confirm &amp; Save as Credit
+          </button>
+        </div>
       </div>
     </div>
   )

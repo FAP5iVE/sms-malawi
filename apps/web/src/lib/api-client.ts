@@ -280,6 +280,10 @@ export const queryKeys = {
     },
     salaryStructure: (staffUid: string) =>
       ['finances', 'salary-structure', staffUid] as const,
+    // [NEW 2026-09-05] Finance Fee Structure workstation's "Enrolled
+    // Add-ons" list — see StudentFeeCommitment in schema.prisma.
+    feeCommitments: (studentId: string, academicYear: string) =>
+      ['finances', 'fee-commitments', studentId, academicYear] as const,
   },
 
   // ── Exams

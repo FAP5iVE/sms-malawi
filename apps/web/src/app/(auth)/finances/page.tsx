@@ -9,18 +9,26 @@
  * [PURPOSE]: Initialises the active tab from ?tab= (post-hydration,
  *   validated against the role-visible tab list) so FinanceDashboard's
  *   corrected quick actions can deep-link into Invoices/Expenses/etc.
- * [DEPENDS ON]: none
+ *   2026-09-05 — YEAR/TERM were hardcoded ('2025/2026' / 1) instead of
+ *   using useCurrentAcademicPeriod() (SETTING_KEYS), unlike every other
+ *   page in the app (PageHeader, every dashboard) since R15 -- fixed to
+ *   match that established pattern; a genuine year/term rollover would
+ *   otherwise have silently kept every finance tab pinned to 2025/2026.
+ * [DEPENDS ON]: @/hooks/useSettings (useCurrentAcademicPeriod)
  */
 
 import { useState, Suspense }    from 'react'
 import { useSearchParams }       from 'next/navigation'
 import { RoleGuard }             from '@/components/shared/RoleGuard'
 import { useAuthStore }          from '@/store/authStore'
+import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
 import { InvoicesTab }           from '@/components/finances/InvoicesTab'
 import { ExpensesTab }           from '@/components/finances/ExpensesTab'
 import { PayrollTab }            from '@/components/finances/PayrollTab'
 import { BudgetTab }             from '@/components/finances/BudgetTab'
 import { FeeStructureTab }       from '@/components/finances/FeeStructureTab'
+import { FinanceFeeStructureTab } from '@/components/finances/FinanceFeeStructureTab'
+import { BulkInvoiceGenerator }   from '@/components/finances/BulkInvoiceGenerator'
 import { useFinanceSummary }     from '@/hooks/useFinances'
 import { ScholarshipTab }        from '@/components/finances/ScholarshipTab'
 import { ReportsExportPanel }    from '@/components/finances/ReportsExportPanel'
@@ -38,6 +46,8 @@ type Tab =
   | 'payroll'
   | 'budget'
   | 'feeStructure'
+  | 'financeFeeStructure'
+  | 'bulkInvoiceGenerator'
   | 'scholarships'
   | 'fines'
   | 'reports'
@@ -79,8 +89,9 @@ function FinancesLoadingSkeleton() {
 
 function FinancesContent() {
   const { role }   = useAuthStore()
-  const YEAR = '2025/2026'
-  const TERM = 1
+  const { academicYear, term: currentTerm, isLoading: periodLoading } = useCurrentAcademicPeriod()
+  const YEAR = academicYear ?? ''
+  const TERM = currentTerm ?? 0
 
   const isStudent = role === 'student'
   const isFinance = role === 'finance' || role === 'admin'
@@ -106,7 +117,15 @@ function FinancesContent() {
     { id: 'expenses'     as Tab, label: 'Expenses',                          show: isFinance                     },
     { id: 'payroll'      as Tab, label: 'Payroll',                           show: isFinance || isHRPayrollViewer },
     { id: 'budget'       as Tab, label: 'Budget',                            show: !isStudent && !isHRPayrollViewer },
-    { id: 'feeStructure' as Tab, label: 'Fee Structure',                     show: isFinance                     },
+    // [2026-09-05] Relabeled to match the rebuilt component -- this is
+    // now the fee catalog *definition* screen (Settings & Fee Catalog);
+    // financeFeeStructure below is the new per-student *application* of
+    // that catalog (the bursar workstation).
+    { id: 'feeStructure' as Tab, label: 'Settings & Fee Catalog',           show: isFinance                     },
+    { id: 'financeFeeStructure' as Tab, label: 'Finance Fee Structure',     show: isFinance                     },
+    // [2026-09-05] Promoted out of the ?action=bulk modal InvoicesTab.tsx
+    // used to open -- now a real top-level tab like every other screen here.
+    { id: 'bulkInvoiceGenerator' as Tab, label: 'Bulk Invoice Generator',   show: isFinance                     },
     { id: 'scholarships' as Tab, label: 'Scholarships',                      show: isFinance                     },
     { id: 'fines'        as Tab, label: 'Library Fines',                     show: isFinance                     },
     // [PRODUCTION FIX 2026-07-27] Forecast and Ledger were fully-built,
@@ -158,6 +177,11 @@ function FinancesContent() {
       setActiveTab(tabParam as Tab)
     }
   }
+
+  // Same skeleton the Suspense boundary above already uses -- avoids
+  // rendering every tab against an empty-string/zero academicYear/term
+  // for the one render before the real setting resolves.
+  if (periodLoading) return <FinancesLoadingSkeleton />
 
   return (
     <div className="space-y-5">
@@ -218,7 +242,9 @@ function FinancesContent() {
       {activeTab === 'expenses'     && <ExpensesTab      academicYear={YEAR} term={TERM} />}
       {activeTab === 'payroll'      && <PayrollTab />}
       {activeTab === 'budget'       && <BudgetTab        academicYear={YEAR} />}
-      {activeTab === 'feeStructure' && <FeeStructureTab  academicYear={YEAR} />}
+      {activeTab === 'feeStructure'        && <FeeStructureTab        academicYear={YEAR} />}
+      {activeTab === 'financeFeeStructure' && <FinanceFeeStructureTab academicYear={YEAR} term={TERM} />}
+      {activeTab === 'bulkInvoiceGenerator' && <BulkInvoiceGenerator />}
       {activeTab === 'scholarships' && <ScholarshipTab   academicYear={YEAR} />}
       {activeTab === 'fines'        && <LibraryFinesTab />}
       {activeTab === 'forecast'     && <ForecastPanel />}

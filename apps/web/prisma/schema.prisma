@@ -35,6 +35,7 @@ model Student {
   borrowings       Borrowing[]
   invoices         Invoice[]
   credits          StudentCredit[]
+  feeCommitments   StudentFeeCommitment[]
   attendanceRecords Attendance[]
   universityPlacements UniversityPlacement[]   // R18 — advisory university placements
   createdAt        DateTime  @default(now())
@@ -284,24 +285,89 @@ model AuditLog {
 
 
 // ─── FEE STRUCTURE ───────────────────────────────────────
+// [SCHEMA EXTENSION 2026-09-05] category/code/mandatory/schedule/description added
+// so the Fee Catalog (Settings) can show real accounting metadata (category badge,
+// mandatory-vs-optional, billing schedule) instead of a bare name+amount row.
+// `isActive` keeps its existing meaning and now doubles as the catalog's
+// Active/Archived state: archiving a fee hides it from new invoice line-item
+// pickers while leaving every existing invoice/line-item untouched (Ledger
+// Preservation Policy) -- never hard-delete a FeeStructure row that has any
+// InvoiceLineItem referencing it.
 model FeeStructure {
-  id           String   @id @default(cuid())
-  name         String                        // "Tuition", "Boarding", "Exam", "Uniform", "Library", "Transport"
-  amount       Decimal  @db.Decimal(12, 2)   // MWK amount
-  classId      String?                       // null = applies to all classes
+  id           String       @id @default(cuid())
+  name         String                            // "Tuition", "Boarding", "Exam", "Uniform", "Library", "Transport"
+  code         String                            // catalog code, e.g. "TUI-01" -- stable identifier, unique per academic year
+  category     FeeCategory  @default(OTHER)
+  amount       Decimal      @db.Decimal(12, 2)   // MWK amount -- the standard rate for this catalog item
+  mandatory    Boolean      @default(true)        // false = optional / enrolled add-on (Transport, Boarding, Uniform, ...)
+  schedule     FeeSchedule  @default(PER_TERM)
+  description  String?
+  classId      String?                           // null = applies to all classes
   academicYear String
-  term         Int?                          // null = applies to all terms
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  term         Int?                              // null = applies to all terms
+  isActive     Boolean      @default(true)        // false = archived (see header note above)
+  commitments  StudentFeeCommitment[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
+  @@unique([academicYear, code])
   @@index([academicYear, classId])
   @@map("fee_structures")
+}
+
+enum FeeCategory {
+  TUITION
+  TRANSPORT
+  UNIFORM
+  BOARDING
+  LEVY
+  ACTIVITY
+  OTHER
+}
+
+enum FeeSchedule {
+  PER_TERM
+  ANNUAL
+  ONE_TIME
+}
+
+// [NEW MODEL 2026-09-05] A student's opt-in to an OPTIONAL fee type
+// (Transport, Boarding, Uniform, ...) for a given academic year -- this is
+// the "Enrolled Add-on" state shown on the Finance Fee Structure
+// workstation and read by BulkInvoiceGenerator's "Include Enrolled Optional
+// Services" step. Mandatory fees never need a commitment row -- they apply
+// to every student in the relevant class/term automatically via
+// FeeStructure.mandatory. A WAIVED commitment is kept (not deleted) so the
+// bursar's decision to stop billing a specific add-on for a specific
+// student is itself part of the audit trail, not silently erased.
+model StudentFeeCommitment {
+  id            String               @id @default(cuid())
+  studentId     String
+  student       Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  feeStructureId String
+  feeStructure  FeeStructure         @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+  academicYear  String
+  status        FeeCommitmentStatus  @default(COMMITTED)
+  notes         String?
+  createdByUid  String
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@unique([studentId, feeStructureId, academicYear])
+  @@index([studentId])
+  @@index([academicYear])
+  @@map("student_fee_commitments")
+}
+
+enum FeeCommitmentStatus {
+  COMMITTED
+  WAIVED
 }
 
 // ─── STUDENT INVOICE (per term per student) ───────────────
 model Invoice {
   id              String          @id @default(cuid())
+  invoiceNumber   String          @unique   // sequential, human-readable -- e.g. "INV-2026-0042" (see invoiceNumberService.ts)
   studentId       String
   academicYear    String
   term            Int
@@ -403,10 +469,13 @@ model Payment {
 }
 
 enum PaymentMethod {
-   CASH  
-   BANK_TRANSFER  
-   MOBILE_MONEY  
-   CHEQUE 
+   CASH
+   BANK_TRANSFER
+   MOBILE_MONEY   // legacy value -- retained for existing records; new entries use AIRTEL_MONEY or TNM_MPAMBA
+   CHEQUE
+   AIRTEL_MONEY
+   TNM_MPAMBA
+   POS_CARD
    }
 
 // ─── INVOICE NOTES (sticky notes on transactions) ────────

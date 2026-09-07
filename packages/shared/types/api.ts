@@ -203,6 +203,7 @@ export interface ApiInvoiceLineItem {
 
 export interface ApiInvoice {
   id: string
+  invoiceNumber: string
   studentId: string
   academicYear: string
   term: number
@@ -234,6 +235,80 @@ export interface ApiStudentCredit {
   reason: string | null
   createdAt: string
   lastAppliedAt: string | null
+}
+
+// [PRODUCTION FIX] Was declared ad hoc inside useFinances.ts with none
+// of the 2026-09-05 fee-catalog fields -- moved here alongside every
+// other finance Api* type and extended to match FeeStructure's real
+// shape (code/category/mandatory/schedule/description), so every new
+// consumer (Settings & Fee Catalog, Finance Fee Structure, Invoice
+// Entry, Bulk Invoice Generator) shares one definition instead of each
+// re-declaring its own partial copy.
+export interface ApiFeeStructure {
+  id: string
+  name: string
+  code: string
+  category: string
+  amount: number
+  mandatory: boolean
+  schedule: string
+  description: string | null
+  classId: string | null
+  academicYear: string
+  term: number | null
+  isActive: boolean
+}
+
+// [NEW] A student's opt-in to an OPTIONAL fee type for a given academic
+// year -- see StudentFeeCommitment in schema.prisma. `feeStructure` is
+// joined server-side wherever a list of a student's commitments is
+// returned (the Finance Fee Structure workstation always needs the
+// fee's own name/category/amount alongside the commitment row).
+export interface ApiStudentFeeCommitment {
+  id: string
+  studentId: string
+  feeStructureId: string
+  academicYear: string
+  status: 'COMMITTED' | 'WAIVED'
+  notes: string | null
+  createdByUid: string
+  createdAt: string
+  updatedAt: string
+  feeStructure?: Pick<ApiFeeStructure, 'id' | 'name' | 'category' | 'amount' | 'mandatory' | 'schedule'>
+}
+
+// [NEW] Per-student outcome row and overall summary for POST
+// /finances/invoices/bulk-generate -- see bulkInvoiceService.ts. Mirrors
+// that service's internal StudentInvoiceResult/BulkInvoiceResult types,
+// plus the dry-run-only fields (scholarshipAbsorbed/advanceCreditConsumed/
+// priorArrears) the Bulk Invoice Generator's roster preview displays
+// before anything is actually committed.
+export interface ApiBulkInvoiceStudentResult {
+  studentId: string
+  registrationNo: string
+  fullName: string
+  classId: string
+  className: string
+  outcome: 'CREATED' | 'EXISTING' | 'SKIPPED' | 'ERROR'
+  invoiceId?: string
+  totalAmount?: number
+  discount?: number
+  scholarshipAbsorbed?: number
+  advanceCreditConsumed?: number
+  priorArrears?: number
+  lineItemCount?: number
+  error?: string
+}
+
+export interface ApiBulkInvoiceResult {
+  academicYear: string
+  term: number
+  created: number
+  existing: number
+  skipped: number
+  errors: number
+  totalRevenue: number
+  students: ApiBulkInvoiceStudentResult[]
 }
 
 export interface ApiInvoiceNote {
