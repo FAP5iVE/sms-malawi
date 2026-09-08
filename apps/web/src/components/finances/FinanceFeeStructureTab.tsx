@@ -287,17 +287,34 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
   )
 }
 
+// [FIXED 2026-09-06] A figure like MWK 5,000,000.00 (or larger) at a fixed
+// text-lg overflowed these cards. There's no reliable container-query
+// breakpoint for "this specific string got too long" (the card's pixel
+// width doesn't change, but the text's rendered width does), so this
+// steps the font size down in tiers keyed to the formatted string's own
+// length -- computed from real formatMWK() output at representative
+// amounts, not guessed.
+function fontSizeForValue(value: string): string {
+  if (value.length <= 13) return 'text-lg'   // up to ~MK 250,000.00
+  if (value.length <= 15) return 'text-base' // up to ~MK 9,999,999.00
+  if (value.length <= 17) return 'text-sm'   // up to ~MK 99,999,999.00
+  return 'text-xs'
+}
+
 function SummaryStat({
   label, value, icon: Icon, highlight, emphasis,
 }: { label: string; value: string; icon: React.ElementType; highlight?: boolean; emphasis?: boolean }) {
   return (
-    <div className={`rounded-xl border p-3.5 ${emphasis ? 'bg-brand-navy border-brand-navy' : 'bg-surface border-base'}`}>
+    <div className={`rounded-xl border p-3.5 min-w-0 ${emphasis ? 'bg-brand-navy border-brand-navy' : 'bg-surface border-base'}`}>
       <div className={`flex items-center gap-1.5 text-xs mb-1 ${emphasis ? 'text-white/70' : 'text-muted'}`}>
-        <Icon className="w-3.5 h-3.5" /> {label}
+        <Icon className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{label}</span>
       </div>
-      <p className={`font-heading font-bold text-lg tabular ${
-        emphasis ? 'text-white' : highlight ? 'text-emerald-600 dark:text-emerald-400' : 'text-body'
-      }`}>
+      <p
+        className={`font-heading font-bold tabular truncate ${fontSizeForValue(value)} ${
+          emphasis ? 'text-white' : highlight ? 'text-emerald-600 dark:text-emerald-400' : 'text-body'
+        }`}
+        title={value}
+      >
         {value}
       </p>
     </div>

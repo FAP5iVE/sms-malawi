@@ -67,6 +67,7 @@
 
 import 'server-only'
 import { Router } from 'express'
+import multer from 'multer'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission } from '@/server/middleware/verifyPermission'
 import {
@@ -89,16 +90,26 @@ import * as feeService from '@/server/services/feeService'
 import * as budgetService from '@/server/services/budgetService'
 import * as installmentService from '@/server/services/installmentService'
 import * as studentService from '@/server/services/studentService'
+// [BUG FIX 2026-09-06] See lib/serialize.ts's header comment -- Decimal
+// fields (FeeStructure.amount, Invoice.totalAmount/balance,
+// InvoiceLineItem.amount/balance, StudentCredit.amount, ...) serialize to
+// JSON as strings by default, which silently broke every client-side sum
+// on the Invoice Entry & Allocation screen (string concatenation instead
+// of addition). Every route below that sends a Prisma result containing
+// one of these fields now wraps it in serializeDecimals() first, so the
+// Api* types' `number` fields are actually numbers at runtime.
+import { serializeDecimals } from '@/lib/serialize'
 import * as accountingService from '@/server/services/accountingService'
 import * as forecastService from '@/server/services/forecastService'
 import { generateFinancialReport } from '@/server/services/reportExportService'
-import { getSignedViewUrl, createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
+import { getSignedViewUrl, uploadFile, FILE_PREFIX } from '@/lib/storage'
 import { prisma } from '@/lib/prisma'
 import { bulkGenerateInvoices } from '@/server/services/bulkInvoiceService'
 import * as Sentry from '@sentry/nextjs'
 import { logger } from '@/lib/logger'
 import { sendError } from '@/server/lib/sendError'
 
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
 
 export const financesRouter = Router()
 
@@ -144,7 +155,7 @@ financesRouter.get(
           academicYear as string,
           term ? Number(term) : 1,
         )
-        return res.json(fees)
+        return res.json(serializeDecimals(fees))
       }
 
       // [PRODUCTION FIX 2026-09-05] When a studentId is given, this now
@@ -160,7 +171,7 @@ financesRouter.get(
           academicYear as string,
           term ? Number(term) : 1,
         )
-        return res.json(fees)
+        return res.json(serializeDecimals(fees))
       }
       // No studentId: the Settings & Fee Catalog screen's own listing --
       // every fee type for the year, active by default, with an explicit
@@ -174,7 +185,7 @@ financesRouter.get(
         where.AND = [{ OR: [{ term: null }, { term: Number(term) }] }]
       }
       const fees = await prisma.feeStructure.findMany({ where, orderBy: { code: 'asc' } })
-      res.json(fees)
+      res.json(serializeDecimals(fees))
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'finances', route: 'fee-structures-list' } })
     }
@@ -203,7 +214,7 @@ financesRouter.post(
           ...(parsed.data.classId ? { classId: parsed.data.classId } : {}),
         },
       })
-      res.status(201).json(fee)
+      res.status(201).json(serializeDecimals(fee))
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'finances', route: 'fee-structure-create' } })
     }
@@ -226,7 +237,7 @@ financesRouter.patch(
         where: { id: String(req.params.id) },
         data: parsed.data,
       })
-      res.json(fee)
+      res.json(serializeDecimals(fee))
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'finances', route: 'fee-structure-update' } })
     }
@@ -244,7 +255,7 @@ financesRouter.get(
     if (!studentId) return res.status(400).json({ error: 'studentId is required' })
     try {
       const commitments = await feeService.listStudentFeeCommitments(String(studentId), academicYear as string)
-      res.json(commitments)
+      res.json(serializeDecimals(commitments))
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'finances', route: 'fee-commitments-list' } })
     }
@@ -306,7 +317,7 @@ financesRouter.get('/invoices', verifyAuth, requireRole([...FINANCE_ROLES]), asy
       lineItems: true,
     },
   })
-  res.json(invoices)
+  res.json(serializeDecimals(invoices))
 })
 
 // [PRODUCTION FIX] Single-invoice fetch with line items — needed when
@@ -322,7 +333,7 @@ financesRouter.get('/invoices/:id', verifyAuth, requireRole([...FINANCE_ROLES, '
     if (req.user!.role === 'student') {
       await studentService.assertStudentOwnership(req.user!.uid, invoice.studentId)
     }
-    res.json(invoice)
+    res.json(serializeDecimals(invoice))
   } catch (err: unknown) {
     return sendError(res, err, { tags: { module: 'finances', route: 'invoice-detail' } })
   }
@@ -343,7 +354,7 @@ financesRouter.post(
     // no response ever sent, hanging the client's fetch indefinitely.
     try {
       const invoice = await feeService.generateInvoice(parsed.data, req.user!.uid, req.user!.role)
-      return res.status(201).json(invoice)
+      return res.status(201).json(serializeDecimals(invoice))
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'finances', route: 'invoice-generate' } })
     }
@@ -363,7 +374,7 @@ financesRouter.post(
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     try {
       const invoice = await feeService.addInvoiceLineItem(parsed.data, req.user!.uid, req.user!.role)
-      return res.status(201).json(invoice)
+      return res.status(201).json(serializeDecimals(invoice))
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'finances', route: 'invoice-add-line-item' } })
     }
@@ -391,7 +402,7 @@ financesRouter.get(
     }
     const { academicYear = '2025/2026' } = req.query
     const result = await feeService.getStudentBalance(id, academicYear as string)
-    res.json(result)
+    res.json(serializeDecimals(result))
   }
 )
 
@@ -414,7 +425,7 @@ financesRouter.get('/credits/:studentId', verifyAuth, async (req, res) => {
       where: { studentId },
       orderBy: { createdAt: 'desc' },
     })
-    return res.json(credits)
+    return res.json(serializeDecimals(credits))
   } catch (err: unknown) {
     return sendError(res, err, { tags: { module: 'finances', route: 'credits' } })
   }
@@ -430,7 +441,7 @@ financesRouter.post(
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     try {
       const result = await feeService.recordPayment(parsed.data, req.user!.uid, req.user!.role)
-      return res.status(201).json(result)
+      return res.status(201).json(serializeDecimals(result))
     } catch (err: unknown) {
       // [PRODUCTION FIX] Distinguish "needs a confirmation the client
       // hasn't given yet" (409 — a normal, expected step in the flow, not
@@ -509,45 +520,28 @@ const EXPENSE_CATEGORY_ACCOUNT: Record<string, string> = {
 // matching the field this session's schema.prisma comment fix corrects
 // from a stale "R2 object key" reference. Mirrors assignments.ts's
 // confirmed POST /:id/submit multer + uploadFile() pattern.
-// POST /expenses/:id/receipt/upload-ticket — mints a one-time Appwrite
-// upload credential. Expense receipts are private (FILE_PREFIX.
-// EXPENSE_RECEIPT is not one of the public prefixes), so the file gets no
-// public read permission; viewing still goes through getSignedViewUrl()'s
-// role-checked proxy, same as before.
-financesRouter.post(
-  '/expenses/:id/receipt/upload-ticket',
-  verifyAuth,
-  requireRole(['admin', 'finance']),
-  async (_req, res) => {
-    try {
-      const ticket = await createDirectUploadTicket(FILE_PREFIX.EXPENSE_RECEIPT)
-      res.json(ticket)
-    } catch (err: unknown) {
-      return sendError(res, err, { tags: { module: 'finances', route: 'receipt-upload-ticket' } })
-    }
-  }
-)
-
-// POST /expenses/:id/receipt — records a receipt the browser has ALREADY
-// uploaded directly to Appwrite via .../receipt/upload-ticket. Takes the
-// resulting fileId (JSON body), not the file itself.
-// [PRODUCTION FIX] Was multer-based, going through this app's own Vercel
-// function for the raw file bytes — hitting the same two hard limits as
-// every other upload in this codebase (Vercel's 4.5MB request-body cap,
-// and no retry on a dropped connection mid-upload).
 financesRouter.post(
   '/expenses/:id/receipt',
   verifyAuth,
   requireRole(['admin', 'finance']),
+  upload.single('file'),
   async (req, res) => {
+    // [PRODUCTION FIX] No try/catch — same systemic bug as the other
+    // upload.single() handlers across this codebase (announcements.ts,
+    // gallery.ts, assignments.ts, hr.ts, library.ts): an error from
+    // uploadFile() became an unhandled rejection with no response sent,
+    // hanging the client's fetch indefinitely.
     try {
-      const fileId = typeof req.body?.fileId === 'string' ? req.body.fileId : undefined
-      if (!fileId || !fileId.startsWith(`${FILE_PREFIX.EXPENSE_RECEIPT}_`)) {
-        return res.status(400).json({ error: 'Missing or invalid fileId — upload the receipt via .../receipt/upload-ticket first.' })
-      }
+      if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
+      const uploaded = await uploadFile(
+        FILE_PREFIX.EXPENSE_RECEIPT,
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype
+      )
       const expense = await prisma.expense.update({
         where: { id: String(req.params.id) },
-        data: { receiptKey: fileId },
+        data: { receiptKey: uploaded.fileId },
       })
       res.status(201).json({ receiptKey: expense.receiptKey })
     } catch (err: unknown) {

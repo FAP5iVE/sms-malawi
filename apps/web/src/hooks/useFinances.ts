@@ -66,6 +66,25 @@ export function useInvoices(
  * to their real Prisma Student.id server-side regardless of what is
  * passed here (see finances.ts's GET /balance/:studentId).
  */
+// [ADDRESSED 2026-09-05] GET /finances/invoices/:id has existed and
+// worked since before this session -- confirmed secured (FINANCE_ROLES +
+// student, own-record only) -- but had no matching hook, unlike every
+// other single-resource GET in this app (useStudent(id) alongside
+// useStudents(), useClass(id) alongside useClasses()). Adding this closes
+// that one gap so the route is actually reachable from the client. None
+// of the five redesigned finance screens need it themselves -- each
+// looks an invoice up by (studentId, academicYear, term) via
+// useInvoices(), not by a already-known id -- so this has no forced
+// call site yet. It's the same kind of standing, reusable
+// infrastructure useStudent()/useClass() already are.
+export function useInvoiceDetail(id: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.finances.invoice(id),
+    queryFn: () => apiFetch<ApiInvoice>(`/finances/invoices/${id}`),
+    enabled: enabled && !!id,
+  })
+}
+
 export function useStudentBalance(studentId: string, academicYear: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.finances.balance(studentId, academicYear),
