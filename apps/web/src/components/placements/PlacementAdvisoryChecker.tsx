@@ -83,6 +83,8 @@ export function PlacementAdvisoryChecker() {
     setChosen((rows) => rows.filter((_, idx) => idx !== i))
   }
 
+  const [submittedGrades, setSubmittedGrades] = useState<{ subject: string; grade: number }[]>([])
+
   function handleSubmit() {
     setFormError(null)
     const cleanGrades = grades
@@ -106,6 +108,7 @@ export function PlacementAdvisoryChecker() {
       return
     }
 
+    setSubmittedGrades(cleanGrades)
     advisory.mutate({
       grades: cleanGrades,
       programmes: cleanChosen.length > 0 ? cleanChosen : undefined,
@@ -265,7 +268,7 @@ export function PlacementAdvisoryChecker() {
               <h3 className="font-heading font-semibold text-sm mb-3">Chosen programmes</h3>
               <div className="grid gap-3">
                 {[...result.chosen].sort((a, b) => a.rank - b.rank).map((r) => (
-                  <PlacementRecommendationCard key={`${r.universityId}-${r.programmeId}`} recommendation={r} rank={r.rank} />
+                  <PlacementRecommendationCard key={`${r.universityId}-${r.programmeId}`} recommendation={r} rank={r.rank} grades={submittedGrades} />
                 ))}
               </div>
             </section>
@@ -278,7 +281,7 @@ export function PlacementAdvisoryChecker() {
             ) : (
               <div className="grid gap-3">
                 {result.top.map((r, i) => (
-                  <PlacementRecommendationCard key={`${r.universityId}-${r.programmeId}`} recommendation={r} rank={i + 1} />
+                  <PlacementRecommendationCard key={`${r.universityId}-${r.programmeId}`} recommendation={r} rank={i + 1} grades={submittedGrades} />
                 ))}
               </div>
             )}

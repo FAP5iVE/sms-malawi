@@ -74,7 +74,7 @@ function clientIpKeyGenerator(req: Request): string {
 // TIER CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type RateLimitTier = 'standard' | 'auth' | 'cron'
+export type RateLimitTier = 'standard' | 'auth' | 'cron' | 'ai'
 
 interface TierConfig {
   windowMs:     number
@@ -97,6 +97,19 @@ const TIER_CONFIG: Record<RateLimitTier, TierConfig> = {
     windowMs:     10 * 60 * 1000,   // 10 minutes
     max:          3,
     errorMessage: 'Cron rate limit exceeded.',
+  },
+  ai: {
+    // R18 — MSCE Advisory "explain this" feature (Gemini API). Deliberately
+    // tight: the free-tier Gemini quota (roughly 10-15 requests/minute,
+    // shared across every user of the whole app, not per-visitor) is far
+    // smaller than the standard tier's 300/15min. This tier exists to stop
+    // one person's repeated clicks — accidental or not — from exhausting
+    // the shared quota for everyone else using the feature at the same
+    // time. Deliberately per-IP, not global, so it can't be used to lock
+    // other users out; it only throttles a single caller.
+    windowMs:     5 * 60 * 1000,    // 5 minutes
+    max:          6,
+    errorMessage: 'AI explanations are limited to a few per few minutes — please wait a moment, or read the standard explanation above.',
   },
 }
 

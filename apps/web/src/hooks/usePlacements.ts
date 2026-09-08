@@ -20,7 +20,7 @@ import type {
   ApiPlacementAnalytics,
   ApiAdvisoryResponse,
 } from '@shared/types/api'
-import type { StaffPlacementEntryInput, StudentClaimInput, RejectClaimInput, AdvisoryCheckInput } from '@shared/schemas/placement'
+import type { StaffPlacementEntryInput, StudentClaimInput, RejectClaimInput, AdvisoryCheckInput, ExplainRecommendationInput } from '@shared/schemas/placement'
 import type { University } from '@shared/constants/universities'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 
@@ -57,6 +57,18 @@ export function useAdvisoryCheck() {
   return useMutation({
     mutationFn: (data: AdvisoryCheckInput) =>
       apiFetch<ApiAdvisoryResponse>('/placements/advisory', { method: 'POST', body: JSON.stringify(data) }),
+  })
+}
+
+// Optional, additive Gemini layer — narrates/answers within an
+// already-computed result. Never the source of truth for eligibility; see
+// placementAdvisoryAIService.ts. `explanation` is null on any failure
+// (unconfigured, timed out, rate-limited) — callers show their own
+// plain-text template in that case, they never block on this.
+export function useExplainRecommendation() {
+  return useMutation({
+    mutationFn: (data: ExplainRecommendationInput) =>
+      apiFetch<{ explanation: string | null }>('/placements/advisory/explain', { method: 'POST', body: JSON.stringify(data) }),
   })
 }
 

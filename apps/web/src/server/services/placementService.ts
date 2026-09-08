@@ -263,11 +263,19 @@ export async function submitClaim(firebaseUid: string, input: StudentClaimInput)
 // ─────────────────────────────────────────────────────────
 
 /**
- * The graduating cohort available to be given an official placement: Form 4
+ * The graduating cohort available to be given an official placement:
  * students holding a placement-ready (certified/results-received) MSCE
  * ManebRecord for the given academic year, each annotated with their
  * existing placement status (if any) so the Staff Entry picker can flag
  * "already placed" candidates.
+ *
+ * [FIX 2026-09-07] Previously also filtered by `class: { form: 4 }`. Removed:
+ * it assumed a graduated student's classId still points to an active Form-4
+ * class object, which isn't guaranteed (class reassignment, historical data
+ * inconsistencies, or the class simply not existing for edge-case records) —
+ * and the certified-MSCE-record check above already correctly scopes "this
+ * year's Form 4 leavers" on its own, so the extra filter added risk of
+ * silently excluding legitimate candidates without adding real correctness.
  */
 export async function listGraduatingCohort(academicYear: string) {
   const records = await prisma.manebRecord.findMany({
@@ -290,10 +298,7 @@ export async function listGraduatingCohort(academicYear: string) {
   if (readyByStudent.size === 0) return []
 
   const students = await prisma.student.findMany({
-    where: {
-      id:    { in: [...readyByStudent.keys()] },
-      class: { form: 4 },
-    },
+    where: { id: { in: [...readyByStudent.keys()] } },
     select: { id: true, registrationNo: true, firstName: true, lastName: true, sex: true },
   })
 

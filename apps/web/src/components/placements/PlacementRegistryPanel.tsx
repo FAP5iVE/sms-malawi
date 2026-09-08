@@ -43,7 +43,7 @@ export function PlacementRegistryPanel() {
   const [academicYear, setAcademicYear] = useState<string>('')
   const effectiveYear = academicYear || schoolInfo?.currentYear || FALLBACK_YEAR
 
-  const { data: placements = [], isLoading } = usePlacementRegistry(effectiveYear)
+  const { data: placements = [], isLoading, isError, error } = usePlacementRegistry(effectiveYear)
 
   const [search, setSearch] = useState('')
   const [universityFilter, setUniversityFilter] = useState<string>('ALL')
@@ -161,17 +161,24 @@ export function PlacementRegistryPanel() {
           <h4 className="font-heading font-semibold text-sm">Confirmed NCHE Placement List ({placements.length})</h4>
           <span className="text-xs text-muted">Showing {filtered.length} of {placements.length} confirmed</span>
         </div>
-        <DataTable
-          data={filtered}
-          isLoading={isLoading}
-          columns={columns}
-          rowKey="id"
-          emptyMessage={
-            placements.length === 0
-              ? `No confirmed placements recorded for ${effectiveYear} yet.`
-              : 'No placements match your search/filters.'
-          }
-        />
+        {isError ? (
+          <div className="text-sm text-brand-coral py-6 text-center px-4 border border-base rounded-xl">
+            <p className="font-medium">Could not load the registry.</p>
+            <p className="text-xs text-muted mt-1">{(error as Error)?.message ?? 'Unknown error — check your connection and try again.'}</p>
+          </div>
+        ) : (
+          <DataTable
+            data={filtered}
+            isLoading={isLoading}
+            columns={columns}
+            rowKey="id"
+            emptyMessage={
+              placements.length === 0
+                ? `No confirmed placements recorded for ${effectiveYear} yet.`
+                : 'No placements match your search/filters.'
+            }
+          />
+        )}
       </div>
     </div>
   )

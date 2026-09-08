@@ -105,7 +105,7 @@ export function ClaimsVerificationPanel() {
   const [academicYear, setAcademicYear] = useState<string>('')
   const effectiveYear = academicYear || schoolInfo?.currentYear || FALLBACK_YEAR
 
-  const { data: queue = [], isLoading } = usePlacementsQueue(effectiveYear)
+  const { data: queue = [], isLoading, isError, error } = usePlacementsQueue(effectiveYear)
   const approve = useApprovePlacementClaim()
   const reject = useRejectPlacementClaim()
 
@@ -175,6 +175,11 @@ export function ClaimsVerificationPanel() {
 
       {isLoading ? (
         <p className="text-sm text-muted py-8 text-center">Loading…</p>
+      ) : isError ? (
+        <div className="text-sm text-brand-coral py-8 text-center px-4">
+          <p className="font-medium">Could not load the verification queue.</p>
+          <p className="text-xs text-muted mt-1">{(error as Error)?.message ?? 'Unknown error — check your connection and try again.'}</p>
+        </div>
       ) : tab === 'pending' ? (
         pending.length === 0 ? (
           <p className="text-sm text-muted py-8 text-center">No claims are waiting for verification.</p>

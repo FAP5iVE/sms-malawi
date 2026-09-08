@@ -40,13 +40,16 @@
 import { Router } from 'express'
 import { verifyAuth } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
+import { createRateLimiter } from '@/lib/ratelimit'
 import { sendError } from '@/server/lib/sendError'
 import * as placementService from '@/server/services/placementService'
+import { explainRecommendation } from '@/server/services/placementAdvisoryAIService'
 import {
   StaffPlacementEntrySchema,
   StudentClaimSchema,
   RejectClaimSchema,
   AdvisoryCheckSchema,
+  ExplainRecommendationSchema,
 } from '@shared/schemas/placement'
 
 export const placementsRouter = Router()
@@ -55,23 +58,32 @@ function badRequest(message: string): Error {
   return Object.assign(new Error(message), { status: 400 })
 }
 
+function getSingleRouteParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0]
+  return value
+}
+
 // ─────────────────────────────────────────────────────────
 //  STUDENT SELF-SERVICE — Student Claim Portal
 // ─────────────────────────────────────────────────────────
 
-placementsRouter.get('/me',
-  verifyAuth, requirePermission('placement.viewOwn'),
+placementsRouter.get(
+  '/me',
+  verifyAuth,
+  requirePermission('placement.viewOwn'),
   async (req, res) => {
     try {
       res.json(await placementService.getMyPlacement(req.user!.uid))
     } catch (err) {
       sendError(res, err, { tags: { module: 'placements' } })
     }
-  },
+  }
 )
 
-placementsRouter.post('/me/claim',
-  verifyAuth, requirePermission('placement.recordOwnChoice'),
+placementsRouter.post(
+  '/me/claim',
+  verifyAuth,
+  requirePermission('placement.recordOwnChoice'),
   async (req, res) => {
     const parsed = StudentClaimSchema.safeParse(req.body)
     if (!parsed.success) {
@@ -82,7 +94,7 @@ placementsRouter.post('/me/claim',
     } catch (err) {
       sendError(res, err, { tags: { module: 'placements' } })
     }
-  },
+  }
 )
 
 // ─────────────────────────────────────────────────────────
@@ -91,8 +103,10 @@ placementsRouter.post('/me/claim',
 // Not gated by any student record or placement status — anyone can run
 // grades through it, including staff helping a student in person.
 
-placementsRouter.post('/advisory',
-  verifyAuth, requirePermission('placement.view'),
+placementsRouter.post(
+  '/advisory',
+  verifyAuth,
+  requirePermission('placement.view'),
   async (req, res) => {
     const parsed = AdvisoryCheckSchema.safeParse(req.body)
     if (!parsed.success) {
@@ -105,111 +119,175 @@ placementsRouter.post('/advisory',
     } catch (err) {
       sendError(res, err, { tags: { module: 'placements' } })
     }
-  },
+  }
+)
+
+// ─────────────────────────────────────────────────────────
+//  AI EXPLANATION (optional, additive — Gemini API layer)
+// ─────────────────────────────────────────────────────────
+// Same permission as the calculator itself (open to everyone). The 'ai'
+// rate-limit tier is deliberately tighter than the app's standard tier —
+// see lib/ratelimit.ts — because the shared free-tier Gemini quota is far
+// smaller than this app's own request budget. Recomputes eligibility fresh
+// from `grades` server-side before it ever reaches the model; never trusts
+// anything the client claims the verdict already is.
+
+placementsRouter.post(
+  '/advisory/explain',
+  verifyAuth,
+  requirePermission('placement.view'),
+  createRateLimiter('ai'),
+  async (req, res) => {
+    const parsed = ExplainRecommendationSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return sendError(res, badRequest(parsed.error.errors[0]?.message ?? 'Invalid request.'))
+    }
+    try {
+      const grades: Record<string, number> = {}
+      for (const g of parsed.data.grades) grades[g.subject] = g.grade
+      const result = await explainRecommendation({
+        grades,
+        universityId: parsed.data.universityId,
+        programmeId: parsed.data.programmeId,
+        question: parsed.data.question,
+      })
+      res.json(result)
+    } catch (err) {
+      sendError(res, err, { tags: { module: 'placements' } })
+    }
+  }
 )
 
 // ─────────────────────────────────────────────────────────
 //  PLACEMENT REGISTRY & ANALYTICS — everyone
 // ─────────────────────────────────────────────────────────
 
-placementsRouter.get('/registry',
-  verifyAuth, requirePermission('placement.view'),
+placementsRouter.get(
+  '/registry',
+  verifyAuth,
+  requirePermission('placement.view'),
   async (req, res) => {
     try {
-      const academicYear = typeof req.query.academicYear === 'string' ? req.query.academicYear : undefined
+      const academicYear =
+        typeof req.query.academicYear === 'string' ? req.query.academicYear : undefined
       res.json(await placementService.listConfirmedPlacements({ academicYear }))
     } catch (err) {
       sendError(res, err, { tags: { module: 'placements' } })
     }
-  },
+  }
 )
 
-placementsRouter.get('/catalogue',
-  verifyAuth, requireAnyPermission(['placement.view', 'placement.viewOwn']),
+placementsRouter.get(
+  '/catalogue',
+  verifyAuth,
+  requireAnyPermission(['placement.view', 'placement.viewOwn']),
   (_req, res) => {
     res.json(placementService.getCatalogue())
-  },
+  }
 )
 
 // ─────────────────────────────────────────────────────────
 //  STAFF PLACEMENT ENTRY
 // ─────────────────────────────────────────────────────────
 
-placementsRouter.get('/eligible',
-  verifyAuth, requireAnyPermission(['placement.manage', 'placement.recordOutcome']),
+placementsRouter.get(
+  '/eligible',
+  verifyAuth,
+  requireAnyPermission(['placement.manage', 'placement.recordOutcome']),
   async (req, res) => {
-    const academicYear = typeof req.query.academicYear === 'string' ? req.query.academicYear : undefined
-    if (!academicYear) return sendError(res, badRequest('academicYear query parameter is required.'))
+    const academicYear =
+      typeof req.query.academicYear === 'string' ? req.query.academicYear : undefined
+    if (!academicYear)
+      return sendError(res, badRequest('academicYear query parameter is required.'))
     try {
       res.json(await placementService.listGraduatingCohort(academicYear))
     } catch (err) {
       sendError(res, err, { tags: { module: 'placements' } })
     }
-  },
+  }
 )
 
-placementsRouter.post('/staff-entry',
-  verifyAuth, requireAnyPermission(['placement.manage', 'placement.recordOutcome']),
+placementsRouter.post(
+  '/staff-entry',
+  verifyAuth,
+  requireAnyPermission(['placement.manage', 'placement.recordOutcome']),
   async (req, res) => {
     const parsed = StaffPlacementEntrySchema.safeParse(req.body)
     if (!parsed.success) {
-      return sendError(res, badRequest(parsed.error.errors[0]?.message ?? 'Invalid placement entry.'))
+      return sendError(
+        res,
+        badRequest(parsed.error.errors[0]?.message ?? 'Invalid placement entry.')
+      )
     }
     try {
-      const updated = await placementService.recordStaffPlacement(parsed.data, req.user!.uid, req.user!.role)
+      const updated = await placementService.recordStaffPlacement(
+        parsed.data,
+        req.user!.uid,
+        req.user!.role
+      )
       res.status(201).json(updated)
     } catch (err) {
       sendError(res, err, { tags: { module: 'placements' } })
     }
-  },
+  }
 )
 
 // ─────────────────────────────────────────────────────────
 //  CLAIMS VERIFICATION DESK
 // ─────────────────────────────────────────────────────────
 
-placementsRouter.get('/queue',
-  verifyAuth, requirePermission('placement.verifyOutcome'),
+placementsRouter.get(
+  '/queue',
+  verifyAuth,
+  requirePermission('placement.verifyOutcome'),
   async (req, res) => {
     try {
-      const academicYear = typeof req.query.academicYear === 'string' ? req.query.academicYear : undefined
+      const academicYear =
+        typeof req.query.academicYear === 'string' ? req.query.academicYear : undefined
       res.json(await placementService.listClaimsQueue({ academicYear }))
     } catch (err) {
       sendError(res, err, { tags: { module: 'placements' } })
     }
-  },
+  }
 )
 
-placementsRouter.patch('/:id/approve',
-  verifyAuth, requirePermission('placement.verifyOutcome'),
+placementsRouter.patch(
+  '/:id/approve',
+  verifyAuth,
+  requirePermission('placement.verifyOutcome'),
   async (req, res) => {
-    const { id } = req.params
-    if (typeof id !== 'string') {
-      return sendError(res, badRequest('Invalid placement id.'))
-    }
+    const claimId = getSingleRouteParam(req.params.id)
+    if (!claimId) return sendError(res, badRequest('Claim id is required.'))
+
     try {
-      res.json(await placementService.approveClaim(id, req.user!.uid, req.user!.role))
+      res.json(await placementService.approveClaim(claimId, req.user!.uid, req.user!.role))
     } catch (err) {
       sendError(res, err, { tags: { module: 'placements' } })
     }
-  },
+  }
 )
 
-placementsRouter.patch('/:id/reject',
-  verifyAuth, requirePermission('placement.verifyOutcome'),
+placementsRouter.patch(
+  '/:id/reject',
+  verifyAuth,
+  requirePermission('placement.verifyOutcome'),
   async (req, res) => {
-    const { id } = req.params
-    if (typeof id !== 'string') {
-      return sendError(res, badRequest('Invalid placement id.'))
-    }
+    const claimId = getSingleRouteParam(req.params.id)
+    if (!claimId) return sendError(res, badRequest('Claim id is required.'))
+
     const parsed = RejectClaimSchema.safeParse(req.body)
     if (!parsed.success) {
-      return sendError(res, badRequest(parsed.error.errors[0]?.message ?? 'A rejection reason is required.'))
+      return sendError(
+        res,
+        badRequest(parsed.error.errors[0]?.message ?? 'A rejection reason is required.')
+      )
     }
     try {
-      res.json(await placementService.rejectClaim(id, parsed.data, req.user!.uid, req.user!.role))
+      res.json(
+        await placementService.rejectClaim(claimId, parsed.data, req.user!.uid, req.user!.role)
+      )
     } catch (err) {
       sendError(res, err, { tags: { module: 'placements' } })
     }
-  },
+  }
 )

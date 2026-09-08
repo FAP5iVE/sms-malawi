@@ -1,6 +1,7 @@
 allowBuilds:
   "@ampproject/toolbox-optimizer": true
   "@firebase/util": true
+  '@google/genai': true
   "@prisma/client": false
   "@prisma/engines": true
   '@sentry/cli': true

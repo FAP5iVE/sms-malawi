@@ -142,6 +142,24 @@ export const AdvisoryCheckSchema = z.object({
 export type AdvisoryGrade      = z.infer<typeof AdvisoryGradeSchema>
 export type AdvisoryCheckInput = z.infer<typeof AdvisoryCheckSchema>
 
+// ─────────────────────────────────────────────────────────
+//  AI EXPLANATION (optional, additive — Gemini API layer)
+// ─────────────────────────────────────────────────────────
+// Same grades + a single programme reference as the advisory checker, plus
+// an optional bounded follow-up question. The server always recomputes
+// eligibility itself from `grades` before it ever reaches the model — see
+// placementAdvisoryAIService.ts. This schema exists only to validate shape
+// and cap the question length; it grants no trust over what the client
+// claims the result already is.
+export const ExplainRecommendationSchema = z.object({
+  grades: z.array(AdvisoryGradeSchema).min(1).max(15),
+  universityId: z.string().min(1),
+  programmeId: z.string().min(1),
+  question: z.string().max(300).optional(),
+})
+
+export type ExplainRecommendationInput = z.infer<typeof ExplainRecommendationSchema>
+
 export type PlacementStatusValue      = z.infer<typeof PlacementStatusSchema>
 export type PlacementEntrySourceValue = z.infer<typeof PlacementEntrySourceSchema>
 export type StaffPlacementEntryInput  = z.infer<typeof StaffPlacementEntrySchema>
