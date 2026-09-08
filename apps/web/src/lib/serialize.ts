@@ -1,6 +1,7 @@
 // apps/web/src/lib/serialize.ts
 //
-// [CHANGE TYPE]: NEW FILE
+// [CHANGE TYPE]: NEW FILE, [BUG FIX 2026-09-06]: rewritten same-day after a
+//   second live bug report — see below.
 // [PURPOSE]: Fixes a real, live bug reported against the Invoice Entry &
 //   Allocation screen: "Total Fixed Fees" (and every other client-side
 //   sum) showed an enormous, garbled figure like "MK
@@ -19,20 +20,55 @@
 //   moment either operand is a string, producing exactly this kind of
 //   nonsense figure.
 //
-//   The fix belongs here, not scattered as Number(...) calls across every
-//   frontend arithmetic site: a number-typed API field should actually BE
-//   a number. serializeDecimals() walks a response body and converts any
-//   Decimal instance (at any nesting depth — line items nested inside an
-//   invoice, an invoice nested inside a balance response, etc.) to a real
-//   number via toNumber() before res.json() sends it.
-// [DEPENDS ON]: @prisma/client/runtime/library (Decimal — the same import
-//   this repo's bulkInvoiceService.ts already used for the same class)
+//   [BUG FIX 2026-09-06] The first version of this fix used `value
+//   instanceof Decimal` to detect a Decimal field, importing Decimal from
+//   @prisma/client/runtime/library. That broke EVERY money field on the
+//   Invoice Entry screen a different way: "MK NaN" everywhere. In a pnpm
+//   workspace, the Decimal class this file imports and the Decimal class
+//   Prisma's generated client actually constructs query results with can
+//   end up as two different physical module instances (pnpm's strict,
+//   symlinked node_modules makes this a known, common pitfall for
+//   instanceof checks specifically) -- so `instanceof Decimal` silently
+//   returned false for genuinely-Decimal values. Every one of those values
+//   then fell through to the generic object-recursion branch below, which
+//   enumerated a Decimal's own INTERNAL decimal.js fields (`s` the sign,
+//   `e` the exponent, `d` the digit array) as if they were ordinary
+//   object properties -- producing garbage in place of the real number,
+//   which is exactly what turns into NaN the moment the frontend does
+//   arithmetic on it or formats it.
+//
+//   The fix: detect "this is a Decimal" by shape (duck typing — does it
+//   have a toNumber() method and decimal.js's characteristic internal
+//   fields?) instead of by class identity. This is immune to the
+//   module-instance mismatch, because it never depends on which physical
+//   copy of the Decimal class constructed the value.
+// [DEPENDS ON]: nothing external -- deliberately dependency-free so there
+//   is no class-identity assumption left to break a second time.
 import 'server-only'
 
-import { Decimal } from '@prisma/client/runtime/library'
+interface DecimalLike {
+  toNumber: () => number
+  // decimal.js's own internal shape -- sign / exponent / digits. Checking
+  // for these (rather than toNumber alone) avoids false-matching some
+  // unrelated object that happens to also expose a toNumber() method.
+  s: number
+  e: number
+  d: number[]
+}
+
+function isDecimalLike(value: unknown): value is DecimalLike {
+  if (value === null || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return (
+    typeof v.toNumber === 'function' &&
+    typeof v.s === 'number' &&
+    typeof v.e === 'number' &&
+    Array.isArray(v.d)
+  )
+}
 
 export function serializeDecimals<T>(value: T): T {
-  if (value instanceof Decimal) {
+  if (isDecimalLike(value)) {
     return value.toNumber() as unknown as T
   }
   if (Array.isArray(value)) {
