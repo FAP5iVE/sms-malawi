@@ -659,7 +659,7 @@ export function PageHeader() {
                     "
                     aria-hidden
                   >
-                    {unreadCount}
+                    {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
               </button>

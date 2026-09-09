@@ -270,7 +270,7 @@ function StudentsContent() {
           label:   'Archive',
           icon:    Archive,
           variant: 'danger' as const,
-          onClick: (row: Student) => handleArchive(row.id),
+          onClick: (row: Student) => setPendingArchiveIds([row.id]),
         }]
       : []),
   ]

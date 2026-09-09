@@ -51,6 +51,7 @@ import { RoleGuard } from '@/components/shared/RoleGuard'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { Field, inputCls } from '@/components/students/StudentFormSections'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { Users, ChevronRight, UserPlus, Pencil, Archive, X, Inbox, ArchiveRestore } from 'lucide-react'
 
 const FORM_COLORS = [
@@ -73,6 +74,13 @@ export default function ClassesPage() {
 function ClassesContent() {
   const [showArchived, setShowArchived] = useState(false)
   const [selectedYear, setSelectedYear] = useState<string | null>(null)
+  // [R15 fix] Archiving a class has no confirmation step at all — unlike
+  // students' bulk-archive path, which routes through ConfirmDialog. A class
+  // affects every enrolled student's roster/timetable/attendance history, so
+  // this needed protection at least as strong as the student path, not less.
+  // Restoring an already-archived class is left unconfirmed (non-destructive,
+  // fully reversible) — only the archive direction is gated.
+  const [pendingArchiveClass, setPendingArchiveClass] = useState<{ id: string; name: string } | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingClass, setEditingClass] = useState<{ id: string; name: string; form: number; stream?: string; teacherId?: string; room?: string; academicYear: string } | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -227,7 +235,11 @@ function ClassesContent() {
                               {can('class.softDelete') && (
                                 <button
                                   type="button"
-                                  onClick={() => handleArchive(cls.id)}
+                                  onClick={() =>
+                                    cls.status === 'ARCHIVED'
+                                      ? handleArchive(cls.id)
+                                      : setPendingArchiveClass({ id: cls.id, name: cls.name })
+                                  }
                                   className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-muted hover:bg-white/60 hover:text-brand-coral transition-colors"
                                   aria-label={cls.status === 'ARCHIVED' ? `Restore ${cls.name}` : `Archive ${cls.name}`}
                                 >
@@ -251,6 +263,19 @@ function ClassesContent() {
       {editingClass && (
         <ClassFormDialog classToEdit={editingClass} onClose={() => setEditingClass(null)} />
       )}
+
+      <ConfirmDialog
+        open={pendingArchiveClass !== null}
+        title={`Archive ${pendingArchiveClass?.name ?? 'this class'}?`}
+        description="This will affect every enrolled student's roster, timetable, and attendance history for this class. Records are preserved and can be restored by an administrator."
+        confirmLabel="Archive Class"
+        destructive
+        onConfirm={() => {
+          if (pendingArchiveClass) handleArchive(pendingArchiveClass.id)
+          setPendingArchiveClass(null)
+        }}
+        onCancel={() => setPendingArchiveClass(null)}
+      />
     </div>
   )
 }

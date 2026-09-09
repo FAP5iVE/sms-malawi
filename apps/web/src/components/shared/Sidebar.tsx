@@ -12,14 +12,14 @@
  *   md – lg (tablet):  Sidebar is ALWAYS in icon-rail (collapsed) mode by default.
  *                      When the user taps the expand chevron, the sidebar enters
  *                      OVERLAY MODE — it detaches from the flex flow via
- *                      `position: fixed`, expands to 220 px, and a backdrop
+ *                      `position: fixed`, expands to 240 px, and a backdrop
  *                      appears behind it. Closing the overlay returns the sidebar
- *                      to the 48 px icon rail in normal flex flow.
- *                      The layout wrapper holds `md:w-12` so the 48 px space is
+ *                      to the 60 px icon rail in normal flex flow.
+ *                      The layout wrapper holds `md:w-[60px]` so the 60 px space is
  *                      always reserved regardless of overlay state (no layout shift).
  *
- *   lg+ (desktop):     Normal sidebar behaviour — collapsed (48 px icon rail) or
- *                      expanded (220 px), spring-animated, in flex flow.
+ *   lg+ (desktop):     Normal sidebar behaviour — collapsed (60 px icon rail) or
+ *                      expanded (240 px), spring-animated, in flex flow.
  *                      Default: expanded on initial lg+ mount.
  *
  * Breakpoint detection:
@@ -37,7 +37,11 @@
  *   Clicking the backdrop or pressing Escape collapses the sidebar.
  *
  * All Phase B8 and B10 behaviour is preserved unchanged:
- *   - SIDEBAR_WIDTH_VARIANTS spring animation (220px ↔ 48px)
+ *   - SIDEBAR_WIDTH_VARIANTS spring animation (SIDEBAR_EXPANDED_WIDTH_PX 240px
+ *     ↔ SIDEBAR_COLLAPSED_WIDTH_PX 60px — see lib/motion.ts. [R15 fix] This
+ *     comment previously said "220px ↔ 48px," a third number disagreeing
+ *     with both the actual animation values and the layout wrapper's
+ *     reserved width — all three now agree.)
  *   - SIDEBAR_LABEL_VARIANTS / SIDEBAR_BADGE_VARIANTS for text/badge fade
  *   - reducedMotionVariants / reducedMotionTransition from motionStore
  *   - layoutId="sidebar-active-dot" shared animated indicator in icon-rail mode
@@ -63,24 +67,8 @@ import {
   DURATION,
   EASE,
 } from '@/lib/motion'
-import type { UserRole } from '@shared/types/roles'
+import { ROLE_LABELS } from '@shared/types/roles'
 import { LG_BREAKPOINT } from '@shared/constants/breakpoints'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ROLE DISPLAY LABELS
-// ─────────────────────────────────────────────────────────────────────────────
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  admin:        'Administrator',
-  high_rank:    'High Rank Staff',
-  finance:      'Finance Staff',
-  library:      'Library Staff',
-  lower_rank:   'Support Staff',
-  academic:     'Academic Staff',
-  hr:           'HR Staff',
-  exam_officer: 'Exam Officer',
-  student:      'Student',
-}
 
 // lg breakpoint in px — must match Tailwind's lg: 1024px
 
@@ -93,8 +81,8 @@ export function Sidebar() {
   const motionEnabled = useMotionEnabled()
   const { items }     = useNavigation()
 
-  // collapsed: true  → 48px icon rail
-  //            false → 220px expanded panel
+  // collapsed: true  → 60px icon rail
+  //            false → 240px expanded panel
   // SSR-safe default: true (icon rail). useEffect corrects to viewport width.
   const [collapsed, setCollapsed] = useState(true)
 

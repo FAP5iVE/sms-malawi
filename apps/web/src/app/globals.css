@@ -208,8 +208,15 @@
     --accent:               215 25% 93%;
     --accent-foreground:    222 47% 11%;
 
-    /* Destructive (danger/delete) */
-    --destructive:          0 84% 60%;     /* #f04646 */
+    /* Destructive (danger/delete)
+       [R15 fix] Previously its own independent red (#f04646), distinct from
+       --brand-coral — the color every hand-built destructive/alert element
+       in the app (ConfirmDialog's destructive button, notification badges,
+       sign-out) actually uses. Two visually-similar-but-different reds both
+       meaning "danger" undermined the color-to-meaning mapping Similarity
+       relies on. Now an alias, so shadcn's Button/Badge `destructive`
+       variants automatically match brand-coral with no call-site changes. */
+    --destructive:          var(--brand-coral);
     --destructive-foreground: 0 0% 100%;
 
     /* UI chrome */
@@ -287,8 +294,9 @@
     --accent:               224 25% 20%;
     --accent-foreground:    215 25% 93%;
 
-    /* Destructive — desaturated in dark mode to avoid vibrating */
-    --destructive:          0 62% 42%;     /* #b83232 */
+    /* Destructive — [R15 fix] aliased to --brand-coral; see light-mode
+       comment above for why. */
+    --destructive:          var(--brand-coral);
     --destructive-foreground: 215 25% 93%;
 
     /* UI chrome */
@@ -441,18 +449,28 @@
     font-feature-settings: 'tnum';
   }
 
-  /* ── Input base style (used in custom non-shadcn inputs) */
+  /* ── Input base style (used in custom non-shadcn inputs)
+     [R15 fix] font-size was a flat 0.875rem (14px) with no responsive
+     override — below the 16px threshold that stops iOS Safari from
+     auto-zooming the viewport on focus. The shadcn Input/Textarea
+     primitives already handle this correctly (text-base/16px on mobile,
+     text-sm/14px at md+); this class now matches that pattern. */
   .input {
     width:            100%;
     border:           1px solid hsl(var(--input));
     border-radius:    var(--radius-lg);
     padding:          0.625rem 0.875rem;
-    font-size:        0.875rem;
+    font-size:        1rem;
     background-color: hsl(var(--background));
     color:            hsl(var(--foreground));
     transition-property:       border-color, box-shadow;
     transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration:       150ms;
+  }
+  @media (min-width: 768px) {
+    .input {
+      font-size: 0.875rem;
+    }
   }
   .input::placeholder {
     color: hsl(var(--muted-foreground));

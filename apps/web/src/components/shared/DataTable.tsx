@@ -203,13 +203,13 @@ function SkeletonRow({ cols }: { cols: number }) {
   return (
     <tr>
       <td className="px-4 py-3">
-        <div className="h-4 w-4 rounded bg-page animate-pulse" />
+        <div className="h-4 w-4 rounded skeleton" />
       </td>
       {Array.from({ length: cols }).map((_, i) => (
         <td key={i} className="px-4 py-3">
           <div
             className={[
-              'h-4 rounded bg-page animate-pulse',
+              'h-4 rounded skeleton',
               i % 3 === 0 ? 'w-3/5' : i % 3 === 1 ? 'w-4/5' : 'w-2/3',
             ].join(' ')}
           />
@@ -253,7 +253,7 @@ function FilterChipsBar({
       ))}
       <button
         onClick={onClearAll}
-        className="text-xs text-brand-coral hover:text-brand-coral/80 font-medium transition-colors"
+        className="text-xs text-muted hover:text-brand-navy font-medium transition-colors"
       >
         Clear all
       </button>
@@ -475,7 +475,7 @@ function MobileCardList<T extends object>({
         {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
-            className="h-20 rounded-xl bg-page animate-pulse"
+            className="h-20 rounded-xl skeleton"
           />
         ))}
       </div>

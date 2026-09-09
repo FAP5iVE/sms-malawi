@@ -50,6 +50,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import Link from 'next/link'
 import { AddUserTypeDialog, type NewUserType } from '@/components/shared/AddUserTypeDialog'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { StaffForm } from '@/components/hr/StaffForm'
 import { StudentForm } from '@/components/students/StudentForm'
 import { useUsers, useUpdateUserRole, useToggleUserDisabled, useSendPasswordReset } from '@/hooks/useAdmin'
@@ -116,6 +117,11 @@ function UserManagementContent() {
   const [sortKey, setSortKey] = useState<SortKey>('user')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [groupByRole, setGroupByRole] = useState(true)
+  // [R15 fix — 1.3 sweep] Disabling a user account was a single unconfirmed
+  // click; a stray tap in a long, sortable list locks a colleague out until
+  // another admin notices and reverses it. Enabling a disabled account stays
+  // unconfirmed (reversible, restorative) — only the disable direction is gated.
+  const [pendingDisable, setPendingDisable] = useState<ApiFirebaseUser | null>(null)
 
   const qc = useQueryClient()
   const { data: usersData } = useUsers()
@@ -239,7 +245,12 @@ function UserManagementContent() {
         <td className="px-4 py-3 text-xs text-muted font-mono">{u.employeeNo ?? u.registrationNo ?? '—'}</td>
         <td className="px-4 py-3">
           <div className="flex items-center gap-1.5">
-            <button onClick={() => toggleDisabled.mutate({ uid: u.uid, disabled: !u.disabled })}
+            <button
+              onClick={() =>
+                u.disabled
+                  ? toggleDisabled.mutate({ uid: u.uid, disabled: false })
+                  : setPendingDisable(u)
+              }
               title={u.disabled ? 'Enable user' : 'Disable user'}
               className="p-1.5 hover:bg-page rounded-lg text-muted">
               <Power className="w-3.5 h-3.5" />
@@ -396,6 +407,19 @@ function UserManagementContent() {
       {addUserType === 'student' && (
         <StudentForm key="add-user-student-form" onClose={closeUserForm} />
       )}
+
+      <ConfirmDialog
+        open={pendingDisable !== null}
+        title={`Disable ${pendingDisable?.displayName ?? pendingDisable?.email ?? 'this user'}?`}
+        description="They will be immediately signed out and unable to log back in until an admin re-enables their account."
+        confirmLabel="Disable User"
+        destructive
+        onConfirm={() => {
+          if (pendingDisable) toggleDisabled.mutate({ uid: pendingDisable.uid, disabled: true })
+          setPendingDisable(null)
+        }}
+        onCancel={() => setPendingDisable(null)}
+      />
     </div>
   )
 }

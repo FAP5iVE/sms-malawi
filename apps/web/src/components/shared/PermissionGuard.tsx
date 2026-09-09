@@ -63,7 +63,7 @@ export type PermissionGuardProps = PermissionGuardBaseProps & PermissionSpec
 function PermissionLoadingSkeleton() {
   return (
     <div className="flex items-center justify-center h-20" aria-hidden="true">
-      <div className="h-5 w-48 rounded-md bg-muted/40 animate-pulse" />
+      <div className="h-5 w-48 rounded-md skeleton" />
     </div>
   )
 }

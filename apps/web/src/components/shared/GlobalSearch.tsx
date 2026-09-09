@@ -2,10 +2,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter }          from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Search, X, GraduationCap, Users, BookOpen, Loader2 } from 'lucide-react'
+import { Search, X, GraduationCap, Users, BookOpen, Loader2, SearchX, WifiOff } from 'lucide-react'
 import { getAuth }            from 'firebase/auth'
 import { useMotionEnabled }   from '@/store/motionStore'
 import { FADE_DOWN_VARIANTS, reducedMotionVariants, reducedMotionTransition, SPRING } from '@/lib/motion'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty'
+import { Kbd } from '@/components/ui/kbd'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -27,17 +29,18 @@ interface Props {
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
+// [R15 fix] Previously swallowed every failure (expired token, network error,
+// a 500 from the fallback route) into the exact same empty shape a genuine
+// "no results" search returns — the caller had no way to tell "nothing
+// matched" from "the request failed." Now lets the error propagate; the
+// caller distinguishes the two and renders a different message for each.
 async function fetchResults(query: string): Promise<SearchResults> {
-  try {
-    const token = await getAuth().currentUser?.getIdToken()
-    const res   = await fetch(`/api/search/fallback?q=${encodeURIComponent(query)}`, {
-      headers: { Authorization: `Bearer ${token ?? ''}` },
-    })
-    if (!res.ok) throw new Error('search failed')
-    return res.json() as Promise<SearchResults>
-  } catch {
-    return { students: [], staff: [], books: [] }
-  }
+  const token = await getAuth().currentUser?.getIdToken()
+  const res   = await fetch(`/api/search/fallback?q=${encodeURIComponent(query)}`, {
+    headers: { Authorization: `Bearer ${token ?? ''}` },
+  })
+  if (!res.ok) throw new Error('search failed')
+  return res.json() as Promise<SearchResults>
 }
 
 function hasResults(r: SearchResults): boolean {
@@ -102,7 +105,15 @@ function BookResult({ hit, onSelect }: { hit: BookHit; onSelect: () => void }) {
 
 // ─── RESULTS DROPDOWN ─────────────────────────────────────────────────────────
 
-function ResultsDropdown({ results, onSelect }: { results: SearchResults; onSelect: () => void }) {
+function ResultsDropdown({
+  results,
+  searchFailed,
+  onSelect,
+}: {
+  results: SearchResults | null
+  searchFailed: boolean
+  onSelect: () => void
+}) {
   const motionEnabled = useMotionEnabled()
   // Post-R19 production fix: reducedMotionVariants/reducedMotionTransition must be
   // CALLED (they branch on motionEnabled internally), never assigned as a bare
@@ -110,7 +121,7 @@ function ResultsDropdown({ results, onSelect }: { results: SearchResults; onSele
   const variants      = reducedMotionVariants(motionEnabled, FADE_DOWN_VARIANTS)
   const transition    = reducedMotionTransition(motionEnabled, { ...SPRING, duration: 0.18 })
 
-  const empty = !hasResults(results)
+  const empty = !results || !hasResults(results)
 
   return (
     <motion.div
@@ -122,8 +133,26 @@ function ResultsDropdown({ results, onSelect }: { results: SearchResults; onSele
       transition={transition}
       className="absolute top-full left-0 right-0 mt-1.5 bg-surface border border-base rounded-2xl shadow-lg overflow-hidden z-50 max-h-[70vh] overflow-y-auto"
     >
-      {empty ? (
-        <p className="px-4 py-5 text-sm text-muted text-center">No results found</p>
+      {searchFailed ? (
+        <Empty className="border-none py-5">
+          <EmptyHeader className="gap-1.5">
+            <EmptyMedia variant="icon">
+              <WifiOff />
+            </EmptyMedia>
+            <EmptyTitle>Search unavailable</EmptyTitle>
+            <EmptyDescription role="alert">Try again in a moment.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : empty ? (
+        <Empty className="border-none py-5">
+          <EmptyHeader className="gap-1.5">
+            <EmptyMedia variant="icon">
+              <SearchX />
+            </EmptyMedia>
+            <EmptyTitle>No results found</EmptyTitle>
+            <EmptyDescription>Try a different name, registration number, or ID.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
         <>
           {results.students.length > 0 && (
@@ -158,6 +187,9 @@ export function GlobalSearch({ variant = 'expanded', placeholder = 'Search stude
   const [loading,   setLoading]   = useState(false)
   const [open,      setOpen]      = useState(false)
   const [expanded,  setExpanded]  = useState(variant === 'expanded')
+  // [R15 fix] Distinguishes "the search request failed" from "the search
+  // genuinely returned nothing" — see fetchResults' comment above.
+  const [searchFailed, setSearchFailed] = useState(false)
   const inputRef   = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -166,13 +198,21 @@ export function GlobalSearch({ variant = 'expanded', placeholder = 'Search stude
   const handleChange = useCallback((value: string) => {
     setQuery(value)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (value.trim().length < 2) { setResults(null); setOpen(false); return }
+    if (value.trim().length < 2) { setResults(null); setSearchFailed(false); setOpen(false); return }
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
-      const res = await fetchResults(value)
-      setResults(res)
-      setOpen(true)
-      setLoading(false)
+      setSearchFailed(false)
+      try {
+        const res = await fetchResults(value)
+        setResults(res)
+        setOpen(true)
+      } catch {
+        setResults(null)
+        setSearchFailed(true)
+        setOpen(true)
+      } finally {
+        setLoading(false)
+      }
     }, 300)
   }, [])
 
@@ -257,6 +297,14 @@ export function GlobalSearch({ variant = 'expanded', placeholder = 'Search stude
             </motion.button>
           )}
         </AnimatePresence>
+        {/* [R15 fix] ⌘K worked but was entirely undiscoverable — nothing in
+            this component ever hinted the shortcut existed. Shown only on
+            the roomy standing desktop bar (not the icon-tight compact
+            overlay), and only while there's nothing else competing for the
+            same space. */}
+        {variant === 'expanded' && !query && !open && (
+          <Kbd className="shrink-0 hidden sm:inline-flex">⌘K</Kbd>
+        )}
         {variant === 'compact' && (
           <button onClick={() => setExpanded(false)} className="shrink-0 text-muted hover:text-brand-navy ml-1">
             <X className="w-3.5 h-3.5" />
@@ -264,8 +312,8 @@ export function GlobalSearch({ variant = 'expanded', placeholder = 'Search stude
         )}
       </div>
       <AnimatePresence>
-        {open && results && (
-          <ResultsDropdown results={results} onSelect={handleSelect} />
+        {open && (results || searchFailed) && (
+          <ResultsDropdown results={results} searchFailed={searchFailed} onSelect={handleSelect} />
         )}
       </AnimatePresence>
     </div>

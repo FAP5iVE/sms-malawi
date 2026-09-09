@@ -40,8 +40,8 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 import { useInactivityTimer } from '@/hooks/useInactivityTimer'
 import { useMotionEnabled } from '@/store/motionStore'
-import { PAGE_VARIANTS } from '@/lib/motion'
-import { useCallback } from 'react'
+import { PAGE_VARIANTS, SIDEBAR_COLLAPSED_WIDTH_PX } from '@/lib/motion'
+import { useEffect, useCallback } from 'react'
 import { logout } from '@/components/providers/AuthProvider'
 import { InactivityWarningDialog } from '@/components/shared/InactivityWarningDialog'
 
@@ -121,6 +121,24 @@ function PageTransitionWrapper({ children }: { children: React.ReactNode }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
+  // [R15 fix] The sidebar wrapper's reserved width below is a hardcoded
+  // Tailwind arbitrary-value class (`md:w-[60px]`) — Tailwind classes must
+  // be static strings, so it can't be generated directly from
+  // SIDEBAR_COLLAPSED_WIDTH_PX at build time. This dev-only check is the
+  // next best thing: it catches the two silently drifting apart again (the
+  // exact failure mode that produced the original 48px/60px mismatch)
+  // instead of only being noticed as a visual bug later.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' && SIDEBAR_COLLAPSED_WIDTH_PX !== 60) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[AuthLayout] Sidebar wrapper is hardcoded to reserve 60px (md:w-[60px]), ` +
+        `but SIDEBAR_COLLAPSED_WIDTH_PX is now ${SIDEBAR_COLLAPSED_WIDTH_PX}. ` +
+        `Update the wrapper's className in (auth)/layout.tsx to match.`
+      )
+    }
+  }, [])
+
   return (
     // AuthProvider is no longer wrapped here — it is mounted once in the
     // root layout (apps/web/src/app/layout.tsx) so that it also covers the
@@ -152,15 +170,25 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         {/* ── Sidebar wrapper ─────────────────────────────────────────────
           `hidden`    → display:none below md (Sidebar not rendered visually)
           `md:flex`   → flex container from md up (Sidebar is a flex child;
-                        collapsed rail md–lg via `md:w-12`, full width `lg:w-auto`)
+                        collapsed rail md–lg via `md:w-[60px]`, full width `lg:w-auto`)
           `shrink-0`  → prevents the sidebar from shrinking on resize edge cases
           `relative z-10` → stacks above the fixed ambient background layer.
+
+          [R15 fix] Was `md:w-12` (48px). Sidebar.tsx's own collapsed-rail
+          animation (SIDEBAR_WIDTH_VARIANTS in lib/motion.ts) actually
+          animates to SIDEBAR_COLLAPSED_WIDTH_PX (60px) — the reserved space
+          here and the sidebar's real animated width disagreed by 12px,
+          overlapping the first pixels of the main content column at the
+          md–lg breakpoint. This literal must stay equal to
+          SIDEBAR_COLLAPSED_WIDTH_PX; the dev-mode check right below this
+          component catches the two silently drifting apart again the way
+          they did before.
 
           Since Sidebar uses motion.aside with its own width management, the
           wrapper only provides the breakpoint-controlled `display` toggle.
           Sidebar's internal spring-animated width still works correctly.
         ────────────────────────────────────────────────────────────────── */}
-        <div className="hidden md:flex md:w-12 lg:w-auto shrink-0 relative z-10">
+        <div className="hidden md:flex md:w-[60px] lg:w-auto shrink-0 relative z-10">
           <Sidebar />
         </div>
 

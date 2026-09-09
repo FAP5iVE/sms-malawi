@@ -192,15 +192,25 @@ export const STAT_CARD_VARIANTS: Variants = {
 
 /**
  * Animated sidebar container width.
- * 240px = Tailwind w-60, 60px = Tailwind w-[60px].
+ * [R15 fix] These were previously bare literals inside the Variants object
+ * below, with the layout wrapper in (auth)/layout.tsx independently
+ * hardcoding "md:w-12" (48px) to reserve the same space — the two numbers
+ * disagreed (48 vs. this file's actual 60), and Sidebar.tsx's own header
+ * comment quoted a third, different number ("220px \u2194 48px") for the same
+ * animation. Exporting the real values here as named constants and having
+ * every consumer reference them (rather than re-typing the numbers) is the
+ * fix — see (auth)/layout.tsx's sidebar wrapper for the other half.
  */
+export const SIDEBAR_EXPANDED_WIDTH_PX  = 240
+export const SIDEBAR_COLLAPSED_WIDTH_PX = 60
+
 export const SIDEBAR_WIDTH_VARIANTS: Variants = {
   expanded: {
-    width: 240,
+    width: SIDEBAR_EXPANDED_WIDTH_PX,
     transition: SPRING.snappy,
   },
   collapsed: {
-    width: 60,
+    width: SIDEBAR_COLLAPSED_WIDTH_PX,
     transition: SPRING.snappy,
   },
 }
