@@ -1143,6 +1143,14 @@ export interface ApiPlacementRecommendation {
   /** The grades-entered candidate's own best-six aggregate (advisory only). */
   aggregate:            number
   score:                number
+  // Present only on `top` results from the diversified/preference-aware
+  // pipeline (server/services/matching/) — absent (undefined) on `chosen`
+  // results, which are a direct lookup of specific programmes the caller
+  // already picked and are never diversified or preference-filtered.
+  fieldCategory?:            string | null
+  careerTags?:               string[]
+  matchedPreferredField?:    boolean
+  matchedPreferredCareer?:   boolean
 }
 
 // The signed-in student's own claim/placement + graduation eligibility.
@@ -1162,10 +1170,21 @@ export interface ApiAdvisoryChosenResult extends ApiPlacementRecommendation {
   rank: number
 }
 
+// Which tier of the preference degrade path actually produced `top` — see
+// server/services/matching/index.ts. Only meaningful when a preference was
+// sent in the request; 'full' with both flags false whenever no preference
+// was set at all (nothing to relax).
+export interface ApiAppliedTier {
+  tier: 'full' | 'relaxed_no_career' | 'relaxed_no_preferences'
+  droppedCareerTag: boolean
+  droppedFieldCategory: boolean
+}
+
 export interface ApiAdvisoryResponse {
   top:          ApiPlacementRecommendation[]
   chosen?:      ApiAdvisoryChosenResult[]
   subjectsUsed: number
+  appliedTier?: ApiAppliedTier
 }
 
 // Public NCHE-selection listing (no auth) — name + where + what only.

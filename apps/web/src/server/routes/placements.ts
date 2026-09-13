@@ -58,11 +58,6 @@ function badRequest(message: string): Error {
   return Object.assign(new Error(message), { status: 400 })
 }
 
-function getSingleRouteParam(value: string | string[] | undefined): string | undefined {
-  if (Array.isArray(value)) return value[0]
-  return value
-}
-
 // ─────────────────────────────────────────────────────────
 //  STUDENT SELF-SERVICE — Student Claim Portal
 // ─────────────────────────────────────────────────────────
@@ -115,7 +110,12 @@ placementsRouter.post(
     try {
       const grades: Record<string, number> = {}
       for (const g of parsed.data.grades) grades[g.subject] = g.grade
-      res.json(placementService.advise(grades, parsed.data.programmes))
+      res.json(
+        placementService.advise(grades, parsed.data.programmes, {
+          fieldCategory: parsed.data.fieldCategory,
+          careerTag: parsed.data.careerTag,
+        })
+      )
     } catch (err) {
       sendError(res, err, { tags: { module: 'placements' } })
     }
@@ -256,11 +256,10 @@ placementsRouter.patch(
   verifyAuth,
   requirePermission('placement.verifyOutcome'),
   async (req, res) => {
-    const claimId = getSingleRouteParam(req.params.id)
-    if (!claimId) return sendError(res, badRequest('Claim id is required.'))
-
+    const id = typeof req.params.id === 'string' ? req.params.id : undefined
+    if (!id) return sendError(res, badRequest('Placement id is required.'))
     try {
-      res.json(await placementService.approveClaim(claimId, req.user!.uid, req.user!.role))
+      res.json(await placementService.approveClaim(id, req.user!.uid, req.user!.role))
     } catch (err) {
       sendError(res, err, { tags: { module: 'placements' } })
     }
@@ -272,9 +271,8 @@ placementsRouter.patch(
   verifyAuth,
   requirePermission('placement.verifyOutcome'),
   async (req, res) => {
-    const claimId = getSingleRouteParam(req.params.id)
-    if (!claimId) return sendError(res, badRequest('Claim id is required.'))
-
+    const id = typeof req.params.id === 'string' ? req.params.id : undefined
+    if (!id) return sendError(res, badRequest('Placement id is required.'))
     const parsed = RejectClaimSchema.safeParse(req.body)
     if (!parsed.success) {
       return sendError(
@@ -283,9 +281,7 @@ placementsRouter.patch(
       )
     }
     try {
-      res.json(
-        await placementService.rejectClaim(claimId, parsed.data, req.user!.uid, req.user!.role)
-      )
+      res.json(await placementService.rejectClaim(id, parsed.data, req.user!.uid, req.user!.role))
     } catch (err) {
       sendError(res, err, { tags: { module: 'placements' } })
     }

@@ -30,10 +30,7 @@ import { useEffect, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Loader2, X } from 'lucide-react'
 import { MotionBottomSheet } from '@/components/shared/MotionBottomSheet'
-import {
-  useCreateCalendarEvent,
-  useUpdateCalendarEvent,
-} from '@/hooks/useCalendarEvents'
+import { useCreateCalendarEvent, useUpdateCalendarEvent } from '@/hooks/useCalendarEvents'
 import { CreateCalendarEventSchema } from '@shared/schemas/calendarEvent'
 import { CALENDAR_COLORS } from '@shared/types/calendar'
 import type { CalendarEvent, CalendarEventCategory } from '@shared/types/calendar'
@@ -78,6 +75,7 @@ export function CalendarEventFormDialog({
   const [fieldError, setFieldError] = useState<string | null>(null)
 
   // Reset/populate fields whenever the dialog opens for a new create vs. an edit target
+  /* eslint-disable react-hooks/set-state-in-effect -- synchronize form state when the dialog target changes */
   useEffect(() => {
     if (!open) return
     setFieldError(null)
@@ -114,6 +112,7 @@ export function CalendarEventFormDialog({
       setAllDay(false)
     }
   }, [open, editEvent, initialDateKey])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -177,9 +176,7 @@ export function CalendarEventFormDialog({
                 aria-pressed={active}
                 className="px-2.5 py-2 min-h-[44px] rounded-xl text-xs font-medium border flex items-center gap-2 text-left transition-colors"
                 style={
-                  active
-                    ? { backgroundColor: `${color}18`, borderColor: color, color }
-                    : undefined
+                  active ? { backgroundColor: `${color}18`, borderColor: color, color } : undefined
                 }
               >
                 <span
@@ -222,12 +219,18 @@ export function CalendarEventFormDialog({
 
           <div className="flex-1 space-y-3">
             <div>
-              <label htmlFor="cal-event-start-date" className="text-xs font-medium text-muted mb-1 block">
+              <label
+                htmlFor="cal-event-start-date"
+                className="text-xs font-medium text-muted mb-1 block"
+              >
                 Start
               </label>
               <div className={allDay ? '' : 'grid grid-cols-[1fr_auto] gap-2'}>
                 <div className="relative">
-                  <CalendarIcon className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                  <CalendarIcon
+                    className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                    aria-hidden="true"
+                  />
                   <input
                     id="cal-event-start-date"
                     type="date"
@@ -242,7 +245,10 @@ export function CalendarEventFormDialog({
                 </div>
                 {!allDay && (
                   <div className="relative">
-                    <Clock className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                    <Clock
+                      className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                      aria-hidden="true"
+                    />
                     <input
                       aria-label="Start time"
                       type="time"
@@ -256,12 +262,18 @@ export function CalendarEventFormDialog({
             </div>
 
             <div>
-              <label htmlFor="cal-event-end-date" className="text-xs font-medium text-muted mb-1 block">
+              <label
+                htmlFor="cal-event-end-date"
+                className="text-xs font-medium text-muted mb-1 block"
+              >
                 End <span className="text-muted/70 font-normal">(optional)</span>
               </label>
               <div className={allDay ? '' : 'grid grid-cols-[1fr_auto] gap-2'}>
                 <div className="relative">
-                  <CalendarIcon className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                  <CalendarIcon
+                    className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                    aria-hidden="true"
+                  />
                   <input
                     id="cal-event-end-date"
                     type="date"
@@ -273,7 +285,10 @@ export function CalendarEventFormDialog({
                 </div>
                 {!allDay && (
                   <div className="relative">
-                    <Clock className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
+                    <Clock
+                      className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                      aria-hidden="true"
+                    />
                     <input
                       aria-label="End time"
                       type="time"
@@ -290,7 +305,10 @@ export function CalendarEventFormDialog({
       </div>
 
       <div>
-        <label htmlFor="cal-event-location" className="text-xs font-medium text-muted mb-1 flex items-center gap-1.5">
+        <label
+          htmlFor="cal-event-location"
+          className="text-xs font-medium text-muted mb-1 flex items-center gap-1.5"
+        >
           <MapPin className="w-3.5 h-3.5" aria-hidden="true" /> Location / Room
         </label>
         <input
@@ -303,7 +321,10 @@ export function CalendarEventFormDialog({
       </div>
 
       <div>
-        <label htmlFor="cal-event-description" className="text-xs font-medium text-muted mb-1 flex items-center gap-1.5">
+        <label
+          htmlFor="cal-event-description"
+          className="text-xs font-medium text-muted mb-1 flex items-center gap-1.5"
+        >
           <AlignLeft className="w-3.5 h-3.5" aria-hidden="true" /> Description / Notes
         </label>
         <textarea

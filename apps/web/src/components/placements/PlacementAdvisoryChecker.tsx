@@ -28,8 +28,9 @@ import { useState } from 'react'
 import { useAdvisoryCheck, usePlacementCatalogue } from '@/hooks/usePlacements'
 import { PlacementRecommendationCard } from '@/components/placements/PlacementRecommendationCard'
 import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
+import { FIELD_CATEGORIES, FIELD_CATEGORY_LABEL, CAREER_FIELDS, type FieldCategory, type CareerField } from '@shared/constants/matching'
 import type { University } from '@shared/constants/universities'
-import { Plus, Trash2, Calculator, Loader2, Sparkles } from 'lucide-react'
+import { Plus, Trash2, Calculator, Loader2, Sparkles, Info } from 'lucide-react'
 
 interface GradeRow {
   subject: string
@@ -57,6 +58,8 @@ export function PlacementAdvisoryChecker() {
   const [grades, setGrades] = useState<GradeRow[]>([emptyGradeRow(), emptyGradeRow(), emptyGradeRow()])
   const [wantsProgrammeCheck, setWantsProgrammeCheck] = useState(false)
   const [chosen, setChosen] = useState<ChosenRow[]>([emptyChosenRow(), emptyChosenRow(), emptyChosenRow()])
+  const [preferredField, setPreferredField] = useState<FieldCategory | ''>('')
+  const [preferredCareer, setPreferredCareer] = useState<CareerField | ''>('')
   const [formError, setFormError] = useState<string | null>(null)
 
   const usedSubjects = new Set(grades.map((g) => g.subject).filter(Boolean))
@@ -112,6 +115,8 @@ export function PlacementAdvisoryChecker() {
     advisory.mutate({
       grades: cleanGrades,
       programmes: cleanChosen.length > 0 ? cleanChosen : undefined,
+      fieldCategory: preferredField || undefined,
+      careerTag: preferredCareer || undefined,
     })
   }
 
@@ -241,6 +246,38 @@ export function PlacementAdvisoryChecker() {
         )}
       </section>
 
+      {/* Optional preferences — narrow/re-weight the top-10 "best fit" list
+          only (never applied to the "check specific programmes" list above,
+          since that's already a targeted lookup the user chose themselves). */}
+      <section className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm block">
+          <span className="block text-xs text-muted mb-1">Preferred field of study (optional)</span>
+          <select
+            value={preferredField}
+            onChange={(e) => setPreferredField(e.target.value as FieldCategory | '')}
+            className="w-full border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none"
+          >
+            <option value="">No preference</option>
+            {FIELD_CATEGORIES.map((fc) => (
+              <option key={fc} value={fc}>{FIELD_CATEGORY_LABEL[fc]}</option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm block">
+          <span className="block text-xs text-muted mb-1">Preferred career field (optional)</span>
+          <select
+            value={preferredCareer}
+            onChange={(e) => setPreferredCareer(e.target.value as CareerField | '')}
+            className="w-full border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none"
+          >
+            <option value="">No preference</option>
+            {CAREER_FIELDS.map((cf) => (
+              <option key={cf} value={cf}>{cf}</option>
+            ))}
+          </select>
+        </label>
+      </section>
+
       {formError && (
         <p role="alert" className="text-sm text-brand-coral">{formError}</p>
       )}
@@ -276,6 +313,16 @@ export function PlacementAdvisoryChecker() {
 
           <section>
             <h3 className="font-heading font-semibold text-sm mb-3">Top 10 matching programmes</h3>
+            {result.appliedTier && result.appliedTier.tier !== 'full' && (preferredField || preferredCareer) && (
+              <div className="bg-brand-amber/10 border border-brand-amber/25 rounded-xl px-4 py-3 text-sm text-body flex items-start gap-2 mb-3">
+                <Info className="w-4 h-4 mt-0.5 shrink-0 text-brand-amber" />
+                <span>
+                  {result.appliedTier.tier === 'relaxed_no_career'
+                    ? 'Not enough programmes matched every preference, so your career preference was relaxed for this list — programmes that still match it are shown first, but this is a wider set than a strict match.'
+                    : 'Not enough programmes matched your preferences at all, so both preferences were relaxed for this list — showing everything you qualify for, with any matching programmes surfaced first.'}
+                </span>
+              </div>
+            )}
             {result.top.length === 0 ? (
               <p className="text-sm text-muted">No matching programmes found for the grades entered.</p>
             ) : (

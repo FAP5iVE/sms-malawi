@@ -112,6 +112,26 @@ export function PlacementRecommendationCard({ recommendation: r, action, rank, g
         </span>
       </div>
 
+      {(eligible || r.matchedPreferredField || r.matchedPreferredCareer) && (
+        <div className="flex flex-wrap gap-1.5">
+          {eligible && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-brand-teal/10 text-brand-teal text-[11px] font-medium px-2 py-0.5">
+              <CheckCircle2 className="w-3 h-3" /> Meets requirements
+            </span>
+          )}
+          {r.matchedPreferredField && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-brand-navy/10 text-brand-navy text-[11px] font-medium px-2 py-0.5">
+              <CheckCircle2 className="w-3 h-3" /> Matches your field preference
+            </span>
+          )}
+          {r.matchedPreferredCareer && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-brand-navy/10 text-brand-navy text-[11px] font-medium px-2 py-0.5">
+              <CheckCircle2 className="w-3 h-3" /> Matches your career interest
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="bg-surface border border-base rounded-lg p-3">
         <p className="text-[11px] font-semibold text-muted uppercase tracking-wide mb-1">Analysis Verdict</p>
         <p className="text-sm text-body">{buildVerdict(r)}</p>

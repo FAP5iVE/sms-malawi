@@ -13,8 +13,9 @@
  *       own selection; goes to PENDING_APPROVAL.
  *     - RejectClaimSchema         — a staff verifier rejects a claim with a
  *       reason; ApproveClaimSchema is not needed (approve takes no body).
- *   The Advisory qualification-checker schemas are unchanged — the
- *   calculator itself was already correct and is reused as-is.
+ *   The Advisory qualification-checker schemas gain two optional
+ *   preferences (fieldCategory, careerTag) for the diversified/preference-
+ *   aware matching pipeline — see server/services/matching/.
  *
  *   Catalogue-vs-free-text rule (unchanged): a destination references EITHER
  *   a curated catalogue programme (placedUniversityId + placedProgrammeId,
@@ -24,6 +25,7 @@
  *   Prisma enums cannot be imported client-side)
  */
 import { z } from 'zod'
+import { FIELD_CATEGORIES, CAREER_FIELDS } from '@shared/constants/matching'
 
 // Mirrors the Prisma PlacementStatus / PlacementEntrySource enums.
 export const PlacementStatusSchema = z.enum(['PENDING_APPROVAL', 'CONFIRMED', 'REJECTED'])
@@ -137,6 +139,12 @@ export const AdvisoryCheckSchema = z.object({
     .min(3, 'Choose at least three programmes to check')
     .max(20)
     .optional(),
+  // Optional preferences — narrow/re-weight the `top` results only; never
+  // applied to an explicit `programmes` check (the caller already chose
+  // those). Combine as AND, with an explicit relaxation path when too few
+  // results satisfy both — see server/services/matching/index.ts.
+  fieldCategory: z.enum(FIELD_CATEGORIES).optional(),
+  careerTag:     z.enum(CAREER_FIELDS).optional(),
 })
 
 export type AdvisoryGrade      = z.infer<typeof AdvisoryGradeSchema>

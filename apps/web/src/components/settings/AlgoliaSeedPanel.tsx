@@ -76,7 +76,7 @@ export function AlgoliaSeedPanel() {
         <div>
           <h3 className="font-heading font-semibold text-brand-navy">Algolia Search Index</h3>
           <p className="text-xs text-muted mt-0.5">
-            Bulk-seed search indices from the live Neon database. Safe to re-run — existing records are overwritten.
+            Bulk-seed search indices from the live Neon database. Safe to re-run, existing records are overwritten.
           </p>
         </div>
 

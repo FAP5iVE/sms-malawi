@@ -48,15 +48,15 @@ import { resolveStudentFromUid } from '@/server/services/studentService'
 import {
   isManebRecordPlacementReady,
   computeEligibility,
-  generateRecommendations,
   parseMsceGrades,
 } from '@/server/services/placementMatchingService'
 import type { ProgramRecommendation } from '@/server/services/placementMatchingService'
+import { matchProgrammes } from '@/server/services/matching'
+import type { MatchPreferences, AppliedTier } from '@/server/services/matching/types'
 import {
   UNIVERSITIES,
   findUniversity,
   findProgram,
-  getAllPrograms,
 } from '@shared/constants/universities'
 import type {
   StaffPlacementEntryInput,
@@ -598,23 +598,39 @@ export function getCatalogue() {
 // in here, which is what makes this "ignore internal exams, use MSCE" by
 // construction rather than a rule that has to be remembered elsewhere. Not
 // gated by any placement record or status — it's a standalone calculator.
+//
+// [OVERHAUL] `top` is now produced by the dedicated matching pipeline
+// (server/services/matching/) — eligibility + base relevance (still this
+// same computeEligibility/generateRecommendations, unchanged), then optional
+// field/career preferences applied as a strict AND filter with an explicit,
+// labeled relaxation path, then capped-per-university diversification. Used
+// to be a single `generateRecommendations(...).slice(0, limit)` call, which
+// had no notion of source diversity — eligible programmes from one
+// university with many similar strong offerings could dominate the whole
+// list even with correct scoring. `chosen` (evaluating specific programmes
+// the caller already picked) is deliberately UNCHANGED — a targeted lookup
+// the caller already narrowed themselves has no reason to be diversified or
+// preference-filtered.
 export interface AdvisoryResponse {
   top:          ProgramRecommendation[]
   chosen?:      (ProgramRecommendation & { rank: number })[]
   subjectsUsed: number
+  appliedTier?: AppliedTier
 }
 
 export function advise(
   grades: Record<string, number>,
   chosen?: { universityId: string; programmeId: string }[],
-  limit = 10,
+  preferences: MatchPreferences = {},
 ): AdvisoryResponse {
-  const programs = getAllPrograms().map(({ university, program }) => ({
-    universityId:   university.id,
-    universityName: university.name,
-    program,
+  const { results, appliedTier } = matchProgrammes(grades, preferences)
+  const top = results.map((r) => ({
+    ...r.recommendation,
+    fieldCategory: r.explanation.fieldCategory,
+    careerTags: r.explanation.careerTags,
+    matchedPreferredField: r.explanation.matchedPreferredField,
+    matchedPreferredCareer: r.explanation.matchedPreferredCareer,
   }))
-  const top = generateRecommendations(grades, programs).slice(0, limit)
 
   let chosenResults: (ProgramRecommendation & { rank: number })[] | undefined
   if (chosen && chosen.length > 0) {
@@ -648,5 +664,5 @@ export function advise(
     })
   }
 
-  return { top, chosen: chosenResults, subjectsUsed: Object.keys(grades).length }
+  return { top, chosen: chosenResults, subjectsUsed: Object.keys(grades).length, appliedTier }
 }
