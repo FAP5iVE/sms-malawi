@@ -49,6 +49,7 @@ import {
   Settings,
   Activity,
   Images,
+  Boxes,
 } from 'lucide-react'
 
 import type { UserRole }   from '@shared/types/roles'
@@ -187,6 +188,15 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href:        '/library',
     icon:        Library,
     roles:       rolesFor('/library'),
+  },
+
+  // ── Assets ────────────────────────────────────────────────────────────────
+  {
+    label:       'Assets & Inventory',
+    mobileLabel: 'Assets',
+    href:        '/assets',
+    icon:        Boxes,
+    roles:       rolesFor('/assets'),
   },
 
   // ── HR ────────────────────────────────────────────────────────────────────

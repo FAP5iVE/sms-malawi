@@ -352,6 +352,22 @@ export const queryKeys = {
       ['library', 'fine-waivers', status ?? 'all'] as const,
   },
 
+  assets: {
+    all: () => ['assets'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      ['assets', 'list', filters ?? {}] as const,
+    detail: (id: string) => ['assets', 'detail', id] as const,
+    assignments: (assetId: string) => ['assets', assetId, 'assignments'] as const,
+    myAssigned: () => ['assets', 'my-assigned'] as const,
+    stats: () => ['assets', 'stats'] as const,
+    rooms: () => ['assets', 'rooms'] as const,
+    requests: (filters?: Record<string, unknown>) => ['assets', 'requests', filters ?? {}] as const,
+    myRequests: () => ['assets', 'requests', 'mine'] as const,
+    requestsByDepartment: () => ['assets', 'requests', 'by-department'] as const,
+    advances: (status?: string) => ['assets', 'advances', status ?? 'all'] as const,
+    requestAdvances: (requestId: string) => ['assets', 'requests', requestId, 'advances'] as const,
+  },
+
   // ── Applications
   applications: {
     all: () => ['applications'] as const,

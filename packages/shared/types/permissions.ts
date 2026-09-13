@@ -238,6 +238,25 @@ export type Permission =
   | 'library.recommendResource'      // Submit resource recommendation for purchase
   | 'library.approveRecommendation'  // Approve / reject resource recommendations
 
+  // ── ASSETS ───────────────────────────────────────────
+  // Non-library physical inventory: furniture, IT/lab/sports/kitchen
+  // equipment, vehicles, tools. Deliberately does not overlap with the
+  // library.* block above — books/borrowings stay entirely there.
+  // Financial valuation/depreciation posting to the GL (mirroring the
+  // existing "1200 Library Inventory" ledger line in accountingService.ts)
+  // is out of scope this phase — assets.* covers custody/register only.
+  | 'assets.viewRegister'            // View the full asset register
+  | 'assets.manageRegister'          // Add / edit / remove assets from the register
+  | 'assets.allocateItem'            // Assign an asset to a staff member, department, or room
+  | 'assets.markCondition'           // Update an asset's condition (incl. marking damaged/lost)
+  | 'assets.dispose'                 // Mark an asset disposed (end of its custody lifecycle)
+  | 'assets.viewInventoryReports'    // View inventory summary / valuation reports
+  | 'assets.requestItem'             // Submit an equipment requisition
+  | 'assets.approveRequest'          // Approve / reject / fulfil equipment requisitions
+  | 'assets.viewOwnAssigned'         // View assets currently assigned to oneself
+  | 'assets.viewAdvances'            // View procurement advances made against requisitions
+  | 'assets.manageAdvances'          // Record/reconcile/write off procurement advances
+
   // ── HR ───────────────────────────────────────────────
   | 'hr.viewOwnProfile'              // View own staff profile
   | 'hr.editOwnLimitedFields'        // Edit own limited fields (phone, address)
@@ -429,6 +448,12 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'library.viewUsageReports',
     'library.viewInventoryReports',
 
+    // Assets — oversight only, same as library above (admin does not
+    // perform business operations — see classes.ts's class.create note)
+    'assets.viewRegister',
+    'assets.viewInventoryReports',
+    'assets.viewAdvances',
+
     // HR — system account management only (no HR data logic)
     'hr.viewAnyProfile',
     'hr.viewHRReports',
@@ -602,6 +627,14 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'library.viewInventoryReports',
     'library.viewBorrowingHistory',
 
+    // Assets — oversight of the register, plus requisition approval
+    // alongside finance (either can approve/reject — see R20 follow-up:
+    // "response of approval from finance and high rank")
+    'assets.viewRegister',
+    'assets.viewInventoryReports',
+    'assets.approveRequest',
+    'assets.viewAdvances',
+
     // HR — full management authority
     'hr.viewOwnProfile',
     'hr.editOwnLimitedFields',
@@ -756,6 +789,23 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'library.viewOwnBorrowings',
     'library.viewOwnFines',
 
+    // Assets — full operational ownership: custody, condition, disposal,
+    // and requisition approval (shared with high_rank — either can
+    // approve/reject, not a sequential two-signature chain). See R20's
+    // PURPOSE note — this role can be split off to a dedicated `stores`
+    // role later without touching any of the assets.* keys themselves,
+    // only which role's Set holds them.
+    'assets.viewRegister',
+    'assets.manageRegister',
+    'assets.allocateItem',
+    'assets.markCondition',
+    'assets.dispose',
+    'assets.viewInventoryReports',
+    'assets.approveRequest',
+    'assets.viewOwnAssigned',
+    'assets.viewAdvances',
+    'assets.manageAdvances',
+
     // HR — self-service only
     'hr.viewOwnProfile',
     'hr.editOwnLimitedFields',
@@ -842,6 +892,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'library.viewBorrowingHistory',
     'library.recommendResource',
     'library.approveRecommendation',
+    'assets.viewOwnAssigned',
 
     // HR — self-service only
     'hr.viewOwnProfile',
@@ -926,6 +977,10 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
 
     // Library — no access (§3.14.1.5)
 
+    // Assets — self-service only: can see what's assigned to them
+    // (maintenance tools etc.), no register/requisition access
+    'assets.viewOwnAssigned',
+
     // HR — self-service only
     'hr.viewOwnProfile',
     'hr.editOwnLimitedFields',
@@ -1007,6 +1062,12 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'library.uploadDigitalResource',
     'library.recommendResource',
 
+    // Assets — can requisition equipment for their department (mirrors
+    // library.recommendResource: suggest, don't approve) and see what's
+    // currently assigned to them
+    'assets.requestItem',
+    'assets.viewOwnAssigned',
+
     // HR — self-service only
     'hr.viewOwnProfile',
     'hr.editOwnLimitedFields',
@@ -1085,6 +1146,9 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'library.viewOwnBorrowings',
     'library.viewOwnFines',
     'library.viewDigitalResources',
+
+    // Assets — self-service only
+    'assets.viewOwnAssigned',
 
     // HR — full management
     'hr.viewOwnProfile',
@@ -1174,6 +1238,9 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'library.viewOwnBorrowings',
     'library.viewOwnFines',
     'library.viewDigitalResources',
+
+    // Assets — self-service only
+    'assets.viewOwnAssigned',
 
     // HR — self-service only
     'hr.viewOwnProfile',

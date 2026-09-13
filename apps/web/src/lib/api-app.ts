@@ -98,6 +98,7 @@ import { usersRouter }         from '@/server/routes/users'
 import { healthRouter }        from '@/server/routes/health'
 import { hrRouter }            from '@/server/routes/hr'
 import { libraryRouter }       from '@/server/routes/library'
+import { assetsRouter }        from '@/server/routes/assets'
 import { galleryRouter }       from '@/server/routes/gallery'
 import { authRouter }          from '@/server/routes/auth'
 import { settingsRouter }      from '@/server/routes/settings'
@@ -228,6 +229,7 @@ export function createApiApp() {
   app.use('/promotion',       verifyAuth, requireRole(['admin', 'exam_officer', 'high_rank']), promotionRouter)
   app.use('/hr',              hrRouter)
   app.use('/library',         libraryRouter)
+  app.use('/assets',          assetsRouter)
   app.use('/gallery',         galleryRouter)
   app.use('/auth',            authRouter)
   app.use('/analytics',       analyticsRouter)

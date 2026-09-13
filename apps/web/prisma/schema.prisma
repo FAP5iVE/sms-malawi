@@ -998,6 +998,7 @@ model StaffProfile {
   loans               StaffLoan[]
   performanceNotes    PerformanceNote[]
   borrowings          Borrowing[]
+  assetAssignments    AssetAssignment[]
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
@@ -1642,4 +1643,187 @@ model VercelAlertEvent {
   createdAt    DateTime  @default(now())
 
   @@index([kind, acknowledged])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// R20 — Assets & Inventory Management
+//
+// Physical, non-library assets: furniture, IT/lab/sports/kitchen
+// equipment, vehicles, maintenance tools. Books/borrowings stay
+// entirely on the existing Book/Borrowing models — this domain
+// deliberately does not touch them.
+//
+// Custody model: an Asset lives IN_STORE until allocated. Each
+// allocation/return is a row in AssetAssignment (full history kept,
+// mirrors Borrowing's ACTIVE/RETURNED pattern) rather than mutating
+// fields on Asset directly, so "who has had this and when" is always
+// reconstructable.
+//
+// Requisition model: AssetRequest is the academic-dept-head-requests,
+// finance-approves-or-rejects workflow, mirroring the existing
+// ResourceRecommendation pattern in the library domain. An approved
+// request is fulfilled by linking it to the Asset that satisfies it
+// (either an existing in-store item or a newly registered one) — it
+// does not itself create financial/GL entries; that stays a manual
+// finance step via the existing accounting module for now (see
+// PURPOSE note in packages/shared/types/permissions.ts's assets.*
+// block for what's deliberately out of scope this phase).
+// ═══════════════════════════════════════════════════════════════
+
+model Asset {
+  id               String          @id @default(cuid())
+  name             String
+  category         AssetCategory
+  description      String?
+  serialNumber     String?         @unique  // only for individually-serialized items (a laptop, a vehicle) — leave null for bulk/consumable lines
+  quantity         Int             @default(1)  // bulk lines (e.g. "40 stacking chairs") track a count; serialized items are always 1
+  condition        AssetCondition  @default(GOOD)
+  status           AssetStatus     @default(IN_STORE)
+  location         String?         // room/department where it's kept while IN_STORE
+  acquisitionDate  DateTime?
+  acquisitionCost  Decimal?        @db.Decimal(12, 2)   // MWK
+  supplier         String?
+  warrantyExpiry   DateTime?
+  photoKey         String?         // Appwrite file ID — mirrors Book.coverKey
+  notes            String?
+  createdByUid     String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  assignments      AssetAssignment[]
+  fulfilledRequests AssetRequest[]
+
+  @@index([category])
+  @@index([status])
+  @@index([name])
+  @@map("assets")
+}
+
+enum AssetCategory {
+  FURNITURE
+  IT_EQUIPMENT
+  LAB_EQUIPMENT
+  SPORTS_EQUIPMENT
+  KITCHEN_EQUIPMENT
+  VEHICLE
+  MAINTENANCE_TOOL
+  OTHER
+}
+
+enum AssetCondition {
+  NEW
+  GOOD
+  FAIR
+  POOR
+  DAMAGED
+}
+
+enum AssetStatus {
+  IN_STORE
+  ALLOCATED
+  UNDER_REPAIR
+  DISPOSED
+  LOST
+}
+
+model AssetAssignment {
+  id                  String              @id @default(cuid())
+  assetId             String
+  asset               Asset               @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  assignedToType       AssetAssigneeType
+  staffId             String?             // set when assignedToType = STAFF
+  staff               StaffProfile?       @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  departmentOrRoom     String?            // set when assignedToType = DEPARTMENT or ROOM
+  quantity            Int                 @default(1)
+  assignedByUid       String
+  assignedAt          DateTime            @default(now())
+  returnedAt          DateTime?
+  status              AssetAssignmentStatus @default(ACTIVE)
+  conditionOnReturn   AssetCondition?
+  notes               String?
+
+  @@index([assetId])
+  @@index([staffId])
+  @@index([status])
+  @@map("asset_assignments")
+}
+
+enum AssetAssigneeType {
+  STAFF
+  DEPARTMENT
+  ROOM
+}
+
+enum AssetAssignmentStatus {
+  ACTIVE
+  RETURNED
+}
+
+model AssetRequest {
+  id               String            @id @default(cuid())
+  requestedByUid   String
+  title            String            // short description, e.g. "10 microscopes for Form 3 Biology"
+  category         AssetCategory
+  quantity         Int               @default(1)
+  department       String?
+  justification    String?
+  status           AssetRequestStatus @default(PENDING)
+  reviewedByUid    String?
+  reviewedAt       DateTime?
+  reviewNotes      String?
+  fulfilledAssetId String?
+  fulfilledAsset   Asset?            @relation(fields: [fulfilledAssetId], references: [id])
+  advances         AssetAdvance[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@index([status])
+  @@index([requestedByUid])
+  @@map("asset_requests")
+}
+
+enum AssetRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FULFILLED
+}
+
+// ═══════════════════════════════════════════════════════════
+// R21 — Asset Procurement Advances
+//
+// "Advances management" for the assets domain, scoped narrowly per the
+// R20 follow-up conversation: cash finance advances to a SUPPLIER against
+// an approved AssetRequest, tracked until the item arrives (reconciled)
+// or the advance is written off. Deliberately NOT double-entry accounting
+// — no AccountEntry/GL rows are created here (same boundary as
+// acquisitionCost on Asset itself, see assetService.ts's file header).
+// This is a tracking record so finance can answer "how much is currently
+// out the door and unreconciled", not a ledger.
+// ═══════════════════════════════════════════════════════════
+
+model AssetAdvance {
+  id              String             @id @default(cuid())
+  assetRequestId  String
+  assetRequest    AssetRequest       @relation(fields: [assetRequestId], references: [id], onDelete: Cascade)
+  supplier        String
+  amount          Decimal            @db.Decimal(12, 2)   // MWK
+  advancedByUid   String
+  advancedAt      DateTime           @default(now())
+  status          AssetAdvanceStatus @default(PENDING)
+  reconciledByUid String?
+  reconciledAt    DateTime?
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([assetRequestId])
+  @@index([status])
+  @@map("asset_advances")
+}
+
+enum AssetAdvanceStatus {
+  PENDING
+  RECONCILED
+  WRITTEN_OFF
 }

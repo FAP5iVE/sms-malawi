@@ -44,6 +44,7 @@ export const PAGE_ACCESS: Record<string, readonly UserRole[]> = {
   '/timetable': ALL_ROLES,
   '/finances': ['admin', 'high_rank', 'finance', 'student', 'hr'],
   '/library': ALL_ROLES,
+  '/assets': ALL_STAFF,
   '/hr': ALL_STAFF,
   '/announcements': ALL_ROLES,
   // [PRODUCTION FIX — Issue #6] New admin gallery management page.

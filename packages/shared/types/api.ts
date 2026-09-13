@@ -678,6 +678,78 @@ export interface ApiBorrowing {
   book?: { title: string; author: string; isbn?: string }
 }
 
+export interface ApiAsset {
+  id: string
+  name: string
+  category: string
+  description?: string
+  serialNumber?: string
+  quantity: number
+  condition: string
+  status: string
+  location?: string
+  acquisitionDate?: string
+  acquisitionCost?: number
+  supplier?: string
+  warrantyExpiry?: string
+  photoKey?: string
+  notes?: string
+  createdByUid: string
+  createdAt: string
+  updatedAt: string
+  assignments?: ApiAssetAssignment[]
+}
+
+export interface ApiAssetAssignment {
+  id: string
+  assetId: string
+  assignedToType: string
+  staffId?: string
+  departmentOrRoom?: string
+  quantity: number
+  assignedByUid: string
+  assignedAt: string
+  returnedAt?: string
+  status: string
+  conditionOnReturn?: string
+  notes?: string
+  asset?: ApiAsset
+}
+
+export interface ApiAssetRequest {
+  id: string
+  requestedByUid: string
+  title: string
+  category: string
+  quantity: number
+  department?: string
+  justification?: string
+  status: string
+  reviewedByUid?: string
+  reviewedAt?: string
+  reviewNotes?: string
+  fulfilledAssetId?: string
+  fulfilledAsset?: ApiAsset
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ApiAssetAdvance {
+  id: string
+  assetRequestId: string
+  supplier: string
+  amount: number
+  advancedByUid: string
+  advancedAt: string
+  status: string
+  reconciledByUid?: string
+  reconciledAt?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+  assetRequest?: { title: string; department?: string }
+}
+
 export interface ApiDigitalResource {
   id: string
   title: string
@@ -1143,14 +1215,6 @@ export interface ApiPlacementRecommendation {
   /** The grades-entered candidate's own best-six aggregate (advisory only). */
   aggregate:            number
   score:                number
-  // Present only on `top` results from the diversified/preference-aware
-  // pipeline (server/services/matching/) — absent (undefined) on `chosen`
-  // results, which are a direct lookup of specific programmes the caller
-  // already picked and are never diversified or preference-filtered.
-  fieldCategory?:            string | null
-  careerTags?:               string[]
-  matchedPreferredField?:    boolean
-  matchedPreferredCareer?:   boolean
 }
 
 // The signed-in student's own claim/placement + graduation eligibility.
@@ -1170,21 +1234,10 @@ export interface ApiAdvisoryChosenResult extends ApiPlacementRecommendation {
   rank: number
 }
 
-// Which tier of the preference degrade path actually produced `top` — see
-// server/services/matching/index.ts. Only meaningful when a preference was
-// sent in the request; 'full' with both flags false whenever no preference
-// was set at all (nothing to relax).
-export interface ApiAppliedTier {
-  tier: 'full' | 'relaxed_no_career' | 'relaxed_no_preferences'
-  droppedCareerTag: boolean
-  droppedFieldCategory: boolean
-}
-
 export interface ApiAdvisoryResponse {
   top:          ApiPlacementRecommendation[]
   chosen?:      ApiAdvisoryChosenResult[]
   subjectsUsed: number
-  appliedTier?: ApiAppliedTier
 }
 
 // Public NCHE-selection listing (no auth) — name + where + what only.
