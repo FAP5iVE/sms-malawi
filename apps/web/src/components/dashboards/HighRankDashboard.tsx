@@ -3,10 +3,7 @@
 /**
  * apps/web/src/components/dashboards/HighRankDashboard.tsx
  *
- * [CHANGE TYPE]: MAJOR REWRITE (stat-card data-wiring and quick-action
- *   link targets only — the overall visual layout is unaffected)
- * [R-PHASE]: R15 — UI/UX Polish: Shared Components, Dashboards,
- *   Confirmation Dialogs & Data-Display Consistency
+ * [CHANGE TYPE]: MAJOR REWRITE
  * [PURPOSE]: All four stat cards were permanent '—' placeholders. Wired to
  *   the real endpoints this executive role already holds permissions for:
  *   Total Students ← useStudents({status:'ACTIVE'}).total; Total Staff ←
@@ -14,14 +11,29 @@
  *   useFinanceSummary(year, term).collectionPercent
  *   (finance.viewSummary); School Pass Rate ← the current year's latest
  *   useSchoolPerformanceTrend point (report.viewSchoolPerformance). Year/
- *   term come from useCurrentAcademicPeriod() (SETTING_KEYS, same phase) —
- *   never hardcoded. Quick actions already pointed at real pages;
- *   unchanged. PlaceholderWidget import moved to its new shared home.
+ *   term come from useCurrentAcademicPeriod() — never hardcoded.
+ *
+ * [PRODUCTION FIX] "Important Reports" was a literal, permanent
+ *   PlaceholderWidget with no data fetch at all — not a stuck loading
+ *   state, a dead component. Every sibling dashboard (Admin, Finance, HR,
+ *   Library, Student) had already been converted to real ChartCard/live
+ *   data; High Rank's was the one left behind. Replaced with:
+ *     (1) PendingActionsPanel (compact) — the student/class approval queue
+ *         that was fully built end-to-end (backend, hooks, UI) but had no
+ *         page anywhere in the app to render on (see the new /approvals
+ *         page and its PAGE_ACCESS/NAV_ITEMS entries).
+ *     (2) Class Performance Comparison — useClassComparison, a real
+ *         analytics endpoint already serving /reports' high_rank tab but
+ *         absent from this dashboard, broadening coverage beyond
+ *         students/staff/fees/pass-rate into per-class academic oversight.
+ *     (3) A school attendance KPI strip — useAttendanceSummary, likewise
+ *         already live for /reports but not represented here at all.
+ *   Also added an "Approvals" quick action pointing at the new page.
  * [DEPENDS ON]: W/hooks/useStudents.ts, W/hooks/useHR.ts,
  *   W/hooks/useFinances.ts, W/hooks/useAnalytics.ts,
- *   W/hooks/useSettings.ts (useCurrentAcademicPeriod, same phase),
- *   W/components/shared/PlaceholderWidget.tsx (same phase),
- *   W/components/shared/StatCard.tsx (statValue, same phase)
+ *   W/hooks/useSettings.ts (useCurrentAcademicPeriod),
+ *   W/components/shared/PendingActionsPanel.tsx,
+ *   W/components/shared/StatCard.tsx (statValue)
  */
 
 import {
@@ -32,13 +44,14 @@ import {
   TrendingUp,
   BarChart3,
   ClipboardList,
+  ClipboardCheck,
   Settings,
   Megaphone,
 } from 'lucide-react'
 import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import type { QuickAction } from '@/components/shared/QuickActions'
-import { PlaceholderWidget } from '@/components/shared/PlaceholderWidget'
+import { PendingActionsPanel } from '@/components/shared/PendingActionsPanel'
 import { ChartCard } from '@/components/shared/ChartCard'
 import { Chart } from '@/components/shared/chart'
 import type { ChartDataPoint } from '@/components/shared/chart'
@@ -46,11 +59,26 @@ import { FeeCollectionRadial } from '@/components/finances/FeeCollectionRadial'
 import { useStudents } from '@/hooks/useStudents'
 import { useStaffDirectory } from '@/hooks/useHR'
 import { useFinanceSummary } from '@/hooks/useFinances'
-import { useSchoolPerformanceTrend, useEnrollmentTrend } from '@/hooks/useAnalytics'
+import {
+  useSchoolPerformanceTrend,
+  useEnrollmentTrend,
+  useClassComparison,
+  useAttendanceSummary,
+} from '@/hooks/useAnalytics'
 import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
 import type { ApiStaffProfile } from '@shared/types/api'
 
 const QUICK_ACTIONS: QuickAction[] = [
+  {
+    // [PRODUCTION FIX] The approval queue this role is one of only two
+    // reviewer roles for (PENDING_ACTION_REVIEWER_ROLES) had no page
+    // anywhere in the app until now — see /approvals.
+    label: 'Approvals',
+    href: '/approvals',
+    icon: ClipboardCheck,
+    color: 'bg-brand-navy/8',
+    text: 'text-brand-navy',
+  },
   {
     // [PRODUCTION FIX 2026-07-28] High Rank already held announcement.create
     // in the permission matrix and the /announcements page's canCreate gate
@@ -140,6 +168,25 @@ export function HighRankDashboard() {
     departed: e.departed,
   }))
 
+  // [PRODUCTION FIX] New — see the file header. Both endpoints were already
+  // live and serving /reports' high_rank tab; neither had ever been pulled
+  // onto this dashboard.
+  const { data: classComparison, isLoading: classComparisonLoading } = useClassComparison(
+    academicYear ?? '',
+    term ?? 0,
+  )
+  const classComparisonData: ChartDataPoint[] = (classComparison ?? []).map((c) => ({
+    x: c.className,
+    average: c.average,
+  }))
+  const classComparisonLoadingAll = periodLoading || classComparisonLoading
+
+  const { data: attendance, isLoading: attendanceLoading } = useAttendanceSummary(
+    academicYear ?? '',
+    term ?? 0,
+  )
+  const attendanceLoadingAll = periodLoading || attendanceLoading
+
   return (
     <div className="space-y-6">
       <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -213,11 +260,66 @@ export function HighRankDashboard() {
           periodLoading={periodLoading}
         />
       </div>
-      <PlaceholderWidget
-        title="Important Reports"
-        sub="School performance overview"
-        h="h-28 md:h-32"
-      />
+      {/* [PRODUCTION FIX] Was a dead PlaceholderWidget — see file header. */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="bg-surface border border-base rounded-xl p-5">
+          <PendingActionsPanel compact title="Pending Approvals" />
+        </div>
+        <ChartCard
+          title="Class Performance Comparison"
+          sub="Average score by class, current term"
+          isLoading={classComparisonLoadingAll}
+          height={220}
+        >
+          <Chart
+            type="bar"
+            data={classComparisonData}
+            series={[{ key: 'average', label: 'Average Score' }]}
+            height={220}
+            emptyStateMessage="No computed results for this term yet."
+            ariaLabel="Average exam score by class for the current term"
+          />
+        </ChartCard>
+      </div>
+      <div className="bg-surface border border-base rounded-xl p-5">
+        <p className="font-heading font-semibold text-sm text-brand-navy mb-3">
+          School Attendance {academicYear ? `— ${academicYear} Term ${term}` : ''}
+        </p>
+        {attendanceLoadingAll ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3" role="status" aria-label="Attendance — loading">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="skeleton h-14 rounded-lg" aria-hidden />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="bg-page rounded-lg p-3 text-center">
+              <p className="text-lg font-heading font-bold text-brand-navy">
+                {attendance ? `${attendance.attendanceRate}%` : '—'}
+              </p>
+              <p className="text-xs text-muted mt-0.5">Attendance Rate</p>
+            </div>
+            <div className="bg-page rounded-lg p-3 text-center">
+              <p className="text-lg font-heading font-bold text-brand-navy">
+                {attendance ? attendance.daysPresent.toLocaleString() : '—'}
+              </p>
+              <p className="text-xs text-muted mt-0.5">Days Present</p>
+            </div>
+            <div className="bg-page rounded-lg p-3 text-center">
+              <p className="text-lg font-heading font-bold text-brand-navy">
+                {attendance ? attendance.daysAbsent.toLocaleString() : '—'}
+              </p>
+              <p className="text-xs text-muted mt-0.5">Days Absent</p>
+            </div>
+            <div className="bg-page rounded-lg p-3 text-center">
+              <p className="text-lg font-heading font-bold text-brand-navy">
+                {attendance ? attendance.daysLate.toLocaleString() : '—'}
+              </p>
+              <p className="text-xs text-muted mt-0.5">Days Late</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

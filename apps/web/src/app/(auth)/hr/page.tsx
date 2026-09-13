@@ -621,8 +621,17 @@ function LoansTab({
   isHR:         boolean
   role:         string | null | undefined
 }) {
+  const { can }       = usePermissions()
   const canManage    = isHR || role === 'finance'
-  const canApprove   = role === 'admin' || role === 'hr'
+  // [PRODUCTION FIX] Backend PATCH /loans/:id/approve was already converted
+  // to requirePermission('hr.approveLoan') (server/routes/hr.ts, item #6),
+  // which the permission matrix grants to 'high_rank' and 'hr' — not
+  // 'admin'. This hardcoded role check still used the old, pre-conversion
+  // rule (admin/hr), so admin saw a working-looking Approve button that
+  // always 403'd, and high_rank — who actually holds the permission — saw
+  // no button at all. Matched to the real backend grant, same fix pattern
+  // as exams/page.tsx and applications/page.tsx.
+  const canApprove   = can('hr.approveLoan')
   const canDisburse  = role === 'admin' || role === 'finance'
   const canRepay     = role === 'admin' || role === 'finance' || role === 'hr'
 

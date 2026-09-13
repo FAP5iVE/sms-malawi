@@ -46,6 +46,7 @@ import {
   ClipboardList,
   ClipboardCheck,
   ShieldCheck,
+  CheckSquare,
   Settings,
   Activity,
   Images,
@@ -270,6 +271,21 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href:        '/applications',
     icon:        ClipboardList,
     roles:       rolesFor('/applications'),
+  },
+  // [PRODUCTION FIX] New nav entry — PendingActionsPanel.tsx (student/class
+  // edit-request approvals) had no page and no nav entry anywhere, so
+  // nothing reviewers needed to act on was ever reachable except by typing
+  // a URL nobody was told about. The 'pendingActions' badge key already
+  // existed and was wired to /pending-actions/counts but was sitting on
+  // User Mgmt below, a page that doesn't render this queue at all and that
+  // high_rank — one of the two actual reviewer roles — can't even open.
+  {
+    label:       'Approvals',
+    mobileLabel: 'Approvals',
+    href:        '/approvals',
+    icon:        CheckSquare,
+    roles:       rolesFor('/approvals'),
+    badge:       'pendingActions',
   },
   {
     label:       'User Mgmt',

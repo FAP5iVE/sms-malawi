@@ -85,6 +85,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { apiFetch } from '@/lib/api-client'
 import { EXAM_MARKS_ENTERABLE_STATUSES } from '@shared/schemas/exam'
 import { ModuleTabs }        from '@/components/shared/ModuleTabs'
+import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import {
   Calendar,
   Plus,
@@ -164,7 +165,15 @@ function ExamsPageInner() {
 
   const { data: myStudent, isLoading: myStudentLoading } = useStudentMe()
   const { data: schoolInfo } = usePublicSchoolInfo()
-  const academicYear = schoolInfo?.currentYear ?? FALLBACK_YEAR
+  // [PRODUCTION FIX] Academic year was a fixed read-only value derived
+  // straight from schoolInfo.currentYear — no way to look at a past year's
+  // exams, analytics, or MANEB records at all. Every other multi-year
+  // screen in the app (Finance, Placements, Classes) uses the shared
+  // <AcademicYearSelect> for exactly this reason. Same controlled pattern
+  // as ClaimsVerificationPanel.tsx: empty state = "follow the school's
+  // current year"; once the user picks one, it sticks.
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState('')
+  const academicYear = selectedAcademicYear || schoolInfo?.currentYear || FALLBACK_YEAR
 
   useEffect(() => {
     setTitle('Exams & Results')
@@ -227,9 +236,24 @@ function ExamsPageInner() {
   // (Report Cards, Promotion, Results Release) from student/lower_rank —
   // the components themselves also gate their actions, this just avoids
   // showing a tab whose contents a role can only ever view, never act on.
+  //
+  // [PRODUCTION FIX] 'analytics' and 'maneb' were shown to every role this
+  // page's RoleGuard admits, including lower_rank and student — but the
+  // backend only grants GET /exams/analytics/top-bottom to
+  // exam.viewClassAnalytics holders (admin/high_rank/academic/exam_officer)
+  // and GET /exams/maneb to admin/high_rank/exam_officer specifically
+  // (exams.ts). lower_rank and student previously saw a tab that always
+  // failed with a permission error and showed no data — exactly the "all
+  // users… nothing is pulled" symptom this was reported as. Gated to match
+  // the real backend grants, the same fix pattern already applied to
+  // applications/page.tsx and hr/page.tsx's Loans tab.
   const MANAGEMENT_TABS: Tab[] = ['report-cards', 'promotion', 'release']
+  const canViewAnalytics = can('exam.viewClassAnalytics')
+  const canViewManeb = role === 'admin' || role === 'high_rank' || role === 'exam_officer'
   const visibleTabs = TABS.filter((t) => {
     if (t.id === 'results') return role === 'student'
+    if (t.id === 'analytics') return canViewAnalytics
+    if (t.id === 'maneb') return canViewManeb
     if (MANAGEMENT_TABS.includes(t.id)) return role !== 'student' && role !== 'lower_rank'
     return true
   })
@@ -240,14 +264,33 @@ function ExamsPageInner() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           {/* R19 — real page heading (was absent, unlike sibling module pages),
              giving assistive tech and E2E heading-role checks a landmark. */}
-          <h1 className="font-heading text-2xl font-bold text-brand-navy">Exams</h1>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h1 className="font-heading text-2xl font-bold text-brand-navy">Exams</h1>
+            {/* [PRODUCTION FIX] Academic year is now a real, standard
+               dropdown (same shared component Finance/Placements/Classes
+               use) instead of a fixed value with no way to change it —
+               applies across every tab (Exams, Analytics, MANEB) since
+               they all read the same page-level academicYear. */}
+            <AcademicYearSelect
+              value={academicYear}
+              onChange={(e) => setSelectedAcademicYear(e.target.value)}
+              aria-label="Select academic year"
+              className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none"
+            />
+          </div>
 
           {/* Mobile-scrollable pill tab navigation — C7 */}
+            {/* [PRODUCTION FIX] Was variant="pill" — the filled navy chip
+               that (see ModuleTabs.tsx) rendered with its background
+               painted behind the page in light mode, leaving the active
+               tab's white label invisible against the white page. Finance,
+               HR, and Placements never had this problem because they use
+               the transparent underline variant instead — adopted here for
+               the same reason. */}
             <ModuleTabs<Tab>
               tabs={visibleTabs}
               active={tab}
               onChange={setTab}
-              variant="pill"
               id="exams-tabs"
             />
 

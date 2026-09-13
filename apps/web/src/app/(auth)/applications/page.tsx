@@ -41,6 +41,7 @@ import { DataTable } from '@/components/shared/DataTable'
 import type { DataColumn, MobileAction } from '@/components/shared/DataTable'
 import { ModuleTabs } from '@/components/shared/ModuleTabs'
 import type { TabItem } from '@/components/shared/ModuleTabs'
+import { usePermissions } from '@/hooks/usePermissions'
 import { CheckCircle, XCircle, UserPlus, Loader2, Inbox } from 'lucide-react'
 
 type ApplicationStatusValue = (typeof ApplicationStatusSchema.options)[number]
@@ -59,6 +60,18 @@ export default function ApplicationsPage() {
 
 function ApplicationsContent() {
   const router = useRouter()
+  const { can } = usePermissions()
+  // [PRODUCTION FIX] Approve/Deny/Admit were rendered unconditionally for
+  // every role this page's RoleGuard admits (admin, high_rank, lower_rank).
+  // The backend (PATCH /applications/:id/status, POST /applications/:id/
+  // convert) only grants application.approve/deny/convertToStudent to
+  // high_rank — lower_rank holds only application.review and admin holds
+  // neither — so lower_rank previously saw working-looking buttons that
+  // always 403'd. Gate rendering to match the real backend grant, the same
+  // fix pattern already applied to exams/page.tsx and hr/page.tsx.
+  const canApprove = can('application.approve')
+  const canDeny    = can('application.deny')
+  const canConvert = can('application.convertToStudent')
   const [activeStatus, setActiveStatus] = useState<ApplicationStatusValue>('PENDING')
   const [page, setPage]                 = useState(1)
   const [actionError, setActionError]   = useState<string | null>(null)
@@ -126,27 +139,31 @@ function ApplicationsContent() {
       priority: 'important',
       render: (app) => (
         <div className="flex items-center justify-end gap-2">
-          {activeStatus === 'PENDING' && (
+          {activeStatus === 'PENDING' && (canApprove || canDeny) && (
             <>
-              <button
-                onClick={() => handleUpdateStatus(app.id, 'APPROVED')}
-                disabled={updating}
-                className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg hover:bg-emerald-100 min-h-[44px] sm:min-h-0"
-                aria-label={`Approve application from ${app.firstName} ${app.lastName}`}
-              >
-                <CheckCircle className="w-3.5 h-3.5" aria-hidden /> Approve
-              </button>
-              <button
-                onClick={() => handleUpdateStatus(app.id, 'DENIED')}
-                disabled={updating}
-                className="flex items-center gap-1 text-xs text-brand-coral bg-brand-coral/10 border border-brand-coral/20 px-2.5 py-1 rounded-lg hover:bg-brand-coral/20 min-h-[44px] sm:min-h-0"
-                aria-label={`Deny application from ${app.firstName} ${app.lastName}`}
-              >
-                <XCircle className="w-3.5 h-3.5" aria-hidden /> Deny
-              </button>
+              {canApprove && (
+                <button
+                  onClick={() => handleUpdateStatus(app.id, 'APPROVED')}
+                  disabled={updating}
+                  className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg hover:bg-emerald-100 min-h-[44px] sm:min-h-0"
+                  aria-label={`Approve application from ${app.firstName} ${app.lastName}`}
+                >
+                  <CheckCircle className="w-3.5 h-3.5" aria-hidden /> Approve
+                </button>
+              )}
+              {canDeny && (
+                <button
+                  onClick={() => handleUpdateStatus(app.id, 'DENIED')}
+                  disabled={updating}
+                  className="flex items-center gap-1 text-xs text-brand-coral bg-brand-coral/10 border border-brand-coral/20 px-2.5 py-1 rounded-lg hover:bg-brand-coral/20 min-h-[44px] sm:min-h-0"
+                  aria-label={`Deny application from ${app.firstName} ${app.lastName}`}
+                >
+                  <XCircle className="w-3.5 h-3.5" aria-hidden /> Deny
+                </button>
+              )}
             </>
           )}
-          {(activeStatus === 'APPROVED' || activeStatus === 'AWAITING_ADMISSION') && (
+          {(activeStatus === 'APPROVED' || activeStatus === 'AWAITING_ADMISSION') && canConvert && (
             <button
               onClick={() => handleConvert(app.id)}
               disabled={converting}
@@ -161,13 +178,16 @@ function ApplicationsContent() {
               Admit as Student
             </button>
           )}
+          {activeStatus === 'PENDING' && !canApprove && !canDeny && (
+            <span className="text-xs text-muted">Awaiting reviewer</span>
+          )}
         </div>
       ),
     },
   ]
 
   const mobileActions: MobileAction<ApiApplication>[] = [
-    ...(activeStatus === 'PENDING'
+    ...(activeStatus === 'PENDING' && canApprove
       ? [
           {
             label:   'Approve',
@@ -175,6 +195,10 @@ function ApplicationsContent() {
             variant: 'default' as const,
             onClick: (row: ApiApplication) => handleUpdateStatus(row.id, 'APPROVED'),
           },
+        ]
+      : []),
+    ...(activeStatus === 'PENDING' && canDeny
+      ? [
           {
             label:   'Deny',
             icon:    XCircle,
@@ -183,7 +207,7 @@ function ApplicationsContent() {
           },
         ]
       : []),
-    ...(activeStatus === 'APPROVED' || activeStatus === 'AWAITING_ADMISSION'
+    ...((activeStatus === 'APPROVED' || activeStatus === 'AWAITING_ADMISSION') && canConvert
       ? [
           {
             label:   'Admit as Student',
@@ -202,6 +226,11 @@ function ApplicationsContent() {
         <p className="text-sm text-muted mt-0.5">Student admission applications</p>
       </div>
 
+      {/* [PRODUCTION FIX] Was variant="pill" — in light mode the active
+         chip's navy background rendered behind the page (see
+         ModuleTabs.tsx), leaving white active-tab text invisible against
+         the white page. Switched to the transparent underline variant
+         already used by Finance/HR/Placements, which has no such issue. */}
       <ModuleTabs<ApplicationStatusValue>
         id="applications-status"
         tabs={STATUS_TABS}
@@ -210,7 +239,6 @@ function ApplicationsContent() {
           setActiveStatus(status)
           setPage(1)
         }}
-        variant="pill"
       />
 
       {actionError && (

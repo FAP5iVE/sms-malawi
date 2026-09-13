@@ -254,7 +254,15 @@ export function ModuleTabs<T extends string>({
               aria-controls={`tabpanel-${tab.id}`}
               onClick={() => onChange(tab.id)}
               className={[
-                'relative flex items-center gap-2',
+                // [PRODUCTION FIX] `relative` alone does not create a new
+                // stacking context (z-index stays `auto`), so the active
+                // pill's `-z-10` background below was painting behind every
+                // normal-flow card on the page — not just behind this
+                // button — leaving bare white active-tab text on the page's
+                // own light-mode background with nothing behind it. `z-0`
+                // gives the button its own stacking context so `-z-10`
+                // only reaches behind *this* button, restoring the pill.
+                'relative z-0 flex items-center gap-2',
                 'px-4 py-2 rounded-lg',
                 'text-sm font-heading font-semibold',
                 'whitespace-nowrap',

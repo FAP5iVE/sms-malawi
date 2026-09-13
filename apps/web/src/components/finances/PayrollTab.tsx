@@ -18,9 +18,20 @@ import type { ApiPayrollRun } from '@shared/types/api'
 import { Loader2, AlertTriangle } from 'lucide-react'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import { usePermissions } from '@/hooks/usePermissions'
 
 export function PayrollTab() {
   const year = new Date().getFullYear()
+  // [PRODUCTION FIX] "Run Payroll" was rendered for anyone who could reach
+  // this tab (finance, admin, and — since PayrollApprovalPanel now shares
+  // this tab — hr/high_rank too), with no check against the permission the
+  // backend actually enforces (POST /payroll/run requires
+  // finance.runPayroll, held only by 'finance'). hr's view was explicitly
+  // meant to be read-only (see finances/page.tsx) but got a live-looking
+  // button that would always 403. Gate it the same way every other
+  // finance action button in this app is gated.
+  const { can } = usePermissions()
+  const canRunPayroll = can('finance.runPayroll')
   // R15 — run-payroll confirmation dialog visibility + visible failure state
   const [confirmRunOpen, setConfirmRunOpen] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
@@ -55,15 +66,17 @@ export function PayrollTab() {
         <h3 className="font-heading font-semibold text-sm text-brand-navy">
           Payroll History {year}
         </h3>
-        <button
-          onClick={() => setConfirmRunOpen(true)}
-          disabled={isPending}
-          className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brand-navy-mid disabled:opacity-60"
-          type="button"
-        >
-          {isPending ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : null}
-          Run {currentMonthName} Payroll
-        </button>
+        {canRunPayroll && (
+          <button
+            onClick={() => setConfirmRunOpen(true)}
+            disabled={isPending}
+            className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brand-navy-mid disabled:opacity-60"
+            type="button"
+          >
+            {isPending ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : null}
+            Run {currentMonthName} Payroll
+          </button>
+        )}
       </div>
 
       {/* R15 — visible run failure (previously silently discarded) */}

@@ -524,8 +524,14 @@ export function PendingActionsPanel({
               ))}
               {pendingCount > compactLimit && (
                 <p className="text-xs text-muted-foreground text-center py-1">
+                  {/* [PRODUCTION FIX] Pointed at /user-management, an
+                     admin-only page that doesn't render this panel at all
+                     and that high_rank — one of the two actual reviewer
+                     roles (PENDING_ACTION_REVIEWER_ROLES) — can't even
+                     open. /approvals is this panel's own real, full-view
+                     page. */}
                   +{pendingCount - compactLimit} more pending — view all in{' '}
-                  <a href="/user-management" className="underline hover:text-foreground">User Management</a>
+                  <a href="/approvals" className="underline hover:text-foreground">Approvals</a>
                 </p>
               )}
             </div>

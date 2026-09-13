@@ -59,6 +59,15 @@ export const PAGE_ACCESS: Record<string, readonly UserRole[]> = {
   '/calendar': ALL_ROLES,
   '/reports': ALL_ROLES,
   '/applications': ['admin', 'high_rank', 'lower_rank'],
+  // [PRODUCTION FIX] New page — PendingActionsPanel.tsx (the generic
+  // student/class edit-request approval queue) was fully built against a
+  // real backend (pendingActionService.ts, /pending-actions routes) but had
+  // no page to live on anywhere in the app, so nothing lower_rank/academic
+  // submitted for approval was ever reachable by the admin/high_rank
+  // reviewers who hold PENDING_ACTION_REVIEWER_ROLES. Same role set the
+  // panel's own internal canAccess check already assumes (reviewers plus
+  // the two requester roles, so requesters can track their own submissions).
+  '/approvals': ['admin', 'high_rank', 'lower_rank', 'academic'],
   '/user-management': ['admin'],
   '/settings': ALL_ROLES,
   // R18 — University Placement Module. [OVERHAUL] The old two-page split
