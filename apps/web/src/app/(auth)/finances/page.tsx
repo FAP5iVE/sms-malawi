@@ -25,7 +25,6 @@ import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
 import { InvoicesTab }           from '@/components/finances/InvoicesTab'
 import { ExpensesTab }           from '@/components/finances/ExpensesTab'
 import { PayrollTab }            from '@/components/finances/PayrollTab'
-import { PayrollApprovalPanel }  from '@/components/finances/PayrollApprovalPanel'
 import { BudgetTab }             from '@/components/finances/BudgetTab'
 import { FeeStructureTab }       from '@/components/finances/FeeStructureTab'
 import { FinanceFeeStructureTab } from '@/components/finances/FinanceFeeStructureTab'
@@ -271,7 +270,6 @@ function FinancesContent() {
       {activeTab === 'payroll'      && (
         <div className="space-y-6">
           <PayrollTab />
-          <PayrollApprovalPanel />
         </div>
       )}
       {activeTab === 'budget'       && <BudgetTab        academicYear={YEAR} />}
