@@ -60,6 +60,7 @@ import type {
   ApiOutstandingByClassRow,
   ApiAcademicSubjectPerformanceRow,
   ApiScholarshipSummary,
+  ApiPayrollBreakdownPoint,
   ApiAttendanceSummary,
   ApiOwnAttendanceSummary,
   ApiLibraryInventoryHealth,
@@ -282,6 +283,18 @@ export function useFinancePayrollTrend(months = 12) {
     queryKey: queryKeys.analytics.financePayrollTrend(months),
     queryFn: () =>
       apiFetch<ApiTimeSeriesPoint[]>(`/analytics/finance/payroll-trend${qs({ months })}`),
+    staleTime: STALE.SLOW,
+  })
+}
+
+/** [Payroll Financial Insights & Trends tab, user-requested] Richer sibling
+ *  of useFinancePayrollTrend above — full gross/PAYE/pension/net/staffCount
+ *  split per run rather than a single totalNet series. */
+export function useFinancePayrollBreakdown(months = 12) {
+  return useQuery({
+    queryKey: queryKeys.analytics.financePayrollBreakdown(months),
+    queryFn: () =>
+      apiFetch<ApiPayrollBreakdownPoint[]>(`/analytics/finance/payroll-breakdown${qs({ months })}`),
     staleTime: STALE.SLOW,
   })
 }

@@ -18,6 +18,7 @@ interface FinanceConfig {
   late_payment_grace_days:    string
   invoice_due_days:           string
   payroll_day_of_month:       string
+  payroll_run_window_days:    string
   enable_usd_display:         string
   receipt_prefix:             string
 }
@@ -29,6 +30,11 @@ export function FinanceSettings() {
     late_payment_grace_days:   '7',
     invoice_due_days:          '30',
     payroll_day_of_month:      '25',
+    // [PRODUCTION FIX] Was never read by payrollService.ts — Run Payroll
+    // could be clicked on any date. Now a genuinely enforced window: N days
+    // starting on Payroll Processing Day, rolling into next month if it
+    // overruns month-end.
+    payroll_run_window_days:   '5',
     enable_usd_display:        'false',
     receipt_prefix:            'RCP',
   })
@@ -129,11 +135,22 @@ export function FinanceSettings() {
         {/* Payroll */}
         <div className="pb-5 border-b border-base">
           <h3 className="font-heading font-semibold text-sm text-body mb-4">Payroll</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-2xl">
+          <p className="text-xs text-muted -mt-2 mb-4 max-w-2xl">
+            Payroll for a month can only be run inside its processing window. 
+            The window opens on the day of the month below and stays open for the number of days specified.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-5 max-w-3xl">
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Payroll Processing Day (1–28)</label>
+              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Window Opens On (day 1–28)</label>
               <input type="number" min={1} max={28} value={config.payroll_day_of_month} onChange={(e) => set('payroll_day_of_month', e.target.value)} className={inputCls} />
-              <p className="text-xs text-muted mt-1">Day of month when payroll runs are auto-drafted.</p>
+              <p className="text-xs text-muted mt-1">First day of the month the Run Payroll button becomes active.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Window Length (days)</label>
+              <input type="number" min={1} max={31} value={config.payroll_run_window_days} onChange={(e) => set('payroll_run_window_days', e.target.value)} className={inputCls} />
+              <p className="text-xs text-muted mt-1">
+                Stays open this many days — e.g. 25 + 5 = open through the 29th (or into next month if it overruns month-end).
+              </p>
             </div>
             <div>
               <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Pension Contribution (%)</label>

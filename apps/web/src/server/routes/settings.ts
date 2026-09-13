@@ -269,6 +269,16 @@ const FINANCE_KEYS = [
   'late_payment_grace_days',  'invoice_due_days',
   'payroll_day_of_month',     'enable_usd_display',
   'receipt_prefix',
+  // [PRODUCTION FIX] payroll_day_of_month was a real, saved setting with
+  // zero readers anywhere in payrollService.ts — Run Payroll could be
+  // clicked on any date, for any month, as many times as the unique
+  // constraint allowed a first attempt. payrollService.getPayrollRunWindow()
+  // now genuinely enforces a window of payroll_run_window_days days starting
+  // on payroll_day_of_month (rolling into the next calendar month if the
+  // window overruns month-end — plain Date arithmetic handles this without
+  // per-month clamping). Defaults to 5 when unset, matching
+  // FinanceSettings.tsx's default.
+  'payroll_run_window_days',
 ]
 
 settingsRouter

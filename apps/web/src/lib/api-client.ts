@@ -276,7 +276,15 @@ export const queryKeys = {
       detail: (id: string) => ['finances', 'payroll', id] as const,
       payslips: (payrollRunId: string) =>
         ['finances', 'payroll', payrollRunId, 'payslips'] as const,
-      myPayslips: () => ['finances', 'payroll', 'my-payslips'] as const,
+      // [Payroll redesign] scoped by staffUid so the "Viewing Employee"
+      // picker (hr.viewAnyPayslips) doesn't collide with the caller's own
+      // cached payslips/salary under one shared key.
+      myPayslips: (staffUid?: string) =>
+        ['finances', 'payroll', 'my-payslips', staffUid ?? 'self'] as const,
+      mySalary: (staffUid?: string) =>
+        ['finances', 'payroll', 'my-salary', staffUid ?? 'self'] as const,
+      runWindow: (month: number, year: number) =>
+        ['finances', 'payroll', 'run-window', month, year] as const,
     },
     salaryStructure: (staffUid: string) =>
       ['finances', 'salary-structure', staffUid] as const,
@@ -327,6 +335,9 @@ export const queryKeys = {
     performance: (staffId: string) => ['hr', 'performance', staffId] as const,
     salaryStructure: (staffUid: string) =>
       ['hr', 'salary-structure', staffUid] as const,
+    // [Salary Structure & Allowances tab, user-requested] finance's staff
+    // picker — see hr.ts's GET /hr/salary-roster header comment.
+    salaryRoster: () => ['hr', 'salary-roster'] as const,
     contractAlerts: (days?: number) => ['hr', 'contract-alerts', days ?? 60] as const,
     contractAlertsUpcoming: (days?: number) => ['hr', 'contract-alerts-upcoming', days ?? 60] as const,
   },
@@ -448,6 +459,8 @@ export const queryKeys = {
     financeCashFlow: (year: string) => ['analytics', 'finance', 'cash-flow', year] as const,
     financePayrollTrend: (months: number) =>
       ['analytics', 'finance', 'payroll-trend', months] as const,
+    financePayrollBreakdown: (months: number) =>
+      ['analytics', 'finance', 'payroll-breakdown', months] as const,
     financeScholarshipSummary: (year: string) =>
       ['analytics', 'finance', 'scholarship-summary', year] as const,
 

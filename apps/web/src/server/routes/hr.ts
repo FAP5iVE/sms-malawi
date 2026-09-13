@@ -70,6 +70,24 @@ hrRouter.get('/', verifyAuth, requireRole([...REVIEWERS]),
     return res.json(staff)
   })
 
+// [PRODUCTION FIX — Salary Structure & Allowances tab, user-requested]
+// finance holds hr.manageSalaryStructure/finance.manageSalaryStructure and
+// genuinely needs a staff picker to use it, but GET / (the real staff
+// directory, immediately above) is role-gated to REVIEWERS
+// (admin/hr/high_rank) — finance was never in that list and has no other
+// route in this file that lists staff at all. A lightweight roster scoped
+// to the exact same permission pair the salary/allowance routes below
+// already use, rather than widening the real directory's role list (a
+// broader change than this tab needs, and not this task's to make).
+// Registered before GET /:id (immediately below) so this literal path
+// can't be shadowed by that single-segment catch-all.
+hrRouter.get('/salary-roster', verifyAuth,
+  requireAnyPermission(['hr.manageSalaryStructure', 'finance.manageSalaryStructure']),
+  async (req, res) => {
+    const staff = await hrService.listStaff({ status: 'ACTIVE' })
+    return res.json(staff)
+  })
+
 hrRouter.get('/:id', verifyAuth, requireRole([...REVIEWERS]),
   async (req, res) => {return res.json(await hrService.getStaffProfile(String(req.params.id)))})
 

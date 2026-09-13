@@ -302,6 +302,17 @@ analyticsRouter.get('/finance/payroll-trend',
     res.json(await analytics.getFinancePayrollTrend(positiveInt(req.query.months, 12)))
   })
 
+// [Payroll Financial Insights & Trends tab, user-requested] Same permission
+// as payroll-trend above (both report.viewPayrollSummary — finance/
+// high_rank only, per S/types/permissions.ts); richer per-run gross/PAYE/
+// pension/net/staffCount split rather than payroll-trend's single totalNet
+// series.
+analyticsRouter.get('/finance/payroll-breakdown',
+  verifyAuth, requirePermission('report.viewPayrollSummary'),
+  async (req, res) => {
+    res.json(await analytics.getFinancePayrollBreakdown(positiveInt(req.query.months, 12)))
+  })
+
 // [R14 — NEW] report.viewScholarshipSummary is granted to high_rank and
 // finance, and had no implementation at any layer.
 analyticsRouter.get('/finance/scholarship-summary',

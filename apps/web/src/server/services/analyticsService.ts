@@ -54,6 +54,7 @@ import { subDays, subMonths, startOfDay, endOfDay, format, startOfWeek, endOfWee
 import { getAttendanceSummaryForTerm, getTermDateRange } from '@/server/services/attendanceService'
 import { getPassingGrades, isPassingClassification, isDistinctionGrade, type ExamTypeKey } from '@/server/services/gradeService'
 import { findUniversity } from '@shared/constants/universities'
+import type { ApiPayrollBreakdownPoint } from '@shared/types/api'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -993,19 +994,65 @@ export async function getFinanceCashFlow(academicYear: string): Promise<CashFlow
   )
 }
 
+// A run only ever sits at COMPLETED transiently, on its way through the
+// approval workflow (COMPLETED → PENDING_APPROVAL → APPROVED → LOCKED —
+// see payrollApprovalService.ts). Every month that has actually finished
+// that workflow is one of the other three statuses, so filtering to
+// COMPLETED alone silently excludes almost every real month from both
+// functions below the moment it's approved. PROCESSING (mid-generation)
+// and FAILED are the only statuses genuinely worth excluding.
+const PAYROLL_TREND_STATUSES = ['COMPLETED', 'PENDING_APPROVAL', 'APPROVED', 'LOCKED'] as const
+
 /**
  * Payroll trend — monthly totalNet for the last N months.
+ * [PRODUCTION FIX] `where: { status: 'COMPLETED' }` excluded every run past
+ * the moment it's submitted for approval — i.e. almost every run that ever
+ * reaches its normal end state (LOCKED) — leaving this trend all-but-empty
+ * for a school with a working approval workflow. Broadened to every
+ * non-transient status.
  */
 export async function getFinancePayrollTrend(months = 12): Promise<TimeSeriesPoint[]> {
   const since = subMonths(new Date(), months)
   const runs = await prisma.payrollRun.findMany({
-    where: { status: 'COMPLETED', createdAt: { gte: since } },
+    where: { status: { in: [...PAYROLL_TREND_STATUSES] }, createdAt: { gte: since } },
     select: { month: true, year: true, totalNet: true },
     orderBy: [{ year: 'asc' }, { month: 'asc' }],
   })
   return runs.map((r) => ({
     label: format(new Date(r.year, r.month - 1, 1), 'MMM yy'),
     value: Math.round(Number(r.totalNet)),
+  }))
+}
+
+/**
+ * Payroll breakdown — one point per run in the last N months with the full
+ * gross/PAYE/pension/net split and enrolled staff count, for Payroll's
+ * Financial Insights & Trends tab. Same non-transient-status scope as
+ * getFinancePayrollTrend() above (see its own comment for why), kept as a
+ * separate function rather than widening that one's return shape — reports/
+ * page.tsx's existing single-series chart consumes the {label,value} shape
+ * as-is and shouldn't need to change to gain this.
+ */
+export async function getFinancePayrollBreakdown(months = 12): Promise<ApiPayrollBreakdownPoint[]> {
+  const since = subMonths(new Date(), months)
+  const runs = await prisma.payrollRun.findMany({
+    where: { status: { in: [...PAYROLL_TREND_STATUSES] }, createdAt: { gte: since } },
+    select: {
+      month: true, year: true, totalGross: true, totalNet: true,
+      payslips: { select: { paye: true, pension: true } },
+      _count: { select: { payslips: true } },
+    },
+    orderBy: [{ year: 'asc' }, { month: 'asc' }],
+  })
+  return runs.map((r) => ({
+    month: r.month,
+    year: r.year,
+    label: format(new Date(r.year, r.month - 1, 1), 'MMM yy'),
+    totalGross: Math.round(Number(r.totalGross)),
+    totalPaye: Math.round(r.payslips.reduce((sum, p) => sum + Number(p.paye), 0)),
+    totalPension: Math.round(r.payslips.reduce((sum, p) => sum + Number(p.pension), 0)),
+    totalNet: Math.round(Number(r.totalNet)),
+    staffCount: r._count.payslips,
   }))
 }
 

@@ -374,6 +374,65 @@ export interface ApiPayrollRun {
   payslips?: ApiPayslip[]
   /** Present on GET /payroll (payrollService.getPayrollHistory), absent on workflow-action responses. */
   _count?: { payslips: number }
+  /** Sum of every payslip's paye/pension on this run — computed in
+   *  getPayrollHistory()/getPayrollRunDetail(), not stored columns (avoids a
+   *  denormalized total that could drift from the real payslip rows). Present
+   *  on GET /payroll and GET /payroll/:id; absent on workflow-action responses. */
+  totalPaye?: number
+  totalPension?: number
+  /** Staff display names resolved server-side from the raw *ByUid audit
+   *  fields above (StaffProfile has no Prisma relation to these — same
+   *  Firebase-UID-as-plain-string pattern as staffName on ApiPayslip).
+   *  Present on GET /payroll and GET /payroll/:id only. */
+  runByName?: string
+  submittedByName?: string
+  approvedByName?: string
+}
+
+/**
+ * GET /payroll/run-window — whether payroll for a given month/year can be
+ * triggered right now, and the school's configured run window either side of
+ * Settings > Finance > Payroll Processing Day. Backs the "Run Payroll" button
+ * enable/disable state and the "opens on/opened on" copy in Payroll Runs &
+ * Approvals — the run window is a real, enforced business rule
+ * (payrollService.processMonthlyPayroll rejects a run attempted outside it),
+ * not just UI decoration.
+ */
+export interface ApiPayrollRunWindow {
+  month: number
+  year: number
+  /** ISO date-time the window opens for this month/year. */
+  opensAt: string
+  /** ISO date-time the window closes for this month/year. */
+  closesAt: string
+  /** Whether `now` falls within [opensAt, closesAt]. */
+  isOpen: boolean
+  /** Whether a PayrollRun already exists for this month/year (the
+   *  @@unique([month,year]) constraint means at most one ever will). */
+  alreadyRun: boolean
+  existingRun?: { id: string; status: string }
+  /** Count of staff with a SalaryStructure row — "N Staff Members Enrolled". */
+  enrolledStaffCount: number
+  /** The two settings this window is computed from, echoed back for display. */
+  windowStartDay: number
+  windowLengthDays: number
+}
+
+/**
+ * GET /analytics/finance/payroll-breakdown — one point per completed-or-later
+ * payroll run in the trailing window, with the full gross/paye/pension/net
+ * split (not just totalNet like the older single-series payroll-trend point)
+ * for Payroll's Financial Insights & Trends tab.
+ */
+export interface ApiPayrollBreakdownPoint {
+  month: number
+  year: number
+  label: string
+  totalGross: number
+  totalPaye: number
+  totalPension: number
+  totalNet: number
+  staffCount: number
 }
 
 export interface ApiPayslip {
@@ -392,15 +451,49 @@ export interface ApiPayslip {
   payrollRun?: { month: number; year: number }
 }
 
-/** GET /payroll/my-salary — self-service current salary structure. */
+/**
+ * One itemized allowance line as returned by the payroll self-service
+ * endpoints (GET /payroll/my-salary) — distinct from useHR.ts's own
+ * ApiAllowance (the HR salary-*management* CRUD contract against
+ * GET/POST/DELETE /hr/:id/allowances), which independently serializes the
+ * same StaffAllowance rows as raw Prisma Decimal strings. This one is
+ * server-normalized to plain numbers since it's a fresh, view-only contract.
+ */
+export interface ApiPayrollAllowance {
+  id:        string
+  type:      string
+  amount:    number
+  recurring: boolean
+  paidMonth: number | null
+  paidYear:  number | null
+  notes:     string | null
+}
+
+/**
+ * GET /payroll/my-salary — self-service current salary structure (the
+ * caller's own, or another staff member's when the caller holds
+ * hr.viewAnyPayslips — the "Viewing Employee" picker in My Pay).
+ * [PRODUCTION FIX] The route this type documents did not exist at all —
+ * useMySalaryStructure() called it and 404'd. Rebuilt against the real
+ * computation payrollService.processMonthlyPayroll() already performs
+ * (base salary + itemized StaffAllowance, not the stale flat
+ * SalaryStructure.allowances/loanBalance columns confirmed to have zero
+ * readers — see payrollService.ts's own header comment).
+ */
 export interface ApiSalaryStructure {
   id:                   string
   staffUid:             string
+  staffName:            string
+  department:           string | null
+  jobTitle:             string | null
   baseSalary:           number
-  allowances:           number
-  loanBalance:           number
   monthlyLoanDeduction: number
+  /** baseSalary + every currently-recurring allowance — the real figure
+   *  next month's payslip would show, mirroring payrollService's own gross
+   *  computation exactly. */
+  monthlyGross:         number
   updatedAt:            string
+  allowances:           ApiPayrollAllowance[]
 }
 
 export interface ApiLibraryFine {

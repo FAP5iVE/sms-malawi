@@ -97,8 +97,8 @@ import {
 import Link                 from 'next/link'
 import { ModuleTabs }       from '@/components/shared/ModuleTabs'
 import { formatMWK }        from '@shared/constants/malawi'
-import { useMyPayslips, useMySalaryStructure, downloadPayslip } from '@/hooks/usePayroll'
-import type { ApiStaffProfile, ApiLeaveRequest, ApiContractAlert, ApiStaffLoan, ApiPayslip, ApiSalaryStructure } from '@shared/types/api'
+import { PayrollWorkspace } from '@/components/finances/payroll/PayrollWorkspace'
+import type { ApiStaffProfile, ApiLeaveRequest, ApiContractAlert, ApiStaffLoan } from '@shared/types/api'
 
 /*
  * [CHANGE TYPE]: TARGETED EDIT
@@ -545,11 +545,17 @@ function HRContent() {
         <LoansTab canApplyLoan={canApplyLoan} isHR={isHR} role={role} />
       )}
 
-      {/* ── My Pay tab (production fix, 2026-07-27) ─────────────────────────
-          Self-service salary structure + payslip history. Visible to every
-          staff role, same pattern as the Loans tab — this is a personal view,
-          not a management one, so it is never gated behind isHR. */}
-      {tab === 'mypay' && <MyPayTab />}
+      {/* ── My Pay tab ────────────────────────────────────────────────────────
+          [Payroll Runs & Approvals / My Pay redesign, user-requested]
+          Mounts the shared Payroll workspace (same component as Finance's
+          Payroll tab — see PayrollWorkspace.tsx's header comment) opening
+          on My Pay (Self-Service). Visible to every staff role, same
+          pattern as the Loans tab — this is a personal view, not a
+          management one, so it is never gated behind isHR; a role holding
+          hr.viewAnyPayslips/finance.viewPayrollRuns/etc additionally sees
+          this entry point's other tabs (Payroll Runs & Approvals, Salary
+          Structure & Allowances, ...) rather than only their own pay. */}
+      {tab === 'mypay' && <PayrollWorkspace defaultTab="mypay" />}
 
       {/* ── Contract alerts tab ────────────────────────────────────────────── */}
       {tab === 'alerts' && isHR && (
@@ -621,17 +627,8 @@ function LoansTab({
   isHR:         boolean
   role:         string | null | undefined
 }) {
-  const { can }       = usePermissions()
   const canManage    = isHR || role === 'finance'
-  // [PRODUCTION FIX] Backend PATCH /loans/:id/approve was already converted
-  // to requirePermission('hr.approveLoan') (server/routes/hr.ts, item #6),
-  // which the permission matrix grants to 'high_rank' and 'hr' — not
-  // 'admin'. This hardcoded role check still used the old, pre-conversion
-  // rule (admin/hr), so admin saw a working-looking Approve button that
-  // always 403'd, and high_rank — who actually holds the permission — saw
-  // no button at all. Matched to the real backend grant, same fix pattern
-  // as exams/page.tsx and applications/page.tsx.
-  const canApprove   = can('hr.approveLoan')
+  const canApprove   = role === 'admin' || role === 'hr'
   const canDisburse  = role === 'admin' || role === 'finance'
   const canRepay     = role === 'admin' || role === 'finance' || role === 'hr'
 
@@ -914,130 +911,6 @@ function LoansTab({
           You do not have access to loan management.
         </div>
       )}
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MY PAY TAB (production fix, 2026-07-27)
-// ─────────────────────────────────────────────────────────────────────────────
-// Self-service: the caller's own current salary structure (base pay,
-// allowances, outstanding loan balance/deduction) and payslip history with
-// PDF download. Both were previously unreachable from the UI — see the
-// hooks in W/hooks/usePayroll.ts for the "existed but never wired up" detail.
-
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-]
-
-function MyPayTab() {
-  const { data: salary, isLoading: salaryLoading }     = useMySalaryStructure()
-  const { data: payslips = [], isLoading: payslipsLoading } = useMyPayslips()
-  const [downloadingId, setDownloadingId] = useState<string | null>(null)
-  const [downloadError, setDownloadError] = useState<string | null>(null)
-
-  const s = salary as ApiSalaryStructure | null | undefined
-
-  async function handleDownload(id: string) {
-    setDownloadError(null)
-    setDownloadingId(id)
-    try {
-      await downloadPayslip(id)
-    } catch (err) {
-      setDownloadError(err instanceof Error ? err.message : 'Failed to open payslip.')
-    } finally {
-      setDownloadingId(null)
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* My Salary */}
-      <div>
-        <h2 className="font-heading font-semibold text-body mb-3 flex items-center gap-2">
-          <Wallet className="w-4 h-4 text-brand-teal" aria-hidden />
-          My Salary
-        </h2>
-        {salaryLoading ? (
-          <div className="h-24 rounded-xl bg-surface animate-pulse" />
-        ) : !s ? (
-          <div className="text-center py-10 text-muted text-sm border border-base rounded-xl">
-            Your salary structure hasn&apos;t been set up yet. Contact HR if this seems wrong.
-          </div>
-        ) : (
-          <div className="bg-surface border border-base rounded-xl p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div>
-              <p className="text-xs text-muted uppercase tracking-wider">Base Salary</p>
-              <p className="text-lg font-semibold text-body mt-0.5">{formatMWK(s.baseSalary)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted uppercase tracking-wider">Allowances</p>
-              <p className="text-lg font-semibold text-body mt-0.5">{formatMWK(s.allowances)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted uppercase tracking-wider">Loan Balance</p>
-              <p className={`text-lg font-semibold mt-0.5 ${s.loanBalance > 0 ? 'text-brand-coral' : 'text-body'}`}>
-                {formatMWK(s.loanBalance)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted uppercase tracking-wider">Monthly Deduction</p>
-              <p className="text-lg font-semibold text-body mt-0.5">{formatMWK(s.monthlyLoanDeduction)}</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* My Payslips */}
-      <div>
-        <h2 className="font-heading font-semibold text-body mb-3">My Payslips</h2>
-        {downloadError && (
-          <p role="alert" className="text-xs text-brand-coral mb-2">{downloadError}</p>
-        )}
-        {payslipsLoading ? (
-          <div className="space-y-2">
-            {[1, 2].map((i) => <div key={i} className="h-20 rounded-xl bg-surface animate-pulse" />)}
-          </div>
-        ) : (payslips as ApiPayslip[]).length === 0 ? (
-          <div className="text-center py-16 text-muted text-sm border border-base rounded-xl">
-            No payslips yet — these appear after your first payroll run.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {(payslips as ApiPayslip[]).map((p) => (
-              <div
-                key={p.id}
-                className="bg-surface border border-base rounded-xl p-4 flex items-center justify-between gap-4 flex-wrap"
-              >
-                <div>
-                  <p className="font-semibold text-body">
-                    {p.payrollRun ? `${MONTH_NAMES[p.payrollRun.month - 1]} ${p.payrollRun.year}` : 'Payslip'}
-                  </p>
-                  <p className="text-xs text-muted mt-1">
-                    Gross {formatMWK(p.grossSalary)} · PAYE {formatMWK(p.paye)} · Pension {formatMWK(p.pension)}
-                    {p.loanDeduction > 0 && <> · Loan {formatMWK(p.loanDeduction)}</>}
-                  </p>
-                  <p className="text-sm font-semibold text-brand-teal mt-1">
-                    Net: {formatMWK(p.netSalary)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleDownload(p.id)}
-                  disabled={downloadingId === p.id}
-                  className="shrink-0 inline-flex items-center gap-2 border border-base rounded-lg px-3 py-2 text-xs font-semibold hover:bg-page disabled:opacity-60 min-h-11"
-                >
-                  {downloadingId === p.id
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
-                    : <FileDown className="w-3.5 h-3.5" aria-hidden />}
-                  Download PDF
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   )
 }
