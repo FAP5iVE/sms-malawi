@@ -185,10 +185,23 @@ export function ApexChartRenderer(props: ChartProps): React.ReactElement {
         },
       },
     },
-    xaxis:
-      base === 'pie' || base === 'donut' || base === 'radialBar'
-        ? undefined
-        : { categories, axisBorder: { show: false }, axisTicks: { show: false } },
+    // [BUG FIX] Was `xaxis: undefined` for pie/donut/radialBar — an
+    // explicitly-*present* key set to undefined, not an absent one.
+    // ApexCharts' own internal create() reads
+    // `w.config.xaxis.convertedCatToNumeric` with no optional chaining,
+    // assuming its own default-merge step always leaves `xaxis` as a real
+    // object; that merge appears to be a shallow one that lets an
+    // explicit `undefined` from a later chart.updateOptions() call
+    // overwrite (rather than skip past) its previously-merged default —
+    // exactly reproducing "Cannot read properties of undefined (reading
+    // 'convertedCatToNumeric')" on a live production monitoring dashboard.
+    // Spreading the key in only when it's a real object — versus always
+    // having the key present with a sometimes-undefined value — means
+    // ApexCharts' own default never gets an explicit `undefined` to
+    // collide with on any update cycle, not just the first mount.
+    ...(base === 'pie' || base === 'donut' || base === 'radialBar'
+      ? {}
+      : { xaxis: { categories, axisBorder: { show: false }, axisTicks: { show: false } } }),
     tooltip: { theme: mode },
     noData: { text: emptyStateMessage ?? 'No data to display.' },
   }

@@ -345,10 +345,43 @@ export async function listReleases(statsPeriod = '30d') {
 }
 
 // ── Logs — proxied live (Logs have no webhook path; Explore-equivalent query) ──
+//
+// [INVESTIGATED, NOT CONFIRMED FIXED] Production 500s from this call
+// (Sentry API 500 on /organizations/.../events/?...&dataset=ourlogs).
+// The sibling fetchApdex() call just above queries the same
+// events/events-stats family and explicitly scopes with `project=-1`
+// (all projects) — this call had no project scoping at all, which is a
+// very plausible trigger for Sentry's Discover-style endpoints to fail
+// server-side rather than cleanly 400ing on a malformed/underscoped
+// query. Added `project=-1` to match that known-working precedent, plus
+// explicit `field` selections (`message`, `timestamp`, `severity`) since
+// Sentry's events endpoint typically expects an explicit field list once
+// a `dataset` is specified. This endpoint's exact contract for the
+// `ourlogs` dataset is NOT confirmed against a live 5ivestack-labs
+// payload (same caveat fetchApdex() already documents for `dataset=metrics`)
+// — if it still 500s, that's Sentry's own API for this dataset, not
+// something inspectable from here. Wrapped in the same fault-isolation
+// fetchApdex() already uses: a failure now degrades to an empty,
+// clearly-flagged log list instead of 500ing the whole /monitoring Logs
+// panel for one flaky upstream call.
 export async function listLogs(opts: { level?: string; limit?: number } = {}) {
-  const params = new URLSearchParams({ statsPeriod: '24h', per_page: String(opts.limit ?? 50) })
+  const params = new URLSearchParams({
+    statsPeriod: '24h',
+    per_page: String(opts.limit ?? 50),
+    project: '-1',
+  })
+  params.append('field', 'message')
+  params.append('field', 'timestamp')
+  params.append('field', 'severity')
   if (opts.level) params.set('query', `severity:${opts.level}`)
-  return sentryFetch<{ data: unknown[] }>(`/organizations/${SENTRY_ORG}/events/?${params.toString()}&dataset=ourlogs`)
+  try {
+    return await sentryFetch<{ data: unknown[] }>(
+      `/organizations/${SENTRY_ORG}/events/?${params.toString()}&dataset=ourlogs`
+    )
+  } catch (err) {
+    logger.warn({ event: 'sentry.logs_unavailable', err: err instanceof Error ? err.message : String(err) })
+    return { data: [], available: false }
+  }
 }
 
 // ── User Feedback — write path + read-back list ──
