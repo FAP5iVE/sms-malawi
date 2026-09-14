@@ -876,13 +876,28 @@ export interface ApiAdminReport {
 }
 
 export interface ApiClassStat {
+  // [PRODUCTION FIX] id/form were always present in the raw response —
+  // getSchoolPerformanceReport's class.findMany() uses `include`, which
+  // never restricts scalar fields — just never declared here, so no
+  // consumer could reference them type-safely. Additive only; nothing
+  // that already read `name`/`_count.students` is affected.
+  id:     string
   name:   string
+  form:   number
   _count: { students: number }
 }
 
 export interface ApiSchoolReport {
   overall?:    { passRate: number; average: number; total: number }
   classStats?: ApiClassStat[]
+  // [PRODUCTION FIX] Computed and returned by getSchoolPerformanceReport
+  // (server/services/reportService.ts) since it was first written, but
+  // never declared here — so useSchoolReport's ApiSchoolReport type made it
+  // inaccessible to any caller even though the backend was already sending
+  // it on every response. Grouped by classId, active students only (see
+  // the groupBy's `where: { status: 'ACTIVE' }`) — despite the backend
+  // variable's name, this is not actually grouped by form/grade.
+  enrollmentByForm?: { classId: string; _count: number }[]
 }
 
 export interface ApiFinanceReport {

@@ -669,6 +669,19 @@ function HighRankPerformancePanel({ academicYear, term }: { academicYear: string
           ) : <EmptyState />}
         </ChartCard>
       )}
+      {/*
+       * [PRODUCTION FIX] high_rank holds report.viewSchoolPerformance — the
+       * same permission GET /maneb/school-stats is gated on — but national
+       * exam results (JCE/MSCE) had no home on this tab at all, only on
+       * exam_officer's separate 'maneb' tab. A school's national exam
+       * standing is core leadership-level performance data, not just an
+       * exam office operational concern. Reuses the exact same panel
+       * exam_officer sees.
+       */}
+      <div className="space-y-5">
+        <SectionHeader title="MANEB National Exam Results" icon={<GraduationCap className="w-4 h-4" />} />
+        <ManebAnalyticsPanel academicYear={academicYear} />
+      </div>
     </div>
   )
 }
@@ -717,6 +730,16 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
           ) : <EmptyState />}
         </ChartCard>
       )}
+      {/*
+       * [PRODUCTION FIX] GET /academic/marks-distribution is gated on the
+       * same report.viewClassPerformance permission as the two charts above
+       * — high_rank already holds it — but this tab never surfaced it.
+       * Reuses the exact panel academic/exam_officer already use.
+       */}
+      <div className="space-y-5">
+        <SectionHeader title="Marks Distribution by Exam" icon={<BarChart2 className="w-4 h-4" />} />
+        <MarksDistributionPanel />
+      </div>
     </div>
   )
 }
@@ -733,8 +756,34 @@ function HighRankTeachersPanel({ academicYear, term }: { academicYear: string; t
     { label: 'Avg Pass Rate',  value: (t) => t.avgPassRate },
   ])
 
+  // [PRODUCTION FIX] Highest/lowest performer — computed client-side from
+  // data this tab already fetches, no new endpoint needed. Sorted copies so
+  // the source array (and the export above) keep the backend's own order.
+  const bySc = teachers && teachers.length > 0 ? [...teachers].sort((a, b) => b.avgStudentScore - a.avgStudentScore) : undefined
+  const topTeacher    = bySc?.[0]
+  const bottomTeacher = bySc && bySc.length > 1 ? bySc[bySc.length - 1] : undefined
+
   return (
     <div className="space-y-5">
+      {topTeacher && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <KpiCard
+            label="Highest Avg Score"
+            value={`${topTeacher.avgStudentScore}%`}
+            sub={topTeacher.teacherName}
+            trend="up"
+          />
+          {bottomTeacher && (
+            <KpiCard
+              label="Lowest Avg Score"
+              value={`${bottomTeacher.avgStudentScore}%`}
+              sub={bottomTeacher.teacherName}
+              trend={bottomTeacher.avgStudentScore < 50 ? 'down' : null}
+              warn={bottomTeacher.avgStudentScore < 50}
+            />
+          )}
+        </div>
+      )}
       {isLoading ? <SkeletonChart /> : (
         <>
           <ChartCard title="Teacher Effectiveness — Student Average Score">
@@ -811,43 +860,76 @@ function HighRankEnrollmentPanel() {
   )
 }
 
-function HighRankFinancePanel({ academicYear }: { academicYear: string }) {
+function HighRankFinancePanel({ academicYear, term }: { academicYear: string; term: number }) {
   const { data: cfRaw, isLoading } = useHighRankFinancialSummary(academicYear)
   const cashFlow = cfRaw as ApiCashFlowRow[] | undefined
 
   return (
-    <div className="space-y-5">
-      {cashFlow && (
-        <div className="grid grid-cols-3 gap-3">
-          {cashFlow.map((row) => (
-            <KpiCard
-              key={row.term}
-              label={`Term ${row.term} Net`}
-              value={`MWK ${(row.net / 1_000_000).toFixed(1)}M`}
-              trend={row.net >= 0 ? 'up' : 'down'}
-              warn={row.net < 0}
-            />
-          ))}
-        </div>
-      )}
-      {isLoading ? <SkeletonChart /> : (
-        <ChartCard title="Revenue vs Expenses by Term">
-          {cashFlow && cashFlow.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={cashFlow.map((r) => ({ ...r, label: `Term ${r.term}` }))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
-                <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), '']} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="revenue"  fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Revenue" />
-                <Bar dataKey="expenses" fill={chartColorAt(3)} radius={[4, 4, 0, 0]} name="Expenses" />
-                <Bar dataKey="payroll"  fill={chartColorAt(2)} radius={[4, 4, 0, 0]} name="Payroll" />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <EmptyState />}
-        </ChartCard>
-      )}
+    <div className="space-y-8">
+      <div className="space-y-5">
+        {cashFlow && (
+          <div className="grid grid-cols-3 gap-3">
+            {cashFlow.map((row) => (
+              <KpiCard
+                key={row.term}
+                label={`Term ${row.term} Net`}
+                value={`MWK ${(row.net / 1_000_000).toFixed(1)}M`}
+                trend={row.net >= 0 ? 'up' : 'down'}
+                warn={row.net < 0}
+              />
+            ))}
+          </div>
+        )}
+        {isLoading ? <SkeletonChart /> : (
+          <ChartCard title="Revenue vs Expenses by Term">
+            {cashFlow && cashFlow.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={cashFlow.map((r) => ({ ...r, label: `Term ${r.term}` }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
+                  <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), '']} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="revenue"  fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Revenue" />
+                  <Bar dataKey="expenses" fill={chartColorAt(3)} radius={[4, 4, 0, 0]} name="Expenses" />
+                  <Bar dataKey="payroll"  fill={chartColorAt(2)} radius={[4, 4, 0, 0]} name="Payroll" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : <EmptyState />}
+          </ChartCard>
+        )}
+      </div>
+
+      {/*
+       * [PRODUCTION FIX] high_rank holds report.viewFeeCollection,
+       * viewOutstandingBalances, viewExpenseBreakdown (covers budget-vs-
+       * actual too — same permission gates both routes), viewPayrollSummary,
+       * and viewScholarshipSummary (packages/shared/types/permissions.ts) —
+       * six analytics endpoints this tab never rendered, even though the
+       * dedicated 'finance' role's own tabs already use every one of them
+       * below. Reusing those exact panels rather than re-deriving new chart
+       * code: same data, same permission, already proven correct.
+       */}
+      <div className="space-y-5">
+        <SectionHeader title="Fee Collection" icon={<DollarSign className="w-4 h-4" />} />
+        <FinanceCollectionPanel />
+      </div>
+      <div className="space-y-5">
+        <SectionHeader title="Outstanding Balances" icon={<AlertTriangle className="w-4 h-4" />} />
+        <FinanceOutstandingPanel academicYear={academicYear} term={term} />
+      </div>
+      <div className="space-y-5">
+        <SectionHeader title="Expenses & Budget" icon={<FileText className="w-4 h-4" />} />
+        <FinanceExpensesPanel academicYear={academicYear} term={term} />
+      </div>
+      <div className="space-y-5">
+        <SectionHeader title="Payroll" icon={<Users className="w-4 h-4" />} />
+        <FinancePayrollPanel />
+      </div>
+      <div className="space-y-5">
+        <SectionHeader title="Scholarships" icon={<GraduationCap className="w-4 h-4" />} />
+        <FinanceScholarshipsPanel academicYear={academicYear} />
+      </div>
     </div>
   )
 }
@@ -1790,6 +1872,38 @@ function AttendanceSummaryPanel({ academicYear, term }: { academicYear: string; 
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
+      {/* [PRODUCTION FIX] The full per-class breakdown was fetched and
+         registered for CSV export but never rendered on screen — only the
+         chart's rounded bars were visible, with no way to see exact
+         present/absent/late counts per class without downloading a file. */}
+      <div className="border border-base rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-page border-b border-base">
+                {['Class', 'Form', 'Students', 'Present', 'Absent', 'Late', 'Rate'].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-base">
+              {data.byClass.map((r) => (
+                <tr key={r.classId} className="hover:bg-page">
+                  <td className="px-4 py-3 font-medium text-brand-navy">{r.className}</td>
+                  <td className="px-4 py-3 text-muted">{r.form}</td>
+                  <td className="px-4 py-3">{r.studentCount}</td>
+                  <td className="px-4 py-3">{r.daysPresent.toLocaleString()}</td>
+                  <td className="px-4 py-3">{r.daysAbsent.toLocaleString()}</td>
+                  <td className="px-4 py-3">{r.daysLate.toLocaleString()}</td>
+                  <td className="px-4 py-3">
+                    <span className={`font-bold ${r.attendanceRate >= 85 ? 'text-brand-teal' : 'text-brand-coral'}`}>{r.attendanceRate}%</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
@@ -2033,6 +2147,20 @@ function SummaryStat({ label, value }: { label: string; value: string | number }
 function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; term: number }) {
   const { data, isLoading } = useSchoolReport(academicYear, term)
 
+  // [PRODUCTION FIX] A "summary" tab that only ever showed 3 KPIs and one
+  // class-size chart wasn't summarizing much. Every hook below is already
+  // imported and already used elsewhere on this exact page (Finance,
+  // Attendance, HR, Admissions, Library, Classes tabs) — this pulls them
+  // together in one place for the first time, which is what an executive
+  // summary is for. No new endpoints, no new permissions — high_rank
+  // already held every one of these.
+  const { data: finance }     = useFinanceReport(academicYear, term)
+  const { data: attendance }  = useAttendanceSummary(academicYear, term)
+  const { data: staffByDept } = useHRStaffByDepartment()
+  const { data: funnel }      = useApplicationsFunnel()
+  const { data: library }     = useLibraryInventoryHealth()
+  const { data: classes }     = useClassComparison(academicYear, term)
+
   useExportable('School Summary', data?.classStats, [
     { label: 'Class',    value: (c: { name: string }) => c.name },
     { label: 'Students', value: (c: { _count: { students: number } }) => c._count.students },
@@ -2041,14 +2169,95 @@ function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; te
   if (isLoading) return <SkeletonChart />
   if (!data) return <EmptyState />
 
+  const totalStaff         = staffByDept?.reduce((s, d) => s + d.value, 0)
+  const totalApplications  = funnel?.find((f) => f.stage === 'Total Applications')?.count
+  const lowAttendanceClasses   = attendance?.byClass.filter((c) => c.attendanceRate < 85) ?? []
+  const underperformingClasses = classes?.filter((c) => c.average < 50) ?? []
+
+  // [PRODUCTION FIX] Each condition below is real, live data already
+  // fetched for other panels on this page — this is what "issues the high
+  // rank should be tracking" actually means: not a new metric, a flag on
+  // an existing one.
+  const issues: { label: string; detail: string }[] = []
+  if ((finance?.outstanding ?? 0) > 0) {
+    issues.push({
+      label: 'Outstanding fees',
+      detail: `MWK ${(finance?.outstanding ?? 0).toLocaleString()} not yet collected`,
+    })
+  }
+  if (lowAttendanceClasses.length > 0) {
+    issues.push({
+      label: 'Low attendance',
+      detail: `${lowAttendanceClasses.length} class${lowAttendanceClasses.length === 1 ? '' : 'es'} below 85% attendance`,
+    })
+  }
+  if (underperformingClasses.length > 0) {
+    issues.push({
+      label: 'Underperforming classes',
+      detail: `${underperformingClasses.length} class${underperformingClasses.length === 1 ? '' : 'es'} averaging below 50%`,
+    })
+  }
+  if ((library?.overdueCount ?? 0) > 0) {
+    issues.push({
+      label: 'Overdue library books',
+      detail: `${library?.overdueCount} book${library?.overdueCount === 1 ? '' : 's'} not yet returned`,
+    })
+  }
+
+  // [PRODUCTION FIX] getSchoolPerformanceReport (server/services/
+  // reportService.ts) has always computed and returned enrollmentByForm —
+  // active students grouped by classId — but ApiSchoolReport never declared
+  // the field, so it was invisible to every consumer even though it was on
+  // every response. Joined here against classStats (same response, now
+  // also declaring `id`) to show active vs total roster per class — a
+  // direct, real data-quality signal, not a cosmetic addition. Falls back
+  // to the raw id rather than dropping the row if a class ever goes
+  // unmatched.
+  const enrollmentByClass = (data.enrollmentByForm ?? []).map((row) => {
+    const match = data.classStats?.find((c) => c.id === row.classId)
+    return {
+      name:   match?.name ?? row.classId,
+      active: row._count,
+      roster: match?._count.students ?? 0,
+    }
+  })
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <SectionHeader title={`School Summary — ${academicYear} Term ${term}`} icon={<FileText className="w-4 h-4" />} />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <SummaryStat label="Pass Rate" value={`${data.overall?.passRate ?? 0}%`} />
-        <SummaryStat label="Average"   value={data.overall?.average ?? 0} />
-        <SummaryStat label="Results"   value={data.overall?.total ?? 0} />
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <SummaryStat label="Pass Rate"  value={`${data.overall?.passRate ?? 0}%`} />
+        <SummaryStat label="Average"    value={data.overall?.average ?? 0} />
+        <SummaryStat label="Results"    value={data.overall?.total ?? 0} />
+        <SummaryStat label="Attendance" value={attendance ? `${attendance.attendanceRate}%` : '—'} />
       </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <SummaryStat label="Fee Collection" value={finance ? `${finance.collectionPct ?? 0}%` : '—'} />
+        <SummaryStat label="Total Staff"    value={totalStaff ?? '—'} />
+        <SummaryStat label="Applications"   value={totalApplications ?? '—'} />
+        <SummaryStat label="Library Books"  value={library ? library.totalTitles : '—'} />
+      </div>
+
+      <div className="bg-surface border border-base rounded-2xl p-5">
+        <SectionHeader title="Issues Needing Attention" icon={<AlertTriangle className="w-4 h-4" />} />
+        {issues.length === 0 ? (
+          <p className="text-sm text-muted mt-3">No outstanding issues flagged for this term.</p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {issues.map((issue) => (
+              <div key={issue.label} className="flex items-start gap-3 bg-brand-coral/5 border border-brand-coral/20 rounded-xl px-4 py-3">
+                <AlertTriangle className="w-4 h-4 text-brand-coral shrink-0 mt-0.5" aria-hidden />
+                <div>
+                  <p className="text-sm font-semibold text-brand-navy">{issue.label}</p>
+                  <p className="text-xs text-muted">{issue.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {data.classStats && data.classStats.length > 0 ? (
         <ChartCard title="Class Sizes">
           <ResponsiveContainer width="100%" height={260}>
@@ -2062,6 +2271,22 @@ function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; te
           </ResponsiveContainer>
         </ChartCard>
       ) : <EmptyState message="No class statistics for this term" />}
+
+      {enrollmentByClass.length > 0 && (
+        <ChartCard title="Active Enrollment vs Total Roster by Class">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={enrollmentByClass}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="roster" fill={chartColorAt(3)} radius={[4, 4, 0, 0]} name="Total Roster" />
+              <Bar dataKey="active" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Active Students" />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      )}
     </div>
   )
 }
@@ -2367,7 +2592,7 @@ function ReportsContent() {
           {role === 'high_rank' && activeTab === 'teachers'    && <HighRankTeachersPanel academicYear={year} term={term} />}
           {role === 'high_rank' && activeTab === 'enrollment'  && <HighRankEnrollmentPanel />}
           {role === 'high_rank' && activeTab === 'attendance'  && <AttendanceSummaryPanel academicYear={year} term={term} />}
-          {role === 'high_rank' && activeTab === 'finance'     && <HighRankFinancePanel academicYear={year} />}
+          {role === 'high_rank' && activeTab === 'finance'     && <HighRankFinancePanel academicYear={year} term={term} />}
           {role === 'high_rank' && activeTab === 'placements'  && <PlacementAnalyticsPanel academicYear={year} />}
           {role === 'high_rank' && activeTab === 'summary'     && <HighRankSummaryPanel academicYear={year} term={term} />}
 
