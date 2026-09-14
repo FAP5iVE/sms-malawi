@@ -26,6 +26,24 @@ export function formatArchiveDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+/**
+ * [FIX] `body` can now contain HTML written via RichTextEditor.tsx (bold,
+ * lists, alignment, highlight — see AnnouncementForm.tsx). The list cards
+ * below only ever show a plain, line-clamped excerpt, so tags need to be
+ * stripped first — otherwise a bold News intro would show its literal
+ * "<strong>...</strong>" markup instead of being bold, and block tags
+ * (</p><p>) would run words together with no separating space.
+ * A body with no HTML at all (every article written before this change)
+ * passes through unchanged.
+ */
+export function stripHtml(html: string): string {
+  return html
+    .replace(/<(p|br|li|h[1-3])[^>]*>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 interface ListProps {
   title: string
   subtitle: string
@@ -89,7 +107,7 @@ export function PublicArchiveList({
                     {/* [PRODUCTION FIX] Collapsed with a 3-line clamp — the
                         full body only ever shows on the detail page below,
                         never inline in the list. */}
-                    <p className="text-sm text-muted leading-relaxed line-clamp-3">{a.body}</p>
+                    <p className="text-sm text-muted leading-relaxed line-clamp-3">{stripHtml(a.body)}</p>
                     <Link
                       href={`${basePath}/${a.id}`}
                       className="inline-block mt-3 text-sm font-heading font-bold text-brand-teal hover:underline"
@@ -156,7 +174,17 @@ export function PublicArchiveDetail({ post, isLoading, notFoundText, backHref, b
           <div className="text-center py-20 text-muted">{notFoundText}</div>
         ) : (
           <article>
-            <div className="font-mono text-xs text-muted mb-3">{formatArchiveDate(post.createdAt)}</div>
+            {/* [NEW] Byline — bold, same line as the date, only rendered
+                when the author filled it in. */}
+            <div className="font-mono text-xs text-muted mb-3 flex flex-wrap items-center gap-x-2">
+              <span>{formatArchiveDate(post.createdAt)}</span>
+              {post.authorName && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="font-sans font-bold text-body">Written by: {post.authorName}</span>
+                </>
+              )}
+            </div>
             <h1 className="font-heading font-extrabold text-2xl sm:text-3xl tracking-tight text-brand-navy dark:text-white mb-6">
               {post.title}
             </h1>
@@ -164,7 +192,16 @@ export function PublicArchiveDetail({ post, isLoading, notFoundText, backHref, b
               // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
               <img src={post.imageUrl} alt="" className="w-full h-auto rounded-2xl border border-base mb-6" />
             )}
-            <div className="text-body leading-relaxed whitespace-pre-wrap">{post.body}</div>
+            {/* [FIX] post.body is HTML now (written via RichTextEditor.tsx),
+                sanitized server-side on every write path in
+                announcementService.ts / the editOwn route before it ever
+                reaches Firestore — safe to render directly here. A
+                plain-text body (every article written before this change)
+                has no tags to interpret and renders exactly as before. */}
+            <div
+              className="text-body leading-relaxed whitespace-pre-wrap [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_mark]:bg-amber-200/70 [&_mark]:rounded-sm [&_mark]:px-0.5 [&_p]:my-2"
+              dangerouslySetInnerHTML={{ __html: post.body }}
+            />
           </article>
         )}
       </div>

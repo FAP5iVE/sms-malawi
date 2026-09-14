@@ -178,6 +178,7 @@ interface PublicPostData {
   body: string
   eventDate?: string | null
   imageKey?: string | null
+  authorName?: string | null
   postType?: string
   createdAt: FirebaseFirestore.Timestamp
 }
@@ -193,6 +194,9 @@ async function mapPublicPost(id: string, data: PublicPostData) {
     // back the raw Appwrite file ID and leaving the frontend with no way
     // to turn it into an <img src>.
     imageUrl: data.imageKey ? await getPublicViewUrl('', data.imageKey) : null,
+    // [FIX] Byline — "Written by: <name>" on the public detail page. null
+    // when the author left it blank.
+    authorName: data.authorName ?? null,
     createdAt: data.createdAt.toDate(),
   }
 }

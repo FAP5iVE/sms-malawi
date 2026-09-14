@@ -80,7 +80,14 @@ export function deriveAudience(
 // ─── ANNOUNCEMENT ─────────────────────────────────────────
 // Relocated from schemas/student.ts (was misfiled there — Announcements
 // have no relation to the Student domain).
-export const AnnouncementSchema = z.object({
+// [FIX] Kept as a plain ZodObject (not yet .refine()d) so callers that need
+// .partial() — currently just the editOwn PATCH route, which allows a
+// partial update to any subset of fields — still have a schema to call it
+// on. z.object(...).refine(...) returns a ZodEffects wrapper, which drops
+// .partial() entirely. AnnouncementSchema below adds the EVENT/eventDate
+// refinement on top of this for the two full-object submission paths
+// (create, publish) that need it enforced.
+export const AnnouncementObjectSchema = z.object({
   title: z.string().min(3).max(200),
   body: z.string().min(10),
   targetAll: z.boolean().default(false),
@@ -93,6 +100,13 @@ export const AnnouncementSchema = z.object({
   // opt-in to public website visibility.
   publicWebsite: z.boolean().default(false),
   imageKey: z.string().optional(),
+  // [FIX] Byline shown on the public detail page as "Written by: <name>",
+  // bold, on the same line as the publish date. Free text (not tied to a
+  // StaffProfile record) so a submitter can credit a guest writer,
+  // committee, or "School Administration" — same deliberately-minimal,
+  // public-safe curation pattern as LeadershipMember.name. Optional: a
+  // post with no author set simply omits the byline on the detail page.
+  authorName: z.string().trim().max(120).optional(),
   // [PRODUCTION FIX] EVENT and ADVERTISEMENT added alongside the existing
   // ANNOUNCEMENT/NEWS pair — see announcementService.ts's postType comment
   // for the full explanation. Each of the four is now an explicit,
@@ -102,6 +116,23 @@ export const AnnouncementSchema = z.object({
   // into each other's public sections.
   postType: z.enum(['ANNOUNCEMENT', 'NEWS', 'EVENT', 'ADVERTISEMENT']).default('ANNOUNCEMENT'),
 })
+
+export const AnnouncementSchema = AnnouncementObjectSchema
+  // [FIX] Root-causes the public Events section's "NaN" date badge: a
+  // dateless EVENT could previously reach PUBLISHED (e.g. a draft
+  // continued/promoted without eventDate ever being (re)filled in — the
+  // draft schema below deliberately allows that mid-edit) and every
+  // renderer that does `new Date(ev.eventDate)` then produces an Invalid
+  // Date, whose .getMonth()/.getDate() are NaN. AnnouncementForm.tsx's own
+  // client-side `isEvent && !eventDate` guard caught the direct-submit
+  // path, but nothing enforced it at the one place that actually decides
+  // what's allowed to be stored — this refine does, for every current and
+  // future caller of this schema (createAnnouncement, publishDraft, the
+  // editOwn PATCH route, ...).
+  .refine((data) => data.postType !== 'EVENT' || !!data.eventDate, {
+    message: 'Please choose the event date.',
+    path: ['eventDate'],
+  })
 export type CreateAnnouncementFormInput = z.infer<typeof AnnouncementSchema>
 export type AnnouncementPostType = CreateAnnouncementFormInput['postType']
 
@@ -123,6 +154,7 @@ export const AnnouncementDraftSchema = z.object({
   eventDate: z.string().datetime().optional(),
   publicWebsite: z.boolean().optional(),
   imageKey: z.string().optional(),
+  authorName: z.string().trim().max(120).optional(),
   postType: z.enum(['ANNOUNCEMENT', 'NEWS', 'EVENT', 'ADVERTISEMENT']).default('ANNOUNCEMENT'),
 })
 export type AnnouncementDraftInput = z.infer<typeof AnnouncementDraftSchema>

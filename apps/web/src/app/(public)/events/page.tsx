@@ -11,6 +11,10 @@
  *   (usePublicEvents), which filters by eventDate server-side, orders by
  *   eventDate, and returns a correct total.
  * [DEPENDS ON]: usePublicEvents (GET /public/events)
+ * [FIX] Was hardcoded to skip the event's attached photo entirely and
+ *   crashed into an "Invalid Date"/NaN display for any event with no
+ *   eventDate — same root cause and fix as page.tsx's Events section (see
+ *   that file's fix note 12).
  */
 
 import { useState } from 'react'
@@ -19,6 +23,7 @@ import { ArrowLeft, CalendarDays } from 'lucide-react'
 import { usePublicEvents } from '@/hooks/usePublic'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
+import { stripHtml } from '@/components/shared/PublicArchive'
 
 const PAGE_SIZE = 20
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -57,21 +62,40 @@ export default function EventsPage() {
           <>
             <div className="space-y-4">
               {events.map((ev) => {
-                const d = new Date(ev.eventDate!)
+                // [FIX] Same root cause as the homepage Events section —
+                // see page.tsx's fix note 12. Guard first, never call
+                // .getMonth()/.getDate()/.toLocaleDateString() on an
+                // Invalid Date.
+                const parsedDate = ev.eventDate ? new Date(ev.eventDate) : null
+                const d = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null
                 return (
                   <article key={ev.id} className="flex gap-5 border border-base rounded-2xl bg-surface p-5">
+                    {/* [FIX] This archive listing never rendered the
+                        event's attached photo at all (unlike the detail
+                        page) — now shown alongside the date badge when one
+                        exists. */}
+                    {ev.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
+                      <img src={ev.imageUrl} alt="" className="shrink-0 w-20 h-20 rounded-xl object-cover hidden sm:block" />
+                    )}
                     <div className="shrink-0 w-16 h-16 rounded-xl bg-brand-navy text-white flex flex-col items-center justify-center">
-                      <span className="font-heading text-[10px] font-bold tracking-wide text-brand-teal-light">
-                        {MONTHS[d.getMonth()]?.slice(0, 3).toUpperCase()}
-                      </span>
-                      <span className="font-heading text-xl font-extrabold leading-tight">{d.getDate()}</span>
+                      {d ? (
+                        <>
+                          <span className="font-heading text-[10px] font-bold tracking-wide text-brand-teal-light">
+                            {MONTHS[d.getMonth()]?.slice(0, 3).toUpperCase()}
+                          </span>
+                          <span className="font-heading text-xl font-extrabold leading-tight">{d.getDate()}</span>
+                        </>
+                      ) : (
+                        <span className="font-heading text-[11px] font-bold tracking-wide text-brand-teal-light">TBA</span>
+                      )}
                     </div>
                     <div>
                       <div className="text-xs text-muted mb-1">
-                        {d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                        {d ? d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Date to be announced'}
                       </div>
                       <h2 className="font-heading font-bold text-lg text-brand-navy dark:text-white mb-1.5">{ev.title}</h2>
-                      <p className="text-sm text-muted leading-relaxed line-clamp-2">{ev.body}</p>
+                      <p className="text-sm text-muted leading-relaxed line-clamp-2">{stripHtml(ev.body)}</p>
                       <Link
                         href={`/events/${ev.id}`}
                         className="inline-block mt-2 text-sm font-heading font-bold text-brand-teal hover:underline"

@@ -37,6 +37,8 @@ export interface Announcement {
   eventDate?: string | null
   publicWebsite?: boolean
   imageKey?: string | null
+  /** [NEW] Byline — see @shared/schemas/announcement's authorName comment. */
+  authorName?: string | null
   createdByUid: string
   createdByRole?: string | null
   /** ISO string (normalized server-side; no Firestore Timestamp on the client). */

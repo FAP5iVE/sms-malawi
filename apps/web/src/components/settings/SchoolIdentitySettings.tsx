@@ -10,6 +10,16 @@
  *   were real, publicly-read SETTING_KEYS with sensible defaults, but no
  *   route or UI anywhere ever let anyone change them — GET/PATCH
  *   /settings/school (added alongside this file) is the missing write path.
+ *
+ *   [FIX, this phase]: Leadership Team could only be added to or removed
+ *   from wholesale — there was no way to change an existing member's name,
+ *   title, or bio, or to swap/remove just their photo, without deleting
+ *   and re-adding them (losing their position in the list in the
+ *   process). Added an Edit button per member that opens the same
+ *   name/title/bio/photo fields as "Add to team" pre-filled with that
+ *   member's current values. No backend change needed — PATCH /school
+ *   already replaces the whole leadershipTeam array on Save Changes, the
+ *   same mechanism add/remove already relied on.
  * [DEPENDS ON]: apps/web/src/server/routes/settings.ts's /school route
  */
 
@@ -91,6 +101,13 @@ export function SchoolIdentitySettings() {
   const [newValue, setNewValue] = useState('')
   const [newLeader, setNewLeader] = useState({ name: '', title: '', bio: '', photoKey: '', photoPreview: '' })
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  // [NEW] In-place editing of an existing leadership member — index into
+  // data.leadershipTeam, or null when nothing is being edited. editDraft
+  // mirrors newLeader's shape so handlePhotoChange's upload pattern can be
+  // reused for "change photo" on an existing member too.
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [editDraft, setEditDraft] = useState({ name: '', title: '', bio: '', photoKey: '', photoPreview: '' })
+  const [uploadingEditPhoto, setUploadingEditPhoto] = useState(false)
   // [NEW] Which Discover card's photo is currently uploading, if any —
   // separate from uploadingPhoto (leadership) since either can be in
   // flight independently of the other.
@@ -139,6 +156,79 @@ export function SchoolIdentitySettings() {
   }
   function removeLeader(i: number) {
     setField('leadershipTeam', data.leadershipTeam.filter((_, idx) => idx !== i))
+    // A remove shouldn't leave a stale edit open on a now-shifted index.
+    if (editingIndex !== null) setEditingIndex(null)
+  }
+
+  /** [NEW] Open member `i` for in-place editing — pre-fills editDraft from
+   *  its current values so "Save" only needs to write back what actually
+   *  changed. */
+  function startEditLeader(i: number) {
+    const m = data.leadershipTeam[i]
+    if (!m) return
+    setEditDraft({
+      name: m.name,
+      title: m.title,
+      bio: m.bio ?? '',
+      photoKey: m.photoKey ?? '',
+      photoPreview: m.photoUrl ?? '',
+    })
+    setEditingIndex(i)
+  }
+
+  function cancelEditLeader() {
+    setEditingIndex(null)
+    setEditDraft({ name: '', title: '', bio: '', photoKey: '', photoPreview: '' })
+  }
+
+  /** [NEW] Writes editDraft back into leadershipTeam[i] in local state —
+   *  same as add/remove, this only takes effect on the backend once the
+   *  page's own "Save Changes" button (handleSave) PATCHes the whole
+   *  array, so editing costs nothing extra server-side. */
+  function saveEditLeader() {
+    if (editingIndex === null) return
+    if (!editDraft.name.trim() || !editDraft.title.trim()) return
+    setField('leadershipTeam', data.leadershipTeam.map((m, idx) =>
+      idx === editingIndex
+        ? {
+            ...m,
+            name: editDraft.name.trim(),
+            title: editDraft.title.trim(),
+            bio: editDraft.bio.trim() || undefined,
+            photoKey: editDraft.photoKey || undefined,
+            photoUrl: editDraft.photoPreview || null,
+          }
+        : m
+    ))
+    cancelEditLeader()
+  }
+
+  /** [NEW] Change photo while editing — same immediate-upload-on-pick
+   *  pattern as handlePhotoChange, scoped to editDraft instead of
+   *  newLeader. */
+  async function handleEditPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Only image files are allowed for a leadership photo.')
+      return
+    }
+    setUploadingEditPhoto(true)
+    setError(null)
+    try {
+      const photoKey = await uploadFileDirectly('/settings/leadership-photo/upload-ticket', file)
+      setEditDraft((p) => ({ ...p, photoKey, photoPreview: URL.createObjectURL(file) }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload photo.')
+    } finally {
+      setUploadingEditPhoto(false)
+    }
+  }
+
+  /** [NEW] Remove just the photo from the member being edited — keeps the
+   *  name/title/bio intact, unlike "Remove" which deletes the whole entry. */
+  function removeEditPhoto() {
+    setEditDraft((p) => ({ ...p, photoKey: '', photoPreview: '' }))
   }
 
   /** [NEW] Uploads immediately on file pick (same "upload first, attach the
@@ -350,27 +440,105 @@ export function SchoolIdentitySettings() {
           {data.leadershipTeam.length === 0 ? (
             <p className="text-xs text-muted">No leadership members added yet.</p>
           ) : (
-            data.leadershipTeam.map((m, i) => (
-              <div key={`${m.name}-${i}`} className="flex items-center justify-between border border-base rounded-xl p-3">
-                <div className="flex items-center gap-3">
-                  {m.photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- Appwrite-hosted photo, not a local Next asset
-                    <img src={m.photoUrl} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
-                  ) : (
-                    <div className="w-9 h-9 rounded-lg bg-brand-navy/10 flex items-center justify-center shrink-0">
-                      <Building2 className="w-4 h-4 text-brand-navy" />
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm font-heading font-semibold text-body">{m.name}</p>
-                    <p className="text-xs text-muted">{m.title}</p>
+            data.leadershipTeam.map((m, i) =>
+              editingIndex === i ? (
+                // [NEW] In-place edit card — same field layout as the "Add
+                // to team" form below, pre-filled from this member's
+                // current values.
+                <div key={`${m.name}-${i}`} className="border border-brand-teal/40 rounded-xl p-3 space-y-2 bg-brand-teal/3">
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    <input
+                      value={editDraft.name}
+                      onChange={(e) => setEditDraft((p) => ({ ...p, name: e.target.value }))}
+                      placeholder="Full name"
+                      className={`${inputCls} min-h-9 text-xs`}
+                    />
+                    <input
+                      value={editDraft.title}
+                      onChange={(e) => setEditDraft((p) => ({ ...p, title: e.target.value }))}
+                      placeholder="Title (e.g. Head Teacher)"
+                      className={`${inputCls} min-h-9 text-xs`}
+                    />
+                  </div>
+                  <textarea
+                    value={editDraft.bio}
+                    onChange={(e) => setEditDraft((p) => ({ ...p, bio: e.target.value }))}
+                    placeholder="Short bio (optional)"
+                    className={`${inputCls} min-h-15 text-xs`}
+                  />
+                  <div className="flex items-center gap-3">
+                    {editDraft.photoPreview ? (
+                      <div className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview or Appwrite-hosted photo, not a local Next asset */}
+                        <img src={editDraft.photoPreview} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 border border-base" />
+                        <button
+                          type="button"
+                          onClick={removeEditPhoto}
+                          className="absolute -top-1.5 -right-1.5 bg-black/60 text-white rounded-full w-4 h-4 flex items-center justify-center"
+                          aria-label="Remove photo"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-page border border-dashed border-base flex items-center justify-center shrink-0">
+                        <ImagePlus className="w-4 h-4 text-muted" aria-hidden />
+                      </div>
+                    )}
+                    <label className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-page cursor-pointer">
+                      {uploadingEditPhoto ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
+                      {editDraft.photoKey ? 'Change photo' : 'Add photo'}
+                      <input type="file" accept="image/*" onChange={handleEditPhotoChange} disabled={uploadingEditPhoto} className="hidden" />
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={saveEditLeader}
+                      disabled={!editDraft.name.trim() || !editDraft.title.trim() || uploadingEditPhoto}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold bg-brand-teal text-white hover:bg-brand-teal-light disabled:opacity-40"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelEditLeader}
+                      className="text-xs text-muted hover:underline font-medium px-2"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </div>
-                <button type="button" onClick={() => removeLeader(i)} className="text-xs text-brand-coral hover:underline font-medium">
-                  Remove
-                </button>
-              </div>
-            ))
+              ) : (
+                <div key={`${m.name}-${i}`} className="flex items-center justify-between border border-base rounded-xl p-3">
+                  <div className="flex items-center gap-3">
+                    {m.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- Appwrite-hosted photo, not a local Next asset
+                      <img src={m.photoUrl} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-lg bg-brand-navy/10 flex items-center justify-center shrink-0">
+                        <Building2 className="w-4 h-4 text-brand-navy" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm font-heading font-semibold text-body">{m.name}</p>
+                      <p className="text-xs text-muted">{m.title}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {/* [NEW] Edit — the missing piece; add/remove already
+                        existed but there was no way to change an existing
+                        member's name/title/bio/photo in place. */}
+                    <button type="button" onClick={() => startEditLeader(i)} className="text-xs text-brand-teal hover:underline font-medium">
+                      Edit
+                    </button>
+                    <button type="button" onClick={() => removeLeader(i)} className="text-xs text-brand-coral hover:underline font-medium">
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )
+            )
           )}
         </div>
         <div className="border border-base rounded-xl p-4 space-y-2">

@@ -63,6 +63,7 @@ import { COLLECTIONS } from '@shared/constants/storage'
 import { STAFF_ROLES } from '@shared/types/roles'
 
 import { getAdminApp } from '@/lib/verifyAuth'
+import { sanitizeRichText } from '@/server/lib/sanitizeRichText'
 
 export type AnnouncementStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'SCHEDULED'
 
@@ -90,6 +91,8 @@ export interface CreateAnnouncementInput {
   // Appwrite file ID (FILE_PREFIX.ANNOUNCEMENT_IMAGE) — optional cover
   // image, primarily for the public News section.
   imageKey?: string
+  // [FIX] Byline — see AnnouncementSchema's authorName comment.
+  authorName?: string
   // [PRODUCTION FIX] EVENT/ADVERTISEMENT added — see AnnouncementSchema in
   // @shared/schemas/announcement and the PUBLIC_ONLY_POST_TYPES comment
   // below for the full explanation.
@@ -371,11 +374,15 @@ function resolveCreateFields(data: CreateAnnouncementInput, directPublish: boole
 export async function createAnnouncement(data: CreateAnnouncementInput, directPublish: boolean) {
   const { postType, targetAll, targetRoles, targetClassId, publicWebsite, status } =
     resolveCreateFields(data, directPublish)
+  // [FIX] body may now carry HTML from RichTextEditor.tsx — sanitize once
+  // here, the one place every create path funnels through, rather than
+  // trusting the client. See server/lib/sanitizeRichText.ts.
+  const body = sanitizeRichText(data.body)
 
   const ref = getFirestore(getAdminApp()).collection(COLLECTIONS.ANNOUNCEMENTS).doc()
   await ref.set({
     title: data.title,
-    body: data.body,
+    body,
     targetAll,
     targetRoles,
     targetClassId,
@@ -383,6 +390,7 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
     eventDate: data.eventDate ?? null,
     publicWebsite,
     imageKey: data.imageKey ?? null,
+    authorName: data.authorName?.trim() || null,
     postType,
     createdByUid: data.createdByUid,
     createdByRole: data.createdByRole,
@@ -400,7 +408,7 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
     // internal try/catch).
     void notifyAudience(ref.id, {
       title: data.title,
-      body: data.body,
+      body,
       targetAll,
       targetRoles,
       targetClassId,
@@ -410,7 +418,7 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
     })
   }
 
-  return { id: ref.id, title: data.title, body: data.body, status }
+  return { id: ref.id, title: data.title, body, status }
 }
 
 // ─── DRAFTS ─────────────────────────────────────────────────
@@ -431,6 +439,7 @@ export interface DraftInput {
   eventDate?: string
   publicWebsite?: boolean
   imageKey?: string
+  authorName?: string
   postType?: AnnouncementPostType
 }
 
@@ -439,7 +448,7 @@ export async function createDraft(data: DraftInput, createdByUid: string, create
   const ref = getFirestore(getAdminApp()).collection(COLLECTIONS.ANNOUNCEMENTS).doc()
   await ref.set({
     title: data.title ?? '',
-    body: data.body ?? '',
+    body: sanitizeRichText(data.body ?? ''),
     targetAll: data.targetAll ?? false,
     targetRoles: data.targetRoles ?? [],
     targetClassId: data.targetClassId ?? null,
@@ -447,6 +456,7 @@ export async function createDraft(data: DraftInput, createdByUid: string, create
     eventDate: data.eventDate ?? null,
     publicWebsite: data.publicWebsite ?? false,
     imageKey: data.imageKey ?? null,
+    authorName: data.authorName?.trim() || null,
     postType: data.postType ?? 'ANNOUNCEMENT',
     createdByUid,
     createdByRole,
@@ -472,13 +482,14 @@ export async function updateDraft(id: string, uid: string, data: DraftInput) {
 
   const update: Record<string, unknown> = { updatedAt: Timestamp.now() }
   if (data.title !== undefined) update.title = data.title
-  if (data.body !== undefined) update.body = data.body
+  if (data.body !== undefined) update.body = sanitizeRichText(data.body)
   if (data.targetAll !== undefined) update.targetAll = data.targetAll
   if (data.targetRoles !== undefined) update.targetRoles = data.targetRoles
   if (data.targetClassId !== undefined) update.targetClassId = data.targetClassId
   if (data.eventDate !== undefined) update.eventDate = data.eventDate
   if (data.publicWebsite !== undefined) update.publicWebsite = data.publicWebsite
   if (data.imageKey !== undefined) update.imageKey = data.imageKey
+  if (data.authorName !== undefined) update.authorName = data.authorName.trim() || null
   if (data.postType !== undefined) update.postType = data.postType
 
   await ref.update(update)
@@ -526,10 +537,11 @@ export async function publishDraft(
 
   const { postType, targetAll, targetRoles, targetClassId, publicWebsite, status } =
     resolveCreateFields(data, directPublish)
+  const body = sanitizeRichText(data.body)
 
   await ref.update({
     title: data.title,
-    body: data.body,
+    body,
     targetAll,
     targetRoles,
     targetClassId,
@@ -537,6 +549,7 @@ export async function publishDraft(
     eventDate: data.eventDate ?? null,
     publicWebsite,
     imageKey: data.imageKey ?? null,
+    authorName: data.authorName?.trim() || null,
     postType,
     status,
     updatedAt: Timestamp.now(),
@@ -545,7 +558,7 @@ export async function publishDraft(
   if (status === 'PUBLISHED') {
     void notifyAudience(id, {
       title: data.title,
-      body: data.body,
+      body,
       targetAll,
       targetRoles,
       targetClassId,
@@ -555,7 +568,7 @@ export async function publishDraft(
     })
   }
 
-  return { id, title: data.title, body: data.body, status }
+  return { id, title: data.title, body, status }
 }
 
 /** Approve a PENDING_APPROVAL announcement and publish it. */
@@ -717,6 +730,7 @@ export interface ViewerAnnouncement {
   eventDate: string | null
   publicWebsite: boolean
   imageKey: string | null
+  authorName: string | null
   createdByUid: string
   createdByRole: string | null
   createdAt: string | null
@@ -746,6 +760,7 @@ function mapViewer(id: string, data: DocumentData): ViewerAnnouncement {
     eventDate: (data.eventDate as string | null | undefined) ?? null,
     publicWebsite: (data.publicWebsite as boolean | undefined) ?? false,
     imageKey: (data.imageKey as string | null | undefined) ?? null,
+    authorName: (data.authorName as string | null | undefined) ?? null,
     createdByUid: (data.createdByUid as string) ?? '',
     createdByRole: (data.createdByRole as string | null | undefined) ?? null,
     createdAt: toIso(data.createdAt),

@@ -57,9 +57,11 @@
  *   8. Hero background is a real campus photo (apps/web/public/images/
  *      hero-campus.webp) via next/image with `fill` + `object-cover`, which
  *      crops to fill the banner on any viewport without ever stretching or
- *      squishing the source image — safe from mobile up. The gallery/news
- *      cards below still use ImagePlaceholder, since no per-item photo
- *      assets exist for those yet.
+ *      squishing the source image — safe from mobile up. The gallery grid
+ *      still uses ImagePlaceholder as a genuine "no photo in this slot"
+ *      fallback; News and Events cards now show the article/event's own
+ *      attached photo (imageUrl) when one exists and only fall back to
+ *      ImagePlaceholder when it doesn't — see fix note 12.
  *   9. The header/footer "S" badge is now the real favicon.png mark
  *      (apps/web/public/favicon.png — already in the repo, was only used
  *      as a favicon before) instead of a plain letter "S" in a coloured box.
@@ -83,6 +85,16 @@
  *      equivalents of the same two colours — which do support variants.
  *      These hover states had never actually worked; unrelated to this
  *      change's stated purpose, but caught while re-verifying the file.
+ *  12. [BUG FIX] News (featured + secondary) and Events cards were
+ *      hardcoded to ImagePlaceholder regardless of whether the underlying
+ *      article/event actually had a cover photo attached — the real photo
+ *      already resolved correctly via imageUrl everywhere else (detail
+ *      pages, /news and /notices archives), it just wasn't read here. Also
+ *      fixes the Events section's "NaN" date badge: an EVENT with no valid
+ *      eventDate now falls back to a "TBA" badge instead of
+ *      new Date("").getDate() rendering literally as "NaN" — see
+ *      @shared/schemas/announcement for the companion fix that stops a new
+ *      dateless EVENT from being saved in the first place.
 
  * [DEPENDS ON]: apps/web/src/hooks/usePublic.ts, next-themes
  */
@@ -115,6 +127,7 @@ import {
 // grid and only picks up the lightbox.
 import { HierarchicalPhotoGrid } from '@/components/shared/HierarchicalPhotoGrid'
 import { PhotoLightbox } from '@/components/shared/PhotoLightbox'
+import { stripHtml } from '@/components/shared/PublicArchive'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED HELPERS
@@ -750,12 +763,26 @@ export default function LandingPage() {
               <div className="grid lg:grid-cols-[1.15fr_1fr] gap-10">
                 {/* Featured */}
                 <article>
-                  <ImagePlaceholder label="News" className="h-[330px] rounded-2xl mb-5" />
+                  {/* [FIX] Was hardcoded to ImagePlaceholder regardless of
+                      whether the article actually had a cover photo — the
+                      real photo already resolves correctly on the detail
+                      page (PublicArchiveDetail) via the same imageUrl this
+                      list already receives from usePublicNews(). */}
+                  {newsItems[0]!.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
+                    <img
+                      src={newsItems[0]!.imageUrl}
+                      alt=""
+                      className="w-full h-[330px] object-cover rounded-2xl mb-5"
+                    />
+                  ) : (
+                    <ImagePlaceholder label="News" className="h-[330px] rounded-2xl mb-5" />
+                  )}
                   <h3 className="font-heading font-bold text-2xl sm:text-[28px] leading-tight tracking-tight text-brand-navy dark:text-white mb-2.5">
                     {newsItems[0]!.title}
                   </h3>
                   <div className="font-mono text-[11.5px] text-muted mb-3">{formatRelativeDate(newsItems[0]!.createdAt)}</div>
-                  <p className="text-[15.5px] leading-relaxed text-muted mb-4 line-clamp-4">{newsItems[0]!.body}</p>
+                  <p className="text-[15.5px] leading-relaxed text-muted mb-4 line-clamp-4">{stripHtml(newsItems[0]!.body)}</p>
                   <Link href={`/news/${newsItems[0]!.id}`} className="font-heading font-bold text-[13.5px] text-brand-teal hover:underline">
                     Read more →
                   </Link>
@@ -765,7 +792,12 @@ export default function LandingPage() {
                 <div className="flex flex-col gap-5">
                   {newsItems.slice(1, 4).map((a) => (
                     <article key={a.id} className="grid grid-cols-[110px_1fr] sm:grid-cols-[132px_1fr] gap-4.5 pb-5 border-b border-base last:border-0 last:pb-0">
-                      <ImagePlaceholder className="h-24 rounded-lg" />
+                      {a.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
+                        <img src={a.imageUrl} alt="" className="h-24 rounded-lg object-cover" />
+                      ) : (
+                        <ImagePlaceholder className="h-24 rounded-lg" />
+                      )}
                       <div>
                         <h4 className="font-heading font-bold text-[15px] sm:text-base leading-snug text-brand-navy dark:text-white mb-2 line-clamp-2">
                           {a.title}
@@ -1125,19 +1157,42 @@ export default function LandingPage() {
             ) : (
               <div className="grid md:grid-cols-3 gap-6">
                 {eventItems.map((ev) => {
-                  const d = new Date(ev.eventDate!)
+                  // [FIX] Root cause of the "NaN" date badge: an EVENT
+                  // published (or seeded) before the eventDate-required
+                  // schema refine could have eventDate as "" or missing,
+                  // and `new Date("")` is an Invalid Date whose
+                  // .getMonth()/.getDate() are NaN. AnnouncementSchema now
+                  // refuses to persist a new dateless EVENT (see
+                  // @shared/schemas/announcement), but this guard also
+                  // covers any already-published record that predates that
+                  // fix, so the public page never shows "NaN" either way.
+                  const parsedDate = ev.eventDate ? new Date(ev.eventDate) : null
+                  const d = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null
                   return (
                     <article key={ev.id} className="border border-base rounded-2xl overflow-hidden bg-page relative card-hover">
-                      <ImagePlaceholder className="h-[170px]" />
+                      {/* [FIX] Was hardcoded to ImagePlaceholder regardless
+                          of whether the event actually had a cover photo. */}
+                      {ev.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
+                        <img src={ev.imageUrl} alt="" className="h-[170px] w-full object-cover" />
+                      ) : (
+                        <ImagePlaceholder className="h-[170px]" />
+                      )}
                       <div className="absolute top-3 left-3 bg-brand-navy text-white rounded-lg px-3 py-2 text-center min-w-[52px]">
-                        <div className="font-heading text-[10.5px] font-bold tracking-wide text-brand-teal-light">{MONTHS[d.getMonth()]}</div>
-                        <div className="font-heading text-xl font-extrabold leading-tight">{d.getDate()}</div>
+                        {d ? (
+                          <>
+                            <div className="font-heading text-[10.5px] font-bold tracking-wide text-brand-teal-light">{MONTHS[d.getMonth()]}</div>
+                            <div className="font-heading text-xl font-extrabold leading-tight">{d.getDate()}</div>
+                          </>
+                        ) : (
+                          <div className="font-heading text-[10.5px] font-bold tracking-wide text-brand-teal-light">TBA</div>
+                        )}
                       </div>
                       <div className="p-5 sm:p-6">
                         <h3 className="font-heading font-bold text-[17px] leading-snug text-brand-navy dark:text-white mb-2.5 line-clamp-2">
                           {ev.title}
                         </h3>
-                        <p className="text-[13.5px] text-muted mb-3.5 line-clamp-2">{ev.body}</p>
+                        <p className="text-[13.5px] text-muted mb-3.5 line-clamp-2">{stripHtml(ev.body)}</p>
                         <Link href={`/events/${ev.id}`} className="font-heading font-bold text-xs text-brand-teal hover:underline">
                           Read more →
                         </Link>

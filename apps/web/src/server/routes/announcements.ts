@@ -52,10 +52,11 @@ import { verifyAuth, getAdminApp } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import { hasPermission } from '@shared/types/permissions'
 import { COLLECTIONS } from '@shared/constants/storage'
-import { AnnouncementSchema, AnnouncementDraftSchema } from '@shared/schemas/announcement'
+import { AnnouncementSchema, AnnouncementObjectSchema, AnnouncementDraftSchema } from '@shared/schemas/announcement'
 import * as announcementService from '@/server/services/announcementService'
 import { createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
+import { sanitizeRichText } from '@/server/lib/sanitizeRichText'
 
 export const announcementsRouter = Router()
 
@@ -200,6 +201,7 @@ announcementsRouter.patch(
           eventDate: parsed.data.eventDate,
           publicWebsite: parsed.data.publicWebsite,
           imageKey: parsed.data.imageKey,
+          authorName: parsed.data.authorName,
           postType: parsed.data.postType,
           createdByUid: user.uid,
           createdByRole: user.role,
@@ -276,6 +278,7 @@ announcementsRouter.post(
           eventDate: parsed.data.eventDate,
           publicWebsite: parsed.data.publicWebsite,
           imageKey: parsed.data.imageKey,
+          authorName: parsed.data.authorName,
           postType: parsed.data.postType,
           createdByUid: user.uid,
           createdByRole: user.role,
@@ -306,11 +309,18 @@ announcementsRouter.patch(
       return res.status(403).json({ error: 'You can only edit your own announcements.' })
     }
 
-    const parsed = AnnouncementSchema.partial().safeParse(req.body)
+    const parsed = AnnouncementObjectSchema.partial().safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
 
+    // [FIX] This route writes parsed.data straight to Firestore rather
+    // than going through announcementService, so it needs its own
+    // sanitizeRichText() call — otherwise a client could PATCH a raw HTML
+    // body in, bypassing every other sanitize site in announcementService.ts.
+    const update = { ...parsed.data }
+    if (update.body !== undefined) update.body = sanitizeRichText(update.body)
+
     await ref.update({
-      ...parsed.data,
+      ...update,
       updatedAt: FieldValue.serverTimestamp(),
     })
     return res.json({ success: true })

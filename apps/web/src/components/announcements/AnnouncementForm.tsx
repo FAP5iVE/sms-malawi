@@ -27,6 +27,12 @@
  *   Save-Draft / continue-a-draft support for all four modes. Previously
  *   there was no way to save incomplete work: every submit had to be a
  *   complete, valid, ready-to-publish item in one sitting.
+ *
+ *   [FIX, this phase]: added an optional Author field (News only — shown
+ *   as "Written by: <name>" on the public detail page) and swapped the
+ *   News body's plain <textarea> for RichTextEditor.tsx, a small
+ *   bold/italic/alignment/list/highlight toolbar. The other three modes
+ *   keep the plain textarea unchanged.
  * [DEPENDS ON]: W/server/routes/announcements.ts (POST /, POST /draft,
  *   PATCH /:id/draft, PATCH /:id/publish), W/hooks/usePermissions.ts,
  *   @shared/schemas/announcement (AnnouncementSchema, AnnouncementDraftSchema)
@@ -41,6 +47,8 @@ import { uploadFileDirectly } from '@/lib/directUpload'
 import { X, Loader2, ImagePlus, Save } from 'lucide-react'
 import { USER_ROLES } from '@shared/types/roles'
 import type { Announcement } from '@/hooks/useAnnouncements'
+import { RichTextEditor } from '@/components/shared/RichTextEditor'
+import { stripHtml } from '@/components/shared/PublicArchive'
 
 type FormMode = 'announcement' | 'event' | 'news' | 'ads'
 
@@ -118,6 +126,10 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
     draft ? (draft.publicWebsite ?? false) : (isEvent || isPublicOnly),
   )
   const [eventDate, setEventDate] = useState(toDateInputValue(draft?.eventDate))
+  // [NEW] Byline — "Written by: <name>", shown bold on the same line as
+  // the date on the public detail page (PublicArchiveDetail). Free text,
+  // optional — a News article with none simply shows no byline.
+  const [authorName, setAuthorName] = useState(draft?.authorName ?? '')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   // [NEW] The already-uploaded imageKey carried over from a draft being
@@ -178,6 +190,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
       targetRoles,
       publicWebsite,
       eventDate: isEvent && eventDate ? new Date(eventDate).toISOString() : undefined,
+      authorName: authorName.trim() || undefined,
       postType: POST_TYPE[mode],
     })
     if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Validation error')
@@ -215,6 +228,10 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
       setError('Please choose the event date.')
       return
     }
+    if (isNews && stripHtml(body).length < 10) {
+      setError('Write a bit more before publishing — the article looks empty.')
+      return
+    }
     const parsed = AnnouncementSchema.safeParse({
       title,
       body,
@@ -222,6 +239,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
       targetRoles,
       publicWebsite,
       eventDate: isEvent && eventDate ? new Date(eventDate).toISOString() : undefined,
+      authorName: authorName.trim() || undefined,
       postType: POST_TYPE[mode],
     })
     if (!parsed.success) return setError(parsed.error.errors[0]?.message ?? 'Validation error')
@@ -235,6 +253,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
         targetRoles: parsed.data.targetRoles,
         publicWebsite: parsed.data.publicWebsite,
         eventDate: parsed.data.eventDate,
+        authorName: parsed.data.authorName,
         postType: parsed.data.postType,
         imageKey,
       }
@@ -305,6 +324,26 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
               className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             />
           </div>
+          {/* [NEW] Author byline — News only, matching the request this was
+              built for. Free text (not tied to a staff record), optional.
+              Shown bold on the same line as the publish date on the public
+              detail page. */}
+          {isNews && (
+            <div>
+              <label htmlFor="announcement-author" className="block text-sm font-medium text-body mb-1.5">
+                Author <span className="text-muted font-normal">(optional)</span>
+              </label>
+              <input
+                id="announcement-author"
+                value={authorName}
+                onChange={(e) => setAuthorName(e.target.value)}
+                placeholder="e.g. Jane Banda, School Administration"
+                maxLength={120}
+                className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              />
+              <p className="text-xs text-muted mt-1">Shown as &quot;Written by: {authorName || '…'}&quot; next to the date.</p>
+            </div>
+          )}
           {isEvent && (
             <div>
               <label htmlFor="event-date" className="block text-sm font-medium text-body mb-1.5">Event date</label>
@@ -322,20 +361,32 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
             <label htmlFor="announcement-body" className="block text-sm font-medium text-body mb-1.5">
               {isEvent ? 'Details' : isNews ? 'Article' : isAds ? 'Notice details' : 'Message'}
             </label>
-            <textarea
-              id="announcement-body"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              required
-              rows={isNews ? 10 : isAds ? 8 : 4}
-              placeholder={
-                isEvent ? 'Describe the event…'
-                : isNews ? 'Write the full article…'
-                : isAds ? 'Intake dates, eligibility, how and where to apply…'
-                : 'Write your announcement here…'
-              }
-              className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page resize-none focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-            />
+            {isNews ? (
+              // [NEW] Formatting toolbar — bold, italic, alignment,
+              // bullet/numbered list, highlight. See RichTextEditor.tsx.
+              // Body is sanitized server-side on every write path
+              // (server/lib/sanitizeRichText.ts) before it's stored.
+              <RichTextEditor
+                value={body}
+                onChange={setBody}
+                placeholder="Write the full article…"
+                minHeightClassName="min-h-[260px]"
+              />
+            ) : (
+              <textarea
+                id="announcement-body"
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                required
+                rows={isAds ? 8 : 4}
+                placeholder={
+                  isEvent ? 'Describe the event…'
+                  : isAds ? 'Intake dates, eligibility, how and where to apply…'
+                  : 'Write your announcement here…'
+                }
+                className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page resize-none focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              />
+            )}
           </div>
           {/* [PRODUCTION FIX] News and Academic Advertisements are
               public-site-only content by design — see the postType comment

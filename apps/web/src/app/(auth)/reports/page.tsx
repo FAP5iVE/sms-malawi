@@ -102,7 +102,7 @@ import type { PieLabelRenderProps } from 'recharts'
 import {
   TrendingUp, BookOpen, Users, DollarSign, ShieldCheck,
   BarChart2, FileText, GraduationCap, Activity, AlertTriangle,
-  ArrowUpRight, ArrowDownRight, Download,
+  ArrowUpRight, ArrowDownRight, Download, ChevronDown,
 } from 'lucide-react'
 import type {
   ApiLoginTrendPoint, ApiCategoryBreakdown, ApiClassPerformanceStat,
@@ -160,12 +160,26 @@ function recentAcademicYears(currentYear: string, yearsBack: number): string[] {
 // ─── EXPORT CONTEXT (R14 — report.export) ────────────────────────────────────
 
 /**
- * What the currently-visible panel offers for export.
+ * What the currently-visible panel(s) offer for export.
  *
  * The Download button lives in the page header, but only the active panel
- * knows what rows it is actually showing — so panels register their table here
- * and the header renders a button that exports precisely what the user is
- * looking at, rather than some fixed guess at what the tab "probably" holds.
+ * knows what rows it is actually showing — so panels register their table
+ * here and the header renders a button that exports precisely what the user
+ * is looking at, rather than some fixed guess at what the tab "probably"
+ * holds.
+ *
+ * [PRODUCTION FIX] This used to hold a single `registration | null` slot —
+ * correct as long as exactly one useExportable-calling panel was ever
+ * mounted per tab, which was true everywhere until High Rank's
+ * Performance/Classes/Finance tabs started stacking multiple existing
+ * sub-panels (each already calling useExportable on its own) into one tab.
+ * With a single slot, the last panel to mount silently overwrote every
+ * registration before it — clicking Export would download only the bottom
+ * -most section's data with no indication the others were never
+ * exportable. Keyed by `label` (a Map) so each panel owns its own entry:
+ * unrelated panels can never evict each other, and a panel re-registering
+ * on every render (its normal behavior) updates its own entry in place
+ * rather than appending duplicates.
  *
  * `download` is a closure rather than raw rows + columns so each panel keeps
  * its own row type: type erasure happens at the boundary, not inside the panel.
@@ -177,19 +191,21 @@ interface ExportRegistration {
 }
 
 interface ExportContextValue {
-  registration: ExportRegistration | null
+  registrations: Map<string, ExportRegistration>
   register: (registration: ExportRegistration) => void
-  clear: () => void
+  unregister: (label: string) => void
 }
 
 const ExportContext = createContext<ExportContextValue>({
-  registration: null,
+  registrations: new Map(),
   register: () => undefined,
-  clear: () => undefined,
+  unregister: () => undefined,
 })
 
 /**
- * Registers the calling panel's table as the page's current export target.
+ * Registers the calling panel's table as one of the page's current export
+ * targets (see the [PRODUCTION FIX] note on ExportContext above for why this
+ * is keyed by label rather than a single overwritable slot).
  *
  * `columns` are held in a ref rather than an effect dependency on purpose:
  * panels declare them inline, so a fresh array identity arrives on every
@@ -202,7 +218,7 @@ function useExportable<T>(
   rows: readonly T[] | undefined,
   columns: readonly CsvColumn<T>[],
 ): void {
-  const { register, clear } = useContext(ExportContext)
+  const { register, unregister } = useContext(ExportContext)
 
   const columnsRef = useRef(columns)
   const rowsRef = useRef(rows)
@@ -227,36 +243,88 @@ function useExportable<T>(
       hasRows,
       download: () => downloadCsv(csvFilename(label), rowsRef.current ?? [], columnsRef.current),
     })
-    return clear
-  }, [register, clear, label, hasRows])
+    // Unregister only this panel's own entry — never the whole map, so
+    // sibling panels registered under other labels are untouched.
+    return () => unregister(label)
+  }, [register, unregister, label, hasRows])
 }
 
-/** The header's Download button — rendered only when the caller actually holds
- *  report.export, as reported by the permission matrix itself. */
+/** The header's Download control — rendered only when the caller actually
+ *  holds report.export, as reported by the permission matrix itself.
+ *  [PRODUCTION FIX] Single-registration tabs (still the overwhelming
+ *  majority) get the exact same one-click button as before. A tab with more
+ *  than one registration (High Rank's stacked panels) gets a small dropdown
+ *  instead of silently picking one — nothing is dropped without the user
+ *  choosing that. */
 function ExportButton() {
-  const { registration } = useContext(ExportContext)
+  const { registrations } = useContext(ExportContext)
   const { data: capabilities } = useReportCapabilities()
   const [message, setMessage] = useState<string | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   if (!capabilities?.canExport) return null
 
-  const disabled = !registration?.hasRows
+  const list = Array.from(registrations.values())
+
+  if (list.length <= 1) {
+    const registration = list[0] as ExportRegistration | undefined
+    const disabled = !registration?.hasRows
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <button
+          type="button"
+          onClick={() => {
+            if (!registration) return
+            setMessage(registration.download() ? null : 'Nothing to export on this tab.')
+          }}
+          disabled={disabled}
+          title={disabled ? 'This tab has no exportable data yet' : `Export ${registration?.label} as CSV`}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border border-base bg-surface text-brand-navy transition-colors hover:bg-base disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+        >
+          <Download className="w-4 h-4" />
+          Export CSV
+        </button>
+        {message && <p role="alert" className="text-xs text-brand-coral">{message}</p>}
+      </div>
+    )
+  }
+
+  const anyExportable = list.some((r) => r.hasRows)
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="relative flex flex-col items-end gap-1">
       <button
         type="button"
-        onClick={() => {
-          if (!registration) return
-          setMessage(registration.download() ? null : 'Nothing to export on this tab.')
-        }}
-        disabled={disabled}
-        title={disabled ? 'This tab has no exportable data yet' : `Export ${registration?.label} as CSV`}
+        onClick={() => setMenuOpen((o) => !o)}
+        disabled={!anyExportable}
+        title={anyExportable ? 'Choose a table to export' : 'This tab has no exportable data yet'}
         className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border border-base bg-surface text-brand-navy transition-colors hover:bg-base disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
       >
         <Download className="w-4 h-4" />
         Export CSV
+        <ChevronDown className="w-3.5 h-3.5" />
       </button>
+      {menuOpen && (
+        <div role="menu" className="absolute right-0 top-full mt-1 min-w-55 bg-surface border border-base rounded-xl shadow-lg py-1 z-20">
+          {list.map((r) => (
+            <button
+              key={r.label}
+              role="menuitem"
+              type="button"
+              disabled={!r.hasRows}
+              onClick={() => {
+                setMessage(r.download() ? null : 'Nothing to export on this tab.')
+                setMenuOpen(false)
+              }}
+              className="w-full text-left px-3 py-2 text-sm text-brand-navy hover:bg-page disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      )}
       {message && <p role="alert" className="text-xs text-brand-coral">{message}</p>}
     </div>
   )
@@ -2500,13 +2568,28 @@ export default function ReportsPage() {
  * each render would re-register forever.
  */
 function ExportProvider({ children }: { children: React.ReactNode }) {
-  const [registration, setRegistration] = useState<ExportRegistration | null>(null)
+  const [registrations, setRegistrations] = useState<Map<string, ExportRegistration>>(new Map())
 
-  const register = useCallback((next: ExportRegistration) => setRegistration(next), [])
-  const clear    = useCallback(() => setRegistration(null), [])
+  // [PRODUCTION FIX] register/unregister now key by label instead of
+  // replacing a single slot — see the ExportContext comment above.
+  const register = useCallback((next: ExportRegistration) => {
+    setRegistrations((prev) => {
+      const copy = new Map(prev)
+      copy.set(next.label, next)
+      return copy
+    })
+  }, [])
+  const unregister = useCallback((label: string) => {
+    setRegistrations((prev) => {
+      if (!prev.has(label)) return prev
+      const copy = new Map(prev)
+      copy.delete(label)
+      return copy
+    })
+  }, [])
 
   return (
-    <ExportContext.Provider value={{ registration, register, clear }}>
+    <ExportContext.Provider value={{ registrations, register, unregister }}>
       {children}
     </ExportContext.Provider>
   )

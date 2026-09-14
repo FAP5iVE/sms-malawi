@@ -77,6 +77,9 @@ export interface PublicAnnouncement {
    *  getPublicViewUrl(), not a raw Appwrite file ID. Present only if a
    *  cover image was attached when the announcement was written. */
   imageUrl:  string | null
+  /** [NEW] Byline — rendered as "Written by: <name>" on the detail page.
+   *  null when the author left it blank. */
+  authorName: string | null
 }
 
 /** GET /public/placement-stats — real UniversityPlacement outcomes,
