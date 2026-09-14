@@ -20,7 +20,7 @@
  *   is told to trust it.
  */
 import { type NextRequest, NextResponse } from 'next/server'
-import { Readable } from 'node:stream'
+import { Readable, Duplex } from 'node:stream'
 import { createApiApp } from '@/lib/api-app'
 
 export const runtime = 'nodejs'
@@ -104,24 +104,49 @@ async function handleRequest(req: NextRequest): Promise<NextResponse> {
     // by hand. We already have the full body in `bodyBuffer` (read once,
     // above), so we just push it and signal EOF immediately.
     const mockReq = new Readable({ read() {} }) as Readable & {
-      method:  string
-      url:     string
-      headers: Record<string, string>
-      socket:  { remoteAddress: string; destroy: () => void; destroyed: boolean }
+      method:     string
+      url:        string
+      headers:    Record<string, string>
+      socket:     Duplex & { remoteAddress: string }
+      connection: Duplex & { remoteAddress: string }
     }
     mockReq.method  = req.method
     mockReq.url     = path + (url.search || '')
     mockReq.headers = Object.fromEntries(req.headers.entries())
+    // EventEmitter throws if an 'error' event fires with no listener attached —
+    // that alone is enough to crash the whole Node process the same way the
+    // destroy()-related bugs above did. Express/body-parser normally attach
+    // their own 'error' handling, but this mock has no real transport to ever
+    // legitimately error, so a no-op listener is a safe backstop either way.
+    mockReq.on('error', () => {})
     // [PRODUCTION FIX] Node's stream internals auto-destroy a Readable once it
     // hits EOF (mockReq.push(null) below), and IncomingMessage-style teardown
     // calls `this.socket.destroy(err)` as part of that. A bare
-    // `{ remoteAddress }` has no destroy() to call, so that throws
-    // `TypeError: this.socket.destroy is not a function` — as an UNCAUGHT
-    // exception outside any of Express's own error handling, which was
-    // killing the whole Node process (exit 129) on every request through
-    // this bridge, not just failing the one request. There's no real socket
-    // to tear down here, so destroy() is a safe no-op.
-    mockReq.socket  = { remoteAddress, destroy() {}, destroyed: false }
+    // `{ remoteAddress, destroy(){}, destroyed:false }` object fixed the
+    // original `TypeError: this.socket.destroy is not a function` crash, but
+    // it's still just a plain object — not a real stream. Node's newer
+    // `_http_incoming`-style teardown also calls `stream.finished()`
+    // (internally named `eos`) on `this.socket` to wait for it to fully
+    // close before invoking the destroy callback. `finished()`/`eos()`
+    // validates its argument with `instanceof Stream` and throws
+    // `TypeError: The "stream" argument must be an instance of
+    // ReadableStream, WritableStream, or Stream. Received an instance of
+    // Object` when handed a plain object — again an UNCAUGHT exception
+    // outside Express's error handling, killing the whole Node process
+    // (exit 129) on every request through this bridge. A real (inert)
+    // Duplex satisfies that `instanceof Stream` check and already ships a
+    // safe no-op `.destroy()` and full EventEmitter interface out of the
+    // box — same reasoning as the mockReq fix above, just applied one level
+    // down to the socket it carries. `connection` is the deprecated alias
+    // for `socket` that some middleware still reads directly.
+    const mockSocket = new Duplex({
+      read() {},
+      write(_chunk, _enc, cb) { cb() },
+    }) as Duplex & { remoteAddress: string }
+    mockSocket.remoteAddress = remoteAddress
+    mockSocket.on('error', () => {}) // inert socket; nothing to flush, never let it crash the process
+    mockReq.socket     = mockSocket
+    mockReq.connection = mockSocket
     if (bodyBuffer && bodyBuffer.length > 0) mockReq.push(bodyBuffer)
     mockReq.push(null) // EOF — mirrors a real IncomingMessage once Vercel has fully received the request
 

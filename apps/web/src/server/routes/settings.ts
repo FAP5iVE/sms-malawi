@@ -269,16 +269,6 @@ const FINANCE_KEYS = [
   'late_payment_grace_days',  'invoice_due_days',
   'payroll_day_of_month',     'enable_usd_display',
   'receipt_prefix',
-  // [PRODUCTION FIX] payroll_day_of_month was a real, saved setting with
-  // zero readers anywhere in payrollService.ts — Run Payroll could be
-  // clicked on any date, for any month, as many times as the unique
-  // constraint allowed a first attempt. payrollService.getPayrollRunWindow()
-  // now genuinely enforces a window of payroll_run_window_days days starting
-  // on payroll_day_of_month (rolling into the next calendar month if the
-  // window overruns month-end — plain Date arithmetic handles this without
-  // per-month clamping). Defaults to 5 when unset, matching
-  // FinanceSettings.tsx's default.
-  'payroll_run_window_days',
 ]
 
 settingsRouter
@@ -383,10 +373,13 @@ const SCHOOL_SCALAR_KEYS = [
 settingsRouter
   .route('/school')
   .get(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
-    const [scalars, coreValues, leadershipTeam, foundedYear] = await Promise.all([
+    const [scalars, coreValues, leadershipTeam, discoverCards, foundedYear] = await Promise.all([
       readSettings(SCHOOL_SCALAR_KEYS),
       settingsService.get(SETTING_KEYS.SCHOOL_CORE_VALUES),
       settingsService.get(SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM),
+      // [NEW] Discover-section card preview photos — same JSON-array/
+      // typed-settingsService split as coreValues/leadershipTeam above.
+      settingsService.get(SETTING_KEYS.SCHOOL_DISCOVER_CARDS),
       // [PRODUCTION FIX 2026-07-28] The "Years of excellence" figure on the
       // landing page is genuinely computed live from this setting — but the
       // setting itself had no write path anywhere, so in practice it was
@@ -405,7 +398,21 @@ settingsRouter
         photoUrl: m.photoKey ? await getPublicViewUrl('', m.photoKey) : null,
       })),
     )
-    return res.json({ ...scalars, coreValues, leadershipTeam: leadershipTeamWithPhotos, foundedYear })
+    // [NEW] Same photoKey -> photoUrl resolution, for the Discover Cards
+    // editor preview.
+    const discoverCardsWithPhotos = await Promise.all(
+      discoverCards.map(async (c) => ({
+        ...c,
+        photoUrl: c.photoKey ? await getPublicViewUrl('', c.photoKey) : null,
+      })),
+    )
+    return res.json({
+      ...scalars,
+      coreValues,
+      leadershipTeam: leadershipTeamWithPhotos,
+      discoverCards: discoverCardsWithPhotos,
+      foundedYear,
+    })
   })
   .patch(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
     const body = req.body as Record<string, unknown>
@@ -422,6 +429,9 @@ settingsRouter
       }
       if (body.leadershipTeam !== undefined) {
         await settingsService.set(SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM, body.leadershipTeam as never, req.user!.uid)
+      }
+      if (body.discoverCards !== undefined) {
+        await settingsService.set(SETTING_KEYS.SCHOOL_DISCOVER_CARDS, body.discoverCards as never, req.user!.uid)
       }
       if (body.foundedYear !== undefined) {
         await settingsService.set(SETTING_KEYS.SCHOOL_FOUNDED_YEAR, Number(body.foundedYear) as never, req.user!.uid)
@@ -450,6 +460,24 @@ settingsRouter.post(
       res.json(ticket)
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'settings', route: 'leadership-photo-ticket' } })
+    }
+  },
+)
+
+// POST /settings/discover-photo/upload-ticket
+// [NEW] Same direct-to-Appwrite ticket pattern as leadership-photo above,
+// for the four Discover-section card preview photos — FILE_PREFIX.DISCOVER_PHOTO
+// instead of LEADERSHIP_PHOTO, same admin/hr/high_rank gating as GET/PATCH
+// /school (this is a School Identity field, not a separate permission).
+settingsRouter.post(
+  '/discover-photo/upload-ticket',
+  requireRole(['admin', 'hr', 'high_rank']),
+  async (_req, res) => {
+    try {
+      const ticket = await createDirectUploadTicket(FILE_PREFIX.DISCOVER_PHOTO)
+      res.json(ticket)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'settings', route: 'discover-photo-ticket' } })
     }
   },
 )

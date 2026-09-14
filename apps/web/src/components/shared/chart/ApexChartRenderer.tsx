@@ -35,6 +35,7 @@ import type { ApexOptions } from 'apexcharts'
 import { useTheme } from 'next-themes'
 import dynamic from 'next/dynamic'
 import type { ComponentType } from 'react'
+import { useMemo } from 'react'
 
 import { chartColorAt } from '@/lib/chartPalette'
 import type { ChartProps, ChartSeriesConfig, ChartType } from './types'
@@ -70,6 +71,35 @@ const ReactApexChart = dynamic(
     loading: () => <div className="h-full w-full rounded-xl bg-page animate-pulse" />,
   },
 )
+
+// [BUG FIX] Hoisted out of the component body. react-apexcharts decides
+// whether to call `updateSeries()` (cheap: patch existing paths) or
+// `updateOptions()` (expensive: tear the chart down via `Destroy.clear()`
+// and fully `create()` it again) by deep-comparing the *previous* `options`
+// object against the new one. That comparator treats any function-valued
+// property as unequal unless it's the exact same reference (functions can
+// only ever be `===` to themselves, never structurally equal) — so an
+// inline `formatter` recreated on every render made `options` register as
+// "changed" on every single render, even when nothing about it actually
+// changed, forcing a full destroy+recreate cycle every time.
+// ApexCharts' own `_updateOptions()` fans that recreate out across
+// `getSyncedCharts()` via a bare `Array.prototype.forEach()`, whose
+// callback's returned promise chain is never collected — so any exception
+// thrown mid-recreate (e.g. from a chart caught mid-teardown by another
+// overlapping recreate) becomes an unhandled promise rejection rather than
+// something a caller could ever `.catch()`. Forcing that expensive,
+// non-cancellable cycle on every render — for a pure formatting function
+// that never needed a fresh identity — was manufacturing exactly the
+// rapid, overlapping recreate cycles that condition needs to surface. This
+// formatter has no closure over component state, so a single stable,
+// module-level reference removes it from the equation entirely: unrelated
+// renders that don't change the chart's actual shape now correctly take
+// the cheap `updateSeries()` path (or skip updating at all), and the
+// destroy+recreate cycle only runs when the chart truly has something new
+// to show.
+function formatRadialValue(v: number): string {
+  return `${Math.round(Number(v))}%`
+}
 
 /** Map a `ChartType` to the ApexCharts base `chart.type`. */
 function apexBaseType(type: ChartType): ApexBaseType {
@@ -122,42 +152,65 @@ export function ApexChartRenderer(props: ChartProps): React.ReactElement {
 
   const isEmpty = data.length === 0 || series.length === 0
   const base = apexBaseType(type)
-  const categories = data.map((d) => String(d.x))
 
-  // Build the two possible series shapes: axis (array of {name,data}) vs
-  // non-axis (number[] for pie/donut/radial).
-  let apexSeries: ApexOptions['series']
-  let labels: string[] | undefined
-  let colors: string[]
+  // [BUG FIX] Previously computed inline in the component body on every
+  // render, producing brand-new array/object references even when `data`
+  // and `series` themselves hadn't changed reference (which, thanks to
+  // TanStack Query's default structural sharing, they don't on a poll that
+  // returns unchanged values). That reference churn fed straight into the
+  // same "options always look changed" problem `formatRadialValue` above
+  // caused — just via `categories`/`colors`/`labels` instead of a function.
+  // Memoizing on the actual inputs means a poll that returns the same
+  // values now produces `apexSeries`/`labels`/`colors`/`categories` that
+  // are reference-*and*-content stable, so the options object built below
+  // only changes when something real did.
+  const { apexSeries, labels, colors, categories } = useMemo(() => {
+    const cats = data.map((d) => String(d.x))
 
-  if (base === 'pie' || base === 'donut') {
-    const first = series[0]
-    apexSeries = first ? data.map((d) => Number(d[first.key] ?? 0)) : []
-    labels = data.map((d) => String(d.x))
-    colors = data.map((_, i) => chartColorAt(i))
-  } else if (base === 'radialBar') {
-    const first = series[0]
-    const firstPoint = data[0]
-    const value = first && firstPoint ? Number(firstPoint[first.key] ?? 0) : 0
-    apexSeries = [value]
-    labels = first ? [first.label] : []
-    colors = [first?.color ?? chartColorAt(0)]
-  } else if (type === 'combo') {
-    apexSeries = series.map((s) => ({
-      name: s.label,
-      type: comboSeriesType(s.kind),
-      data: data.map((d) => Number(d[s.key] ?? 0)),
-    }))
-    colors = seriesColors(series)
-  } else {
-    apexSeries = series.map((s) => ({
-      name: s.label,
-      data: data.map((d) => Number(d[s.key] ?? 0)),
-    }))
-    colors = seriesColors(series)
-  }
+    if (base === 'pie' || base === 'donut') {
+      const first = series[0]
+      return {
+        apexSeries: first ? data.map((d) => Number(d[first.key] ?? 0)) : [],
+        labels: data.map((d) => String(d.x)),
+        colors: data.map((_, i) => chartColorAt(i)),
+        categories: cats,
+      }
+    }
+    if (base === 'radialBar') {
+      const first = series[0]
+      const firstPoint = data[0]
+      const value = first && firstPoint ? Number(firstPoint[first.key] ?? 0) : 0
+      return {
+        apexSeries: [value],
+        labels: first ? [first.label] : [],
+        colors: [first?.color ?? chartColorAt(0)],
+        categories: cats,
+      }
+    }
+    if (type === 'combo') {
+      return {
+        apexSeries: series.map((s) => ({
+          name: s.label,
+          type: comboSeriesType(s.kind),
+          data: data.map((d) => Number(d[s.key] ?? 0)),
+        })),
+        labels: undefined,
+        colors: seriesColors(series),
+        categories: cats,
+      }
+    }
+    return {
+      apexSeries: series.map((s) => ({
+        name: s.label,
+        data: data.map((d) => Number(d[s.key] ?? 0)),
+      })),
+      labels: undefined,
+      colors: seriesColors(series),
+      categories: cats,
+    }
+  }, [base, type, data, series])
 
-  const options: ApexOptions = {
+  const options: ApexOptions = useMemo(() => ({
     chart: {
       type: base,
       background: 'transparent',
@@ -181,7 +234,7 @@ export function ApexChartRenderer(props: ChartProps): React.ReactElement {
         hollow: { size: '62%' },
         dataLabels: {
           name: { show: true, fontSize: '12px' },
-          value: { show: true, formatter: (v) => `${Math.round(Number(v))}%` },
+          value: { show: true, formatter: formatRadialValue },
         },
       },
     },
@@ -204,7 +257,7 @@ export function ApexChartRenderer(props: ChartProps): React.ReactElement {
       : { xaxis: { categories, axisBorder: { show: false }, axisTicks: { show: false } } }),
     tooltip: { theme: mode },
     noData: { text: emptyStateMessage ?? 'No data to display.' },
-  }
+  }), [base, type, mode, zoomable, exportable, emptyStateMessage, colors, labels, categories, series])
 
   return (
     <figure className="w-full" aria-label={ariaLabel} role="group">

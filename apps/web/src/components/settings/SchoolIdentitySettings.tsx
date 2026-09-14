@@ -33,6 +33,27 @@ interface LeadershipMember {
   order?: number
 }
 
+/** [NEW] One entry in SETTING_KEYS.SCHOOL_DISCOVER_CARDS — the preview
+ *  photo behind one of the four fixed Discover-section cards on the public
+ *  landing page. Same photoKey/photoUrl split as LeadershipMember above:
+ *  photoKey is what's actually persisted, photoUrl is GET /school's
+ *  resolved-for-preview-only convenience field. */
+interface DiscoverCardEntry {
+  cardKey:   'leadership' | 'academics' | 'student_life' | 'admissions'
+  photoKey?: string
+  photoUrl?: string | null
+}
+
+/** The four Discover cards are fixed (they mirror page.tsx's hardcoded
+ *  title/desc/href for each) — only which preview photo belongs to which
+ *  is editable, so this is a label lookup, not a user-managed list. */
+const DISCOVER_CARD_DEFS: { cardKey: DiscoverCardEntry['cardKey']; label: string }[] = [
+  { cardKey: 'leadership',   label: 'Leadership' },
+  { cardKey: 'academics',    label: 'Academics' },
+  { cardKey: 'student_life', label: 'Student Life' },
+  { cardKey: 'admissions',   label: 'Admissions' },
+]
+
 interface SchoolIdentityData {
   school_name?: string
   school_slogan?: string
@@ -50,6 +71,8 @@ interface SchoolIdentityData {
   social_linkedin_url?: string
   coreValues: string[]
   leadershipTeam: LeadershipMember[]
+  // [NEW] See DiscoverCardEntry above.
+  discoverCards: DiscoverCardEntry[]
   foundedYear?: number
 }
 
@@ -60,7 +83,7 @@ const textareaCls = `${inputCls} resize-y min-h-[80px] py-2.5`
 const label = 'block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5'
 
 export function SchoolIdentitySettings() {
-  const [data, setData]       = useState<SchoolIdentityData>({ coreValues: [], leadershipTeam: [] })
+  const [data, setData]       = useState<SchoolIdentityData>({ coreValues: [], leadershipTeam: [], discoverCards: [] })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
   const [saved, setSaved]     = useState(false)
@@ -68,10 +91,19 @@ export function SchoolIdentitySettings() {
   const [newValue, setNewValue] = useState('')
   const [newLeader, setNewLeader] = useState({ name: '', title: '', bio: '', photoKey: '', photoPreview: '' })
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  // [NEW] Which Discover card's photo is currently uploading, if any —
+  // separate from uploadingPhoto (leadership) since either can be in
+  // flight independently of the other.
+  const [uploadingDiscoverKey, setUploadingDiscoverKey] = useState<DiscoverCardEntry['cardKey'] | null>(null)
 
   useEffect(() => {
     apiFetch<SchoolIdentityData>('/settings/school')
-      .then((d) => setData({ ...d, coreValues: d.coreValues ?? [], leadershipTeam: d.leadershipTeam ?? [] }))
+      .then((d) => setData({
+        ...d,
+        coreValues: d.coreValues ?? [],
+        leadershipTeam: d.leadershipTeam ?? [],
+        discoverCards: d.discoverCards ?? [],
+      }))
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false))
   }, [])
@@ -128,6 +160,34 @@ export function SchoolIdentitySettings() {
       setError(err instanceof Error ? err.message : 'Failed to upload photo.')
     } finally {
       setUploadingPhoto(false)
+    }
+  }
+
+  /** [NEW] Same immediate-upload-on-pick pattern as handlePhotoChange above
+   *  (leadership photos) — uploads via FILE_PREFIX.DISCOVER_PHOTO, then
+   *  upserts (by cardKey) into data.discoverCards. Each of the four fixed
+   *  cards has at most one photo, so this replaces any existing entry for
+   *  that cardKey rather than appending a duplicate. */
+  async function handleDiscoverPhotoChange(cardKey: DiscoverCardEntry['cardKey'], e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setError('Only image files are allowed for a Discover card photo.')
+      return
+    }
+    setUploadingDiscoverKey(cardKey)
+    setError(null)
+    try {
+      const photoKey = await uploadFileDirectly('/settings/discover-photo/upload-ticket', file)
+      const photoUrl = URL.createObjectURL(file)
+      setField('discoverCards', [
+        ...data.discoverCards.filter((c) => c.cardKey !== cardKey),
+        { cardKey, photoKey, photoUrl },
+      ])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload photo.')
+    } finally {
+      setUploadingDiscoverKey(null)
     }
   }
 
@@ -343,6 +403,47 @@ export function SchoolIdentitySettings() {
           >
             <Plus className="w-3.5 h-3.5" /> Add to team
           </button>
+        </div>
+      </div>
+
+      {/* [NEW] Discover Cards — preview photo behind each of the four fixed
+          Discover-section cards on the public landing page. Same
+          upload-immediately-on-pick workflow as the Leadership Team photos
+          above, just one fixed slot per card instead of an open list. */}
+      <div>
+        <label className={label}>Discover Cards — Preview Images</label>
+        <p className="text-xs text-muted mb-3 -mt-1">
+          Shown behind each card in the public landing page&apos;s Discover section, replacing its default colour once set.
+        </p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {DISCOVER_CARD_DEFS.map(({ cardKey, label: cardLabel }) => {
+            const entry = data.discoverCards.find((c) => c.cardKey === cardKey)
+            const isUploading = uploadingDiscoverKey === cardKey
+            return (
+              <div key={cardKey} className="border border-base rounded-xl p-3 flex flex-col items-center gap-2 text-center">
+                {entry?.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- local blob: preview or Appwrite-hosted photo, not a local Next asset
+                  <img src={entry.photoUrl} alt="" className="w-full aspect-video rounded-lg object-cover border border-base" />
+                ) : (
+                  <div className="w-full aspect-video rounded-lg bg-page border border-dashed border-base flex items-center justify-center">
+                    <ImagePlus className="w-5 h-5 text-muted" aria-hidden />
+                  </div>
+                )}
+                <p className="text-xs font-heading font-semibold text-body">{cardLabel}</p>
+                <label className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-page cursor-pointer">
+                  {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
+                  {entry?.photoKey ? 'Change photo' : 'Add photo'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleDiscoverPhotoChange(cardKey, e)}
+                    disabled={isUploading}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            )
+          })}
         </div>
       </div>
 

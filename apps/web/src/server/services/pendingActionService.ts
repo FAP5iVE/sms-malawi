@@ -535,19 +535,44 @@ export async function getById(id: string): Promise<PendingActionRow | null> {
 /**
  * Get count breakdown across all statuses.
  * Used by the admin dashboard badge and summary widget.
+ *
+ * [PRODUCTION FIX] Previously ran six separate `count()` round trips (one
+ * per PendingActionStatus value plus an unfiltered total), reported by
+ * Sentry as an N+1 Query issue on GET /api/[[...slug]] — five near-identical
+ * `SELECT COUNT(*) ... WHERE status = CAST($1 ...)` spans back to back
+ * (~78ms each), all on a table small enough that a single grouped query
+ * does the same job in one round trip. `groupBy` returns one row per
+ * status present in the table in a single query; the unfiltered total is
+ * just the sum of those rows, so no separate `count()` call is needed
+ * either — five-plus statuses collapsed into 1 query.
  */
 export async function getCounts(): Promise<PendingActionCounts> {
-  const [pending, approved, rejected, cancelled, expired, total] =
-    await prisma.$transaction([
-      prisma.pendingAction.count({ where: { status: 'PENDING'   } }),
-      prisma.pendingAction.count({ where: { status: 'APPROVED'  } }),
-      prisma.pendingAction.count({ where: { status: 'REJECTED'  } }),
-      prisma.pendingAction.count({ where: { status: 'CANCELLED' } }),
-      prisma.pendingAction.count({ where: { status: 'EXPIRED'   } }),
-      prisma.pendingAction.count(),
-    ])
+  const groups = await prisma.pendingAction.groupBy({
+    by:     ['status'],
+    _count: { _all: true },
+  })
 
-  return { pending, approved, rejected, cancelled, expired, total }
+  const byStatus: Record<PendingActionStatus, number> = {
+    PENDING:   0,
+    APPROVED:  0,
+    REJECTED:  0,
+    CANCELLED: 0,
+    EXPIRED:   0,
+  }
+  let total = 0
+  for (const g of groups) {
+    byStatus[g.status] = g._count._all
+    total += g._count._all
+  }
+
+  return {
+    pending:   byStatus.PENDING,
+    approved:  byStatus.APPROVED,
+    rejected:  byStatus.REJECTED,
+    cancelled: byStatus.CANCELLED,
+    expired:   byStatus.EXPIRED,
+    total,
+  }
 }
 
 /**

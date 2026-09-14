@@ -25,6 +25,9 @@ import { RoleGuard } from '@/components/shared/RoleGuard'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { uploadFileDirectly } from '@/lib/directUpload'
 import { Images, ImagePlus, Loader2, Trash2, X } from 'lucide-react'
+// [NEW] Click-a-photo-to-view-full-size — grid itself is unchanged (kept
+// exactly as it was), this only adds the viewer.
+import { PhotoLightbox } from '@/components/shared/PhotoLightbox'
 
 interface GalleryPhoto {
   id: string
@@ -183,6 +186,8 @@ function GalleryContent() {
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // [NEW] Which photo (index into `photos`) is open full-size, if any.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   const { data: photos = [], isLoading, error } = useQuery({
     queryKey: queryKeys.gallery.all(),
@@ -245,11 +250,21 @@ function GalleryContent() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {photos.map((p) => (
+          {photos.map((p, i) => (
             <div key={p.id} className="group relative rounded-xl overflow-hidden border border-base bg-surface">
-              {/* eslint-disable-next-line @next/next/no-img-element -- remote Appwrite view URL, not a local/optimizable asset */}
-              <img src={p.url} alt={p.caption ?? 'Gallery photo'} className="w-full aspect-square object-cover" />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+              {/* [NEW] Photo itself is now a click-to-view-full-size trigger
+                  — a real <button> (not just an onClick on the <img>) so it
+                  stays keyboard-reachable. Grid/card layout is unchanged. */}
+              <button
+                type="button"
+                onClick={() => setLightboxIndex(i)}
+                aria-label={`View ${p.caption ?? 'photo'} full size`}
+                className="block w-full"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- remote Appwrite view URL, not a local/optimizable asset */}
+                <img src={p.url} alt={p.caption ?? 'Gallery photo'} className="w-full aspect-square object-cover" />
+              </button>
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
                 {p.category && (
                   <span className="inline-block text-[10px] font-heading font-bold text-white/90 bg-white/20 rounded-full px-2 py-0.5 mb-1">
                     {p.category}
@@ -292,6 +307,18 @@ function GalleryContent() {
       )}
 
       {showUpload && <UploadForm onDone={refresh} />}
+
+      <PhotoLightbox
+        photos={photos.map((p) => ({
+          id: p.id,
+          url: p.url,
+          alt: p.caption ?? 'Gallery photo',
+          caption: p.caption,
+          category: p.category,
+        }))}
+        index={lightboxIndex}
+        onIndexChange={setLightboxIndex}
+      />
     </div>
   )
 }

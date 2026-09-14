@@ -62,6 +62,19 @@ export const publicRouter = Router()
 publicRouter.get('/school-info', async (_req, res) => {
   const settings = await settingsService.getPublicSettings()
 
+  // [NEW] Resolve each Discover card's optional photoKey to a real view URL
+  // — same getPublicViewUrl() resolution /public/leadership already does
+  // for SCHOOL_LEADERSHIP_TEAM photos. Cards with no photo yet keep
+  // photoUrl: null so the landing page can fall back to its existing
+  // gradient tint instead of rendering a broken <img>.
+  const discoverCardsRaw = settings[SETTING_KEYS.SCHOOL_DISCOVER_CARDS] ?? []
+  const discoverCards = await Promise.all(
+    discoverCardsRaw.map(async (c) => ({
+      cardKey:  c.cardKey,
+      photoUrl: c.photoKey ? await getPublicViewUrl('', c.photoKey) : null,
+    })),
+  )
+
   res.json({
     schoolName:  settings[SETTING_KEYS.SCHOOL_NAME]           ?? 'SMS Malawi',
     slogan:      settings[SETTING_KEYS.SCHOOL_SLOGAN]         ?? 'Where Minds Ignite & Futures Begin.',
@@ -75,6 +88,9 @@ publicRouter.get('/school-info', async (_req, res) => {
     vision:      settings[SETTING_KEYS.SCHOOL_VISION]         ?? '',
     mission:     settings[SETTING_KEYS.SCHOOL_MISSION]        ?? '',
     coreValues:  settings[SETTING_KEYS.SCHOOL_CORE_VALUES]    ?? [],
+    // [NEW] See resolution above — one entry per card that has a photo set,
+    // absent entries mean "no photo yet, use the default tint".
+    discoverCards,
     currentYear: settings[SETTING_KEYS.CURRENT_ACADEMIC_YEAR] ?? '2025/2026',
     // [PRODUCTION FIX 2026-07-28] Footer social icons — real URLs now,
     // editable under Settings -> School Identity. Empty string = hide icon.

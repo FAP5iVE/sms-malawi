@@ -127,6 +127,17 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
       photoKey: z.string().optional(),
       order:    z.number().optional(),
     })).max(30),
+  // [NEW] Preview photo per fixed Discover card — cardKey is a closed union
+  // (matches DiscoverCardKey) so a typo can't create an orphaned entry the
+  // landing page's cardKey lookup will never match. At most one entry per
+  // card in practice (the settings editor upserts by cardKey), but the
+  // array itself doesn't enforce uniqueness — the editor is the source of
+  // truth for that, same trust level as SCHOOL_LEADERSHIP_TEAM above.
+  [SETTING_KEYS.SCHOOL_DISCOVER_CARDS]:
+    z.array(z.object({
+      cardKey:  z.enum(['leadership', 'academics', 'student_life', 'admissions']),
+      photoKey: z.string().optional(),
+    })).max(4),
   // Empty string is deliberately valid here (hides the footer icon) — only
   // a non-empty value must actually be a well-formed URL.
   [SETTING_KEYS.SOCIAL_FACEBOOK_URL]:  z.string().url().or(z.literal('')),

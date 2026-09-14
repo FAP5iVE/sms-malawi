@@ -110,6 +110,11 @@ import {
   useNewsletterSubscribe,
   useContactForm,
 } from '@/hooks/usePublic'
+// [NEW] Shared hierarchical grid + full-size lightbox — see those files'
+// headers. Reused as-is by /gallery; gallery-admin keeps its own plain
+// grid and only picks up the lightbox.
+import { HierarchicalPhotoGrid } from '@/components/shared/HierarchicalPhotoGrid'
+import { PhotoLightbox } from '@/components/shared/PhotoLightbox'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED HELPERS
@@ -265,6 +270,9 @@ export default function LandingPage() {
   const { data: eventsPage,        isLoading: eventsLoading }        = usePublicEvents(3)
   const { data: galleryPage, isLoading: galleryLoading } = usePublicGallery(5)
   const galleryPhotos = galleryPage?.photos ?? []
+  // [NEW] Which "Life at our school" photo is open full-size, if any —
+  // null means the lightbox is closed. Index into `galleryPhotos`.
+  const [galleryLightboxIndex, setGalleryLightboxIndex] = useState<number | null>(null)
 
   const currentYearNum = new Date().getFullYear()
   const yearsOfExcellence = schoolInfo ? currentYearNum - schoolInfo.founded : null
@@ -839,24 +847,37 @@ export default function LandingPage() {
             </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {/* [PRODUCTION FIX] Preview photo now comes from Settings ->
+                  School Identity -> Discover Cards (SETTING_KEYS.SCHOOL_DISCOVER_CARDS,
+                  same upload-first/photoKey workflow as leadership team
+                  photos). `tint` is kept as the fallback background for any
+                  card that hasn't had a photo set yet, rather than leaving
+                  it blank. */}
               {[
-                { title: 'Leadership', desc: 'A head teacher and board committed to transparent, forward-thinking school governance.', href: '/leadership', tint: 'from-brand-navy-light/40 to-brand-navy' },
-                { title: 'Academics', desc: 'A rigorous curriculum aligned to MANEB standards for both JCE and MSCE candidates.', href: '/academics', tint: 'from-brand-teal/70 to-brand-navy' },
-                { title: 'Student Life', desc: 'Sport, drama, choir, debate and community service alongside a full boarding programme.', href: '/student-life', tint: 'from-brand-purple/70 to-brand-navy' },
-                { title: 'Admissions', desc: 'Everything a prospective family needs — entry requirements, fees and application steps.', href: '/admissions', tint: 'from-brand-amber/70 to-brand-navy' },
-              ].map((card) => (
-                <Link
-                  key={card.title}
-                  href={card.href}
-                  className={`block text-left rounded-2xl overflow-hidden relative min-h-[290px] card-hover bg-linear-to-b ${card.tint}`}
-                >
-                  <div className="absolute inset-0 bg-linear-to-b from-black/5 to-black/70" />
-                  <div className="relative p-6 flex flex-col justify-end h-[290px] box-border">
-                    <h3 className="font-heading font-bold text-lg text-white mb-2">{card.title}</h3>
-                    <p className="text-[13.5px] leading-relaxed text-white/65">{card.desc}</p>
-                  </div>
-                </Link>
-              ))}
+                { title: 'Leadership', cardKey: 'leadership' as const, desc: 'A head teacher and board committed to transparent, forward-thinking school governance.', href: '/leadership', tint: 'from-brand-navy-light/40 to-brand-navy' },
+                { title: 'Academics', cardKey: 'academics' as const, desc: 'A rigorous curriculum aligned to MANEB standards for both JCE and MSCE candidates.', href: '/academics', tint: 'from-brand-teal/70 to-brand-navy' },
+                { title: 'Student Life', cardKey: 'student_life' as const, desc: 'Sport, drama, choir, debate and community service alongside a full boarding programme.', href: '/student-life', tint: 'from-brand-purple/70 to-brand-navy' },
+                { title: 'Admissions', cardKey: 'admissions' as const, desc: 'Everything a prospective family needs — entry requirements, fees and application steps.', href: '/admissions', tint: 'from-brand-amber/70 to-brand-navy' },
+              ].map((card) => {
+                const photoUrl = schoolInfo?.discoverCards?.find((d) => d.cardKey === card.cardKey)?.photoUrl ?? null
+                return (
+                  <Link
+                    key={card.title}
+                    href={card.href}
+                    className={`block text-left rounded-2xl overflow-hidden relative min-h-[290px] card-hover ${photoUrl ? '' : `bg-linear-to-b ${card.tint}`}`}
+                  >
+                    {photoUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element -- Appwrite-hosted photo, not a local Next asset
+                      <img src={photoUrl} alt={card.title} className="absolute inset-0 h-full w-full object-cover" />
+                    )}
+                    <div className="absolute inset-0 bg-linear-to-b from-black/5 to-black/70" />
+                    <div className="relative p-6 flex flex-col justify-end h-[290px] box-border">
+                      <h3 className="font-heading font-bold text-lg text-white mb-2">{card.title}</h3>
+                      <p className="text-[13.5px] leading-relaxed text-white/65">{card.desc}</p>
+                    </div>
+                  </Link>
+                )
+              })}
             </div>
 
             {/* Mission, Vision & Core Values — real Settings-backed fields.
@@ -917,28 +938,44 @@ export default function LandingPage() {
                 </Link>
               </div>
               {galleryLoading ? (
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                  {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-32 rounded-xl bg-page animate-pulse" />)}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className={`aspect-square rounded-xl bg-page animate-pulse ${i === 1 ? 'col-span-2 row-span-2' : ''}`} />
+                  ))}
                 </div>
               ) : galleryPhotos.length === 0 ? (
                 <div className="text-center py-10 text-muted text-sm border border-base rounded-xl">
                   No photos have been added to the gallery yet.
                 </div>
               ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
-                  {galleryPhotos.map((p) => (
-                    // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL, not a local/remote-pattern asset
-                    <img
-                      key={p.id}
-                      src={p.url}
-                      alt={p.caption ?? p.category ?? 'School photo'}
-                      className="h-32 w-full object-contain bg-page rounded-xl border border-base"
-                    />
-                  ))}
-                </div>
+                // [PRODUCTION FIX] Was a flat uniform grid of contain-fit
+                // thumbnails with no way to see a photo larger. Hierarchical
+                // grid + click-to-view full size (see those components'
+                // headers) — same pattern as /gallery.
+                <HierarchicalPhotoGrid
+                  photos={galleryPhotos.map((p) => ({
+                    id: p.id,
+                    url: p.url,
+                    alt: p.caption ?? p.category ?? 'School photo',
+                    caption: p.caption,
+                    category: p.category,
+                  }))}
+                  onPhotoClick={setGalleryLightboxIndex}
+                />
               )}
             </div>
           </div>
+          <PhotoLightbox
+            photos={galleryPhotos.map((p) => ({
+              id: p.id,
+              url: p.url,
+              alt: p.caption ?? p.category ?? 'School photo',
+              caption: p.caption,
+              category: p.category,
+            }))}
+            index={galleryLightboxIndex}
+            onIndexChange={setGalleryLightboxIndex}
+          />
         </section>
 
         {/* ══════════════════════════════════════════════════════════════

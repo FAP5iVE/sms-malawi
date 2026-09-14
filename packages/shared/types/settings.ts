@@ -73,6 +73,23 @@ export interface LeadershipMember {
   order?:   number
 }
 
+/** [NEW] The four fixed Discover-section cards on the public landing page
+ *  (page.tsx's hardcoded `href`/description copy for each is unchanged —
+ *  this union only identifies *which* card a preview photo belongs to).
+ *  A literal union, not a free-text string, so a typo in either the
+ *  Settings editor or the landing page's lookup can't silently produce a
+ *  card with no matching photo. */
+export type DiscoverCardKey = 'leadership' | 'academics' | 'student_life' | 'admissions'
+
+/** One entry in SETTING_KEYS.SCHOOL_DISCOVER_CARDS — the optional preview
+ *  photo shown behind each Discover card on the public landing page,
+ *  replacing that card's flat gradient tint once set. Same
+ *  upload-first/attach-photoKey pattern as LeadershipMember.photoKey. */
+export interface DiscoverCardImage {
+  cardKey:   DiscoverCardKey
+  photoKey?: string // Appwrite file ID — FILE_PREFIX.DISCOVER_PHOTO
+}
+
 // ─────────────────────────────────────────────────────────
 //  SETTING KEYS
 //  Single source of truth for all key string literals.
@@ -114,6 +131,11 @@ export const SETTING_KEYS = {
   // records publicly, which would leak internal HR data never meant to be
   // public (employee numbers, department, contact details, etc).
   SCHOOL_LEADERSHIP_TEAM:         'school_leadership_team',
+  // [NEW] Optional preview photo for each of the four fixed Discover-section
+  // cards (Leadership/Academics/Student Life/Admissions) on the public
+  // landing page — replaces that card's flat gradient tint once set. Same
+  // admin/hr/high_rank-curated, upload-first pattern as SCHOOL_LEADERSHIP_TEAM.
+  SCHOOL_DISCOVER_CARDS:          'school_discover_cards',
   // [PRODUCTION FIX 2026-07-28] Footer social icons previously linked
   // nowhere (decorative buttons, no href) in both the old page and the
   // redesign. Real, admin/hr/high_rank-editable URLs, each optional — an
@@ -247,6 +269,7 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.SCHOOL_SYSTEM_TAGLINE]: string
   readonly [SETTING_KEYS.SCHOOL_HERO_SUBTITLE]:  string
   readonly [SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM]: LeadershipMember[]
+  readonly [SETTING_KEYS.SCHOOL_DISCOVER_CARDS]: DiscoverCardImage[]
   readonly [SETTING_KEYS.SOCIAL_FACEBOOK_URL]:  string
   readonly [SETTING_KEYS.SOCIAL_TWITTER_URL]:   string
   readonly [SETTING_KEYS.SOCIAL_INSTAGRAM_URL]: string
@@ -435,6 +458,13 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
     isPublic: true,
     description: 'Public leadership/management team listing shown on the Discover -> Leadership page.',
+    defaultValue: [],
+  },
+  [SETTING_KEYS.SCHOOL_DISCOVER_CARDS]: {
+    key: SETTING_KEYS.SCHOOL_DISCOVER_CARDS,
+    category: SETTING_CATEGORIES.SCHOOL_IDENTITY,
+    isPublic: true,
+    description: 'Preview photos for the four Discover-section cards (Leadership/Academics/Student Life/Admissions) on the public landing page.',
     defaultValue: [],
   },
   [SETTING_KEYS.SOCIAL_FACEBOOK_URL]: {

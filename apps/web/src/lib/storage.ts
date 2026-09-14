@@ -90,6 +90,15 @@ export const FILE_PREFIX = {
   // view URL by /public/leadership the same way ANNOUNCEMENT_IMAGE/
   // SCHOOL_GALLERY already are. Same public, no-signed-proxy pattern.
   LEADERSHIP_PHOTO:   'leadership_photo',
+  // [NEW] Discover-section card preview photo — SETTING_KEYS.SCHOOL_DISCOVER_CARDS
+  // entries reference this via DiscoverCardImage.photoKey, resolved to a
+  // view URL by /public/school-info the same way LEADERSHIP_PHOTO is by
+  // /public/leadership. Deliberately two underscore-segments ('discover',
+  // 'photo'), matching every other FILE_PREFIX value — canReadFile()'s
+  // `fileId.split('_').slice(0, 2)` only ever inspects the first two
+  // segments of a fileId, so a three-segment prefix here would silently
+  // fail to match its own READ_ROLES entry.
+  DISCOVER_PHOTO:     'discover_photo',
 } as const
 
 export type FilePrefix = typeof FILE_PREFIX[keyof typeof FILE_PREFIX]
@@ -122,6 +131,8 @@ const READ_ROLES: Record<FilePrefix, string[]> = {
   announcement_image: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
   school_gallery:     ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
   leadership_photo:   ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
+  // [NEW] Same public-asset tier as school_gallery/leadership_photo above.
+  discover_photo:     ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
 }
 
 export function canReadFile(fileId: string, userRole: string, userUid: string, ownerUid?: string): boolean {
@@ -232,6 +243,11 @@ const PUBLIC_FILE_PREFIXES: readonly FilePrefix[] = [
   FILE_PREFIX.ANNOUNCEMENT_IMAGE,
   FILE_PREFIX.SCHOOL_GALLERY,
   FILE_PREFIX.LEADERSHIP_PHOTO,
+  // [NEW] Without this, discover-photo uploads would get non-public
+  // Appwrite file permissions and getPublicViewUrl() would 403 for
+  // unauthenticated landing-page visitors — same reasoning as
+  // LEADERSHIP_PHOTO/SCHOOL_GALLERY above.
+  FILE_PREFIX.DISCOVER_PHOTO,
 ]
 
 export interface DirectUploadTicket {

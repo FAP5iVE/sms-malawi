@@ -503,13 +503,31 @@ calendarRouter.get('/events',
 
     // ── 10. Manually-created calendar events (this phase's new
     //         CalendarEvent model) — reuses its own stored category for
-    //         color/grouping, same as every other source. ──
+    //         color/grouping, same as every other source.
+    // [VISIBILITY] This is the actual fix for the reported bug: every
+    // manually-created event used to be visible to every role regardless
+    // of category, since roleCanViewManualCategory() didn't exist yet —
+    // a manually-logged "Leave" event (created via the same form the
+    // adopted reference UI itself demonstrates for exactly this, e.g.
+    // "Mercy Gondwe — Unpaid Leave") was visible to students. Each row is
+    // now checked against the category it was created with; its own
+    // creator can always additionally see their own creation regardless,
+    // since a generic CalendarEvent row has no field identifying which
+    // staff member a manual "leave" entry is actually about beyond
+    // whoever logged it — see calendarVisibility.ts's own docstring. ──
     const manualEvents = await calendarEventService.listEvents({
       start: rangeStart.toISOString(),
       end:   rangeEnd.toISOString(),
     })
     for (const ev of manualEvents) {
       const category = ev.category as CalendarEvent['category']
+      const isOwn = ev.createdByUid === uid
+      const canView = isOwn
+        || (category === 'assignment'
+              ? ASSIGNMENT_UNRESTRICTED_ROLES.includes(role)
+              : roleCanViewManualCategory(role, category))
+      if (!canView) continue
+
       const meta: Record<string, string> = {}
       if (ev.description) meta.description = ev.description
       if (ev.location) meta.venue = ev.location

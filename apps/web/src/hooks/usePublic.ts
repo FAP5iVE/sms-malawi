@@ -35,6 +35,11 @@ export interface PublicSchoolInfo {
   vision:      string
   mission:     string
   coreValues:  string[]
+  /** [NEW] One resolved entry per Discover card that has a preview photo
+   *  set (Settings -> School Identity -> Discover Cards). A card with no
+   *  matching entry here has no photo yet — the landing page falls back
+   *  to that card's default gradient tint in that case. */
+  discoverCards: { cardKey: 'leadership' | 'academics' | 'student_life' | 'admissions'; photoUrl: string | null }[]
   currentYear: string
   /** [PRODUCTION FIX 2026-07-28] Footer social icons — real URLs, editable
    *  under Settings -> School Identity. null = hide that icon. */

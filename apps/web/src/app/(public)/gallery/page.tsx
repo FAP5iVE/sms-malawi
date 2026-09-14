@@ -2,9 +2,12 @@
 
 /**
  * apps/web/src/app/(public)/gallery/page.tsx
- * [CHANGE TYPE]: NEW FILE (production fix, 2026-07-28)
+ * [CHANGE TYPE]: MAJOR REWRITE (hierarchical grid + full-size viewer)
  * [PURPOSE]: Full gallery browsing page. The landing page's "Life at our
  *   school" strip shows 5 photos and links here for everything else.
+ *   Photos now render in the shared hierarchical/bento grid (same one the
+ *   landing strip uses) instead of a flat uniform grid, and every photo
+ *   opens full size in the shared lightbox on click.
  * [DEPENDS ON]: usePublicGallery (GET /public/gallery)
  */
 
@@ -14,6 +17,8 @@ import { ArrowLeft, ImageIcon } from 'lucide-react'
 import { usePublicGallery } from '@/hooks/usePublic'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
+import { HierarchicalPhotoGrid } from '@/components/shared/HierarchicalPhotoGrid'
+import { PhotoLightbox } from '@/components/shared/PhotoLightbox'
 
 const PAGE_SIZE = 24
 
@@ -22,6 +27,17 @@ export default function GalleryPage() {
   const { data, isLoading } = usePublicGallery(PAGE_SIZE, page)
   const photos = data?.photos ?? []
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1
+  // Which photo (index into the *current page's* `photos`) is open
+  // full-size, if any. Closed explicitly on pagination below, rather than
+  // left open pointing at a now-different photo once the page changes.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const lightboxPhotos = photos.map((p) => ({
+    id: p.id,
+    url: p.url,
+    alt: p.caption ?? p.category ?? 'School photo',
+    caption: p.caption,
+    category: p.category,
+  }))
 
   return (
     <div className="min-h-screen bg-page">
@@ -51,24 +67,12 @@ export default function GalleryPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {photos.map((p) => (
-                <div key={p.id} className="group relative aspect-square rounded-xl overflow-hidden border border-base bg-page">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL */}
-                  <img src={p.url} alt={p.caption ?? p.category ?? 'School photo'} className="w-full h-full object-contain" />
-                  {(p.caption || p.category) && (
-                    <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <p className="text-xs text-white font-heading font-semibold">{p.caption ?? p.category}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <HierarchicalPhotoGrid photos={lightboxPhotos} onPhotoClick={setLightboxIndex} />
 
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-3 mt-10">
                 <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  onClick={() => { setPage((p) => Math.max(1, p - 1)); setLightboxIndex(null) }}
                   disabled={page <= 1}
                   className="px-4 py-2 rounded-lg border border-base text-sm font-semibold disabled:opacity-40"
                 >
@@ -76,7 +80,7 @@ export default function GalleryPage() {
                 </button>
                 <span className="text-sm text-muted">Page {page} of {totalPages}</span>
                 <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  onClick={() => { setPage((p) => Math.min(totalPages, p + 1)); setLightboxIndex(null) }}
                   disabled={page >= totalPages}
                   className="px-4 py-2 rounded-lg border border-base text-sm font-semibold disabled:opacity-40"
                 >
@@ -87,6 +91,7 @@ export default function GalleryPage() {
           </>
         )}
       </div>
+      <PhotoLightbox photos={lightboxPhotos} index={lightboxIndex} onIndexChange={setLightboxIndex} />
     </div>
   )
 }
