@@ -178,7 +178,7 @@ export function RichTextEditor({
   useEffect(() => {
     if (!editor) return
     if (value !== editor.getHTML()) {
-      editor.commands.setContent(value || '', { emitUpdate: false })
+      editor.commands.setContent(value || '', false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-sync on external value changes, not on every editor identity change
   }, [value])
