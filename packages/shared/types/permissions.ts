@@ -454,7 +454,18 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'assets.viewInventoryReports',
     'assets.viewAdvances',
 
-    // HR — system account management only (no HR data logic)
+    // HR — system account management, plus self-service payslip access.
+    // [PRODUCTION FIX, user-requested] admin previously held none of the
+    // payroll permissions at all, including hr.viewOwnPayslips — the
+    // matrix's own comment framed this as "admin doesn't perform business
+    // operations," but that's a category error: whether admin *manages*
+    // payroll is a business-operation question (rightly no — finance/hr
+    // own that); whether an admin/IT staff member *receives* a salary
+    // is not a business-operation question at all, it's just a fact about
+    // that person's employment. This grants only the self-service view —
+    // admin still can't manage salary structures, run payroll, approve,
+    // lock, or view anyone else's payslips; none of that changes.
+    'hr.viewOwnPayslips',
     'hr.viewAnyProfile',
     'hr.viewHRReports',
     'hr.viewAnyProfile',

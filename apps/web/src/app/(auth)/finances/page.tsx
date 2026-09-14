@@ -258,20 +258,16 @@ function FinancesContent() {
       {/* Tab content */}
       {activeTab === 'invoices'     && <InvoicesTab      academicYear={YEAR} term={TERM} />}
       {activeTab === 'expenses'     && <ExpensesTab      academicYear={YEAR} term={TERM} />}
-      {/* [PRODUCTION FIX] PayrollApprovalPanel — submit-for-approval / approve
-         / lock / rollback — was fully built against a real backend
-         (payrollApprovalService.ts, /payroll/:id/{submit-for-approval,
-         approve,lock,rollback}) but never imported by any page, so the
-         entire payroll approval lifecycle was unreachable for every role,
-         not just high_rank: finance had no way to submit a completed run,
-         high_rank had no way to approve one. It's self-contained (fetches
-         its own data, gates each action on the matching permission) so it
-         drops in cleanly alongside the existing "create a new run" flow. */}
-      {activeTab === 'payroll'      && (
-        <div className="space-y-6">
-          <PayrollTab />
-        </div>
-      )}
+      {/* [PRODUCTION FIX] PayrollTab now mounts the full Payroll workspace
+         (Runs & Approvals / Salary Structure & Allowances / My Pay /
+         Financial Insights & Trends / PAYE & Pension Settings — see
+         PayrollWorkspace.tsx), including the full submit → approve → lock →
+         rollback workflow. The standalone PayrollApprovalPanel this comment
+         used to describe was folded into that workspace's Runs &
+         Approvals tab and deleted; importing it here separately (as an
+         earlier revision of this file did) breaks the build, since the
+         file no longer exists. */}
+      {activeTab === 'payroll'      && <PayrollTab />}
       {activeTab === 'budget'       && <BudgetTab        academicYear={YEAR} />}
       {activeTab === 'feeStructure'        && <FeeStructureTab        academicYear={YEAR} />}
       {activeTab === 'financeFeeStructure' && <FinanceFeeStructureTab academicYear={YEAR} term={TERM} />}

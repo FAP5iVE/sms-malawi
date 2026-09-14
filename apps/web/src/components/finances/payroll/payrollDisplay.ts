@@ -26,10 +26,28 @@ export const WORKFLOW_STEPS = [
 ] as const
 
 interface StatusMeta {
-  /** History-table / current-cycle badge text. */
+  /** History-table / current-cycle status text. */
   badge: string
-  /** Tailwind classes for the badge pill. */
-  badgeClassName: string
+  /** [PRODUCTION FIX, user-requested] Was a `bg-X/10 text-X` pill —
+   *  changed to a plain colored-text treatment (no background highlight),
+   *  per feedback that the fill looked heavy in the table. This is a fixed
+   *  lookup keyed by the six real PayrollRun.status values from the
+   *  database (payrollApprovalService.ts's PayrollStatus enum) — yes,
+   *  intentionally hardcoded: there are exactly six possible statuses,
+   *  they never change at runtime, and there's nothing here that should be
+   *  admin-configurable, so a static map is the correct (not a shortcut)
+   *  way to render them consistently everywhere this file is used.
+   *  Two of the previous colors (text-sky-700, text-emerald-700) were raw,
+   *  non-theme-aware Tailwind shades with no .dark override anywhere in
+   *  globals.css — chosen for contrast against a light background, so on
+   *  the actual dark theme (which redefines --brand-navy/-teal/-amber/
+   *  -coral specifically to stay legible on a near-black background — see
+   *  globals.css's own "Never use the same navy as light mode — it
+   *  disappears on dark bg" comment) they read as dim, low-contrast text.
+   *  Every status below now uses only the four theme-aware brand-* tokens,
+   *  which already have correct light/dark HSL values defined, so no new
+   *  dark: overrides are needed here — the same class works in both modes. */
+  textClassName: string
   /** Which workflow step (1-4) this status corresponds to, for the stepper's
    *  "current" highlight. PROCESSING/FAILED aren't real steps in the 4-stage
    *  workflow — they render the stepper with nothing marked current instead. */
@@ -37,16 +55,16 @@ interface StatusMeta {
 }
 
 const STATUS_META: Record<PayrollStatus, StatusMeta> = {
-  PROCESSING:       { badge: 'Processing…',        badgeClassName: 'bg-brand-amber/10 text-brand-amber',  step: null },
-  COMPLETED:        { badge: 'Calculated (Draft)',  badgeClassName: 'bg-sky-500/10 text-sky-700',          step: 1 },
-  PENDING_APPROVAL: { badge: 'Submitted',           badgeClassName: 'bg-brand-amber/10 text-brand-amber',  step: 2 },
-  APPROVED:         { badge: 'Approved by Head',    badgeClassName: 'bg-emerald-500/10 text-emerald-700',  step: 3 },
-  LOCKED:           { badge: 'Locked & Posted',     badgeClassName: 'bg-brand-navy/10 text-brand-navy',    step: 4 },
-  FAILED:           { badge: 'Failed',              badgeClassName: 'bg-brand-coral/10 text-brand-coral',  step: null },
+  PROCESSING:       { badge: 'Processing…',        textClassName: 'text-brand-amber', step: null },
+  COMPLETED:        { badge: 'Calculated (Draft)',  textClassName: 'text-brand-navy',  step: 1 },
+  PENDING_APPROVAL: { badge: 'Submitted',           textClassName: 'text-brand-amber', step: 2 },
+  APPROVED:         { badge: 'Approved by Head',    textClassName: 'text-brand-teal',  step: 3 },
+  LOCKED:           { badge: 'Locked & Posted',     textClassName: 'text-brand-teal',  step: 4 },
+  FAILED:           { badge: 'Failed',              textClassName: 'text-brand-coral', step: null },
 }
 
 export function getStatusMeta(status: string): StatusMeta {
-  return STATUS_META[status as PayrollStatus] ?? { badge: status, badgeClassName: 'bg-base text-muted', step: null }
+  return STATUS_META[status as PayrollStatus] ?? { badge: status, textClassName: 'text-muted', step: null }
 }
 
 const MONTH_NAMES = [

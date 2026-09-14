@@ -90,7 +90,6 @@ import {
   Loader2,
   UserPlus,
   Wallet,
-  FileDown,
   X,
   ChevronRight,
 }                           from 'lucide-react'

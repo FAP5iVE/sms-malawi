@@ -17,13 +17,12 @@
  *     runs       → finance.viewPayrollRuns   (finance, hr, high_rank)
  *     structure  → hr.manageSalaryStructure  (hr)
  *                  or finance.manageSalaryStructure (finance)
- *     mypay      → hr.viewOwnPayslips        (every non-admin staff role)
+ *     mypay      → hr.viewOwnPayslips        (every staff role, admin included)
  *     insights   → report.viewPayrollSummary (finance, high_rank)
  *     settings   → settings.managePayrollConfig (finance)
- *   A role with none of the above (only admin, verified against
- *   S/types/permissions.ts — admin holds zero payroll permissions despite
- *   Finance's page treating admin as isFinance for tab visibility) sees an
- *   empty-state message instead of a blank tab bar.
+ *   A role with none of the above sees an empty-state message instead of
+ *   a blank tab bar (in practice this never happens now — every non-
+ *   student role holds at least hr.viewOwnPayslips).
  * [DEPENDS ON]: PayrollRunsTab / SalaryStructureTab / MyPayTab /
  *   PayrollInsightsTab / PayrollSettingsTab (same change), W/components/
  *   shared/ModuleTabs.tsx, W/hooks/usePermissions.ts
@@ -73,8 +72,17 @@ export function PayrollWorkspace({ defaultTab }: PayrollWorkspaceProps) {
 
   if (tabs.length === 0) {
     return (
-      <div className="text-center py-16 text-muted text-sm border border-dashed border-base rounded-xl">
-        You don&apos;t have access to any payroll details.
+      <div className="text-center py-16 px-6 text-sm border border-dashed border-base rounded-xl">
+        <p className="text-body font-heading font-semibold mb-1">No payroll access on this account</p>
+        {/* [Reverted, user-requested] admin now holds hr.viewOwnPayslips
+            (see S/types/permissions.ts) — every non-student role holds at
+            least that, so this branch is effectively unreachable in
+            practice. Left as a generic fallback rather than removed
+            entirely, in case a future role is added without any payroll
+            permission at all. */}
+        <p className="text-muted max-w-md mx-auto">
+          This account doesn&apos;t hold any payroll-related permission — nothing here to show.
+        </p>
       </div>
     )
   }

@@ -64,7 +64,7 @@ import { requirePermission } from '@/server/middleware/verifyPermission'
 import { hasPermission } from '@shared/types/permissions'
 import * as payrollService from '@/server/services/payrollService'
 import * as payrollApprovalService from '@/server/services/payrollApprovalService'
-import { getDownloadUrl } from '@/lib/storage'
+import { getSignedViewUrl, canReadFile } from '@/lib/storage'
 import { prisma } from '@/lib/prisma'
 import { sendError } from '@/server/lib/sendError'
 
@@ -143,17 +143,36 @@ payrollRouter.get('/my-salary', verifyAuth, async (req, res) => {
   res.json(structure)
 })
 
-// GET /payroll/payslips/:id/download — get signed URL
+// GET /payroll/payslips/:id/download — get a signed, auth-checked view URL
+// [PRODUCTION FIX] Two bugs, both required for "View Payslip" to actually
+// work for anyone:
+//   1. This previously returned getDownloadUrl(...) — a raw, unauthenticated
+//      Appwrite REST URL. Payslip files are private in Appwrite (not in
+//      PUBLIC_FILE_PREFIXES), so that URL 401'd from Appwrite itself for
+//      every caller, including the payslip's own owner — the "even self
+//      payslips don't work" report. getDownloadUrl's own doc comment says
+//      as much: "Internal use only — callers should prefer getSignedViewUrl
+//      for client-facing URLs." Switched to getSignedViewUrl(), which
+//      returns this app's own auth-checked /api/files/[fileId] proxy URL —
+//      the same mechanism report cards, transcripts, and every other
+//      protected document already use.
+//   2. The permission check here was narrower than the real access rule
+//      already defined for this exact file category — lib/storage.ts's
+//      READ_ROLES.payslip is ['admin','finance','hr','__self'], but this
+//      route only ever allowed admin or the owner. finance/hr got a 403
+//      trying to view a payslip that isn't their own, despite the
+//      "Viewing Employee" picker in My Pay existing specifically so they
+//      can do that. Now checks the same canReadFile() the file proxy uses,
+//      so both layers agree on who's allowed in.
 payrollRouter.get('/payslips/:id/download', verifyAuth, async (req, res) => {
   const payslip = await prisma.payslip.findUniqueOrThrow({
     where: { id: String(req.params.id) },
   })
-  // Staff can only download their own payslip (admin can download any)
-  if (req.user!.role !== 'admin' && payslip.staffUid !== req.user!.uid) {
+  if (!payslip.payslipKey) return res.status(404).json({ error: 'Payslip PDF not ready' })
+  if (!canReadFile(payslip.payslipKey, req.user!.role, req.user!.uid, payslip.staffUid)) {
     return res.status(403).json({ error: 'Access denied' })
   }
-  if (!payslip.payslipKey) return res.status(404).json({ error: 'Payslip PDF not ready' })
-  const url = await getDownloadUrl('sms-payslips', payslip.payslipKey)
+  const url = await getSignedViewUrl(payslip.payslipKey)
   res.json({ url })
 })
 

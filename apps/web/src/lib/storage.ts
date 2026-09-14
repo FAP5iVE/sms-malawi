@@ -135,9 +135,26 @@ const READ_ROLES: Record<FilePrefix, string[]> = {
   discover_photo:     ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
 }
 
+// [PRODUCTION FIX] The previous `fileId.split('_').slice(0, 2).join('_')`
+// extraction assumed every FilePrefix has exactly two underscore-separated
+// segments (student_photo, school_gallery, ...). Every single-segment
+// prefix — payslip, receipt, ebook, transcript — instead reconstructed the
+// WHOLE fileId (prefix + unique suffix) as the "prefix", which never
+// matches a READ_ROLES key, so all four categories silently fell through to
+// `userRole === 'admin'` regardless of role or __self ownership. This is
+// the direct cause of "even self payslips don't work for any user" — a
+// staff member downloading their own payslip went through the file proxy's
+// __self ownership resolution correctly (that part was already fixed —
+// see api/files/[fileId]/route.ts's own header comment), then got denied
+// here anyway because "payslip" was never recognized as a valid prefix.
+// Matches against every real FILE_PREFIX value by startsWith(), preferring
+// the longest match — no two current prefixes collide, but this keeps a
+// future prefix like "receipt_reversal" from being misread as "receipt".
 export function canReadFile(fileId: string, userRole: string, userUid: string, ownerUid?: string): boolean {
-  const prefix = fileId.split('_').slice(0, 2).join('_') as FilePrefix
-  const allowed = READ_ROLES[prefix]
+  const prefix = (Object.values(FILE_PREFIX) as string[])
+    .filter((p) => fileId === p || fileId.startsWith(`${p}_`))
+    .sort((a, b) => b.length - a.length)[0] as FilePrefix | undefined
+  const allowed = prefix ? READ_ROLES[prefix] : undefined
   if (!allowed) return userRole === 'admin'
   if (allowed.includes(userRole)) return true
   if (allowed.includes('__self') && ownerUid && userUid === ownerUid) return true

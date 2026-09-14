@@ -63,7 +63,7 @@ function WorkflowStepper({ currentStep }: { currentStep: number | null }) {
             key={s.key}
             className={[
               'rounded-xl border p-3',
-              isCurrent ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-base bg-page',
+              isCurrent ? 'border-brand-teal/40 bg-brand-teal/5' : 'border-base bg-page',
             ].join(' ')}
           >
             <div className="flex items-center gap-2 mb-1">
@@ -71,7 +71,7 @@ function WorkflowStepper({ currentStep }: { currentStep: number | null }) {
                 className={[
                   'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-heading font-bold shrink-0',
                   isCurrent
-                    ? 'bg-emerald-500 text-white'
+                    ? 'bg-brand-teal text-white'
                     : isDone
                       ? 'bg-brand-navy text-white'
                       : 'bg-base text-muted',
@@ -164,7 +164,7 @@ function RunDetailModal({ runId, onClose }: { runId: string; onClose: () => void
     { key: 'paye', label: 'PAYE Tax', priority: 'important', render: (p) => <span className="text-brand-coral">-{formatMWK(p.paye)}</span> },
     { key: 'pension', label: 'Pension', priority: 'optional', render: (p) => <span className="text-brand-coral">-{formatMWK(p.pension)}</span> },
     { key: 'loanDeduction', label: 'Loan Ded.', priority: 'optional', render: (p) => p.loanDeduction > 0 ? <span className="text-brand-coral">-{formatMWK(p.loanDeduction)}</span> : <span className="text-muted">—</span> },
-    { key: 'netSalary', label: 'Net Pay', priority: 'critical', render: (p) => <span className="font-semibold text-emerald-700">{formatMWK(p.netSalary)}</span> },
+    { key: 'netSalary', label: 'Net Pay', priority: 'critical', render: (p) => <span className="font-semibold text-brand-teal">{formatMWK(p.netSalary)}</span> },
     {
       key: 'id', label: 'Payslip', priority: 'important',
       render: (p) => (
@@ -266,7 +266,7 @@ function CurrentCycleCard({
               <h2 className="font-heading font-bold text-lg text-body">
                 Current Cycle: {formatRunPeriod(CURRENT_MONTH, CURRENT_YEAR)}
               </h2>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-heading font-semibold ${meta.badgeClassName}`}>
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-heading font-semibold bg-current/10 ${meta.textClassName}`}>
                 {currentRun ? meta.badge : 'Not Started'}
               </span>
             </div>
@@ -295,53 +295,51 @@ function CurrentCycleCard({
       )}
 
       <div className="bg-page rounded-xl p-4 mb-4">
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <div>
-            <p className="text-sm font-heading font-semibold text-body">Workflow Status</p>
-            <p className="text-xs text-muted mt-0.5">
-              {!currentRun
-                ? 'Payroll for this month has not been run yet.'
-                : status === 'COMPLETED'
-                  ? 'Payroll calculations verified. Ready for Finance submission.'
-                  : status === 'PENDING_APPROVAL'
-                    ? 'Awaiting High Rank approval.'
-                    : status === 'APPROVED'
-                      ? 'Approved — ready to lock and post the journal entry.'
-                      : status === 'LOCKED'
-                        ? 'Locked and posted. This month is permanently closed.'
-                        : ''}
-            </p>
-          </div>
-          {currentRun && (
-            <button type="button" onClick={onInspect}
-              className="min-h-[36px] px-3.5 rounded-lg text-xs font-heading font-semibold border border-base text-body hover:bg-surface transition-colors">
-              Inspect Payslips ({staffCount})
-            </button>
-          )}
+        <div className="mb-3">
+          <p className="text-sm font-heading font-semibold text-body">Workflow Status</p>
+          <p className="text-xs text-muted mt-0.5">
+            {!currentRun
+              ? 'Payroll for this month has not been run yet.'
+              : status === 'COMPLETED'
+                ? 'Payroll calculations verified. Ready for Finance submission.'
+                : status === 'PENDING_APPROVAL'
+                  ? 'Awaiting High Rank approval.'
+                  : status === 'APPROVED'
+                    ? 'Approved — ready to lock and post the journal entry.'
+                    : status === 'LOCKED'
+                      ? 'Locked and posted. This month is permanently closed.'
+                      : ''}
+          </p>
         </div>
         <WorkflowStepper currentStep={meta.step} />
       </div>
 
-      {/* Primary action for the current cycle */}
+      {/* Primary action for the current cycle. The run-window dates are
+          shown to anyone who can see this tab (not just finance.runPayroll
+          holders) — they were previously nested inside the `canRun` check
+          below, so an hr/high_rank viewer (finance.viewPayrollRuns only)
+          never saw them at all, which read as "no run window is even
+          configured" when it was actually just hidden from them. */}
+      {!currentRun && runWindow && (
+        <p className="text-xs text-muted mb-3">
+          Run window {new Date() < new Date(runWindow.opensAt) ? 'opens' : 'closed'} {formatWindowDate(runWindow.opensAt)}
+          {' '}– {formatWindowDate(runWindow.closesAt)}.
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         {!currentRun && canRun && (
-          <>
-            <button
-              type="button"
-              disabled={!runWindow?.isOpen || windowLoading}
-              onClick={() => setConfirmAction('run')}
-              className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-navy hover:bg-brand-navy/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-            >
-              {runMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Run {formatRunPeriodShort(CURRENT_MONTH, CURRENT_YEAR)} Payroll
-            </button>
-            {runWindow && !runWindow.isOpen && (
-              <p className="text-xs text-muted">
-                Run window {new Date() < new Date(runWindow.opensAt) ? 'opens' : 'closed'} {formatWindowDate(runWindow.opensAt)}
-                {' '}– {formatWindowDate(runWindow.closesAt)}.
-              </p>
-            )}
-          </>
+          <button
+            type="button"
+            disabled={!runWindow?.isOpen || windowLoading}
+            onClick={() => setConfirmAction('run')}
+            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-navy hover:bg-brand-navy/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          >
+            {runMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+            Run {formatRunPeriodShort(CURRENT_MONTH, CURRENT_YEAR)} Payroll
+          </button>
+        )}
+        {!currentRun && !canRun && (
+          <p className="text-xs text-muted">Only Finance can run payroll for this month.</p>
         )}
 
         {currentRun?.status === 'COMPLETED' && canRun && (
@@ -351,10 +349,13 @@ function CurrentCycleCard({
             <Send className="w-4 h-4" aria-hidden /> Submit for Approval
           </button>
         )}
+        {currentRun?.status === 'COMPLETED' && !canRun && (
+          <p className="text-xs text-muted">Awaiting submission by Finance.</p>
+        )}
 
         {currentRun?.status === 'PENDING_APPROVAL' && canApprove && (
           <button type="button" onClick={() => setConfirmAction('approve')}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors flex items-center gap-2">
+            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-teal hover:bg-brand-teal/90 transition-colors flex items-center gap-2">
             {approveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
             <ClipboardCheck className="w-4 h-4" aria-hidden /> Approve Payroll
           </button>
@@ -369,6 +370,9 @@ function CurrentCycleCard({
             {lockMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
             <Lock className="w-4 h-4" aria-hidden /> Lock &amp; Post Journal
           </button>
+        )}
+        {currentRun?.status === 'APPROVED' && !canLock && (
+          <p className="text-xs text-muted">Awaiting lock &amp; posting by Finance.</p>
         )}
 
         {currentRun?.status === 'LOCKED' && canRollback && (
@@ -484,14 +488,19 @@ export function PayrollRunsTab() {
       key: 'status', label: 'Status', priority: 'critical',
       render: (r) => {
         const meta = getStatusMeta(r.status)
-        return <span className={`px-2.5 py-0.5 rounded-full text-xs font-heading font-semibold whitespace-nowrap ${meta.badgeClassName}`}>{meta.badge}</span>
+        // [PRODUCTION FIX, user-requested] Was a bg-X/10 pill — plain
+        // colored text reads better in a dense table, and (unlike the
+        // previous text-sky-700/text-emerald-700 shades) every color here
+        // is one of the four theme-aware brand-* tokens, so it stays
+        // legible in both light and dark mode without a bg fill to help it.
+        return <span className={`text-xs font-heading font-semibold whitespace-nowrap ${meta.textClassName}`}>{meta.badge}</span>
       },
     },
     { key: '_count', label: 'Staff', priority: 'optional', render: (r) => r._count?.payslips ?? '—' },
     { key: 'totalGross', label: 'Total Gross', priority: 'important', render: (r) => formatMWK(r.totalGross) },
     { key: 'totalPaye', label: 'PAYE Withholding', priority: 'optional', render: (r) => r.totalPaye !== undefined ? <span className="text-brand-coral">-{formatMWK(r.totalPaye)}</span> : '—' },
     { key: 'totalPension', label: 'Pension', priority: 'optional', render: (r) => r.totalPension !== undefined ? <span className="text-brand-coral">-{formatMWK(r.totalPension)}</span> : '—' },
-    { key: 'totalNet', label: 'Net Payable', priority: 'critical', render: (r) => <span className="font-semibold text-emerald-700">{formatMWK(r.totalNet)}</span> },
+    { key: 'totalNet', label: 'Net Payable', priority: 'critical', render: (r) => <span className="font-semibold text-brand-teal">{formatMWK(r.totalNet)}</span> },
     {
       key: 'id', label: 'Actions', priority: 'critical',
       render: (r) => (
