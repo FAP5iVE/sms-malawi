@@ -64,6 +64,9 @@ import {
   useEnrollmentTrend,
   useClassComparison,
   useAttendanceSummary,
+  useApplicationsFunnel,
+  useHRStaffByDepartment,
+  useLibraryBorrowingTrend,
 } from '@/hooks/useAnalytics'
 import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
 import type { ApiStaffProfile } from '@shared/types/api'
@@ -186,6 +189,32 @@ export function HighRankDashboard() {
     term ?? 0,
   )
   const attendanceLoadingAll = periodLoading || attendanceLoading
+
+  // [PRODUCTION FIX — follow-up] The three widgets above still only cover
+  // academic performance, finance, and school-wide enrollment/attendance.
+  // "A wide range of issues across all sections" means the modules with
+  // zero presence on this dashboard: Admissions, HR, and Library. All
+  // three hooks below already exist, are already permission-verified for
+  // high_rank (report.viewAdmissionTrends / viewHRReports /
+  // viewLibraryUsage — packages/shared/types/permissions.ts), and already
+  // serve real data to /reports — just never pulled onto this page.
+  const { data: funnel, isLoading: funnelLoading } = useApplicationsFunnel()
+  const funnelData: ChartDataPoint[] = (funnel ?? []).map((f) => ({
+    x: f.stage,
+    count: f.count,
+  }))
+
+  const { data: staffByDept, isLoading: staffByDeptLoading } = useHRStaffByDepartment()
+  const staffByDeptData: ChartDataPoint[] = (staffByDept ?? []).map((d) => ({
+    x: d.category,
+    staff: d.value,
+  }))
+
+  const { data: borrowing, isLoading: borrowingLoading } = useLibraryBorrowingTrend(12)
+  const borrowingData: ChartDataPoint[] = (borrowing ?? []).map((p) => ({
+    x: p.label,
+    value: p.value,
+  }))
 
   return (
     <div className="space-y-6">
@@ -319,6 +348,59 @@ export function HighRankDashboard() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* [PRODUCTION FIX — follow-up] Admissions, HR, and Library had zero
+         presence anywhere on this dashboard — the sections above only ever
+         covered academic performance and finance. All three endpoints
+         below already exist and already serve /reports; this is the first
+         time they're pulled onto the High Rank home screen itself. */}
+      <div className="grid md:grid-cols-3 gap-4">
+        <ChartCard
+          title="Admissions Funnel"
+          sub="Applications by stage"
+          isLoading={funnelLoading}
+          height={180}
+        >
+          <Chart
+            type="bar"
+            data={funnelData}
+            series={[{ key: 'count', label: 'Applications' }]}
+            height={180}
+            emptyStateMessage="No applications recorded yet."
+            ariaLabel="Number of applications at each admissions stage"
+          />
+        </ChartCard>
+        <ChartCard
+          title="Staff by Department"
+          sub="Active staff headcount"
+          isLoading={staffByDeptLoading}
+          height={180}
+        >
+          <Chart
+            type="bar"
+            data={staffByDeptData}
+            series={[{ key: 'staff', label: 'Staff' }]}
+            height={180}
+            emptyStateMessage="No staff records yet."
+            ariaLabel="Active staff headcount by department"
+          />
+        </ChartCard>
+        <ChartCard
+          title="Library Borrowing"
+          sub="Books issued, last 12 weeks"
+          isLoading={borrowingLoading}
+          height={180}
+        >
+          <Chart
+            type="line"
+            data={borrowingData}
+            series={[{ key: 'value', label: 'Books Issued' }]}
+            height={180}
+            emptyStateMessage="No borrowing activity recorded yet."
+            ariaLabel="Weekly books issued over the last 12 weeks"
+          />
+        </ChartCard>
       </div>
     </div>
   )
