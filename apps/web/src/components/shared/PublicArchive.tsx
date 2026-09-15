@@ -38,7 +38,7 @@ export function formatArchiveDate(iso: string): string {
  */
 export function stripHtml(html: string): string {
   return html
-    .replace(/<(p|br|li|h[1-3])[^>]*>/gi, ' ')
+    .replace(/<(p|br|li|h[1-4]|blockquote)[^>]*>/gi, ' ')
     .replace(/<[^>]+>/g, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -199,7 +199,7 @@ export function PublicArchiveDetail({ post, isLoading, notFoundText, backHref, b
                 plain-text body (every article written before this change)
                 has no tags to interpret and renders exactly as before. */}
             <div
-              className="text-body leading-relaxed whitespace-pre-wrap [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_mark]:bg-amber-200/70 [&_mark]:rounded-sm [&_mark]:px-0.5 [&_p]:my-2"
+              className="text-body leading-relaxed whitespace-pre-wrap [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_mark]:bg-amber-200/70 [&_mark]:rounded-sm [&_mark]:px-0.5 [&_p]:my-2 [&_blockquote]:border-l-4 [&_blockquote]:border-brand-teal/40 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted [&_blockquote]:my-3 [&_a]:text-brand-teal [&_a]:underline [&_a]:underline-offset-2 [&_img]:rounded-xl [&_img]:border [&_img]:border-base [&_h2]:font-heading [&_h2]:font-bold [&_h2]:text-xl [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:font-heading [&_h3]:font-bold [&_h3]:text-lg [&_h3]:mt-4 [&_h3]:mb-2 [&_h4]:font-heading [&_h4]:font-bold [&_h4]:text-base [&_h4]:mt-3 [&_h4]:mb-1.5 after:content-[''] after:table after:clear-both"
               dangerouslySetInnerHTML={{ __html: post.body }}
             />
           </article>

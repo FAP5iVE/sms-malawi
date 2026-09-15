@@ -20,6 +20,21 @@
  *   member's current values. No backend change needed — PATCH /school
  *   already replaces the whole leadershipTeam array on Save Changes, the
  *   same mechanism add/remove already relied on.
+ *
+ *   [BUG FIX, same day]: that edit card's own "Save" button — and,
+ *   pre-existing, "Add to team" and "Remove" too — only ever updated
+ *   local React state (the same setField() every other field on this page
+ *   uses, deferring to the page-wide "Save Changes" button). Sitting right
+ *   next to the member it just changed and using the same word ("Save")
+ *   as the real save action, the edit card's button gave a strong false
+ *   signal that the change was already persisted — a refresh before
+ *   scrolling down to click "Save Changes" silently discarded it, on both
+ *   this page and (since nothing had reached the backend) the public
+ *   /leadership page. Fixed by making leadership add/edit/remove PATCH
+ *   `{ leadershipTeam }` immediately via persistLeadershipTeam(), with its
+ *   own saving/error/saved feedback — independent of the rest of the
+ *   form's Save Changes button, so an in-progress edit to e.g. the vision
+ *   statement is never saved early as a side effect.
  * [DEPENDS ON]: apps/web/src/server/routes/settings.ts's /school route
  */
 
@@ -139,9 +154,53 @@ export function SchoolIdentitySettings() {
     setField('coreValues', data.coreValues.filter((x) => x !== v))
   }
 
-  function addLeader() {
+  /** [FIX] The bug: add/edit/remove here only ever updated local `data`
+   *  state via setField — same pattern as every other field on this page
+   *  (name, slogan, vision, ...), which is by design meant to be committed
+   *  all together by the page's own "Save Changes" button at the bottom.
+   *  That's fine for text fields, but the Edit card's own "Save" button
+   *  sits right next to the member it just edited and uses the same word
+   *  ("Save") as the real save action — a strong, misleading signal that
+   *  the edit is already persisted. A refresh before scrolling down and
+   *  clicking "Save Changes" silently discarded it, on both the settings
+   *  page and (since nothing had reached the backend) the public
+   *  leadership page.
+   *
+   *  Fix: leadership add/edit/remove now PATCH immediately, independent
+   *  of the rest of the form's Save Changes button — matching what
+   *  "editable ... anytime" actually implies, and removing this failure
+   *  mode entirely rather than just relabeling the button. Sends only
+   *  `{ leadershipTeam }`, not the whole `data` object, so an unrelated
+   *  half-edited field elsewhere on the page (e.g. a vision statement
+   *  being typed) is never accidentally saved early as a side effect. */
+  const [savingLeadership, setSavingLeadership] = useState(false)
+  const [leadershipError, setLeadershipError] = useState<string | null>(null)
+  const [leadershipSaved, setLeadershipSaved] = useState(false)
+
+  async function persistLeadershipTeam(nextTeam: LeadershipMember[]): Promise<boolean> {
+    setField('leadershipTeam', nextTeam) // keep the UI in sync immediately
+    setSavingLeadership(true)
+    setLeadershipError(null)
+    try {
+      await apiFetch('/settings/school', { method: 'PATCH', body: JSON.stringify({ leadershipTeam: nextTeam }) })
+      setLeadershipSaved(true)
+      setTimeout(() => setLeadershipSaved(false), 2500)
+      return true
+    } catch (err) {
+      // [FIX] A failed save must not look identical to a successful one —
+      // surface the error and leave the caller free to keep any in-progress
+      // edit state open (e.g. saveEditLeader below only exits edit mode
+      // once this returns true) so nothing is silently lost.
+      setLeadershipError(err instanceof Error ? err.message : 'Failed to save leadership team.')
+      return false
+    } finally {
+      setSavingLeadership(false)
+    }
+  }
+
+  async function addLeader() {
     if (!newLeader.name.trim() || !newLeader.title.trim()) return
-    setField('leadershipTeam', [
+    const ok = await persistLeadershipTeam([
       ...data.leadershipTeam,
       {
         name: newLeader.name.trim(),
@@ -152,12 +211,12 @@ export function SchoolIdentitySettings() {
         order: data.leadershipTeam.length,
       },
     ])
-    setNewLeader({ name: '', title: '', bio: '', photoKey: '', photoPreview: '' })
+    if (ok) setNewLeader({ name: '', title: '', bio: '', photoKey: '', photoPreview: '' })
   }
-  function removeLeader(i: number) {
-    setField('leadershipTeam', data.leadershipTeam.filter((_, idx) => idx !== i))
+  async function removeLeader(i: number) {
+    const ok = await persistLeadershipTeam(data.leadershipTeam.filter((_, idx) => idx !== i))
     // A remove shouldn't leave a stale edit open on a now-shifted index.
-    if (editingIndex !== null) setEditingIndex(null)
+    if (ok && editingIndex !== null) setEditingIndex(null)
   }
 
   /** [NEW] Open member `i` for in-place editing — pre-fills editDraft from
@@ -174,6 +233,7 @@ export function SchoolIdentitySettings() {
       photoPreview: m.photoUrl ?? '',
     })
     setEditingIndex(i)
+    setLeadershipError(null)
   }
 
   function cancelEditLeader() {
@@ -181,14 +241,14 @@ export function SchoolIdentitySettings() {
     setEditDraft({ name: '', title: '', bio: '', photoKey: '', photoPreview: '' })
   }
 
-  /** [NEW] Writes editDraft back into leadershipTeam[i] in local state —
-   *  same as add/remove, this only takes effect on the backend once the
-   *  page's own "Save Changes" button (handleSave) PATCHes the whole
-   *  array, so editing costs nothing extra server-side. */
-  function saveEditLeader() {
+  /** [FIX] Now persists immediately (see persistLeadershipTeam above)
+   *  instead of only updating local state — exits edit mode only once the
+   *  PATCH actually succeeds, so a failed save leaves the edit card open
+   *  with the error shown rather than silently reverting on next load. */
+  async function saveEditLeader() {
     if (editingIndex === null) return
     if (!editDraft.name.trim() || !editDraft.title.trim()) return
-    setField('leadershipTeam', data.leadershipTeam.map((m, idx) =>
+    const ok = await persistLeadershipTeam(data.leadershipTeam.map((m, idx) =>
       idx === editingIndex
         ? {
             ...m,
@@ -200,7 +260,7 @@ export function SchoolIdentitySettings() {
           }
         : m
     ))
-    cancelEditLeader()
+    if (ok) cancelEditLeader()
   }
 
   /** [NEW] Change photo while editing — same immediate-upload-on-pick
@@ -435,7 +495,15 @@ export function SchoolIdentitySettings() {
 
       {/* Leadership team */}
       <div>
-        <label className={label}>Leadership Team (public listing)</label>
+        <div className="flex items-center gap-2 mb-1">
+          <label className={label}>Leadership Team (public listing)</label>
+          {/* [FIX] Add/edit/remove now save immediately (see
+              persistLeadershipTeam) — this replaces the misleading "looks
+              saved but isn't until you also click Save Changes" gap. */}
+          {savingLeadership && <span className="text-[11px] text-muted flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving…</span>}
+          {!savingLeadership && leadershipSaved && <span className="text-[11px] text-brand-teal font-medium">Saved ✓</span>}
+        </div>
+        {leadershipError && <p className="text-xs text-destructive mb-2">{leadershipError}</p>}
         <div className="space-y-2 mb-4">
           {data.leadershipTeam.length === 0 ? (
             <p className="text-xs text-muted">No leadership members added yet.</p>
@@ -495,15 +563,16 @@ export function SchoolIdentitySettings() {
                     <button
                       type="button"
                       onClick={saveEditLeader}
-                      disabled={!editDraft.name.trim() || !editDraft.title.trim() || uploadingEditPhoto}
+                      disabled={!editDraft.name.trim() || !editDraft.title.trim() || uploadingEditPhoto || savingLeadership}
                       className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold bg-brand-teal text-white hover:bg-brand-teal-light disabled:opacity-40"
                     >
-                      Save
+                      {savingLeadership ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save'}
                     </button>
                     <button
                       type="button"
                       onClick={cancelEditLeader}
-                      className="text-xs text-muted hover:underline font-medium px-2"
+                      disabled={savingLeadership}
+                      className="text-xs text-muted hover:underline font-medium px-2 disabled:opacity-40"
                     >
                       Cancel
                     </button>
@@ -529,10 +598,10 @@ export function SchoolIdentitySettings() {
                     {/* [NEW] Edit — the missing piece; add/remove already
                         existed but there was no way to change an existing
                         member's name/title/bio/photo in place. */}
-                    <button type="button" onClick={() => startEditLeader(i)} className="text-xs text-brand-teal hover:underline font-medium">
+                    <button type="button" onClick={() => startEditLeader(i)} disabled={savingLeadership} className="text-xs text-brand-teal hover:underline font-medium disabled:opacity-40">
                       Edit
                     </button>
-                    <button type="button" onClick={() => removeLeader(i)} className="text-xs text-brand-coral hover:underline font-medium">
+                    <button type="button" onClick={() => removeLeader(i)} disabled={savingLeadership} className="text-xs text-brand-coral hover:underline font-medium disabled:opacity-40">
                       Remove
                     </button>
                   </div>
@@ -566,10 +635,10 @@ export function SchoolIdentitySettings() {
           <button
             type="button"
             onClick={addLeader}
-            disabled={!newLeader.name.trim() || !newLeader.title.trim() || uploadingPhoto}
+            disabled={!newLeader.name.trim() || !newLeader.title.trim() || uploadingPhoto || savingLeadership}
             className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-page disabled:opacity-40"
           >
-            <Plus className="w-3.5 h-3.5" /> Add to team
+            {savingLeadership ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add to team
           </button>
         </div>
       </div>
