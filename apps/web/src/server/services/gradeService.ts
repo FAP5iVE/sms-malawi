@@ -47,32 +47,28 @@
  */
 
 import 'server-only'
-import { prisma }  from '@/lib/prisma'
-import { logger }  from '@/lib/logger'
+import { prisma } from '@/lib/prisma'
+import { logger } from '@/lib/logger'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface GradeRow {
-  grade:      string
+  grade: string
   minPercent: number
   maxPercent: number
-  pass:       boolean
-  label:      string | null
+  pass: boolean
+  label: string | null
 }
 
 export interface GradeResult {
   grade: string
-  pass:  boolean
+  pass: boolean
   label: string | null
 }
 
-export type ExamTypeKey =
-  | 'MSCE'
-  | 'JCE'
-  | 'INTERNAL_F1F2'
-  | 'INTERNAL_F3F4'
+export type ExamTypeKey = 'MSCE' | 'JCE' | 'INTERNAL_F1F2' | 'INTERNAL_F3F4'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DEFAULT SEED DATA
@@ -80,51 +76,275 @@ export type ExamTypeKey =
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const DEFAULT_GRADING_SCALES: Array<{
-  examType:     ExamTypeKey
-  grade:        string
-  minPercent:   number
-  maxPercent:   number
-  pass:         boolean
-  label:        string
+  examType: ExamTypeKey
+  grade: string
+  minPercent: number
+  maxPercent: number
+  pass: boolean
+  label: string
   displayOrder: number
 }> = [
   // MSCE — Form 4 MANEB national exam. 1&2 Distinction, 3–6 Credit,
   // 7&8 Pass, 9 Fail.
-  { examType: 'MSCE', grade: '1', minPercent: 80, maxPercent: 100, pass: true,  label: 'Distinction', displayOrder: 1 },
-  { examType: 'MSCE', grade: '2', minPercent: 70, maxPercent: 79,  pass: true,  label: 'Distinction', displayOrder: 2 },
-  { examType: 'MSCE', grade: '3', minPercent: 60, maxPercent: 69,  pass: true,  label: 'Credit',      displayOrder: 3 },
-  { examType: 'MSCE', grade: '4', minPercent: 50, maxPercent: 59,  pass: true,  label: 'Credit',      displayOrder: 4 },
-  { examType: 'MSCE', grade: '5', minPercent: 40, maxPercent: 49,  pass: true,  label: 'Credit',      displayOrder: 5 },
-  { examType: 'MSCE', grade: '6', minPercent: 35, maxPercent: 39,  pass: true,  label: 'Credit',      displayOrder: 6 },
-  { examType: 'MSCE', grade: '7', minPercent: 30, maxPercent: 34,  pass: true,  label: 'Pass',        displayOrder: 7 },
-  { examType: 'MSCE', grade: '8', minPercent: 25, maxPercent: 29,  pass: true,  label: 'Pass',        displayOrder: 8 },
-  { examType: 'MSCE', grade: '9', minPercent: 0,  maxPercent: 24,  pass: false, label: 'Fail',        displayOrder: 9 },
+  {
+    examType: 'MSCE',
+    grade: '1',
+    minPercent: 80,
+    maxPercent: 100,
+    pass: true,
+    label: 'Distinction',
+    displayOrder: 1,
+  },
+  {
+    examType: 'MSCE',
+    grade: '2',
+    minPercent: 70,
+    maxPercent: 79,
+    pass: true,
+    label: 'Distinction',
+    displayOrder: 2,
+  },
+  {
+    examType: 'MSCE',
+    grade: '3',
+    minPercent: 60,
+    maxPercent: 69,
+    pass: true,
+    label: 'Credit',
+    displayOrder: 3,
+  },
+  {
+    examType: 'MSCE',
+    grade: '4',
+    minPercent: 50,
+    maxPercent: 59,
+    pass: true,
+    label: 'Credit',
+    displayOrder: 4,
+  },
+  {
+    examType: 'MSCE',
+    grade: '5',
+    minPercent: 40,
+    maxPercent: 49,
+    pass: true,
+    label: 'Credit',
+    displayOrder: 5,
+  },
+  {
+    examType: 'MSCE',
+    grade: '6',
+    minPercent: 35,
+    maxPercent: 39,
+    pass: true,
+    label: 'Credit',
+    displayOrder: 6,
+  },
+  {
+    examType: 'MSCE',
+    grade: '7',
+    minPercent: 30,
+    maxPercent: 34,
+    pass: true,
+    label: 'Pass',
+    displayOrder: 7,
+  },
+  {
+    examType: 'MSCE',
+    grade: '8',
+    minPercent: 25,
+    maxPercent: 29,
+    pass: true,
+    label: 'Pass',
+    displayOrder: 8,
+  },
+  {
+    examType: 'MSCE',
+    grade: '9',
+    minPercent: 0,
+    maxPercent: 24,
+    pass: false,
+    label: 'Fail',
+    displayOrder: 9,
+  },
 
   // JCE — Form 2 MANEB national exam. A Excellent, B Very Good, C Good,
   // D Average, F Fail — five grades.
-  { examType: 'JCE', grade: 'A', minPercent: 80, maxPercent: 100, pass: true,  label: 'Excellent', displayOrder: 1 },
-  { examType: 'JCE', grade: 'B', minPercent: 65, maxPercent: 79,  pass: true,  label: 'Very Good', displayOrder: 2 },
-  { examType: 'JCE', grade: 'C', minPercent: 50, maxPercent: 64,  pass: true,  label: 'Good',      displayOrder: 3 },
-  { examType: 'JCE', grade: 'D', minPercent: 35, maxPercent: 49,  pass: true,  label: 'Average',   displayOrder: 4 },
-  { examType: 'JCE', grade: 'F', minPercent: 0,  maxPercent: 34,  pass: false, label: 'Fail',      displayOrder: 5 },
+  {
+    examType: 'JCE',
+    grade: 'A',
+    minPercent: 80,
+    maxPercent: 100,
+    pass: true,
+    label: 'Excellent',
+    displayOrder: 1,
+  },
+  {
+    examType: 'JCE',
+    grade: 'B',
+    minPercent: 65,
+    maxPercent: 79,
+    pass: true,
+    label: 'Very Good',
+    displayOrder: 2,
+  },
+  {
+    examType: 'JCE',
+    grade: 'C',
+    minPercent: 50,
+    maxPercent: 64,
+    pass: true,
+    label: 'Good',
+    displayOrder: 3,
+  },
+  {
+    examType: 'JCE',
+    grade: 'D',
+    minPercent: 35,
+    maxPercent: 49,
+    pass: true,
+    label: 'Average',
+    displayOrder: 4,
+  },
+  {
+    examType: 'JCE',
+    grade: 'F',
+    minPercent: 0,
+    maxPercent: 34,
+    pass: false,
+    label: 'Fail',
+    displayOrder: 5,
+  },
 
   // Internal — Form 1 & 2 (mirrors JCE's A–F scale exactly)
-  { examType: 'INTERNAL_F1F2', grade: 'A', minPercent: 80, maxPercent: 100, pass: true,  label: 'Excellent', displayOrder: 1 },
-  { examType: 'INTERNAL_F1F2', grade: 'B', minPercent: 65, maxPercent: 79,  pass: true,  label: 'Very Good', displayOrder: 2 },
-  { examType: 'INTERNAL_F1F2', grade: 'C', minPercent: 50, maxPercent: 64,  pass: true,  label: 'Good',      displayOrder: 3 },
-  { examType: 'INTERNAL_F1F2', grade: 'D', minPercent: 35, maxPercent: 49,  pass: true,  label: 'Average',   displayOrder: 4 },
-  { examType: 'INTERNAL_F1F2', grade: 'F', minPercent: 0,  maxPercent: 34,  pass: false, label: 'Fail',      displayOrder: 5 },
+  {
+    examType: 'INTERNAL_F1F2',
+    grade: 'A',
+    minPercent: 80,
+    maxPercent: 100,
+    pass: true,
+    label: 'Excellent',
+    displayOrder: 1,
+  },
+  {
+    examType: 'INTERNAL_F1F2',
+    grade: 'B',
+    minPercent: 65,
+    maxPercent: 79,
+    pass: true,
+    label: 'Very Good',
+    displayOrder: 2,
+  },
+  {
+    examType: 'INTERNAL_F1F2',
+    grade: 'C',
+    minPercent: 50,
+    maxPercent: 64,
+    pass: true,
+    label: 'Good',
+    displayOrder: 3,
+  },
+  {
+    examType: 'INTERNAL_F1F2',
+    grade: 'D',
+    minPercent: 35,
+    maxPercent: 49,
+    pass: true,
+    label: 'Average',
+    displayOrder: 4,
+  },
+  {
+    examType: 'INTERNAL_F1F2',
+    grade: 'F',
+    minPercent: 0,
+    maxPercent: 34,
+    pass: false,
+    label: 'Fail',
+    displayOrder: 5,
+  },
 
   // Internal — Form 3 & 4 (mirrors MSCE's 1–9 scale exactly)
-  { examType: 'INTERNAL_F3F4', grade: '1', minPercent: 80, maxPercent: 100, pass: true,  label: 'Distinction', displayOrder: 1 },
-  { examType: 'INTERNAL_F3F4', grade: '2', minPercent: 70, maxPercent: 79,  pass: true,  label: 'Distinction', displayOrder: 2 },
-  { examType: 'INTERNAL_F3F4', grade: '3', minPercent: 60, maxPercent: 69,  pass: true,  label: 'Credit',      displayOrder: 3 },
-  { examType: 'INTERNAL_F3F4', grade: '4', minPercent: 50, maxPercent: 59,  pass: true,  label: 'Credit',      displayOrder: 4 },
-  { examType: 'INTERNAL_F3F4', grade: '5', minPercent: 40, maxPercent: 49,  pass: true,  label: 'Credit',      displayOrder: 5 },
-  { examType: 'INTERNAL_F3F4', grade: '6', minPercent: 35, maxPercent: 39,  pass: true,  label: 'Credit',      displayOrder: 6 },
-  { examType: 'INTERNAL_F3F4', grade: '7', minPercent: 30, maxPercent: 34,  pass: true,  label: 'Pass',        displayOrder: 7 },
-  { examType: 'INTERNAL_F3F4', grade: '8', minPercent: 25, maxPercent: 29,  pass: true,  label: 'Pass',        displayOrder: 8 },
-  { examType: 'INTERNAL_F3F4', grade: '9', minPercent: 0,  maxPercent: 24,  pass: false, label: 'Fail',        displayOrder: 9 },
+  {
+    examType: 'INTERNAL_F3F4',
+    grade: '1',
+    minPercent: 80,
+    maxPercent: 100,
+    pass: true,
+    label: 'Distinction',
+    displayOrder: 1,
+  },
+  {
+    examType: 'INTERNAL_F3F4',
+    grade: '2',
+    minPercent: 70,
+    maxPercent: 79,
+    pass: true,
+    label: 'Distinction',
+    displayOrder: 2,
+  },
+  {
+    examType: 'INTERNAL_F3F4',
+    grade: '3',
+    minPercent: 60,
+    maxPercent: 69,
+    pass: true,
+    label: 'Credit',
+    displayOrder: 3,
+  },
+  {
+    examType: 'INTERNAL_F3F4',
+    grade: '4',
+    minPercent: 50,
+    maxPercent: 59,
+    pass: true,
+    label: 'Credit',
+    displayOrder: 4,
+  },
+  {
+    examType: 'INTERNAL_F3F4',
+    grade: '5',
+    minPercent: 40,
+    maxPercent: 49,
+    pass: true,
+    label: 'Credit',
+    displayOrder: 5,
+  },
+  {
+    examType: 'INTERNAL_F3F4',
+    grade: '6',
+    minPercent: 35,
+    maxPercent: 39,
+    pass: true,
+    label: 'Credit',
+    displayOrder: 6,
+  },
+  {
+    examType: 'INTERNAL_F3F4',
+    grade: '7',
+    minPercent: 30,
+    maxPercent: 34,
+    pass: true,
+    label: 'Pass',
+    displayOrder: 7,
+  },
+  {
+    examType: 'INTERNAL_F3F4',
+    grade: '8',
+    minPercent: 25,
+    maxPercent: 29,
+    pass: true,
+    label: 'Pass',
+    displayOrder: 8,
+  },
+  {
+    examType: 'INTERNAL_F3F4',
+    grade: '9',
+    minPercent: 0,
+    maxPercent: 24,
+    pass: false,
+    label: 'Fail',
+    displayOrder: 9,
+  },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -135,7 +355,7 @@ export const DEFAULT_GRADING_SCALES: Array<{
 // admin updates to force the next caller to refresh from the DB.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CACHE_TTL_MS = 60 * 60 * 1000   // 1 hour
+const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
 
 let _cache: Map<ExamTypeKey, GradeRow[]> | null = null
 let _cacheExpiry = 0
@@ -149,7 +369,7 @@ async function loadScales(): Promise<Map<ExamTypeKey, GradeRow[]>> {
   if (_cache && Date.now() < _cacheExpiry) return _cache
 
   const rows = await prisma.gradingScale.findMany({
-    where:   { isActive: true },
+    where: { isActive: true },
     orderBy: { displayOrder: 'asc' },
   })
 
@@ -164,11 +384,11 @@ async function loadScales(): Promise<Map<ExamTypeKey, GradeRow[]>> {
     const key = r.examType as ExamTypeKey
     if (!map.has(key)) map.set(key, [])
     map.get(key)!.push({
-      grade:      r.grade,
+      grade: r.grade,
       minPercent: r.minPercent,
       maxPercent: r.maxPercent,
-      pass:       r.pass,
-      label:      r.label,
+      pass: r.pass,
+      label: r.label,
     })
   }
 
@@ -191,7 +411,7 @@ async function pruneStaleGrades(): Promise<void> {
   const examTypes = Array.from(new Set(DEFAULT_GRADING_SCALES.map((s) => s.examType)))
 
   const existing = await prisma.gradingScale.findMany({
-    where:  { examType: { in: examTypes } },
+    where: { examType: { in: examTypes } },
     select: { id: true, examType: true, grade: true },
   })
   const staleIds = existing
@@ -202,7 +422,7 @@ async function pruneStaleGrades(): Promise<void> {
     await prisma.gradingScale.deleteMany({ where: { id: { in: staleIds } } })
     logger.info(
       { event: 'grading.pruned_stale', count: staleIds.length },
-      'Removed grade rows no longer present in the default scale',
+      'Removed grade rows no longer present in the default scale'
     )
   }
 }
@@ -216,11 +436,11 @@ export async function seedDefaultGradingScales(): Promise<void> {
   await prisma.$transaction(
     DEFAULT_GRADING_SCALES.map((scale) =>
       prisma.gradingScale.upsert({
-        where:  { examType_grade: { examType: scale.examType, grade: scale.grade } },
+        where: { examType_grade: { examType: scale.examType, grade: scale.grade } },
         create: scale,
-        update: {},   // Never overwrite existing customised scales on seed
-      }),
-    ),
+        update: {}, // Never overwrite existing customised scales on seed
+      })
+    )
   )
   logger.info({ event: 'grading.seeded' }, 'Default grading scales seeded')
 }
@@ -237,8 +457,8 @@ export async function seedDefaultGradingScales(): Promise<void> {
 
 export async function calcGrade(
   percentage: number,
-  examType:   string,
-  classForm?: number,
+  examType: string,
+  classForm?: number
 ): Promise<GradeResult> {
   const scales = await loadScales()
 
@@ -248,9 +468,7 @@ export async function calcGrade(
   } else if (examType === 'MANEB_JCE') {
     key = 'JCE'
   } else {
-    key = classForm !== undefined && classForm >= 3
-      ? 'INTERNAL_F3F4'
-      : 'INTERNAL_F1F2'
+    key = classForm !== undefined && classForm >= 3 ? 'INTERNAL_F3F4' : 'INTERNAL_F1F2'
   }
 
   const table = scales.get(key) ?? []
@@ -269,18 +487,18 @@ export async function listGradingScales() {
 export interface UpdateGradeScaleInput {
   minPercent: number
   maxPercent: number
-  pass:       boolean
-  label?:     string
+  pass: boolean
+  label?: string
 }
 
 export async function updateGradeScale(
-  id:          string,
-  input:       UpdateGradeScaleInput,
-  actorUid:    string,
+  id: string,
+  input: UpdateGradeScaleInput,
+  actorUid: string
 ): Promise<void> {
   await prisma.gradingScale.update({
     where: { id },
-    data:  { ...input, updatedByUid: actorUid },
+    data: { ...input, updatedByUid: actorUid },
   })
   invalidateGradeCache()
   logger.info({ event: 'grading.updated', id, actorUid })
@@ -294,15 +512,15 @@ export async function resetToDefaults(actorUid: string): Promise<void> {
         where: { examType_grade: { examType: scale.examType, grade: scale.grade } },
         create: { ...scale, updatedByUid: actorUid },
         update: {
-          minPercent:   scale.minPercent,
-          maxPercent:   scale.maxPercent,
-          pass:         scale.pass,
-          label:        scale.label,
+          minPercent: scale.minPercent,
+          maxPercent: scale.maxPercent,
+          pass: scale.pass,
+          label: scale.label,
           displayOrder: scale.displayOrder,
           updatedByUid: actorUid,
         },
-      }),
-    ),
+      })
+    )
   )
   invalidateGradeCache()
   logger.info({ event: 'grading.reset', actorUid })
@@ -318,7 +536,10 @@ export async function resetToDefaults(actorUid: string): Promise<void> {
 // pre-assigned grade.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function getGradeInfo(examType: ExamTypeKey, grade: string): Promise<GradeResult | null> {
+export async function getGradeInfo(
+  examType: ExamTypeKey,
+  grade: string
+): Promise<GradeResult | null> {
   const scales = await loadScales()
   const row = (scales.get(examType) ?? []).find((g) => g.grade === grade)
   return row ? { grade: row.grade, pass: row.pass, label: row.label } : null
@@ -329,7 +550,10 @@ export async function getGradeInfo(examType: ExamTypeKey, grade: string): Promis
  *  no such tier since its scale has no "Pass"-labelled grade at all). Used
  *  by promotionService.ts's MSCE-style promotion rule, which requires a
  *  minimum count of distinction/credit grades, not just passing grades. */
-export async function isDistinctionOrCredit(examType: ExamTypeKey, grade: string): Promise<boolean> {
+export async function isDistinctionOrCredit(
+  examType: ExamTypeKey,
+  grade: string
+): Promise<boolean> {
   const info = await getGradeInfo(examType, grade)
   if (!info || !info.pass) return false
   return (info.label ?? '').trim().toLowerCase() !== 'pass'
@@ -342,10 +566,10 @@ export async function isDistinctionOrCredit(examType: ExamTypeKey, grade: string
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function getPassMarkThreshold(
-  examType: 'MSCE' | 'JCE' | 'INTERNAL_F1F2' | 'INTERNAL_F3F4',
+  examType: 'MSCE' | 'JCE' | 'INTERNAL_F1F2' | 'INTERNAL_F3F4'
 ): Promise<number> {
   const scales = await loadScales()
-  const table  = scales.get(examType) ?? []
+  const table = scales.get(examType) ?? []
   const lowestPass = table.filter((g) => g.pass).at(-1)
   return lowestPass?.minPercent ?? 35
 }
@@ -387,37 +611,37 @@ export async function getPassMarkThreshold(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface JceOutcome {
-  examType:        'JCE'
+  examType: 'JCE'
   /** JCE has no numeric aggregate — always null. Field kept so callers can
    *  read `.points`/`.classification` across both outcome shapes uniformly. */
-  points:          null
+  points: null
   /** 'PASS' | 'FAIL' | 'Incomplete' (no subject grades recorded at all). */
-  classification:  string
+  classification: string
   /** Overall PASS/FAIL — ≥6 subjects passed, English among them. */
-  pass:            boolean
-  passedSubjects:  number
-  totalSubjects:   number
-  englishPassed:   boolean
+  pass: boolean
+  passedSubjects: number
+  totalSubjects: number
+  englishPassed: boolean
 }
 
 export interface MsceOutcome {
-  examType:            'MSCE'
+  examType: 'MSCE'
   /** Sum of the best-six PERFORMED subjects' points (range 6–54); null if
    *  fewer than six subjects were performed — no six-subject sum exists. */
-  points:              number | null
+  points: number | null
   /** 'MSCE Awarded — Option A' | 'MSCE Awarded — Option B' |
    *  'MSCE Not Awarded' | 'Incomplete' (no subject grades recorded at all). */
-  classification:      string
+  classification: string
   /** Certificate awarded — Option A or Option B satisfied (§4.3). */
-  pass:                boolean
-  certificateOption:   'A' | 'B' | null
+  pass: boolean
+  certificateOption: 'A' | 'B' | null
   /** Names of the (up to 6) subjects whose points make up the aggregate
    *  sum — empty when points is null. */
-  aggregateSubjects:   string[]
+  aggregateSubjects: string[]
   /** Whether English happened to be one of the best-six subjects — NOT
    *  whether English was passed (that's a separate, eligibility-only fact). */
-  englishInAggregate:  boolean
-  totalSubjects:       number
+  englishInAggregate: boolean
+  totalSubjects: number
 }
 
 export type ManebOutcome = JceOutcome | MsceOutcome
@@ -428,20 +652,28 @@ function isEnglishSubject(subject: string): boolean {
 
 async function computeJceOutcome(subjectGrades: Record<string, string>): Promise<JceOutcome> {
   const scales = await loadScales()
-  const table  = scales.get('JCE') ?? []
+  const table = scales.get('JCE') ?? []
   const passOf = (grade: string): boolean => table.find((g) => g.grade === grade)?.pass ?? false
   const isKnownGrade = (grade: string): boolean => table.some((g) => g.grade === grade)
 
-  const entries       = Object.entries(subjectGrades).filter(([, grade]) => isKnownGrade(grade))
+  const entries = Object.entries(subjectGrades).filter(([, grade]) => isKnownGrade(grade))
   const totalSubjects = entries.length
   const passedEntries = entries.filter(([, grade]) => passOf(grade))
   const passedSubjects = passedEntries.length
-  const englishPassed  = passedEntries.some(([subject]) => isEnglishSubject(subject))
+  const englishPassed = passedEntries.some(([subject]) => isEnglishSubject(subject))
 
   const pass = passedSubjects >= 6 && englishPassed
-  const classification = totalSubjects === 0 ? 'Incomplete' : (pass ? 'PASS' : 'FAIL')
+  const classification = totalSubjects === 0 ? 'Incomplete' : pass ? 'PASS' : 'FAIL'
 
-  return { examType: 'JCE', points: null, classification, pass, passedSubjects, totalSubjects, englishPassed }
+  return {
+    examType: 'JCE',
+    points: null,
+    classification,
+    pass,
+    passedSubjects,
+    totalSubjects,
+    englishPassed,
+  }
 }
 
 async function computeMsceOutcome(subjectGrades: Record<string, string>): Promise<MsceOutcome> {
@@ -455,10 +687,7 @@ async function computeMsceOutcome(subjectGrades: Record<string, string>): Promis
 // term). Both are 1–9 scales with the same Distinction/Credit/Pass/Fail
 // tiers, and a Form 3 term result is summarised the same way a real MSCE
 // result is — as an aggregate of points, never as an averaged grade.
-function msceStyleOutcome(
-  table:         GradeRow[],
-  subjectGrades: Record<string, string>,
-): MsceOutcome {
+function msceStyleOutcome(table: GradeRow[], subjectGrades: Record<string, string>): MsceOutcome {
   // `table` is ordered by displayOrder asc — index+1 is the grade's point value
 
   const pointOf = (grade: string): number | null => {
@@ -468,7 +697,7 @@ function msceStyleOutcome(
   const isCreditTier = (grade: string): boolean => {
     const row = table.find((g) => g.grade === grade)
     if (!row || !row.pass) return false
-    return (row.label ?? '').trim().toLowerCase() !== 'pass'   // Distinction (1–2) or Credit (3–6); excludes bare "Pass" (7–8)
+    return (row.label ?? '').trim().toLowerCase() !== 'pass' // Distinction (1–2) or Credit (3–6); excludes bare "Pass" (7–8)
   }
   const passOf = (grade: string): boolean => table.find((g) => g.grade === grade)?.pass ?? false
 
@@ -484,15 +713,15 @@ function msceStyleOutcome(
   let englishInAggregate = false
   if (totalSubjects >= 6) {
     const ranked = [...performed].sort((a, b) => a.points - b.points).slice(0, 6)
-    points             = ranked.reduce((sum, x) => sum + x.points, 0)
-    aggregateSubjects  = ranked.map((x) => x.subject)
+    points = ranked.reduce((sum, x) => sum + x.points, 0)
+    aggregateSubjects = ranked.map((x) => x.subject)
     englishInAggregate = ranked.some((x) => isEnglishSubject(x.subject))
   }
 
   // ── 2. Certificate eligibility: Option A / Option B over ALL passed
   //      subjects — a wholly separate subject set from the aggregate above.
-  const passed         = performed.filter((x) => passOf(x.grade))
-  const englishPassed  = passed.some((x) => isEnglishSubject(x.subject))
+  const passed = performed.filter((x) => passOf(x.grade))
+  const englishPassed = passed.some((x) => isEnglishSubject(x.subject))
   const creditOrBetter = passed.filter((x) => isCreditTier(x.grade)).length
 
   let certificateOption: 'A' | 'B' | null = null
@@ -503,17 +732,27 @@ function msceStyleOutcome(
   const pass = certificateOption !== null
 
   const classification =
-    totalSubjects === 0 ? 'Incomplete' : (pass ? `MSCE Awarded — Option ${certificateOption}` : 'MSCE Not Awarded')
+    totalSubjects === 0
+      ? 'Incomplete'
+      : pass
+        ? `MSCE Awarded — Option ${certificateOption}`
+        : 'MSCE Not Awarded'
 
   return {
-    examType: 'MSCE', points, classification, pass, certificateOption,
-    aggregateSubjects, englishInAggregate, totalSubjects,
+    examType: 'MSCE',
+    points,
+    classification,
+    pass,
+    certificateOption,
+    aggregateSubjects,
+    englishInAggregate,
+    totalSubjects,
   }
 }
 
 export async function computeManebAggregate(
-  examType:      'JCE' | 'MSCE',
-  subjectGrades: Record<string, string>,
+  examType: 'JCE' | 'MSCE',
+  subjectGrades: Record<string, string>
 ): Promise<ManebOutcome> {
   return examType === 'JCE' ? computeJceOutcome(subjectGrades) : computeMsceOutcome(subjectGrades)
 }
@@ -552,62 +791,62 @@ export interface InternalTermOutcome {
   /** Did the student pass the term overall? */
   pass: boolean
   passedSubjects: number
-  totalSubjects:  number
+  totalSubjects: number
 }
 
 export async function computeInternalTermOutcome(
-  classForm:     number,
+  classForm: number,
   subjectGrades: Record<string, string>,
   /** Term average percentage — used for the JCE-track overall grade only.
    *  Deliberately unused on the MSCE track. */
-  averagePercent: number,
+  averagePercent: number
 ): Promise<InternalTermOutcome> {
   const scales = await loadScales()
 
   // ── MSCE track (Forms 3–4): aggregate of points, never an average grade.
   if (classForm >= 3) {
     const outcome = msceStyleOutcome(scales.get('INTERNAL_F3F4') ?? [], subjectGrades)
-    const table   = scales.get('INTERNAL_F3F4') ?? []
-    const passOf  = (g: string): boolean => table.find((r) => r.grade === g)?.pass ?? false
+    const table = scales.get('INTERNAL_F3F4') ?? []
+    const passOf = (g: string): boolean => table.find((r) => r.grade === g)?.pass ?? false
     const passedSubjects = Object.values(subjectGrades).filter(passOf).length
 
     const classification =
       outcome.totalSubjects === 0
         ? 'No subjects recorded'
-        : outcome.aggregatePoints === null
+        : outcome.points === null
           ? `Aggregate unavailable — only ${outcome.totalSubjects} subject(s) recorded, six are required`
-          : `${outcome.aggregatePoints} points from the best six subjects`
+          : `${outcome.points} points from the best six subjects`
 
     return {
-      track:             'MSCE',
-      aggregatePoints:   outcome.points,
+      track: 'MSCE',
+      aggregatePoints: outcome.points,
       aggregateSubjects: outcome.aggregateSubjects,
-      overallGrade:      '',
+      overallGrade: '',
       classification,
-      pass:              outcome.pass,
+      pass: outcome.pass,
       passedSubjects,
-      totalSubjects:     outcome.totalSubjects,
+      totalSubjects: outcome.totalSubjects,
     }
   }
 
   // ── JCE track (Forms 1–2): overall letter grade from the term average.
-  const table  = scales.get('INTERNAL_F1F2') ?? []
+  const table = scales.get('INTERNAL_F1F2') ?? []
   const passOf = (g: string): boolean => table.find((r) => r.grade === g)?.pass ?? false
   const isKnown = (g: string): boolean => table.some((r) => r.grade === g)
 
-  const entries        = Object.entries(subjectGrades).filter(([, g]) => isKnown(g))
-  const totalSubjects  = entries.length
+  const entries = Object.entries(subjectGrades).filter(([, g]) => isKnown(g))
+  const totalSubjects = entries.length
   const passedSubjects = entries.filter(([, g]) => passOf(g)).length
 
   const overall = await calcGrade(averagePercent, 'INTERNAL', classForm)
 
   return {
-    track:             'JCE',
-    aggregatePoints:   null,
+    track: 'JCE',
+    aggregatePoints: null,
     aggregateSubjects: [],
-    overallGrade:      overall.grade,
-    classification:    totalSubjects === 0 ? 'No subjects recorded' : `Grade ${overall.grade}`,
-    pass:              overall.pass,
+    overallGrade: overall.grade,
+    classification: totalSubjects === 0 ? 'No subjects recorded' : `Grade ${overall.grade}`,
+    pass: overall.pass,
     passedSubjects,
     totalSubjects,
   }
@@ -617,8 +856,8 @@ export async function computeInternalTermOutcome(
  *  analytics can band MSCE-track results without re-deriving the scale. */
 export async function getGradePoints(examType: ExamTypeKey, grade: string): Promise<number | null> {
   const scales = await loadScales()
-  const table  = scales.get(examType) ?? []
-  const idx    = table.findIndex((g) => g.grade === grade)
+  const table = scales.get(examType) ?? []
+  const idx = table.findIndex((g) => g.grade === grade)
   return idx === -1 ? null : idx + 1
 }
 
