@@ -24,6 +24,9 @@ export const CreateBookSchema = z.object({
   publishedYear: z.number().int().min(1900).max(getMaxPublishedYear()).optional(),
   totalCopies:   z.number().int().positive().default(1),
   barcode:       z.string().optional(),
+  // [R21] Physical shelf/location label (e.g. "M-02") — shown under the
+  // barcode in the redesigned catalog UI.
+  shelf:         z.string().optional(),
 })
 
 // [PRODUCTION FIX 2026-07-28] Catalog management had create + list, but no
@@ -70,6 +73,13 @@ export const CreateRecommendationSchema = z.object({
   type:    z.enum(['BOOK', 'EBOOK', 'JOURNAL', 'OTHER']),
   subject: z.string().optional(),
   reason:  z.string().min(1),
+  // [R21] Requester Name & Role / Class-Form-Department fields added to
+  // match the redesigned "Recommend a Resource" form — all optional and
+  // purely display-side; requestedByUid (set server-side from the
+  // authenticated user) remains the real identity link.
+  requesterName:  z.string().optional(),
+  requesterRole:  z.enum(['Student', 'Staff', 'Parent', 'Other']).optional(),
+  requesterClass: z.string().optional(),
 })
 
 export const ReviewRecommendationSchema = z.object({

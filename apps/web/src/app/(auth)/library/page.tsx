@@ -58,12 +58,14 @@ import { PermissionGuard }   from '@/components/shared/PermissionGuard'
 import { useAuthStore }      from '@/store/authStore'
 import {
   useBooks,
+  useBook,
   useLibraryStats,
   useBorrowings,
   useDigitalResources,
   useScanBarcode,
   useIssueBorrowing,
   useReturnBook,
+  useRenewBorrowing,
   useRecommendations,
   useCreateRecommendation,
   useApproveRecommendation,
@@ -77,11 +79,20 @@ import {
   useCreateBook,
   useUploadDigitalResource,
   useCatalogReportStats,
+  useConditionReport,
   useFines,
   useClearFine,
+  useAssessFine,
+  useWaiveFineDirect,
+  useOverdueByClass,
 }                            from '@/hooks/useLibrary'
+import { apiFetch }          from '@/lib/api-client'
 import { DigitalResourceViewer } from '@/components/library/DigitalResourceViewer'
-import { BookOpen, Scan, FileText, AlertTriangle, Eye, Check, X as XIcon, Undo2, Pencil, Archive, ArrowUpDown, Users2, Upload, Loader2 } from 'lucide-react'
+import {
+  BookOpen, Scan, FileText, AlertTriangle, Eye, Check, X as XIcon, Undo2, Pencil, Archive,
+  ArrowUpDown, Users2, Upload, Loader2, Repeat, Shield, Plus, Sparkles, LayoutGrid,
+  List, Download, Printer, Search, ArrowUpRight, ShieldCheck, ClipboardList, BookMarked,
+}                            from 'lucide-react'
 import { ModuleTabs }        from '@/components/shared/ModuleTabs'
 import { MALAWI_SUBJECTS, formatMWK } from '@shared/constants/malawi'
 import type {
@@ -89,6 +100,7 @@ import type {
   ApiBorrowing,
   ApiDigitalResource,
   ApiLibraryStats,
+  ApiLibraryConditionEntry,
 }                            from '@shared/types/api'
 
 /*
@@ -102,7 +114,13 @@ type Tab = 'catalog' | 'borrowings' | 'digital' | 'recommendations' | 'reports'
 
 const TABS = [
   { id: 'catalog'         as Tab, label: 'Book Catalog',      icon: BookOpen  },
-  { id: 'borrowings'      as Tab, label: 'Borrowings',        icon: Scan      },
+  // [R21] Borrowings' tab icon was Scan — the same icon the catalog tab's
+  // literal barcode-scan button uses, a direct visual conflict called out
+  // when adopting the screenshot UI. Swapped for Repeat (a circulation/
+  // cycle glyph — matches the screenshot's Borrowings icon), same icon
+  // now shared with the "On Loan" stat tile and the "Active Borrowings"
+  // sub-tab below. Every other tab icon is unchanged per instruction.
+  { id: 'borrowings'      as Tab, label: 'Borrowings',        icon: Repeat    },
   { id: 'digital'         as Tab, label: 'Digital Library',   icon: FileText  },
   { id: 'recommendations' as Tab, label: 'Recommendations',   icon: Check     },
   // [PRODUCTION FIX 2026-07-28] Genuinely distinct librarian surface —
@@ -111,6 +129,29 @@ const TABS = [
   // another generic tab to every role.
   { id: 'reports'         as Tab, label: 'Reports & Fines',   icon: Users2    },
 ]
+
+// [R21] Displayed status derived client-side from a live (unreturned)
+// borrowing's real status + due date — "DUE SOON" isn't a stored
+// BorrowStatus value, it's an ACTIVE loan within 3 days of its due date.
+function borrowingDisplayStatus(b: ApiBorrowing): 'OVERDUE' | 'DUE_SOON' | 'ACTIVE' {
+  if (b.status === 'OVERDUE') return 'OVERDUE'
+  const daysLeft = Math.ceil((new Date(b.dueDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+  if (b.status === 'ACTIVE' && daysLeft <= 3) return 'DUE_SOON'
+  return 'ACTIVE'
+}
+
+function borrowingCountdownLabel(b: ApiBorrowing): string {
+  const days = Math.round((new Date(b.dueDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+  if (days < 0) return `Overdue by ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'}`
+  if (days === 0) return 'Due today'
+  return `Due in ${days} day${days === 1 ? '' : 's'}`
+}
+
+function borrowerLabel(b: ApiBorrowing): { name: string; sublabel: string } {
+  if (b.student) return { name: `${b.student.firstName} ${b.student.lastName}`, sublabel: `${b.student.registrationNo}${b.student.class ? ` · ${b.student.class.name}` : ''}` }
+  if (b.staff)   return { name: `${b.staff.firstName} ${b.staff.lastName}`,     sublabel: `${b.staff.employeeNo}${b.staff.department ? ` · ${b.staff.department}` : ''}` }
+  return { name: 'Unknown borrower', sublabel: '—' }
+}
 
 export default function LibraryPage() {
   return (
@@ -144,16 +185,27 @@ export default function LibraryPage() {
 // class of bug found and fixed for SortHeader in user-management/page.tsx
 // earlier this session.
 function BookRow({
-  book: b, isLibStaff, onIssue, onEdit,
+  book: b, isLibStaff, onIssue, onEdit, onView,
 }: {
   book: ApiBook
   isLibStaff: boolean
   onIssue: (bookId: string) => void
   onEdit: (book: ApiBook) => void
+  /** [R21] Eye-icon "view" action — opens BookDetailModal. */
+  onView: (bookId: string) => void
 }) {
   return (
     <tr className="hover:bg-page">
-      <td className="px-4 py-3 font-medium">{b.title}</td>
+      <td className="px-4 py-3 font-medium">
+        {b.title}
+        {/* [R21] Barcode + shelf sub-line, matching the screenshot's
+            "MAT-2017-001 · Shelf M-02" under the title. */}
+        {(b.barcode || b.shelf) && (
+          <p className="text-xs font-mono text-muted mt-0.5">
+            {b.barcode ?? '—'}{b.shelf ? ` · Shelf ${b.shelf}` : ''}
+          </p>
+        )}
+      </td>
       <td className="px-4 py-3 text-muted">{b.author}</td>
       <td className="px-4 py-3">
         <span className="text-xs bg-base rounded px-2 py-0.5">{b.category}</span>
@@ -178,6 +230,9 @@ function BookRow({
               Issue
             </button>
           </PermissionGuard>
+          <button type="button" onClick={() => onView(b.id)} aria-label={`View ${b.title}`} className="text-muted hover:text-body min-h-11 min-w-11 flex items-center justify-center">
+            <Eye className="w-3.5 h-3.5" />
+          </button>
           {isLibStaff && (
             <button type="button" onClick={() => onEdit(b)} aria-label={`Edit ${b.title}`} className="text-muted hover:text-body min-h-11 min-w-11 flex items-center justify-center">
               <Pencil className="w-3.5 h-3.5" />
@@ -214,6 +269,7 @@ function BookFormModal({
   const [publishedYear, setPublishedYear] = useState(book?.publishedYear?.toString() ?? '')
   const [totalCopies, setTotalCopies] = useState(book?.totalCopies?.toString() ?? '1')
   const [barcode, setBarcode] = useState(book?.barcode ?? '')
+  const [shelf, setShelf] = useState(book?.shelf ?? '')
 
   const pending = createBook.isPending || updateBook.isPending || archiveBook.isPending
   const error = createBook.error ?? updateBook.error ?? archiveBook.error
@@ -229,6 +285,7 @@ function BookFormModal({
       publishedYear: publishedYear ? Number(publishedYear) : undefined,
       totalCopies: Number(totalCopies) || 1,
       barcode: barcode.trim() || undefined,
+      shelf: shelf.trim() || undefined,
     }
     if (book) {
       updateBook.mutate({ id: book.id, data }, { onSuccess: onClose })
@@ -289,6 +346,10 @@ function BookFormModal({
             <div>
               <label htmlFor="book-barcode" className="text-xs text-muted mb-1 block">Barcode <span className="text-muted/70">(optional)</span></label>
               <input id="book-barcode" value={barcode} onChange={(e) => setBarcode(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+            </div>
+            <div>
+              <label htmlFor="book-shelf" className="text-xs text-muted mb-1 block">Shelf <span className="text-muted/70">(e.g. M-02)</span></label>
+              <input id="book-shelf" value={shelf} onChange={(e) => setShelf(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
             </div>
           </div>
 
@@ -501,24 +562,94 @@ function BorrowerPicker({
   )
 }
 
+// [R21] Standalone "+ Issue Book" entry point (Catalog toolbar and the
+// Borrowings tab's sub-tab bar, per the screenshots) needs to pick a book
+// FIRST — the per-row "Issue" link already has one via bookId. Debounces
+// against the same GET /library the catalog tab itself uses.
+function BookPicker({ value, onChange }: { value: ApiBook | null; onChange: (book: ApiBook | null) => void }) {
+  const [query, setQuery]     = useState('')
+  const [results, setResults] = useState<ApiBook[]>([])
+  const [open, setOpen]       = useState(false)
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleChange = useCallback((v: string) => {
+    setQuery(v)
+    onChange(null)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (v.trim().length < 2) { setResults([]); setOpen(false); return }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const hits = await apiFetch<ApiBook[]>(`/library?search=${encodeURIComponent(v)}&available=true`)
+        setResults(hits)
+        setOpen(true)
+      } catch { setResults([]) }
+      setLoading(false)
+    }, 300)
+  }, [onChange])
+
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current) }, [])
+
+  return (
+    <div className="relative">
+      <input
+        value={value ? value.title : query}
+        onChange={(e) => handleChange(e.target.value)}
+        onFocus={() => results.length > 0 && setOpen(true)}
+        placeholder="Search title, author, or barcode…"
+        className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        autoComplete="off"
+      />
+      {loading && <Loader2 className="w-4 h-4 animate-spin text-muted absolute right-3 top-1/2 -translate-y-1/2" />}
+      {open && results.length > 0 && (
+        <div className="absolute z-20 mt-1 w-full bg-surface border border-base rounded-lg shadow-lg max-h-56 overflow-y-auto">
+          {results.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => { onChange(b); setQuery(''); setOpen(false) }}
+              className="w-full text-left px-3 py-2 hover:bg-page text-sm"
+            >
+              <p className="font-medium text-body">{b.title}</p>
+              <p className="text-xs text-muted">{b.author} · {b.availableCopies} available</p>
+            </button>
+          ))}
+        </div>
+      )}
+      {open && !loading && results.length === 0 && query.trim().length >= 2 && (
+        <div className="absolute z-20 mt-1 w-full bg-surface border border-base rounded-lg shadow-lg px-3 py-2 text-xs text-muted">
+          No available copies match &ldquo;{query}&rdquo;.
+        </div>
+      )}
+    </div>
+  )
+}
+
 function IssueBookModal({
   bookId, onClose, onIssued,
 }: {
-  bookId: string
+  /** [R21] null when opened from the standalone "+ Issue Book" button —
+   *  the modal then shows a book search step first instead of assuming
+   *  one is already chosen. */
+  bookId: string | null
   onClose: () => void
   /** Called once, only on a successful issue (not on cancel) — lets a
    *  caller react to the specific outcome, e.g. clearing a scan result. */
   onIssued?: () => void
 }) {
   const issueBorrowing = useIssueBorrowing()
+  const [pickedBook, setPickedBook] = useState<ApiBook | null>(null)
   const [borrowerType, setBorrowerType] = useState<'student' | 'staff'>('student')
   const [borrower, setBorrower] = useState<BorrowerHit | null>(null)
   const [dueDate, setDueDate] = useState('')
 
+  const effectiveBookId = bookId ?? pickedBook?.id ?? null
+
   function handleSubmit() {
-    if (!borrower || !dueDate) return
+    if (!effectiveBookId || !borrower || !dueDate) return
     issueBorrowing.mutate({
-      bookId,
+      bookId: effectiveBookId,
       borrowerType: borrowerType === 'student' ? 'STUDENT' : 'STAFF',
       studentId: borrowerType === 'student' ? borrower.id : undefined,
       staffId: borrowerType === 'staff' ? borrower.id : undefined,
@@ -542,6 +673,12 @@ function IssueBookModal({
           </button>
         </div>
         <div className="p-6 space-y-4">
+          {!bookId && (
+            <div>
+              <label className="text-xs text-muted mb-1 block">Book</label>
+              <BookPicker value={pickedBook} onChange={setPickedBook} />
+            </div>
+          )}
           <div className="flex gap-2">
             <button
               type="button"
@@ -580,7 +717,7 @@ function IssueBookModal({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={issueBorrowing.isPending || !borrower || !dueDate}
+            disabled={issueBorrowing.isPending || !effectiveBookId || !borrower || !dueDate}
             className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
           >
             {issueBorrowing.isPending ? 'Issuing…' : 'Issue Book'}
@@ -589,6 +726,334 @@ function IssueBookModal({
             <p className="text-sm text-brand-coral">
               {issueBorrowing.error instanceof Error ? issueBorrowing.error.message : 'Something went wrong.'}
             </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// [R21] "marking a physical book condition is not wired any where" —
+// ReturnBorrowingSchema already accepted condition/notes; the return
+// button just always sent condition:'GOOD'. This modal is the actual
+// condition picker, and — since returnBook() only ever fines overdue
+// days, never damage/loss — chains a second, separate mutation (the same
+// "+ Assess Fine" endpoint) when the librarian records a damage/loss fee,
+// so a damaged/lost return finally has a real financial consequence.
+function ReturnBookModal({
+  borrowing, onClose,
+}: {
+  borrowing: ApiBorrowing
+  onClose: () => void
+}) {
+  const returnBook  = useReturnBook()
+  const assessFine  = useAssessFine()
+  const [condition, setCondition] = useState<'GOOD' | 'DAMAGED' | 'LOST'>('GOOD')
+  const [notes, setNotes]         = useState('')
+  const [feeAmount, setFeeAmount] = useState('')
+
+  const { name: borrowerName } = borrowerLabel(borrowing)
+  const bookTitle = borrowing.book?.title ?? 'this book'
+  const needsFee = condition !== 'GOOD'
+
+  function handleSubmit() {
+    returnBook.mutate({
+      borrowingId: borrowing.id,
+      data: { condition, notes: notes.trim() || undefined },
+    }, {
+      onSuccess: () => {
+        const fee = Number(feeAmount)
+        if (needsFee && fee > 0) {
+          assessFine.mutate({
+            studentId: borrowing.studentId,
+            staffId: borrowing.staffId,
+            bookTitle,
+            amount: fee,
+            reason: notes.trim() || `Book returned ${condition.toLowerCase()}.`,
+          }, { onSuccess: onClose, onError: onClose })
+        } else {
+          onClose()
+        }
+      },
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
+        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
+          <h2 className="font-heading font-bold text-brand-navy">Return Book</h2>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
+            <XIcon className="w-4 h-4 text-muted" />
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-body"><strong>{bookTitle}</strong> — {borrowerName}</p>
+
+          <div>
+            <label className="text-xs text-muted mb-1.5 block">Condition on return</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(['GOOD', 'DAMAGED', 'LOST'] as const).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCondition(c)}
+                  className={`py-2 rounded-lg text-sm font-semibold border ${
+                    condition === c
+                      ? c === 'GOOD' ? 'bg-brand-teal text-white border-brand-teal' : 'bg-brand-coral text-white border-brand-coral'
+                      : 'border-base text-body'
+                  }`}
+                >
+                  {c.charAt(0) + c.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {needsFee && (
+            <>
+              <div>
+                <label htmlFor="return-notes" className="text-xs text-muted mb-1 block">
+                  Describe the {condition === 'LOST' ? 'loss' : 'damage'}
+                </label>
+                <textarea
+                  id="return-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  placeholder={condition === 'LOST' ? 'e.g. Never returned; reported lost by borrower.' : 'e.g. Torn binding and water spill on chapters 3-4.'}
+                  className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+                />
+              </div>
+              <div>
+                <label htmlFor="return-fee" className="text-xs text-muted mb-1 block">Fine amount (MK) <span className="text-muted/70">(optional — leave blank to skip)</span></label>
+                <input
+                  id="return-fee"
+                  type="number"
+                  min="0"
+                  value={feeAmount}
+                  onChange={(e) => setFeeAmount(e.target.value)}
+                  className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+                />
+              </div>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={returnBook.isPending || assessFine.isPending}
+            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+          >
+            {returnBook.isPending || assessFine.isPending ? 'Processing…' : 'Confirm Return'}
+          </button>
+          {returnBook.error && (
+            <p className="text-sm text-brand-coral">
+              {returnBook.error instanceof Error ? returnBook.error.message : 'Something went wrong.'}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// [R21] Eye-icon "view" action in the redesigned Catalog table — Book had
+// no detail view anywhere; useBook(id) already returns active borrowings
+// for the title (see GET /library/:id), just never had a caller.
+function BookDetailModal({ bookId, onClose }: { bookId: string; onClose: () => void }) {
+  const { data: book, isLoading } = useBook(bookId)
+  const b = book as ApiBook | undefined
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
+        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
+          <h2 className="font-heading font-bold text-brand-navy">Book Details</h2>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
+            <XIcon className="w-4 h-4 text-muted" />
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          {isLoading || !b ? (
+            <div className="text-center py-10 text-muted text-sm animate-pulse">Loading…</div>
+          ) : (
+            <>
+              <div>
+                <p className="font-heading font-bold text-lg text-brand-navy">{b.title}</p>
+                <p className="text-sm text-muted">{b.author}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><p className="text-xs text-muted">Category</p><p className="font-medium">{b.category}</p></div>
+                <div><p className="text-xs text-muted">Publisher</p><p className="font-medium">{b.publisher ?? '—'}</p></div>
+                <div><p className="text-xs text-muted">Year</p><p className="font-medium">{b.publishedYear ?? '—'}</p></div>
+                <div><p className="text-xs text-muted">ISBN</p><p className="font-medium">{b.isbn ?? '—'}</p></div>
+                <div><p className="text-xs text-muted">Barcode</p><p className="font-medium">{b.barcode ?? '—'}</p></div>
+                <div><p className="text-xs text-muted">Shelf</p><p className="font-medium">{b.shelf ?? '—'}</p></div>
+                <div><p className="text-xs text-muted">Copies</p><p className="font-medium">{b.totalCopies}</p></div>
+                <div><p className="text-xs text-muted">Available</p><p className={`font-semibold ${b.availableCopies === 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>{b.availableCopies}</p></div>
+              </div>
+              <div>
+                <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">Currently on loan</p>
+                {!b.borrowings || b.borrowings.length === 0 ? (
+                  <p className="text-sm text-muted">No copies currently checked out.</p>
+                ) : (
+                  <ul className="divide-y divide-base border border-base rounded-lg">
+                    {b.borrowings.map((loan) => {
+                      const { name } = borrowerLabel(loan)
+                      return (
+                        <li key={loan.id} className="px-3 py-2 text-sm flex items-center justify-between">
+                          <span>{name}</span>
+                          <span className="text-xs text-muted">Due {new Date(loan.dueDate).toLocaleDateString()}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// [R21] "+ Assess Fine" in the Fines & Penalties Ledger — a manual fine
+// (damage discovered after return, a lost-book charge, or any other
+// penalty not tied to today's return flow) previously had a screenshot
+// button and no UI at all. Posts straight to the same finance endpoint
+// Return uses for damage/loss fees.
+function AssessFineModal({ onClose }: { onClose: () => void }) {
+  const assessFine = useAssessFine()
+  const [borrowerType, setBorrowerType] = useState<'student' | 'staff'>('student')
+  const [borrower, setBorrower] = useState<BorrowerHit | null>(null)
+  const [bookTitle, setBookTitle] = useState('')
+  const [amount, setAmount] = useState('')
+  const [reason, setReason] = useState('')
+
+  function handleSubmit() {
+    const amt = Number(amount)
+    if (!borrower || !bookTitle.trim() || !reason.trim() || !(amt > 0)) return
+    assessFine.mutate({
+      studentId: borrowerType === 'student' ? borrower.id : undefined,
+      staffId: borrowerType === 'staff' ? borrower.id : undefined,
+      bookTitle: bookTitle.trim(),
+      amount: amt,
+      reason: reason.trim(),
+    }, { onSuccess: onClose })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
+        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
+          <h2 className="font-heading font-bold text-brand-navy">Assess Fine</h2>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
+            <XIcon className="w-4 h-4 text-muted" />
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="flex gap-2">
+            <button type="button" onClick={() => { setBorrowerType('student'); setBorrower(null) }}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${borrowerType === 'student' ? 'bg-brand-navy text-white border-brand-navy' : 'border-base text-body'}`}>
+              Student
+            </button>
+            <button type="button" onClick={() => { setBorrowerType('staff'); setBorrower(null) }}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${borrowerType === 'staff' ? 'bg-brand-navy text-white border-brand-navy' : 'border-base text-body'}`}>
+              Staff
+            </button>
+          </div>
+          <div>
+            <label className="text-xs text-muted mb-1 block">{borrowerType === 'student' ? 'Student' : 'Staff member'}</label>
+            <BorrowerPicker type={borrowerType} value={borrower} onChange={setBorrower} />
+          </div>
+          <div>
+            <label htmlFor="fine-book-title" className="text-xs text-muted mb-1 block">Book title</label>
+            <input id="fine-book-title" value={bookTitle} onChange={(e) => setBookTitle(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+          </div>
+          <div>
+            <label htmlFor="fine-amount" className="text-xs text-muted mb-1 block">Amount (MK)</label>
+            <input id="fine-amount" type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+          </div>
+          <div>
+            <label htmlFor="fine-reason" className="text-xs text-muted mb-1 block">Reason</label>
+            <textarea id="fine-reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={2}
+              placeholder="e.g. Book returned damaged. Torn binding and water spill on chapters 3-4."
+              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page" />
+          </div>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={assessFine.isPending || !borrower || !bookTitle.trim() || !reason.trim() || !(Number(amount) > 0)}
+            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+          >
+            {assessFine.isPending ? 'Assessing…' : 'Assess Fine'}
+          </button>
+          {assessFine.error && (
+            <p className="text-sm text-brand-coral">
+              {assessFine.error instanceof Error ? assessFine.error.message : 'Something went wrong.'}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// [R21] "Student Library Clearance Audit — Open Clearance Checker" —
+// built entirely from data already loaded elsewhere on this page
+// (useBorrowings by studentId + the all-statuses fines list), so no new
+// backend route was needed: an active/overdue loan or a pending fine
+// both block clearance.
+function ClearanceCheckerModal({ allFines, onClose }: {
+  allFines: Array<{ id: string; studentId?: string | null; bookTitle: string; amount: number; status: string }>
+  onClose: () => void
+}) {
+  const [borrower, setBorrower] = useState<BorrowerHit | null>(null)
+  const { data: loans = [] } = useBorrowings({ studentId: borrower?.id, unreturned: true })
+  const pendingFines = borrower ? allFines.filter((f) => f.studentId === borrower.id && f.status === 'PENDING') : []
+  const outstandingLoans = loans as ApiBorrowing[]
+  const isClear = !!borrower && outstandingLoans.length === 0 && pendingFines.length === 0
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
+        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
+          <h2 className="font-heading font-bold text-brand-navy">Student Library Clearance Audit</h2>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
+            <XIcon className="w-4 h-4 text-muted" />
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="text-xs text-muted mb-1 block">Student</label>
+            <BorrowerPicker type="student" value={borrower} onChange={setBorrower} />
+          </div>
+
+          {borrower && (
+            <div className={`rounded-xl p-4 border ${isClear ? 'bg-brand-teal/8 border-brand-teal/25' : 'bg-brand-coral/8 border-brand-coral/25'}`}>
+              <p className={`font-heading font-semibold text-sm ${isClear ? 'text-brand-teal' : 'text-brand-coral'}`}>
+                {isClear ? 'Cleared — no outstanding books or fines' : 'Not cleared'}
+              </p>
+              {!isClear && (
+                <div className="mt-3 space-y-2">
+                  {outstandingLoans.map((loan) => (
+                    <p key={loan.id} className="text-sm text-body">
+                      📕 {loan.book?.title ?? 'Untitled'} — {borrowingDisplayStatus(loan) === 'OVERDUE' ? borrowingCountdownLabel(loan) : `due ${new Date(loan.dueDate).toLocaleDateString()}`}
+                    </p>
+                  ))}
+                  {pendingFines.map((f) => (
+                    <p key={f.id} className="text-sm text-body">
+                      💰 {f.bookTitle} — {formatMWK(f.amount)} pending
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -640,12 +1105,39 @@ function LibraryContent() {
   const [viewingResource, setViewingResource] = useState<{ id: string; title: string } | null>(null)
   const [showUploadResource, setShowUploadResource] = useState(false)
   const [issuingBookId, setIssuingBookId] = useState<string | null>(null)
+  // [R21] Standalone "+ Issue Book" button (no book preselected) — kept
+  // separate from issuingBookId so per-row/scan-triggered issues (which
+  // always have a real bookId) don't have to special-case a sentinel value.
+  const [showStandaloneIssue, setShowStandaloneIssue] = useState(false)
+  // [R21] Catalog Table/Grid toggle from the screenshot.
+  const [catalogView, setCatalogView] = useState<'table' | 'grid'>('table')
+  const [viewingBookId, setViewingBookId] = useState<string | null>(null)
+  const [returningBorrowing, setReturningBorrowing] = useState<ApiBorrowing | null>(null)
 
   const [recTitle, setRecTitle]   = useState('')
+  const [recAuthor, setRecAuthor] = useState('')
   const [recReason, setRecReason] = useState('')
+  const [recRequesterName, setRecRequesterName] = useState('')
+  const [recRequesterRole, setRecRequesterRole] = useState<'Student' | 'Staff' | 'Parent' | 'Other'>('Student')
+  const [recRequesterClass, setRecRequesterClass] = useState('')
   const [waiverFineId, setWaiverFineId] = useState('')
   const [waiverReason, setWaiverReason] = useState('')
   const [workflowMessage, setWorkflowMessage] = useState<string | null>(null)
+
+  // [R21] Borrowings tab sub-navigation — "Active Borrowings" / "Fine
+  // Waiver Portal" match the screenshot; "Quick Check-in Desk" is
+  // intentionally skipped per instruction.
+  const [borrowingsSubTab, setBorrowingsSubTab] = useState<'active' | 'waivers'>('active')
+  const [borrowingsSearch, setBorrowingsSearch] = useState('')
+  const [borrowingsFilter, setBorrowingsFilter] = useState<'all' | 'active' | 'dueSoon' | 'overdue'>('all')
+
+  // [R21] Reports & Fines sub-navigation — Fines & Penalties Ledger /
+  // Circulation & Popularity Insights / Catalog Distribution / Clearance
+  // & Audit Reports, matching the screenshot's black pill bar.
+  const [reportsSubTab, setReportsSubTab] = useState<'fines' | 'circulation' | 'catalogDist' | 'clearance'>('fines')
+  const [assessingFine, setAssessingFine] = useState(false)
+  const [showClearanceChecker, setShowClearanceChecker] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   const isLibStaff = ['admin', 'library'].includes(role ?? '')
 
@@ -660,9 +1152,19 @@ function LibraryContent() {
     sortDir,
   })
   const { data: catalogReport } = useCatalogReportStats()
+  const { data: conditionReport = [] } = useConditionReport()
+  // [R21] Fetches ALL fines once (unfiltered) so the ledger's three
+  // summary cards (Total Outstanding / Collected Treasury / Total
+  // Penalties Assessed), the Clearance Checker, and the Treasury CSV
+  // export can all derive their numbers client-side from one dataset —
+  // the visible list is then filtered from the same data, not a second
+  // network round trip per status.
+  const { data: allFines = [] } = useFines()
   const [fineStatusFilter, setFineStatusFilter] = useState<'' | 'PENDING' | 'PAID' | 'WAIVED'>('PENDING')
-  const { data: fines = [] } = useFines(fineStatusFilter || undefined)
+  const fines = fineStatusFilter ? allFines.filter((f) => f.status === fineStatusFilter) : allFines
   const clearFine = useClearFine()
+  const waiveFine  = useWaiveFineDirect()
+  const { data: overdueByClass = [] } = useOverdueByClass()
 
   // Client-side grouping — the backend already returns the right sort
   // order; grouping is purely a display concern on top of it.
@@ -678,7 +1180,19 @@ function LibraryContent() {
       })()
     : null
 
-  const { data: overdue = [] }      = useBorrowings({ overdue: true })
+  // [R21] "All Loans" fetches every unreturned (ACTIVE+OVERDUE) borrowing
+  // once, with the search box passed straight through to the server;
+  // the All/Active/Due Soon/Overdue chips then filter this same set
+  // client-side (DUE SOON isn't a stored status — see
+  // borrowingDisplayStatus() above).
+  const { data: activeLoans = [] } = useBorrowings({ unreturned: true, search: borrowingsSearch || undefined })
+  const visibleLoans = (activeLoans as ApiBorrowing[]).filter((b) => {
+    if (borrowingsFilter === 'all') return true
+    const displayStatus = borrowingDisplayStatus(b)
+    if (borrowingsFilter === 'overdue') return displayStatus === 'OVERDUE'
+    if (borrowingsFilter === 'dueSoon') return displayStatus === 'DUE_SOON'
+    return displayStatus === 'ACTIVE'
+  })
   const { data: digitalResources = [] } = useDigitalResources({
     type:    digitalTypeFilter || undefined,
     form:    digitalFormFilter ? Number(digitalFormFilter) : undefined,
@@ -688,7 +1202,7 @@ function LibraryContent() {
   const { data: fineWaivers = [] }      = useFineWaivers('PENDING')
 
   const scanBarcode        = useScanBarcode()
-  const returnBook         = useReturnBook()
+  const renewBorrowing     = useRenewBorrowing()
   const createRecommendation  = useCreateRecommendation()
   const approveRecommendation = useApproveRecommendation()
   const rejectRecommendation  = useRejectRecommendation()
@@ -713,21 +1227,98 @@ function LibraryContent() {
     setIssuingBookId(bookId)
   }
 
-  function handleReturn(borrowingId: string) {
-    returnBook.mutate({ borrowingId, data: { condition: 'GOOD' } })
+  function handleRenew(borrowingId: string) {
+    renewBorrowing.mutate(borrowingId)
   }
 
   function handleSubmitRecommendation() {
     if (!recTitle.trim() || !recReason.trim()) return
     createRecommendation.mutate(
-      { title: recTitle, type: 'BOOK', reason: recReason },
+      {
+        title: recTitle,
+        author: recAuthor.trim() || undefined,
+        type: 'BOOK',
+        reason: recReason,
+        requesterName: recRequesterName.trim() || undefined,
+        requesterRole: recRequesterRole,
+        requesterClass: recRequesterClass.trim() || undefined,
+      },
       {
         onSuccess: () => {
-          setRecTitle(''); setRecReason('')
+          setRecTitle(''); setRecAuthor(''); setRecReason('')
+          setRecRequesterName(''); setRecRequesterClass('')
           setWorkflowMessage('Recommendation submitted for library staff review.')
         },
       },
     )
+  }
+
+  // [R21] Client-side CSV builders for the Clearance & Audit Reports
+  // panel — "Treasury Settlement Report" and "Overdue Loans Defaulter
+  // List" both work entirely off data already loaded on this page
+  // (allFines, overdueByClass), so no new backend route was needed.
+  function downloadTreasuryCsv() {
+    const paid = allFines.filter((f) => f.status === 'PAID')
+    const rows = [
+      ['Borrower', 'Book', 'Reason', 'Amount (MK)', 'Paid At'],
+      ...paid.map((f) => [f.borrowerName, f.bookTitle, f.reason, String(f.amount), f.paidAt ? new Date(f.paidAt).toLocaleDateString() : '']),
+    ]
+    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `treasury-settlement-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function printDefaultersNotice() {
+    const cutoff = 14 * 24 * 60 * 60 * 1000
+    const rows = overdueByClass.flatMap((c) =>
+      c.students
+        .filter((st) => Date.now() - new Date(st.dueDate).getTime() > cutoff)
+        .map((st) => ({ className: c.className, ...st })),
+    )
+    const win = window.open('', '_blank')
+    if (!win) return
+    win.document.write(`
+      <html><head><title>Overdue Loans Defaulter List</title>
+      <style>body{font-family:sans-serif;padding:24px} h1{font-size:18px} table{width:100%;border-collapse:collapse;margin-top:16px} th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:13px}</style>
+      </head><body>
+      <h1>Overdue Loans Defaulter List — books overdue &gt; 14 days</h1>
+      <table><thead><tr><th>Class</th><th>Student</th><th>Book</th><th>Due Date</th></tr></thead><tbody>
+      ${rows.map((r) => `<tr><td>${r.className}</td><td>${r.studentName}</td><td>${r.bookTitle}</td><td>${new Date(r.dueDate).toLocaleDateString()}</td></tr>`).join('')}
+      </tbody></table>
+      </body></html>
+    `)
+    win.document.close()
+    win.focus()
+    win.print()
+  }
+
+  function exportReportsCsv() {
+    let rows: string[][] = []
+    let filename = 'library-report.csv'
+    if (reportsSubTab === 'fines') {
+      rows = [['Borrower', 'Book', 'Reason', 'Amount (MK)', 'Status'], ...fines.map((f) => [f.borrowerName, f.bookTitle, f.reason, String(f.amount), f.status])]
+      filename = 'fines-and-penalties-ledger.csv'
+    } else if (reportsSubTab === 'catalogDist' && catalogReport) {
+      rows = [['Category', 'Titles', 'Copies', 'Available'], ...catalogReport.byCategory.map((c) => [c.category, String(c.titleCount), String(c.copyCount), String(c.availableCount)])]
+      filename = 'catalog-distribution.csv'
+    } else if (reportsSubTab === 'circulation' && catalogReport) {
+      rows = [['Most Borrowed Book', 'Author', 'Times Borrowed'], ...catalogReport.mostBorrowed.map((r) => [r.book?.title ?? '', r.book?.author ?? '', String(r.borrowCount)])]
+      filename = 'circulation-insights.csv'
+    }
+    if (rows.length === 0) return
+    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   function handleSubmitFineWaiver() {
@@ -755,25 +1346,33 @@ function LibraryContent() {
         </div>
       </div>
 
-      {/* Summary stat tiles */}
+      {/* Summary stat tiles — [R21] added a 5th "Pending Fines" tile
+          (MK amount, from the new pendingFinesAmount stat) matching the
+          screenshot's 5-tile layout; On Loan now uses the same Repeat
+          icon as the Borrowings tab. */}
       {s && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
-            { label: 'Total Books',   value: s.totalBooks,         warn: false                      },
-            { label: 'On Loan',       value: s.activeBorrowings,   warn: false                      },
-            { label: 'Overdue',       value: s.overdueBorrowings,  warn: s.overdueBorrowings > 0    },
-            { label: 'Digital Files', value: s.digitalCount,       warn: false                      },
-          ].map(({ label, value, warn }) => (
+            { label: 'Total Books',   value: String(s.totalBooks),                    sub: 'Cataloged & shelf-ready', icon: BookOpen, warn: false },
+            { label: 'On Loan',       value: String(s.activeBorrowings),               sub: 'Circulation active',      icon: Repeat,   warn: false },
+            { label: 'Overdue',       value: String(s.overdueBorrowings),              sub: 'Requires attention',      icon: AlertTriangle, warn: s.overdueBorrowings > 0 },
+            { label: 'Digital Files', value: String(s.digitalCount),                   sub: 'Past papers & guides',    icon: FileText, warn: false },
+            { label: 'Pending Fines', value: formatMWK(s.pendingFinesAmount),          sub: `${s.pendingFines} pending infraction${s.pendingFines === 1 ? '' : 's'}`, icon: AlertTriangle, warn: s.pendingFinesAmount > 0 },
+          ].map(({ label, value, sub, icon: Icon, warn }) => (
             <div
               key={label}
-              className={`bg-surface border rounded-xl p-4 text-center ${
+              className={`bg-surface border rounded-xl p-4 ${
                 warn ? 'border-brand-coral/30 bg-brand-coral/5' : 'border-base'
               }`}
             >
-              <p className={`text-2xl font-bold ${warn ? 'text-brand-coral' : 'text-brand-navy'}`}>
+              <div className="flex items-center justify-between">
+                <p className={`text-xs font-heading font-semibold uppercase tracking-wider ${warn ? 'text-brand-coral' : 'text-muted'}`}>{label}</p>
+                <Icon className={`w-4 h-4 ${warn ? 'text-brand-coral' : 'text-muted'}`} aria-hidden />
+              </div>
+              <p className={`text-2xl font-bold mt-1.5 ${warn ? 'text-brand-coral' : 'text-brand-navy'}`}>
                 {value}
               </p>
-              <p className="text-xs text-muted mt-1">{label}</p>
+              <p className={`text-xs mt-1 ${warn ? 'text-brand-coral' : 'text-muted'}`}>{sub}</p>
             </div>
           ))}
         </div>
@@ -884,34 +1483,57 @@ function LibraryContent() {
                 <option value="publisher">Group by publisher</option>
               </select>
             </div>
+          </div>
+
+          {/* [R21] Standalone Issue Book (opens the book-search-first
+              modal) + Add Book, right-aligned on their own row — matches
+              the screenshot's toolbar layout below the filter row. */}
+          <div className="flex items-center justify-end gap-2">
+            <PermissionGuard permission="library.issueBook">
+              <button
+                type="button"
+                onClick={() => setShowStandaloneIssue(true)}
+                className="inline-flex items-center gap-1.5 bg-brand-navy text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-navy/90 min-h-[44px]"
+              >
+                <Check className="w-4 h-4" aria-hidden /> Issue Book
+              </button>
+            </PermissionGuard>
             {isLibStaff && (
               <button
                 type="button"
                 onClick={() => setShowAddBook(true)}
                 className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-[44px]"
               >
-                <BookOpen className="w-4 h-4" aria-hidden /> Add Book
+                <Plus className="w-4 h-4" aria-hidden /> Add Book
               </button>
             )}
-            {isLibStaff && (
+          </div>
+
+          {/* [R21] Scan barcode (left) / item count + Table-Grid toggle
+              (right) — matches the screenshot's third toolbar row. */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            {isLibStaff ? (
               <div className="flex flex-col gap-1.5">
                 <div className="flex gap-2">
                   <label htmlFor="library-barcode" className="sr-only">Scan or enter a barcode</label>
-                  <input
-                    id="library-barcode"
-                    value={barcodeInput}
-                    onChange={(e) => setBarcodeInput(e.target.value)}
-                    placeholder="Scan barcode…"
-                    className="border border-base rounded-xl px-3 py-2.5 text-sm w-36 focus:outline-none"
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleScan(barcodeInput) }}
-                  />
+                  <div className="relative">
+                    <Scan className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
+                    <input
+                      id="library-barcode"
+                      value={barcodeInput}
+                      onChange={(e) => setBarcodeInput(e.target.value)}
+                      placeholder="Scan barcode…"
+                      className="border border-base rounded-xl pl-9 pr-3 py-2 text-sm w-44 bg-surface focus:outline-none"
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleScan(barcodeInput) }}
+                    />
+                  </div>
                   <button
                     type="button"
                     onClick={() => handleScan(barcodeInput)}
-                    aria-label="Scan barcode"
+                    aria-label="Look up barcode"
                     className="bg-brand-navy text-white px-3 py-2 rounded-xl text-sm min-h-11"
                   >
-                    <Scan className="w-4 h-4" aria-hidden />
+                    Look up
                   </button>
                 </div>
                 {scanError && <p className="text-xs text-brand-coral">{scanError}</p>}
@@ -930,12 +1552,73 @@ function LibraryContent() {
                   </div>
                 )}
               </div>
-            )}
+            ) : <span />}
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted">Showing {(books as ApiBook[]).length} title{(books as ApiBook[]).length === 1 ? '' : 's'}</span>
+              <div className="flex border border-base rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setCatalogView('table')}
+                  aria-label="Table view"
+                  aria-pressed={catalogView === 'table'}
+                  className={`p-2 min-h-11 ${catalogView === 'table' ? 'bg-brand-navy text-white' : 'bg-surface text-muted hover:bg-page'}`}
+                >
+                  <List className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCatalogView('grid')}
+                  aria-label="Grid view"
+                  aria-pressed={catalogView === 'grid'}
+                  className={`p-2 min-h-11 ${catalogView === 'grid' ? 'bg-brand-navy text-white' : 'bg-surface text-muted hover:bg-page'}`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
 
           {isLoading ? (
             <div className="text-center py-12 text-muted animate-pulse">
               Loading catalog…
+            </div>
+          ) : catalogView === 'grid' ? (
+            /* [R21] Grid view — screenshot's Table/Grid toggle. Cards
+               reuse the same book data as the table; no cover images
+               exist in this system yet, so a BookOpen glyph stands in. */
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {(books as ApiBook[]).length === 0 && (
+                <div className="col-span-full text-center py-12 text-muted text-sm border border-base rounded-xl">No books found.</div>
+              )}
+              {(books as ApiBook[]).map((b) => (
+                <div key={b.id} className="bg-surface border border-base rounded-xl p-4 flex flex-col gap-2">
+                  <div className="w-full h-24 bg-page rounded-lg flex items-center justify-center">
+                    <BookOpen className="w-8 h-8 text-muted/50" aria-hidden />
+                  </div>
+                  <div>
+                    <p className="font-heading font-semibold text-sm text-body">{b.title}</p>
+                    <p className="text-xs text-muted">{b.author}</p>
+                    <p className="text-xs text-muted mt-0.5">
+                      {b.barcode ?? '—'}{b.shelf ? ` · Shelf ${b.shelf}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs bg-base rounded px-2 py-0.5">{b.category}</span>
+                    <span className={`text-xs font-semibold ${b.availableCopies === 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>
+                      {b.availableCopies}/{b.totalCopies} available
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-auto pt-1">
+                    <PermissionGuard permission="library.issueBook">
+                      <button type="button" disabled={b.availableCopies === 0} onClick={() => handleIssue(b.id)} className="text-xs font-semibold text-brand-teal underline disabled:opacity-40 min-h-11">Issue</button>
+                    </PermissionGuard>
+                    <button type="button" onClick={() => setViewingBookId(b.id)} aria-label={`View ${b.title}`} className="text-muted hover:text-body min-h-11 min-w-11 flex items-center justify-center"><Eye className="w-3.5 h-3.5" /></button>
+                    {isLibStaff && (
+                      <button type="button" onClick={() => setEditingBook(b)} aria-label={`Edit ${b.title}`} className="text-muted hover:text-body min-h-11 min-w-11 flex items-center justify-center"><Pencil className="w-3.5 h-3.5" /></button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="border border-base rounded-xl overflow-hidden">
@@ -944,13 +1627,16 @@ function LibraryContent() {
                 {(books as ApiBook[]).map((b) => (
                   <div key={b.id} className="px-4 py-3">
                     <p className="font-heading font-semibold text-sm text-body">{b.title}</p>
-                    <p className="text-xs text-muted mt-0.5">{b.author}</p>
+                    <p className="text-xs text-muted mt-0.5">
+                      {b.author}{b.shelf ? ` · Shelf ${b.shelf}` : ''}
+                    </p>
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       <span className="text-xs bg-base rounded px-2 py-0.5">{b.category}</span>
                       <span className="text-xs text-muted">{b.totalCopies} copies</span>
                       <span className={`text-xs font-semibold ${b.availableCopies === 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>
                         {b.availableCopies} available
                       </span>
+                      <button type="button" onClick={() => setViewingBookId(b.id)} aria-label={`View ${b.title}`} className="text-muted hover:text-body min-h-11 min-w-11 flex items-center justify-center"><Eye className="w-3.5 h-3.5" /></button>
                       <PermissionGuard permission="library.issueBook">
                         <button
                           type="button"
@@ -971,7 +1657,9 @@ function LibraryContent() {
                 ))}
               </div>
 
-              {/* Desktop table — books */}
+              {/* Desktop table — books. [R21] Title column now shows the
+                  barcode + shelf sub-line (screenshot's "MAT-2017-001 ·
+                  Shelf M-02"), and Actions gained an Eye "view" icon. */}
               <table className="w-full text-sm border-collapse hidden md:table">
                 <thead>
                   <tr className="bg-page border-b border-base">
@@ -994,12 +1682,12 @@ function LibraryContent() {
                           {groupName} · {groupBooks.length}
                         </td>
                       </tr>
-                      {groupBooks.map((b) => <BookRow key={b.id} book={b} isLibStaff={isLibStaff} onIssue={handleIssue} onEdit={setEditingBook} />)}
+                      {groupBooks.map((b) => <BookRow key={b.id} book={b} isLibStaff={isLibStaff} onIssue={handleIssue} onEdit={setEditingBook} onView={setViewingBookId} />)}
                     </tbody>
                   ))
                 ) : (
                   <tbody className="divide-y divide-base">
-                    {(books as ApiBook[]).map((b) => <BookRow key={b.id} book={b} isLibStaff={isLibStaff} onIssue={handleIssue} onEdit={setEditingBook} />)}
+                    {(books as ApiBook[]).map((b) => <BookRow key={b.id} book={b} isLibStaff={isLibStaff} onIssue={handleIssue} onEdit={setEditingBook} onView={setViewingBookId} />)}
                   </tbody>
                 )}
               </table>
@@ -1015,85 +1703,241 @@ function LibraryContent() {
       {/* ── Borrowings tab ────────────────────────────────────────────────── */}
       {tab === 'borrowings' && (
         <div className="space-y-4">
-          {(overdue as ApiBorrowing[]).length > 0 && (
-            <div role="status" aria-live="polite" className="bg-brand-coral/8 border border-brand-coral/25 rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-brand-coral shrink-0 mt-0.5" aria-hidden />
-                <div>
-                  <p className="font-semibold text-brand-coral">
-                    {(overdue as ApiBorrowing[]).length} overdue borrowing(s)
-                  </p>
-                  <p className="text-sm text-muted mt-0.5">
-                    Fines are applied automatically on return.
-                  </p>
+          {/* [R21] Sub-tab pill bar (Active Borrowings / Fine Waiver
+              Portal — "Quick Check-in Desk" skipped per instruction) with
+              the standalone "+ Issue Book" button trailing it, matching
+              the screenshot's secondary toolbar. */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <ModuleTabs<'active' | 'waivers'>
+              tabs={[
+                { id: 'active',  label: 'Active Borrowings',  icon: Repeat, badge: (activeLoans as ApiBorrowing[]).length },
+                { id: 'waivers', label: 'Fine Waiver Portal',  icon: Shield, badge: fineWaivers.length },
+              ]}
+              active={borrowingsSubTab}
+              onChange={setBorrowingsSubTab}
+              variant="pill"
+              id="borrowings-subtabs"
+            />
+            <PermissionGuard permission="library.issueBook">
+              <button
+                type="button"
+                onClick={() => setShowStandaloneIssue(true)}
+                className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-[44px] shrink-0"
+              >
+                <Plus className="w-4 h-4" aria-hidden /> Issue Book
+              </button>
+            </PermissionGuard>
+          </div>
+
+          {borrowingsSubTab === 'active' && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex-1 min-w-56 relative">
+                  <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
+                  <label htmlFor="borrowings-search" className="sr-only">Search borrower name, student ID, book title, or barcode</label>
+                  <input
+                    id="borrowings-search"
+                    value={borrowingsSearch}
+                    onChange={(e) => setBorrowingsSearch(e.target.value)}
+                    placeholder="Search borrower name, student ID, book title, or barcode…"
+                    className="w-full border border-base rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const code = window.prompt('Scan or type a barcode:')
+                    if (code) handleScan(code)
+                  }}
+                  className="inline-flex items-center gap-1.5 border border-base rounded-xl px-3 py-2.5 text-sm text-body hover:bg-page min-h-[44px]"
+                >
+                  <Scan className="w-4 h-4" aria-hidden /> Scan Barcode
+                </button>
+                <div className="flex items-center gap-1.5 bg-page rounded-xl p-1">
+                  {([
+                    ['all', 'All Loans'],
+                    ['active', 'Active'],
+                    ['dueSoon', 'Due Soon'],
+                    ['overdue', 'Overdue'],
+                  ] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setBorrowingsFilter(id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${borrowingsFilter === id ? 'bg-brand-navy text-white' : 'text-muted hover:text-body'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <ul className="mt-3 divide-y divide-brand-coral/15">
-                {(overdue as ApiBorrowing[]).map((b) => (
-                  <li key={b.id} className="py-2 flex items-center justify-between gap-3 text-sm">
-                    <span>{b.book?.title ?? 'Untitled'} — due {new Date(b.dueDate).toLocaleDateString()}</span>
-                    <PermissionGuard permission="library.processReturn">
-                      <button
-                        type="button"
-                        onClick={() => handleReturn(b.id)}
-                        className="flex items-center gap-1.5 text-brand-teal font-semibold underline min-h-11"
-                      >
-                        <Undo2 className="w-3.5 h-3.5" aria-hidden /> Mark returned
-                      </button>
-                    </PermissionGuard>
-                  </li>
-                ))}
-              </ul>
+
+              {(scanError || scanResult) && (
+                <div className={`text-xs rounded-lg px-3 py-2 flex items-center justify-between gap-2 ${scanError ? 'bg-brand-coral/10 border border-brand-coral/25 text-brand-coral' : 'bg-brand-teal/10 border border-brand-teal/25'}`}>
+                  {scanError ? <span>{scanError}</span> : (
+                    <>
+                      <span>Found: <strong>{scanResult?.title}</strong></span>
+                      <PermissionGuard permission="library.issueBook">
+                        <button type="button" onClick={() => handleIssue(scanResult!.id)} className="text-brand-teal font-semibold underline min-h-11">Issue this book</button>
+                      </PermissionGuard>
+                    </>
+                  )}
+                </div>
+              )}
+
+              <div className="border border-base rounded-xl overflow-hidden">
+                {/* Mobile card list — borrowings */}
+                <div className="divide-y divide-base md:hidden">
+                  {visibleLoans.length === 0 && <div className="text-center py-10 text-muted text-sm">No matching loans.</div>}
+                  {visibleLoans.map((b) => {
+                    const displayStatus = borrowingDisplayStatus(b)
+                    const { name, sublabel } = borrowerLabel(b)
+                    return (
+                      <div key={b.id} className="px-4 py-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-heading font-semibold text-sm text-body">{name}</p>
+                            <p className="text-xs text-muted">{sublabel}</p>
+                          </div>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                            displayStatus === 'OVERDUE' ? 'bg-brand-coral/10 text-brand-coral'
+                            : displayStatus === 'DUE_SOON' ? 'bg-brand-amber/10 text-brand-amber'
+                            : 'bg-brand-teal/10 text-brand-teal'
+                          }`}>
+                            {displayStatus === 'DUE_SOON' ? 'DUE SOON' : displayStatus}
+                          </span>
+                        </div>
+                        <p className="text-sm text-body mt-1">{b.book?.title ?? 'Untitled'}</p>
+                        <p className="text-xs text-muted">{borrowingCountdownLabel(b)}</p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <PermissionGuard permission="library.issueBook">
+                            <button type="button" onClick={() => handleRenew(b.id)} disabled={renewBorrowing.isPending} className="text-xs font-semibold text-brand-navy underline">Renew (+14d)</button>
+                          </PermissionGuard>
+                          <PermissionGuard permission="library.processReturn">
+                            <button type="button" onClick={() => setReturningBorrowing(b)} className="text-xs font-semibold text-brand-teal underline">Return Book</button>
+                          </PermissionGuard>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Desktop table — borrowings */}
+                <table className="w-full text-sm border-collapse hidden md:table">
+                  <thead>
+                    <tr className="bg-page border-b border-base">
+                      {['Borrower / Student', 'Book Title & Barcode', 'Issue Date', 'Due Date & Countdown', 'Status', 'Circulation Actions'].map((h) => (
+                        <th key={h} scope="col" className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-base">
+                    {visibleLoans.length === 0 && (
+                      <tr><td colSpan={6} className="text-center py-10 text-muted text-sm">No matching loans.</td></tr>
+                    )}
+                    {visibleLoans.map((b) => {
+                      const displayStatus = borrowingDisplayStatus(b)
+                      const { name, sublabel } = borrowerLabel(b)
+                      return (
+                        <tr key={b.id} className="hover:bg-page">
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-body">{name}</p>
+                            <p className="text-xs text-muted">{sublabel}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-body">{b.book?.title ?? 'Untitled'}</p>
+                            <p className="text-xs font-mono text-muted">{b.book?.barcode ?? '—'}</p>
+                          </td>
+                          <td className="px-4 py-3 text-muted text-xs">{new Date(b.issuedAt).toLocaleDateString()}</td>
+                          <td className="px-4 py-3">
+                            <p className="text-xs">{new Date(b.dueDate).toLocaleDateString()}</p>
+                            <p className={`text-xs ${displayStatus === 'OVERDUE' ? 'text-brand-coral' : 'text-muted'}`}>{borrowingCountdownLabel(b)}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              displayStatus === 'OVERDUE' ? 'bg-brand-coral/10 text-brand-coral'
+                              : displayStatus === 'DUE_SOON' ? 'bg-brand-amber/10 text-brand-amber'
+                              : 'bg-brand-teal/10 text-brand-teal'
+                            }`}>
+                              {displayStatus === 'DUE_SOON' ? 'DUE SOON' : displayStatus}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <PermissionGuard permission="library.issueBook">
+                                <button type="button" onClick={() => handleRenew(b.id)} disabled={renewBorrowing.isPending} className="text-xs font-semibold text-brand-navy underline disabled:opacity-50">
+                                  Renew (+14d)
+                                </button>
+                              </PermissionGuard>
+                              <PermissionGuard permission="library.processReturn">
+                                <button type="button" onClick={() => setReturningBorrowing(b)} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-teal underline">
+                                  <Undo2 className="w-3 h-3" aria-hidden /> Return Book
+                                </button>
+                              </PermissionGuard>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
-          <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
-            <h3 className="font-heading font-semibold text-sm text-body">Request a Fine Waiver</h3>
-            <p className="text-xs text-muted">
-              Have an outstanding library fine you&apos;d like reviewed? Submit the fine ID with your reason below.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label htmlFor="waiver-fine-id" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Fine ID</label>
-                <input id="waiver-fine-id" value={waiverFineId} onChange={(e) => setWaiverFineId(e.target.value)}
-                  className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+          {borrowingsSubTab === 'waivers' && (
+            <div className="space-y-4">
+              <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
+                <h3 className="font-heading font-semibold text-sm text-body">Request a Fine Waiver</h3>
+                <p className="text-xs text-muted">
+                  Have an outstanding library fine you&apos;d like reviewed? Submit the fine ID with your reason below.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="waiver-fine-id" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Fine ID</label>
+                    <input id="waiver-fine-id" value={waiverFineId} onChange={(e) => setWaiverFineId(e.target.value)}
+                      placeholder="e.g. FINE-101"
+                      className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+                  </div>
+                  <div>
+                    <label htmlFor="waiver-reason" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Reason</label>
+                    <input id="waiver-reason" value={waiverReason} onChange={(e) => setWaiverReason(e.target.value)}
+                      placeholder="Explain circumstance (e.g. financial hardship, verified flood damage, medical leave)…"
+                      className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+                  </div>
+                </div>
+                <button type="button" onClick={handleSubmitFineWaiver} disabled={createFineWaiver.isPending}
+                  className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
+                  {createFineWaiver.isPending ? 'Submitting…' : 'Submit Waiver Request'}
+                </button>
+                {workflowMessage && <p className="text-sm text-brand-teal">{workflowMessage}</p>}
               </div>
-              <div>
-                <label htmlFor="waiver-reason" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Reason</label>
-                <input id="waiver-reason" value={waiverReason} onChange={(e) => setWaiverReason(e.target.value)}
-                  className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
-              </div>
-            </div>
-            <button type="button" onClick={handleSubmitFineWaiver} disabled={createFineWaiver.isPending}
-              className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
-              {createFineWaiver.isPending ? 'Submitting…' : 'Submit Waiver Request'}
-            </button>
-            {workflowMessage && <p className="text-sm text-brand-teal">{workflowMessage}</p>}
-          </div>
 
-          <PermissionGuard permission="library.waiveFine">
-            <div className="bg-surface border border-base rounded-xl p-4">
-              <h3 className="font-heading font-semibold text-sm text-body mb-3">Pending Fine Waiver Requests</h3>
-              {fineWaivers.length === 0 ? (
-                <p className="text-sm text-muted">No pending waiver requests.</p>
-              ) : (
-                <ul className="divide-y divide-base">
-                  {fineWaivers.map((w) => (
-                    <li key={w.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
-                      <span>{w.reason} — MWK {w.amount}</span>
-                      <div className="flex gap-3">
-                        <button type="button" onClick={() => approveFineWaiver.mutate(w.id)} aria-label="Approve waiver" className="text-brand-teal min-h-11 min-w-11 flex items-center justify-center"><Check className="w-4 h-4" /></button>
-                        <button type="button" onClick={() => {
-                          const reason = window.prompt('Reason for rejecting this waiver request:')
-                          if (reason) rejectFineWaiver.mutate({ id: w.id, reason })
-                        }} aria-label="Reject waiver" className="text-brand-coral min-h-11 min-w-11 flex items-center justify-center"><XIcon className="w-4 h-4" /></button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <PermissionGuard permission="library.waiveFine">
+                <div className="bg-surface border border-base rounded-xl p-4">
+                  <h3 className="font-heading font-semibold text-sm text-body mb-3">Pending Fine Waiver Requests</h3>
+                  {fineWaivers.length === 0 ? (
+                    <p className="text-sm text-muted">No pending waiver requests.</p>
+                  ) : (
+                    <ul className="divide-y divide-base">
+                      {fineWaivers.map((w) => (
+                        <li key={w.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
+                          <span>{w.reason} — MWK {w.amount}</span>
+                          <div className="flex gap-3">
+                            <button type="button" onClick={() => approveFineWaiver.mutate(w.id)} aria-label="Approve waiver" className="text-brand-teal min-h-11 min-w-11 flex items-center justify-center"><Check className="w-4 h-4" /></button>
+                            <button type="button" onClick={() => {
+                              const reason = window.prompt('Reason for rejecting this waiver request:')
+                              if (reason) rejectFineWaiver.mutate({ id: w.id, reason })
+                            }} aria-label="Reject waiver" className="text-brand-coral min-h-11 min-w-11 flex items-center justify-center"><XIcon className="w-4 h-4" /></button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </PermissionGuard>
             </div>
-          </PermissionGuard>
+          )}
         </div>
       )}
 
@@ -1200,32 +2044,106 @@ function LibraryContent() {
         />
       )}
 
+      {/* [R21] Standalone "+ Issue Book" (Catalog toolbar + Borrowings
+          sub-tab bar) — no book preselected, so bookId is null and the
+          modal shows its own book-search step. */}
+      {showStandaloneIssue && (
+        <IssueBookModal
+          bookId={null}
+          onClose={() => setShowStandaloneIssue(false)}
+        />
+      )}
+
+      {/* [R21] Eye-icon "view" action from the Catalog table/grid. */}
+      {viewingBookId && (
+        <BookDetailModal bookId={viewingBookId} onClose={() => setViewingBookId(null)} />
+      )}
+
+      {/* [R21] Return Book — real condition picker, opened from the
+          Active Borrowings table's "Return Book" action. */}
+      {returningBorrowing && (
+        <ReturnBookModal borrowing={returningBorrowing} onClose={() => setReturningBorrowing(null)} />
+      )}
+
+      {/* [R21] "+ Assess Fine" — Fines & Penalties Ledger. */}
+      {assessingFine && (
+        <AssessFineModal onClose={() => setAssessingFine(false)} />
+      )}
+
+      {/* [R21] "Open Clearance Checker" — Clearance & Audit Reports. */}
+      {showClearanceChecker && (
+        <ClearanceCheckerModal allFines={allFines} onClose={() => setShowClearanceChecker(false)} />
+      )}
+
       {/* ── Recommendations tab ──────────────────────────────────────────── */}
       {tab === 'recommendations' && (
         <div className="space-y-4">
+          {/* [R21] Redesigned to match the screenshot's field set (Title,
+              Author(s), Requester Name & Role, Class/Form/Department, Why
+              acquire) — the underlying listing/review workflow below is
+              unchanged, per instruction. */}
           <PermissionGuard permission="library.recommendResource">
-            <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
-              <h3 className="font-heading font-semibold text-sm text-body">Recommend a Resource</h3>
+            <div className="bg-surface border border-base rounded-xl p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-brand-amber" aria-hidden />
+                <h3 className="font-heading font-semibold text-sm text-body">Recommend a Resource</h3>
+              </div>
+              <p className="text-xs text-muted -mt-2">Suggest new books, textbooks, or syllabus guides for the school library acquisition budget.</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="rec-title" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Title</label>
+                  <label htmlFor="rec-title" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Title *</label>
                   <input id="rec-title" value={recTitle} onChange={(e) => setRecTitle(e.target.value)}
+                    placeholder="Book title, edition, or journal name…"
                     className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
                 </div>
                 <div>
-                  <label htmlFor="rec-reason" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Why should the library acquire this?</label>
-                  <input id="rec-reason" value={recReason} onChange={(e) => setRecReason(e.target.value)}
+                  <label htmlFor="rec-author" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Author(s)</label>
+                  <input id="rec-author" value={recAuthor} onChange={(e) => setRecAuthor(e.target.value)}
+                    placeholder="Author, editor, or publishing house…"
                     className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
                 </div>
+                <div>
+                  <label htmlFor="rec-requester-name" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Requester Name &amp; Role</label>
+                  <div className="flex gap-2">
+                    <input id="rec-requester-name" value={recRequesterName} onChange={(e) => setRecRequesterName(e.target.value)}
+                      placeholder="Your Name…"
+                      className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+                    <select
+                      value={recRequesterRole}
+                      onChange={(e) => setRecRequesterRole(e.target.value as typeof recRequesterRole)}
+                      aria-label="Requester role"
+                      className="min-h-11 border border-base rounded-xl px-2 text-sm bg-page text-body"
+                    >
+                      <option value="Student">Student</option>
+                      <option value="Staff">Staff</option>
+                      <option value="Parent">Parent</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="rec-requester-class" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Class / Form / Department</label>
+                  <input id="rec-requester-class" value={recRequesterClass} onChange={(e) => setRecRequesterClass(e.target.value)}
+                    placeholder="e.g. Form 4 Science B or Department of Languages"
+                    className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="rec-reason" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Why should the library acquire this? *</label>
+                  <textarea id="rec-reason" value={recReason} onChange={(e) => setRecReason(e.target.value)} rows={3}
+                    placeholder="Explain academic relevance, exam syllabus support, or general literary value…"
+                    className="w-full border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
+                </div>
               </div>
-              <button type="button" onClick={handleSubmitRecommendation} disabled={createRecommendation.isPending}
-                className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
+              <button type="button" onClick={handleSubmitRecommendation} disabled={createRecommendation.isPending || !recTitle.trim() || !recReason.trim()}
+                className="inline-flex items-center gap-1.5 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
                 {createRecommendation.isPending ? 'Submitting…' : 'Submit Recommendation'}
               </button>
               {workflowMessage && <p className="text-sm text-brand-teal">{workflowMessage}</p>}
             </div>
           </PermissionGuard>
 
+          {/* [R21] Listing/approve/reject workflow unchanged — only the
+              row now also shows the requester fields when present. */}
           <PermissionGuard permission="library.approveRecommendation">
             <div className="bg-surface border border-base rounded-xl p-4">
               <h3 className="font-heading font-semibold text-sm text-body mb-3">Pending Recommendations</h3>
@@ -1236,8 +2154,13 @@ function LibraryContent() {
                   {recommendations.map((r) => (
                     <li key={r.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
                       <div>
-                        <p className="font-medium">{r.title}</p>
+                        <p className="font-medium">{r.title}{r.author ? ` — ${r.author}` : ''}</p>
                         <p className="text-xs text-muted">{r.reason}</p>
+                        {(r.requesterName || r.requesterClass) && (
+                          <p className="text-xs text-muted/80 mt-0.5">
+                            {[r.requesterName, r.requesterRole, r.requesterClass].filter(Boolean).join(' · ')}
+                          </p>
+                        )}
                       </div>
                       <div className="flex gap-3 shrink-0">
                         <button type="button" onClick={() => approveRecommendation.mutate({ id: r.id })} aria-label="Approve recommendation" className="text-brand-teal min-h-11 min-w-11 flex items-center justify-center"><Check className="w-4 h-4" /></button>
@@ -1259,113 +2182,302 @@ function LibraryContent() {
           [PRODUCTION FIX 2026-07-28] Most-borrowed/most-read/category
           breakdown and fines management both had zero UI anywhere — the
           former had no backend either until this pass; fines were created
-          automatically but had no listing/clearing surface at all. */}
-      {tab === 'reports' && isLibStaff && (
-        <div className="space-y-6">
-          <div>
-            <h2 className="font-heading font-semibold text-body mb-3">Most Borrowed Books</h2>
-            {!catalogReport || catalogReport.mostBorrowed.length === 0 ? (
-              <p className="text-sm text-muted">No borrowing history yet.</p>
-            ) : (
-              <div className="bg-surface rounded-xl divide-y divide-base">
-                {catalogReport.mostBorrowed.map((r, i) => (
-                  <div key={r.book?.id ?? i} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                    <div>
-                      <span className="text-muted mr-2">{i + 1}.</span>
-                      <span className="font-medium text-body">{r.book?.title}</span>
-                      <span className="text-muted ml-1.5">— {r.book?.author}</span>
-                    </div>
-                    <span className="font-heading font-semibold text-brand-teal">{r.borrowCount}×</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          automatically but had no listing/clearing surface at all.
+          [R21] Restructured into 4 sub-tabs (Fines & Penalties Ledger /
+          Circulation & Popularity Insights / Catalog Distribution /
+          Clearance & Audit Reports) matching the screenshot's pill bar,
+          with Export CSV / Print trailing it instead of "+ Issue Book". */}
+      {tab === 'reports' && isLibStaff && (() => {
+        const totalOutstanding = allFines.filter((f) => f.status === 'PENDING').reduce((sum, f) => sum + f.amount, 0)
+        const collectedTotal   = allFines.filter((f) => f.status === 'PAID').reduce((sum, f) => sum + f.amount, 0)
+        const totalAssessed    = allFines.reduce((sum, f) => sum + f.amount, 0)
+        const totalPhysicalCopies = catalogReport?.byCategory.reduce((sum, c) => sum + c.copyCount, 0) ?? 0
+        const categoryBooks = selectedCategory ? (books as ApiBook[]).filter((b) => b.category === selectedCategory) : []
 
-          <div>
-            <h2 className="font-heading font-semibold text-body mb-3">Most Read (Digital)</h2>
-            {!catalogReport || catalogReport.mostRead.length === 0 ? (
-              <p className="text-sm text-muted">No digital resource views yet.</p>
-            ) : (
-              <div className="bg-surface rounded-xl divide-y divide-base">
-                {catalogReport.mostRead.map((r, i) => (
-                  <div key={r.resource?.id ?? i} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                    <div>
-                      <span className="text-muted mr-2">{i + 1}.</span>
-                      <span className="font-medium text-body">{r.resource?.title}</span>
-                      <span className="text-muted ml-1.5">— {r.resource?.type}</span>
-                    </div>
-                    <span className="font-heading font-semibold text-brand-teal">{r.viewCount} views</span>
-                  </div>
-                ))}
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <ModuleTabs<'fines' | 'circulation' | 'catalogDist' | 'clearance'>
+                tabs={[
+                  { id: 'fines',       label: 'Fines & Penalties Ledger',        icon: AlertTriangle,  badge: fines.length },
+                  { id: 'circulation', label: 'Circulation & Popularity Insights', icon: ArrowUpRight },
+                  { id: 'catalogDist', label: 'Catalog Distribution',            icon: BookMarked,     badge: catalogReport?.byCategory.length ?? 0 },
+                  { id: 'clearance',   label: 'Clearance & Audit Reports',       icon: ClipboardList },
+                ]}
+                active={reportsSubTab}
+                onChange={setReportsSubTab}
+                variant="pill"
+                id="reports-subtabs"
+              />
+              <div className="flex items-center gap-2 shrink-0">
+                <button type="button" onClick={exportReportsCsv} className="inline-flex items-center gap-1.5 border border-base rounded-xl px-3 py-2.5 text-sm text-body hover:bg-page min-h-[44px]">
+                  <Download className="w-4 h-4" aria-hidden /> Export CSV
+                </button>
+                <button type="button" onClick={() => window.print()} className="inline-flex items-center gap-1.5 border border-base rounded-xl px-3 py-2.5 text-sm text-body hover:bg-page min-h-[44px]">
+                  <Printer className="w-4 h-4" aria-hidden /> Print
+                </button>
               </div>
-            )}
-          </div>
-
-          <div>
-            <h2 className="font-heading font-semibold text-body mb-3">Catalog by Category</h2>
-            {!catalogReport || catalogReport.byCategory.length === 0 ? (
-              <p className="text-sm text-muted">No books in the catalog yet.</p>
-            ) : (
-              <div className="grid sm:grid-cols-3 gap-3">
-                {catalogReport.byCategory.map((c) => (
-                  <div key={c.category} className="bg-surface rounded-xl p-4">
-                    <p className="font-heading font-semibold text-sm text-body">{c.category}</p>
-                    <p className="text-xs text-muted mt-1">{c.titleCount} titles · {c.copyCount} copies</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-heading font-semibold text-body">Library Fines</h2>
-              <select
-                value={fineStatusFilter}
-                onChange={(e) => setFineStatusFilter(e.target.value as typeof fineStatusFilter)}
-                className="border border-base rounded-lg px-3 py-1.5 text-sm bg-surface min-h-[36px]"
-                aria-label="Filter fines by status"
-              >
-                <option value="PENDING">Pending</option>
-                <option value="PAID">Paid</option>
-                <option value="WAIVED">Waived</option>
-                <option value="">All statuses</option>
-              </select>
             </div>
-            {fines.length === 0 ? (
-              <p className="text-sm text-muted">No {fineStatusFilter ? fineStatusFilter.toLowerCase() : ''} fines.</p>
-            ) : (
-              <div className="bg-surface rounded-xl divide-y divide-base">
-                {fines.map((f) => (
-                  <div key={f.id} className="flex items-center justify-between px-4 py-3 text-sm">
+
+            {/* ── Fines & Penalties Ledger ─────────────────────────────── */}
+            {reportsSubTab === 'fines' && (
+              <div className="space-y-4">
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div className="bg-surface border border-base rounded-xl p-4">
+                    <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider">Total Outstanding (Pending)</p>
+                    <p className="text-2xl font-bold text-brand-amber mt-1.5">{formatMWK(totalOutstanding)}</p>
+                    <p className="text-xs text-brand-amber mt-1">{allFines.filter((f) => f.status === 'PENDING').length} uncollected fines</p>
+                  </div>
+                  <div className="bg-surface border border-base rounded-xl p-4">
+                    <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider">Collected Treasury Total</p>
+                    <p className="text-2xl font-bold text-brand-teal mt-1.5">{formatMWK(collectedTotal)}</p>
+                    <p className="text-xs text-brand-teal mt-1">{allFines.filter((f) => f.status === 'PAID').length} settled receipts on record</p>
+                  </div>
+                  <div className="bg-surface border border-base rounded-xl p-4">
+                    <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider">Total Penalties Assessed</p>
+                    <p className="text-2xl font-bold text-brand-navy mt-1.5">{formatMWK(totalAssessed)}</p>
+                    <p className="text-xs text-muted mt-1">Damaged books, lost copies &amp; late fees</p>
+                  </div>
+                </div>
+
+                <div className="bg-surface border border-base rounded-xl p-4">
+                  <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
                     <div>
-                      <p className="font-medium text-body">{f.borrowerName} — {f.bookTitle}</p>
-                      <p className="text-xs text-muted">{f.reason} · {formatMWK(f.amount)}</p>
+                      <h3 className="font-heading font-semibold text-sm text-body">Library Fines &amp; Damages</h3>
+                      <p className="text-xs text-muted">Manage book damages, lost copies, and overdue penalty settlements</p>
                     </div>
-                    {f.status === 'PENDING' ? (
-                      <PermissionGuard permission="library.clearFine">
-                        <button
-                          type="button"
-                          onClick={() => clearFine.mutate(f.id)}
-                          disabled={clearFine.isPending}
-                          className="text-xs font-semibold text-brand-teal hover:underline disabled:opacity-50"
-                        >
-                          Mark Paid
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={fineStatusFilter}
+                        onChange={(e) => setFineStatusFilter(e.target.value as typeof fineStatusFilter)}
+                        className="border border-base rounded-lg px-3 py-1.5 text-sm bg-surface min-h-[36px]"
+                        aria-label="Filter fines by status"
+                      >
+                        <option value="PENDING">Pending</option>
+                        <option value="PAID">Paid</option>
+                        <option value="WAIVED">Waived</option>
+                        <option value="">All statuses</option>
+                      </select>
+                      <PermissionGuard permission="library.applyFine">
+                        <button type="button" onClick={() => setAssessingFine(true)} className="inline-flex items-center gap-1.5 bg-brand-navy text-white rounded-lg px-3 py-1.5 text-sm font-semibold min-h-[36px]">
+                          <Plus className="w-3.5 h-3.5" aria-hidden /> Assess Fine
                         </button>
                       </PermissionGuard>
+                    </div>
+                  </div>
+
+                  {fines.length === 0 ? (
+                    <p className="text-sm text-muted">No {fineStatusFilter ? fineStatusFilter.toLowerCase() : ''} fines.</p>
+                  ) : (
+                    <div className="divide-y divide-base">
+                      {fines.map((f) => (
+                        <div key={f.id} className="flex items-center justify-between gap-3 px-1 py-3 text-sm">
+                          <div>
+                            <p className="font-medium text-body">
+                              {f.borrowerName} — {f.bookTitle}
+                              {f.status === 'PENDING' && <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-amber/10 text-brand-amber">PENDING</span>}
+                            </p>
+                            <p className="text-xs text-muted">{f.reason} · {formatMWK(f.amount)}</p>
+                          </div>
+                          {f.status === 'PENDING' ? (
+                            <div className="flex items-center gap-3 shrink-0">
+                              <PermissionGuard permission="library.clearFine">
+                                <button type="button" onClick={() => clearFine.mutate(f.id)} disabled={clearFine.isPending} className="text-xs font-semibold text-brand-teal hover:underline disabled:opacity-50">Mark Paid</button>
+                              </PermissionGuard>
+                              <PermissionGuard permission="library.waiveFine">
+                                <button type="button" onClick={() => waiveFine.mutate(f.id)} disabled={waiveFine.isPending} className="text-xs font-semibold text-muted hover:underline disabled:opacity-50">Waive</button>
+                              </PermissionGuard>
+                            </div>
+                          ) : (
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${f.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-brand-teal/10 text-brand-teal'}`}>
+                              {f.status}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* [R21] "no where to see how many and what books are
+                    lost, damaged" — libraryService.getConditionReport(). */}
+                <div className="bg-surface border border-base rounded-xl p-4">
+                  <h3 className="font-heading font-semibold text-sm text-body mb-1">Damaged &amp; Lost Books</h3>
+                  <p className="text-xs text-muted mb-3">
+                    {conditionReport.filter((c) => c.condition === 'DAMAGED').length} damaged · {conditionReport.filter((c) => c.condition === 'LOST').length} lost
+                  </p>
+                  {conditionReport.length === 0 ? (
+                    <p className="text-sm text-muted">No damaged or lost copies recorded.</p>
+                  ) : (
+                    <ul className="divide-y divide-base">
+                      {conditionReport.map((c: ApiLibraryConditionEntry) => (
+                        <li key={c.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
+                          <div>
+                            <p className="font-medium text-body">{c.bookTitle} — {c.borrowerName}</p>
+                            {c.notes && <p className="text-xs text-muted">{c.notes}</p>}
+                          </div>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${c.condition === 'LOST' ? 'bg-brand-coral/10 text-brand-coral' : 'bg-brand-amber/10 text-brand-amber'}`}>
+                            {c.condition}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Circulation & Popularity Insights ────────────────────── */}
+            {reportsSubTab === 'circulation' && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="bg-surface border border-base rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-heading font-semibold text-sm text-body">Most Borrowed Books</h3>
+                    <span className="text-xs bg-base rounded-full px-2 py-0.5 text-muted">Physical Catalog</span>
+                  </div>
+                  <p className="text-xs text-muted mb-2">Top 10 physical library titles by checkout frequency</p>
+                  {!catalogReport || catalogReport.mostBorrowed.length === 0 ? (
+                    <p className="text-sm text-muted">No borrowing history yet.</p>
+                  ) : (
+                    <div className="divide-y divide-base">
+                      {catalogReport.mostBorrowed.map((r, i) => (
+                        <div key={r.book?.id ?? i} className="flex items-center justify-between px-1 py-2.5 text-sm">
+                          <div>
+                            <span className="text-muted mr-2">{i + 1}.</span>
+                            <span className="font-medium text-body">{r.book?.title}</span>
+                            <span className="text-muted ml-1.5">— {r.book?.author}</span>
+                          </div>
+                          <span className="font-heading font-semibold text-brand-teal shrink-0">{r.borrowCount}×</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="bg-surface border border-base rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-heading font-semibold text-sm text-body">Most Read (Digital)</h3>
+                    <span className="text-xs bg-base rounded-full px-2 py-0.5 text-muted">Digital E-Library</span>
+                  </div>
+                  <p className="text-xs text-muted mb-2">Top digital resources accessed by students &amp; faculty</p>
+                  {!catalogReport || catalogReport.mostRead.length === 0 ? (
+                    <p className="text-sm text-muted">No digital resource views yet.</p>
+                  ) : (
+                    <div className="divide-y divide-base">
+                      {catalogReport.mostRead.map((r, i) => (
+                        <div key={r.resource?.id ?? i} className="flex items-center justify-between px-1 py-2.5 text-sm">
+                          <div>
+                            <span className="text-muted mr-2">{i + 1}.</span>
+                            <span className="font-medium text-body">{r.resource?.title}</span>
+                            <span className="text-muted ml-1.5">— {r.resource?.type}</span>
+                          </div>
+                          <span className="font-heading font-semibold text-brand-teal shrink-0">{r.viewCount} views</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Catalog Distribution ─────────────────────────────────── */}
+            {reportsSubTab === 'catalogDist' && (
+              <div className="bg-surface border border-base rounded-xl p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-heading font-semibold text-sm text-body">Catalog by Category</h3>
+                    <p className="text-xs text-muted">Collection volume distribution, title count, physical copies, and active shelf utilization</p>
+                  </div>
+                  <p className="text-xs text-muted shrink-0">Total physical copies: <strong className="text-body">{totalPhysicalCopies}</strong></p>
+                </div>
+                {!catalogReport || catalogReport.byCategory.length === 0 ? (
+                  <p className="text-sm text-muted">No books in the catalog yet.</p>
+                ) : (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {catalogReport.byCategory.map((c) => {
+                      const pct = c.copyCount > 0 ? Math.round((c.availableCount / c.copyCount) * 100) : 0
+                      return (
+                        // [R21] "the card should be clickable then display
+                        // books of that category" — toggles a book list
+                        // below, filtered from the same catalog data.
+                        <button
+                          key={c.category}
+                          type="button"
+                          onClick={() => setSelectedCategory(selectedCategory === c.category ? null : c.category)}
+                          className={`text-left bg-page border rounded-xl p-4 hover:border-brand-teal/40 transition-colors ${selectedCategory === c.category ? 'border-brand-teal ring-1 ring-brand-teal/30' : 'border-base'}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="font-heading font-semibold text-xs text-body uppercase tracking-wide">{c.category}</p>
+                            <ArrowUpRight className="w-3.5 h-3.5 text-muted" aria-hidden />
+                          </div>
+                          <p className="text-xs text-muted mt-1">{c.titleCount} title{c.titleCount === 1 ? '' : 's'} · {c.copyCount} copies</p>
+                          <div className="mt-3">
+                            <div className="flex items-center justify-between text-xs text-muted mb-1">
+                              <span>In-Shelf Available</span>
+                              <span>{c.availableCount} / {c.copyCount}</span>
+                            </div>
+                            <div className="h-1.5 bg-base rounded-full overflow-hidden">
+                              <div className="h-full bg-brand-navy rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {selectedCategory && (
+                  <div className="mt-4 pt-4 border-t border-base">
+                    <h4 className="font-heading font-semibold text-sm text-body mb-2">{selectedCategory} — {categoryBooks.length} title{categoryBooks.length === 1 ? '' : 's'}</h4>
+                    {categoryBooks.length === 0 ? (
+                      <p className="text-sm text-muted">No titles loaded for this category yet — try opening the Book Catalog tab first.</p>
                     ) : (
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${f.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-brand-teal/10 text-brand-teal'}`}>
-                        {f.status}
-                      </span>
+                      <ul className="divide-y divide-base">
+                        {categoryBooks.map((b) => (
+                          <li key={b.id} className="py-2 flex items-center justify-between text-sm">
+                            <span>{b.title} <span className="text-muted">— {b.author}</span></span>
+                            <span className={`text-xs font-semibold ${b.availableCopies === 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>{b.availableCopies}/{b.totalCopies} available</span>
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
-                ))}
+                )}
+              </div>
+            )}
+
+            {/* ── Clearance & Audit Reports ────────────────────────────── */}
+            {reportsSubTab === 'clearance' && (
+              <div className="space-y-4">
+                <div className="bg-surface border border-base rounded-xl p-4 flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="font-heading font-semibold text-sm text-body">Student Library Clearance Audit</h3>
+                    <p className="text-xs text-muted">Official verification system for examination admit cards and school leaving certificates.</p>
+                  </div>
+                  <button type="button" onClick={() => setShowClearanceChecker(true)} className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-[44px] shrink-0">
+                    <ShieldCheck className="w-4 h-4" aria-hidden /> Open Clearance Checker
+                  </button>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="bg-surface border border-base rounded-xl p-4">
+                    <h3 className="font-heading font-semibold text-sm text-body">Treasury Settlement Report</h3>
+                    <p className="text-xs text-muted mt-1 mb-3">Summary of all fines collected in cash and school fee deductions this term.</p>
+                    <button type="button" onClick={downloadTreasuryCsv} className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3 py-2 text-sm text-body hover:bg-page">
+                      <Download className="w-3.5 h-3.5" aria-hidden /> Download Treasury Audit (CSV)
+                    </button>
+                  </div>
+                  <div className="bg-surface border border-base rounded-xl p-4">
+                    <h3 className="font-heading font-semibold text-sm text-body">Overdue Loans Defaulter List</h3>
+                    <p className="text-xs text-muted mt-1 mb-3">Print notice letters for students with books overdue past 14 days.</p>
+                    <button type="button" onClick={printDefaultersNotice} className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3 py-2 text-sm text-body hover:bg-page">
+                      <Printer className="w-3.5 h-3.5" aria-hidden /> Print Defaulters Notice
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {(showAddBook || editingBook) && (
         <BookFormModal

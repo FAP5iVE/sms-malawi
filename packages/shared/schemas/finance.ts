@@ -268,11 +268,20 @@ export const CreateBudgetSchema = z.object({
 })
 
 // ─── LIBRARY FINE ────────────────────────────────────────
+// [R21] studentId is now optional and staffId added alongside it — a
+// manually-assessed fine (damage/loss, "+ Assess Fine" in the Library
+// Reports & Fines ledger) needs to support a staff borrower exactly like
+// library.ts's issueBorrowing()/returnBook() already do; the previous
+// studentId-only shape made staff fines impossible to record here.
 export const CreateLibraryFineSchema = z.object({
-  studentId: z.string().min(1),
+  studentId: z.string().min(1).optional(),
+  staffId:   z.string().min(1).optional(),
   bookTitle: z.string().min(1),
-  amount: z.number().positive(),
-  reason: z.string().min(1),
+  amount:    z.number().positive(),
+  reason:    z.string().min(1),
+}).refine((data) => !!data.studentId || !!data.staffId, {
+  message: 'Either studentId or staffId is required.',
+  path: ['studentId'],
 })
 
 // ─── INFERRED TYPES ──────────────────────────────────────

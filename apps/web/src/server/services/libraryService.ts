@@ -94,7 +94,20 @@ export async function listBooks(filters: {
 export async function getBook(id: string) {
   return prisma.book.findUniqueOrThrow({
     where: { id },
-    include: { borrowings: { where: { status: 'ACTIVE' }, orderBy: { issuedAt: 'desc' } } },
+    // [R21] BookDetailModal's "Currently on loan" list needs a real
+    // borrower name (borrowerLabel() reads .student/.staff) — this
+    // previously only included the raw Borrowing rows with opaque
+    // studentId/staffId strings.
+    include: {
+      borrowings: {
+        where: { status: 'ACTIVE' },
+        orderBy: { issuedAt: 'desc' },
+        include: {
+          student: { select: { firstName: true, lastName: true, registrationNo: true, class: { select: { name: true } } } },
+          staff:   { select: { firstName: true, lastName: true, employeeNo: true, department: true } },
+        },
+      },
+    },
   })
 }
 
@@ -181,6 +194,7 @@ export async function createBook(data: CreateBookInput, actorUid: string) {
       totalCopies:   data.totalCopies,
       availableCopies: data.totalCopies,
       barcode:       data.barcode ?? null,
+      shelf:         data.shelf ?? null,
     },
   })
   logger.info({ event: 'book.create', bookId: book.id, actorUid })
@@ -297,20 +311,106 @@ export async function returnBook(borrowingId: string, data: ReturnBorrowingInput
   return { overdueDays, fineAmount, fineId }
 }
 
+// [PRODUCTION FIX — R21] The redesigned Borrowings tab (Active Borrowings)
+// needs three things the previous filter set couldn't do at all:
+//   1. A real borrower name/registration/class/department in the row —
+//      previously only book was included; studentId/staffId were opaque
+//      ids with no join anywhere in this function.
+//   2. A single search box across borrower name, student ID, book title,
+//      and barcode (the screenshot's "Search borrower name, student ID,
+//      book title, or barcode…") — done as one OR clause across the real
+//      Student/Staff/Book relations (Borrowing.student/.staff/.book are
+//      all declared @relation fields, unlike LibraryFine's plain-string
+//      ids, so this is a direct Prisma filter, not a batch-lookup
+//      workaround).
+//   3. `unreturned` (ACTIVE+OVERDUE, i.e. every currently-out loan — the
+//      "All Loans" chip) and `dueSoon` (ACTIVE and due within 3 days —
+//      the "Due Soon" chip) — neither existed as a queryable shape before;
+//      `overdue` (dueDate < now) is kept for backward compatibility with
+//      existing callers (LibraryDashboard's overdue-count usage).
 export async function listBorrowings(filters: {
   studentId?: string; staffId?: string; status?: string; overdue?: boolean
+  unreturned?: boolean; dueSoon?: boolean; search?: string
 } = {}) {
   const now = new Date()
+  const dueSoonEnd = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)
   return prisma.borrowing.findMany({
     where: {
       ...(filters.studentId  ? { studentId: filters.studentId } : {}),
       ...(filters.staffId   ? { staffId: filters.staffId } : {}),
       ...(filters.status     ? { status: filters.status as never } : {}),
       ...(filters.overdue    ? { dueDate: { lt: now }, status: 'ACTIVE' } : {}),
+      ...(filters.unreturned  ? { status: { in: ['ACTIVE', 'OVERDUE'] } } : {}),
+      ...(filters.dueSoon    ? { status: 'ACTIVE', dueDate: { gte: now, lte: dueSoonEnd } } : {}),
+      ...(filters.search    ? {
+        OR: [
+          { book:    { title:  { contains: filters.search, mode: 'insensitive' } } },
+          { book:    { barcode: { contains: filters.search, mode: 'insensitive' } } },
+          { student: { firstName: { contains: filters.search, mode: 'insensitive' } } },
+          { student: { lastName:  { contains: filters.search, mode: 'insensitive' } } },
+          { student: { registrationNo: { contains: filters.search, mode: 'insensitive' } } },
+          { staff:   { firstName: { contains: filters.search, mode: 'insensitive' } } },
+          { staff:   { lastName:  { contains: filters.search, mode: 'insensitive' } } },
+          { staff:   { employeeNo: { contains: filters.search, mode: 'insensitive' } } },
+        ],
+      } : {}),
     },
-    include: { book: { select: { title: true, author: true, isbn: true } } },
+    include: {
+      book:    { select: { title: true, author: true, isbn: true, barcode: true } },
+      student: { select: { firstName: true, lastName: true, registrationNo: true, class: { select: { name: true } } } },
+      staff:   { select: { firstName: true, lastName: true, employeeNo: true, department: true } },
+    },
     orderBy: { dueDate: 'asc' },
   })
+}
+
+// [PRODUCTION FIX — R21] "Renew (+14d)" had no backend at all — a
+// librarian could only Return a loan, never extend its due date. Renewing
+// resets the window to 14 days from the moment of renewal (not from the
+// old due date), which also naturally clears an OVERDUE status back to
+// ACTIVE — a book renewed today is, by definition, no longer overdue.
+// Blocked once a copy is already RETURNED or LOST, since there is no live
+// loan left to extend.
+export async function renewBorrowing(borrowingId: string, actorUid: string, days = 14) {
+  const borrowing = await prisma.borrowing.findUniqueOrThrow({ where: { id: borrowingId } })
+  if (borrowing.status === 'RETURNED' || borrowing.status === 'LOST') {
+    throw new Error('This loan has already been closed out and cannot be renewed.')
+  }
+  const newDueDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+  const updated = await prisma.borrowing.update({
+    where: { id: borrowingId },
+    data: { dueDate: newDueDate, status: 'ACTIVE' },
+  })
+  logger.info({ event: 'book.renewed', borrowingId, newDueDate, actorUid })
+  return updated
+}
+
+// [PRODUCTION FIX — R21] "no where to see how many and what books are
+// lost, damaged" — Borrowing.condition (DAMAGED/LOST) was set on return
+// but never surfaced anywhere. This reads it back with the book title and
+// borrower name attached, for the Reports & Fines ledger's new
+// "Damaged & Lost Books" panel.
+export async function getConditionReport() {
+  const rows = await prisma.borrowing.findMany({
+    where: { condition: { in: ['DAMAGED', 'LOST'] } },
+    include: {
+      book:    { select: { title: true } },
+      student: { select: { firstName: true, lastName: true } },
+      staff:   { select: { firstName: true, lastName: true } },
+    },
+    orderBy: { returnedAt: 'desc' },
+  })
+  return rows.map((b) => ({
+    id:           b.id,
+    bookId:       b.bookId,
+    bookTitle:    b.book.title,
+    condition:    b.condition as 'DAMAGED' | 'LOST',
+    notes:        b.notes ?? undefined,
+    returnedAt:   b.returnedAt ?? undefined,
+    borrowerName: b.student ? `${b.student.firstName} ${b.student.lastName}`
+                : b.staff   ? `${b.staff.firstName} ${b.staff.lastName}`
+                : 'Unknown',
+  }))
 }
 
 // ─── OVERDUE CHECK (called by cron job) ──────────────────
@@ -417,14 +517,24 @@ export async function getOverdueByClass() {
 }
 
 export async function getLibraryStats() {
-  const [totalBooks, activeBorrowings, overdueBorrowings, pendingFines, digitalCount] = await prisma.$transaction([
+  const [totalBooks, activeBorrowings, overdueBorrowings, pendingFines, pendingFinesSum, digitalCount] = await prisma.$transaction([
     prisma.book.aggregate({ _sum: { totalCopies: true } }),
     prisma.borrowing.count({ where: { status: 'ACTIVE' } }),
     prisma.borrowing.count({ where: { status: 'OVERDUE' } }),
     prisma.libraryFine.count({ where: { status: 'PENDING' } }),
+    // [R21] The summary tile needs the MK amount outstanding, not just a
+    // count — pendingFines (count) is kept for existing callers.
+    prisma.libraryFine.aggregate({ where: { status: 'PENDING' }, _sum: { amount: true } }),
     prisma.digitalResource.count({ where: { approved: true } }),
   ])
-  return { totalBooks: totalBooks._sum.totalCopies ?? 0, activeBorrowings, overdueBorrowings, pendingFines, digitalCount }
+  return {
+    totalBooks: totalBooks._sum.totalCopies ?? 0,
+    activeBorrowings,
+    overdueBorrowings,
+    pendingFines,
+    pendingFinesAmount: Number(pendingFinesSum._sum.amount ?? 0),
+    digitalCount,
+  }
 }
 
 // [PRODUCTION FIX 2026-07-28] Most-borrowed book, most-read digital
@@ -449,7 +559,10 @@ export async function getCatalogReportStats() {
     prisma.book.groupBy({
       by: ['category'],
       _count: { category: true },
-      _sum: { totalCopies: true },
+      // [R21] Catalog Distribution's redesigned cards show an
+      // "In-Shelf Available: X / Y" bar per category — availableCopies
+      // wasn't summed before, only totalCopies.
+      _sum: { totalCopies: true, availableCopies: true },
     }),
   ])
 
@@ -471,6 +584,7 @@ export async function getCatalogReportStats() {
       category: c.category,
       titleCount: c._count.category,
       copyCount: c._sum.totalCopies ?? 0,
+      availableCount: c._sum.availableCopies ?? 0,
     })),
   }
 }

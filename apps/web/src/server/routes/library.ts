@@ -86,6 +86,11 @@ libraryRouter.get('/reports/catalog', verifyAuth, requireRole([...LIB_STAFF, 'hi
 libraryRouter.get('/reports/overdue-by-class', verifyAuth, requireRole([...LIB_STAFF, 'high_rank']),
   async (_req, res) => {return res.json(await libService.getOverdueByClass())})
 
+// [R21] "no where to see how many and what books are lost, damaged" —
+// Borrowing.condition was set on return but never had a listing route.
+libraryRouter.get('/reports/conditions', verifyAuth, requireRole([...LIB_STAFF, 'high_rank']),
+  async (_req, res) => {return res.json(await libService.getConditionReport())})
+
 libraryRouter.get('/barcode/:barcode', verifyAuth, requireRole([...LIB_STAFF]),
   async (req, res) => {
     const book = await libService.findBookByBarcode(String(req.params.barcode))
@@ -111,8 +116,13 @@ libraryRouter.patch('/fines/:id/clear', verifyAuth, requirePermission('library.c
 // ── BORROWING ──
 libraryRouter.get('/borrowings/list', verifyAuth, requireRole([...LIB_STAFF, 'high_rank']),
   async (req, res) => {
-    const { studentId, staffId, status, overdue } = req.query as Record<string, string>
-    return res.json(await libService.listBorrowings({ studentId, staffId, status, overdue: overdue === 'true' }))
+    const { studentId, staffId, status, overdue, unreturned, dueSoon, search } = req.query as Record<string, string>
+    return res.json(await libService.listBorrowings({
+      studentId, staffId, status, search,
+      overdue:    overdue === 'true',
+      unreturned: unreturned === 'true',
+      dueSoon:    dueSoon === 'true',
+    }))
   })
 
 libraryRouter.post('/borrowings/issue', verifyAuth, requirePermission('library.issueBook'),
@@ -131,6 +141,19 @@ libraryRouter.patch('/borrowings/:id/return', verifyAuth, requirePermission('lib
     const parsed = ReturnBorrowingSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     return res.json(await libService.returnBook(String(req.params.id), parsed.data, req.user!.uid))
+  })
+
+// [R21] "Renew (+14d)" — the Active Borrowings table's renew action had no
+// backend at all. Gated on library.issueBook — renewing is, functionally,
+// re-extending an issue, and every role that may issue a book may extend
+// one already out.
+libraryRouter.patch('/borrowings/:id/renew', verifyAuth, requirePermission('library.issueBook'),
+  async (req, res) => {
+    try {
+      return res.json(await libService.renewBorrowing(String(req.params.id), req.user!.uid))
+    } catch (err: unknown) {
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'library' } })
+    }
   })
 
 // ── DIGITAL LIBRARY (static/collection routes before /digital/:id/view) ──

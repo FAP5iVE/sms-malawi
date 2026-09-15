@@ -60,6 +60,11 @@ export interface CreateRecommendationInput {
   type:           'BOOK' | 'EBOOK' | 'JOURNAL' | 'OTHER'
   subject?:       string
   reason:         string
+  // [R21] Display-only fields captured on the redesigned "Recommend a
+  // Resource" form — requestedByUid (above) remains the real identity link.
+  requesterName?:  string
+  requesterRole?:  string
+  requesterClass?: string
 }
 
 export async function createRecommendation(
@@ -74,6 +79,9 @@ export async function createRecommendation(
       type:           input.type,
       subject:        input.subject,
       reason:         input.reason,
+      requesterName:  input.requesterName,
+      requesterRole:  input.requesterRole,
+      requesterClass: input.requesterClass,
       status:         'PENDING',
     },
   })

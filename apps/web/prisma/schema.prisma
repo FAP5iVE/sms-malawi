@@ -777,6 +777,9 @@ model ResourceRecommendation {
   type            String   // 'BOOK' | 'EBOOK' | 'JOURNAL' | 'OTHER'
   subject         String?
   reason          String
+  requesterName   String?  // R21: free-text name as typed on the Recommend a Resource form (requestedByUid already identifies the account; this is display-only)
+  requesterRole   String?  // R21: 'Student' | 'Staff' | 'Parent' | 'Other' — self-declared on the form, not derived from the account role
+  requesterClass  String?  // R21: class/form/department as typed on the form
   status          String   @default("PENDING")
   reviewedByUid   String?
   reviewNotes     String?
@@ -1140,6 +1143,7 @@ model Book {
   totalCopies   Int          @default(1)
   availableCopies Int        @default(1)
   barcode       String?      @unique
+  shelf         String?      // R21: physical shelf/location label (e.g. "M-02") shown under the barcode in the catalog UI
   coverKey      String?      // Appwrite file ID
   borrowings    Borrowing[]
   createdAt     DateTime     @default(now())

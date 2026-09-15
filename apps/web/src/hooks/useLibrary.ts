@@ -24,19 +24,23 @@ import type {
   CreateRecommendationInput, ReviewRecommendationInput, RejectRecommendationInput,
   CreateFineWaiverInput, RejectFineWaiverInput, CreateDigitalResourceInput,
 } from '@shared/schemas/library'
-import type { ApiResourceRecommendation, ApiFineWaiverRequest } from '@shared/types/api'
+import type { ApiResourceRecommendation, ApiFineWaiverRequest, ApiLibraryFine, ApiLibraryConditionEntry } from '@shared/types/api'
+import type { CreateLibraryFineInput } from '@shared/schemas/finance'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { uploadFileDirectly } from '@/lib/directUpload'
 
 /**
  * Response shape of GET /library/stats — mirrors
  * libraryService.getLibraryStats()'s return object (R15).
+ * R21 adds pendingFinesAmount — the redesigned "Pending Fines" stat tile
+ * needs the MK total, not just the infraction count.
  */
 export interface ApiLibraryStats {
   totalBooks:        number
   activeBorrowings:  number
   overdueBorrowings: number
   pendingFines:      number
+  pendingFinesAmount: number
   digitalCount:      number
 }
 
@@ -113,12 +117,32 @@ export function useReturnBook() {
   })
 }
 
-export function useBorrowings(filters: { studentId?: string; staffId?: string; status?: string; overdue?: boolean } = {}) {
+// [R21] `search` (borrower name/student ID/book title/barcode — one box,
+// server-side OR across the real Student/Staff/Book relations),
+// `unreturned` (ACTIVE+OVERDUE — "All Loans" chip) and `dueSoon` (ACTIVE,
+// due within 3 days — "Due Soon" chip) added for the redesigned Active
+// Borrowings table's search bar + filter chips.
+export function useBorrowings(filters: {
+  studentId?: string; staffId?: string; status?: string; overdue?: boolean
+  unreturned?: boolean; dueSoon?: boolean; search?: string
+} = {}) {
   const params = new URLSearchParams()
-  Object.entries(filters).forEach(([k, v]) => { if (v !== undefined) params.set(k, String(v)) })
+  Object.entries(filters).forEach(([k, v]) => { if (v !== undefined && v !== '') params.set(k, String(v)) })
   return useQuery({
     queryKey: queryKeys.library.borrowings(filters),
-    queryFn: () => apiFetch(`/library/borrowings/list?${params}`),
+    queryFn: () => apiFetch<import('@shared/types/api').ApiBorrowing[]>(`/library/borrowings/list?${params}`),
+  })
+}
+
+// [R21] "Renew (+14d)" circulation action — previously had no mutation at
+// all. Extends the loan's due date 14 days from now and clears an
+// OVERDUE status back to ACTIVE (see libraryService.renewBorrowing()).
+export function useRenewBorrowing() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (borrowingId: string) => apiFetch(`/library/borrowings/${borrowingId}/renew`, { method: 'PATCH', body: JSON.stringify({}) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
+    onError: (err) => { console.error('[useRenewBorrowing] failed', err) },
   })
 }
 
@@ -251,18 +275,36 @@ export function useCatalogReportStats() {
     queryFn: () => apiFetch<{
       mostBorrowed: { book?: { id: string; title: string; author: string }; borrowCount: number }[]
       mostRead: { resource?: { id: string; title: string; type: string }; viewCount: number }[]
-      byCategory: { category: string; titleCount: number; copyCount: number }[]
+      // [R21] availableCount added — Catalog Distribution's redesigned
+      // cards show an "In-Shelf Available: X / Y" bar per category.
+      byCategory: { category: string; titleCount: number; copyCount: number; availableCount: number }[]
     }>('/library/reports/catalog'),
   })
 }
 
+// [R21] "no where to see how many and what books are lost, damaged" —
+// libraryService.getConditionReport() surfaces returned copies recorded
+// as DAMAGED/LOST for the ledger's new "Damaged & Lost Books" panel.
+export function useConditionReport() {
+  return useQuery({
+    queryKey: ['library', 'reports', 'conditions'] as const,
+    queryFn: () => apiFetch<ApiLibraryConditionEntry[]>('/library/reports/conditions'),
+  })
+}
+
+// [R21] Widened to the fields already present in listFines()'s spread
+// (`...f`) but previously left off the return-type annotation —
+// studentId/staffId/paidAt/waivedAt are needed by the Clearance Checker
+// (per-student pending-fine lookup) and the Treasury CSV export
+// (paidAt), both built client-side from this same query.
 export function useFines(status?: string) {
   const params = status ? `?status=${encodeURIComponent(status)}` : ''
   return useQuery({
     queryKey: ['library', 'fines', status ?? null] as const,
     queryFn: () => apiFetch<Array<{
       id: string; bookTitle: string; amount: number; reason: string; status: string
-      borrowerName: string; createdAt: string
+      studentId?: string | null; staffId?: string | null
+      borrowerName: string; createdAt: string; paidAt?: string; waivedAt?: string
     }>>(`/library/fines${params}`),
   })
 }
@@ -272,6 +314,40 @@ export function useClearFine() {
   return useMutation({
     mutationFn: (id: string) => apiFetch(`/library/fines/${id}/clear`, { method: 'PATCH', body: JSON.stringify({}) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['library', 'fines'] }),
+  })
+}
+
+// [R21] "+ Assess Fine" (Fines & Penalties Ledger) and the inline "Waive"
+// action on each pending fine row — both had a screenshot button but no
+// UI wiring. Rather than duplicate fine-creation/waiver logic already
+// built and working on the finance side (POST/PATCH /finances/library-
+// fines — the only place a paid fine also posts an accounting-ledger
+// entry), these two call straight through to it and invalidate both this
+// module's fines query key and finance's own, so the Reports & Fines
+// ledger and Finance's Library Fines tab never drift out of sync.
+export function useAssessFine() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: CreateLibraryFineInput) => apiFetch<ApiLibraryFine>('/finances/library-fines', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['library', 'fines'] })
+      qc.invalidateQueries({ queryKey: queryKeys.finances.libraryFines() })
+      qc.invalidateQueries({ queryKey: queryKeys.library.stats() })
+    },
+    onError: (err) => { console.error('[useAssessFine] failed', err) },
+  })
+}
+
+export function useWaiveFineDirect() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<ApiLibraryFine>(`/finances/library-fines/${id}/waive`, { method: 'PATCH', body: JSON.stringify({}) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['library', 'fines'] })
+      qc.invalidateQueries({ queryKey: queryKeys.finances.libraryFines() })
+      qc.invalidateQueries({ queryKey: queryKeys.library.stats() })
+    },
+    onError: (err) => { console.error('[useWaiveFineDirect] failed', err) },
   })
 }
 

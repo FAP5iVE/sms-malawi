@@ -511,7 +511,9 @@ export interface ApiLibraryFine {
   student?: { firstName: string; lastName: string }
 }
 
-/** R12 — matches libraryWorkflowService.ts's ResourceRecommendation shape. */
+/** R12 — matches libraryWorkflowService.ts's ResourceRecommendation shape.
+ *  R21 — adds requesterName/requesterRole/requesterClass (display-only
+ *  fields captured on the redesigned "Recommend a Resource" form). */
 export interface ApiResourceRecommendation {
   id: string
   requestedByUid: string
@@ -521,6 +523,9 @@ export interface ApiResourceRecommendation {
   type: 'BOOK' | 'EBOOK' | 'JOURNAL' | 'OTHER'
   subject?: string
   reason: string
+  requesterName?: string
+  requesterRole?: string
+  requesterClass?: string
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
   reviewedByUid?: string
   reviewNotes?: string
@@ -755,6 +760,10 @@ export interface ApiBook {
   totalCopies: number
   availableCopies: number
   barcode?: string
+  /** R21 — physical shelf/location label, e.g. "M-02". */
+  shelf?: string
+  /** Only present on GET /library/:id — active loans for this title. */
+  borrowings?: ApiBorrowing[]
 }
 
 export interface ApiBorrowing {
@@ -767,8 +776,14 @@ export interface ApiBorrowing {
   dueDate: string
   returnedAt?: string
   status: string
+  condition?: string
+  notes?: string
   fineAmount?: number
-  book?: { title: string; author: string; isbn?: string }
+  book?: { title: string; author: string; isbn?: string; barcode?: string }
+  /** R21 — joined in listBorrowings() so the Borrowings table can show a
+   *  real borrower name/registration/class without a second round trip. */
+  student?: { firstName: string; lastName: string; registrationNo: string; class?: { name: string } }
+  staff?: { firstName: string; lastName: string; employeeNo: string; department: string }
 }
 
 export interface ApiAsset {
@@ -862,7 +877,23 @@ export interface ApiLibraryStats {
   activeBorrowings: number
   overdueBorrowings: number
   pendingFines: number
+  /** R21 — MK total of PENDING library fines (pendingFines above stayed a
+   *  count; the redesigned summary tile needs the amount too). */
+  pendingFinesAmount: number
   digitalCount: number
+}
+
+/** R21 — one row of libraryService.getConditionReport(): a returned copy
+ *  recorded as DAMAGED or LOST, for the "no way to see how many/what books
+ *  are lost or damaged" gap in the Reports & Fines ledger. */
+export interface ApiLibraryConditionEntry {
+  id: string
+  bookId: string
+  bookTitle: string
+  condition: 'DAMAGED' | 'LOST'
+  notes?: string
+  returnedAt?: string
+  borrowerName: string
 }
 
 // ─── REPORT RESPONSE TYPES ───────────────────────────────
