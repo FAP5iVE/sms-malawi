@@ -220,7 +220,7 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
                 </thead>
                 <tbody className="divide-y divide-base">
                   {students.map((student) => (
-                    <tr key={student.id} className={marks[student.id]?.absent ? 'bg-amber-50' : ''}>
+                    <tr key={student.id} className={marks[student.id]?.absent ? 'text-muted italic' : ''}>
                       <td className="px-5 py-3">
                         <p className="font-medium text-body">{student.firstName} {student.lastName}</p>
                         <p className="text-xs text-muted">{student.registrationNo}</p>

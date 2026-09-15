@@ -194,7 +194,7 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
               expenses.map((e) => (
                 <tr key={e.id} className="border-b border-base hover:bg-page">
                   <td className="px-4 py-3">
-                    <span className="text-xs bg-brand-navy/8 text-brand-navy px-2 py-0.5 rounded-full font-medium">
+                    <span className="text-xs text-brand-navy font-medium">
                       {e.category}
                     </span>
                   </td>

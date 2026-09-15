@@ -109,7 +109,7 @@ export function StudentPortalStatementTab({
         ) : (
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/25 dark:text-blue-400 dark:border-blue-800/50 mb-1.5">
+              <span className="inline-flex items-center text-xs font-semibold text-brand-navy mb-1.5">
                 Verified Student Profile
               </span>
               <h3 className="font-heading font-bold text-lg text-body">

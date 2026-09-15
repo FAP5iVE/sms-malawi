@@ -411,17 +411,25 @@ function ExamsPageInner() {
                             {new Date(exam.date).toLocaleDateString('en-MW')}
                           </td>
                           <td className="px-5 py-3">
+                            {/* [NO COLOUR BLOCKS] Status was a filled chip
+                                (bg-green-100 text-green-700 and friends).
+                                Those raw Tailwind palette pairs are fixed
+                                light-mode values with no dark variant, so in
+                                dark mode a pale background sat against a
+                                near-black page. Status is now carried by font
+                                colour alone, using the theme-aware brand
+                                tokens, which resolve correctly in BOTH modes. */}
                             <span
-                              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              className={`text-xs font-semibold uppercase tracking-wide ${
                                 exam.status === 'RESULTS_RELEASED'
-                                  ? 'bg-green-100 text-green-700'
+                                  ? 'text-brand-teal'
                                   : exam.status === 'RESULTS_APPROVED'
-                                    ? 'bg-brand-teal/15 text-brand-teal'
+                                    ? 'text-brand-teal'
                                     : exam.status === 'MARKS_FINAL'
-                                      ? 'bg-blue-100 text-blue-700'
+                                      ? 'text-brand-navy'
                                       : exam.status.includes('MARKS')
-                                        ? 'bg-amber-100 text-amber-700'
-                                        : 'bg-gray-100 text-gray-600'
+                                        ? 'text-brand-amber'
+                                        : 'text-muted'
                               }`}
                             >
                               {exam.status.replace(/_/g, ' ')}
@@ -447,21 +455,28 @@ function ExamsPageInner() {
                                 </button>
                               )}
                               {canApprove && exam.status === 'MARKS_FINAL' && (
+                                /* [ACTION AFFORDANCE] Approve and Release are
+                                   state-changing actions on exam results, but
+                                   they rendered as bare underlined text,
+                                   visually identical to the "Review / Correct"
+                                   navigation link beside them. Both are now
+                                   real buttons so an irreversible action looks
+                                   like one. */
                                 <button
                                   onClick={() => approveResults.mutate(exam.id)}
                                   disabled={approveResults.isPending}
-                                  className="text-xs text-brand-navy hover:underline"
+                                  className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-brand-navy text-brand-navy hover:bg-brand-navy hover:text-white transition-colors disabled:opacity-60"
                                 >
-                                  Approve
+                                  {approveResults.isPending ? 'Approving…' : 'Approve'}
                                 </button>
                               )}
                               {canRelease && exam.status === 'RESULTS_APPROVED' && (
                                 <button
                                   onClick={() => releaseResults.mutate(exam.id)}
                                   disabled={releaseResults.isPending}
-                                  className="text-xs text-green-700 hover:underline font-semibold"
+                                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-teal text-white hover:bg-brand-teal-light transition-colors disabled:opacity-60"
                                 >
-                                  Release to Students
+                                  {releaseResults.isPending ? 'Releasing…' : 'Release to Students'}
                                 </button>
                               )}
                             </div>

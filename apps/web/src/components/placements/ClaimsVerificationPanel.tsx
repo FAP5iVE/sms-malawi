@@ -135,7 +135,7 @@ export function ClaimsVerificationPanel() {
             <h3 className="font-heading font-semibold text-base">
               Claims Verification &amp; Approval Desk
               {pending.length > 0 && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-brand-amber/15 text-brand-amber text-xs font-bold px-2 py-0.5 align-middle">
+                <span className="ml-2 inline-flex items-center text-brand-amber text-xs font-bold align-middle">
                   {pending.length} Pending
                 </span>
               )}

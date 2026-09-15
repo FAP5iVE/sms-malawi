@@ -138,7 +138,11 @@ export interface StudentPerformancePoint {
   academicYear: string
   term: number
   average: number
+  /** JCE track: the overall letter grade. MSCE track: the aggregate
+   *  rendered as "34 pts" — Forms 3-4 have no overall grade. */
   grade: string
+  aggregatePoints: number | null
+  gradingTrack: string | null
   position: number | null
   classTotal: number
   passStatus: boolean
@@ -1452,6 +1456,8 @@ export async function getStudentPerformanceTrend(
       term: true,
       average: true,
       grade: true,
+      aggregatePoints: true,
+      gradingTrack: true,
       classPosition: true,
       classTotal: true,
       passStatus: true,
@@ -1473,7 +1479,14 @@ export async function getStudentPerformanceTrend(
         academicYear: r.academicYear,
         term: r.term,
         average: Number(r.average),
-        grade: r.grade,
+        // MSCE track (Forms 3-4) has no overall grade — the term's overall
+        // result is its aggregate of points. Surface the aggregate as the
+        // headline figure there and leave `grade` to the JCE track.
+        grade: r.gradingTrack === 'MSCE'
+          ? (r.aggregatePoints != null ? `${r.aggregatePoints} pts` : '—')
+          : r.grade,
+        aggregatePoints: r.aggregatePoints,
+        gradingTrack: r.gradingTrack,
         position: r.classPosition,
         classTotal: r.classTotal,
         passStatus: r.passStatus,

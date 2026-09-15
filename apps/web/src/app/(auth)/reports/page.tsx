@@ -1527,7 +1527,7 @@ function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; t
                       <td className="px-4 py-2">{r.studentCount}</td>
                       <td className="px-4 py-2 font-bold text-brand-navy">{r.average}%</td>
                       <td className="px-4 py-2">
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.passRate >= 50 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{r.passRate}%</span>
+                        <span className={`text-xs font-semibold ${r.passRate >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}>{r.passRate}%</span>
                       </td>
                     </tr>
                   ))}

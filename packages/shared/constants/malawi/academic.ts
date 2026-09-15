@@ -67,6 +67,47 @@ export function isManebNationalTerm(form: number, term: number): boolean {
   return getManebExamType(form, term) !== null
 }
 
+// ─── GRADING TRACK (JCE vs MSCE) ──────────────────────────
+// Which of the two Malawian secondary grading systems a form is taught and
+// assessed under. This is NOT about MANEB sitting terms — a Form 3 student
+// in Term 1 sits a school exam, but that exam is graded on the MSCE 1–9
+// scale and summarised as an AGGREGATE OF POINTS, exactly like MSCE.
+//
+//   Forms 1–2  → 'JCE'  — letter grades A–F. There is NO aggregate, no
+//                         point total, and no overall grade beyond the
+//                         per-subject letter. An overall "average grade" is
+//                         a meaningful JCE-side summary.
+//   Forms 3–4  → 'MSCE' — numeric grades 1–9. The overall result is the SUM
+//                         of the point values of the best six subjects
+//                         (range 6–54, lower is better). Averaging the
+//                         percentages and then grading that average is NOT
+//                         an MSCE result and must never be presented as one.
+//
+// Every UI label, report-card row, and analytics bucket must branch on this
+// function rather than re-deriving form >= 3 inline.
+export type GradingTrack = 'JCE' | 'MSCE'
+
+/** The grading system a form is assessed under, for ALL terms — not just
+ *  MANEB sitting terms. See the block comment above. */
+export function getGradingTrack(form: number): GradingTrack {
+  return form >= 3 ? 'MSCE' : 'JCE'
+}
+
+/** True when a form's overall result is an aggregate of points (Forms 3–4)
+ *  rather than an overall grade (Forms 1–2). The single predicate every
+ *  "Points vs Grade" label decision in the UI should read. */
+export function usesAggregatePoints(form: number): boolean {
+  return getGradingTrack(form) === 'MSCE'
+}
+
+/** The number of subjects that make up an MSCE aggregate. */
+export const MSCE_AGGREGATE_SUBJECT_COUNT = 6
+
+/** Best and worst possible MSCE aggregate: six subjects at grade 1 = 6,
+ *  six at grade 9 = 54. Lower is better. */
+export const MSCE_AGGREGATE_BEST  = 6
+export const MSCE_AGGREGATE_WORST = 54
+
 // ─── FORM LEVELS ──────────────────────────────────────────
 // Single source for the four secondary forms. Replaces every hardcoded
 // [1,2,3,4] / ['Form 1'..'Form 4'] array across apply/page.tsx,

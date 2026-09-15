@@ -147,6 +147,20 @@ export interface ReportCardData {
   totalMarks:      number
   averagePercent:  number
 
+  /** [MSCE CORRECTION] Which grading system produced this card's results.
+   *  'MSCE' (Forms 3-4) summarises the term as an AGGREGATE OF POINTS — the
+   *  sum of the six best subjects, 6-54, lower is better. 'JCE' (Forms 1-2)
+   *  summarises it as an overall grade off the term average. The aggregate
+   *  row at the foot of the grades table branches on this; it previously
+   *  printed the average percentage for every form and left the Grade cell
+   *  as a bare em dash, so an MSCE card never showed a points total at all. */
+  gradingTrack?:     'JCE' | 'MSCE'
+  /** MSCE track only — the aggregate. Null when fewer than six subjects
+   *  were graded, in which case no valid six-subject sum exists. */
+  aggregatePoints?:  number | null
+  /** MSCE track only — the (up to six) subjects counted in the aggregate. */
+  aggregateSubjects?: string[]
+
   /** GR-2: present only for Form 2 Term 3 (JCE) / Form 4 Term 3 (MSCE) —
    *  when set, the card renders the MANEB result section instead of the
    *  internal CA/Exam/Total grades table above (subjects/classPosition/
@@ -223,6 +237,15 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
     : (data.classForm >= 3 ? 'INTERNAL_F3F4' : 'INTERNAL_F1F2')
   const { data: gradingScale = [] } = useGradingScales(examTypeKey)
   const gradeRow = (grade: string) => gradingScale.find((g) => g.grade === grade)
+
+  // [MSCE CORRECTION] Forms 3-4 are summarised by an aggregate of points,
+  // Forms 1-2 by an overall grade. gradingTrack is authoritative when the
+  // server supplied it; classForm is the fallback for cards built from rows
+  // computed before that field existed.
+  const isMsceTrack = data.gradingTrack
+    ? data.gradingTrack === 'MSCE'
+    : data.classForm >= 3
+  const aggregateSubjects = data.aggregateSubjects ?? []
 
   const attendancePct = data.totalSchoolDays > 0
     ? Math.round((data.daysPresent / data.totalSchoolDays) * 100)
@@ -412,6 +435,20 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
           </tr>
         </thead>
         <tbody>
+          {/* A term with no computed results previously rendered an EMPTY
+             table body under a full header, which read as a broken card
+             rather than an absent result — the reported "report card is not
+             being populated by the grades and subjects" symptom. The card now
+             says plainly why it is empty. */}
+          {data.subjects.length === 0 && (
+            <tr>
+              <td colSpan={6} style={{ padding: '10pt 5pt', textAlign: 'center', fontSize: '8pt', color: '#6b7280', fontStyle: 'italic', borderBottom: '0.5pt solid #e5e7eb' }}>
+                No subject results have been computed for Term {data.term} yet.
+                Results appear here once marks are finalised, approved, released,
+                and &ldquo;Compute Results&rdquo; has been run for this class.
+              </td>
+            </tr>
+          )}
           {data.subjects.map((s, i) => (
             <tr
               key={s.subject}
@@ -419,6 +456,13 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
             >
               <td style={{ padding: '3pt 5pt', fontWeight: 600, fontSize: '8.5pt', borderRight: '1pt solid #e5e7eb', borderBottom: '0.5pt solid #e5e7eb' }}>
                 {s.subject}
+                {/* MSCE: flag the six subjects whose points form the
+                    aggregate, so the total at the foot is checkable. */}
+                {isMsceTrack && aggregateSubjects.includes(s.subject) && (
+                  <span style={{ marginLeft: '3pt', fontSize: '6.5pt', fontWeight: 700, color: '#1e3a5f', letterSpacing: '0.04em' }}>
+                    ● IN AGG.
+                  </span>
+                )}
               </td>
               <td style={{ padding: '3pt 5pt', textAlign: 'center', borderRight: '1pt solid #e5e7eb', borderBottom: '0.5pt solid #e5e7eb' }}>
                 {s.caScore != null ? s.caScore.toFixed(1) : '—'}
@@ -446,25 +490,59 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
           ))}
         </tbody>
 
-        {/* Aggregate row */}
+        {/* [MSCE CORRECTION] Aggregate row.
+
+            Forms 3-4 (MSCE track) are summarised by an AGGREGATE OF POINTS —
+            the sum of the point values of the six best subjects (6-54, lower
+            is better). Forms 1-2 (JCE track) have no aggregate at all and are
+            summarised by the term average and overall grade.
+
+            This row previously printed the average percentage under a header
+            reading "AGGREGATE" for every form, with an em dash in the Grade
+            cell — so an MSCE card showed no points total anywhere, and the
+            one figure it did show was a percentage, which is not an MSCE
+            result. Both tracks are now labelled for what they actually are. */}
         <tfoot>
-          <tr style={{ background: '#f0f4f8', borderTop: '1.5pt solid #1e3a5f' }}>
-            <td colSpan={2} style={{ padding: '4pt 5pt', fontWeight: 700, fontSize: '8.5pt', color: '#1e3a5f', borderRight: '1pt solid #d1d5db' }}>
-              AGGREGATE
-            </td>
-            <td style={{ padding: '4pt 5pt', textAlign: 'center', fontWeight: 700, borderRight: '1pt solid #d1d5db' }}>
-              —
-            </td>
-            <td style={{ padding: '4pt 5pt', textAlign: 'center', fontWeight: 800, color: '#1e3a5f', borderRight: '1pt solid #d1d5db' }}>
-              {data.averagePercent.toFixed(1)}%
-            </td>
-            <td style={{ padding: '4pt 5pt', textAlign: 'center', fontWeight: 800, fontSize: '10pt', color: '#374151', borderRight: '1pt solid #d1d5db' }}>
-              —
-            </td>
-            <td style={{ padding: '4pt 5pt', fontWeight: 700, color: '#1e3a5f' }}>
-              Position: {ordinal(data.classPosition)} / {data.classTotal}
-            </td>
-          </tr>
+          {isMsceTrack ? (
+            <tr style={{ background: '#f0f4f8', borderTop: '1.5pt solid #1e3a5f' }}>
+              <td colSpan={3} style={{ padding: '4pt 5pt', fontWeight: 700, fontSize: '8.5pt', color: '#1e3a5f', borderRight: '1pt solid #d1d5db' }}>
+                AGGREGATE POINTS (best six subjects)
+              </td>
+              <td style={{ padding: '4pt 5pt', textAlign: 'center', fontWeight: 700, fontSize: '8pt', color: '#4b5563', borderRight: '1pt solid #d1d5db' }}>
+                {data.averagePercent.toFixed(1)}%
+              </td>
+              <td style={{ padding: '4pt 5pt', textAlign: 'center', fontWeight: 800, fontSize: '11pt', color: '#1e3a5f', borderRight: '1pt solid #d1d5db' }}>
+                {data.aggregatePoints != null ? data.aggregatePoints : '—'}
+              </td>
+              <td style={{ padding: '4pt 5pt', fontWeight: 700, color: '#1e3a5f' }}>
+                Position: {ordinal(data.classPosition)} / {data.classTotal}
+              </td>
+            </tr>
+          ) : (
+            <tr style={{ background: '#f0f4f8', borderTop: '1.5pt solid #1e3a5f' }}>
+              <td colSpan={3} style={{ padding: '4pt 5pt', fontWeight: 700, fontSize: '8.5pt', color: '#1e3a5f', borderRight: '1pt solid #d1d5db' }}>
+                OVERALL
+              </td>
+              <td style={{ padding: '4pt 5pt', textAlign: 'center', fontWeight: 800, color: '#1e3a5f', borderRight: '1pt solid #d1d5db' }}>
+                {data.averagePercent.toFixed(1)}%
+              </td>
+              <td style={{ padding: '4pt 5pt', textAlign: 'center', fontWeight: 800, fontSize: '10pt', color: '#374151', borderRight: '1pt solid #d1d5db' }}>
+                —
+              </td>
+              <td style={{ padding: '4pt 5pt', fontWeight: 700, color: '#1e3a5f' }}>
+                Position: {ordinal(data.classPosition)} / {data.classTotal}
+              </td>
+            </tr>
+          )}
+          {isMsceTrack && (
+            <tr>
+              <td colSpan={6} style={{ padding: '3pt 5pt', fontSize: '7pt', color: '#6b7280', fontStyle: 'italic' }}>
+                {data.aggregatePoints != null
+                  ? `Aggregate = sum of the points of the six best subjects (${(data.aggregateSubjects ?? []).join(', ')}). Range 6-54; a lower total is better. MSCE does not award an overall grade.`
+                  : 'Aggregate not available — six graded subjects are required to form an MSCE aggregate.'}
+              </td>
+            </tr>
+          )}
         </tfoot>
       </table>
       )}

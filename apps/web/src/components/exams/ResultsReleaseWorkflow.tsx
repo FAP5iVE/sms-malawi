@@ -114,12 +114,12 @@ const STATUS_CONFIG: Record<ExamStatus, {
   step:   number
 }> = {
   SCHEDULED:        { label: 'Scheduled',       icon: Clock,         chip: 'bg-base text-muted border-base',                   step: 0 },
-  IN_PROGRESS:      { label: 'In Progress',     icon: Clock,         chip: 'bg-blue-50 text-blue-600 border-blue-200',          step: 1 },
-  MARKS_PENDING:    { label: 'Marks Pending',   icon: Clock,         chip: 'bg-brand-amber/10 text-brand-amber border-brand-amber/25', step: 2 },
+  IN_PROGRESS:      { label: 'In Progress',     icon: Clock,         chip: 'text-brand-navy', step: 1 },
+  MARKS_PENDING:    { label: 'Marks Pending',   icon: Clock,         chip: 'text-brand-amber', step: 2 },
   MARKS_DRAFT:      { label: 'Marks (Draft)',   icon: Clock,         chip: 'bg-brand-amber/10 text-brand-amber border-brand-amber/25', step: 2 },
-  MARKS_FINAL:      { label: 'Marks Final',     icon: CheckCircle2,  chip: 'bg-emerald-50 text-emerald-700 border-emerald-200', step: 3 },
-  RESULTS_APPROVED: { label: 'Exam Approved',   icon: CheckCircle2,  chip: 'bg-brand-teal/10 text-brand-teal border-brand-teal/25',   step: 4 },
-  RESULTS_RELEASED: { label: 'Released',        icon: Eye,           chip: 'bg-purple-50 text-purple-700 border-purple-200',    step: 5 },
+  MARKS_FINAL:      { label: 'Marks Final',     icon: CheckCircle2,  chip: 'text-brand-teal', step: 3 },
+  RESULTS_APPROVED: { label: 'Exam Approved',   icon: CheckCircle2,  chip: 'text-brand-teal', step: 4 },
+  RESULTS_RELEASED: { label: 'Released',        icon: Eye,           chip: 'text-brand-purple', step: 5 },
 }
 
 const PIPELINE_STEPS = [
@@ -138,7 +138,7 @@ const PIPELINE_STEPS = [
 function StatusBadge({ status }: { status: ExamStatus }) {
   const { label, icon: Icon, chip } = STATUS_CONFIG[status]
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-heading font-semibold border ${chip}`}>
+    <span className={`inline-flex items-center gap-1 text-xs font-heading font-semibold uppercase tracking-wide ${chip}`}>
       <Icon className="w-3 h-3 shrink-0" aria-hidden />
       {label}
     </span>
@@ -447,7 +447,7 @@ export function ResultsReleaseWorkflow({
       )}
 
       {releaseNote && (
-        <div role="status" className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-700 flex items-center gap-2">
+        <div role="status" className="border border-base rounded-xl px-4 py-3 text-sm text-brand-teal flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           {releaseNote}
         </div>

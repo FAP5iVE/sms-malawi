@@ -238,7 +238,7 @@ function FilterChipsBar({
       {filters.map((f) => (
         <span
           key={f.key}
-          className="inline-flex items-center gap-1.5 bg-brand-navy/8 text-brand-navy text-xs font-medium px-2.5 py-1 rounded-full border border-brand-navy/20"
+          className="inline-flex items-center gap-1.5 text-brand-navy text-xs font-medium"
         >
           <span className="text-muted">{f.label}:</span>
           {f.value}

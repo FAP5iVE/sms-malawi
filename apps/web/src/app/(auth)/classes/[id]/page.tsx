@@ -197,7 +197,7 @@ function ClassDetailContent() {
       priority: 'important',
       render: (s) =>
         s.approvedAt ? null : (
-          <span className="inline-flex items-center gap-1 text-[10px] font-heading font-semibold text-brand-amber bg-brand-amber/10 border border-brand-amber/30 rounded-full px-2 py-0.5">
+          <span className="inline-flex items-center gap-1 text-[10px] font-heading font-semibold text-brand-amber">
             <Hourglass className="w-2.5 h-2.5" aria-hidden />
             Pending approval
           </span>

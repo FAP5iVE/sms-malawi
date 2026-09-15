@@ -403,7 +403,7 @@ export function ReportCardGenerator() {
 
       {/* Success summary */}
       {done && (
-        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-800/40 dark:text-emerald-400">
+        <div className="flex items-center gap-2 border border-base rounded-xl px-4 py-3 text-sm text-brand-teal">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           {doneCount} report card{doneCount !== 1 ? 's' : ''} generated successfully.
           {failedCount > 0 && ` ${failedCount} failed — use the retry button to regenerate.`}

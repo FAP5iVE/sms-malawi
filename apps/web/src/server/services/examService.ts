@@ -83,7 +83,7 @@ import 'server-only'
 import { prisma }           from '@/lib/prisma'
 import { logger }           from '@/lib/logger'
 import { checkBalanceGate } from '@/server/services/feeService'
-import { calcGrade, computeManebAggregate } from '@/server/services/gradeService'
+import { calcGrade, computeManebAggregate, computeInternalTermOutcome } from '@/server/services/gradeService'
 import { getManebExamType } from '@shared/constants/malawi'
 import * as classService    from '@/server/services/classService'
 import * as auditService    from '@/server/services/auditService'
@@ -484,13 +484,43 @@ export async function getStudentResults(studentId: string, academicYear: string,
   // "your average vs class average" and "position of N".
   const siblings = await prisma.termResult.findMany({
     where:  { classId: termResult.classId, academicYear, term },
-    select: { average: true },
+    select: { average: true, aggregatePoints: true },
   })
   const classSize = siblings.length
   const classAverage = classSize > 0
     ? Math.round((siblings.reduce((sum, r) => sum + toNumber(r.average), 0) / classSize) * 100) / 100
     : null
-  return { ...termResult, classAverage, classSize }
+
+  // MSCE track: the meaningful class benchmark is the average AGGREGATE, not
+  // the average percentage — a Form 3/4 student compares points to points.
+  const siblingPoints = siblings
+    .map((r) => r.aggregatePoints)
+    .filter((p): p is number => p !== null)
+  const classAveragePoints = siblingPoints.length > 0
+    ? Math.round((siblingPoints.reduce((sum, p) => sum + p, 0) / siblingPoints.length) * 10) / 10
+    : null
+
+  // classForm lets the client label the overall result correctly ("Points"
+  // for Forms 3-4, "Grade" for Forms 1-2) without guessing from the class
+  // name string.
+  const cls = await prisma.class.findUnique({
+    where:  { id: termResult.classId },
+    select: { form: true },
+  })
+
+  return {
+    ...termResult,
+    // Decimal columns serialise to strings over JSON, which is why the
+    // student's own Average rendered as an em dash while the computed
+    // classAverage (a real number) rendered fine. Coerced here so every
+    // consumer receives numbers.
+    totalMark:      toNumber(termResult.totalMark),
+    average:        toNumber(termResult.average),
+    classForm:      cls?.form ?? null,
+    classAverage,
+    classAveragePoints,
+    classSize,
+  }
 }
 
 // ─── COMPUTE TERM RESULTS ────────────────────────────────
@@ -514,7 +544,7 @@ export async function computeTermResults(classId: string, academicYear: string, 
     where: { classId, academicYear, term, status: 'RESULTS_RELEASED' },
     include: { marks: true },
   })
-  const results: { studentId: string; average: number }[] = []
+  const results: { studentId: string; average: number; points: number | null }[] = []
 
   for (const student of students) {
     const subjectMap: Record<string, { marks: number[] }> = {}
@@ -536,20 +566,72 @@ export async function computeTermResults(classId: string, academicYear: string, 
       totalAvg += avg; subjectCount++
     }
     const overallAvg = subjectCount > 0 ? totalAvg / subjectCount : 0
-    const { grade, pass } = await calcGrade(overallAvg, 'INTERNAL', classForm)
+
+    // [MSCE CORRECTION] The overall result is NOT calcGrade(overallAvg).
+    // Forms 3-4 are assessed on the MSCE 1-9 scale, whose overall result is
+    // the sum of the point values of the six best subjects — averaging the
+    // percentages and re-grading that average produces a number that looks
+    // like an MSCE grade but is not one, and it was passing every student
+    // because the average always landed in a passing band. Forms 1-2 keep
+    // the JCE-style overall letter grade. gradeService owns both branches.
+    const gradeMap = Object.fromEntries(
+      Object.entries(subjectResults).map(([subject, s]) => [subject, s.grade]),
+    )
+    const outcome = await computeInternalTermOutcome(classForm, gradeMap, overallAvg)
+
     await prisma.termResult.upsert({
       where: { studentId_academicYear_term: { studentId: student.id, academicYear, term } },
-      create: { studentId: student.id, classId, academicYear, term, totalMark: subjectCount * overallAvg, average: Math.round(overallAvg * 100) / 100, grade, passStatus: pass, subjectResults },
-      update: { average: Math.round(overallAvg * 100) / 100, grade, passStatus: pass, subjectResults },
+      create: {
+        studentId: student.id, classId, academicYear, term,
+        totalMark:         subjectCount * overallAvg,
+        average:           Math.round(overallAvg * 100) / 100,
+        grade:             outcome.overallGrade,
+        aggregatePoints:   outcome.aggregatePoints,
+        aggregateSubjects: outcome.aggregateSubjects,
+        gradingTrack:      outcome.track,
+        passStatus:        outcome.pass,
+        subjectResults,
+      },
+      update: {
+        average:           Math.round(overallAvg * 100) / 100,
+        grade:             outcome.overallGrade,
+        aggregatePoints:   outcome.aggregatePoints,
+        aggregateSubjects: outcome.aggregateSubjects,
+        gradingTrack:      outcome.track,
+        passStatus:        outcome.pass,
+        subjectResults,
+      },
     })
-    results.push({ studentId: student.id, average: overallAvg })
+    results.push({
+      studentId: student.id,
+      average:   overallAvg,
+      points:    outcome.aggregatePoints,
+    })
   }
 
-  results.sort((a, b) => b.average - a.average)
+  // [MSCE CORRECTION] Ranking direction differs by track. On the MSCE track
+  // a LOWER aggregate is better, so ranking by average descending put the
+  // worst candidates at the top. Students with no valid six-subject
+  // aggregate rank last rather than being treated as a perfect score.
+  const msceTrack = classForm >= 3
+  results.sort((a, b) => {
+    if (msceTrack) {
+      const ap = a.points ?? Number.POSITIVE_INFINITY
+      const bp = b.points ?? Number.POSITIVE_INFINITY
+      if (ap !== bp) return ap - bp
+      return b.average - a.average   // tie-break on average, higher is better
+    }
+    return b.average - a.average
+  })
+
+  // classPosition/classTotal were declared on TermResult but never written —
+  // which is why every generated report card read "Position: 0th / 0".
+  // Written here alongside `position` from the same ranked pass.
+  const classTotal = results.length
   await prisma.$transaction(
     results.map((r, i) => prisma.termResult.update({
       where: { studentId_academicYear_term: { studentId: r.studentId, academicYear, term } },
-      data: { position: i + 1 },
+      data: { position: i + 1, classPosition: i + 1, classTotal },
     }))
   )
   logger.info({ event: 'term_results.computed', classId, academicYear, term, count: results.length, actorUid })
@@ -880,20 +962,57 @@ export interface RankedStudent {
   registrationNo: string
   classId:        string
   className:      string
+  /** The percentage figure (overall term average, or the selected subject's
+   *  average). Always present. */
   value:          number
+  /** MSCE-track rows only — the aggregate the ranking actually used. Null on
+   *  the JCE track and when no six-subject aggregate exists. */
+  points:         number | null
   position:       number
+}
+
+/** Per-class summary used when no single class is selected. Replaces the
+ *  old school-wide merged ranking: a Form 2 result and a Form 4 result are
+ *  produced by two different grading systems (JCE letters vs MSCE points)
+ *  over two different syllabuses, so ordering them in one Top 10 compares
+ *  quantities that are not comparable. Each class is summarised on its own
+ *  terms instead, and rankings are only ever produced within one class. */
+export interface ClassAnalyticsSummary {
+  classId:      string
+  className:    string
+  form:         number
+  gradingTrack: 'JCE' | 'MSCE'
+  total:        number
+  classAverage: number | null
+  /** MSCE-track classes only — mean aggregate points for the class. */
+  averagePoints: number | null
+  passRate:     number | null
+  atRiskCount:  number
 }
 
 export interface ExamAnalyticsResult {
   metric:            'overall' | 'subject'
   subject:           string | null
+  /** Set only when a single class is selected. */
+  classId:           string | null
+  className:         string | null
+  form:              number | null
+  gradingTrack:      'JCE' | 'MSCE' | null
+  /** True when no class was selected: `perClass` is populated and top/bottom
+   *  are deliberately empty, because a cross-form ranking is not meaningful. */
+  schoolWide:        boolean
+  /** Why a selection returned nothing, when it did — so the UI can say
+   *  something better than "No results computed for this selection yet." */
+  emptyReason:       string | null
   total:             number
   classAverage:      number | null
+  averagePoints:     number | null
   passRate:          number | null
   atRiskCount:       number
   gradeDistribution: { grade: string; count: number }[]
   top:               RankedStudent[]
   bottom:            RankedStudent[]
+  perClass:          ClassAnalyticsSummary[]
 }
 
 // AN-1 (top/bottom-10, filters, tie-safe) + AN-3 (pass rate, grade distribution,
@@ -920,12 +1039,38 @@ export async function getExamAnalytics(
     }
   }
 
+  const schoolWide = !opts.classId
+
   const results = await prisma.termResult.findMany({
     where:  { academicYear, term, ...(opts.classId ? { classId: opts.classId } : {}) },
-    select: { studentId: true, classId: true, average: true, grade: true, passStatus: true, subjectResults: true },
+    select: {
+      studentId: true, classId: true, average: true, grade: true,
+      aggregatePoints: true, gradingTrack: true, passStatus: true, subjectResults: true,
+    },
   })
 
-  // Value per student: subject average when a subject filter is set, else overall.
+  // Class metadata for every class in play — needed to know each row's
+  // grading track (JCE letters vs MSCE points) and to name classes.
+  const classIdsInScope = opts.classId
+    ? [opts.classId]
+    : Array.from(new Set(results.map((r) => r.classId)))
+  const classRows = await prisma.class.findMany({
+    where:  { id: { in: classIdsInScope } },
+    select: { id: true, name: true, form: true },
+  })
+  const classById = new Map(classRows.map((c) => [c.id, c]))
+
+  const trackOf = (classId: string, stored: string | null): 'JCE' | 'MSCE' =>
+    (stored as 'JCE' | 'MSCE' | null) ?? ((classById.get(classId)?.form ?? 1) >= 3 ? 'MSCE' : 'JCE')
+
+  const selectedClass = opts.classId ? classById.get(opts.classId) ?? null : null
+  const selectedTrack: 'JCE' | 'MSCE' | null = selectedClass
+    ? (selectedClass.form >= 3 ? 'MSCE' : 'JCE')
+    : null
+
+  // Value per student: subject average when a subject filter is set, else
+  // overall average. `points` is carried alongside so MSCE-track classes can
+  // be ranked on the aggregate rather than the percentage.
   const rows = results
     .map((r) => {
       let value: number | null
@@ -936,49 +1081,160 @@ export async function getExamAnalytics(
       } else {
         value = toNumber(r.average)
       }
-      return { studentId: r.studentId, classId: r.classId, grade: r.grade, passStatus: r.passStatus, value }
+      return {
+        studentId: r.studentId,
+        classId:   r.classId,
+        grade:     r.grade,
+        points:    r.aggregatePoints,
+        track:     trackOf(r.classId, r.gradingTrack),
+        passStatus: r.passStatus,
+        value,
+      }
     })
-    .filter((r): r is { studentId: string; classId: string; grade: string; passStatus: boolean; value: number } => r.value !== null)
+    .filter((r): r is {
+      studentId: string; classId: string; grade: string; points: number | null
+      track: 'JCE' | 'MSCE'; passStatus: boolean; value: number
+    } => r.value !== null)
 
   const total = rows.length
+
+  // ── Empty: say WHY, rather than the flat "No results computed for this
+  //    selection yet." that covered four different causes indistinguishably
+  //    (class not computed, subject not taught, wrong term, wrong year).
   if (total === 0) {
-    return { metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null, total: 0, classAverage: null, passRate: null, atRiskCount: 0, gradeDistribution: [], top: [], bottom: [] }
+    let emptyReason: string
+    if (opts.classId && !selectedClass) {
+      emptyReason = 'That class does not exist in the selected academic year.'
+    } else if (opts.classId && results.length === 0) {
+      emptyReason = `No results have been computed for ${selectedClass?.name ?? 'this class'} in Term ${term} of ${academicYear} yet. Open the Exams tab, select the class, and use "Compute Results" once its exams are released.`
+    } else if (opts.subject) {
+      emptyReason = `No ${opts.subject} results were recorded for this selection in Term ${term}. Either the subject is not taught to this class, or its exam has not been released and computed yet.`
+    } else {
+      emptyReason = `No results have been computed for Term ${term} of ${academicYear} yet.`
+    }
+    return {
+      metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null,
+      classId: opts.classId ?? null, className: selectedClass?.name ?? null,
+      form: selectedClass?.form ?? null, gradingTrack: selectedTrack,
+      schoolWide, emptyReason,
+      total: 0, classAverage: null, averagePoints: null, passRate: null,
+      atRiskCount: 0, gradeDistribution: [], top: [], bottom: [], perClass: [],
+    }
   }
 
-  // AN-3 summary.
+  // ── Summary figures (apply to whatever scope was requested).
   const classAverage = Math.round((rows.reduce((sum, r) => sum + r.value, 0) / total) * 100) / 100
   const passRate     = Math.round((rows.filter((r) => r.passStatus).length / total) * 100)
   const atRiskCount  = rows.filter((r) => !r.passStatus).length
-  const gradeMap = new Map<string, number>()
-  for (const r of rows) gradeMap.set(r.grade, (gradeMap.get(r.grade) ?? 0) + 1)
-  const gradeDistribution = Array.from(gradeMap.entries())
+
+  const pointRows    = rows.map((r) => r.points).filter((p): p is number => p !== null)
+  const averagePoints = pointRows.length > 0
+    ? Math.round((pointRows.reduce((a, b) => a + b, 0) / pointRows.length) * 10) / 10
+    : null
+
+  // ── Per-class breakdown, always computed. This is what school-wide shows
+  //    INSTEAD of a merged ranking.
+  const perClass: ClassAnalyticsSummary[] = Array.from(
+    rows.reduce((acc, r) => {
+      const bucket = acc.get(r.classId) ?? []
+      bucket.push(r)
+      acc.set(r.classId, bucket)
+      return acc
+    }, new Map<string, typeof rows>()),
+  ).map(([classId, bucket]) => {
+    const meta = classById.get(classId)
+    const pts  = bucket.map((b) => b.points).filter((p): p is number => p !== null)
+    return {
+      classId,
+      className:    meta?.name ?? '—',
+      form:         meta?.form ?? 0,
+      gradingTrack: (meta?.form ?? 1) >= 3 ? 'MSCE' as const : 'JCE' as const,
+      total:        bucket.length,
+      classAverage: Math.round((bucket.reduce((s, b) => s + b.value, 0) / bucket.length) * 100) / 100,
+      averagePoints: pts.length > 0
+        ? Math.round((pts.reduce((a, b) => a + b, 0) / pts.length) * 10) / 10
+        : null,
+      passRate:     Math.round((bucket.filter((b) => b.passStatus).length / bucket.length) * 100),
+      atRiskCount:  bucket.filter((b) => !b.passStatus).length,
+    }
+  }).sort((a, b) => a.form - b.form || a.className.localeCompare(b.className))
+
+  // ── Grade distribution. On the MSCE track `grade` is deliberately empty
+  //    (Forms 3-4 have no overall grade), so distribution is banded by
+  //    aggregate points instead of producing one meaningless blank bucket.
+  const distMap = new Map<string, number>()
+  for (const r of rows) {
+    let key: string
+    if (r.track === 'MSCE') {
+      if (r.points == null) key = 'No aggregate'
+      else if (r.points <= 12) key = '6-12 (best)'
+      else if (r.points <= 24) key = '13-24'
+      else if (r.points <= 36) key = '25-36'
+      else key = '37-54'
+    } else {
+      key = r.grade || '—'
+    }
+    distMap.set(key, (distMap.get(key) ?? 0) + 1)
+  }
+  const gradeDistribution = Array.from(distMap.entries())
     .map(([grade, count]) => ({ grade, count }))
     .sort((a, b) => a.grade.localeCompare(b.grade))
 
-  // Resolve names + class names (staff-facing lists).
+  // ── Rankings. ONLY produced for a single selected class. A school-wide
+  //    Top 10 would rank a Form 2 JCE letter result against a Form 4 MSCE
+  //    aggregate — different scales, different syllabuses, not comparable.
+  if (schoolWide) {
+    return {
+      metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null,
+      classId: null, className: null, form: null, gradingTrack: null,
+      schoolWide: true, emptyReason: null,
+      total, classAverage, averagePoints, passRate, atRiskCount,
+      gradeDistribution, top: [], bottom: [], perClass,
+    }
+  }
+
   const studentIds = rows.map((r) => r.studentId)
-  const classIds   = Array.from(new Set(rows.map((r) => r.classId)))
-  const [students, classes] = await Promise.all([
-    prisma.student.findMany({ where: { id: { in: studentIds } }, select: { id: true, firstName: true, lastName: true, registrationNo: true } }),
-    prisma.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true } }),
-  ])
+  const students = await prisma.student.findMany({
+    where: { id: { in: studentIds } },
+    select: { id: true, firstName: true, lastName: true, registrationNo: true },
+  })
   const nameById = new Map(students.map((s) => [s.id, `${s.firstName} ${s.lastName}`]))
   const regById  = new Map(students.map((s) => [s.id, s.registrationNo]))
-  const clsById  = new Map(classes.map((c) => [c.id, c.name]))
 
   const enriched = rows.map((r) => ({
     studentId:      r.studentId,
     name:           nameById.get(r.studentId) ?? '—',
     registrationNo: regById.get(r.studentId) ?? '',
     classId:        r.classId,
-    className:      clsById.get(r.classId) ?? '—',
+    className:      classById.get(r.classId)?.name ?? '—',
     value:          Math.round(r.value * 100) / 100,
+    points:         r.points,
   }))
 
-  const byBest  = [...enriched].sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
-  const byWorst = [...enriched].sort((a, b) => a.value - b.value || a.name.localeCompare(b.name))
-  const top     = byBest.slice(0, limit).map((r, i) => ({ ...r, position: i + 1 }))
-  const bottom  = byWorst.slice(0, limit).map((r, i) => ({ ...r, position: i + 1 }))
+  // Ranking key. On the MSCE track, and only when looking at the overall
+  // result (not a single subject), the ranking quantity is the AGGREGATE and
+  // a LOWER total is better. Students with no valid six-subject aggregate
+  // sort last rather than sorting as if they scored a perfect 6.
+  const rankByPoints = selectedTrack === 'MSCE' && !opts.subject
+  const keyOf = (r: typeof enriched[number]): number =>
+    rankByPoints ? (r.points ?? Number.POSITIVE_INFINITY) : r.value
 
-  return { metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null, total, classAverage, passRate, atRiskCount, gradeDistribution, top, bottom }
+  const byBest = [...enriched].sort((a, b) =>
+    rankByPoints
+      ? (keyOf(a) - keyOf(b)) || a.name.localeCompare(b.name)
+      : (keyOf(b) - keyOf(a)) || a.name.localeCompare(b.name),
+  )
+  const byWorst = [...byBest].reverse()
+
+  const top    = byBest.slice(0, limit).map((r, i) => ({ ...r, position: i + 1 }))
+  const bottom = byWorst.slice(0, limit).map((r, i) => ({ ...r, position: i + 1 }))
+
+  return {
+    metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null,
+    classId: opts.classId ?? null, className: selectedClass?.name ?? null,
+    form: selectedClass?.form ?? null, gradingTrack: selectedTrack,
+    schoolWide: false, emptyReason: null,
+    total, classAverage, averagePoints, passRate, atRiskCount,
+    gradeDistribution, top, bottom, perClass,
+  }
 }

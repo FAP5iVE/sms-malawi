@@ -446,7 +446,20 @@ async function computeJceOutcome(subjectGrades: Record<string, string>): Promise
 
 async function computeMsceOutcome(subjectGrades: Record<string, string>): Promise<MsceOutcome> {
   const scales = await loadScales()
-  const table  = scales.get('MSCE') ?? []   // ordered by displayOrder asc — index+1 is the grade's point value
+  return msceStyleOutcome(scales.get('MSCE') ?? [], subjectGrades)
+}
+
+// The MSCE aggregate/eligibility computation, parameterised over the grade
+// table so it can be driven by either the MANEB 'MSCE' scale (national
+// sitting) or the identical-shaped 'INTERNAL_F3F4' scale (a Form 3/4 school
+// term). Both are 1–9 scales with the same Distinction/Credit/Pass/Fail
+// tiers, and a Form 3 term result is summarised the same way a real MSCE
+// result is — as an aggregate of points, never as an averaged grade.
+function msceStyleOutcome(
+  table:         GradeRow[],
+  subjectGrades: Record<string, string>,
+): MsceOutcome {
+  // `table` is ordered by displayOrder asc — index+1 is the grade's point value
 
   const pointOf = (grade: string): number | null => {
     const idx = table.findIndex((g) => g.grade === grade)
@@ -503,6 +516,110 @@ export async function computeManebAggregate(
   subjectGrades: Record<string, string>,
 ): Promise<ManebOutcome> {
   return examType === 'JCE' ? computeJceOutcome(subjectGrades) : computeMsceOutcome(subjectGrades)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INTERNAL TERM OUTCOME — the overall result of a SCHOOL term exam
+//
+// This exists because computeTermResults() previously summarised every form
+// the same way: average the subject percentages, then run that average back
+// through calcGrade() to get an "overall grade". For Forms 1–2 that is a
+// reasonable JCE-side summary. For Forms 3–4 it is simply not an MSCE
+// result — MSCE has no average grade. The overall result of an MSCE-track
+// term is the SUM of the point values of the best six subjects, and the
+// pass decision is the certificate-eligibility gate, not "is the average
+// percentage above the pass mark".
+//
+// Both branches return the same shape so callers never special-case the
+// field set, only the labels they put on it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface InternalTermOutcome {
+  track: 'JCE' | 'MSCE'
+  /** MSCE track: aggregate of the best six subjects (6–54, lower is better).
+   *  Null when fewer than six subjects were performed — no aggregate exists.
+   *  ALWAYS null on the JCE track: Forms 1–2 have no point aggregate. */
+  aggregatePoints: number | null
+  /** MSCE track: the (up to six) subjects whose points make up the sum. */
+  aggregateSubjects: string[]
+  /** JCE track only: the overall letter grade derived from the term average.
+   *  ALWAYS an empty string on the MSCE track — an MSCE term has no overall
+   *  grade, and writing one is what produced the "Grade 7" bug. */
+  overallGrade: string
+  /** Human-readable summary of the outcome, e.g. "34 points — 6 subjects
+   *  passed" or "Grade C". */
+  classification: string
+  /** Did the student pass the term overall? */
+  pass: boolean
+  passedSubjects: number
+  totalSubjects:  number
+}
+
+export async function computeInternalTermOutcome(
+  classForm:     number,
+  subjectGrades: Record<string, string>,
+  /** Term average percentage — used for the JCE-track overall grade only.
+   *  Deliberately unused on the MSCE track. */
+  averagePercent: number,
+): Promise<InternalTermOutcome> {
+  const scales = await loadScales()
+
+  // ── MSCE track (Forms 3–4): aggregate of points, never an average grade.
+  if (classForm >= 3) {
+    const outcome = msceStyleOutcome(scales.get('INTERNAL_F3F4') ?? [], subjectGrades)
+    const table   = scales.get('INTERNAL_F3F4') ?? []
+    const passOf  = (g: string): boolean => table.find((r) => r.grade === g)?.pass ?? false
+    const passedSubjects = Object.values(subjectGrades).filter(passOf).length
+
+    const classification =
+      outcome.totalSubjects === 0
+        ? 'No subjects recorded'
+        : outcome.aggregatePoints === null
+          ? `Aggregate unavailable — only ${outcome.totalSubjects} subject(s) recorded, six are required`
+          : `${outcome.aggregatePoints} points from the best six subjects`
+
+    return {
+      track:             'MSCE',
+      aggregatePoints:   outcome.points,
+      aggregateSubjects: outcome.aggregateSubjects,
+      overallGrade:      '',
+      classification,
+      pass:              outcome.pass,
+      passedSubjects,
+      totalSubjects:     outcome.totalSubjects,
+    }
+  }
+
+  // ── JCE track (Forms 1–2): overall letter grade from the term average.
+  const table  = scales.get('INTERNAL_F1F2') ?? []
+  const passOf = (g: string): boolean => table.find((r) => r.grade === g)?.pass ?? false
+  const isKnown = (g: string): boolean => table.some((r) => r.grade === g)
+
+  const entries        = Object.entries(subjectGrades).filter(([, g]) => isKnown(g))
+  const totalSubjects  = entries.length
+  const passedSubjects = entries.filter(([, g]) => passOf(g)).length
+
+  const overall = await calcGrade(averagePercent, 'INTERNAL', classForm)
+
+  return {
+    track:             'JCE',
+    aggregatePoints:   null,
+    aggregateSubjects: [],
+    overallGrade:      overall.grade,
+    classification:    totalSubjects === 0 ? 'No subjects recorded' : `Grade ${overall.grade}`,
+    pass:              overall.pass,
+    passedSubjects,
+    totalSubjects,
+  }
+}
+
+/** The point value of a grade on a 1–9 scale (its 1-based rank). Exposed so
+ *  analytics can band MSCE-track results without re-deriving the scale. */
+export async function getGradePoints(examType: ExamTypeKey, grade: string): Promise<number | null> {
+  const scales = await loadScales()
+  const table  = scales.get(examType) ?? []
+  const idx    = table.findIndex((g) => g.grade === grade)
+  return idx === -1 ? null : idx + 1
 }
 
 /** The set of passing grade strings for an exam type (subject-level pass

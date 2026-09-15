@@ -65,20 +65,25 @@ type Student = ApiStudent
 // STATUS BADGE
 // ─────────────────────────────────────────────────────────────────────────────
 
+// [NO COLOUR BLOCKS] These were filled chips. Two of them used raw Tailwind
+// palette values (blue-50/purple-50) that have no dark variant at all, so in
+// dark mode a pale block sat against the near-black page. Status is now
+// carried by font colour alone, using the theme-aware brand tokens, which
+// resolve correctly under both :root and .dark.
 const STATUS_STYLES: Record<string, string> = {
-  ACTIVE:                 'bg-brand-teal/15 text-brand-teal',
-  ARCHIVED:               'bg-base text-muted',
-  AWAITING_MANEB_RESULTS: 'bg-blue-50 text-blue-700',
-  GRADUATED:              'bg-purple-50 text-purple-700',
+  ACTIVE:                 'text-brand-teal',
+  ARCHIVED:               'text-muted',
+  AWAITING_MANEB_RESULTS: 'text-brand-navy',
+  GRADUATED:              'text-brand-purple',
 }
 
 function StatusBadge({ status }: { status: string }) {
   return (
     <span
       className={`
-        inline-flex items-center px-2.5 py-1 rounded-full
-        text-xs font-heading font-semibold
-        ${STATUS_STYLES[status] ?? 'bg-base text-muted'}
+        inline-flex items-center
+        text-xs font-heading font-semibold uppercase tracking-wide
+        ${STATUS_STYLES[status] ?? 'text-muted'}
       `}
     >
       {status.replace(/_/g, ' ')}
@@ -147,10 +152,8 @@ const COLUMNS: DataColumn<Student>[] = [
       return (
         <span
           className={`
-            text-xs font-semibold px-2 py-0.5 rounded-full
-            ${cleared
-              ? 'bg-emerald-50 text-emerald-700'
-              : 'bg-brand-coral/10 text-brand-coral'}
+            text-xs font-semibold
+            ${cleared ? 'text-brand-teal' : 'text-brand-coral'}
           `}
         >
           {cleared ? 'Cleared' : 'Outstanding'}

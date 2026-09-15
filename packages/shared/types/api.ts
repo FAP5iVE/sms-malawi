@@ -613,8 +613,23 @@ export interface ApiTermResult {
   term: number
   totalMark: number
   average: number
+  /** JCE track (Forms 1-2) ONLY — the overall letter grade for the term.
+   *  Always an empty string on the MSCE track: Forms 3-4 have no overall
+   *  grade. Read aggregatePoints instead and label it "Points". */
   grade: string
+  /** MSCE track (Forms 3-4) ONLY — sum of the point values of the six best
+   *  subjects (6-54, lower is better). Null on the JCE track, and null on
+   *  the MSCE track when fewer than six subjects were recorded. */
+  aggregatePoints: number | null
+  /** The (up to six) subjects whose points make up aggregatePoints. */
+  aggregateSubjects: string[] | null
+  /** 'JCE' | 'MSCE' — which grading system produced this row. */
+  gradingTrack: 'JCE' | 'MSCE' | null
+  /** The form (1-4) of the class this result belongs to. */
+  classForm: number | null
   position: number | null
+  classPosition: number
+  classTotal: number
   passStatus: boolean
   subjectResults: Record<string, { average: number; grade: string; pass: boolean }>
   attendanceDays: number
@@ -624,6 +639,9 @@ export interface ApiTermResult {
   reportCardKey: string | null
   releasedAt: string | null
   classAverage: number | null
+  /** MSCE track — the class's mean aggregate, the points-to-points
+   *  equivalent of classAverage. Null when no sibling has an aggregate. */
+  classAveragePoints: number | null
   classSize: number | null
 }
 
@@ -634,19 +652,48 @@ export interface ApiRankedStudent {
   classId:        string
   className:      string
   value:          number
+  /** MSCE-track rows only — the aggregate the ranking used (lower is
+   *  better). Null on the JCE track and when no aggregate exists. */
+  points:         number | null
   position:       number
+}
+
+export interface ApiClassAnalyticsSummary {
+  classId:       string
+  className:     string
+  form:          number
+  gradingTrack:  'JCE' | 'MSCE'
+  total:         number
+  classAverage:  number | null
+  averagePoints: number | null
+  passRate:      number | null
+  atRiskCount:   number
 }
 
 export interface ApiExamAnalytics {
   metric:            'overall' | 'subject'
   subject:           string | null
+  classId:           string | null
+  className:         string | null
+  form:              number | null
+  gradingTrack:      'JCE' | 'MSCE' | null
+  /** True when no class was selected. `perClass` is populated and top/bottom
+   *  are empty: ranking a Form 2 JCE result against a Form 4 MSCE aggregate
+   *  compares two different grading systems and is not meaningful. */
+  schoolWide:        boolean
+  /** Populated when the selection returned nothing, explaining which of the
+   *  several possible causes applied. */
+  emptyReason:       string | null
   total:             number
   classAverage:      number | null
+  /** MSCE-track — mean aggregate points across the scope. */
+  averagePoints:     number | null
   passRate:          number | null
   atRiskCount:       number
   gradeDistribution: { grade: string; count: number }[]
   top:               ApiRankedStudent[]
   bottom:            ApiRankedStudent[]
+  perClass:          ApiClassAnalyticsSummary[]
 }
 
 export interface ApiManebRecord {
@@ -1080,7 +1127,11 @@ export interface ApiStudentPerformancePoint {
   academicYear:  string
   term:          number
   average:       number
+  /** JCE track: the overall letter grade. MSCE track: the aggregate
+   *  rendered as "34 pts" — Forms 3-4 have no overall grade. */
   grade:         string
+  aggregatePoints: number | null
+  gradingTrack:  string | null
   position:      number | null
   classTotal:    number
   passStatus:    boolean

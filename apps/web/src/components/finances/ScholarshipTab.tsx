@@ -167,7 +167,7 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold border ${s.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-gray-100 text-gray-500 border-gray-200'}`}
+                      className={`inline-flex text-xs font-semibold ${s.isActive ? 'text-brand-teal' : 'text-muted'}`}
                     >
                       {s.isActive ? 'Active' : 'Inactive'}
                     </span>

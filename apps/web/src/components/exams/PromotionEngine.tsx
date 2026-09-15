@@ -69,9 +69,9 @@ const OUTCOME_CONFIG: Record<PromotionOutcome, {
   icon:  React.ElementType
   chip:  string
 }> = {
-  PROMOTED:        { label: 'Promoted',         icon: CheckCircle2,  chip: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  REPEATED:        { label: 'Repeats',          icon: XCircle,       chip: 'bg-brand-coral/10 text-brand-coral border-brand-coral/20' },
-  AWAITING_MANEB:  { label: 'Awaiting MANEB',  icon: Clock,         chip: 'bg-brand-amber/10 text-brand-amber border-brand-amber/20' },
+  PROMOTED:        { label: 'Promoted',         icon: CheckCircle2,  chip: 'text-brand-teal' },
+  REPEATED:        { label: 'Repeats',          icon: XCircle,       chip: 'text-brand-coral' },
+  AWAITING_MANEB:  { label: 'Awaiting MANEB',  icon: Clock,         chip: 'text-brand-amber' },
   ALREADY_AWAITING:{ label: 'Already Waiting', icon: Clock,         chip: 'bg-base text-muted border-base' },
   SKIPPED_NO_RESULT:{ label: 'Skipped',        icon: AlertTriangle, chip: 'bg-base text-muted border-base' },
 }
@@ -79,7 +79,7 @@ const OUTCOME_CONFIG: Record<PromotionOutcome, {
 function OutcomeBadge({ outcome }: { outcome: PromotionOutcome }) {
   const { label, icon: Icon, chip } = OUTCOME_CONFIG[outcome]
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${chip}`}>
+    <span className={`inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide ${chip}`}>
       <Icon className="w-3 h-3" aria-hidden />
       {label}
     </span>
@@ -327,9 +327,9 @@ export function PromotionEngine() {
       {preview && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: 'Promoted',      value: preview.promoted,       color: 'text-emerald-600', bg: 'bg-emerald-50', outcome: 'PROMOTED' as PromotionOutcome },
-            { label: 'Repeating',     value: preview.repeated,       color: 'text-brand-coral',  bg: 'bg-brand-coral/10', outcome: 'REPEATED' as PromotionOutcome },
-            { label: 'Await MANEB',   value: preview.awaitingManeb,  color: 'text-brand-amber',  bg: 'bg-brand-amber/10', outcome: 'AWAITING_MANEB' as PromotionOutcome },
+            { label: 'Promoted',      value: preview.promoted,       color: 'text-brand-teal', bg: '', outcome: 'PROMOTED' as PromotionOutcome },
+            { label: 'Repeating',     value: preview.repeated,       color: 'text-brand-coral',  bg: '', outcome: 'REPEATED' as PromotionOutcome },
+            { label: 'Await MANEB',   value: preview.awaitingManeb,  color: 'text-brand-amber',  bg: '', outcome: 'AWAITING_MANEB' as PromotionOutcome },
             { label: 'Skipped',       value: preview.skipped,        color: 'text-muted',         bg: 'bg-page', outcome: 'SKIPPED_NO_RESULT' as PromotionOutcome },
           ].map(({ label, value, color, outcome }) => (
             <button

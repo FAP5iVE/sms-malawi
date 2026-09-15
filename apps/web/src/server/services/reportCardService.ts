@@ -280,11 +280,29 @@ export async function getReportCardData(
   const nextForm = student.class ? student.class.form + 1 : null
   const nextClass = nextForm && nextForm <= 4 ? `Form ${nextForm}` : undefined
 
+  // [MSCE CORRECTION] The card must know which grading system produced this
+  // term so its aggregate row can show POINTS (Forms 3-4) rather than a
+  // percentage under an "AGGREGATE" heading. gradingTrack is written at
+  // compute time; classForm is the fallback for rows computed before it
+  // existed.
+  const gradingTrack: 'JCE' | 'MSCE' =
+    (termResult?.gradingTrack as 'JCE' | 'MSCE' | null) ?? (classForm >= 3 ? 'MSCE' : 'JCE')
+
+  // classPosition/classTotal are written by computeTermResults() alongside
+  // `position`. Falling back to `position` covers rows computed before that
+  // write path existed — without it the card printed "Position: 0th / 0"
+  // even when a real rank had been calculated.
+  const classPosition = termResult?.classPosition || termResult?.position || 0
+  const classTotal    = termResult?.classTotal || 0
+
   return {
     ...baseFields,
     subjects,
-    classPosition:   termResult?.classPosition  ?? 0,
-    classTotal:      termResult?.classTotal     ?? 0,
+    gradingTrack,
+    aggregatePoints:   termResult?.aggregatePoints ?? null,
+    aggregateSubjects: (termResult?.aggregateSubjects as string[] | null) ?? [],
+    classPosition,
+    classTotal,
     totalMarks:      Number(termResult?.totalMark    ?? 0),
     averagePercent:  Number(termResult?.average      ?? 0),
     classTeacher:        student.class?.teacherId ? 'Class Teacher' : '—',
@@ -540,15 +558,42 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
     y += rowH
   })
 
-  // Aggregate row
+  // [MSCE CORRECTION] Aggregate row — must mirror PrintableReportCard.tsx.
+  // Forms 3-4 (MSCE track) are summarised by an AGGREGATE OF POINTS (sum of
+  // the six best subjects, 6-54, lower is better); Forms 1-2 (JCE track)
+  // have no aggregate and are summarised by the term average. This row
+  // printed the average percentage under an "AGGREGATE" heading for every
+  // form, so a Form 3/4 PDF never carried a points total at all.
+  const pdfIsMsce = (data.gradingTrack ?? (data.classForm >= 3 ? 'MSCE' : 'JCE')) === 'MSCE'
   setFill(240, 244, 248)
   doc.rect(ML, y, CW, 7, 'FD')
   setFont(8, 'bold')
   setColor(30, 58, 95)
-  text('AGGREGATE', ML + 1.5, y + 5)
-  text(`Average: ${data.averagePercent.toFixed(1)}%`, ML + 96, y + 5)
+  if (pdfIsMsce) {
+    text('AGGREGATE POINTS (best six)', ML + 1.5, y + 5)
+    text(
+      data.aggregatePoints != null ? `${data.aggregatePoints} points` : 'Not available',
+      ML + 96, y + 5,
+    )
+  } else {
+    text('OVERALL', ML + 1.5, y + 5)
+    text(`Average: ${data.averagePercent.toFixed(1)}%`, ML + 96, y + 5)
+  }
   text(`Position: ${data.classPosition} / ${data.classTotal}`, ML + 135, y + 5)
   y += 7 + 4
+
+  if (pdfIsMsce) {
+    setFont(6.5)
+    setColor(107, 114, 128)
+    text(
+      data.aggregatePoints != null
+        ? `Aggregate = sum of the points of the six best subjects (${(data.aggregateSubjects ?? []).join(', ')}). Range 6-54; lower is better. MSCE awards no overall grade.`
+        : 'Aggregate not available - six graded subjects are required to form an MSCE aggregate.',
+      ML + 1.5, y,
+    )
+    setColor(0, 0, 0)
+    y += 4
+  }
   }
 
   // ── 4. Attendance ─────────────────────────────────────────────────────────

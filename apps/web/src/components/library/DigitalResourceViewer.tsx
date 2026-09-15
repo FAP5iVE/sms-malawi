@@ -178,7 +178,7 @@ export function DigitalResourceViewer({
               <span className="font-heading font-semibold text-sm text-white truncate">
                 {title}
               </span>
-              <span className="shrink-0 text-[10px] bg-brand-teal/20 text-brand-teal border border-brand-teal/30 px-2 py-0.5 rounded-full font-heading font-semibold uppercase tracking-wide">
+              <span className="shrink-0 text-[10px] text-brand-teal font-heading font-semibold uppercase tracking-wide">
                 View Only
               </span>
             </div>

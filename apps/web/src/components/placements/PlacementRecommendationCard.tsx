@@ -115,17 +115,17 @@ export function PlacementRecommendationCard({ recommendation: r, action, rank, g
       {(eligible || r.matchedPreferredField || r.matchedPreferredCareer) && (
         <div className="flex flex-wrap gap-1.5">
           {eligible && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand-teal/10 text-brand-teal text-[11px] font-medium px-2 py-0.5">
+            <span className="inline-flex items-center gap-1 text-brand-teal text-[11px] font-medium">
               <CheckCircle2 className="w-3 h-3" /> Meets requirements
             </span>
           )}
           {r.matchedPreferredField && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand-navy/10 text-brand-navy text-[11px] font-medium px-2 py-0.5">
+            <span className="inline-flex items-center gap-1 text-brand-navy text-[11px] font-medium">
               <CheckCircle2 className="w-3 h-3" /> Matches your field preference
             </span>
           )}
           {r.matchedPreferredCareer && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand-navy/10 text-brand-navy text-[11px] font-medium px-2 py-0.5">
+            <span className="inline-flex items-center gap-1 text-brand-navy text-[11px] font-medium">
               <CheckCircle2 className="w-3 h-3" /> Matches your career interest
             </span>
           )}

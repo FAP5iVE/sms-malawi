@@ -236,10 +236,10 @@ function UserManagementContent() {
           </select>
         </td>
         <td className="px-4 py-3">
-          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${u.disabled ? 'bg-brand-coral/10 text-brand-coral' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'}`}>
+          <span className={`text-xs font-semibold ${u.disabled ? 'text-brand-coral' : 'text-brand-teal'}`}>
             {u.disabled ? 'Disabled' : 'Active'}
           </span>
-          {u.requiresPasswordChange && <span className="ml-1 text-xs bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full">Must Change PW</span>}
+          {u.requiresPasswordChange && <span className="ml-1 text-xs text-brand-amber">Must Change PW</span>}
         </td>
         <td className="px-4 py-3 text-xs text-muted">{u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString('en-MW') : 'Never'}</td>
         <td className="px-4 py-3 text-xs text-muted font-mono">{u.employeeNo ?? u.registrationNo ?? '—'}</td>

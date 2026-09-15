@@ -21,8 +21,16 @@
  * Used in: student list DataTable cells, student profile header,
  * class dashboard cards, and academic staff dashboard widgets.
  *
+ * [NO COLOUR BLOCKS] The badge variant was a filled pill
+ * (bg-red-50/bg-amber-50/bg-blue-50/bg-emerald-50 plus dark: overrides and a
+ * matching border). Status is now carried by FONT COLOUR alone, using the
+ * theme-aware brand tokens, which resolve to appropriate values under both
+ * :root and .dark — so a single token works in light and dark mode with no
+ * dark: variant to keep in sync. The dot and card variants keep their fills:
+ * a dot IS its colour, and the card is a panel rather than a status word.
+ *
  * Variants:
- *   'badge'   — coloured pill with icon + label  (default, DataTable use)
+ *   'badge'   — icon + coloured label text        (default, DataTable use)
  *   'dot'     — small coloured circle only        (compact list rows)
  *   'card'    — full card with contributing factors list (student detail page)
  *
@@ -47,7 +55,7 @@ const RISK_CONFIG: Record<RiskLevel, {
   HIGH: {
     label:     'High Risk',
     icon:      AlertTriangle,
-    badge:     'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/25 dark:text-red-400 dark:border-red-800/50',
+    badge:     'text-brand-coral',
     dot:       'bg-red-500',
     card:      'border-red-200 bg-red-50/50 dark:border-red-800/40 dark:bg-red-950/15',
     cardTitle: 'text-red-700 dark:text-red-400',
@@ -65,7 +73,7 @@ const RISK_CONFIG: Record<RiskLevel, {
     // (near-white) pill with unreadable text once the page goes dark.
     // Switched to the same literal-palette + explicit dark: pattern that
     // already works correctly for every other risk level.
-    badge:     'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/25 dark:text-amber-400 dark:border-amber-800/50',
+    badge:     'text-brand-amber',
     dot:       'bg-amber-500',
     card:      'border-amber-200 bg-amber-50/50 dark:border-amber-800/40 dark:bg-amber-950/15',
     cardTitle: 'text-amber-700 dark:text-amber-400',
@@ -73,7 +81,7 @@ const RISK_CONFIG: Record<RiskLevel, {
   LOW: {
     label:     'Low Risk',
     icon:      Info,
-    badge:     'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/25 dark:text-blue-400',
+    badge:     'text-brand-navy',
     dot:       'bg-blue-400',
     card:      'border-blue-200 bg-blue-50/50 dark:border-blue-800/40',
     cardTitle: 'text-blue-600 dark:text-blue-400',
@@ -81,7 +89,7 @@ const RISK_CONFIG: Record<RiskLevel, {
   NONE: {
     label:     'On Track',
     icon:      ShieldCheck,
-    badge:     'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/25 dark:text-emerald-400',
+    badge:     'text-brand-teal',
     dot:       'bg-emerald-500',
     card:      'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800/40',
     cardTitle: 'text-emerald-700 dark:text-emerald-400',
@@ -111,9 +119,9 @@ function BadgeVariant({ riskLevel, className = '' }: { riskLevel: RiskLevel; cla
   return (
     <span
       className={`
-        inline-flex items-center gap-1 px-2 py-0.5
-        rounded-full text-xs font-heading font-semibold
-        border ${badge} ${className}
+        inline-flex items-center gap-1
+        text-xs font-heading font-semibold
+        ${badge} ${className}
       `}
       aria-label={`Risk level: ${label}`}
     >

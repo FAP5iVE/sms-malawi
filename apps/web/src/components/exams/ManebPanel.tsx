@@ -163,7 +163,7 @@ export function ManebPanel({ academicYear }: Props) {
         </div>
       </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
+      <div className="border border-base rounded-xl px-4 py-3 text-sm text-brand-amber flex items-start gap-2">
         <GraduationCap className="w-4 h-4 mt-0.5 shrink-0" />
         <span>
           {examType === 'MSCE' ? (
@@ -356,7 +356,7 @@ export function ManebPanel({ academicYear }: Props) {
                     {r.aggregatePoints != null && <span className="ml-1 text-xs font-normal text-muted">({r.aggregatePoints} pts)</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs bg-brand-teal/15 text-brand-teal px-2 py-0.5 rounded-full">{r.status}</span>
+                    <span className="text-xs text-brand-teal">{r.status}</span>
                   </td>
                 </tr>
               ))}

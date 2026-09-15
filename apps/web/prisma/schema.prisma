@@ -883,7 +883,19 @@ model TermResult {
   term           Int
   totalMark      Decimal  @db.Decimal(6,2)
   average        Decimal  @db.Decimal(5,2)
+  // JCE track (Forms 1-2) ONLY — the overall letter grade for the term.
+  // Always an empty string on the MSCE track: Forms 3-4 have no overall
+  // grade, they have an aggregate of points (see aggregatePoints below).
   grade          String
+  // MSCE track (Forms 3-4) ONLY — the sum of the point values of the six
+  // best subjects (6-54, lower is better). Null when fewer than six
+  // subjects were recorded, or on the JCE track where no aggregate exists.
+  aggregatePoints   Int?
+  // The (up to six) subject names whose points make up aggregatePoints.
+  aggregateSubjects Json?
+  // 'JCE' | 'MSCE' — which grading system produced this row, persisted so
+  // report cards and analytics never have to re-derive it from the class.
+  gradingTrack      String?
   position       Int?
   passStatus     Boolean
   subjectResults Json
