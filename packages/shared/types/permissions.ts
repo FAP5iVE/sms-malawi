@@ -817,7 +817,15 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'assets.viewAdvances',
     'assets.manageAdvances',
 
-    // HR — self-service only
+    // HR — self-service, plus viewing any staff member's payslips
+    // [PRODUCTION FIX, user-requested] finance already holds
+    // finance.manageSalaryStructure and finance.viewPayrollRuns (sees
+    // every payroll run's totals), but had no way to drill into one
+    // specific person's My Pay view the way hr/high_rank's "Viewing
+    // Employee" picker already lets them — a real gap against how finance
+    // actually needs to work day to day (a staff member calls about their
+    // payslip, finance should be able to just look).
+    'hr.viewAnyPayslips',
     'hr.viewOwnProfile',
     'hr.editOwnLimitedFields',
     'hr.applyLeave',

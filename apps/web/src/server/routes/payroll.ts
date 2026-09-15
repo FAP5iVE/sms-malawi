@@ -227,6 +227,33 @@ payrollRouter.post(
   }
 )
 
+// POST /payroll/runs/:id/discard — clear a run stuck in PROCESSING so
+// Finance can retry. [NEW, user-requested] Same permission as running
+// payroll in the first place — discarding a stuck run only ever makes
+// sense as a prelude to running it again. See
+// payrollService.discardStuckRun()'s header comment for why this needed
+// to exist at all: without it, a run that got stuck mid-transaction
+// permanently blocked that month via the @@unique([month,year])
+// constraint, with no way to recover short of a manual DB fix.
+payrollRouter.post(
+  '/runs/:id/discard',
+  verifyAuth,
+  requirePermission('finance.runPayroll'),
+  async (req, res) => {
+    try {
+      await payrollService.discardStuckRun(String(req.params.id), req.user!.uid, req.user!.role)
+      // [NOTE] apiFetch() on the client always calls res.json() on a
+      // successful response — a 204 No Content has no body to parse and
+      // would throw client-side. Respond 200 with a small JSON body
+      // instead, rather than special-casing 204 handling in the shared
+      // apiFetch helper for this one route.
+      res.json({ discarded: true })
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 409, tags: { module: 'payroll' } })
+    }
+  }
+)
+
 // GET /payroll/:id — a single run's full detail (every payslip line), for
 // the "Deep Inspection" / "Inspect Payslips" drill-down. Registered last so
 // this single-segment catch-all pattern can never shadow the more specific

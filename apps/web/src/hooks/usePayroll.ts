@@ -25,6 +25,7 @@
  */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import type {
   ApiPayslip,
   ApiSalaryStructure,
@@ -32,7 +33,7 @@ import type {
   ApiPayrollRunWindow,
   ApiStaffProfile,
 } from '@shared/types/api'
-import { apiFetch, queryKeys } from '@/lib/api-client'
+import { apiFetch, queryKeys, ApiError } from '@/lib/api-client'
 
 function qs(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams()
@@ -74,9 +75,25 @@ export function useMySalaryStructure(staffUid?: string) {
  * it just mints a signed URL, so a plain async function (not useMutation)
  * keeps this simple for a one-shot button click.
  */
+/**
+ * Fetches a signed download URL for a payslip and opens it in a new tab.
+ * Not a mutation — GET /payroll/payslips/:id/download has no side effect,
+ * it just mints a signed URL, so a plain async function (not useMutation)
+ * keeps this simple for a one-shot button click.
+ * [PRODUCTION FIX, user-requested] Every call site fired this with no
+ * .catch() — a 403 (not yours to view) or 404 (PDF not generated, e.g. a
+ * seeded/demo payslip with no real file behind it) rejected silently.
+ * "View Payslip" looked like a dead button; it was actually failing with a
+ * real, readable server message that just had nowhere to go. Now surfaces
+ * that message via sonner's toast (mounted once in app/layout.tsx).
+ */
 export async function downloadPayslip(payslipId: string): Promise<void> {
-  const { url } = await apiFetch<{ url: string }>(`/payroll/payslips/${payslipId}/download`)
-  window.open(url, '_blank', 'noopener,noreferrer')
+  try {
+    const { url } = await apiFetch<{ url: string }>(`/payroll/payslips/${payslipId}/download`)
+    window.open(url, '_blank', 'noopener,noreferrer')
+  } catch (err) {
+    toast.error(err instanceof ApiError ? err.message : 'Could not open this payslip.')
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -189,6 +206,20 @@ export function useRollbackPayrollRun() {
         method: 'POST',
         body: JSON.stringify({ reason }),
       }),
+    onSuccess: invalidate,
+  })
+}
+
+/** [NEW, user-requested] Clears a run stuck in PROCESSING so Finance can
+ *  retry — see payrollService.discardStuckRun()'s header comment for why
+ *  this needed to exist. apiFetch returns void here since the route
+ *  responds 204 No Content, not a run body — there's nothing left to
+ *  return once the run is deleted. */
+export function useDiscardStuckRun() {
+  const invalidate = useInvalidateAllPayroll()
+  return useMutation({
+    mutationFn: (runId: string) =>
+      apiFetch<{ discarded: boolean }>(`/payroll/runs/${runId}/discard`, { method: 'POST', body: JSON.stringify({}) }),
     onSuccess: invalidate,
   })
 }

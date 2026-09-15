@@ -21,8 +21,8 @@ import { Wallet, PiggyBank, Download, User } from 'lucide-react'
 import { formatMWK } from '@shared/constants/malawi'
 import type { ApiPayslip, ApiStaffProfile } from '@shared/types/api'
 import { useAuthStore } from '@/store/authStore'
-import { useStaffDirectory, useMyLoans, useLoans } from '@/hooks/useHR'
-import { useMyPayslips, useMySalaryStructure, downloadPayslip } from '@/hooks/usePayroll'
+import { useMyLoans, useLoans } from '@/hooks/useHR'
+import { useMyPayslips, useMySalaryStructure, useSalaryRoster, downloadPayslip } from '@/hooks/usePayroll'
 import { DataTable, type DataColumn } from '@/components/shared/DataTable'
 import { formatRunPeriod } from './payrollDisplay'
 
@@ -30,9 +30,15 @@ const CURRENT_YEAR = new Date().getFullYear()
 
 // ─────────────────────────────────────────────────────────────────────────────
 // "VIEWING EMPLOYEE" PICKER — only ever mounted for hr.viewAnyPayslips
-// holders (see MyPayTab below), so its useStaffDirectory() call — gated
-// server-side to admin/hr/high_rank — is never fired for a caller who'd
-// just get a 403 back.
+// holders (see MyPayTab below).
+// [PRODUCTION FIX, user-requested] Was useStaffDirectory() (GET /hr), which
+// is role-gated to admin/hr/high_rank — worked fine for hr/high_rank (both
+// already in that list) but 403'd the moment finance was granted
+// hr.viewAnyPayslips too, since finance was never in that role list.
+// Switched to useSalaryRoster() (GET /hr/salary-roster), which now
+// explicitly accepts hr.viewAnyPayslips as a qualifying permission — see
+// that route's own header comment. Same roster the Salary Structure &
+// Allowances tab already uses for its own staff picker.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function EmployeePicker({
@@ -41,7 +47,7 @@ function EmployeePicker({
   selected: ApiStaffProfile | null
   onChange: (staff: ApiStaffProfile | null) => void
 }) {
-  const { data } = useStaffDirectory()
+  const { data } = useSalaryRoster()
   const directory = (data ?? []) as ApiStaffProfile[]
 
   return (

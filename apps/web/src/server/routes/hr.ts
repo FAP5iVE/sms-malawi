@@ -81,8 +81,19 @@ hrRouter.get('/', verifyAuth, requireRole([...REVIEWERS]),
 // broader change than this tab needs, and not this task's to make).
 // Registered before GET /:id (immediately below) so this literal path
 // can't be shadowed by that single-segment catch-all.
+//
+// [PRODUCTION FIX, user-requested] Also now doubles as the roster behind
+// My Pay (Self-Service)'s "Viewing Employee" picker — that picker used
+// GET / (the real directory) directly, which works for hr/high_rank (both
+// are in REVIEWERS) but not finance, who was just granted
+// hr.viewAnyPayslips and needs the exact same picker to work. Rather than
+// widen the real directory's role list for this too, added
+// hr.viewAnyPayslips as a third qualifying permission here — same
+// reasoning as above, and it keeps both pickers (salary editing, payslip
+// viewing) sharing one lightweight, correctly-scoped roster instead of
+// each route re-deriving its own.
 hrRouter.get('/salary-roster', verifyAuth,
-  requireAnyPermission(['hr.manageSalaryStructure', 'finance.manageSalaryStructure']),
+  requireAnyPermission(['hr.manageSalaryStructure', 'finance.manageSalaryStructure', 'hr.viewAnyPayslips']),
   async (req, res) => {
     const staff = await hrService.listStaff({ status: 'ACTIVE' })
     return res.json(staff)

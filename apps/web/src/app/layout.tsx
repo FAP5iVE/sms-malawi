@@ -4,6 +4,7 @@ import { Analytics }            from '@vercel/analytics/next'
 import { AuthProvider }         from '@/components/providers/AuthProvider'
 import { QueryProvider }        from '@/components/providers/QueryProvider'
 import { ThemeProvider }        from '@/components/providers/ThemeProvider'
+import { Toaster }              from '@/components/ui/sonner'
 
 export const metadata: Metadata = {
   title: {
@@ -54,6 +55,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>
+        {/* [PRODUCTION FIX, user-requested] sonner was an installed
+           dependency with a fully themed Toaster wrapper
+           (components/ui/sonner.tsx) that was never mounted anywhere —
+           every toast() call anywhere in the app was a silent no-op.
+           Surfaced first by downloadPayslip() in usePayroll.ts, whose
+           rejected promise (a 403/404 from the payslip download route)
+           had nowhere to go, so "View Payslip" looked like it did nothing
+           at all when it actually failed. Mounted once, here, so any
+           future toast() call anywhere in the app also just works. */}
+        <Toaster />
         <Analytics />
       </body>
     </html>

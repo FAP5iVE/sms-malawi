@@ -81,9 +81,11 @@ import { logger } from '@/lib/logger'
 import { generatePayslipPdf } from '@/server/services/receiptService'
 import * as settingsService from '@/server/services/settingsService'
 import * as hrService from '@/server/services/hrService'
+import * as auditService from '@/server/services/auditService'
 import { SETTING_KEYS } from '@shared/types/settings'
 import type { PayeBracket } from '@shared/types/settings'
 import type { ApiPayrollRunWindow, ApiSalaryStructure } from '@shared/types/api'
+import type { UserRole } from '@shared/types/roles'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RUN WINDOW — payroll_day_of_month / payroll_run_window_days
@@ -127,7 +129,10 @@ function computeRunWindow(month: number, year: number, startDay: number, windowD
  * right now, for the Run Payroll button's enabled state and "opens on"/
  * "window closed" copy in Payroll Runs & Approvals.
  */
-export async function getPayrollRunWindow(month: number, year: number): Promise<ApiPayrollRunWindow> {
+export async function getPayrollRunWindow(
+  month: number,
+  year: number
+): Promise<ApiPayrollRunWindow> {
   const { startDay, windowDays } = await getPayrollScalarSettings()
   const { opensAt, closesAt } = computeRunWindow(month, year, startDay, windowDays)
   const now = new Date()
@@ -174,6 +179,57 @@ function calculateMonthlyPAYE(grossMonthly: number, brackets: readonly PayeBrack
   return annualTax / 12
 }
 
+/**
+ * POST /payroll/runs/:id/discard — clears a run stuck in PROCESSING so
+ * Finance can retry. [NEW, user-requested]
+ *
+ * PROCESSING only exists for the moment processMonthlyPayroll() is
+ * literally mid-transaction below — it should never be visible to a user
+ * for longer than that. If a run is ever OBSERVED sitting at PROCESSING
+ * (the transaction crashed after creating the row but before completing,
+ * a serverless function timed out mid-run, etc.), the
+ * @@unique([month,year]) constraint means that month can never be run
+ * again — there was previously no way out of this short of a manual DB
+ * fix. Only valid on a PROCESSING run; every other status has a real,
+ * intentional next step (submit/approve/lock/rollback) and should go
+ * through payrollApprovalService.ts instead, not be discarded.
+ */
+export async function discardStuckRun(
+  runId: string,
+  actorUid: string,
+  actorRole: UserRole
+): Promise<void> {
+  const run = await prisma.payrollRun.findUniqueOrThrow({ where: { id: runId } })
+  if (run.status !== 'PROCESSING') {
+    throw Object.assign(
+      new Error(`Only a run stuck in PROCESSING can be discarded (this one is ${run.status}).`),
+      { status: 409 }
+    )
+  }
+  // Defensive: a healthy transaction failure already rolls its own payslip
+  // inserts back, but delete any that somehow survived (e.g. a crash
+  // between the transaction committing and the final status update) so
+  // discarding never leaves orphaned Payslip rows behind.
+  await prisma.$transaction([
+    prisma.payslip.deleteMany({ where: { payrollRunId: runId } }),
+    prisma.payrollRun.delete({ where: { id: runId } }),
+  ])
+  await auditService.log({
+    action: 'payroll.discardStuckRun',
+    entityType: 'PayrollRun',
+    entityId: runId,
+    actorUid,
+    actorRole,
+  })
+  logger.warn({
+    event: 'payroll.discarded_stuck_run',
+    runId,
+    month: run.month,
+    year: run.year,
+    actorUid,
+  })
+}
+
 export async function processMonthlyPayroll(
   month: number,
   year: number,
@@ -188,7 +244,7 @@ export async function processMonthlyPayroll(
   if (existing) {
     throw Object.assign(
       new Error(`Payroll for ${month}/${year} has already been run and is locked for this month.`),
-      { status: 409 },
+      { status: 409 }
     )
   }
 
@@ -202,9 +258,9 @@ export async function processMonthlyPayroll(
   if (now < opensAt || now > closesAt) {
     throw Object.assign(
       new Error(
-        `Payroll for ${month}/${year} can only be run between ${opensAt.toDateString()} and ${closesAt.toDateString()}.`,
+        `Payroll for ${month}/${year} can only be run between ${opensAt.toDateString()} and ${closesAt.toDateString()}.`
       ),
-      { status: 403 },
+      { status: 403 }
     )
   }
 
@@ -228,9 +284,7 @@ export async function processMonthlyPayroll(
     where: { uid: { in: staffUids } },
     select: { id: true, uid: true, firstName: true, lastName: true },
   })
-  const staffNameByUid = new Map(
-    staffProfiles.map((s) => [s.uid, `${s.firstName} ${s.lastName}`])
-  )
+  const staffNameByUid = new Map(staffProfiles.map((s) => [s.uid, `${s.firstName} ${s.lastName}`]))
   const staffIdByUid = new Map(staffProfiles.map((s) => [s.uid, s.id]))
 
   // [PRODUCTION FIX] Allowances are itemized now (StaffAllowance) — a
@@ -240,15 +294,15 @@ export async function processMonthlyPayroll(
   const allowances = await prisma.staffAllowance.findMany({
     where: {
       staffUid: { in: staffUids },
-      OR: [
-        { recurring: true },
-        { recurring: false, paidMonth: month, paidYear: year },
-      ],
+      OR: [{ recurring: true }, { recurring: false, paidMonth: month, paidYear: year }],
     },
   })
   const allowanceTotalByUid = new Map<string, number>()
   for (const a of allowances) {
-    allowanceTotalByUid.set(a.staffUid, (allowanceTotalByUid.get(a.staffUid) ?? 0) + Number(a.amount))
+    allowanceTotalByUid.set(
+      a.staffUid,
+      (allowanceTotalByUid.get(a.staffUid) ?? 0) + Number(a.amount)
+    )
   }
 
   let totalGross = 0
@@ -351,7 +405,9 @@ export async function processMonthlyPayroll(
  *  PayrollRun store plain UID strings with no Prisma relation to
  *  StaffProfile). Returns a Map so callers can look up "" for an unknown/
  *  missing uid without a conditional at every call site. */
-async function resolveStaffNames(uids: (string | null | undefined)[]): Promise<Map<string, string>> {
+async function resolveStaffNames(
+  uids: (string | null | undefined)[]
+): Promise<Map<string, string>> {
   const distinct = [...new Set(uids.filter((u): u is string => !!u))]
   if (distinct.length === 0) return new Map()
   const profiles = await prisma.staffProfile.findMany({
@@ -378,7 +434,7 @@ export async function getPayrollHistory(year: number) {
   })
 
   const nameByUid = await resolveStaffNames(
-    runs.flatMap((r) => [r.runByUid, r.submittedByUid, r.approvedByUid]),
+    runs.flatMap((r) => [r.runByUid, r.submittedByUid, r.approvedByUid])
   )
 
   return runs.map(({ payslips, ...run }) => ({
