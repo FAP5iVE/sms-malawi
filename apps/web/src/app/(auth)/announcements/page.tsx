@@ -1,54 +1,47 @@
 /*
- * [CHANGE TYPE]: UI REORGANIZATION ONLY (no route, permission, schema, or
- *   query-shape changes — see the R13 header below for the workflow this
- *   preserves untouched)
- * [PURPOSE]: Restructured the page from one flat Published/Pending
- *   Approval/Drafts tab strip (mixing all four post types together) into
- *   content-type tabs — Announcements / News / Events / Advertisements —
- *   each an independent view that owns its own "New …" create action and
- *   its own Published/Pending Approval/Drafts status tabs + search box,
- *   matching the shared ModuleTabs component already used for this exact
- *   underline-primary/pill-secondary tab pattern elsewhere (Finance, HR,
- *   Library, Monitoring). The four create buttons that used to sit in one
- *   row in the page header now live inside their matching type tab.
- *
- *   All data still comes from the same three hooks below, fetching the
- *   same routes with the same permission gates (GET /announcements, GET
- *   /announcements/pending behind announcement.approvePublish, GET
- *   /announcements/drafts behind announcement.create/createWithApproval) —
- *   splitting by content type and by the search box is done client-side
- *   over the data those hooks already return, exactly as
- *   PendingApprovalList/DraftsList already only mount when the caller
- *   holds the matching permission (unchanged from before this edit).
- * [DEPENDS ON]: apps/web/src/components/shared/ModuleTabs.tsx (unchanged)
- */
-/*
  * apps/web/src/app/(auth)/announcements/page.tsx
  *
- * [CHANGE TYPE]: MAJOR REWRITE (canCreate gate and list-query scope; the
- *   page's overall layout is otherwise unaffected)
- * [R-PHASE]: R13 — Announcements, Timetable & Calendar Domain
- * [PURPOSE]:
- *   1. canCreate: was `role !== 'student'` (excluding student, who
- *      formally holds announcement.createWithApproval, while wrongly
- *      including admin, who holds none of announcement.create/
- *      createWithApproval/publishDirect). Now `role !== 'admin'`,
- *      matching the real permission matrix — every other role holds at
- *      least one of announcement.create/createWithApproval.
- *   2. Added a "Pending Approval" tab for admin/high_rank/academic (the
- *      three roles holding announcement.approvePublish) — previously no
- *      approver had any UI surface to discover what was awaiting their
- *      action, independent of and in addition to the collection-name bug
- *      AnnouncementForm.tsx's fix (same phase) addresses. Approve calls
- *      the new PATCH /announcements/:id/approve route (this phase) via
- *      the R1-consolidated apiFetch.
+ * [CHANGE TYPE]: MAJOR REWRITE (UI/layout only — no backend route,
+ *   permission, or workflow changes; see [DEPENDS ON] for the one
+ *   additive hook-signature change this required)
+ * [R-PHASE]: R15 — UI/UX Polish: Shared Components, Dashboards,
+ *   Confirmation Dialogs & Data-Display Consistency
+ * [PURPOSE]: Restructured this page from one flat Published/Pending
+ *   Approval/Drafts block mixing all four postTypes together (with four
+ *   "create" buttons stacked in the header) into four independent
+ *   content-type sections — News / Academic Advertisements /
+ *   Announcements / Events — navigated with the shared ModuleTabs
+ *   component (the same tabbed-section pattern Finance/HR/Library/Exams
+ *   already use), replacing this page's own one-off shadcn Tabs usage.
+ *   Each content-type tab now owns its own single "create new" entry
+ *   point and its own Published/Pending Approval/Drafts sub-navigation
+ *   (ModuleTabs 'pill' variant, badge-counted), plus a search box that
+ *   filters the active list by title/body. All four sections still read
+ *   from the exact same three endpoints as before (GET /announcements,
+ *   GET /announcements/pending, GET /announcements/drafts) and simply
+ *   filter the already-fetched, already-permission-resolved results by
+ *   postType client-side — nothing about who can see, create, approve,
+ *   reject, publish, or delete what changed.
+ *
+ *   Public-facing visibility was already correct and untouched by this
+ *   pass: GET /public/announcements (and /public/news,
+ *   /public/academic-advertisements, /public/events) is a fully
+ *   unauthenticated router filtered server-side on
+ *   status === 'PUBLISHED' && publicWebsite === true, and the public site
+ *   already surfaces it — the homepage's Announcements rail and the
+ *   /notices archive + /notices/:id detail page (see that page's own
+ *   [ROUTING NOTE] for why it isn't literally at /public/announcements —
+ *   this (auth) page owns that URL). No gating existed to remove here.
  * [DEPENDS ON]: apps/web/src/hooks/useAnnouncements.ts
- *   (usePendingAnnouncements — same phase), apps/web/src/lib/api-client.ts
- *   (apiFetch), apps/web/src/hooks/usePermissions.ts
+ *   (usePendingAnnouncements/useMyDrafts now accept an optional `enabled`
+ *   flag, defaulting to true — the only other file this change touches),
+ *   apps/web/src/lib/api-client.ts (apiFetch),
+ *   apps/web/src/hooks/usePermissions.ts,
+ *   apps/web/src/components/shared/ModuleTabs.tsx
  */
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAnnouncements, usePendingAnnouncements, useMyDrafts, type Announcement } from '@/hooks/useAnnouncements'
 import { RoleGuard } from '@/components/shared/RoleGuard'
@@ -56,11 +49,65 @@ import { AnnouncementForm } from '@/components/announcements/AnnouncementForm'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useAuthStore } from '@/store/authStore'
 import { apiFetch, queryKeys } from '@/lib/api-client'
-import { ModuleTabs } from '@/components/shared/ModuleTabs'
-import type { TabItem } from '@/components/shared/ModuleTabs'
+import { ModuleTabs, type TabItem } from '@/components/shared/ModuleTabs'
 import { Bell, PlusCircle, Megaphone, Check, Loader2, CalendarDays, X, Trash2, Newspaper, Landmark, FileEdit, PencilLine, Search } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
+
+type PostType = Announcement['postType']
+type FormMode = 'announcement' | 'event' | 'news' | 'ads'
+type StatusTab = 'published' | 'pending' | 'drafts'
+
+/** [NEW] The four independent content-type tabs this page now navigates
+ *  between, in the requested News / Ad / Announcement / Events order.
+ *  Indexed by PostType (not an array) so every lookup — activeTypeMeta,
+ *  the ModuleTabs list below — is statically known to resolve, matching
+ *  this file's existing POST_TYPE_TO_FORM_MODE indexing convention rather
+ *  than needing a fallback for a `noUncheckedIndexedAccess` array access. */
+interface ContentTypeMeta {
+  id: PostType
+  label: string
+  icon: React.ElementType
+  formMode: FormMode
+  createLabel: string
+}
+
+const CONTENT_TYPE_ORDER: PostType[] = ['NEWS', 'ADVERTISEMENT', 'ANNOUNCEMENT', 'EVENT']
+
+const CONTENT_TYPE_META: Record<PostType, ContentTypeMeta> = {
+  NEWS: { id: 'NEWS', label: 'News', icon: Newspaper, formMode: 'news', createLabel: 'Write News Article' },
+  ADVERTISEMENT: { id: 'ADVERTISEMENT', label: 'Academic Advertisements', icon: Landmark, formMode: 'ads', createLabel: 'New Academic Advertisement' },
+  ANNOUNCEMENT: { id: 'ANNOUNCEMENT', label: 'Announcements', icon: Megaphone, formMode: 'announcement', createLabel: 'New Announcement' },
+  EVENT: { id: 'EVENT', label: 'Events', icon: CalendarDays, formMode: 'event', createLabel: 'New Event' },
+}
+
+/** Client-side only — filters whichever list (Published/Pending/Drafts)
+ *  is currently on screen by title/body, against the already-fetched,
+ *  already-permission-resolved result set. Never touches the network. */
+function matchesSearch(item: { title: string; body: string }, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  return item.title.toLowerCase().includes(q) || item.body.toLowerCase().includes(q)
+}
+
+/** Search box for the active content-type tab's list — same bordered
+ *  icon+input shape as GlobalSearch.tsx, scoped to this page. */
+function ContentSearchBox({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <div className="flex items-center gap-2 border border-base rounded-xl px-3 min-h-[44px] bg-page w-full sm:w-72 shrink-0">
+      <Search className="w-4 h-4 text-muted shrink-0" aria-hidden="true" />
+      <label htmlFor="announcements-search" className="sr-only">{placeholder}</label>
+      <input
+        id="announcements-search"
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="flex-1 bg-transparent text-sm text-body placeholder:text-muted focus:outline-none min-w-0"
+      />
+    </div>
+  )
+}
 
 export default function AnnouncementsPage() {
   return (
@@ -80,16 +127,6 @@ export default function AnnouncementsPage() {
       <AnnouncementsContent />
     </RoleGuard>
   )
-}
-
-/** Simple client-side title/body substring match — the search box next to
- *  each type tab's status tabs. None of the three list routes take a
- *  `search` query param today, so this filters the already-fetched page
- *  data rather than adding one. */
-function matchesSearch(item: { title: string; body: string }, search: string): boolean {
-  const q = search.trim().toLowerCase()
-  if (!q) return true
-  return item.title.toLowerCase().includes(q) || item.body.toLowerCase().includes(q)
 }
 
 function PublishedList({ announcements, isLoading, error }: { announcements: ReturnType<typeof useAnnouncements>['announcements']; isLoading: boolean; error?: string | null }) {
@@ -227,25 +264,12 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
   )
 }
 
-/** [UI REORG] Now scoped to the active type tab's postType and search box
- *  (both passed in — filtering happens here, over the same pending list
- *  usePendingAnnouncements() already fetched). `active` controls only the
- *  rendered output, not the hook/fetch, so switching status tabs within a
- *  type — or switching type tabs entirely — never re-triggers a fetch
- *  that's already cached, and the "Pending Approval" tab's badge count
- *  stays correct even while a different status tab is the one showing. */
-function PendingApprovalList({
-  postType,
-  search,
-  active,
-  onCountChange,
-}: {
-  postType: Announcement['postType']
-  search: string
-  active: boolean
-  onCountChange?: (count: number) => void
-}) {
-  const { pending, loading, error: feedError } = usePendingAnnouncements()
+/** [CHANGED] Now reads its data from props instead of calling
+ *  usePendingAnnouncements() itself — the parent fetches once (so the
+ *  same result set can also badge-count every content-type tab) and
+ *  passes down the slice already filtered to the active postType/search.
+ *  Internal approve/reject logic is otherwise untouched. */
+function PendingApprovalList({ pending, isLoading: loading, error: feedError }: { pending: Announcement[]; isLoading: boolean; error?: string | null }) {
   const { can } = usePermissions()
   const queryClient = useQueryClient()
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -286,20 +310,6 @@ function PendingApprovalList({
     }
   }
 
-  // Scoped to the type tab currently open. The badge count reports the
-  // type-scoped total (not narrowed by the free-text search) so the tab
-  // label reads as a stable "how many total", same as the screenshot's
-  // Pending Approval (3) — search only narrows what's listed below it.
-  const forType = pending.filter((a) => a.postType === postType)
-  const filtered = forType.filter((a) => matchesSearch(a, search))
-
-  useEffect(() => {
-    onCountChange?.(forType.length)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [forType.length])
-
-  if (!active) return null
-
   if (loading) {
     return (
       <div className="space-y-3">
@@ -321,7 +331,7 @@ function PendingApprovalList({
     )
   }
 
-  if (filtered.length === 0) {
+  if (pending.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted">
         <Check className="w-10 h-10 mb-3 opacity-30" aria-hidden="true" />
@@ -337,7 +347,7 @@ function PendingApprovalList({
           {error}
         </p>
       )}
-      {filtered.map((a) => (
+      {pending.map((a) => (
         <div key={a.id} className="bg-surface border border-base rounded-2xl p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -406,33 +416,23 @@ function PendingApprovalList({
   )
 }
 
-const POST_TYPE_TO_FORM_MODE: Record<Announcement['postType'], 'announcement' | 'event' | 'news' | 'ads'> = {
+const POST_TYPE_TO_FORM_MODE: Record<Announcement['postType'], FormMode> = {
   ANNOUNCEMENT: 'announcement',
   EVENT: 'event',
   NEWS: 'news',
   ADVERTISEMENT: 'ads',
 }
 
-/** "Save the draft and continue writing later" — the caller's own drafts,
- *  now scoped to the active type tab's postType and search box the same
- *  way PendingApprovalList is (see its comment above for why `active`
- *  gates only the render, not the fetch). Every card in this list is
- *  necessarily the same postType as the tab it's shown in, so the old
- *  per-card type chip is redundant here and has been dropped. */
-function DraftsList({
-  postType,
-  search,
-  active,
-  onContinue,
-  onCountChange,
-}: {
-  postType: Announcement['postType']
-  search: string
-  active: boolean
-  onContinue: (draft: Announcement) => void
-  onCountChange?: (count: number) => void
-}) {
-  const { drafts, loading, error } = useMyDrafts()
+/** [NEW] "Save the draft and continue writing later" — every draft the
+ *  caller has saved, with a way to resume editing (opens AnnouncementForm
+ *  pre-filled) or discard it.
+ *  [CHANGED] Was self-fetching across all four post types with a per-item
+ *  type badge (POST_TYPE_LABEL) to tell them apart in one combined list.
+ *  Now reads its data from props — the parent fetches once and passes
+ *  down the slice already scoped to the active content-type tab, so the
+ *  per-item type badge is redundant (every draft on screen already shares
+ *  the tab's type) and has been dropped. */
+function DraftsList({ drafts, isLoading: loading, error, onContinue }: { drafts: Announcement[]; isLoading: boolean; error?: string | null; onContinue: (draft: Announcement) => void }) {
   const queryClient = useQueryClient()
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -451,16 +451,6 @@ function DraftsList({
       setDeletingId(null)
     }
   }
-
-  const forType = drafts.filter((d) => d.postType === postType)
-  const filtered = forType.filter((d) => matchesSearch(d, search))
-
-  useEffect(() => {
-    onCountChange?.(forType.length)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [forType.length])
-
-  if (!active) return null
 
   if (loading) {
     return (
@@ -481,7 +471,7 @@ function DraftsList({
     )
   }
 
-  if (filtered.length === 0) {
+  if (drafts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted">
         <FileEdit className="w-10 h-10 mb-3 opacity-30" aria-hidden="true" />
@@ -497,7 +487,7 @@ function DraftsList({
           {deleteError}
         </p>
       )}
-      {filtered.map((d) => (
+      {drafts.map((d) => (
         <div key={d.id} className="bg-surface border border-base rounded-2xl p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -549,86 +539,46 @@ function DraftsList({
   )
 }
 
-type ContentTypeTab = 'announcement' | 'news' | 'event' | 'ads'
-type StatusTab = 'published' | 'pending' | 'drafts'
-
-interface TypeTabConfig {
-  id: ContentTypeTab
-  label: string
-  icon: React.ElementType
-  postType: Announcement['postType']
-  createLabel: string
-  createIcon: React.ElementType
-  searchNoun: string
-}
-
-// [UI REORG] One entry per content type — each carries exactly what its
-// old header button used to (label/icon/postType), plus a search-box noun.
-// Keyed by id (rather than a plain array + .find()) so looking up the
-// active type's config is a checked Record access, not a possibly-
-// undefined array search — TYPE_TAB_ORDER below controls display order.
-const TYPE_TABS: Record<ContentTypeTab, TypeTabConfig> = {
-  announcement: { id: 'announcement', label: 'Announcements', icon: Megaphone, postType: 'ANNOUNCEMENT', createLabel: 'New Announcement', createIcon: PlusCircle, searchNoun: 'announcements' },
-  news: { id: 'news', label: 'News', icon: Newspaper, postType: 'NEWS', createLabel: 'Write News Article', createIcon: Newspaper, searchNoun: 'news articles' },
-  event: { id: 'event', label: 'Events', icon: CalendarDays, postType: 'EVENT', createLabel: 'New Event', createIcon: CalendarDays, searchNoun: 'events' },
-  ads: { id: 'ads', label: 'Advertisements', icon: Landmark, postType: 'ADVERTISEMENT', createLabel: 'New Academic Advertisement', createIcon: Landmark, searchNoun: 'academic advertisements' },
-}
-
-// Order mirrors the page's own name first, then the original button order
-// (Write News Article, New Academic Advertisement, New Event) that used to
-// run alongside "New Announcement".
-const TYPE_TAB_ORDER: ContentTypeTab[] = ['announcement', 'news', 'event', 'ads']
-
 function AnnouncementsContent() {
-  const { announcements, loading: isLoading, error: announcementsError } = useAnnouncements()
+  const { announcements, loading: announcementsLoading, error: announcementsError } = useAnnouncements()
   const { can } = usePermissions()
   const queryClient = useQueryClient()
-  const [formMode, setFormMode] = useState<'announcement' | 'event' | 'news' | 'ads' | null>(null)
-  // Set when opening the form via DraftsList's "Continue" button —
+  const [formMode, setFormMode] = useState<FormMode | null>(null)
+  // [NEW] Set when opening the form via DraftsList's "Continue" button —
   // pre-fills AnnouncementForm and switches its Publish action to
   // PATCH /:id/publish instead of creating a new document.
   const [editingDraft, setEditingDraft] = useState<Announcement | null>(null)
 
-  // [UI REORG] Content-type tab (Announcements/News/Events/Advertisements)
-  // is the primary navigator now; status (Published/Pending Approval/
-  // Drafts) is a secondary filter scoped to whichever type tab is open.
-  // Search resets on a type switch (stale text from one type's list is
-  // confusing on another); status is left as-is, since an approver
-  // checking "what's pending" typically wants to flip through every type
-  // without reselecting the Pending Approval tab each time.
-  const [activeType, setActiveType] = useState<ContentTypeTab>('announcement')
-  const [activeStatus, setActiveStatus] = useState<StatusTab>('published')
-  const [search, setSearch] = useState('')
-  const [pendingCount, setPendingCount] = useState(0)
-  const [draftsCount, setDraftsCount] = useState(0)
-
   const canCreate = can('announcement.create') || can('announcement.createWithApproval')
   const canApprove = can('announcement.approvePublish')
-  const hasStatusTabs = canApprove || canCreate
 
-  const activeTypeConfig = TYPE_TABS[activeType]
-  const CreateIcon = activeTypeConfig.createIcon
+  // [CHANGED] Previously only fetched once PendingApprovalList/DraftsList
+  // actually mounted (i.e. once the viewer clicked into that tab) — now
+  // fetched once here so their counts can badge every content-type tab's
+  // status pills up front, not just whichever one happens to be open.
+  // `enabled` reproduces the same "don't fire the request unless the
+  // viewer holds the permission the route requires" behavior the old
+  // conditional-mount pattern gave for free.
+  const { pending, loading: pendingLoading, error: pendingError } = usePendingAnnouncements(canApprove)
+  const { drafts, loading: draftsLoading, error: draftsError } = useMyDrafts(canCreate)
 
-  const publishedForType = useMemo(
-    () => announcements.filter((a) => a.postType === activeTypeConfig.postType),
-    [announcements, activeTypeConfig.postType]
-  )
-  const publishedForTypeAndSearch = useMemo(
-    () => publishedForType.filter((a) => matchesSearch(a, search)),
-    [publishedForType, search]
-  )
+  // [NEW] Which of the four content-type tabs (News/Ads/Announcements/
+  // Events) is active, which of its Published/Pending/Drafts sub-tabs is
+  // active, and the free-text filter for whichever list that resolves to.
+  const [activeType, setActiveType] = useState<PostType>('ANNOUNCEMENT')
+  const [statusTab, setStatusTab] = useState<StatusTab>('published')
+  const [search, setSearch] = useState('')
 
-  // Published always shown; Pending Approval / Drafts only for callers who
-  // hold the matching permission — conditional spread (rather than
-  // building the full array then .filter()) keeps each `id` a checked
-  // literal instead of being widened to `string`.
-  const statusTabs: TabItem<StatusTab>[] = [
-    { id: 'published', label: 'Published', badge: publishedForType.length },
-    ...(canApprove ? [{ id: 'pending' as const, label: 'Pending Approval', badge: pendingCount }] : []),
-    ...(canCreate ? [{ id: 'drafts' as const, label: 'Drafts', badge: draftsCount }] : []),
-  ]
+  const activeTypeMeta = CONTENT_TYPE_META[activeType]
+  const TypeIcon = activeTypeMeta.icon
 
-  function openCreate(mode: ContentTypeTab) {
+  function changeType(id: PostType) {
+    setActiveType(id)
+    setStatusTab('published')
+    setSearch('')
+  }
+
+  function openCreate(mode: FormMode) {
     setEditingDraft(null)
     setFormMode(mode)
   }
@@ -649,91 +599,129 @@ function AnnouncementsContent() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.announcements.drafts() })
   }
 
-  function handleTypeChange(id: ContentTypeTab) {
-    setActiveType(id)
-    setSearch('')
-  }
+  // [NEW] Scope each already-fetched, already-permission-resolved result
+  // set to the active content-type tab, then to the search box — purely
+  // client-side, same three arrays GET /announcements, /announcements/
+  // pending and /announcements/drafts already returned.
+  const typeAnnouncements = useMemo(
+    () => announcements.filter((a) => a.postType === activeType),
+    [announcements, activeType],
+  )
+  const typePending = useMemo(
+    () => pending.filter((a) => a.postType === activeType),
+    [pending, activeType],
+  )
+  const typeDrafts = useMemo(
+    () => drafts.filter((d) => d.postType === activeType),
+    [drafts, activeType],
+  )
+
+  const filteredPublished = useMemo(
+    () => typeAnnouncements.filter((a) => matchesSearch(a, search)),
+    [typeAnnouncements, search],
+  )
+  const filteredPending = useMemo(
+    () => typePending.filter((a) => matchesSearch(a, search)),
+    [typePending, search],
+  )
+  const filteredDrafts = useMemo(
+    () => typeDrafts.filter((d) => matchesSearch(d, search)),
+    [typeDrafts, search],
+  )
+
+  const statusTabs: TabItem<StatusTab>[] = [
+    { id: 'published' as const, label: 'Published', badge: typeAnnouncements.length },
+    ...(canApprove ? [{ id: 'pending' as const, label: 'Pending Approval', badge: typePending.length }] : []),
+    ...(canCreate ? [{ id: 'drafts' as const, label: 'Drafts', badge: typeDrafts.length }] : []),
+  ]
+  const showStatusTabs = canApprove || canCreate
 
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="flex items-center gap-2 mb-6">
-        <Megaphone className="w-5 h-5 text-brand-teal" aria-hidden="true" />
-        <h1 className="font-heading font-bold text-xl text-brand-navy">Announcements</h1>
+      <div className="mb-6">
+        <div className="flex items-center gap-2">
+          <Megaphone className="w-5 h-5 text-brand-teal" aria-hidden="true" />
+          <h1 className="font-heading font-bold text-xl text-brand-navy">Announcements</h1>
+        </div>
+        <p className="text-sm text-muted mt-0.5">News, announcements, academic advertisements and events — all in one place.</p>
       </div>
 
-      {/* Content-type tabs — each keeps its old "New …" create action and
-          Published/Pending Approval/Drafts filters, now scoped to that
-          type instead of one shared, mixed feed. */}
-      <ModuleTabs<ContentTypeTab>
-        id="announcements-type"
-        tabs={TYPE_TAB_ORDER.map((id) => ({ id, label: TYPE_TABS[id].label, icon: TYPE_TABS[id].icon }))}
+      {/* [NEW] Content-type navigation — News / Academic Advertisements /
+          Announcements / Events, each an independent section with its own
+          create entry point and its own Published/Pending/Drafts state,
+          in place of the four buttons this header used to stack at once. */}
+      <ModuleTabs<PostType>
+        tabs={CONTENT_TYPE_ORDER.map((id) => ({ id, label: CONTENT_TYPE_META[id].label, icon: CONTENT_TYPE_META[id].icon }))}
         active={activeType}
-        onChange={handleTypeChange}
+        onChange={changeType}
+        variant="underline"
+        id="content-type-tabs"
       />
 
-      <div className="mt-5 space-y-4">
-        {/* Action row — create button (same announcement.create /
-            createWithApproval gate as before) + search, scoped to the
-            active type tab. */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div className="mt-5">
+        {/* Type header row — section label + its one create action */}
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+          <div className="flex items-center gap-2">
+            <TypeIcon className="w-5 h-5 text-muted" aria-hidden="true" />
+            <h2 className="font-heading font-semibold text-base text-body">{activeTypeMeta.label}</h2>
+          </div>
           {canCreate && (
             <button
-              onClick={() => openCreate(activeTypeConfig.id)}
+              onClick={() => openCreate(activeTypeMeta.formMode)}
               className="flex items-center gap-2 bg-brand-teal text-white px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-brand-teal-light transition-colors min-h-[44px]"
             >
-              <CreateIcon className="w-4 h-4" aria-hidden="true" />
-              {activeTypeConfig.createLabel}
+              {/* [PRESERVED] "New Announcement" kept its own distinct
+                  PlusCircle icon (rather than reusing Megaphone) to match
+                  the original per-button iconography. */}
+              {activeType === 'ANNOUNCEMENT'
+                ? <PlusCircle className="w-4 h-4" aria-hidden="true" />
+                : <TypeIcon className="w-4 h-4" aria-hidden="true" />}
+              {activeTypeMeta.createLabel}
             </button>
           )}
-          <div className={`relative w-full sm:w-72 ${canCreate ? '' : 'sm:ml-auto'}`}>
-            <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
-            <label htmlFor="announcements-search" className="sr-only">
-              Search {activeTypeConfig.searchNoun}
-            </label>
-            <input
-              id="announcements-search"
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={`Search ${activeTypeConfig.searchNoun}…`}
-              className="w-full min-h-[44px] border border-base rounded-xl pl-9 pr-4 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-            />
-          </div>
         </div>
 
-        {/* Status tabs — Published always shown; Pending Approval / Drafts
-            only for callers who hold the matching permission, same gate
-            as the old TabsTrigger conditionals. */}
-        {hasStatusTabs && (
-          <ModuleTabs<StatusTab>
-            id={`announcements-status-${activeType}`}
-            tabs={statusTabs}
-            active={activeStatus}
-            onChange={setActiveStatus}
-            variant="pill"
-          />
-        )}
+        {showStatusTabs ? (
+          <>
+            {/* Published / Pending Approval / Drafts, badge-counted, plus
+                the search box — same row, matching the reference layout. */}
+            <div className="bg-surface border border-base rounded-2xl p-4 mb-4 flex items-center justify-between gap-3 flex-wrap">
+              <ModuleTabs<StatusTab>
+                tabs={statusTabs}
+                active={statusTab}
+                onChange={setStatusTab}
+                variant="pill"
+                id={`status-tabs-${activeType}`}
+              />
+              <ContentSearchBox
+                value={search}
+                onChange={setSearch}
+                placeholder={`Search ${activeTypeMeta.label.toLowerCase()}…`}
+              />
+            </div>
 
-        {(!hasStatusTabs || activeStatus === 'published') && (
-          <PublishedList announcements={publishedForTypeAndSearch} isLoading={isLoading} error={announcementsError} />
-        )}
-        {canApprove && (
-          <PendingApprovalList
-            postType={activeTypeConfig.postType}
-            search={search}
-            active={activeStatus === 'pending'}
-            onCountChange={setPendingCount}
-          />
-        )}
-        {canCreate && (
-          <DraftsList
-            postType={activeTypeConfig.postType}
-            search={search}
-            active={activeStatus === 'drafts'}
-            onContinue={continueDraft}
-            onCountChange={setDraftsCount}
-          />
+            {statusTab === 'published' && (
+              <PublishedList announcements={filteredPublished} isLoading={announcementsLoading} error={announcementsError} />
+            )}
+            {statusTab === 'pending' && canApprove && (
+              <PendingApprovalList pending={filteredPending} isLoading={pendingLoading} error={pendingError} />
+            )}
+            {statusTab === 'drafts' && canCreate && (
+              <DraftsList drafts={filteredDrafts} isLoading={draftsLoading} error={draftsError} onContinue={continueDraft} />
+            )}
+          </>
+        ) : (
+          <>
+            <div className="flex justify-end mb-4">
+              <ContentSearchBox
+                value={search}
+                onChange={setSearch}
+                placeholder={`Search ${activeTypeMeta.label.toLowerCase()}…`}
+              />
+            </div>
+            <PublishedList announcements={filteredPublished} isLoading={announcementsLoading} error={announcementsError} />
+          </>
         )}
       </div>
 

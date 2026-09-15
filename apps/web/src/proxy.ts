@@ -16,6 +16,23 @@
  *   (4) BYPASS_PREFIXES drops '/fonts/' and '/images/' — both are already
  *       excluded by config.matcher's own negative-lookahead pattern below;
  *       keeping them here was a harmless but confusing double-exclusion.
+ *
+ *   [PRODUCTION FIX] PUBLIC_PATHS gains '/notices' and
+ *   '/academic-advertisements' — the exact same bug class the
+ *   2026-07-28 fix above already found and fixed for /news, /events,
+ *   /gallery, etc.: both pages live under app/(public)/, have no
+ *   page-level auth check, and read from the fully unauthenticated
+ *   GET /public/announcements and /public/academic-advertisements routes
+ *   (filtered server-side on status === 'PUBLISHED' &&
+ *   publicWebsite === true) — but neither was ever added here, so Layer 3
+ *   below ("every non-public, non-bypassed path requires a session")
+ *   redirected anonymous visitors straight to /login before the page's
+ *   own (already-correct) no-auth data flow ever ran. This is why
+ *   announcements/adverts marked public still appeared gated end-to-end
+ *   despite every other layer already being right. isPublicPath()'s
+ *   prefix match covers the /notices/:id and /academic-advertisements/:id
+ *   detail routes too, same as it already does for /news/:id and
+ *   /events/:id.
  * [DEPENDS ON]: none
  */
 import { NextRequest, NextResponse } from 'next/server'
@@ -74,6 +91,12 @@ const PUBLIC_PATHS = [
   '/academics',
   '/student-life',
   '/admissions',
+  // [PRODUCTION FIX] Same bug, same fix, just missed in the first pass —
+  // see this file's header comment. Both are public-only content (forced
+  // publicWebsite=true server-side; see AnnouncementForm.tsx) with no
+  // page-level auth check, reading the unauthenticated /public/* routes.
+  '/notices',
+  '/academic-advertisements',
   '/',           // landing page
 ] as const
 
