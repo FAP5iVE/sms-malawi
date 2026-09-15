@@ -32,16 +32,17 @@
  *   /notices archive + /notices/:id detail page (see that page's own
  *   [ROUTING NOTE] for why it isn't literally at /public/announcements —
  *   this (auth) page owns that URL). No gating existed to remove here.
- * [DEPENDS ON]: apps/web/src/hooks/useAnnouncements.ts
- *   (usePendingAnnouncements/useMyDrafts now accept an optional `enabled`
- *   flag, defaulting to true — the only other file this change touches),
+ * [DEPENDS ON]: apps/web/src/hooks/useAnnouncements.ts (unchanged —
+ *   usePendingAnnouncements/useMyDrafts keep their original no-arg
+ *   signatures; PendingApprovalList/DraftsList stay self-fetching and
+ *   report their type-scoped count up via onCountChange instead),
  *   apps/web/src/lib/api-client.ts (apiFetch),
  *   apps/web/src/hooks/usePermissions.ts,
  *   apps/web/src/components/shared/ModuleTabs.tsx
  */
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAnnouncements, usePendingAnnouncements, useMyDrafts, type Announcement } from '@/hooks/useAnnouncements'
 import { RoleGuard } from '@/components/shared/RoleGuard'
@@ -91,11 +92,12 @@ function matchesSearch(item: { title: string; body: string }, query: string): bo
 }
 
 /** Search box for the active content-type tab's list — same bordered
- *  icon+input shape as GlobalSearch.tsx, scoped to this page. */
+ *  input classes as students/page.tsx's own filter box, with a Search
+ *  icon overlaid the way GlobalSearch.tsx does it. */
 function ContentSearchBox({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
-    <div className="flex items-center gap-2 border border-base rounded-xl px-3 min-h-[44px] bg-page w-full sm:w-72 shrink-0">
-      <Search className="w-4 h-4 text-muted shrink-0" aria-hidden="true" />
+    <div className="relative w-full sm:w-72 shrink-0">
+      <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
       <label htmlFor="announcements-search" className="sr-only">{placeholder}</label>
       <input
         id="announcements-search"
@@ -103,7 +105,7 @@ function ContentSearchBox({ value, onChange, placeholder }: { value: string; onC
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="flex-1 bg-transparent text-sm text-body placeholder:text-muted focus:outline-none min-w-0"
+        className="w-full min-h-[44px] border border-base rounded-xl pl-9 pr-4 py-2.5 text-sm bg-page text-body placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
       />
     </div>
   )
@@ -264,12 +266,29 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
   )
 }
 
-/** [CHANGED] Now reads its data from props instead of calling
- *  usePendingAnnouncements() itself — the parent fetches once (so the
- *  same result set can also badge-count every content-type tab) and
- *  passes down the slice already filtered to the active postType/search.
- *  Internal approve/reject logic is otherwise untouched. */
-function PendingApprovalList({ pending, isLoading: loading, error: feedError }: { pending: Announcement[]; isLoading: boolean; error?: string | null }) {
+/** [MERGED — adopted from a parallel redesign pass] Kept self-fetching via
+ *  usePendingAnnouncements() with its original no-arg signature (zero
+ *  change to hooks/useAnnouncements.ts), scoped to the active content-type
+ *  tab's postType and the search box via props, and reports its
+ *  type-scoped count to the parent (onCountChange) so every content-type
+ *  tab's Pending Approval badge stays correct without a fetch per tab.
+ *  `active` gates only the render — after every hook above it has already
+ *  run — so switching status tabs, or type tabs, never re-mounts this
+ *  component or re-fires GET /announcements/pending; it just keeps
+ *  running quietly in the background reporting its count. Approve/reject
+ *  logic is untouched. */
+function PendingApprovalList({
+  postType,
+  search,
+  active,
+  onCountChange,
+}: {
+  postType: PostType
+  search: string
+  active: boolean
+  onCountChange: (count: number) => void
+}) {
+  const { pending, loading, error: feedError } = usePendingAnnouncements()
   const { can } = usePermissions()
   const queryClient = useQueryClient()
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -310,6 +329,20 @@ function PendingApprovalList({ pending, isLoading: loading, error: feedError }: 
     }
   }
 
+  // Scoped to the type tab currently open, then to the search box. The
+  // badge count reports the type-scoped total (not narrowed by search) so
+  // the tab label reads as a stable "how many total" — search only
+  // narrows what's listed below it.
+  const forType = pending.filter((a) => a.postType === postType)
+  const filtered = forType.filter((a) => matchesSearch(a, search))
+
+  useEffect(() => {
+    onCountChange(forType.length)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postType, forType.length])
+
+  if (!active) return null
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -331,7 +364,7 @@ function PendingApprovalList({ pending, isLoading: loading, error: feedError }: 
     )
   }
 
-  if (pending.length === 0) {
+  if (filtered.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted">
         <Check className="w-10 h-10 mb-3 opacity-30" aria-hidden="true" />
@@ -347,7 +380,7 @@ function PendingApprovalList({ pending, isLoading: loading, error: feedError }: 
           {error}
         </p>
       )}
-      {pending.map((a) => (
+      {filtered.map((a) => (
         <div key={a.id} className="bg-surface border border-base rounded-2xl p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -423,16 +456,29 @@ const POST_TYPE_TO_FORM_MODE: Record<Announcement['postType'], FormMode> = {
   ADVERTISEMENT: 'ads',
 }
 
-/** [NEW] "Save the draft and continue writing later" — every draft the
- *  caller has saved, with a way to resume editing (opens AnnouncementForm
- *  pre-filled) or discard it.
- *  [CHANGED] Was self-fetching across all four post types with a per-item
- *  type badge (POST_TYPE_LABEL) to tell them apart in one combined list.
- *  Now reads its data from props — the parent fetches once and passes
- *  down the slice already scoped to the active content-type tab, so the
- *  per-item type badge is redundant (every draft on screen already shares
- *  the tab's type) and has been dropped. */
-function DraftsList({ drafts, isLoading: loading, error, onContinue }: { drafts: Announcement[]; isLoading: boolean; error?: string | null; onContinue: (draft: Announcement) => void }) {
+/** [MERGED — adopted from a parallel redesign pass] "Save the draft and
+ *  continue writing later" — kept self-fetching via useMyDrafts() with its
+ *  original no-arg signature, now scoped to the active content-type tab's
+ *  postType and the search box via props, reporting its type-scoped count
+ *  to the parent the same way PendingApprovalList does above (see its
+ *  comment for why `active` gates only the render, not the fetch). Every
+ *  card in this list is necessarily the same postType as the tab it's
+ *  shown in, so the old per-card type chip was redundant here and has
+ *  been dropped. */
+function DraftsList({
+  postType,
+  search,
+  active,
+  onContinue,
+  onCountChange,
+}: {
+  postType: PostType
+  search: string
+  active: boolean
+  onContinue: (draft: Announcement) => void
+  onCountChange: (count: number) => void
+}) {
+  const { drafts, loading, error } = useMyDrafts()
   const queryClient = useQueryClient()
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -451,6 +497,16 @@ function DraftsList({ drafts, isLoading: loading, error, onContinue }: { drafts:
       setDeletingId(null)
     }
   }
+
+  const forType = drafts.filter((d) => d.postType === postType)
+  const filtered = forType.filter((d) => matchesSearch(d, search))
+
+  useEffect(() => {
+    onCountChange(forType.length)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postType, forType.length])
+
+  if (!active) return null
 
   if (loading) {
     return (
@@ -471,7 +527,7 @@ function DraftsList({ drafts, isLoading: loading, error, onContinue }: { drafts:
     )
   }
 
-  if (drafts.length === 0) {
+  if (filtered.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted">
         <FileEdit className="w-10 h-10 mb-3 opacity-30" aria-hidden="true" />
@@ -487,7 +543,7 @@ function DraftsList({ drafts, isLoading: loading, error, onContinue }: { drafts:
           {deleteError}
         </p>
       )}
-      {drafts.map((d) => (
+      {filtered.map((d) => (
         <div key={d.id} className="bg-surface border border-base rounded-2xl p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -551,16 +607,7 @@ function AnnouncementsContent() {
 
   const canCreate = can('announcement.create') || can('announcement.createWithApproval')
   const canApprove = can('announcement.approvePublish')
-
-  // [CHANGED] Previously only fetched once PendingApprovalList/DraftsList
-  // actually mounted (i.e. once the viewer clicked into that tab) — now
-  // fetched once here so their counts can badge every content-type tab's
-  // status pills up front, not just whichever one happens to be open.
-  // `enabled` reproduces the same "don't fire the request unless the
-  // viewer holds the permission the route requires" behavior the old
-  // conditional-mount pattern gave for free.
-  const { pending, loading: pendingLoading, error: pendingError } = usePendingAnnouncements(canApprove)
-  const { drafts, loading: draftsLoading, error: draftsError } = useMyDrafts(canCreate)
+  const showStatusTabs = canApprove || canCreate
 
   // [NEW] Which of the four content-type tabs (News/Ads/Announcements/
   // Events) is active, which of its Published/Pending/Drafts sub-tabs is
@@ -568,6 +615,14 @@ function AnnouncementsContent() {
   const [activeType, setActiveType] = useState<PostType>('ANNOUNCEMENT')
   const [statusTab, setStatusTab] = useState<StatusTab>('published')
   const [search, setSearch] = useState('')
+
+  // [MERGED — adopted from a parallel redesign pass] Pending/Drafts stay
+  // self-fetching (see PendingApprovalList/DraftsList above) and report
+  // their own type-scoped count up here via onCountChange, instead of
+  // this component fetching both lists itself — so no change to
+  // hooks/useAnnouncements.ts was needed at all.
+  const [pendingCount, setPendingCount] = useState(0)
+  const [draftsCount, setDraftsCount] = useState(0)
 
   const activeTypeMeta = CONTENT_TYPE_META[activeType]
   const TypeIcon = activeTypeMeta.icon
@@ -599,42 +654,24 @@ function AnnouncementsContent() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.announcements.drafts() })
   }
 
-  // [NEW] Scope each already-fetched, already-permission-resolved result
-  // set to the active content-type tab, then to the search box — purely
-  // client-side, same three arrays GET /announcements, /announcements/
-  // pending and /announcements/drafts already returned.
+  // Scoped to the active content-type tab, then to the search box —
+  // purely client-side, over the same array GET /announcements already
+  // returned. Pending/Drafts do the equivalent filtering internally now
+  // (see their own postType/search props above).
   const typeAnnouncements = useMemo(
     () => announcements.filter((a) => a.postType === activeType),
     [announcements, activeType],
   )
-  const typePending = useMemo(
-    () => pending.filter((a) => a.postType === activeType),
-    [pending, activeType],
-  )
-  const typeDrafts = useMemo(
-    () => drafts.filter((d) => d.postType === activeType),
-    [drafts, activeType],
-  )
-
   const filteredPublished = useMemo(
     () => typeAnnouncements.filter((a) => matchesSearch(a, search)),
     [typeAnnouncements, search],
   )
-  const filteredPending = useMemo(
-    () => typePending.filter((a) => matchesSearch(a, search)),
-    [typePending, search],
-  )
-  const filteredDrafts = useMemo(
-    () => typeDrafts.filter((d) => matchesSearch(d, search)),
-    [typeDrafts, search],
-  )
 
   const statusTabs: TabItem<StatusTab>[] = [
     { id: 'published' as const, label: 'Published', badge: typeAnnouncements.length },
-    ...(canApprove ? [{ id: 'pending' as const, label: 'Pending Approval', badge: typePending.length }] : []),
-    ...(canCreate ? [{ id: 'drafts' as const, label: 'Drafts', badge: typeDrafts.length }] : []),
+    ...(canApprove ? [{ id: 'pending' as const, label: 'Pending Approval', badge: pendingCount }] : []),
+    ...(canCreate ? [{ id: 'drafts' as const, label: 'Drafts', badge: draftsCount }] : []),
   ]
-  const showStatusTabs = canApprove || canCreate
 
   return (
     <div className="p-6">
@@ -660,7 +697,9 @@ function AnnouncementsContent() {
       />
 
       <div className="mt-5">
-        {/* Type header row — section label + its one create action */}
+        {/* Type header row — section label on the left, its one create
+            action kept on the right, exactly where it sat before this
+            merge. */}
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
           <div className="flex items-center gap-2">
             <TypeIcon className="w-5 h-5 text-muted" aria-hidden="true" />
@@ -704,11 +743,31 @@ function AnnouncementsContent() {
             {statusTab === 'published' && (
               <PublishedList announcements={filteredPublished} isLoading={announcementsLoading} error={announcementsError} />
             )}
-            {statusTab === 'pending' && canApprove && (
-              <PendingApprovalList pending={filteredPending} isLoading={pendingLoading} error={pendingError} />
+            {/* [MERGED] PendingApprovalList/DraftsList are mounted for as
+                long as the viewer holds the matching permission (same
+                fetch-gating the old conditional-mount pattern gave), not
+                only while their status tab happens to be selected — so
+                switching type or status tabs never re-triggers their
+                fetch, and pendingCount/draftsCount above (used for the
+                pill badges) stay accurate even when a different status
+                tab is the one currently shown. Each renders nothing of
+                its own unless `active` matches the open status tab. */}
+            {canApprove && (
+              <PendingApprovalList
+                postType={activeType}
+                search={search}
+                active={statusTab === 'pending'}
+                onCountChange={setPendingCount}
+              />
             )}
-            {statusTab === 'drafts' && canCreate && (
-              <DraftsList drafts={filteredDrafts} isLoading={draftsLoading} error={draftsError} onContinue={continueDraft} />
+            {canCreate && (
+              <DraftsList
+                postType={activeType}
+                search={search}
+                active={statusTab === 'drafts'}
+                onContinue={continueDraft}
+                onCountChange={setDraftsCount}
+              />
             )}
           </>
         ) : (

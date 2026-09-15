@@ -20,16 +20,6 @@
  *   uses TanStack Query (refetch-on-focus + short staleTime) instead of a
  *   realtime listener — announcements are not chat; near-real-time is
  *   ample and matches the rest of the app.
- *
- *   [PRODUCTION FIX] usePendingAnnouncements()/useMyDrafts() now take an
- *   optional `enabled` flag (default true — every existing call site keeps
- *   firing unconditionally). The redesigned (auth)/announcements/page.tsx
- *   calls both once at the top of the page (so their counts can badge
- *   every content-type tab, not just whichever one is open) instead of
- *   only mounting PendingApprovalList/DraftsList when the viewer could see
- *   them — `enabled` reproduces that same "don't fire the request unless
- *   the viewer holds the permission the route requires" behavior without
- *   depending on conditional mounting to achieve it.
  * [DEPENDS ON]: W/lib/api-client (apiFetch, queryKeys)
  */
 'use client'
@@ -83,20 +73,14 @@ export function useAnnouncements() {
 /**
  * PENDING_APPROVAL announcements — for the approver Pending tab. The route
  * is gated by announcement.approvePublish, so non-approvers receive 403;
- * the caller is expected to only enable this for approvers (previously via
- * conditional mounting, now via the `enabled` param below), but the server
- * is the real authority.
- *
- * @param enabled  [NEW] Pass `false` to skip the request entirely (e.g. the
- *   viewer doesn't hold announcement.approvePublish) — defaults to `true`,
- *   so every pre-existing call site is unaffected.
+ * the page is expected to only mount this for approvers (it renders the tab
+ * behind the same permission), but the server is the real authority.
  */
-export function usePendingAnnouncements(enabled: boolean = true) {
+export function usePendingAnnouncements() {
   const query = useQuery({
     queryKey: queryKeys.announcements.pending(),
     queryFn: () => apiFetch<AnnouncementsResponse>('/announcements/pending'),
     staleTime: 30_000,
-    enabled,
   })
 
   return {
@@ -111,18 +95,12 @@ export function usePendingAnnouncements(enabled: boolean = true) {
  * (announcement/event/news/ad) — GET /announcements/drafts. Backs the
  * "Drafts" tab: continue writing later, and keep several drafts before
  * committing to Publish.
- *
- * @param enabled  [NEW] Pass `false` to skip the request entirely (e.g. the
- *   viewer holds neither announcement.create nor
- *   announcement.createWithApproval) — defaults to `true`, so every
- *   pre-existing call site is unaffected.
  */
-export function useMyDrafts(enabled: boolean = true) {
+export function useMyDrafts() {
   const query = useQuery({
     queryKey: queryKeys.announcements.drafts(),
     queryFn: () => apiFetch<AnnouncementsResponse>('/announcements/drafts'),
     staleTime: 15_000,
-    enabled,
   })
 
   return {
