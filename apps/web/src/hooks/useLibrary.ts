@@ -306,6 +306,11 @@ export function useFines(status?: string) {
       studentId?: string | null; staffId?: string | null
       borrowerName: string; createdAt: string; paidAt?: string; waivedAt?: string
     }>>(`/library/fines${params}`),
+    // [FIX] Belt-and-suspenders against the Decimal-as-string bug fixed
+    // in listFines() — coerces `amount` again on the client so any future
+    // Decimal field that slips through a JSON response can't silently
+    // turn the ledger's summary-card totals into string concatenation.
+    select: (data) => data.map((f) => ({ ...f, amount: Number(f.amount) })),
   })
 }
 

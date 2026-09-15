@@ -170,6 +170,17 @@ export async function listFines(status?: string) {
 
   return fines.map((f) => ({
     ...f,
+    // [FIX] LibraryFine.amount is a Prisma Decimal — serialized through
+    // res.json() it arrives client-side as a STRING (Decimal.toJSON()),
+    // not a number. Per-row display still looked correct because
+    // formatMWK() internally does ToNumber() coercion, but any client-side
+    // arithmetic (e.g. summing pending/paid/assessed totals with the `+`
+    // operator) silently did STRING CONCATENATION instead of addition —
+    // "7500.00" + "14500.00" → "7500.0014500.00" — which is exactly the
+    // absurd multi-quadrillion-Kwacha totals reported on the ledger's
+    // summary cards. Coercing to a real number here fixes it for every
+    // consumer, not just this one screen.
+    amount: Number(f.amount),
     borrowerName: f.studentId ? studentById.get(f.studentId) ?? 'Unknown student'
       : f.staffId ? staffById.get(f.staffId) ?? 'Unknown staff' : 'Unknown',
   }))

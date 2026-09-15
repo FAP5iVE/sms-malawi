@@ -982,6 +982,13 @@ financesRouter.get(
     res.json(
       fines.map((fine) => ({
         ...fine,
+        // [FIX] Same Decimal-as-string issue fixed in libraryService.ts's
+        // listFines() — LibraryFine.amount is a Prisma Decimal, which
+        // JSON.stringify serializes as a string. ApiLibraryFine.amount is
+        // typed `number`; without this coercion that type was a lie, and
+        // any future summary/total built from this endpoint would hit the
+        // same string-concatenation bug the Reports & Fines ledger had.
+        amount: Number(fine.amount),
         student: fine.studentId && studentById.get(fine.studentId)
           ? {
               firstName: studentById.get(fine.studentId)!.firstName,

@@ -534,14 +534,37 @@ function BorrowerPicker({
 
   return (
     <div className="relative">
-      <input
-        value={value ? value.fullName : query}
-        onChange={(e) => handleChange(e.target.value)}
-        onFocus={() => results.length > 0 && setOpen(true)}
-        placeholder={type === 'student' ? 'Search student by name…' : 'Search staff by name…'}
-        className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-        autoComplete="off"
-      />
+      {/* [FIX] Previously collapsed to just `value.fullName` once picked —
+          with same-name students/staff this made it impossible to tell
+          which record was actually selected. Now shows the same
+          distinguishing sublabel (registration no. / class, or
+          department) the dropdown row showed, with a clear way to change
+          the pick. */}
+      {value ? (
+        <div className="w-full border border-brand-teal/40 bg-brand-teal/5 rounded-lg px-3 py-2 flex items-center justify-between gap-2 min-h-11">
+          <div>
+            <p className="text-sm font-medium text-body">{value.fullName}</p>
+            <p className="text-xs text-muted">{value.sublabel}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => { onChange(null); setQuery('') }}
+            aria-label="Change selection"
+            className="text-muted hover:text-body shrink-0"
+          >
+            <XIcon className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <input
+          value={query}
+          onChange={(e) => handleChange(e.target.value)}
+          onFocus={() => results.length > 0 && setOpen(true)}
+          placeholder={type === 'student' ? 'Search by name or registration number…' : 'Search by name…'}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          autoComplete="off"
+        />
+      )}
       {loading && <Loader2 className="w-4 h-4 animate-spin text-muted absolute right-3 top-1/2 -translate-y-1/2" />}
       {open && results.length > 0 && (
         <div className="absolute z-20 mt-1 w-full bg-surface border border-base rounded-lg shadow-lg max-h-56 overflow-y-auto">
@@ -1021,7 +1044,7 @@ function ClearanceCheckerModal({ allFines, onClose }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
+      <div className="relative z-10 w-full max-w-lg min-h-[440px] max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
         <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy">Student Library Clearance Audit</h2>
           <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
@@ -1485,36 +1508,14 @@ function LibraryContent() {
             </div>
           </div>
 
-          {/* [R21] Standalone Issue Book (opens the book-search-first
-              modal) + Add Book, right-aligned on their own row — matches
-              the screenshot's toolbar layout below the filter row. */}
-          <div className="flex items-center justify-end gap-2">
-            <PermissionGuard permission="library.issueBook">
-              <button
-                type="button"
-                onClick={() => setShowStandaloneIssue(true)}
-                className="inline-flex items-center gap-1.5 bg-brand-navy text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-navy/90 min-h-[44px]"
-              >
-                <Check className="w-4 h-4" aria-hidden /> Issue Book
-              </button>
-            </PermissionGuard>
-            {isLibStaff && (
-              <button
-                type="button"
-                onClick={() => setShowAddBook(true)}
-                className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-[44px]"
-              >
-                <Plus className="w-4 h-4" aria-hidden /> Add Book
-              </button>
-            )}
-          </div>
-
-          {/* [R21] Scan barcode (left) / item count + Table-Grid toggle
-              (right) — matches the screenshot's third toolbar row. */}
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            {isLibStaff ? (
-              <div className="flex flex-col gap-1.5">
-                <div className="flex gap-2">
+          {/* [R21] Scan barcode, Issue Book, Add Book, item count, and the
+              Table/Grid toggle all on one row — previously "Issue Book" /
+              "Add Book" sat alone on their own row, leaving an
+              awkward mostly-empty line above this one. */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              {isLibStaff ? (
+                <div className="flex items-center gap-2">
                   <label htmlFor="library-barcode" className="sr-only">Scan or enter a barcode</label>
                   <div className="relative">
                     <Scan className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" aria-hidden />
@@ -1536,46 +1537,69 @@ function LibraryContent() {
                     Look up
                   </button>
                 </div>
-                {scanError && <p className="text-xs text-brand-coral">{scanError}</p>}
-                {scanResult && (
-                  <div className="text-xs bg-brand-teal/10 border border-brand-teal/25 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
-                    <span>Found: <strong>{scanResult.title}</strong></span>
-                    <PermissionGuard permission="library.issueBook">
-                      <button
-                        type="button"
-                        onClick={() => handleIssue(scanResult.id)}
-                        className="text-brand-teal font-semibold underline min-h-11"
-                      >
-                        Issue this book
-                      </button>
-                    </PermissionGuard>
-                  </div>
+              ) : <span />}
+
+              <div className="flex items-center gap-2">
+                <PermissionGuard permission="library.issueBook">
+                  <button
+                    type="button"
+                    onClick={() => setShowStandaloneIssue(true)}
+                    className="inline-flex items-center gap-1.5 bg-brand-navy text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-navy/90 min-h-[44px]"
+                  >
+                    <Check className="w-4 h-4" aria-hidden /> Issue Book
+                  </button>
+                </PermissionGuard>
+                {isLibStaff && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddBook(true)}
+                    className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-[44px]"
+                  >
+                    <Plus className="w-4 h-4" aria-hidden /> Add Book
+                  </button>
                 )}
               </div>
-            ) : <span />}
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-muted">Showing {(books as ApiBook[]).length} title{(books as ApiBook[]).length === 1 ? '' : 's'}</span>
-              <div className="flex border border-base rounded-lg overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setCatalogView('table')}
-                  aria-label="Table view"
-                  aria-pressed={catalogView === 'table'}
-                  className={`p-2 min-h-11 ${catalogView === 'table' ? 'bg-brand-navy text-white' : 'bg-surface text-muted hover:bg-page'}`}
-                >
-                  <List className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCatalogView('grid')}
-                  aria-label="Grid view"
-                  aria-pressed={catalogView === 'grid'}
-                  className={`p-2 min-h-11 ${catalogView === 'grid' ? 'bg-brand-navy text-white' : 'bg-surface text-muted hover:bg-page'}`}
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted">Showing {(books as ApiBook[]).length} title{(books as ApiBook[]).length === 1 ? '' : 's'}</span>
+                <div className="flex border border-base rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setCatalogView('table')}
+                    aria-label="Table view"
+                    aria-pressed={catalogView === 'table'}
+                    className={`p-2 min-h-11 ${catalogView === 'table' ? 'bg-brand-navy text-white' : 'bg-surface text-muted hover:bg-page'}`}
+                  >
+                    <List className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCatalogView('grid')}
+                    aria-label="Grid view"
+                    aria-pressed={catalogView === 'grid'}
+                    className={`p-2 min-h-11 ${catalogView === 'grid' ? 'bg-brand-navy text-white' : 'bg-surface text-muted hover:bg-page'}`}
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
+
+            {scanError && <p className="text-xs text-brand-coral">{scanError}</p>}
+            {scanResult && (
+              <div className="text-xs bg-brand-teal/10 border border-brand-teal/25 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+                <span>Found: <strong>{scanResult.title}</strong></span>
+                <PermissionGuard permission="library.issueBook">
+                  <button
+                    type="button"
+                    onClick={() => handleIssue(scanResult.id)}
+                    className="text-brand-teal font-semibold underline min-h-11"
+                  >
+                    Issue this book
+                  </button>
+                </PermissionGuard>
+              </div>
+            )}
           </div>
 
           {isLoading ? (
