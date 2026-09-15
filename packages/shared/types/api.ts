@@ -941,6 +941,10 @@ export interface ApiLibraryConditionEntry {
   notes?: string
   returnedAt?: string
   borrowerName: string
+  /** [R21.2] 'RETURN' — set via the return flow, tied to a real loan and
+   *  borrower. 'CATALOG' — a shelf copy marked directly from the Catalog
+   *  (see BookConditionLog), no borrower involved. */
+  source: 'RETURN' | 'CATALOG'
 }
 
 // ─── REPORT RESPONSE TYPES ───────────────────────────────

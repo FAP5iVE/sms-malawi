@@ -1158,12 +1158,40 @@ model Book {
   shelf         String?      // R21: physical shelf/location label (e.g. "M-02") shown under the barcode in the catalog UI
   coverKey      String?      // Appwrite file ID
   borrowings    Borrowing[]
+  // [R21.2] "no where to change [a book's] status" outside of the
+  // return flow — Borrowing.condition only ever applied to a copy that
+  // was actively out on loan. This lets library staff mark a *shelf*
+  // copy (never checked out, or discovered damaged/lost independent of
+  // any return) directly from the Catalog, with its own audit trail.
+  conditionLogs BookConditionLog[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
   @@index([category])
   @@index([title])
   @@map("books")
+}
+
+// [R21.2] Records a book condition change made directly from the Catalog
+// (as opposed to Borrowing.condition, set when a loaned copy is
+// returned). Marking a copy here removes it from availableCopies
+// (DAMAGED or LOST — it's off the shelf either way) and, for LOST only,
+// also removes it from totalCopies (a damaged copy is presumed
+// repairable and still owned; a lost one is a write-off). Deliberately
+// has no borrower/fine — a shelf copy found damaged/lost has no one to
+// bill; that stays the return flow's job.
+model BookConditionLog {
+  id             String   @id @default(cuid())
+  bookId         String
+  book           Book     @relation(fields: [bookId], references: [id])
+  condition      String   // 'DAMAGED' | 'LOST'
+  copies         Int      @default(1)
+  notes          String?
+  recordedByUid  String
+  createdAt      DateTime @default(now())
+
+  @@index([bookId])
+  @@map("book_condition_logs")
 }
 
 enum BookCategory {

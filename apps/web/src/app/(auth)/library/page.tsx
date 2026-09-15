@@ -65,6 +65,7 @@ import {
   useScanBarcode,
   useIssueBorrowing,
   useReturnBook,
+  useMarkBookCondition,
   useRenewBorrowing,
   useRecommendations,
   useCreateRecommendation,
@@ -87,6 +88,7 @@ import {
   useOverdueByClass,
 }                            from '@/hooks/useLibrary'
 import { apiFetch }          from '@/lib/api-client'
+import { usePermissions }    from '@/hooks/usePermissions'
 import { DigitalResourceViewer } from '@/components/library/DigitalResourceViewer'
 import {
   BookOpen, Scan, FileText, AlertTriangle, Eye, Check, X as XIcon, Undo2, Pencil, Archive,
@@ -935,10 +937,131 @@ function BookDetailModal({ bookId, onClose }: { bookId: string; onClose: () => v
                   </ul>
                 )}
               </div>
+
+              {/* [R21.2] "no where to change [a book's] status" outside of
+                  the return flow — marks a shelf copy damaged/lost right
+                  from here, independent of any loan. Copies out on loan
+                  are still marked via the Return flow (they have a real
+                  borrower to attribute the condition to). */}
+              <PermissionGuard any={['library.markDamaged', 'library.markLost']}>
+                <MarkConditionSection book={b} onClose={onClose} />
+              </PermissionGuard>
             </>
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// [R21.2] The actual "change a book's status to lost/damaged" mechanism
+// — lives inside BookDetailModal, gated to whichever of
+// library.markDamaged / library.markLost the user actually holds (a role
+// could plausibly have one but not the other). Only copies currently on
+// the shelf (availableCopies) can be marked this way; a copy out with a
+// borrower is marked via the Return flow instead, which already covers
+// that case and correctly attributes it to a loan.
+function MarkConditionSection({ book, onClose }: { book: ApiBook; onClose: () => void }) {
+  const { can } = usePermissions()
+  const markCondition = useMarkBookCondition()
+  const [picking, setPicking] = useState<'DAMAGED' | 'LOST' | null>(null)
+  const [copies, setCopies] = useState('1')
+  const [notes, setNotes] = useState('')
+
+  const canDamaged = can('library.markDamaged')
+  const canLost = can('library.markLost')
+  if (!canDamaged && !canLost) return null
+
+  if (book.availableCopies === 0) {
+    return (
+      <div>
+        <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">Book Condition</p>
+        <p className="text-sm text-muted">
+          No copies of this title are currently on the shelf to mark. A copy that&apos;s out on loan is marked
+          damaged or lost when it&apos;s returned, from the Borrowings tab.
+        </p>
+      </div>
+    )
+  }
+
+  function handleConfirm() {
+    if (!picking) return
+    const n = Math.min(Math.max(1, Number(copies) || 1), book.availableCopies)
+    markCondition.mutate({ bookId: book.id, data: { condition: picking, copies: n, notes: notes.trim() || undefined } }, {
+      onSuccess: onClose,
+    })
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">Book Condition</p>
+      {!picking ? (
+        <div className="flex gap-2">
+          {canDamaged && (
+            <button type="button" onClick={() => setPicking('DAMAGED')}
+              className="flex-1 py-2 rounded-lg text-sm font-semibold border border-brand-amber/40 text-brand-amber hover:bg-brand-amber/5">
+              Mark a copy Damaged
+            </button>
+          )}
+          {canLost && (
+            <button type="button" onClick={() => setPicking('LOST')}
+              className="flex-1 py-2 rounded-lg text-sm font-semibold border border-brand-coral/40 text-brand-coral hover:bg-brand-coral/5">
+              Mark a copy Lost
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3 border border-base rounded-lg p-3">
+          <p className="text-sm font-medium text-body">
+            Mark {picking === 'LOST' ? 'lost' : 'damaged'} — {book.title}
+          </p>
+          <div className="flex items-center gap-3">
+            <label htmlFor="condition-copies" className="text-xs text-muted shrink-0">Copies</label>
+            <input
+              id="condition-copies"
+              type="number"
+              min={1}
+              max={book.availableCopies}
+              value={copies}
+              onChange={(e) => setCopies(e.target.value)}
+              className="w-20 border border-base rounded-lg px-2 py-1.5 text-sm bg-page"
+            />
+            <span className="text-xs text-muted">of {book.availableCopies} on the shelf</span>
+          </div>
+          <div>
+            <label htmlFor="condition-notes" className="text-xs text-muted mb-1 block">Notes <span className="text-muted/70">(optional)</span></label>
+            <textarea
+              id="condition-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder={picking === 'LOST' ? 'e.g. Not found during annual stock take.' : 'e.g. Water damage discovered on the shelf.'}
+              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+            />
+          </div>
+          {picking === 'LOST' && (
+            <p className="text-xs text-muted">
+              Marking a copy lost removes it from this title&apos;s total copy count. Marking it damaged only takes
+              it off the shelf — it stays in the total count as repairable.
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => { setPicking(null); setNotes(''); setCopies('1') }}
+              className="flex-1 py-2 rounded-lg text-sm font-semibold border border-base text-body">
+              Cancel
+            </button>
+            <button type="button" onClick={handleConfirm} disabled={markCondition.isPending}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60 ${picking === 'LOST' ? 'bg-brand-coral' : 'bg-brand-amber'}`}>
+              {markCondition.isPending ? 'Saving…' : `Confirm ${picking === 'LOST' ? 'Lost' : 'Damaged'}`}
+            </button>
+          </div>
+          {markCondition.error && (
+            <p className="text-xs text-brand-coral">
+              {markCondition.error instanceof Error ? markCondition.error.message : 'Something went wrong.'}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

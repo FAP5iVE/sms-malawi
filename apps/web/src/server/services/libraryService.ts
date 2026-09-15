@@ -402,16 +402,25 @@ export async function renewBorrowing(borrowingId: string, actorUid: string, days
 // borrower name attached, for the Reports & Fines ledger's new
 // "Damaged & Lost Books" panel.
 export async function getConditionReport() {
-  const rows = await prisma.borrowing.findMany({
-    where: { condition: { in: ['DAMAGED', 'LOST'] } },
-    include: {
-      book:    { select: { title: true } },
-      student: { select: { firstName: true, lastName: true } },
-      staff:   { select: { firstName: true, lastName: true } },
-    },
-    orderBy: { returnedAt: 'desc' },
-  })
-  return rows.map((b) => ({
+  const [returnRows, catalogRows] = await Promise.all([
+    prisma.borrowing.findMany({
+      where: { condition: { in: ['DAMAGED', 'LOST'] } },
+      include: {
+        book:    { select: { title: true } },
+        student: { select: { firstName: true, lastName: true } },
+        staff:   { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { returnedAt: 'desc' },
+    }),
+    // [R21.2] Shelf copies marked damaged/lost directly from the
+    // Catalog (markBookCondition()) — no borrower involved, so no
+    // student/staff join here.
+    prisma.bookConditionLog.findMany({
+      include: { book: { select: { title: true } } },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ])
+  const fromReturns = returnRows.map((b) => ({
     id:           b.id,
     bookId:       b.bookId,
     bookTitle:    b.book.title,
@@ -421,7 +430,69 @@ export async function getConditionReport() {
     borrowerName: b.student ? `${b.student.firstName} ${b.student.lastName}`
                 : b.staff   ? `${b.staff.firstName} ${b.staff.lastName}`
                 : 'Unknown',
+    source:       'RETURN' as const,
   }))
+  const fromCatalog = catalogRows.map((c) => ({
+    id:           c.id,
+    bookId:       c.bookId,
+    bookTitle:    c.book.title,
+    condition:    c.condition as 'DAMAGED' | 'LOST',
+    notes:        c.notes ?? undefined,
+    returnedAt:   c.createdAt,
+    borrowerName: c.copies > 1 ? `${c.copies} copies — marked from catalog` : 'Marked from catalog',
+    source:       'CATALOG' as const,
+  }))
+  return [...fromReturns, ...fromCatalog].sort(
+    (a, b) => new Date(b.returnedAt ?? 0).getTime() - new Date(a.returnedAt ?? 0).getTime(),
+  )
+}
+
+// [R21.2] "no where to change [a book's] status" outside of the return
+// flow — this is the standalone path: mark a shelf copy (never checked
+// out, or found damaged/lost independent of any loan) directly from the
+// Catalog. Caps `copies` at the book's current availableCopies — a copy
+// that's out with a borrower is marked via the return flow instead,
+// which already has this covered and correctly attributes it to that
+// loan. DAMAGED only removes the copy from availableCopies (presumed
+// repairable, still owned); LOST removes it from both availableCopies
+// and totalCopies (a write-off).
+export async function markBookCondition(
+  bookId: string,
+  input: { condition: 'DAMAGED' | 'LOST'; copies: number; notes?: string },
+  actorUid: string,
+) {
+  const book = await prisma.book.findUniqueOrThrow({ where: { id: bookId } })
+  if (input.copies > book.availableCopies) {
+    throw new Error(
+      `Only ${book.availableCopies} cop${book.availableCopies === 1 ? 'y' : 'ies'} of this title are currently on the shelf. ` +
+      'A copy that is out on loan can only be marked damaged or lost when it is returned.',
+    )
+  }
+  const [updatedBook, log] = await prisma.$transaction([
+    prisma.book.update({
+      where: { id: bookId },
+      data: {
+        availableCopies: { decrement: input.copies },
+        ...(input.condition === 'LOST' ? { totalCopies: { decrement: input.copies } } : {}),
+      },
+    }),
+    prisma.bookConditionLog.create({
+      data: {
+        bookId,
+        condition: input.condition,
+        copies: input.copies,
+        notes: input.notes ?? null,
+        recordedByUid: actorUid,
+      },
+    }),
+  ])
+  logger.info({ event: 'book.condition.marked', bookId, condition: input.condition, copies: input.copies, actorUid })
+  void algolia.updateBook({
+    objectID: updatedBook.id,
+    availableCopies: updatedBook.availableCopies,
+    totalCopies: updatedBook.totalCopies,
+  })
+  return { book: updatedBook, log }
 }
 
 // ─── OVERDUE CHECK (called by cron job) ──────────────────

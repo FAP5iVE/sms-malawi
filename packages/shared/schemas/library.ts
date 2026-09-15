@@ -58,6 +58,17 @@ export const ReturnBorrowingSchema = z.object({
   notes:     z.string().optional(),
 })
 
+// [R21.2] "no where to change [a book's] status" outside of the return
+// flow — marks a *shelf* copy (not currently on loan) damaged/lost
+// directly from the Catalog. `copies` is capped server-side at the
+// book's current availableCopies (you can't mark a copy that's out with
+// a borrower this way — that's still the return flow's job).
+export const MarkBookConditionSchema = z.object({
+  condition: z.enum(['DAMAGED', 'LOST']),
+  copies:    z.number().int().positive().default(1),
+  notes:     z.string().optional(),
+})
+
 export const CreateDigitalResourceSchema = z.object({
   title:        z.string().min(1),
   type:         z.enum(['EBOOK','PAST_PAPER','REFERENCE','STUDY_GUIDE']),
@@ -103,6 +114,7 @@ export type CreateBookInput             = z.infer<typeof CreateBookSchema>
 export type UpdateBookInput             = z.infer<typeof UpdateBookSchema>
 export type IssueBorrowingInput         = z.infer<typeof IssueBorrowingSchema>
 export type ReturnBorrowingInput        = z.infer<typeof ReturnBorrowingSchema>
+export type MarkBookConditionInput      = z.infer<typeof MarkBookConditionSchema>
 export type CreateDigitalResourceInput  = z.infer<typeof CreateDigitalResourceSchema>
 export type CreateRecommendationInput   = z.infer<typeof CreateRecommendationSchema>
 export type ReviewRecommendationInput   = z.infer<typeof ReviewRecommendationSchema>

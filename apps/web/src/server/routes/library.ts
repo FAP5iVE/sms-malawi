@@ -43,11 +43,13 @@
 import { Router } from 'express'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
+import { hasPermission } from '@shared/types/permissions'
 import {
   CreateBookSchema,
   UpdateBookSchema,
   IssueBorrowingSchema,
   ReturnBorrowingSchema,
+  MarkBookConditionSchema,
   CreateDigitalResourceSchema,
   CreateRecommendationSchema,
   ReviewRecommendationSchema,
@@ -141,6 +143,27 @@ libraryRouter.patch('/borrowings/:id/return', verifyAuth, requirePermission('lib
     const parsed = ReturnBorrowingSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     return res.json(await libService.returnBook(String(req.params.id), parsed.data, req.user!.uid))
+  })
+
+// [R21.2] "no where to change [a book's] status" outside of the return
+// flow — marks a *shelf* copy damaged/lost directly from the Catalog.
+// Gated on holding EITHER markDamaged or markLost so a role with just
+// one still reaches the handler; the handler then checks the specific
+// permission for the condition actually being set, since a role could
+// plausibly hold one but not the other.
+libraryRouter.patch('/:id/condition', verifyAuth, requireAnyPermission(['library.markDamaged', 'library.markLost']),
+  async (req, res) => {
+    const parsed = MarkBookConditionSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    const requiredPermission = parsed.data.condition === 'LOST' ? 'library.markLost' : 'library.markDamaged'
+    if (!hasPermission(req.user!.role, requiredPermission)) {
+      return res.status(403).json({ error: 'You do not have permission to perform this action.', required: requiredPermission })
+    }
+    try {
+      return res.json(await libService.markBookCondition(String(req.params.id), parsed.data, req.user!.uid))
+    } catch (err: unknown) {
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'library' } })
+    }
   })
 
 // [R21] "Renew (+14d)" — the Active Borrowings table's renew action had no

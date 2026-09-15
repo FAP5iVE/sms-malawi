@@ -20,7 +20,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type {
-  CreateBookInput, IssueBorrowingInput, ReturnBorrowingInput,
+  CreateBookInput, IssueBorrowingInput, ReturnBorrowingInput, MarkBookConditionInput,
   CreateRecommendationInput, ReviewRecommendationInput, RejectRecommendationInput,
   CreateFineWaiverInput, RejectFineWaiverInput, CreateDigitalResourceInput,
 } from '@shared/schemas/library'
@@ -114,6 +114,21 @@ export function useReturnBook() {
     mutationFn: ({ borrowingId, data }: { borrowingId: string; data: ReturnBorrowingInput }) =>
       apiFetch(`/library/borrowings/${borrowingId}/return`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
+  })
+}
+
+// [R21.2] "no where to change [a book's] status" outside of the return
+// flow — marks a shelf copy damaged/lost directly from the Catalog
+// (BookDetailModal's eye-icon view). Invalidates the whole library query
+// space since this touches the book's copy counts (Catalog/Catalog
+// Distribution) and the condition report (Reports & Fines ledger).
+export function useMarkBookCondition() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ bookId, data }: { bookId: string; data: MarkBookConditionInput }) =>
+      apiFetch(`/library/${bookId}/condition`, { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
+    onError: (err) => { console.error('[useMarkBookCondition] failed', err) },
   })
 }
 
