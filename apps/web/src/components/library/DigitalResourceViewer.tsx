@@ -1,33 +1,56 @@
 'use client'
 
 /**
- * DigitalResourceViewer
+ * View-only PDF renderer for Library digital resources.
  *
- * FIXED: the previous implementation embedded the protected PDF directly in
- * a sandboxed iframe. Chromium/Android can fall back to its external PDF
- * handler in that situation, which produced the "PDF / Open" screen shown in
- * production. The iframe was also behind a pointer-events:none overlay, so
- * scrolling/interacting with the browser PDF viewer was disabled.
- *
- * The viewer now:
- *   - fetches the protected bytes with the Firebase Bearer token;
- *   - renders PDFs with PDF.js on a canvas (no browser PDF plugin required);
- *   - works consistently on desktop and mobile browsers;
- *   - supports page navigation, zoom, and fit-to-width;
- *   - never exposes a permanent Appwrite URL;
- *   - keeps the existing server-side authorization boundary.
- *
- * This is still view-only UI, not DRM. A user with sufficient technical
- * access can still obtain content from their browser's network/memory.
+ * PDF.js is used instead of the browser's native PDF iframe so desktop and
+ * mobile browsers use the same rendering path. Render tasks are explicitly
+ * cancelled/serialized because PDF.js forbids concurrent render() calls on
+ * the same canvas.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, ChevronLeft, ChevronRight, Eye, Loader2, Minus, Plus, RotateCw, X } from 'lucide-react'
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Loader2,
+  Minus,
+  Plus,
+  RotateCw,
+  X,
+} from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getAuth } from 'firebase/auth'
 import { useMotionEnabled } from '@/store/motionStore'
 import { reducedMotionTransition, reducedMotionVariants, SPRING } from '@/lib/motion'
 import { useDigitalResourceView } from '@/hooks/useLibrary'
+
+type PdfPageLike = {
+  getViewport: (params: { scale: number }) => { width: number; height: number }
+  render: (params: {
+    canvasContext: CanvasRenderingContext2D
+    viewport: { width: number; height: number }
+    intent?: 'display'
+  }) => PdfRenderTaskLike
+}
+
+type PdfDocumentLike = {
+  numPages: number
+  getPage: (pageNumber: number) => Promise<PdfPageLike>
+  loadingTask: PdfLoadingTaskLike
+}
+
+type PdfLoadingTaskLike = {
+  promise: Promise<PdfDocumentLike>
+  destroy: () => Promise<void>
+}
+
+type PdfRenderTaskLike = {
+  promise: Promise<void>
+  cancel: () => void
+}
 
 interface DigitalResourceViewerProps {
   resourceId: string
@@ -35,30 +58,26 @@ interface DigitalResourceViewerProps {
   onClose: () => void
 }
 
-interface PdfPageLike {
-  getViewport: (params: { scale: number }) => { width: number; height: number }
-  render: (params: {
-    canvasContext: CanvasRenderingContext2D
-    viewport: { width: number; height: number }
-    intent?: 'display'
-  }) => { promise: Promise<void> }
-}
-
-interface PdfDocumentLike {
-  numPages: number
-  getPage: (pageNumber: number) => Promise<PdfPageLike>
-  destroy: () => Promise<void>
-}
-
 function friendlyPdfError(error: unknown): string {
   if (error instanceof Error) {
-    if (/password/i.test(error.message)) return 'This PDF is password-protected and cannot be displayed here.'
+    if (/password/i.test(error.message)) {
+      return 'This PDF is password-protected and cannot be displayed here.'
+    }
     if (/Invalid PDF|Missing PDF|PDF header/i.test(error.message)) {
       return 'The uploaded file is not a valid PDF.'
     }
     return error.message
   }
+
   return 'The PDF could not be displayed.'
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
+}
+
+function isRenderCancellation(error: unknown): boolean {
+  return error instanceof Error && /RenderingCancelledException|cancelled/i.test(error.message)
 }
 
 export function DigitalResourceViewer({
@@ -67,12 +86,12 @@ export function DigitalResourceViewer({
   onClose,
 }: DigitalResourceViewerProps) {
   const motionEnabled = useMotionEnabled()
-  const { mutate: getViewUrl } = useDigitalResourceView()
+  const { mutate: getViewUrl, isPending: isViewUrlPending } = useDigitalResourceView()
 
   const [viewUrl, setViewUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [visible, setVisible] = useState(true)
-  const [loading, setLoading] = useState(true)
+  const [loadingPdf, setLoadingPdf] = useState(true)
   const [pageNumber, setPageNumber] = useState(1)
   const [numPages, setNumPages] = useState(0)
   const [zoom, setZoom] = useState(1)
@@ -82,104 +101,129 @@ export function DigitalResourceViewer({
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const viewerBodyRef = useRef<HTMLDivElement | null>(null)
   const pdfRef = useRef<PdfDocumentLike | null>(null)
+  const loadingTaskRef = useRef<PdfLoadingTaskLike | null>(null)
+  const renderTaskRef = useRef<PdfRenderTaskLike | null>(null)
+  const renderQueueRef = useRef<Promise<void>>(Promise.resolve())
   const renderGenerationRef = useRef(0)
 
+  const cancelRenderTask = useCallback(() => {
+    const task = renderTaskRef.current
+    if (!task) return
+
+    renderTaskRef.current = null
+    task.cancel()
+
+    // PDF.js keeps the canvas marked as "in use" until the cancelled render
+    // task settles. Queue subsequent renders behind this promise.
+    renderQueueRef.current = task.promise.catch(() => {})
+  }, [])
+
+  const destroyPdf = useCallback(async () => {
+    cancelRenderTask()
+
+    // PDF.js v6 no longer exposes PDFDocumentProxy.destroy(). The supported
+    // teardown path is the document's loadingTask.destroy(). We also wait for
+    // a cancelled render to settle before destroying the document because
+    // PDF.js explicitly warns against cleanup while a render is active.
+    await renderQueueRef.current
+
+    const pdf = pdfRef.current
+    pdfRef.current = null
+    if (pdf) {
+      await pdf.loadingTask.destroy().catch(() => {})
+    }
+  }, [cancelRenderTask])
+
   const loadViewUrl = useCallback(() => {
-    setLoading(true)
     setError(null)
     setViewUrl(null)
+    setLoadingPdf(true)
+    setPageNumber(1)
+    setNumPages(0)
+    setZoom(1)
 
     getViewUrl(resourceId, {
       onSuccess: ({ url }) => {
         setViewUrl(url)
       },
       onError: (e) => {
-        setLoading(false)
+        setLoadingPdf(false)
         setError(e instanceof Error ? e.message : 'Unable to load resource')
       },
     })
-  }, [resourceId, getViewUrl])
+  }, [getViewUrl, resourceId])
 
   useEffect(() => {
-    // Defer the mutation to the next task. The React hooks lint rule
-    // `react-hooks/set-state-in-effect` treats React Query's mutation call as
-    // a synchronous state update when it is invoked directly in an effect.
-    // The mutation itself is still the correct source of truth; deferring it
-    // prevents a synchronous cascading render on mount.
-    const timer = window.setTimeout(() => {
-      loadViewUrl()
-    }, 0)
-
+    const timer = window.setTimeout(loadViewUrl, 0)
     return () => window.clearTimeout(timer)
   }, [loadViewUrl])
 
-  // Download the protected bytes using the normal Firebase Authorization
-  // header. This avoids putting the Firebase ID token into a URL query string.
   useEffect(() => {
-    if (!viewUrl) return
+    const protectedViewUrl = viewUrl
+    if (protectedViewUrl === null) return
 
     let cancelled = false
     const controller = new AbortController()
 
-    async function loadPdf() {
+    const loadPdf = async () => {
+      // Make sure an older document/render has fully stopped before replacing it.
+      await destroyPdf()
+      if (cancelled) return
+
       try {
-        setLoading(true)
+        setLoadingPdf(true)
         setError(null)
         setPageNumber(1)
         setNumPages(0)
         setZoom(1)
 
         const user = getAuth().currentUser
-        if (!user) throw new Error('Your session has expired. Please sign in again.')
-
-        const token = await user.getIdToken()
-
-        if (viewUrl === null) {
-          throw new Error('The PDF URL is unavailable.')
+        if (!user) {
+          throw new Error('Your session has expired. Please sign in again.')
         }
 
-        const pdfUrl: string = viewUrl
+        const token = await user.getIdToken()
+        if (cancelled) return
 
-        const response = await fetch(pdfUrl, {
+        const response = await fetch(protectedViewUrl, {
           method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
           referrerPolicy: 'no-referrer',
           signal: controller.signal,
         })
 
         if (!response.ok) {
-          if (response.status === 401) throw new Error('Your session has expired. Please sign in again.')
-          if (response.status === 403) throw new Error('You do not have permission to view this resource.')
-          if (response.status === 404) throw new Error('The resource file could not be found.')
+          if (response.status === 401) {
+            throw new Error('Your session has expired. Please sign in again.')
+          }
+          if (response.status === 403) {
+            throw new Error('You do not have permission to view this resource.')
+          }
+          if (response.status === 404) {
+            throw new Error('The resource file could not be found.')
+          }
           throw new Error(`The resource server returned HTTP ${response.status}.`)
         }
 
-              const contentType = response.headers
-        .get('content-type')
-        ?.split(';')[0]
-        ?.trim()
-        .toLowerCase()
+        const contentTypeHeader = response.headers.get('content-type')
+        const contentType = contentTypeHeader?.split(';')[0]?.trim().toLowerCase() ?? ''
+
         if (contentType && contentType !== 'application/pdf' && !contentType.endsWith('+pdf')) {
-          throw new Error(`This viewer only supports PDF resources. The uploaded file is reported as ${contentType}.`)
+          throw new Error(
+            `This viewer only supports PDF resources. The uploaded file is reported as ${contentType}.`,
+          )
         }
 
         const bytes = new Uint8Array(await response.arrayBuffer())
         if (cancelled) return
 
-        // Validate the actual payload as well as the MIME type. This catches
-        // cases where a storage record has stale/wrong metadata.
         const pdfSignature = new TextDecoder().decode(bytes.slice(0, 5))
         if (pdfSignature !== '%PDF-') {
           throw new Error('The stored file is not a valid PDF. Re-upload the resource as a PDF.')
         }
 
-        // PDF.js is loaded only in the browser. The worker is bundled by the
-        // Next.js build rather than depending on a third-party CDN.
         const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-
         pdfjs.GlobalWorkerOptions.workerSrc = new URL(
           'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
           import.meta.url,
@@ -188,24 +232,24 @@ export function DigitalResourceViewer({
         const loadingTask = pdfjs.getDocument({
           data: bytes,
           useSystemFonts: true,
-        })
+        }) as unknown as PdfLoadingTaskLike
 
-        const documentProxy = (await loadingTask.promise) as unknown as PdfDocumentLike
+        loadingTaskRef.current = loadingTask
+
+        const documentProxy = await loadingTask.promise
         if (cancelled) {
-          await documentProxy.destroy().catch(() => {})
+          await loadingTask.destroy().catch(() => {})
           return
         }
 
-        if (pdfRef.current) {
-          await pdfRef.current.destroy().catch(() => {})
-        }
-
         pdfRef.current = documentProxy
+        loadingTaskRef.current = null
         setNumPages(documentProxy.numPages)
-        setLoading(false)
+        setLoadingPdf(false)
       } catch (e) {
-        if (cancelled || (e instanceof DOMException && e.name === 'AbortError')) return
-        setLoading(false)
+        if (cancelled || isAbortError(e)) return
+
+        setLoadingPdf(false)
         setError(friendlyPdfError(e))
       }
     }
@@ -215,49 +259,48 @@ export function DigitalResourceViewer({
     return () => {
       cancelled = true
       controller.abort()
+      void destroyPdf()
     }
-  }, [viewUrl])
+  }, [destroyPdf, viewUrl])
 
-  // Destroy PDF.js resources when the viewer closes/unmounts.
   useEffect(() => {
     return () => {
-      const pdf = pdfRef.current
-      pdfRef.current = null
-      if (pdf) void pdf.destroy().catch(() => {})
+      void destroyPdf()
     }
-  }, [])
+  }, [destroyPdf])
 
-  // Render only the current page. This keeps memory usage reasonable on
-  // phones even for large past papers/eBooks.
   useEffect(() => {
     const pdf = pdfRef.current
     const canvas = canvasRef.current
     const body = viewerBodyRef.current
 
-    if (!pdf || !canvas || !body || !numPages || loading) return
+    if (!pdf || !canvas || !body || !numPages || loadingPdf || error) return
 
-    // Keep narrowed references in stable locals so TypeScript does not lose
-    // the null check inside the async render function.
     const pdfDocument = pdf
     const canvasElement = canvas
     const viewerBody = body
-
     let cancelled = false
     const generation = ++renderGenerationRef.current
 
-    async function renderCurrentPage() {
+    // Cancel the previous render before starting another one. Then wait for
+    // PDF.js to release the canvas before calling render() again.
+    cancelRenderTask()
+    const previousRender = renderQueueRef.current
+
+    const renderCurrentPage = async () => {
+      let activeRenderTask: PdfRenderTaskLike | null = null
+
       try {
         setRendering(true)
+        await previousRender
+
+        if (cancelled || generation !== renderGenerationRef.current) return
 
         const page = await pdfDocument.getPage(pageNumber)
         if (cancelled || generation !== renderGenerationRef.current) return
 
         const baseViewport = page.getViewport({ scale: 1 })
         const availableWidth = Math.max(viewerBody.clientWidth - 32, 280)
-
-        // Fit the PDF to the viewer on phones and small screens. On desktop,
-        // cap the base size so very wide displays do not create unnecessarily
-        // huge canvases.
         const fitScale = Math.min(
           1.5,
           Math.max(0.55, availableWidth / baseViewport.width),
@@ -272,25 +315,39 @@ export function DigitalResourceViewer({
         canvasElement.style.height = `${Math.ceil(viewport.height)}px`
 
         const context = canvasElement.getContext('2d', { alpha: false })
-        if (!context) throw new Error('Your browser could not create a PDF rendering surface.')
+        if (!context) {
+          throw new Error('Your browser could not create a PDF rendering surface.')
+        }
 
         context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0)
         context.fillStyle = '#ffffff'
-        context.fillRect(0, 0, canvasElement.width, canvasElement.height)
+        context.fillRect(0, 0, viewport.width, viewport.height)
 
-        await page.render({
+        const renderTask = page.render({
           canvasContext: context,
           viewport,
           intent: 'display',
-        }).promise
+        })
+
+        activeRenderTask = renderTask
+        renderTaskRef.current = renderTask
+        renderQueueRef.current = renderTask.promise.catch(() => {})
+
+        await renderTask.promise
 
         if (!cancelled && generation === renderGenerationRef.current) {
           setRendering(false)
         }
       } catch (e) {
-        if (!cancelled && generation === renderGenerationRef.current) {
-          setRendering(false)
-          setError(friendlyPdfError(e))
+        if (cancelled || generation !== renderGenerationRef.current || isRenderCancellation(e)) {
+          return
+        }
+
+        setRendering(false)
+        setError(friendlyPdfError(e))
+      } finally {
+        if (activeRenderTask && renderTaskRef.current === activeRenderTask) {
+          renderTaskRef.current = null
         }
       }
     }
@@ -299,17 +356,16 @@ export function DigitalResourceViewer({
 
     return () => {
       cancelled = true
+      renderGenerationRef.current += 1
+      cancelRenderTask()
     }
-  }, [pageNumber, zoom, numPages, loading, renderTick])
+  }, [cancelRenderTask, error, loadingPdf, numPages, pageNumber, renderTick, zoom])
 
-  // Re-render at fit-to-width when the viewer changes size, e.g. rotating a
-  // phone from portrait to landscape.
   useEffect(() => {
     const body = viewerBodyRef.current
     if (!body) return
 
     const observer = new ResizeObserver(() => {
-      renderGenerationRef.current += 1
       setRenderTick((current) => current + 1)
     })
 
@@ -328,6 +384,8 @@ export function DigitalResourceViewer({
   function changeZoom(delta: number) {
     setZoom((current) => Math.min(2.5, Math.max(0.5, Number((current + delta).toFixed(2)))))
   }
+
+  const loading = isViewUrlPending || loadingPdf
 
   const backdropVariants = reducedMotionVariants(motionEnabled, {
     hidden: { opacity: 0 },
@@ -357,9 +415,7 @@ export function DigitalResourceViewer({
           <div className="flex items-center gap-3 px-3 sm:px-5 py-2.5 bg-brand-navy/95 shrink-0 border-b border-white/10">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <Eye className="w-4 h-4 text-brand-teal shrink-0" aria-hidden />
-              <span className="font-heading font-semibold text-sm text-white truncate">
-                {title}
-              </span>
+              <span className="font-heading font-semibold text-sm text-white truncate">{title}</span>
               <span className="hidden sm:inline shrink-0 text-[10px] text-brand-teal font-heading font-semibold uppercase tracking-wide">
                 View Only
               </span>
