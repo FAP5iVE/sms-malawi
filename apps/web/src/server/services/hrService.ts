@@ -236,12 +236,18 @@ export async function updateStaff(id: string, input: UpdateStaffInput) {
   }
 
   void algolia.updateStaff({
-    objectID:   updated.id,
-    firstName:  updated.firstName,
-    lastName:   updated.lastName,
-    fullName:   `${updated.firstName} ${updated.lastName}`,
-    department: updated.department,
-    email:      updated.email ?? null,
+    objectID:       updated.id,
+    firstName:      updated.firstName,
+    lastName:       updated.lastName,
+    fullName:       `${updated.firstName} ${updated.lastName}`,
+    department:     updated.department,
+    email:          updated.email ?? null,
+    // [ALGOLIA ROLLOUT — Tier 1 item 4] previously omitted — see the note
+    // on AlgoliaStaff in algoliaService.ts.
+    jobTitle:       updated.jobTitle,
+    employmentType: updated.employmentType,
+    contractExpiry: updated.contractExpiry ? updated.contractExpiry.toISOString() : null,
+    dateJoined:     updated.dateJoined.toISOString(),
   })
 
   return getStaffProfile(id)
@@ -363,15 +369,21 @@ export async function createStaff(data: CreateStaffInput, actorUid: string) {
   }
 
   void algolia.indexStaff({
-    objectID:   staff.id,
-    uid:        staff.uid,
-    firstName:  staff.firstName,
-    lastName:   staff.lastName,
-    fullName:   `${staff.firstName} ${staff.lastName}`,
-    role:       staff.role,
-    department: staff.department,
-    status:     staff.status,
-    email:      staff.email ?? null,
+    objectID:       staff.id,
+    uid:            staff.uid,
+    firstName:      staff.firstName,
+    lastName:       staff.lastName,
+    fullName:       `${staff.firstName} ${staff.lastName}`,
+    role:           staff.role,
+    department:     staff.department,
+    status:         staff.status,
+    email:          staff.email ?? null,
+    // [ALGOLIA ROLLOUT — Tier 1 item 4] previously omitted — see the note
+    // on AlgoliaStaff in algoliaService.ts.
+    jobTitle:       staff.jobTitle,
+    employmentType: staff.employmentType,
+    contractExpiry: staff.contractExpiry ? staff.contractExpiry.toISOString() : null,
+    dateJoined:     staff.dateJoined.toISOString(),
   })
 
   // 4. Best-effort welcome email with the temp password. A failure here does

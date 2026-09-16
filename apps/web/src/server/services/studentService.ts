@@ -782,6 +782,9 @@ logger.info(
     status:         created.status,
     sex:            created.sex,
     academicYear:   (created as ApiStudentDetail & { class?: { name: string; form: number; academicYear: string } | null }).class?.academicYear ?? null,
+    // [ALGOLIA ROLLOUT — Tier 1 item 3] previously collected on the model
+    // and returned by getById(), but never passed into this call.
+    district:       created.district ?? null,
   })
   return created
 }
@@ -855,6 +858,9 @@ await auditService.log({
     lastName:  updated.lastName,
     fullName:  `${updated.firstName} ${updated.lastName}`,
     status:    updated.status,
+    // [ALGOLIA ROLLOUT — Tier 1 item 3] see the same note on indexStudent()
+    // above — district was collected but never synced.
+    district:  updated.district ?? null,
   })
   return updated
 }

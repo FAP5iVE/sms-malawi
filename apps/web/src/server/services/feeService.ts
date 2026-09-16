@@ -66,6 +66,7 @@ import type {
 } from '@shared/schemas/finance'
 import { generateReceipt } from '@/server/services/receiptService'
 import * as accountingService from '@/server/services/accountingService'
+import * as algolia from '@/server/services/algoliaService'
 import { resolveStudentFromUid } from '@/server/services/studentService'
 import { getSchoolBranding } from '@/server/services/notificationService'
 import * as settingsService from '@/server/services/settingsService'
@@ -285,7 +286,7 @@ export async function generateInvoice(
           scholarshipId: scholarship?.id ?? null,
           lineItems: { create: lineItemsData },
         },
-        include: { lineItems: true },
+        include: { lineItems: true, student: { select: { firstName: true, lastName: true, registrationNo: true, class: { select: { name: true } } } } },
       })
       for (const c of creditApplications) {
         await tx.studentCredit.update({
@@ -300,6 +301,19 @@ export async function generateInvoice(
   logger.info({
     event: 'invoice.generated', invoiceId: invoice.id, studentId: data.studentId,
     totalAmount, feeTypes: feeStructures.map((f) => f.name), creditApplied, actorUid, actorRole,
+  })
+  // [ALGOLIA ROLLOUT — Tier 2 item 7, upgraded to high priority] New index.
+  void algolia.indexInvoice({
+    objectID:       invoice.id,
+    studentName:    `${invoice.student.firstName} ${invoice.student.lastName}`,
+    registrationNo: invoice.student.registrationNo,
+    status:         invoice.status,
+    academicYear:   invoice.academicYear,
+    term:           invoice.term,
+    className:      invoice.student.class?.name ?? null,
+    dueDate:        invoice.dueDate.toISOString(),
+    balance:        Number(invoice.balance),
+    createdAt:      invoice.createdAt.toISOString(),
   })
   return invoice
 }
@@ -491,6 +505,11 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
   }
 
   logger.info({ event: 'payment.recorded', paymentId: payment.id, invoiceId: data.invoiceId, amount: data.amount, method: data.method, actorUid, actorRole })
+  void algolia.updateInvoice({
+    objectID: updatedInvoice.id,
+    status:   updatedInvoice.status,
+    balance:  Number(updatedInvoice.balance),
+  })
   return { payment: { ...payment, receiptKey }, invoice: updatedInvoice }
 }
 
@@ -521,13 +540,52 @@ export async function applyLatePenalties(penaltyRate?: number): Promise<number> 
   })
   for (const inv of overdue) {
     const penalty = Number(inv.balance) * rate
-    await prisma.invoice.update({
+    const updated = await prisma.invoice.update({
       where: { id: inv.id },
       data: { latePenalty: { increment: penalty }, totalAmount: { increment: penalty }, balance: { increment: penalty }, status: 'OVERDUE' },
     })
+    void algolia.updateInvoice({ objectID: updated.id, status: updated.status, balance: Number(updated.balance) })
   }
   logger.info({ event: 'late_penalties.applied', count: overdue.length, rate })
   return overdue.length
+}
+
+// [ALGOLIA ROLLOUT — Tier 2 item 7] Bulk seed — same pattern as the other
+// entities. Loops in batches rather than one findMany, since invoices can
+// run into the thousands over a few years of history and the old route's
+// own `take: 100` cap is exactly the bug this item exists to fix — the
+// seed path must not silently repeat it.
+export async function seedAllInvoicesToAlgolia(): Promise<algolia.BulkIndexResult> {
+  const BATCH_SIZE = 500
+  let cursor: string | undefined
+  let totalIndexed = 0
+  for (;;) {
+    const invoices = await prisma.invoice.findMany({
+      take: BATCH_SIZE,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: { id: 'asc' },
+      include: { student: { select: { firstName: true, lastName: true, registrationNo: true, class: { select: { name: true } } } } },
+    })
+    if (invoices.length === 0) break
+    const result = await algolia.bulkIndexInvoices(invoices.map((inv) => ({
+      objectID:       inv.id,
+      studentName:    `${inv.student.firstName} ${inv.student.lastName}`,
+      registrationNo: inv.student.registrationNo,
+      status:         inv.status,
+      academicYear:   inv.academicYear,
+      term:           inv.term,
+      className:      inv.student.class?.name ?? null,
+      dueDate:        inv.dueDate.toISOString(),
+      balance:        Number(inv.balance),
+      createdAt:      inv.createdAt.toISOString(),
+    })))
+    if (!result.configured) return result
+    if (result.error) return result
+    totalIndexed += result.indexed
+    cursor = invoices[invoices.length - 1]!.id
+    if (invoices.length < BATCH_SIZE) break
+  }
+  return { indexed: totalIndexed, configured: true }
 }
 
 export async function getFinanceSummary(academicYear: string, term: number) {

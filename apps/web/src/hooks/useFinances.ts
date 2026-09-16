@@ -40,6 +40,18 @@ export function useFinanceSummary(academicYear: string, term: number) {
   })
 }
 
+// [ALGOLIA ROLLOUT — Tier 2 item 7, stopgap] GET /finances/invoices used to
+// return an unbounded-by-consumer-expectation raw array capped at a
+// hardcoded `take: 100` server-side — the same silent-truncation bug class
+// as the original User Management item. The route now paginates properly
+// (real total/page/pages), so this hook loops every page and concatenates,
+// preserving its existing `ApiInvoice[]` contract for both callers
+// (StudentFeeStructure.tsx, InvoicesTab.tsx) rather than pushing a
+// pagination-envelope shape change out to them. Same stopgap-not-endgame
+// note as useUsers() in useAdmin.ts: once InvoicesTab's search/filter/sort
+// move to querying the `invoices` Algolia index directly, this should go
+// back to fetching one page at a time and let Algolia own pagination.
+interface ApiInvoicePage { invoices: ApiInvoice[]; total: number; page: number; pages: number }
 export function useInvoices(
   filters: { academicYear?: string; term?: number; status?: string; studentId?: string } = {},
   enabled = true
@@ -50,7 +62,20 @@ export function useInvoices(
   })
   return useQuery({
     queryKey: queryKeys.finances.invoices(filters),
-    queryFn: () => apiFetch<ApiInvoice[]>(`/finances/invoices?${params}`),
+    queryFn: async () => {
+      const allInvoices: ApiInvoice[] = []
+      let page = 1
+      for (;;) {
+        const query = new URLSearchParams(params)
+        query.set('page', String(page))
+        query.set('pageSize', '200')
+        const result = await apiFetch<ApiInvoicePage>(`/finances/invoices?${query}`)
+        allInvoices.push(...result.invoices)
+        if (page >= result.pages) break
+        page++
+      }
+      return allInvoices
+    },
     enabled,
   })
 }

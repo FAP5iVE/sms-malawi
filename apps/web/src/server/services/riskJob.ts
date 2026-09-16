@@ -28,6 +28,21 @@
  *   path back in — e.g. a dedicated `RiskAssessment` table — remains out
  *   of scope.
  *
+ * [CHANGE TYPE]: TARGETED EDIT [ALGOLIA ROLLOUT — Tier 1 item 3]
+ *   R5's "persistence path back in remains out of scope" note above no
+ *   longer applies. Persisting weekly-computed riskLevel back to Postgres
+ *   was the wrong call (see R5's own reasoning — nothing kept a column in
+ *   sync, hence removing it), but that reasoning doesn't apply to Algolia:
+ *   this job already recomputes riskLevel for every active student every
+ *   Monday regardless of whether anything reads it, so pushing that same
+ *   value into the students index via partialUpdateObject is free
+ *   (already-computed data, one more await per student in the same batch)
+ *   and turns riskLevel into a genuinely useful instant facet
+ *   ("show me all HIGH-risk students") without recreating the Postgres
+ *   integrity trap R5 removed — Algolia is explicitly a cache/derived-data
+ *   store here, not a system of record, so a value that's "correct as of
+ *   last Monday" is the expected shape, not a bug.
+ *
  * Weekly cron job that computes risk levels for all active students.
  *
  * Triggered by:
@@ -41,6 +56,7 @@ import 'server-only'
 import { prisma }            from '@/lib/prisma'
 import { logger }            from '@/lib/logger'
 import { assessStudentRisk } from '@/server/services/riskService'
+import * as algolia          from '@/server/services/algoliaService'
 
 const CONCURRENT_LIMIT = 10
 
@@ -63,6 +79,12 @@ export async function runRiskAssessmentJob(
         try {
           const { riskLevel } = await assessStudentRisk(s.id, academicTerm, academicYear)
           logger.info({ event: 'risk-job.student-assessed', studentId: s.id, riskLevel })
+          // [ALGOLIA ROLLOUT — Tier 1 item 3] see header comment — Algolia,
+          // not Postgres, is the persistence layer for this derived value.
+          // Fire-and-forget like every other algolia.* call site in this
+          // codebase: a failed push here just means this one student's
+          // riskLevel facet is stale until next Monday, not a job failure.
+          void algolia.updateStudent({ objectID: s.id, riskLevel })
           processed++
         } catch (err) {
           logger.error({ event: 'risk-job.student-error', studentId: s.id, err })

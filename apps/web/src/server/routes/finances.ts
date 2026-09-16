@@ -295,8 +295,13 @@ financesRouter.patch(
 )
 
 // ── INVOICES
+// [ALGOLIA ROLLOUT — Tier 2 item 7] Was hardcoded to `take: 100` with no
+// pagination at all — the same silent-truncation bug class as the
+// original User Management item (invoices past the 100th just never
+// appeared, no error). Real page/pageSize now, same shape as
+// applicationService.listApplications()'s envelope.
 financesRouter.get('/invoices', verifyAuth, requireRole([...FINANCE_ROLES]), async (req, res) => {
-  const { studentId, academicYear, term, status } = req.query
+  const { studentId, academicYear, term, status, page, pageSize } = req.query
   const where: Prisma.InvoiceWhereInput = {}
   if (studentId) where.studentId = String(studentId)
   if (academicYear) where.academicYear = String(academicYear)
@@ -304,20 +309,33 @@ financesRouter.get('/invoices', verifyAuth, requireRole([...FINANCE_ROLES]), asy
   // Cast to InvoiceStatus enum directly — NOT InvoiceWhereInput['status']
   // because that indexed type includes undefined which violates exactOptionalPropertyTypes
   if (status) where.status = String(status) as InvoiceStatus
-  const invoices = await prisma.invoice.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    take: 100,
-    // [R9] Joined student name — the frontend never resolves a raw
-    // studentId to a name itself (InvoicesTab.tsx's "Student" column).
-    // [PRODUCTION FIX] lineItems included — the payment modal needs each
-    // fee type's own balance to build the allocation table.
-    include: {
-      student: { select: { firstName: true, lastName: true } },
-      lineItems: true,
-    },
+
+  const safePageSize = Math.min(Math.max(Number(pageSize) || 50, 1), 200)
+  const safePage     = Math.max(Number(page) || 1, 1)
+
+  const [invoices, total] = await Promise.all([
+    prisma.invoice.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (safePage - 1) * safePageSize,
+      take: safePageSize,
+      // [R9] Joined student name — the frontend never resolves a raw
+      // studentId to a name itself (InvoicesTab.tsx's "Student" column).
+      // [PRODUCTION FIX] lineItems included — the payment modal needs each
+      // fee type's own balance to build the allocation table.
+      include: {
+        student: { select: { firstName: true, lastName: true } },
+        lineItems: true,
+      },
+    }),
+    prisma.invoice.count({ where }),
+  ])
+  res.json({
+    invoices: serializeDecimals(invoices),
+    total,
+    page:  safePage,
+    pages: Math.max(Math.ceil(total / safePageSize), 1),
   })
-  res.json(serializeDecimals(invoices))
 })
 
 // [PRODUCTION FIX] Single-invoice fetch with line items — needed when

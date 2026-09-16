@@ -52,6 +52,7 @@ import { prisma }            from '@/lib/prisma'
 import { sendEmail }         from '@/lib/email'
 import { logger }            from '@/lib/logger'
 import * as auditService     from '@/server/services/auditService'
+import * as algolia          from '@/server/services/algoliaService'
 import { getSchoolBranding } from '@/server/services/notificationService'
 import { renderApplicationReceived } from '@/server/templates/emails/application-received'
 import type { ApplicationInput } from '@shared/schemas/student'
@@ -103,6 +104,31 @@ function buildApplicationCreateData(data: ApplicationInput) {
     guardianAddress:   data.guardianAddress ?? null,
     applyingForForm:   FORM_LEVEL_BY_CLASS_APPLYING[data.classApplying],
     status:            'PENDING' as const,
+  }
+}
+
+// [ALGOLIA ROLLOUT — Tier 1 item 6] Shared by both create paths (public +
+// internal) and by the admin seed route — one mapping from an Application
+// Prisma row to the search record, instead of duplicating the field list
+// at every call site.
+function toAlgoliaApplication(application: {
+  id: string; firstName: string; lastName: string; otherNames: string | null
+  guardianName: string; previousSchool: string | null; status: string
+  applyingForForm: number; academicYear: string | null; sex: string; createdAt: Date
+}): algolia.AlgoliaApplication {
+  return {
+    objectID:        application.id,
+    firstName:       application.firstName,
+    lastName:        application.lastName,
+    otherNames:      application.otherNames ?? null,
+    fullName:        `${application.firstName} ${application.lastName}`,
+    guardianName:    application.guardianName,
+    previousSchool:  application.previousSchool ?? null,
+    status:          application.status,
+    applyingForForm: application.applyingForForm,
+    academicYear:    application.academicYear ?? null,
+    sex:             application.sex,
+    createdAt:       application.createdAt.toISOString(),
   }
 }
 
@@ -200,6 +226,7 @@ export async function createPublicApplication(data: ApplicationInput) {
   const application = await prisma.application.create({
     data: buildApplicationCreateData(data),
   })
+  void algolia.indexApplication(toAlgoliaApplication(application))
 
   // ── Confirmation emails (fire-and-forget) — rendered via the shared
   // application-received template, not inline HTML strings.
@@ -247,15 +274,29 @@ export async function createPublicApplication(data: ApplicationInput) {
 // ─────────────────────────────────────────────────────────
 
 export async function createApplication(data: ApplicationInput) {
-  return prisma.application.create({
+  const application = await prisma.application.create({
     data: buildApplicationCreateData(data),
   })
+  void algolia.indexApplication(toAlgoliaApplication(application))
+  return application
+}
+
+// [ALGOLIA ROLLOUT — Tier 1 item 6] Bulk seed, same pattern as the other
+// entities' seed routes — called from algoliaAdmin.ts.
+export async function seedAllApplicationsToAlgolia(): Promise<algolia.BulkIndexResult> {
+  const applications = await prisma.application.findMany({
+    select: {
+      id: true, firstName: true, lastName: true, otherNames: true, guardianName: true,
+      previousSchool: true, status: true, applyingForForm: true, academicYear: true,
+      sex: true, createdAt: true,
+    },
+  })
+  return algolia.bulkIndexApplications(applications.map(toAlgoliaApplication))
 }
 
 // ─────────────────────────────────────────────────────────
 //  STATUS UPDATE — approve / deny / mark awaiting admission
 // ─────────────────────────────────────────────────────────
-
 export async function updateApplicationStatus(
   id:        string,
   status:    'APPROVED' | 'DENIED' | 'AWAITING_ADMISSION',
@@ -290,6 +331,8 @@ export async function updateApplicationStatus(
       context: notes ? { notes } : undefined,
     },
   })
+
+  void algolia.updateApplication({ objectID: id, status })
 
   return updated
 }

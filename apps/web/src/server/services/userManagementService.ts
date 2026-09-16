@@ -48,6 +48,7 @@ import { prisma } from '@/lib/prisma'
 import { clearTokensForUser } from '@/lib/push'
 import { generateTempPassword } from '@/lib/tempPassword'
 import { sendEmail } from '@/lib/email'
+import * as algolia from '@/server/services/algoliaService'
 import type { CreateUserInput, NotificationPrefInput } from '@shared/schemas/admin'
 import type { UserRole } from '@shared/types/roles'
 
@@ -129,6 +130,41 @@ export async function createUser(data: CreateUserInput, actorUid: string) {
     )
   }
   logger.info({ event: 'user.created', uid: userRecord.uid, role: data.role, subtitle, actorUid })
+
+  // [ALGOLIA ROLLOUT — Tier 1 item 2] employeeNo/registrationNo aren't known
+  // at this point without an extra lookup (data only carries staffId/
+  // studentId, not the display identifiers listUsers() later joins in) —
+  // fire-and-forget resolve + index rather than blocking account creation
+  // on it; a failure here just means this one account is briefly missing
+  // from search until the next seed run, same fallback story every other
+  // void algolia.* call in this codebase already relies on.
+  void (async () => {
+    let employeeNo: string | null = null
+    let registrationNo: string | null = null
+    if (data.staffId) {
+      const sp = await prisma.staffProfile.findUnique({ where: { id: data.staffId }, select: { employeeNo: true } })
+      employeeNo = sp?.employeeNo ?? null
+    }
+    if (data.studentId) {
+      const st = await prisma.student.findUnique({ where: { id: data.studentId }, select: { registrationNo: true } })
+      registrationNo = st?.registrationNo ?? null
+    }
+    await algolia.indexUserAccount({
+      objectID:               userRecord.uid,
+      displayName:            data.displayName,
+      email:                  data.email,
+      role:                   data.role,
+      disabled:               false,
+      requiresPasswordChange: true,
+      createdAt:              userRecord.metadata.creationTime,
+      lastSignIn:             userRecord.metadata.lastSignInTime ?? null,
+      employeeNo,
+      registrationNo,
+      staffProfileId:         data.staffId ?? null,
+      studentId:              data.studentId ?? null,
+    })
+  })()
+
   return { uid: userRecord.uid, email: data.email, role: data.role, subtitle }
 }
 
@@ -172,11 +208,47 @@ export async function listUsers(pageToken?: string) {
   }
 }
 
+// ─── ALGOLIA BULK SEED ───────────────────────────────────
+// [ALGOLIA ROLLOUT — Tier 1 item 2] Deliberately loops every Firebase
+// listUsers() page via pageToken until exhausted, rather than the single
+// call the Accounts tab's own useUsers() makes — this is the seed path,
+// so it must not reproduce the exact "only the first 100" bug this whole
+// item exists to fix. Called from the admin seed route (algoliaAdmin.ts),
+// same pattern as seed-students/seed-staff/seed-books.
+export async function seedAllUserAccountsToAlgolia(): Promise<algolia.BulkIndexResult> {
+  let pageToken: string | undefined
+  let totalIndexed = 0
+  do {
+    const page = await listUsers(pageToken)
+    const records = page.users.map((u) => ({
+      objectID:               u.uid,
+      displayName:            u.displayName ?? null,
+      email:                  u.email ?? null,
+      role:                   u.role ?? null,
+      disabled:               u.disabled,
+      requiresPasswordChange: u.requiresPasswordChange,
+      createdAt:              u.createdAt ?? null,
+      lastSignIn:             u.lastSignIn ?? null,
+      employeeNo:             u.employeeNo,
+      registrationNo:         u.registrationNo,
+      staffProfileId:         u.staffProfileId,
+      studentId:              u.studentId,
+    }))
+    const result = await algolia.bulkIndexUserAccounts(records)
+    if (!result.configured) return result   // Algolia not configured — bail out on the first page, nothing to gain from looping.
+    if (result.error) return result
+    totalIndexed += result.indexed
+    pageToken = page.pageToken
+  } while (pageToken)
+  return { indexed: totalIndexed, configured: true }
+}
+
 // ─── UPDATE ROLE ─────────────────────────────────────────
 export async function updateUserRole(uid: string, role: UserRole, actorUid: string) {
   const existing = await getAuth().getUser(uid)
   await getAuth().setCustomUserClaims(uid, { ...existing.customClaims, role })
   logger.info({ event: 'user.role_updated', uid, role, actorUid })
+  void algolia.updateUserAccount({ objectID: uid, role })
   return { uid, role }
 }
 
@@ -190,6 +262,7 @@ export async function toggleUserDisabled(uid: string, disabled: boolean, actorUi
     await clearTokensForUser(uid)
   }
   logger.info({ event: disabled ? 'user.disabled' : 'user.enabled', uid, actorUid })
+  void algolia.updateUserAccount({ objectID: uid, disabled })
 }
 
 // ─── CLEAR PASSWORD-CHANGE-REQUIRED FLAG ─────────────────
@@ -211,6 +284,7 @@ export async function clearPasswordChangeRequirement(uid: string): Promise<void>
     requiresPasswordChange: false,
   })
   logger.info({ event: 'user.passwordChangeCleared', uid })
+  void algolia.updateUserAccount({ objectID: uid, requiresPasswordChange: false })
 }
 
 // ─── RESET PASSWORD ──────────────────────────────────────

@@ -127,6 +127,9 @@ export async function updateBook(id: string, data: import('@shared/schemas/libra
     category:        book.category,
     availableCopies: book.availableCopies,
     totalCopies:     book.totalCopies,
+    publisher:       book.publisher ?? null,
+    publishedYear:   book.publishedYear ?? null,
+    shelf:           book.shelf ?? null,
   })
   return book
 }
@@ -217,6 +220,9 @@ export async function createBook(data: CreateBookInput, actorUid: string) {
     category:       book.category,
     totalCopies:    book.totalCopies,
     availableCopies: book.availableCopies,
+    publisher:      book.publisher ?? null,
+    publishedYear:  book.publishedYear ?? null,
+    shelf:          book.shelf ?? null,
   })
   return book
 }

@@ -57,6 +57,7 @@ import { logger } from '@/lib/logger'
 import { sendBatchEmails } from '@/lib/email'
 import * as notificationService from '@/server/services/notificationService'
 import * as notificationFeedService from '@/server/services/notificationFeedService'
+import * as algolia from '@/server/services/algoliaService'
 import { deriveAudience } from '@shared/schemas/announcement'
 import type { AnnouncementPostType } from '@shared/schemas/announcement'
 import { COLLECTIONS } from '@shared/constants/storage'
@@ -399,6 +400,18 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
     updatedAt: Timestamp.now(),
   })
 
+  // [ALGOLIA ROLLOUT — Tier 2 item 8] Firestore-backed, so the sync call
+  // goes right here at the write site rather than a Prisma create hook.
+  void algolia.indexAnnouncement({
+    objectID:    ref.id,
+    title:       data.title,
+    status,
+    postType,
+    targetRoles: targetRoles ?? [],
+    eventDate:   data.eventDate ?? null,
+    createdAt:   new Date().toISOString(),
+  })
+
   if (status === 'PUBLISHED') {
     // [BE-005] Not awaited — see this function's own note above. The
     // Firestore write above is what the client is actually waiting to
@@ -464,6 +477,15 @@ export async function createDraft(data: DraftInput, createdByUid: string, create
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   })
+  void algolia.indexAnnouncement({
+    objectID:    ref.id,
+    title:       data.title ?? '',
+    status:      'DRAFT',
+    postType:    data.postType ?? 'ANNOUNCEMENT',
+    targetRoles: data.targetRoles ?? [],
+    eventDate:   data.eventDate ?? null,
+    createdAt:   new Date().toISOString(),
+  })
   return { id: ref.id, status: 'DRAFT' as const }
 }
 
@@ -493,6 +515,18 @@ export async function updateDraft(id: string, uid: string, data: DraftInput) {
   if (data.postType !== undefined) update.postType = data.postType
 
   await ref.update(update)
+  // [ALGOLIA ROLLOUT — Tier 2 item 8] Only push the fields this index
+  // actually cares about — most DraftInput fields (body, imageKey, etc.)
+  // have no facet/searchable counterpart, no need to round-trip them.
+  if (data.title !== undefined || data.postType !== undefined || data.targetRoles !== undefined || data.eventDate !== undefined) {
+    void algolia.updateAnnouncement({
+      objectID:    id,
+      ...(data.title       !== undefined ? { title: data.title } : {}),
+      ...(data.postType    !== undefined ? { postType: data.postType } : {}),
+      ...(data.targetRoles !== undefined ? { targetRoles: data.targetRoles } : {}),
+      ...(data.eventDate   !== undefined ? { eventDate: data.eventDate } : {}),
+    })
+  }
   return { id, status: 'DRAFT' as const }
 }
 
@@ -568,6 +602,15 @@ export async function publishDraft(
     })
   }
 
+  void algolia.updateAnnouncement({
+    objectID:    id,
+    title:       data.title,
+    status,
+    postType,
+    targetRoles: targetRoles ?? [],
+    eventDate:   data.eventDate ?? null,
+  })
+
   return { id, title: data.title, body, status }
 }
 
@@ -599,6 +642,8 @@ export async function publishAnnouncement(id: string, approvedByUid: string) {
     publicWebsite: (existing.publicWebsite as boolean | undefined) ?? false,
   })
 
+  void algolia.updateAnnouncement({ objectID: id, status: 'PUBLISHED' })
+
   return { id, status: 'PUBLISHED' }
 }
 
@@ -629,6 +674,8 @@ export async function rejectAnnouncement(id: string, rejectedByUid: string, reas
     rejectedAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   })
+
+  void algolia.updateAnnouncement({ objectID: id, status: 'REJECTED' })
 
   return { id, status: 'REJECTED' }
 }
@@ -678,6 +725,7 @@ export async function promoteDueScheduled(): Promise<{ promoted: number }> {
       createdByUid: data.createdByUid as string,
       publicWebsite: (data.publicWebsite as boolean | undefined) ?? false,
     })
+    void algolia.updateAnnouncement({ objectID: doc.id, status: 'PUBLISHED' })
     promoted++
   }
 
@@ -708,6 +756,45 @@ export async function listAnnouncements(options?: {
     announcements: docs.map((d) => ({ id: d.id, ...d.data() })),
     hasMore,
   }
+}
+
+// [ALGOLIA ROLLOUT — Tier 2 item 8] Bulk seed. Firestore-backed, so this
+// pages through the collection directly rather than a Prisma findMany —
+// same idea as every other seed function, different data source. Firestore
+// Timestamp fields need converting to ISO strings; a doc with no createdAt
+// at all (shouldn't happen, but Firestore has no schema enforcement) falls
+// back to epoch rather than throwing, so one bad doc doesn't fail the batch.
+export async function seedAllAnnouncementsToAlgolia(): Promise<algolia.BulkIndexResult> {
+  const db = getFirestore(getAdminApp())
+  const PAGE_SIZE = 500
+  let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | undefined
+  let totalIndexed = 0
+  for (;;) {
+    let query: Query<DocumentData> = db.collection(COLLECTIONS.ANNOUNCEMENTS).orderBy('__name__').limit(PAGE_SIZE)
+    if (lastDoc) query = query.startAfter(lastDoc)
+    const snap = await query.get()
+    if (snap.empty) break
+    const records: algolia.AlgoliaAnnouncement[] = snap.docs.map((d) => {
+      const data = d.data() as DocumentData
+      const createdAt = data.createdAt as Timestamp | undefined
+      return {
+        objectID:    d.id,
+        title:       (data.title as string) ?? '',
+        status:      (data.status as string) ?? 'DRAFT',
+        postType:    (data.postType as string) ?? 'ANNOUNCEMENT',
+        targetRoles: (data.targetRoles as string[] | undefined) ?? [],
+        eventDate:   (data.eventDate as string | null | undefined) ?? null,
+        createdAt:   createdAt ? createdAt.toDate().toISOString() : new Date(0).toISOString(),
+      }
+    })
+    const result = await algolia.bulkIndexAnnouncements(records)
+    if (!result.configured) return result
+    if (result.error) return result
+    totalIndexed += result.indexed
+    lastDoc = snap.docs[snap.docs.length - 1]
+    if (snap.docs.length < PAGE_SIZE) break
+  }
+  return { indexed: totalIndexed, configured: true }
 }
 
 // ─── SERVER-SIDE VIEWER READS (N2) ─────────────────────────

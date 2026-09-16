@@ -43,6 +43,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import * as auditService from '@/server/services/auditService'
+import * as algolia from '@/server/services/algoliaService'
 import * as notificationService from '@/server/services/notificationService'
 import { resolveStudentFromUid } from '@/server/services/studentService'
 import {
@@ -104,6 +105,30 @@ const placementInclude = {
 } as const
 
 type RawPlacement = Prisma.UniversityPlacementGetPayload<{ include: typeof placementInclude }>
+
+// [ALGOLIA ROLLOUT — Tier 1/2 item 10] Resolves a display name for the
+// university/programme the same way notifyPlacementOutcome() already does:
+// the free-text field when this was an off-catalogue entry, else a
+// catalogue lookup by id. Shared here so the four call sites below (claim
+// submit/approve/reject, staff entry) and the bulk seed route build this
+// the same way.
+function toAlgoliaPlacement(raw: RawPlacement): algolia.AlgoliaPlacement {
+  const universityName =
+    raw.placedUniversityName ?? (raw.placedUniversityId ? findUniversity(raw.placedUniversityId)?.name : undefined) ?? null
+  const programmeName =
+    raw.placedProgrammeName ??
+    (raw.placedUniversityId && raw.placedProgrammeId ? findProgram(raw.placedUniversityId, raw.placedProgrammeId)?.name : undefined) ??
+    null
+  return {
+    objectID:             raw.id,
+    studentName:          `${raw.student.firstName} ${raw.student.lastName}`,
+    placedUniversityName: universityName,
+    placedProgrammeName:  programmeName,
+    admissionYear:        raw.admissionYear ?? null,
+    status:               raw.status,
+    entrySource:          raw.entrySource,
+  }
+}
 
 /**
  * Batch-resolve a set of Firebase UIDs (recordedByUid / verifiedByUid) to
@@ -255,6 +280,7 @@ export async function submitClaim(firebaseUid: string, input: StudentClaimInput)
   })
   logger.info({ event: 'placement.claim.submitted', placementId: updated.id, studentId: student.id })
 
+  void algolia.indexPlacement(toAlgoliaPlacement(updated))
   return mapPlacementRecord(updated, await resolveStaffNames([updated.recordedByUid, updated.verifiedByUid]))
 }
 
@@ -394,6 +420,7 @@ export async function recordStaffPlacement(
   logger.info({ event: 'placement.staffEntry.recorded', placementId: updated.id, actorUid })
 
   await notifyPlacementOutcome(updated.id, 'Confirmed')
+  void algolia.indexPlacement(toAlgoliaPlacement(updated))
   return mapPlacementRecord(updated, await resolveStaffNames([updated.recordedByUid, updated.verifiedByUid]))
 }
 
@@ -455,6 +482,7 @@ export async function approveClaim(id: string, actorUid: string, actorRole: User
   logger.info({ event: 'placement.claim.approved', placementId: id, actorUid })
 
   await notifyPlacementOutcome(id, 'Confirmed')
+  void algolia.indexPlacement(toAlgoliaPlacement(updated))
   return mapPlacementRecord(updated, await resolveStaffNames([updated.recordedByUid, updated.verifiedByUid]))
 }
 
@@ -487,6 +515,7 @@ export async function rejectClaim(
   logger.info({ event: 'placement.claim.rejected', placementId: id, actorUid })
 
   await notifyPlacementOutcome(id, 'Rejected', input.reason)
+  void algolia.indexPlacement(toAlgoliaPlacement(updated))
   return mapPlacementRecord(updated, await resolveStaffNames([updated.recordedByUid, updated.verifiedByUid]))
 }
 
@@ -536,6 +565,17 @@ async function notifyPlacementOutcome(
   } catch (err) {
     logger.error({ err, placementId }, '[placementService] placement-update notification failed')
   }
+}
+
+// [ALGOLIA ROLLOUT — Tier 1/2 item 10] Bulk seed — same pattern as the
+// other entities. Indexes every placement (all statuses), not just
+// CONFIRMED ones, since the staff Claims Verification Desk needs to search
+// PENDING_APPROVAL/REJECTED records too — the public registry page's own
+// query is responsible for filtering to status:CONFIRMED, this index does
+// not enforce that split.
+export async function seedAllPlacementsToAlgolia(): Promise<algolia.BulkIndexResult> {
+  const raws = await prisma.universityPlacement.findMany({ include: placementInclude })
+  return algolia.bulkIndexPlacements(raws.map(toAlgoliaPlacement))
 }
 
 // ─────────────────────────────────────────────────────────
