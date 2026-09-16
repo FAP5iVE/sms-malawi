@@ -100,6 +100,22 @@ export function useUploadDigitalResource() {
   })
 }
 
+// [FIX] The Digital Library tab could show a "Pending Approval" badge
+// (r.approved === false) but had no way for anyone to actually approve
+// it — PATCH /library/digital/:id/approve already existed and is
+// already granted to the library role (library.approveDigitalResource),
+// it just had no hook or button calling it anywhere. Library staff are
+// the intended approval authority per that permission grant; this is
+// what was actually missing, not a permissions-matrix gap.
+export function useApproveDigitalResource() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (resourceId: string) => apiFetch(`/library/digital/${resourceId}/approve`, { method: 'PATCH', body: JSON.stringify({}) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
+    onError: (err) => { console.error('[useApproveDigitalResource] failed', err) },
+  })
+}
+
 export function useIssueBorrowing() {
   const qc = useQueryClient()
   return useMutation({

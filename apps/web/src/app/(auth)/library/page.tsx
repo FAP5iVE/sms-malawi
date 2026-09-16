@@ -79,6 +79,7 @@ import {
   useArchiveBook,
   useCreateBook,
   useUploadDigitalResource,
+  useApproveDigitalResource,
   useCatalogReportStats,
   useConditionReport,
   useFines,
@@ -1355,6 +1356,7 @@ function LibraryContent() {
   const createFineWaiver      = useCreateFineWaiver()
   const approveFineWaiver     = useApproveFineWaiver()
   const rejectFineWaiver      = useRejectFineWaiver()
+  const approveDigitalResource = useApproveDigitalResource()
 
   const s = stats as ApiLibraryStats | undefined
 
@@ -2154,6 +2156,23 @@ function LibraryContent() {
                       <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
                         Pending Approval
                       </span>
+                    )}
+                    {/* [FIX] "library staff are the approval authority" —
+                        library.approveDigitalResource was already granted
+                        to the library role and PATCH /digital/:id/approve
+                        already worked; this button (and the hook behind
+                        it) is the only piece that was actually missing. */}
+                    {!r.approved && (
+                      <PermissionGuard permission="library.approveDigitalResource">
+                        <button
+                          type="button"
+                          onClick={() => approveDigitalResource.mutate(r.id)}
+                          disabled={approveDigitalResource.isPending}
+                          className="block mt-1.5 text-xs font-semibold text-brand-teal underline disabled:opacity-50"
+                        >
+                          {approveDigitalResource.isPending ? 'Approving…' : 'Approve'}
+                        </button>
+                      </PermissionGuard>
                     )}
                   </div>
                   {(r.approved || isLibStaff) && (
