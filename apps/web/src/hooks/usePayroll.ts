@@ -96,6 +96,28 @@ export async function downloadPayslip(payslipId: string): Promise<void> {
   }
 }
 
+/**
+ * [BUGFIX — ERR-5 / ERR-6 / ERR-7, 2026-09-16] Mutation wrapper around
+ * downloadPayslip(). The toast.error() above already surfaces a failure
+ * (a prior fix), but the "View Payslip" buttons calling downloadPayslip()
+ * directly (MyPayTab.tsx, PayrollRunsTab.tsx) had no pending/disabled
+ * state at all — nothing visibly happens between the click and the toast
+ * (or the new tab opening), so on a slow connection, or on a
+ * seeded/demo payslip with no real file behind it (a permanent 404, so
+ * every click fails the same way), users click it repeatedly. Sentry
+ * recorded this as "Rage Click" on this exact button, twice, right
+ * alongside the "Payslip PDF not ready" ApiError itself. useMutation's
+ * isPending + variables (the payslipId just clicked) let a specific row's
+ * button disable itself and show "Opening…" immediately on click, closing
+ * the feedback gap that caused the rage-clicking rather than just
+ * reacting to it after the fact.
+ */
+export function useDownloadPayslip() {
+  return useMutation({
+    mutationFn: (payslipId: string) => downloadPayslip(payslipId),
+  })
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SALARY STRUCTURE & ALLOWANCES — staff picker
 // ─────────────────────────────────────────────────────────────────────────────

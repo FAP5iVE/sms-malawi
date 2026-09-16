@@ -69,7 +69,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import {
   usePayrollHistory, useRunWindowStatus, usePayrollRunDetail,
   useRunPayroll, useSubmitPayrollForApproval, useApprovePayrollRun,
-  useLockPayrollRun, useRollbackPayrollRun, useDiscardStuckRun, downloadPayslip,
+  useLockPayrollRun, useRollbackPayrollRun, useDiscardStuckRun, useDownloadPayslip,
 } from '@/hooks/usePayroll'
 import { DataTable, type DataColumn } from '@/components/shared/DataTable'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -369,6 +369,9 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
 
 function RunDetailModal({ runId, onClose }: { runId: string; onClose: () => void }) {
   const { data: run, isLoading } = usePayrollRunDetail(runId)
+  // [BUGFIX — ERR-5 / ERR-6 / ERR-7] see useDownloadPayslip()'s own header
+  // comment in usePayroll.ts — same fix as MyPayTab.tsx's identical button.
+  const downloadPayslipMutation = useDownloadPayslip()
 
   const columns: DataColumn<ApiPayslip>[] = [
     { key: 'staffName', label: 'Staff Member', priority: 'critical' },
@@ -379,15 +382,22 @@ function RunDetailModal({ runId, onClose }: { runId: string; onClose: () => void
     { key: 'netSalary', label: 'Net Pay', priority: 'critical', render: (p) => <span className="font-semibold text-brand-teal">{formatMWK(p.netSalary)}</span> },
     {
       key: 'id', label: 'Payslip', priority: 'important',
-      render: (p) => (
-        <button
-          type="button"
-          onClick={() => downloadPayslip(p.id)}
-          className="inline-flex items-center gap-1.5 text-xs font-heading font-semibold text-brand-navy hover:underline"
-        >
-          <Download className="w-3.5 h-3.5" aria-hidden /> View
-        </button>
-      ),
+      render: (p) => {
+        const isDownloading = downloadPayslipMutation.isPending && downloadPayslipMutation.variables === p.id
+        return (
+          <button
+            type="button"
+            onClick={() => downloadPayslipMutation.mutate(p.id)}
+            disabled={isDownloading}
+            aria-busy={isDownloading}
+            className="inline-flex items-center gap-1.5 text-xs font-heading font-semibold text-brand-navy hover:underline disabled:opacity-60 disabled:pointer-events-none"
+          >
+            {isDownloading
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> Opening…</>
+              : <><Download className="w-3.5 h-3.5" aria-hidden /> View</>}
+          </button>
+        )
+      },
     },
   ]
 

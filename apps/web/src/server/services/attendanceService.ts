@@ -31,7 +31,7 @@ import 'server-only'
 
 import { prisma }        from '@/lib/prisma'
 import * as auditService from '@/server/services/auditService'
-import { ACADEMIC_TERMS } from '@shared/constants/malawi'
+import { ACADEMIC_TERMS, parseAcademicYear } from '@shared/constants/malawi'
 import type { AttendanceEntryInput } from '@shared/schemas/student'
 import type { UserRole } from '@shared/types/roles'
 
@@ -140,13 +140,43 @@ export interface TermAttendanceSummary {
 /** Resolves an academicYear ("2025/2026") + term (1|2|3) to a real
  *  [start, end] calendar date range using ACADEMIC_TERMS' month/day
  *  boundaries. Term 1 falls in the first calendar year of academicYear;
- *  Terms 2 and 3 fall in the second (the academic year spans Sept–July). */
+ *  Terms 2 and 3 fall in the second (the academic year spans Sept–July).
+ *
+ *  [BUGFIX — ERR-4, 2026-09-16] This used to parse academicYear itself via
+ *  a bare `academicYear.split('/')`, with no validation — a malformed or
+ *  unresolved value (e.g. the settings row for
+ *  SETTING_KEYS.CURRENT_ACADEMIC_YEAR never having been configured, or a
+ *  caller passing something that isn't "YYYY/YYYY") silently produced
+ *  `Number(undefined)` → NaN → `new Date("NaN-09-01...")` → an Invalid
+ *  Date object, which was then handed straight to
+ *  `prisma.attendance.groupBy()`'s `where.date.gte/lte` and blew up as an
+ *  opaque PrismaClientValidationError deep inside Prisma's runtime,
+ *  instead of a clear error at the point the bad input was actually
+ *  introduced. `parseAcademicYear()` (shared/constants/malawi/academic.ts)
+ *  already exists to do exactly this validation — its own header comment
+ *  says it throws on a malformed value "rather than silently producing
+ *  NaN" — but this function had its own unvalidated copy of the same
+ *  parsing logic instead of calling it. Re-thrown here with `{ status:
+ *  400 }` so it reaches the client as an actionable message instead of a
+ *  generic 500 (see hrService.ts's applyForLeave() for the identical
+ *  status-tagging convention). `term` is now validated the same way —
+ *  previously any value other than 1 or 2 silently fell through to Term
+ *  3's date range. */
 export function getTermDateRange(academicYear: string, term: number): { start: Date; end: Date } {
-  const [firstYearStr, secondYearStr] = academicYear.split('/')
-  const firstYear  = Number(firstYearStr)
-  const secondYear = Number(secondYearStr)
-  const year = term === 1 ? firstYear : secondYear
+  let startYear: number, endYear: number
+  try {
+    ;({ startYear, endYear } = parseAcademicYear(academicYear))
+  } catch (err) {
+    throw Object.assign(
+      new Error(err instanceof Error ? err.message : `Invalid academic year "${academicYear}".`),
+      { status: 400 },
+    )
+  }
+  if (term !== 1 && term !== 2 && term !== 3) {
+    throw Object.assign(new Error(`Invalid term "${term}" — expected 1, 2, or 3.`), { status: 400 })
+  }
 
+  const year = term === 1 ? startYear : endYear
   const termKey = term === 1 ? 'TERM_1' : term === 2 ? 'TERM_2' : 'TERM_3'
   const { start, end } = ACADEMIC_TERMS[termKey]
 

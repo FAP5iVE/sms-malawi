@@ -44,6 +44,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import { toast } from 'sonner'
 import {
   FileText,
   CheckCircle2,
@@ -302,7 +303,29 @@ export function BulkInvoiceGenerator() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const bulkGenerate = useBulkGenerateInvoices()
+  // [BUGFIX — ERR-10, 2026-09-16] `bulkGenerate` used to be one shared
+  // useMutation() instance for BOTH the dry-run preview call AND the real
+  // commit call. Two knock-on problems:
+  //   1. The "Preview Roster" button's spinner/label
+  //      (`bulkGenerate.isPending && !finalResult`) can't tell preview and
+  //      commit apart — finalResult isn't set until the commit *finishes*,
+  //      so while a commit is in flight this condition is also true, and
+  //      the button behind the still-open ConfirmDialog flips back to
+  //      "Running preview…". That's the "goes back to the same review
+  //      loading state" you saw — it's not actually re-running the
+  //      preview, it's the commit's own pending state being misread as a
+  //      preview.
+  //   2. commit() had no re-entrancy guard, and ConfirmDialog's Confirm
+  //      button (see below) had no pending state of its own — clicking it
+  //      did nothing visible until the request resolved, so a user
+  //      unsure whether the click registered had nothing to stop them
+  //      clicking it again, firing a second concurrent commit.
+  // Splitting into two independent mutations fixes both: each has its own
+  // isPending, so the preview button can no longer be confused by the
+  // commit's state, and commit() below now checks commitMutation.isPending
+  // itself before doing anything.
+  const previewMutation = useBulkGenerateInvoices()
+  const commitMutation   = useBulkGenerateInvoices()
 
   function baseRequest(dryRun: boolean, studentIds?: string[]): BulkGenerateInvoicesInput {
     return {
@@ -322,7 +345,7 @@ export function BulkInvoiceGenerator() {
     setError(null)
     setFinalResult(null)
     try {
-      const result = await bulkGenerate.mutateAsync(baseRequest(true))
+      const result = await previewMutation.mutateAsync(baseRequest(true))
       setPreview(result)
       setSelected(
         new Set(result.students.filter((s) => s.outcome === 'CREATED').map((s) => s.studentId))
@@ -333,19 +356,23 @@ export function BulkInvoiceGenerator() {
   }
 
   async function commit() {
-    if (!preview) return
+    if (!preview || commitMutation.isPending) return
     setError(null)
     try {
       const studentIds = preview.students
         .filter((s) => s.outcome === 'CREATED' && selected.has(s.studentId))
         .map((s) => s.studentId)
-      const result = await bulkGenerate.mutateAsync(baseRequest(false, studentIds))
+      const result = await commitMutation.mutateAsync(baseRequest(false, studentIds))
       setFinalResult(result)
       setPreview(null)
       setConfirmOpen(false)
+      const createdCount = result.students.filter((s) => s.outcome === 'CREATED').length
+      toast.success(createdCount > 0 ? `${createdCount} invoice(s) generated.` : 'Invoice generation complete.')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Generation failed.')
+      const message = e instanceof Error ? e.message : 'Generation failed.'
+      setError(message)
       setConfirmOpen(false)
+      toast.error(message)
     }
   }
 
@@ -472,15 +499,15 @@ export function BulkInvoiceGenerator() {
         <button
           type="button"
           onClick={runPreview}
-          disabled={bulkGenerate.isPending || !academicYear}
+          disabled={previewMutation.isPending || commitMutation.isPending || !academicYear}
           className="inline-flex items-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy-light disabled:opacity-60"
         >
-          {bulkGenerate.isPending && !finalResult ? (
+          {previewMutation.isPending ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <Eye className="w-4 h-4" />
           )}
-          {bulkGenerate.isPending && !finalResult ? 'Running preview…' : 'Preview Roster'}
+          {previewMutation.isPending ? 'Running preview…' : 'Preview Roster'}
         </button>
       </div>
 
@@ -528,7 +555,7 @@ export function BulkInvoiceGenerator() {
             <button
               type="button"
               onClick={() => setConfirmOpen(true)}
-              disabled={selected.size === 0 || bulkGenerate.isPending}
+              disabled={selected.size === 0 || commitMutation.isPending}
               className="inline-flex items-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
             >
               <FileText className="w-4 h-4" />
@@ -585,7 +612,7 @@ export function BulkInvoiceGenerator() {
         </div>
       )}
 
-      {!preview && !finalResult && !bulkGenerate.isPending && (
+      {!preview && !finalResult && !previewMutation.isPending && !commitMutation.isPending && (
         <div className="text-center py-16 text-muted text-sm border border-dashed border-base rounded-xl">
           Configure the options above and click Preview Roster to see exactly who would be billed
           before generating anything.
@@ -597,8 +624,10 @@ export function BulkInvoiceGenerator() {
         title="Generate invoices?"
         description={`${selected.size} invoice(s) will be created for the selected students in ${selectedClassName}, Term ${term} ${academicYear}. This creates real financial records.`}
         confirmLabel={`Generate ${selected.size} Invoices`}
+        confirming={commitMutation.isPending}
+        confirmingLabel="Generating…"
         onConfirm={() => void commit()}
-        onCancel={() => setConfirmOpen(false)}
+        onCancel={() => { if (!commitMutation.isPending) setConfirmOpen(false) }}
       />
     </div>
   )

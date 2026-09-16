@@ -28,9 +28,10 @@
  */
 
 import { useState, useEffect }         from 'react'
+import { toast }                       from 'sonner'
 import { TrendingUp, TrendingDown, Scale, BookOpen } from 'lucide-react'
 import { ModuleTabs }                  from '@/components/shared/ModuleTabs'
-import { apiFetch }                    from '@/lib/api-client'
+import { apiFetch, ApiError }          from '@/lib/api-client'
 import { formatMWK }                   from '@shared/constants/malawi'
 import type {
   IncomeStatement,
@@ -210,14 +211,36 @@ function AccountLedgerPanel() {
   const [lines, setLines] = useState<LedgerLine[]>([])
   const [loading, setLoading] = useState(false)
 
+  // [BUGFIX — ERR-9, 2026-09-16] Two compounding issues:
+  //   1. `code` is a free-text input with no non-empty guard. Clearing it
+  //      (select-all + delete, then clicking Load Ledger — exactly what
+  //      the Sentry breadcrumbs for this show) produced a request to
+  //      `/finances/accounting/ledger/` — no code segment at all — which
+  //      doesn't match this app's `/ledger/:code` route and fell through
+  //      to the global "Route not found." 404 handler instead of ever
+  //      reaching accountingService.ts's real validation.
+  //   2. This function had no `.catch()` of its own, and its one caller
+  //      (the button below) doesn't await it either — so that 404 (or any
+  //      other failure) surfaced only as an unhandled promise rejection,
+  //      never shown to the person who clicked the button. Same silent-
+  //      failure shape as usePayroll.ts's downloadPayslip() had.
   async function load() {
+    const trimmedCode = code.trim()
+    if (!trimmedCode) {
+      toast.error('Enter an account code before loading the ledger.')
+      return
+    }
     setLoading(true)
     try {
       const data = await apiFetch<LedgerLine[]>(
-        `/finances/accounting/ledger/${code}?from=${from}&to=${to}`,
+        `/finances/accounting/ledger/${encodeURIComponent(trimmedCode)}?from=${from}&to=${to}`,
       )
       setLines(data)
-    } finally { setLoading(false) }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not load the account ledger.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -238,7 +261,7 @@ function AccountLedgerPanel() {
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
             className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
         </div>
-        <button type="button" onClick={load} disabled={loading}
+        <button type="button" onClick={load} disabled={loading || !code.trim()}
           className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
           {loading ? 'Loading…' : 'Load Ledger'}
         </button>

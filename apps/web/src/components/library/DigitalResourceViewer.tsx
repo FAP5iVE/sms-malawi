@@ -28,12 +28,31 @@
  *      permanent link is ever exposed (see W/lib/storage.ts's
  *      getSignedViewUrl(), which itself proxies through
  *      W/app/api/files/[fileId]/route.ts rather than a raw Appwrite URL).
- *   2. The URL is loaded in an <iframe> with sandbox="allow-scripts allow-same-origin"
- *      — this disables form submission and top navigation (preventing save-as tricks).
+ *   2. [BUGFIX — ERR-11, 2026-09-16] The iframe no longer carries a
+ *      `sandbox` attribute. It used to (sandbox="allow-scripts
+ *      allow-same-origin"), on the reasoning that it disables form
+ *      submission and top navigation — true, but `sandbox` in any form
+ *      also unconditionally disables plugins per the HTML spec
+ *      (https://github.com/whatwg/html/issues/3958), and Chromium's
+ *      built-in PDF viewer is implemented as exactly that: a plugin. The
+ *      practical effect was that no PDF could ever render here — Chrome
+ *      shows its generic broken-document placeholder instead, every
+ *      time, regardless of which sandbox tokens are present (confirmed
+ *      against Chromium issue 413851 and multiple other
+ *      sandbox-blocks-PDF reports; this is long-standing, documented
+ *      behavior, not a version-specific quirk). A PDF has no forms to
+ *      submit and no script of its own to navigate the top frame with,
+ *      so that specific protection wasn't doing anything for this
+ *      content type anyway — the real defenses against a hostile upload
+ *      are same-origin serving behind an authenticated, role-checked
+ *      proxy (layer 1) and a locked-down Content-Type (layer 4, below),
+ *      neither of which needed `sandbox` to work.
  *   3. CSS `pointer-events: none` on the iframe overlay prevents right-click
  *      context menus on the rendered PDF in most browsers.
  *   4. The iframe has no `download` attribute and shows no toolbar via the
- *      `#toolbar=0` PDF.js fragment query.
+ *      `#toolbar=0` PDF.js fragment query. The proxy route also sends
+ *      `X-Content-Type-Options: nosniff`, so the response can't be
+ *      MIME-sniffed into something else.
  *   5. The component disables the browser native right-click context menu
  *      on the container via onContextMenu.
  *
@@ -244,7 +263,6 @@ export function DigitalResourceViewer({
                   src={`${viewUrl}#toolbar=0&navpanes=0&scrollbar=1`}
                   title={title}
                   className="w-full h-full border-0"
-                  sandbox="allow-scripts allow-same-origin"
                   style={{ pointerEvents: 'none' }}
                   aria-label={`View-only viewer for ${title}`}
                 />

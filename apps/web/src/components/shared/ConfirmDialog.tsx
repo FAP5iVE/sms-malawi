@@ -36,7 +36,7 @@
 import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Loader2 } from 'lucide-react'
 import { useMotionEnabled } from '@/store/motionStore'
 import {
   OVERLAY_VARIANTS,
@@ -59,6 +59,23 @@ export interface ConfirmDialogProps {
   confirmLabel?: string
   /** Styles the confirm button as destructive (coral) when true. */
   destructive?: boolean
+  /**
+   * [BUGFIX — ERR-10, 2026-09-16] Optional — pass a caller's own
+   * mutation.isPending (or equivalent) while onConfirm's async work is in
+   * flight. Without this, the dialog gave zero feedback between the click
+   * and whatever happened next (BulkInvoiceGenerator.tsx's "Generate N
+   * Invoices" confirmation — the reported bug — looked identical whether
+   * nothing had happened yet or the request was seconds from finishing),
+   * so a user unsure whether their click registered had nothing to stop
+   * them clicking Confirm again. When true: the confirm button shows a
+   * spinner + confirmingLabel and both buttons disable, and onCancel /
+   * Escape are ignored so an in-flight action can't be dismissed out from
+   * under itself. Defaults to false — every other current caller of this
+   * dialog is unaffected.
+   */
+  confirming?: boolean
+  /** Label shown on the confirm button while `confirming` is true. Default: "Working…". */
+  confirmingLabel?: string
   onConfirm: () => void
   onCancel: () => void
 }
@@ -73,6 +90,8 @@ export default function ConfirmDialog({
   description,
   confirmLabel = 'Confirm',
   destructive = false,
+  confirming = false,
+  confirmingLabel = 'Working…',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -82,15 +101,15 @@ export default function ConfirmDialog({
   const titleId       = useId()
   const descId        = useId()
 
-  // ── Escape → cancel ────────────────────────────────────────────────────────
+  // ── Escape → cancel (ignored mid-confirm, see `confirming` above) ─────────
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel()
+      if (e.key === 'Escape' && !confirming) onCancel()
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [open, onCancel])
+  }, [open, confirming, onCancel])
 
   // ── Focus trap via `inert` + default focus on Cancel ──────────────────────
   // The dialog portals directly under <body>; every other direct body child
@@ -144,7 +163,7 @@ export default function ConfirmDialog({
             exit="exit"
             transition={overlayTransition}
             className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[2px]"
-            onClick={onCancel}
+            onClick={confirming ? undefined : onCancel}
             aria-hidden="true"
           />
 
@@ -202,6 +221,7 @@ export default function ConfirmDialog({
                   ref={cancelRef}
                   type="button"
                   onClick={onCancel}
+                  disabled={confirming}
                   className="
                     min-h-[44px] px-4 rounded-xl
                     text-sm font-heading font-semibold
@@ -209,6 +229,7 @@ export default function ConfirmDialog({
                     hover:bg-page hover:text-body
                     active:bg-base/60
                     transition-colors
+                    disabled:opacity-60 disabled:pointer-events-none
                   "
                 >
                   Cancel
@@ -216,16 +237,21 @@ export default function ConfirmDialog({
                 <button
                   type="button"
                   onClick={onConfirm}
+                  disabled={confirming}
+                  aria-busy={confirming}
                   className={[
+                    'inline-flex items-center gap-2',
                     'min-h-[44px] px-5 rounded-xl',
                     'text-sm font-heading font-semibold text-white',
                     'transition-colors',
+                    'disabled:opacity-70 disabled:pointer-events-none',
                     destructive
                       ? 'bg-brand-coral hover:bg-brand-coral/90 active:bg-brand-coral/80'
                       : 'bg-brand-navy hover:bg-brand-navy/90 active:bg-brand-navy/80',
                   ].join(' ')}
                 >
-                  {confirmLabel}
+                  {confirming && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+                  {confirming ? confirmingLabel : confirmLabel}
                 </button>
               </div>
             </motion.div>

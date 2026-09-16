@@ -17,12 +17,12 @@
  */
 
 import { useMemo, useState } from 'react'
-import { Wallet, PiggyBank, Download, User } from 'lucide-react'
+import { Wallet, PiggyBank, Download, User, Loader2 } from 'lucide-react'
 import { formatMWK } from '@shared/constants/malawi'
 import type { ApiPayslip, ApiStaffProfile } from '@shared/types/api'
 import { useAuthStore } from '@/store/authStore'
 import { useMyLoans, useLoans } from '@/hooks/useHR'
-import { useMyPayslips, useMySalaryStructure, useSalaryRoster, downloadPayslip } from '@/hooks/usePayroll'
+import { useMyPayslips, useMySalaryStructure, useSalaryRoster, useDownloadPayslip } from '@/hooks/usePayroll'
 import { DataTable, type DataColumn } from '@/components/shared/DataTable'
 import { formatRunPeriod } from './payrollDisplay'
 
@@ -126,6 +126,9 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
 
   const { data: payslips = [], isLoading: payslipsLoading } = useMyPayslips(targetUid)
   const { data: salary, isLoading: salaryLoading } = useMySalaryStructure(targetUid)
+  // [BUGFIX — ERR-5 / ERR-6 / ERR-7] see useDownloadPayslip()'s own header
+  // comment in usePayroll.ts.
+  const downloadPayslipMutation = useDownloadPayslip()
 
   // Loan lookups are two separate hooks (rather than one branching on
   // targetUid) so each only ever fires the request its caller's role can
@@ -165,12 +168,19 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
     { key: 'netSalary', label: 'Net Remittance', priority: 'critical', render: (p) => <span className="font-semibold text-emerald-700">{formatMWK(p.netSalary)}</span> },
     {
       key: 'id', label: 'Action', priority: 'critical',
-      render: (p) => (
-        <button type="button" onClick={() => downloadPayslip(p.id)}
-          className="inline-flex items-center gap-1.5 text-xs font-heading font-semibold text-brand-navy hover:underline whitespace-nowrap">
-          <Download className="w-3.5 h-3.5" aria-hidden /> View Payslip
-        </button>
-      ),
+      render: (p) => {
+        const isDownloading = downloadPayslipMutation.isPending && downloadPayslipMutation.variables === p.id
+        return (
+          <button type="button" onClick={() => downloadPayslipMutation.mutate(p.id)}
+            disabled={isDownloading}
+            aria-busy={isDownloading}
+            className="inline-flex items-center gap-1.5 text-xs font-heading font-semibold text-brand-navy hover:underline whitespace-nowrap disabled:opacity-60 disabled:pointer-events-none">
+            {isDownloading
+              ? <><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> Opening…</>
+              : <><Download className="w-3.5 h-3.5" aria-hidden /> View Payslip</>}
+          </button>
+        )
+      },
     },
   ]
 

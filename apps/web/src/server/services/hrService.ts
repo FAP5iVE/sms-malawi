@@ -401,13 +401,29 @@ export async function attachStaffPhoto(staffId: string, fileId: string): Promise
 }
 
 // ─── LEAVE MANAGEMENT ────────────────────────────────────
+// [BUGFIX — ERR-1 / ERR-2, 2026-09-16] These four validation throws below
+// were plain `new Error(...)` with no `.status`. globalErrorHandler
+// (server/middleware/inputSanitise.ts) treats any error with no `.status`
+// as a 500 — and in production, 5xx messages are always replaced with the
+// generic "An internal server error occurred." before reaching the client.
+// So a staff member applying for a weekend leave date or over their
+// balance got that generic string (easy to miss, and useless — it doesn't
+// say what was actually wrong), while the real, specific message
+// ("Leave cannot start or end on a weekend.", "Insufficient ANNUAL leave
+// balance. Available: 12 days.") only ever reached Sentry. The frontend
+// (hr/page.tsx's applyForLeave.isError block) was already correctly
+// wired to display whatever message came back — it just never got the
+// real one. Tagging these `{ status: 400 }`, same convention as the
+// 400/409s already thrown elsewhere in this file (see createStaff above),
+// routes them through globalErrorHandler's 4xx branch instead, which
+// passes `err.message` straight through.
 export async function applyForLeave(staffId: string, data: LeaveRequestInput) {
   const start = new Date(data.startDate)
   const end   = new Date(data.endDate)
   const days  = differenceInBusinessDays(end, start) + 1
 
-  if (days <= 0) throw new Error('End date must be after start date.')
-  if (isWeekend(start) || isWeekend(end)) throw new Error('Leave cannot start or end on a weekend.')
+  if (days <= 0) throw Object.assign(new Error('End date must be after start date.'), { status: 400 })
+  if (isWeekend(start) || isWeekend(end)) throw Object.assign(new Error('Leave cannot start or end on a weekend.'), { status: 400 })
 
   // Check balance for annual/sick leave
   if (['ANNUAL', 'SICK'].includes(data.leaveType)) {
@@ -416,7 +432,7 @@ export async function applyForLeave(staffId: string, data: LeaveRequestInput) {
       where: { staffId_leaveType_year: { staffId, leaveType: data.leaveType as LeaveType, year } },
     })
     const remaining = (balance?.totalDays ?? 0) - (balance?.usedDays ?? 0) - (balance?.pendingDays ?? 0)
-    if (days > remaining) throw new Error(`Insufficient ${data.leaveType} leave balance. Available: ${remaining} days.`)
+    if (days > remaining) throw Object.assign(new Error(`Insufficient ${data.leaveType} leave balance. Available: ${remaining} days.`), { status: 400 })
     // Reserve pending days
     await prisma.leaveBalance.update({
       where: { staffId_leaveType_year: { staffId, leaveType: data.leaveType as LeaveType, year } },
@@ -554,11 +570,18 @@ export async function getMyLoans(uid: string) {
   })
 }
 
+// [BUGFIX — ERR-3, 2026-09-16] Same root cause and same fix as
+// applyForLeave() above: `existing` was thrown as a plain Error (implicit
+// 500 → generic message in production), instead of surfacing to the
+// requesting staff member. Tagged `{ status: 409 }` — this is a conflict
+// with an existing resource (an active loan), the same status this file
+// already uses for the analogous "account already exists" conflicts in
+// createStaff() above.
 export async function requestLoan(staffId: string, data: LoanRequestInput) {
   const existing = await prisma.staffLoan.findFirst({
     where: { staffId, status: { in: ['PENDING','APPROVED','DISBURSED','REPAYING'] } },
   })
-  if (existing) throw new Error('You already have an active loan. Settle it before applying for a new one.')
+  if (existing) throw Object.assign(new Error('You already have an active loan. Settle it before applying for a new one.'), { status: 409 })
 
   // [PRODUCTION FIX 2026-07-28] No interest rate concept existed anywhere —
   // loans were interest-free by omission, not by design decision. Flat

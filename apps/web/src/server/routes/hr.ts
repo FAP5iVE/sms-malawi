@@ -99,6 +99,25 @@ hrRouter.get('/salary-roster', verifyAuth,
     return res.json(staff)
   })
 
+// [BUGFIX — ERR-8, 2026-09-16] Moved here from its old spot down in the
+// "── LOANS ──" section, above. Registered AFTER GET /:id (below), a
+// bare GET /hr/loans was being swallowed by that single-segment
+// catch-all — Express matched "loans" as :id, so every request to this
+// route actually ran hrService.getStaffProfile("loans"), which
+// findUniqueOrThrow() correctly failed to find and threw a
+// PrismaClientKnownRequestError (P2025) for, surfacing in Sentry as
+// "GET /hr/:id" against the real request URL "/api/hr/loans". Same
+// literal-path-before-catch-all rule /salary-roster (above) already
+// documents and follows; this route just wasn't following it. See
+// hrService.listLoans() for the role-list rationale (unchanged).
+hrRouter.get('/loans', verifyAuth, requireRole(['admin', 'hr', 'finance', 'high_rank']),
+  async (req, res) => {
+    const { status } = req.query as { status?: string }
+    return res.json(await hrService.listLoans(
+      status as 'PENDING' | 'APPROVED' | 'DISBURSED' | 'REPAYING' | 'SETTLED' | 'REJECTED' | undefined
+    ))
+  })
+
 hrRouter.get('/:id', verifyAuth, requireRole([...REVIEWERS]),
   async (req, res) => {return res.json(await hrService.getStaffProfile(String(req.params.id)))})
 
@@ -279,13 +298,10 @@ hrRouter.patch('/leave/requests/:id/review', verifyAuth, requireRole([...REVIEWE
 // [R11] NEW — hrService.listLoans() needs a route; the Loans tab's
 // admin-management view has no other way to see loan requests across all
 // staff. See header comment for the role-list rationale.
-hrRouter.get('/loans', verifyAuth, requireRole(['admin', 'hr', 'finance', 'high_rank']),
-  async (req, res) => {
-    const { status } = req.query as { status?: string }
-    return res.json(await hrService.listLoans(
-      status as 'PENDING' | 'APPROVED' | 'DISBURSED' | 'REPAYING' | 'SETTLED' | 'REJECTED' | undefined
-    ))
-  })
+// [BUGFIX — ERR-8, 2026-09-16] The GET /loans route itself now lives up
+// near GET /salary-roster, ahead of the GET /:id catch-all — see that
+// route's own comment for why. Left this section header in place since
+// /loans/mine and /loans/request (below) are still part of it.
 
 // [POST-R11] NEW — self-service loan status. A staff member who submits
 // a request via POST /loans/request previously had no way to check on
