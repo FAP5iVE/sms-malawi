@@ -51,14 +51,23 @@ import { RoleGuard } from '@/components/shared/RoleGuard'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { Field, inputCls } from '@/components/students/StudentFormSections'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
+import { TeacherSelect } from '@/components/shared/TeacherSelect'
+import { ClassSubjectsField } from '@/components/classes/ClassSubjectsField'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
-import { Users, ChevronRight, UserPlus, Pencil, Archive, X, Inbox, ArchiveRestore } from 'lucide-react'
+import type { ApiClass } from '@shared/types/api'
+import { Users, ChevronRight, UserPlus, Pencil, Archive, X, Inbox, ArchiveRestore, GraduationCap } from 'lucide-react'
 
+// [BUGFIX 2026-09-16] These were bg-*-50/border-*-200 — at that lightness
+// the tint reads as barely-there/washed-out against the page background
+// ("too faded, too muted"). One step darker on both background and border
+// keeps the same four-color rotation and stays legible against the black
+// class-teacher/student-count text added below, without going as bold as a
+// solid fill.
 const FORM_COLORS = [
-  'bg-blue-50 border-blue-200',
-  'bg-teal-50 border-teal-200',
-  'bg-purple-50 border-purple-200',
-  'bg-amber-50 border-amber-200',
+  'bg-blue-100 border-blue-300',
+  'bg-teal-100 border-teal-300',
+  'bg-purple-100 border-purple-300',
+  'bg-amber-100 border-amber-300',
 ]
 
 export default function ClassesPage() {
@@ -212,6 +221,10 @@ function ClassesContent() {
                             <p className="text-xs text-muted mt-0.5">
                               {cls.room ?? 'No room assigned'}
                             </p>
+                            <p className="flex items-center gap-1 text-xs text-muted mt-0.5">
+                              <GraduationCap className="w-3 h-3 shrink-0" aria-hidden />
+                              {cls.teacherName ?? 'No class teacher assigned'}
+                            </p>
                           </div>
                           <ChevronRight className="w-4 h-4 text-muted mt-0.5" aria-hidden />
                         </Link>
@@ -258,10 +271,32 @@ function ClassesContent() {
       )}
 
       {showAddForm && (
-        <ClassFormDialog onClose={() => setShowAddForm(false)} />
+        <ClassFormDialog
+          classes={classes ?? []}
+          activeYear={activeYear}
+          onClose={() => setShowAddForm(false)}
+          onCreated={(cls) => {
+            setShowAddForm(false)
+            // Straight into edit mode for the class just created — this is
+            // the "when creating a class ... there should be the option to
+            // set subjects for that class" flow: subjects/teacher can only
+            // be set once the class has an id (PUT /classes/:id/subjects),
+            // so the fastest path from "create" to "set subjects" is
+            // reopening this same dialog already scoped to the new class.
+            setEditingClass({
+              id: cls.id, name: cls.name, form: cls.form, stream: cls.stream,
+              teacherId: cls.teacherId, room: cls.room, academicYear: cls.academicYear,
+            })
+          }}
+        />
       )}
       {editingClass && (
-        <ClassFormDialog classToEdit={editingClass} onClose={() => setEditingClass(null)} />
+        <ClassFormDialog
+          classes={classes ?? []}
+          activeYear={activeYear}
+          classToEdit={editingClass}
+          onClose={() => setEditingClass(null)}
+        />
       )}
 
       <ConfirmDialog
@@ -287,19 +322,32 @@ function ClassesContent() {
 interface ClassFormDialogProps {
   onClose: () => void
   classToEdit?: { id: string; name: string; form: number; stream?: string; teacherId?: string; room?: string; academicYear: string } | null
+  /** Live classes list — used to grey out staff who already head another
+   *  ACTIVE class this academic year (server also enforces this; see
+   *  classService.assertNotAlreadyClassTeacher). */
+  classes: ApiClass[]
+  activeYear: string | null
+  /** Fired instead of onClose on a successful create, so the caller can
+   *  transition straight into editing the new class (see the "set
+   *  subjects right after creating" flow above this component). */
+  onCreated?: (cls: ApiClass) => void
 }
 
-function ClassFormDialog({ onClose, classToEdit }: ClassFormDialogProps) {
+function ClassFormDialog({ onClose, classToEdit, classes, activeYear, onCreated }: ClassFormDialogProps) {
   const isEdit = !!classToEdit
   const { mutate: createClass, isPending: isCreating } = useCreateClass()
   const { mutate: updateClass, isPending: isUpdating } = useUpdateClass()
   const isPending = isCreating || isUpdating
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const { can } = usePermissions()
+  const canAssignTeacher = can('class.assignTeacher')
+  const canManageSubjects = can('class.manageSubjectPresets')
 
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<CreateClassInput>({
     resolver: zodResolver(CreateClassSchema) as Resolver<CreateClassInput>,
@@ -312,8 +360,19 @@ function ClassFormDialog({ onClose, classToEdit }: ClassFormDialogProps) {
           room: classToEdit.room,
           academicYear: classToEdit.academicYear,
         }
-      : undefined,
+      : { academicYear: activeYear ?? undefined },
   })
+
+  const formYear = watch('academicYear')
+  // A staff member may head at most one ACTIVE class per academicYear —
+  // classService.assertNotAlreadyClassTeacher's client-side mirror. Only
+  // classes in the same target year count, and the class being edited
+  // never disables its own current teacher.
+  const disabledTeacherUids = new Set(
+    classes
+      .filter((c) => c.status === 'ACTIVE' && c.teacherId && c.academicYear === formYear && c.id !== classToEdit?.id)
+      .map((c) => c.teacherId!),
+  )
 
   function onSubmit(data: CreateClassInput) {
     setSubmitError(null)
@@ -327,7 +386,7 @@ function ClassFormDialog({ onClose, classToEdit }: ClassFormDialogProps) {
       )
     } else {
       createClass(data, {
-        onSuccess: () => onClose(),
+        onSuccess: (cls) => (onCreated ? onCreated(cls) : onClose()),
         onError: (err) => setSubmitError(err instanceof Error ? err.message : 'Failed to create class.'),
       })
     }
@@ -374,9 +433,28 @@ function ClassFormDialog({ onClose, classToEdit }: ClassFormDialogProps) {
             <Field label="Room" error={errors.room?.message}>
               <input type="text" {...register('room')} placeholder="e.g. Room 12 (optional)" className={inputCls} />
             </Field>
-            <Field label="Teacher Firebase UID" error={errors.teacherId?.message}>
-              <input type="text" {...register('teacherId')} placeholder="Optional" className={inputCls} />
-            </Field>
+            {/* [BUGFIX 2026-09-16] Was a free-text "Teacher Firebase UID"
+                input — replaced with a searchable, name-based staff picker
+                (GET /hr/teacher-roster, academic staff only). Only shown to
+                roles that actually hold class.assignTeacher (high_rank) —
+                classService enforces the same boundary server-side, so
+                showing this to lower_rank would only produce a confusing
+                403 on save. */}
+            {canAssignTeacher ? (
+              <Field label="Class Teacher" error={errors.teacherId?.message}>
+                <TeacherSelect
+                  value={watch('teacherId')}
+                  onChange={(uid) => setValue('teacherId', uid, { shouldValidate: true, shouldDirty: true })}
+                  disabledUids={disabledTeacherUids}
+                  disabledReason={(t) => `${t.firstName} ${t.lastName} is already the class teacher of another class for ${formYear}.`}
+                  placeholder="Optional — search teacher…"
+                />
+              </Field>
+            ) : (
+              <p className="text-xs text-muted -mt-1">
+                Only a high-ranking staff member can assign a class teacher.
+              </p>
+            )}
             <Field label="Academic Year" error={errors.academicYear?.message} required>
               <AcademicYearSelect
                 value={watch('academicYear')}
@@ -389,6 +467,19 @@ function ClassFormDialog({ onClose, classToEdit }: ClassFormDialogProps) {
               <p role="alert" className="text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
                 {submitError}
               </p>
+            )}
+
+            {/* Subjects can only be set once the class has an id — new
+                classes are routed straight into edit mode after creation
+                (see onCreated above) specifically so this section is
+                reachable in the same flow. */}
+            {isEdit && (
+              <div className="pt-2 border-t border-base">
+                <p className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+                  Subjects Taken by This Class
+                </p>
+                <ClassSubjectsField classId={classToEdit!.id} readOnly={!canManageSubjects} />
+              </div>
             )}
           </div>
 

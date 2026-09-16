@@ -24,6 +24,7 @@
  * [DEPENDS ON]: none
  */
 import { z } from 'zod'
+import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
 
 // ─── ENUMS ───────────────────────────────────────────────
 export const StudentStatusSchema = z.enum([
@@ -167,6 +168,24 @@ export const CreateSubjectAssignmentSchema = z.object({
   academicYear: z.string().regex(/^\d{4}\/\d{4}$/, 'Format: 2025/2026'),
 })
 
+// ─── CLASS SUBJECT PRESETS ───────────────────────────────
+// [NEW 2026-09-16 — Class Subject Presets] The set of subjects a class is
+// offered — distinct from CreateSubjectAssignmentSchema above (which pairs
+// a teacher to one already-offered subject). classId travels in the route
+// param, not the body (matches CreateTimetableSlotSchema's own classId-in-
+// body/param split conventions elsewhere in this file — here the route is
+// PUT /classes/:id/subjects, so only the subject list is submitted).
+// Subjects are constrained to the canonical MALAWI_SUBJECTS list — the same
+// source of truth TimetableSlotForm.tsx/ExamForm.tsx already draw from —
+// so a preset can never contain a subject the rest of the system doesn't
+// recognise. Deduplicated server-side in classService.setClassSubjectPresets.
+export const SetClassSubjectPresetsSchema = z.object({
+  subjects: z
+    .array(z.enum(MALAWI_SUBJECTS))
+    .min(1, 'Select at least one subject')
+    .max(MALAWI_SUBJECTS.length),
+})
+
 // ─── ASSIGNMENT ──────────────────────────────────────────
 export const CreateAssignmentSchema = z.object({
   title: z.string().min(3, 'Title is required').max(200),
@@ -201,6 +220,7 @@ export type CreateClassInput = z.infer<typeof CreateClassSchema>
 export type UpdateClassInput = z.infer<typeof UpdateClassSchema>
 export type CreateTimetableSlotInput = z.infer<typeof CreateTimetableSlotSchema>
 export type CreateSubjectAssignmentInput = z.infer<typeof CreateSubjectAssignmentSchema>
+export type SetClassSubjectPresetsInput = z.infer<typeof SetClassSubjectPresetsSchema>
 export type CreateAssignmentInput = z.infer<typeof CreateAssignmentSchema>
 export type SubmitAssignmentInput = z.infer<typeof SubmitAssignmentSchema>
 export type MarkAttendanceInput = z.infer<typeof MarkAttendanceSchema>

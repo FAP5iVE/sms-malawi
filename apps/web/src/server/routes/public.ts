@@ -546,9 +546,21 @@ publicRouter.get('/leadership', async (_req, res) => {
 // Deliberately narrow: only school-wide items (classId null, term null),
 // since a public page can't sensibly show every class/term-specific
 // variant — those belong in the real application/enrolment flow.
+// [BUGFIX 2026-09-16] The `year` fallback was hardcoded to the literal
+// string '2025/2026' — once the school's real CURRENT_ACADEMIC_YEAR
+// setting advanced past that (settingsService.ts, SETTING_KEYS.
+// CURRENT_ACADEMIC_YEAR) and FeeStructure rows were recreated under the
+// new year, this route kept querying the old, now-empty year forever
+// (admissions/page.tsx's usePublicFeeStructure() call passes no `year`,
+// so it always hit this default). Replaced with the same
+// settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR) lookup every
+// other current-year default in this codebase already uses (see this
+// file's own /school-info route, classes.ts's GET /:id/timetable).
 
 publicRouter.get('/fee-structure', async (req, res) => {
-  const year = String(req.query.year ?? '2025/2026')
+  const year = typeof req.query.year === 'string' && req.query.year
+    ? req.query.year
+    : await settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
   const items = await prisma.feeStructure.findMany({
     where: { academicYear: year, classId: null, term: null, isActive: true },
     select: { name: true, amount: true },

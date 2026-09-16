@@ -53,6 +53,14 @@
  *   (unrelated to this file directly, transitively via
  *   leaveConflictService.ts). payrollService.ts (POST-R11) now calls
  *   recordLoanRepayment() after each monthly run.
+ *
+ * [MAINT 2026-09-16 — Class Subject Presets / Teacher Roster]: listStaff()
+ *   gained a `role` filter, reusing the existing query/select shape rather
+ *   than a second staff-listing function — backs the new GET
+ *   /hr/teacher-roster (role: 'academic', status: 'ACTIVE'), the searchable
+ *   staff picker classService.assertIsTeacherStaff's name-based UIs (class
+ *   teacher, timetable slot teacher) now use instead of a free-text
+ *   Firebase-UID field.
  */
 import 'server-only'
 import * as admin from 'firebase-admin'
@@ -68,7 +76,7 @@ import type {
   CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput,
   LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput, CreateAllowanceInput
 } from '@shared/schemas/hr'
-import type { LeaveType, Prisma} from '@prisma/client'
+import type { LeaveType, Prisma, StaffRole } from '@prisma/client'
 import * as algolia from '@/server/services/algoliaService'
 import { checkLeaveConflicts, type ConflictCheckResult } from '@/server/services/leaveConflictService'
 import * as notificationService from '@/server/services/notificationService'
@@ -77,12 +85,16 @@ import { SETTING_KEYS } from '@shared/types/settings'
   
 // ─── STAFF PROFILES ─────────────────────────────────────
 export async function listStaff(filters: {
-  department?: string; jobTitle?: string; status?: string; search?: string
+  department?: string; jobTitle?: string; status?: string; search?: string; role?: string
 } = {}) {
   const where:  Prisma.StaffProfileWhereInput = {}
   if (filters.department) where.department = filters.department
   if (filters.jobTitle) where.jobTitle = filters.jobTitle
   if (filters.status) where.status = filters.status as 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED' | 'TERMINATED'
+  // [NEW 2026-09-16 — Class Subject Presets / Teacher Roster] role filter —
+  // backs GET /hr/teacher-roster's role: 'academic' query, reusing this
+  // function rather than a second staff-listing query.
+  if (filters.role) where.role = filters.role as StaffRole
   if (filters.search) {
     where.OR = [
       { firstName: { contains: filters.search, mode: 'insensitive' } },

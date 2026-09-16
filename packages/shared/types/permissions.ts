@@ -94,7 +94,17 @@ export type Permission =
   | 'class.hardDelete'               // Hard delete — admin only
   | 'class.approvePendingAction'     // Approve pending class changes
   | 'class.assignTeacher'            // Assign class teacher
-  | 'class.assignSubject'            // Assign subjects to a class
+  | 'class.assignSubject'            // Assign subjects to a class (subject-teacher pairing — ClassSubjectAssignment)
+  // [NEW 2026-09-16 — Class Subject Presets] Set/change the list of
+  // subjects a class offers (ClassSubjectPreset) — distinct from
+  // class.assignSubject above, which pairs a teacher to one already-
+  // offered subject. Deliberately its own permission rather than an
+  // overload of class.assignSubject: exam_officer holds that permission
+  // for subject-teacher pairing but is explicitly NOT one of the roles
+  // that may set a class's subject list (admin/high_rank/lower_rank only,
+  // per the intended workflow) — reusing class.assignSubject here would
+  // have over-granted exam_officer this capability.
+  | 'class.manageSubjectPresets'     // Set a class's preset subject list (locks 5 days after first set)
   | 'class.assignRoom'               // Assign a classroom
   | 'class.bookLab'                  // Book lab session for a class
   | 'class.makeAnnouncement'         // Post class-level announcement
@@ -400,6 +410,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'class.view',
     'class.approvePendingAction',
     'class.assignSubject',   // manage subject-teacher assignments (class structure, not results)
+    'class.manageSubjectPresets', // set a class's preset subject list (with high_rank/lower_rank)
     'class.viewAnalytics',
 
     // Applications — oversight
@@ -558,6 +569,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'class.approvePendingAction',
     'class.assignTeacher',
     'class.assignSubject',
+    'class.manageSubjectPresets',
     'class.assignRoom',
     'class.viewAnalytics',
 
@@ -959,6 +971,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'class.create',
     'class.edit',
     'class.softDelete',
+    'class.manageSubjectPresets', // set a class's preset subject list (with admin/high_rank)
     'class.viewAnalytics',
 
     // Applications — partial access with approval limits

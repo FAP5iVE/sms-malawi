@@ -15,11 +15,14 @@
  *   classes list page's archived-classes toggle has real data to filter —
  *   listClasses()'s own new includeArchived parameter would otherwise be a
  *   backend capability with zero UI caller.
+ * [MAINT 2026-09-16 — Class Subject Presets]: Added useClassSubjects() and
+ *   useSetClassSubjectPresets() — GET/PUT /classes/:id/subjects' client
+ *   hooks (classService.getClassSubjectsMeta/setClassSubjectPresets).
  * [DEPENDS ON]: W/lib/api-client.ts
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { CreateClassInput, UpdateClassInput, CreateAssignmentInput, CreateTimetableSlotInput } from '@shared/schemas/student'
-import type { ApiClass, ApiTimetableSlot, ApiAssignment, ApiSubjectAssignment } from '@shared/types/api'
+import type { ApiClass, ApiTimetableSlot, ApiAssignment, ApiSubjectAssignment, ApiClassSubjectsMeta } from '@shared/types/api'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { uploadFileDirectly } from '@/lib/directUpload'
 
@@ -77,6 +80,35 @@ export function useMySubjectAssignments(academicYear?: string) {
           : '/classes/subject-assignments/mine',
       ),
     enabled: !!academicYear,
+  })
+}
+
+// The class's preset subjects + derived 5-day lock state (classService.
+// getClassSubjectsMeta). Backs the Class form's subjects section and the
+// subject-restriction logic in TimetableSlotForm/ExamForm.
+export function useClassSubjects(classId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.classes.subjects(classId ?? ''),
+    queryFn: () => apiFetch<ApiClassSubjectsMeta>(`/classes/${classId}/subjects`),
+    enabled: !!classId,
+  })
+}
+
+export function useSetClassSubjectPresets() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ classId, subjects }: { classId: string; subjects: string[] }) =>
+      apiFetch<ApiClassSubjectsMeta>(`/classes/${classId}/subjects`, {
+        method: 'PUT',
+        body:   JSON.stringify({ subjects }),
+      }),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: queryKeys.classes.subjects(variables.classId) })
+      qc.invalidateQueries({ queryKey: queryKeys.classes.detail(variables.classId) })
+    },
+    onError: (err) => {
+      console.error('[useSetClassSubjectPresets] Failed to save class subjects:', err)
+    },
   })
 }
 

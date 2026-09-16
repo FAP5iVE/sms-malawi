@@ -15,12 +15,14 @@
  *   [POST-R11 follow-up]: adds useMyLoans() — self-service loan status,
  *   a gap identified after R11 shipped (a staff member who requested a
  *   loan had no way to check on it afterward).
+ * [MAINT 2026-09-16 — Class Subject Presets / Teacher Roster]: Added
+ *   useTeacherRoster() — GET /hr/teacher-roster's client hook.
  * [DEPENDS ON]: W/lib/api-client.ts
  */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput, CreateAllowanceInput } from '@shared/schemas/hr'
-import type { ApiStaffLoan, ApiLeaveRequest, ApiContractAlert } from '@shared/types/api'
+import type { ApiStaffLoan, ApiLeaveRequest, ApiContractAlert, ApiStaffProfile } from '@shared/types/api'
 import type { ConflictCheckResult } from '@/server/services/leaveConflictService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { STALE } from '@/components/providers/QueryProvider'
@@ -31,6 +33,19 @@ export function useStaffDirectory(filters: { department?: string; jobTitle?: str
   return useQuery({
     queryKey: queryKeys.hr.staff(filters),
     queryFn: () => apiFetch(`/hr?${params}`),
+  })
+}
+
+// [NEW 2026-09-16 — Class Subject Presets / Teacher Roster] Searchable
+// academic-staff picker — see GET /hr/teacher-roster's own header comment
+// (hr.ts) for the full rationale. Kept separate from useStaffDirectory the
+// same way useSalaryRoster is (usePayroll.ts) — the callers here
+// (class.assignTeacher/class.assignSubject/timetable.edit*) mostly aren't
+// in the real staff directory's REVIEWERS role list either.
+export function useTeacherRoster() {
+  return useQuery({
+    queryKey: queryKeys.hr.teacherRoster(),
+    queryFn: () => apiFetch<ApiStaffProfile[]>('/hr/teacher-roster'),
   })
 }
 

@@ -236,6 +236,8 @@ export const queryKeys = {
       ['classes', id, 'timetable', year, term] as const,
     assignments: (id: string) => ['classes', id, 'assignments'] as const,
     subjectAssignmentsMine: (academicYear?: string) => ['classes', 'subject-assignments', 'mine', academicYear ?? null] as const,
+    /** GET/PUT /classes/:id/subjects — preset subjects + 5-day lock state. */
+    subjects: (id: string) => ['classes', id, 'subjects'] as const,
     analytics: (id: string) => ['classes', id, 'analytics'] as const,
     labBookings: (id: string) => ['classes', id, 'lab-bookings'] as const,
     /** GET /classes/my-timetable/today, useMyTimetableToday(). */
@@ -338,6 +340,9 @@ export const queryKeys = {
     // [Salary Structure & Allowances tab, user-requested] finance's staff
     // picker — see hr.ts's GET /hr/salary-roster header comment.
     salaryRoster: () => ['hr', 'salary-roster'] as const,
+    /** GET /hr/teacher-roster — academic staff picker (see hr.ts's own
+     *  header comment for the full rationale and permission gate). */
+    teacherRoster: () => ['hr', 'teacher-roster'] as const,
     contractAlerts: (days?: number) => ['hr', 'contract-alerts', days ?? 60] as const,
     contractAlertsUpcoming: (days?: number) => ['hr', 'contract-alerts-upcoming', days ?? 60] as const,
   },

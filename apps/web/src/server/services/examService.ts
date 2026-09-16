@@ -77,6 +77,15 @@
  *   feeBlockedCount/marksEntered per exam — ResultsReleaseWorkflow.tsx
  *   needs these for its per-exam release-readiness summary and previously
  *   had no source for any of them.
+ *
+ * [MAINT 2026-09-16 — Class Subject Presets]: createExam()/updateExam() now
+ *   also call classService.assertSubjectOfferedByClass(classId, subject) —
+ *   the exam's subject must be one of the class's preset subjects (see
+ *   classService.ts's Class Subject Presets section), the same shared gate
+ *   createTimetableSlot/createSubjectAssignment use. This applies to every
+ *   actor, not just teachers scoped by assertOwnsSubject above — an
+ *   oversight role (exam_officer/high_rank) can no longer schedule an exam
+ *   for a subject the class doesn't offer either.
  */
 import 'server-only'
 
@@ -148,6 +157,13 @@ export async function createExam(data: CreateExamInput, actor: ExamActor) {
   // AC-4: a teacher may schedule an exam only for a (class, subject) they are
   // assigned to; oversight roles bypass. (MANEB guards above run first.)
   await assertOwnsSubject(actor, data.classId, data.subject, data.academicYear)
+
+  // [NEW 2026-09-16 — Class Subject Presets] The subject must be one of
+  // this class's preset subjects (or the class has no presets configured
+  // yet) — the same shared gate createTimetableSlot and
+  // createSubjectAssignment use, so an exam can never be scheduled for a
+  // subject the class doesn't offer, regardless of the actor's role.
+  await classService.assertSubjectOfferedByClass(data.classId, data.subject)
 
   const exam = await prisma.exam.create({
     data: { ...data, date: new Date(data.date), createdByUid: actor.uid },
@@ -262,6 +278,11 @@ export async function updateExam(id: string, data: UpdateExamInput, actor: ExamA
   if (nextClassId !== existing.classId || nextSubject !== existing.subject) {
     await assertOwnsSubject(actor, nextClassId, nextSubject, nextYear)
   }
+
+  // [NEW 2026-09-16 — Class Subject Presets] Same shared gate createExam
+  // uses — re-checked on every update (not just class/subject changes)
+  // since it's a cheap query and keeps the rule uniform.
+  await classService.assertSubjectOfferedByClass(nextClassId, nextSubject)
 
   // MANEB re-guard.
   if (nextType === 'MANEB_JCE' || nextType === 'MANEB_MSCE') {

@@ -69,12 +69,25 @@ model Class {
   room        String?
   status      ClassStatus @default(ACTIVE)
   academicYear String                      // "2025/2026"
+  // [MAINT 2026-09-16 — Class Subject Presets] Timestamp of the first time
+  // this class's ClassSubjectPreset rows were ever set. Anchors the 5-day
+  // edit window (classService's SUBJECT_PRESET_LOCK_WINDOW_DAYS): once now()
+  // passes subjectsSetAt + 5 days, the preset subject list is locked for
+  // the remainder of this Class row's academicYear (Class rows are already
+  // one-per-year — see promotionService's nextClassId handoff — so "locked
+  // for the rest of the academic year" and "locked for this Class row" are
+  // the same statement). Null means presets have never been set yet, which
+  // is also the signal setClassSubjectPresets()/assertSubjectOfferedByClass()
+  // use to distinguish "first-time setup" (unrestricted) from "editing
+  // within the window" (diff + in-use guard) from "locked" (rejected).
+  subjectsSetAt DateTime?
   students    Student[]
   assignments Assignment[]
   labBookings LabBooking[]
   timetable   TimetableSlot[]
   exams       Exam[]
   subjectAssignments ClassSubjectAssignment[]
+  subjectPresets     ClassSubjectPreset[]
   attendanceRecords Attendance[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -266,6 +279,36 @@ model ClassSubjectAssignment {
   @@map("class_subject_assignments")
 }
 
+
+// ─── CLASS SUBJECT PRESET ─────────────────────────────────
+// [NEW MODEL 2026-09-16 — Class Subject Presets] The set of subjects a
+// class is offered — set once by admin/high_rank/lower_rank (see
+// PERMISSIONS_MAP's class.manageSubjectPresets), editable for 5 days from
+// the first time they're set (Class.subjectsSetAt), then locked for the
+// rest of that Class row's academicYear (Class rows are already one per
+// academic year — see Class.subjectsSetAt's own comment). This is
+// deliberately a *separate* concept from ClassSubjectAssignment (which
+// pairs a specific teacher to a subject *within* this preset list) —
+// conflating "what subjects does this class offer" with "who teaches
+// them" was the pre-existing gap this model closes. Every subject-bearing
+// write this phase touches (TimetableSlot.subject via
+// classService.createTimetableSlot, ClassSubjectAssignment.subject via
+// classService.createSubjectAssignment, Exam.subject via
+// examService.createExam/updateExam) is validated against this table
+// through the single shared classService.assertSubjectOfferedByClass()
+// helper — one canonical gate, not a duplicate check per call site.
+model ClassSubjectPreset {
+  id           String   @id @default(cuid())
+  classId      String
+  class        Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject      String
+  createdByUid String
+  createdAt    DateTime @default(now())
+
+  @@unique([classId, subject])
+  @@index([classId])
+  @@map("class_subject_presets")
+}
 
 // ─── AUDIT LOG ───────────────────────────────────────────
 model AuditLog {

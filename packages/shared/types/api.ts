@@ -114,8 +114,19 @@ export interface ApiClass {
   stream?: string
   room?: string
   teacherId?: string
+  // [MAINT 2026-09-16 — Class Subject Presets / class teacher display]
+  // Application-level join onto StaffProfile by teacherId (a plain Firebase
+  // UID string — no DB-level FK is possible, matching the established
+  // pattern in hrService.ts) — populated by classService's
+  // attachTeacherNames() helper on every read path (listClasses/getClass),
+  // never a second client-side fetch. Null when teacherId is unset, or set
+  // but the staff record can't be resolved.
+  teacherName?: string | null
   status: 'ACTIVE' | 'ARCHIVED'
   academicYear: string
+  // Null = subject presets never set for this class yet (see
+  // ClassSubjectsMeta.locked for the derived 5-day lock state).
+  subjectsSetAt?: string | null
   students?: ApiStudent[]
   _count?: { students: number }
   // Only populated by GET /classes/:id (classService.getClass()'s include) — list endpoints omit this
@@ -130,6 +141,27 @@ export interface ApiSubjectAssignment {
   subject: string
   teacherUid: string
   academicYear: string
+}
+
+/**
+ * Response shape of GET /classes/:id/subjects (classService.
+ * getClassSubjectsMeta) and the return value of PUT /classes/:id/subjects
+ * (classService.setClassSubjectPresets) — the class's preset subject list
+ * plus the derived 5-day edit-window lock state. `subjects: []` with
+ * `subjectsSetAt: null` means presets were never configured for this class
+ * (the transition-bridge state classService.assertSubjectOfferedByClass()
+ * also reads — every subject is accepted until a first preset is set).
+ */
+export interface ApiClassSubjectsMeta {
+  classId: string
+  academicYear: string
+  subjects: string[]
+  subjectsSetAt: string | null
+  /** subjectsSetAt + 5 days — null until subjectsSetAt is set. */
+  lockedAt: string | null
+  /** true once now() has passed lockedAt — the list can no longer change
+   *  for the rest of this Class row's academicYear. */
+  locked: boolean
 }
 
 /** Response shape of GET /attendance/class/:classId and GET /attendance/student/:studentId */

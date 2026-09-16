@@ -46,6 +46,10 @@
  *      left role-gated — no dedicated permission exists for either.
  * [DEPENDS ON]: hrService.ts (listLoans, reviewLeave conflicts, getMyLoans
  *   — same phase/follow-up)
+ *
+ * [MAINT 2026-09-16 — Class Subject Presets / Teacher Roster]: Added GET
+ *   /teacher-roster — see its own inline header note for the full
+ *   rationale and permission gate.
  */
 import 'server-only'
 import { Router } from 'express'
@@ -99,23 +103,26 @@ hrRouter.get('/salary-roster', verifyAuth,
     return res.json(staff)
   })
 
-// [BUGFIX — ERR-8, 2026-09-16] Moved here from its old spot down in the
-// "── LOANS ──" section, above. Registered AFTER GET /:id (below), a
-// bare GET /hr/loans was being swallowed by that single-segment
-// catch-all — Express matched "loans" as :id, so every request to this
-// route actually ran hrService.getStaffProfile("loans"), which
-// findUniqueOrThrow() correctly failed to find and threw a
-// PrismaClientKnownRequestError (P2025) for, surfacing in Sentry as
-// "GET /hr/:id" against the real request URL "/api/hr/loans". Same
-// literal-path-before-catch-all rule /salary-roster (above) already
-// documents and follows; this route just wasn't following it. See
-// hrService.listLoans() for the role-list rationale (unchanged).
-hrRouter.get('/loans', verifyAuth, requireRole(['admin', 'hr', 'finance', 'high_rank']),
+// [NEW 2026-09-16 — Class Subject Presets / Teacher Roster] The searchable
+// staff picker behind "assign a class teacher" (classService.
+// assertNotAlreadyClassTeacher's UI counterpart), timetable slot teachers,
+// and subject-teacher assignment — every place this codebase previously
+// asked for a raw Firebase UID in a free-text field. role: 'academic' is
+// this system's existing definition of "teacher" (see ExamForm.tsx's
+// isTeacher check) — non-teaching staff never appear here, matching the
+// requirement that this list "strictly contain the names of teachers
+// only." Gated to the union of permissions actually used to assign a
+// teacher somewhere (class.assignTeacher: class teacher;
+// class.assignSubject: subject-teacher pairing, also held by exam_officer;
+// timetable.editDirect/editWithApproval: timetable slot teacher, covering
+// admin via class.assignSubject and high_rank/exam_officer directly).
+// Registered before GET /:id for the same shadowing reason as
+// /salary-roster above.
+hrRouter.get('/teacher-roster', verifyAuth,
+  requireAnyPermission(['class.assignTeacher', 'class.assignSubject', 'timetable.editDirect', 'timetable.editWithApproval']),
   async (req, res) => {
-    const { status } = req.query as { status?: string }
-    return res.json(await hrService.listLoans(
-      status as 'PENDING' | 'APPROVED' | 'DISBURSED' | 'REPAYING' | 'SETTLED' | 'REJECTED' | undefined
-    ))
+    const staff = await hrService.listStaff({ role: 'academic', status: 'ACTIVE' })
+    return res.json(staff)
   })
 
 hrRouter.get('/:id', verifyAuth, requireRole([...REVIEWERS]),
@@ -298,10 +305,13 @@ hrRouter.patch('/leave/requests/:id/review', verifyAuth, requireRole([...REVIEWE
 // [R11] NEW — hrService.listLoans() needs a route; the Loans tab's
 // admin-management view has no other way to see loan requests across all
 // staff. See header comment for the role-list rationale.
-// [BUGFIX — ERR-8, 2026-09-16] The GET /loans route itself now lives up
-// near GET /salary-roster, ahead of the GET /:id catch-all — see that
-// route's own comment for why. Left this section header in place since
-// /loans/mine and /loans/request (below) are still part of it.
+hrRouter.get('/loans', verifyAuth, requireRole(['admin', 'hr', 'finance', 'high_rank']),
+  async (req, res) => {
+    const { status } = req.query as { status?: string }
+    return res.json(await hrService.listLoans(
+      status as 'PENDING' | 'APPROVED' | 'DISBURSED' | 'REPAYING' | 'SETTLED' | 'REJECTED' | undefined
+    ))
+  })
 
 // [POST-R11] NEW — self-service loan status. A staff member who submits
 // a request via POST /loans/request previously had no way to check on

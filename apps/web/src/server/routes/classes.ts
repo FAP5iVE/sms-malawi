@@ -30,15 +30,24 @@
  *      default is replaced with settingsService.get(SETTING_KEYS.
  *      CURRENT_ACADEMIC_YEAR) — R14 will centralize this lookup pattern
  *      further; this phase wires the call.
+ * [MAINT 2026-09-16 — Class Subject Presets]: Added GET/PUT
+ *   /:id/subjects — the class's preset subject list (classService.
+ *   getClassSubjectsMeta/setClassSubjectPresets). GET is gated by the
+ *   existing class.view (broad read access — timetable/exam creation flows
+ *   need to know a class's offered subjects regardless of who's creating);
+ *   PUT is gated by the new class.manageSubjectPresets permission
+ *   (admin/high_rank/lower_rank only — deliberately excludes exam_officer,
+ *   which holds class.assignSubject for subject-teacher pairing but was
+ *   never one of the roles meant to set a class's subject list).
  * [DEPENDS ON]: apps/web/src/server/services/classService.ts,
  *   apps/web/src/server/services/settingsService.ts,
  *   apps/web/src/server/services/pendingActionService.ts,
- *   @shared/schemas/student (UpdateClassSchema)
+ *   @shared/schemas/student (UpdateClassSchema, SetClassSubjectPresetsSchema)
  */
 import { Router } from 'express'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission } from '@/server/middleware/verifyPermission'
-import { CreateClassSchema, UpdateClassSchema, CreateTimetableSlotSchema, CreateSubjectAssignmentSchema } from '@shared/schemas/student'
+import { CreateClassSchema, UpdateClassSchema, CreateTimetableSlotSchema, CreateSubjectAssignmentSchema, SetClassSubjectPresetsSchema } from '@shared/schemas/student'
 import * as classService         from '@/server/services/classService'
 import * as pendingActionService from '@/server/services/pendingActionService'
 import * as settingsService      from '@/server/services/settingsService'
@@ -136,6 +145,33 @@ classesRouter.delete('/:id', requirePermission('class.softDelete'), async (req, 
 
   const cls = await classService.archiveClass(id, user.uid, user.role)
   return res.json(cls)
+})
+
+// ─── CLASS SUBJECT PRESETS ────────────────────────────────
+// The set of subjects a class offers — distinct from subject-teacher
+// assignments below. GET is class.view (broad read access); PUT is
+// class.manageSubjectPresets (admin/high_rank/lower_rank only).
+
+// GET /classes/:id/subjects — preset subjects + derived 5-day lock state.
+classesRouter.get('/:id/subjects', requirePermission('class.view'), async (req, res) => {
+  const id = String(req.params.id)
+  return res.json(await classService.getClassSubjectsMeta(id))
+})
+
+// PUT /classes/:id/subjects — set/change the class's preset subject list.
+// Rejected once the 5-day edit window (from the first time it was set)
+// has closed — classService.setClassSubjectPresets throws a 403 naming
+// the lock date. Also rejects removing a subject already in use by a
+// timetable slot, exam, or subject-teacher assignment for this class.
+classesRouter.put('/:id/subjects', requirePermission('class.manageSubjectPresets'), async (req, res) => {
+  const id = String(req.params.id)
+  const parsed = SetClassSubjectPresetsSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+  const { user } = req
+  if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+
+  const meta = await classService.setClassSubjectPresets(id, parsed.data.subjects, user.uid, user.role)
+  return res.json(meta)
 })
 
 

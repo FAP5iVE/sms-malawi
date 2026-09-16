@@ -14,7 +14,21 @@
  *   panel) and hides END_TERM when the chosen class+term is a national MANEB
  *   sitting (isManebNationalTerm) — mirroring examService.createExam()'s own
  *   server-side guards so the form never offers a submission the API rejects.
- * [DEPENDS ON]: @/hooks/useClasses (useMySubjectAssignments), @/store/authStore,
+ * [MAINT 2026-09-16 — Class Subject Presets]: Once a class is selected, the
+ *   Subject dropdown is narrowed to that class's preset subjects
+ *   (useClassSubjects(selectedClassId) — classService.
+ *   assertSubjectOfferedByClass is the server-side twin of this
+ *   restriction, and now applies to every role, not just teachers). A
+ *   subject outside the preset renders as a disabled <option> ("not
+ *   offered by this class") rather than being hidden outright, so it's
+ *   visible what's excluded — unless the class has no presets configured
+ *   yet, in which case every subject stays selectable (the same
+ *   transition-bridge state the backend allows). For a teacher this
+ *   narrows their own assigned-subjects list further still; in practice
+ *   the two should already agree, since createSubjectAssignment also
+ *   validates against the class's presets.
+ * [DEPENDS ON]: @/hooks/useClasses (useMySubjectAssignments,
+ *   useClassSubjects), @/store/authStore,
  *   @shared/constants/malawi (MALAWI_SUBJECTS, isManebNationalTerm)
  */
 'use client'
@@ -25,7 +39,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateExamSchema } from '@shared/schemas/exam'
 import type { CreateExamInput } from '@shared/schemas/exam'
 import { useCreateExam } from '@/hooks/useExams'
-import { useClasses, useMySubjectAssignments } from '@/hooks/useClasses'
+import { useClasses, useMySubjectAssignments, useClassSubjects } from '@/hooks/useClasses'
 import { useAuthStore } from '@/store/authStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, AlertTriangle } from 'lucide-react'
@@ -62,6 +76,7 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
   })
 
   const selectedClassId = watch('classId')
+  const { data: subjectsMeta } = useClassSubjects(selectedClassId || undefined)
 
   // AC-4: teachers pick only from their assigned classes/subjects.
   const assignedClassIds = new Set(assignments.map((a) => a.classId))
@@ -74,6 +89,13 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
   const availableSubjects: readonly string[] = isTeacher
     ? (selectedClassId ? (subjectsByClass[selectedClassId] ?? []) : [])
     : MALAWI_SUBJECTS
+
+  // [NEW 2026-09-16 — Class Subject Presets] Once the class has preset
+  // subjects configured, only those are selectable — everyone else in
+  // availableSubjects renders disabled, not hidden, so the exclusion is
+  // visible rather than a silent gap.
+  const presetSubjects = subjectsMeta?.subjects ?? []
+  const hasPresets = presetSubjects.length > 0
 
   // Never offer a MANEB_* type through the internal scheduler; hide END_TERM
   // when the chosen class+term is a national MANEB sitting.
@@ -136,9 +158,21 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
                 <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Subject</label>
                 <select {...register('subject')} className={ic} aria-label="Subject" disabled={isTeacher && !selectedClassId}>
                   <option value="">{isTeacher && !selectedClassId ? 'Select a class first\u2026' : 'Select subject\u2026'}</option>
-                  {availableSubjects.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {availableSubjects.map((s) => {
+                    const notOffered = hasPresets && !presetSubjects.includes(s)
+                    return (
+                      <option key={s} value={s} disabled={notOffered}>
+                        {s}{notOffered ? ' (not offered by this class)' : ''}
+                      </option>
+                    )
+                  })}
                 </select>
                 {errors.subject && <p className="text-xs text-brand-coral mt-1">{errors.subject.message}</p>}
+                {selectedClassId && !hasPresets && (
+                  <p className="text-xs text-muted mt-1">
+                    This class has no preset subjects yet — every subject is selectable until they are set.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Date</label>
