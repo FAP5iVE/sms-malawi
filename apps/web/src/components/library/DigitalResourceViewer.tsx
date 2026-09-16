@@ -1,110 +1,64 @@
 'use client'
 
-/*
- * apps/web/src/components/library/DigitalResourceViewer.tsx — Phase D11
+/**
+ * DigitalResourceViewer
  *
- * [CHANGE TYPE]: TARGETED EDIT
- * [R-PHASE]: R12 — Library Domain & the Storage API Contract Fix
- * [PURPOSE]: This component had zero real importers and its own fetch
- *   logic never compiled — it imported a nonexistent `apiClient` export
- *   from api-client.ts (the real singleton is `apiFetch`) and called the
- *   view endpoint with POST and an expected `{ viewUrl, expiresAt }`
- *   response shape that neither matches the real route (GET
- *   /library/digital/:id/view, which returns `{ url }`) nor the
- *   now-fixed libraryService.ts's getDigitalResourceViewUrl() (a signed
- *   proxy URL good for 1 hour, not 15 minutes). Repointed onto the
- *   existing, correctly-built useDigitalResourceView() hook
- *   (useLibrary.ts) instead of hand-rolling a duplicate fetch — this also
- *   means the component now shares the same 401-refresh-retry apiFetch
- *   behavior every other correctly-written data fetch in this codebase
- *   gets for free. A real entry point from the Library page's digital
- *   resources list now renders this component (library/page.tsx, same
- *   phase) — its first real caller.
+ * FIXED: the previous implementation embedded the protected PDF directly in
+ * a sandboxed iframe. Chromium/Android can fall back to its external PDF
+ * handler in that situation, which produced the "PDF / Open" screen shown in
+ * production. The iframe was also behind a pointer-events:none overlay, so
+ * scrolling/interacting with the browser PDF viewer was disabled.
  *
- * View-only PDF/eBook viewer enforcing no-download policy.
+ * The viewer now:
+ *   - fetches the protected bytes with the Firebase Bearer token;
+ *   - renders PDFs with PDF.js on a canvas (no browser PDF plugin required);
+ *   - works consistently on desktop and mobile browsers;
+ *   - supports page navigation, zoom, and fit-to-width;
+ *   - never exposes a permanent Appwrite URL;
+ *   - keeps the existing server-side authorization boundary.
  *
- * Enforcement layers:
- *   1. Server only returns a short-lived (1 hour) signed proxy URL — no
- *      permanent link is ever exposed (see W/lib/storage.ts's
- *      getSignedViewUrl(), which itself proxies through
- *      W/app/api/files/[fileId]/route.ts rather than a raw Appwrite URL).
- *   2. [BUGFIX — ERR-11, 2026-09-16] The iframe no longer carries a
- *      `sandbox` attribute. It used to (sandbox="allow-scripts
- *      allow-same-origin"), on the reasoning that it disables form
- *      submission and top navigation — true, but `sandbox` in any form
- *      also unconditionally disables plugins per the HTML spec
- *      (https://github.com/whatwg/html/issues/3958), and Chromium's
- *      built-in PDF viewer is implemented as exactly that: a plugin. The
- *      practical effect was that no PDF could ever render here — Chrome
- *      shows its generic broken-document placeholder instead, every
- *      time, regardless of which sandbox tokens are present (confirmed
- *      against Chromium issue 413851 and multiple other
- *      sandbox-blocks-PDF reports; this is long-standing, documented
- *      behavior, not a version-specific quirk). A PDF has no forms to
- *      submit and no script of its own to navigate the top frame with,
- *      so that specific protection wasn't doing anything for this
- *      content type anyway — the real defenses against a hostile upload
- *      are same-origin serving behind an authenticated, role-checked
- *      proxy (layer 1) and a locked-down Content-Type (layer 4, below),
- *      neither of which needed `sandbox` to work.
- *   3. CSS `pointer-events: none` on the iframe overlay prevents right-click
- *      context menus on the rendered PDF in most browsers.
- *   4. The iframe has no `download` attribute and shows no toolbar via the
- *      `#toolbar=0` PDF.js fragment query. The proxy route also sends
- *      `X-Content-Type-Options: nosniff`, so the response can't be
- *      MIME-sniffed into something else.
- *   5. The component disables the browser native right-click context menu
- *      on the container via onContextMenu.
- *
- * Note: A determined user can always inspect network traffic and download
- * the file directly. These layers prevent casual/accidental downloading by
- * students as required by the system spec — they are not DRM.
- *
- * Props:
- *   resourceId  string    — fetches the signed view URL via useDigitalResourceView() on open
- *   title       string    — displayed in the viewer header
- *   onClose     () => void
+ * This is still view-only UI, not DRM. A user with sufficient technical
+ * access can still obtain content from their browser's network/memory.
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import { Loader2, X, AlertTriangle, Eye }   from 'lucide-react'
-import { motion, AnimatePresence }           from 'framer-motion'
-import { getAuth }                           from 'firebase/auth'
-import { useMotionEnabled }                  from '@/store/motionStore'
-import { reducedMotionVariants, reducedMotionTransition, SPRING } from '@/lib/motion'
-import { useDigitalResourceView }            from '@/hooks/useLibrary'
-import { VIEW_URL_TTL_SECS } from '@shared/constants/storage'
-
-// [PRODUCTION FIX] /api/files/[fileId] requires a live auth token
-// (getIdTokenFromRequest, verifyAuth.ts) and this signed URL is loaded
-// directly as an <iframe src> below — a plain navigation that can never
-// attach a request header. Every open previously returned {"error":
-// "Unauthorised"}. Appending a freshly-fetched ID token as ?token= (now
-// accepted as a fallback by getIdTokenFromRequest) fixes this without
-// weakening the access check — the same decoded uid/role still gets
-// verified, just read from the query string instead of a header this
-// iframe load could never send.
-async function appendAuthToken(url: string): Promise<string> {
-  const user = getAuth().currentUser
-  if (!user) return url
-  const token = await user.getIdToken()
-  const separator = url.includes('?') ? '&' : '?'
-  return `${url}${separator}token=${encodeURIComponent(token)}`
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// COUNTDOWN REFRESH (re-fetches URL before expiry)
-// ─────────────────────────────────────────────────────────────────────────────
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DIGITAL RESOURCE VIEWER
-// ─────────────────────────────────────────────────────────────────────────────
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AlertTriangle, ChevronLeft, ChevronRight, Eye, Loader2, Minus, Plus, RotateCw, X } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { getAuth } from 'firebase/auth'
+import { useMotionEnabled } from '@/store/motionStore'
+import { reducedMotionTransition, reducedMotionVariants, SPRING } from '@/lib/motion'
+import { useDigitalResourceView } from '@/hooks/useLibrary'
 
 interface DigitalResourceViewerProps {
   resourceId: string
-  title:      string
-  onClose:    () => void
+  title: string
+  onClose: () => void
+}
+
+interface PdfPageLike {
+  getViewport: (params: { scale: number }) => { width: number; height: number }
+  render: (params: {
+    canvasContext: CanvasRenderingContext2D
+    viewport: { width: number; height: number }
+    intent?: 'display'
+  }) => { promise: Promise<void> }
+}
+
+interface PdfDocumentLike {
+  numPages: number
+  getPage: (pageNumber: number) => Promise<PdfPageLike>
+  destroy: () => Promise<void>
+}
+
+function friendlyPdfError(error: unknown): string {
+  if (error instanceof Error) {
+    if (/password/i.test(error.message)) return 'This PDF is password-protected and cannot be displayed here.'
+    if (/Invalid PDF|Missing PDF|PDF header/i.test(error.message)) {
+      return 'The uploaded file is not a valid PDF.'
+    }
+    return error.message
+  }
+  return 'The PDF could not be displayed.'
 }
 
 export function DigitalResourceViewer({
@@ -113,69 +67,279 @@ export function DigitalResourceViewer({
   onClose,
 }: DigitalResourceViewerProps) {
   const motionEnabled = useMotionEnabled()
-  const viewResource   = useDigitalResourceView()
+  const { mutate: getViewUrl } = useDigitalResourceView()
 
-  const [viewUrl,    setViewUrl]    = useState<string | null>(null)
-  const [error,      setError]      = useState<string | null>(null)
-  const [visible,    setVisible]    = useState(true)
+  const [viewUrl, setViewUrl] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [visible, setVisible] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [pageNumber, setPageNumber] = useState(1)
+  const [numPages, setNumPages] = useState(0)
+  const [zoom, setZoom] = useState(1)
+  const [rendering, setRendering] = useState(false)
+  const [renderTick, setRenderTick] = useState(0)
 
-  // Fetch a signed view URL from the server
-  const fetchUrl = useCallback(() => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const viewerBodyRef = useRef<HTMLDivElement | null>(null)
+  const pdfRef = useRef<PdfDocumentLike | null>(null)
+  const renderGenerationRef = useRef(0)
+
+  const loadViewUrl = useCallback(() => {
+    setLoading(true)
     setError(null)
-    viewResource.mutate(resourceId, {
-      onSuccess: (session) => { void appendAuthToken(session.url).then(setViewUrl) },
-      onError:   (e) => setError(e instanceof Error ? e.message : 'Unable to load resource'),
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resourceId])
+    setViewUrl(null)
 
-  // Initial load. Calls viewResource.mutate(...) directly rather than via
-  // fetchUrl() — fetchUrl's leading setError(null) is a no-op on mount
-  // (error already starts null above) but would otherwise execute
-  // synchronously as part of calling fetchUrl() from this effect's body.
-  // onSuccess/onError are genuine deferred continuations (fired later, when
-  // the mutation settles), so no setState happens synchronously within this
-  // effect at all. fetchUrl itself is unchanged and still used as-is by the
-  // auto-refresh timer below (a setTimeout callback — already correctly
-  // deferred) and the "Try again" button (an event handler).
+    getViewUrl(resourceId, {
+      onSuccess: ({ url }) => {
+        setViewUrl(url)
+      },
+      onError: (e) => {
+        setLoading(false)
+        setError(e instanceof Error ? e.message : 'Unable to load resource')
+      },
+    })
+  }, [resourceId, getViewUrl])
+
   useEffect(() => {
-    viewResource.mutate(resourceId, {
-      onSuccess: (session) => { void appendAuthToken(session.url).then(setViewUrl) },
-      onError:   (e) => setError(e instanceof Error ? e.message : 'Unable to load resource'),
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resourceId])
+    // Defer the mutation to the next task. The React hooks lint rule
+    // `react-hooks/set-state-in-effect` treats React Query's mutation call as
+    // a synchronous state update when it is invoked directly in an effect.
+    // The mutation itself is still the correct source of truth; deferring it
+    // prevents a synchronous cascading render on mount.
+    const timer = window.setTimeout(() => {
+      loadViewUrl()
+    }, 0)
 
-  // Auto-refresh URL 60 seconds before expiry
+    return () => window.clearTimeout(timer)
+  }, [loadViewUrl])
+
+  // Download the protected bytes using the normal Firebase Authorization
+  // header. This avoids putting the Firebase ID token into a URL query string.
   useEffect(() => {
     if (!viewUrl) return
-    const refreshMs = (VIEW_URL_TTL_SECS - 60) * 1000
-    const t = setTimeout(fetchUrl, refreshMs)
-    return () => clearTimeout(t)
-  }, [viewUrl, fetchUrl])
 
-  const loading = viewResource.isPending
+    let cancelled = false
+    const controller = new AbortController()
 
-  // Block right-click context menu on the entire viewer
-  function handleContextMenu(e: React.MouseEvent) {
-    e.preventDefault()
-  }
+    async function loadPdf() {
+      try {
+        setLoading(true)
+        setError(null)
+        setPageNumber(1)
+        setNumPages(0)
+        setZoom(1)
+
+        const user = getAuth().currentUser
+        if (!user) throw new Error('Your session has expired. Please sign in again.')
+
+        const token = await user.getIdToken()
+
+        if (viewUrl === null) {
+          throw new Error('The PDF URL is unavailable.')
+        }
+
+        const pdfUrl: string = viewUrl
+
+        const response = await fetch(pdfUrl, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          cache: 'no-store',
+          referrerPolicy: 'no-referrer',
+          signal: controller.signal,
+        })
+
+        if (!response.ok) {
+          if (response.status === 401) throw new Error('Your session has expired. Please sign in again.')
+          if (response.status === 403) throw new Error('You do not have permission to view this resource.')
+          if (response.status === 404) throw new Error('The resource file could not be found.')
+          throw new Error(`The resource server returned HTTP ${response.status}.`)
+        }
+
+              const contentType = response.headers
+        .get('content-type')
+        ?.split(';')[0]
+        ?.trim()
+        .toLowerCase()
+        if (contentType && contentType !== 'application/pdf' && !contentType.endsWith('+pdf')) {
+          throw new Error(`This viewer only supports PDF resources. The uploaded file is reported as ${contentType}.`)
+        }
+
+        const bytes = new Uint8Array(await response.arrayBuffer())
+        if (cancelled) return
+
+        // Validate the actual payload as well as the MIME type. This catches
+        // cases where a storage record has stale/wrong metadata.
+        const pdfSignature = new TextDecoder().decode(bytes.slice(0, 5))
+        if (pdfSignature !== '%PDF-') {
+          throw new Error('The stored file is not a valid PDF. Re-upload the resource as a PDF.')
+        }
+
+        // PDF.js is loaded only in the browser. The worker is bundled by the
+        // Next.js build rather than depending on a third-party CDN.
+        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
+          import.meta.url,
+        ).toString()
+
+        const loadingTask = pdfjs.getDocument({
+          data: bytes,
+          useSystemFonts: true,
+        })
+
+        const documentProxy = (await loadingTask.promise) as unknown as PdfDocumentLike
+        if (cancelled) {
+          await documentProxy.destroy().catch(() => {})
+          return
+        }
+
+        if (pdfRef.current) {
+          await pdfRef.current.destroy().catch(() => {})
+        }
+
+        pdfRef.current = documentProxy
+        setNumPages(documentProxy.numPages)
+        setLoading(false)
+      } catch (e) {
+        if (cancelled || (e instanceof DOMException && e.name === 'AbortError')) return
+        setLoading(false)
+        setError(friendlyPdfError(e))
+      }
+    }
+
+    void loadPdf()
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [viewUrl])
+
+  // Destroy PDF.js resources when the viewer closes/unmounts.
+  useEffect(() => {
+    return () => {
+      const pdf = pdfRef.current
+      pdfRef.current = null
+      if (pdf) void pdf.destroy().catch(() => {})
+    }
+  }, [])
+
+  // Render only the current page. This keeps memory usage reasonable on
+  // phones even for large past papers/eBooks.
+  useEffect(() => {
+    const pdf = pdfRef.current
+    const canvas = canvasRef.current
+    const body = viewerBodyRef.current
+
+    if (!pdf || !canvas || !body || !numPages || loading) return
+
+    // Keep narrowed references in stable locals so TypeScript does not lose
+    // the null check inside the async render function.
+    const pdfDocument = pdf
+    const canvasElement = canvas
+    const viewerBody = body
+
+    let cancelled = false
+    const generation = ++renderGenerationRef.current
+
+    async function renderCurrentPage() {
+      try {
+        setRendering(true)
+
+        const page = await pdfDocument.getPage(pageNumber)
+        if (cancelled || generation !== renderGenerationRef.current) return
+
+        const baseViewport = page.getViewport({ scale: 1 })
+        const availableWidth = Math.max(viewerBody.clientWidth - 32, 280)
+
+        // Fit the PDF to the viewer on phones and small screens. On desktop,
+        // cap the base size so very wide displays do not create unnecessarily
+        // huge canvases.
+        const fitScale = Math.min(
+          1.5,
+          Math.max(0.55, availableWidth / baseViewport.width),
+        )
+        const scale = fitScale * zoom
+        const viewport = page.getViewport({ scale })
+
+        const devicePixelRatio = Math.min(window.devicePixelRatio || 1, 2)
+        canvasElement.width = Math.ceil(viewport.width * devicePixelRatio)
+        canvasElement.height = Math.ceil(viewport.height * devicePixelRatio)
+        canvasElement.style.width = `${Math.ceil(viewport.width)}px`
+        canvasElement.style.height = `${Math.ceil(viewport.height)}px`
+
+        const context = canvasElement.getContext('2d', { alpha: false })
+        if (!context) throw new Error('Your browser could not create a PDF rendering surface.')
+
+        context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0)
+        context.fillStyle = '#ffffff'
+        context.fillRect(0, 0, canvasElement.width, canvasElement.height)
+
+        await page.render({
+          canvasContext: context,
+          viewport,
+          intent: 'display',
+        }).promise
+
+        if (!cancelled && generation === renderGenerationRef.current) {
+          setRendering(false)
+        }
+      } catch (e) {
+        if (!cancelled && generation === renderGenerationRef.current) {
+          setRendering(false)
+          setError(friendlyPdfError(e))
+        }
+      }
+    }
+
+    void renderCurrentPage()
+
+    return () => {
+      cancelled = true
+    }
+  }, [pageNumber, zoom, numPages, loading, renderTick])
+
+  // Re-render at fit-to-width when the viewer changes size, e.g. rotating a
+  // phone from portrait to landscape.
+  useEffect(() => {
+    const body = viewerBodyRef.current
+    if (!body) return
+
+    const observer = new ResizeObserver(() => {
+      renderGenerationRef.current += 1
+      setRenderTick((current) => current + 1)
+    })
+
+    observer.observe(body)
+    return () => observer.disconnect()
+  }, [])
 
   function handleClose() {
     setVisible(false)
   }
 
+  function handleContextMenu(event: React.MouseEvent) {
+    event.preventDefault()
+  }
+
+  function changeZoom(delta: number) {
+    setZoom((current) => Math.min(2.5, Math.max(0.5, Number((current + delta).toFixed(2)))))
+  }
+
   const backdropVariants = reducedMotionVariants(motionEnabled, {
-    hidden:  { opacity: 0 },
+    hidden: { opacity: 0 },
     visible: { opacity: 1 },
-    exit:    { opacity: 0 },
+    exit: { opacity: 0 },
   })
+
   const panelVariants = reducedMotionVariants(motionEnabled, {
-    hidden:  { opacity: 0, scale: 0.96, y: 12 },
-    visible: { opacity: 1, scale: 1,    y: 0  },
-    exit:    { opacity: 0, scale: 0.96, y: 12 },
+    hidden: { opacity: 0, scale: 0.98, y: 8 },
+    visible: { opacity: 1, scale: 1, y: 0 },
+    exit: { opacity: 0, scale: 0.98, y: 8 },
   })
-  const panelTransition = reducedMotionTransition(motionEnabled, SPRING.snappy)
 
   return (
     <AnimatePresence onExitComplete={onClose}>
@@ -187,93 +351,146 @@ export function DigitalResourceViewer({
           animate="visible"
           exit="exit"
           transition={reducedMotionTransition(motionEnabled, { duration: 0.18 })}
-          className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex flex-col bg-[#111318]"
           onContextMenu={handleContextMenu}
         >
-          {/* Header bar */}
-          <div className="flex items-center justify-between px-5 py-3 bg-brand-navy/90 shrink-0">
-            <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-3 px-3 sm:px-5 py-2.5 bg-brand-navy/95 shrink-0 border-b border-white/10">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               <Eye className="w-4 h-4 text-brand-teal shrink-0" aria-hidden />
               <span className="font-heading font-semibold text-sm text-white truncate">
                 {title}
               </span>
-              <span className="shrink-0 text-[10px] text-brand-teal font-heading font-semibold uppercase tracking-wide">
+              <span className="hidden sm:inline shrink-0 text-[10px] text-brand-teal font-heading font-semibold uppercase tracking-wide">
                 View Only
               </span>
             </div>
+
+            {numPages > 0 && (
+              <div className="flex items-center gap-1 text-white">
+                <button
+                  type="button"
+                  onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
+                  disabled={pageNumber <= 1}
+                  className="p-2 rounded-lg hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none"
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <span className="min-w-19 text-center text-xs tabular-nums text-white/80">
+                  {pageNumber} / {numPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPageNumber((p) => Math.min(numPages, p + 1))}
+                  disabled={pageNumber >= numPages}
+                  className="p-2 rounded-lg hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none"
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+
+            {numPages > 0 && (
+              <div className="hidden sm:flex items-center gap-1 border-l border-white/10 pl-2">
+                <button
+                  type="button"
+                  onClick={() => changeZoom(-0.1)}
+                  disabled={zoom <= 0.5}
+                  className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30"
+                  aria-label="Zoom out"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <span className="w-12 text-center text-[11px] text-white/60 tabular-nums">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => changeZoom(0.1)}
+                  disabled={zoom >= 2.5}
+                  className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 disabled:opacity-30"
+                  aria-label="Zoom in"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={loadViewUrl}
+              disabled={loading}
+              className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+              aria-label="Reload resource"
+            >
+              <RotateCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+
             <button
               type="button"
               onClick={handleClose}
-              className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+              className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 min-h-11 min-w-11 flex items-center justify-center"
               aria-label="Close viewer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Viewer body */}
           <motion.div
+            ref={viewerBodyRef}
             key="digital-viewer-panel"
             variants={panelVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
-            transition={panelTransition}
-            className="flex-1 flex items-center justify-center overflow-hidden relative"
+            transition={reducedMotionTransition(motionEnabled, SPRING.snappy)}
+            className="flex-1 min-h-0 overflow-auto p-4 bg-[#2a2d33]"
             onContextMenu={handleContextMenu}
           >
-            {loading && (
-              <div className="flex flex-col items-center gap-3 text-white">
-                <Loader2 className="w-8 h-8 animate-spin text-brand-teal" />
-                <p className="text-sm text-white/70">Loading resource…</p>
+            {(loading || rendering) && !error && (
+              <div className="sticky top-0 z-10 flex justify-center pointer-events-none">
+                <div className="inline-flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-xs text-white/80 backdrop-blur-sm">
+                  <Loader2 className="w-4 h-4 animate-spin text-brand-teal" />
+                  {loading ? 'Loading PDF…' : 'Rendering page…'}
+                </div>
               </div>
             )}
 
             {error && (
-              <div className="flex flex-col items-center gap-3 max-w-sm text-center">
-                <AlertTriangle className="w-8 h-8 text-brand-coral" />
-                <p className="text-white font-heading font-semibold">Unable to load resource</p>
-                <p className="text-sm text-white/60">{error}</p>
-                <button
-                  type="button"
-                  onClick={fetchUrl}
-                  className="mt-2 px-5 py-2.5 rounded-xl bg-brand-teal text-white text-sm font-heading font-semibold hover:bg-brand-teal/90 transition-colors min-h-[44px]"
-                >
-                  Try again
-                </button>
+              <div className="min-h-full flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3 max-w-md text-center">
+                  <AlertTriangle className="w-9 h-9 text-brand-coral" />
+                  <p className="text-white font-heading font-semibold">Unable to display resource</p>
+                  <p className="text-sm text-white/60">{error}</p>
+                  <button
+                    type="button"
+                    onClick={loadViewUrl}
+                    className="mt-2 px-5 py-2.5 rounded-xl bg-brand-teal text-white text-sm font-heading font-semibold hover:bg-brand-teal/90 transition-colors min-h-11"
+                  >
+                    Try again
+                  </button>
+                </div>
               </div>
             )}
 
-            {viewUrl && !loading && (
-              <>
-                {/*
-                  Transparent overlay div on top of the iframe to intercept
-                  right-click before the browser's PDF context menu appears.
-                  pointer-events: none is applied to the iframe itself so the
-                  overlay receives all mouse events.
-                */}
-                <div
-                  className="absolute inset-0 z-10"
-                  onContextMenu={handleContextMenu}
-                  style={{ cursor: 'default' }}
-                  aria-hidden
-                />
-                <iframe
-                  key={viewUrl}
-                  src={`${viewUrl}#toolbar=0&navpanes=0&scrollbar=1`}
-                  title={title}
-                  className="w-full h-full border-0"
-                  style={{ pointerEvents: 'none' }}
-                  aria-label={`View-only viewer for ${title}`}
-                />
-              </>
+            {!error && !loading && numPages > 0 && (
+              <div className="min-w-full flex justify-center">
+                <div className="rounded-sm shadow-2xl bg-white overflow-hidden">
+                  <canvas
+                    ref={canvasRef}
+                    aria-label={`Page ${pageNumber} of ${numPages} of ${title}`}
+                    onContextMenu={handleContextMenu}
+                    className="block select-none"
+                  />
+                </div>
+              </div>
             )}
           </motion.div>
 
-          {/* Footer notice */}
-          <div className="shrink-0 px-5 py-2 bg-brand-navy/80 text-center">
-            <p className="text-[11px] text-white/40">
-              This resource is for viewing only. Downloading or reproducing this content is not permitted.
+          <div className="shrink-0 px-3 sm:px-5 py-2 bg-brand-navy/95 text-center border-t border-white/10">
+            <p className="text-[10px] sm:text-[11px] text-white/40">
+              View only. Downloading or reproducing this resource is not permitted.
             </p>
           </div>
         </motion.div>

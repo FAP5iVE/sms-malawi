@@ -135,9 +135,26 @@ const READ_ROLES: Record<FilePrefix, string[]> = {
   discover_photo:     ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
 }
 
+// [PRODUCTION FIX] The previous `fileId.split('_').slice(0, 2).join('_')`
+// extraction assumed every FilePrefix has exactly two underscore-separated
+// segments (student_photo, school_gallery, ...). Every single-segment
+// prefix — payslip, receipt, ebook, transcript — instead reconstructed the
+// WHOLE fileId (prefix + unique suffix) as the "prefix", which never
+// matches a READ_ROLES key, so all four categories silently fell through to
+// `userRole === 'admin'` regardless of role or __self ownership. This is
+// the direct cause of "even self payslips don't work for any user" — a
+// staff member downloading their own payslip went through the file proxy's
+// __self ownership resolution correctly (that part was already fixed —
+// see api/files/[fileId]/route.ts's own header comment), then got denied
+// here anyway because "payslip" was never recognized as a valid prefix.
+// Matches against every real FILE_PREFIX value by startsWith(), preferring
+// the longest match — no two current prefixes collide, but this keeps a
+// future prefix like "receipt_reversal" from being misread as "receipt".
 export function canReadFile(fileId: string, userRole: string, userUid: string, ownerUid?: string): boolean {
-  const prefix = fileId.split('_').slice(0, 2).join('_') as FilePrefix
-  const allowed = READ_ROLES[prefix]
+  const prefix = (Object.values(FILE_PREFIX) as string[])
+    .filter((p) => fileId === p || fileId.startsWith(`${p}_`))
+    .sort((a, b) => b.length - a.length)[0] as FilePrefix | undefined
+  const allowed = prefix ? READ_ROLES[prefix] : undefined
   if (!allowed) return userRole === 'admin'
   if (allowed.includes(userRole)) return true
   if (allowed.includes('__self') && ownerUid && userUid === ownerUid) return true
@@ -320,34 +337,23 @@ export async function createDirectUploadTicket(
 
 // ─── SIGNED / PRESIGNED VIEW URL ─────────────────────────────────────────────
 
-const SIGNED_URL_TTL_SECONDS = 3600 // 1 hour
+const SIGNED_URL_TTL_SECONDS = 3600 // retained as the intended proxy-session lifetime
 
 /**
- * Returns a short-lived signed URL for viewing a file.
+ * Returns the protected same-origin proxy URL used for viewing a file.
  * All sensitive file access must go through this — never expose raw Appwrite URLs.
  */
 export async function getSignedViewUrl(fileId: string): Promise<string> {
   getClient() // throws if APPWRITE_ENDPOINT/PROJECT_ID/API_KEY are missing
   // Appwrite Node SDK getFilePreview / getFileView returns a URL object.
-  // For sensitive docs we use createFileDownload which allows TTL in newer SDKs.
-  // Since Appwrite free tier doesn't support JWT-scoped URLs out of the box,
-  // we proxy the download through our own API route (see /api/files/[fileId]/route.ts).
-  // This function returns our internal proxy URL, not a direct Appwrite URL.
-  // [FIX] Returns a RELATIVE path now, not an absolute URL built from
-  // NEXT_PUBLIC_APP_URL. Every consumer of this value opens it inside a
-  // browser (iframe src, window.open, <a href>), where a relative path
-  // resolves against the current page's own origin automatically — the
-  // old absolute form depended on that env var being set and exactly
-  // matching whatever origin the user is actually browsing (production
-  // alias vs custom domain vs a preview deployment). If it didn't, the
-  // browser would silently try to load the file from a different
-  // origin than the one serving the page, which — depending on that
-  // other origin's own headers — could look like exactly the "blocked"
-  // symptom the Digital Library viewer was hitting. This removes that
-  // entire failure class for every caller (report cards, transcripts,
-  // receipts, staff photos, exam results, digital resources), not just
-  // this one.
-  return `/api/files/${encodeURIComponent(fileId)}?ttl=${SIGNED_URL_TTL_SECONDS}`
+  // Appwrite file URLs are deliberately never exposed for protected documents.
+  // The browser receives only our same-origin proxy URL and must authenticate
+  // the actual byte request with a Firebase Bearer token.
+  // Keep this same-origin and relative. The browser fetches the file through
+  // /api/files/[fileId] with the Firebase Bearer token. This avoids coupling
+  // local development to the production domain and avoids putting auth
+  // credentials in the URL.
+  return `/api/files/${encodeURIComponent(fileId)}`
 }
 
 /**

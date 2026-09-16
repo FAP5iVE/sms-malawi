@@ -117,10 +117,14 @@ export async function GET(
     return new NextResponse(buffer as BodyInit, {
       status: 200,
       headers: {
+        // The stored Appwrite MIME type is authoritative for the browser
+        // response. PDF.js consumes the bytes through fetch, so it does not
+        // depend on Chrome's built-in PDF plugin.
         'Content-Type': mimeType,
-        'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
-        'Cache-Control': 'private, max-age=3600, must-revalidate',
+        'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
+        'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'no-referrer',
       },
     })
   } catch (err) {
