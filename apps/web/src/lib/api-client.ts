@@ -608,4 +608,11 @@ export const queryKeys = {
     errors: (level?: string) => ['vercelMonitoring', 'errors', level ?? null] as const,
     alerts: () => ['vercelMonitoring', 'alerts'] as const,
   },
+
+  // ── Sessions (Reports > Admin > Sessions tab)
+  sessions: {
+    list: (window: string) => ['sessions', 'list', window] as const,
+    summary: () => ['sessions', 'summary'] as const,
+    activity: (sessionId: string) => ['sessions', 'activity', sessionId] as const,
+  },
 } as const

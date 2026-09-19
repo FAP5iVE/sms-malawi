@@ -39,6 +39,7 @@ import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 import { useInactivityTimer } from '@/hooks/useInactivityTimer'
+import { useSessionHeartbeat } from '@/hooks/useSessionHeartbeat'
 import { useMotionEnabled } from '@/store/motionStore'
 import { PAGE_VARIANTS, SIDEBAR_COLLAPSED_WIDTH_PX } from '@/lib/motion'
 import { useEffect, useCallback } from 'react'
@@ -54,6 +55,10 @@ import { InactivityWarningDialog } from '@/components/shared/InactivityWarningDi
 function InactivityManager() {
   const router = useRouter()
   const { showWarning, keepAlive } = useInactivityTimer()
+  // [Sessions tab, Reports > Admin] Side-effect only, no DOM output — kept
+  // in this same always-mounted component rather than a second top-level
+  // one, since both are "run for the lifetime of an authenticated session".
+  useSessionHeartbeat()
 
   const handleLogout = useCallback(async () => {
     // R2: delegate to AuthProvider's shared logout() — it sequences the FCM

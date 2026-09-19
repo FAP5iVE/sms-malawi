@@ -227,30 +227,51 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined>
   ])
 }
 
+// [Sessions tab, Reports > Admin] Best-effort call to close the caller's
+// UserSession row cleanly (endReason: 'logout') before signOut(auth) runs.
+// Same reasoning as the FCM unregister call just below it: by the time
+// onIdTokenChanged's signed-out branch would fire, auth.currentUser is
+// already null and there's no valid token left to authenticate the call
+// with. Bounded by the same LOGOUT_CLEANUP_TIMEOUT_MS as the FCM step —
+// a hung request here must never delay sign-out. If this is missed for
+// any reason, the session simply ages out of "active now" once its
+// heartbeat (~60s) goes stale, rather than being marked as cleanly logged
+// out — the Sessions tab still reflects reality within a few minutes.
+async function logSessionEnd(authToken?: string): Promise<void> {
+  try {
+    await apiFetch<void>('/auth/log-logout', { method: 'POST' }, authToken)
+  } catch {
+    // Non-critical — see comment above.
+  }
+}
+
 export async function logout(): Promise<void> {
   if (!auth) return // auth is null during SSR; never reached in browser
 
   try {
     const user = getAuth().currentUser
-    if (user && currentFcmToken) {
-      // Capture a still-valid token and unregister the FCM token BEFORE
-      // sign-out — but bounded by a timeout so a slow token fetch or a hung
-      // unregister request can never delay the sign-out below.
-      const tokenToUnregister = currentFcmToken
-      await withTimeout(
-        (async () => {
-          let authToken: string | undefined
-          try {
-            authToken = await user.getIdToken()
-          } catch {
-            authToken = undefined
-          }
-          await unregisterFcmTokenFromServer(tokenToUnregister, authToken)
-        })(),
-        LOGOUT_CLEANUP_TIMEOUT_MS,
-      )
-      currentFcmToken = null
-      currentFcmTokenRegisteredAt = null
+    if (user) {
+      let authToken: string | undefined
+      try {
+        authToken = await user.getIdToken()
+      } catch {
+        authToken = undefined
+      }
+
+      await withTimeout(logSessionEnd(authToken), LOGOUT_CLEANUP_TIMEOUT_MS)
+
+      if (currentFcmToken) {
+        // Capture a still-valid token and unregister the FCM token BEFORE
+        // sign-out — but bounded by a timeout so a slow token fetch or a hung
+        // unregister request can never delay the sign-out below.
+        const tokenToUnregister = currentFcmToken
+        await withTimeout(
+          unregisterFcmTokenFromServer(tokenToUnregister, authToken),
+          LOGOUT_CLEANUP_TIMEOUT_MS,
+        )
+        currentFcmToken = null
+        currentFcmTokenRegisteredAt = null
+      }
     }
   } catch {
     // Any failure in best-effort cleanup is swallowed — sign-out must

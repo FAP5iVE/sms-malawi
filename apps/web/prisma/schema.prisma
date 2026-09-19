@@ -326,6 +326,41 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+// ─── USER SESSIONS ────────────────────────────────────────
+// [NEW — Sessions tab, Reports > Admin] Backs the "who's logged in right
+// now" admin view (userMgmt.viewActiveSessions / userMgmt.terminateSession
+// — both permissions already existed in permissions.ts with zero callers
+// until now). One open (loggedOutAt IS NULL) row per uid at a time:
+// Firebase Admin's revokeRefreshTokens(uid) has no per-device granularity
+// — it revokes every refresh token for that uid at once — so tracking
+// per-device rows separately would let the UI promise a per-device force
+// logout it can't actually deliver. A fresh login-success closes any
+// still-open row for the same uid (endReason: 'new_login') before opening
+// a new one, so at most one row per uid is ever "open".
+// lastSeenAt is bumped by a periodic client heartbeat (POST
+// /auth/heartbeat, ~60s interval — see useSessionHeartbeat.ts) rather than
+// on every API call, so "currently active" is computed as
+// loggedOutAt IS NULL AND lastSeenAt within a short grace window of now,
+// not merely "never logged out" (a browser closed without a clean logout
+// would otherwise look active forever).
+model UserSession {
+  id           String    @id @default(cuid())
+  uid          String                            // Firebase Auth UID
+  role         String                             // role snapshot at login time
+  loginAt      DateTime  @default(now())
+  lastSeenAt   DateTime  @default(now())          // bumped by heartbeat
+  loggedOutAt  DateTime?                          // null while the session is open
+  endReason    String?                            // 'logout' | 'forced' | 'new_login'
+  forcedByUid  String?                            // admin uid, when endReason = 'forced'
+  userAgent    String?
+  ipAddress    String?
+  createdAt    DateTime  @default(now())
+
+  @@index([uid])
+  @@index([lastSeenAt])
+  @@index([uid, loggedOutAt])
+  @@map("user_sessions")
+}
 
 // ─── FEE STRUCTURE ───────────────────────────────────────
 // [SCHEMA EXTENSION 2026-09-05] category/code/mandatory/schedule/description added

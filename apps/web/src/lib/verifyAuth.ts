@@ -42,12 +42,27 @@ export async function verifyAuth(req: Request, res: Response, next: NextFunction
   }
   const token = authHeader.slice(7)
   try {
-    const decoded = await admin.auth(getAdminApp()).verifyIdToken(token)
+    // [Sessions tab, Reports > Admin] checkRevoked=true (the second
+    // argument) is what makes force-logout (sessionService.forceLogout →
+    // revokeRefreshTokens(uid)) actually end a session promptly, rather
+    // than only after the token's own natural ~1hr expiry. Without it,
+    // verifyIdToken() only checks the token's signature/expiry — a
+    // revoked-but-not-yet-expired token still passes. This does cost one
+    // extra network round trip per request (Firebase looks up the user's
+    // tokensValidAfterTime), which is the documented tradeoff for prompt
+    // revocation detection; acceptable here given this app's bounded
+    // school-sized user base and existing per-request Firestore/Neon calls
+    // on most routes anyway.
+    const decoded = await admin.auth(getAdminApp()).verifyIdToken(token, true)
     const role = decoded['role'] as UserRole | undefined
     if (!role) return res.status(403).json({ error: 'No role assigned to user' })
     req.user = { uid: decoded.uid, role, email: decoded.email ?? '' }
     next()
-  } catch {
+  } catch (err: unknown) {
+    const code = (err as { code?: string } | undefined)?.code
+    if (code === 'auth/id-token-revoked') {
+      return res.status(401).json({ error: 'Session has been revoked. Please sign in again.' })
+    }
     res.status(401).json({ error: 'Invalid or expired token' })
   }
 }

@@ -1369,6 +1369,52 @@ export interface ApiSystemHealth {
   activeUsersLastHr:  number
   services:           ApiServiceHealth[]
 }
+
+// ─── SESSIONS (Reports > Admin > Sessions tab) ────────────
+// Backs sessionService.ts — userMgmt.viewActiveSessions / .terminateSession.
+
+export type ApiSessionWindow = '10m' | '30m' | '1h' | 'all'
+
+export interface ApiUserSession {
+  id:             string
+  uid:            string
+  role:           string
+  displayName:    string | null
+  email:          string | null
+  employeeNo:     string | null
+  registrationNo: string | null
+  loginAt:        string
+  lastSeenAt:     string
+  loggedOutAt:    string | null
+  endReason:      string | null
+  isActiveNow:    boolean
+  /** Milliseconds from loginAt to (loggedOutAt ?? lastSeenAt). */
+  durationMs:     number
+}
+
+export interface ApiSessionListResponse {
+  sessions: ApiUserSession[]
+  window:   ApiSessionWindow
+}
+
+export interface ApiSessionSummary {
+  activeNow: number
+  last10m:   number
+  last30m:   number
+  last1h:    number
+}
+
+// /sessions/:id/activity proxies auditService.queryByActor() (same as
+// /audit/actor/:uid) — that returns AuditLogRow, which carries `severity`
+// on top of every ApiAuditLogEntry field, so this isn't quite that type.
+export interface ApiSessionAuditEntry extends ApiAuditLogEntry {
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
+}
+
+export interface ApiSessionActivityResponse {
+  session: ApiUserSession
+  entries: ApiSessionAuditEntry[]
+}
 // ─── PLACEMENTS (R18 — university placement & advisory, redesigned) ──────────
 // Matches the "Malawi Higher Education Placement & Advisory" reference
 // module's three-status workflow: a placement is either entered directly by

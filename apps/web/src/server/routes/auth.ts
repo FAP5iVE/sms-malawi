@@ -12,10 +12,24 @@
  *   calls right after a sign-in attempt succeeds or fails, to actually
  *   produce the data the graph has been querying for all along.
  * [DEPENDS ON]: W/server/services/auditService.ts
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (Sessions tab, Reports > Admin). Adds three
+ *   endpoints powering sessionService's UserSession rows — the write side
+ *   of "who's logged in now" / force logout / duration tracking:
+ *     - log-login-success now also opens a UserSession row (unchanged
+ *       AuditLog write kept exactly as-is, same reasoning as above).
+ *     - POST /auth/heartbeat — pinged every ~60s by useSessionHeartbeat.ts
+ *       while a tab is open, bumping the session's lastSeenAt so "active
+ *       now" reflects real recent activity, not just "never logged out".
+ *     - POST /auth/log-logout — called by AuthProvider's logout() BEFORE
+ *       signOut(auth), same sequencing as its FCM-unregister-before-
+ *       signout fix and for the same reason: this needs a still-valid
+ *       token to authenticate.
  */
 import { Router } from 'express'
 import { verifyAuth } from '@/lib/verifyAuth'
 import * as auditService from '@/server/services/auditService'
+import * as sessionService from '@/server/services/sessionService'
 
 export const authRouter = Router()
 
@@ -30,6 +44,32 @@ authRouter.post('/log-login-success', verifyAuth, async (req, res) => {
     actorUid:   req.user!.uid,
     actorRole:  req.user!.role,
   })
+  await sessionService.recordLogin({
+    uid: req.user!.uid,
+    role: req.user!.role,
+    userAgent: req.headers['user-agent'],
+    // req.ip reads Vercel's edge hop unless 'trust proxy' is set — it is,
+    // in api-app.ts's createApiApp() (R4 fix, same reasoning applies here).
+    ipAddress: req.ip,
+  })
+  res.status(204).end()
+})
+
+// POST /auth/heartbeat — bumps the caller's open session's lastSeenAt.
+// Fire-and-forget from the client's perspective; failures here must never
+// surface as a user-facing error, so the client hook (useSessionHeartbeat)
+// swallows rejections same as the FCM registration path does.
+authRouter.post('/heartbeat', verifyAuth, async (req, res) => {
+  await sessionService.heartbeat(req.user!.uid)
+  res.status(204).end()
+})
+
+// POST /auth/log-logout — closes the caller's open session cleanly
+// (endReason: 'logout', as opposed to an admin's forced 'forced' or a
+// fresh login's 'new_login'). Called from AuthProvider.logout() before
+// signOut(auth) actually clears the Firebase session.
+authRouter.post('/log-logout', verifyAuth, async (req, res) => {
+  await sessionService.recordLogout(req.user!.uid)
   res.status(204).end()
 })
 

@@ -307,7 +307,7 @@ function PurchaseOrderForm({ onClose }: { onClose: () => void }) {
   }
   return <div className="bg-surface border border-base rounded-xl p-5 space-y-4">
     <div className="flex justify-between"><h4 className="font-semibold text-brand-navy">New purchase order</h4><button type="button" onClick={onClose} className="text-muted">Close</button></div>
-    <p className="text-xs text-muted">Emergency/sole-source POs with manually-entered lines aren't supported from this form yet — only ordering against a selected quotation.</p>
+    <p className="text-xs text-muted">Emergency/sole-source POs with manually-entered lines are not supported from this form yet — only ordering against a selected quotation.</p>
     <div className="grid sm:grid-cols-2 gap-3">
       <Field label="Approved requisition">
         <select value={prId} onChange={e => setPrId(e.target.value)} className="input">

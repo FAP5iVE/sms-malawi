@@ -46,6 +46,7 @@ import {
 import { RoleGuard }         from '@/components/shared/RoleGuard'
 import { ModuleSurface }     from '@/components/shared/ModuleSurface'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
+import { AdminSessionsPanel } from '@/components/reports/AdminSessionsPanel'
 import { chartColorAt } from '@/lib/chartPalette'
 import { useAuthStore }      from '@/store/authStore'
 import { usePublicSettings } from '@/hooks/useSettings'
@@ -103,7 +104,7 @@ import type { PieLabelRenderProps } from 'recharts'
 import {
   TrendingUp, BookOpen, Users, DollarSign, ShieldCheck,
   BarChart2, FileText, GraduationCap, Activity, AlertTriangle,
-  ArrowUpRight, ArrowDownRight, Download, ChevronDown,
+  ArrowUpRight, ArrowDownRight, Download, ChevronDown, Wifi,
 } from 'lucide-react'
 import type {
   ApiLoginTrendPoint, ApiCategoryBreakdown, ApiClassPerformanceStat,
@@ -335,6 +336,7 @@ const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNo
   admin: [
     { id: 'overview',  label: 'Overview',    icon: <Activity className="w-4 h-4" /> },
     { id: 'security',  label: 'Security',    icon: <ShieldCheck className="w-4 h-4" /> },
+    { id: 'sessions',  label: 'Sessions',    icon: <Wifi className="w-4 h-4" /> },
     { id: 'audit',     label: 'Audit Log',   icon: <FileText className="w-4 h-4" /> },
   ],
   high_rank: [
@@ -647,15 +649,15 @@ function AdminAuditPanel() {
   const { data: audit } = useAuditLog({ page: 1 })
 
   useExportable<ApiAuditLogEntry>('Audit Log', audit?.logs, [
-    { label: 'Action',       value: (l) => l.action },
-    { label: 'Entity',       value: (l) => l.entityType },
-    { label: 'Entity ID',    value: (l) => l.entityId },
-    { label: 'Actor UID',    value: (l) => l.actorUid },
+    { label: 'Action',    value: (l) => l.action },
+    { label: 'Entity',    value: (l) => l.entityType },
+    { label: 'Entity ID', value: (l) => l.entityId },
     { label: 'Actor Name',   value: (l) => l.actorName ?? '' },
     { label: 'Employee No.', value: (l) => l.actorEmployeeNo ?? '' },
     { label: 'Reg. No.',     value: (l) => l.actorRegistrationNo ?? '' },
-    { label: 'Role',         value: (l) => l.actorRole },
-    { label: 'Time',         value: (l) => l.createdAt },
+    { label: 'Actor',     value: (l) => l.actorUid },
+    { label: 'Role',      value: (l) => l.actorRole },
+    { label: 'Time',      value: (l) => l.createdAt },
   ])
 
   return (
@@ -687,8 +689,8 @@ function AdminAuditPanel() {
             </colgroup>
             <thead>
               <tr className="bg-page border-b border-base">
-                {['Action', 'Entity', 'Entity ID', 'Actor', 'Name', 'ID No.', 'Role', 'Time'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap truncate">{h}</th>
+                {['Action', 'Entity', 'Entity ID', 'Actor', 'Role', 'Time'].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -2716,6 +2718,7 @@ function ReportsContent() {
       {/* ── Admin Panels (period-independent) ── */}
       {role === 'admin' && activeTab === 'overview'  && <AdminOverviewPanel />}
       {role === 'admin' && activeTab === 'security'  && <AdminSecurityPanel />}
+      {role === 'admin' && activeTab === 'sessions'  && <AdminSessionsPanel />}
       {role === 'admin' && activeTab === 'audit'     && <AdminAuditPanel />}
 
       {/* Every other role's panels are scoped to an academic year and term. */}

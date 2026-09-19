@@ -103,6 +103,7 @@ import { galleryRouter }       from '@/server/routes/gallery'
 import { authRouter }          from '@/server/routes/auth'
 import { settingsRouter }      from '@/server/routes/settings'
 import { auditRouter }         from '@/server/routes/audit'
+import { sessionsRouter }      from '@/server/routes/sessions'
 import { pendingActionsRouter }from '@/server/routes/pendingActions'
 import { notificationsRouter } from '@/server/routes/notifications'
 import { promotionRouter }     from '@/server/routes/promotion'
@@ -228,6 +229,7 @@ export function createApiApp() {
   // SETTING_KEYS-driven header term badge and dashboard year/term reads.
   app.use('/settings',        verifyAuth, settingsRouter)
   app.use('/audit',           auditRouter)
+  app.use('/sessions',        sessionsRouter)
   app.use('/pending-actions', pendingActionsRouter)
   app.use('/notifications',   notificationsRouter)
   app.use('/promotion',       verifyAuth, requireRole(['admin', 'exam_officer', 'high_rank']), promotionRouter)
