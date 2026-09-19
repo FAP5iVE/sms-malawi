@@ -63,6 +63,56 @@ function getPrismaInstance(): PrismaClient {
   return globalForPrisma.__prisma
 }
 
+// ─── CONNECTION RESILIENCE ────────────────────────────────────
+// `poolQueryViaFetch = true` makes ordinary queries stateless HTTP fetches,
+// but `$transaction([...])` still needs a real held-open session. Over an
+// unstable path to Neon that session can drop mid-flight, and once it does
+// the adapter's client stays permanently unqueryable — every later call on
+// the same singleton fails identically until the process is restarted.
+// resetPrismaClient()/withRetry() let a caller recover from that instead.
+
+export function resetPrismaClient(): void {
+  globalForPrisma.__prisma = undefined
+}
+
+function isTransientConnectionError(err: unknown): boolean {
+  if (err instanceof Error) {
+    return /connection error|not queryable|ECONNRESET|fetch failed/i.test(err.message)
+  }
+  // A dropped Neon socket can also surface as a bare WebSocket ErrorEvent
+  // (type: 'error', timeStamp: ...) rather than an Error instance.
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    (err as { type?: unknown }).type === 'error' &&
+    'timeStamp' in (err as Record<string, unknown>)
+  )
+}
+
+/**
+ * Run an operation that may open a real DB session (chiefly
+ * `prisma.$transaction([...])`) with retry-on-drop. On a transient
+ * connection error the shared client is torn down and lazily recreated
+ * (via the Proxy below) before retrying, with a short backoff.
+ */
+export async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (isTransientConnectionError(err) && attempt < retries) {
+        console.warn(
+          `[prisma] transient connection error — recreating client and retrying (attempt ${attempt + 1}/${retries})`
+        )
+        resetPrismaClient()
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)))
+        continue
+      }
+      throw err
+    }
+  }
+}
+
 // Proxy defers createPrismaClient() — and therefore env.DATABASE_URL —
 // until the first property access at request time, not at module load.
 // All existing call sites (prisma.user.findMany, prisma.$transaction, etc.)

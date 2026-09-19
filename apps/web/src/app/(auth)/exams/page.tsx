@@ -85,6 +85,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { apiFetch } from '@/lib/api-client'
 import { EXAM_MARKS_ENTERABLE_STATUSES } from '@shared/schemas/exam'
 import { ModuleTabs }        from '@/components/shared/ModuleTabs'
+import { ModuleSurface }     from '@/components/shared/ModuleSurface'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import {
   Calendar,
@@ -279,6 +280,12 @@ function ExamsPageInner() {
             />
           </div>
 
+          {/* [PRODUCTION FIX] Tab strip + tab content now sit inside
+             ModuleSurface — the standard elevated panel every module page
+             uses (see ModuleSurface.tsx). This page was the visual
+             reference for that standard, so wrapping it here formalises
+             what it already implied rather than changing its look. */}
+          <ModuleSurface>
           {/* Mobile-scrollable pill tab navigation — C7 */}
             {/* [PRODUCTION FIX] Was variant="pill" — the filled navy chip
                that (see ModuleTabs.tsx) rendered with its background
@@ -560,6 +567,7 @@ function ExamsPageInner() {
               </p>
             )
           )}
+          </ModuleSurface>
         </div>
 
         {/* Modals */}

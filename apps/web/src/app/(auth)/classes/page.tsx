@@ -48,6 +48,7 @@ import type { CreateClassInput } from '@shared/schemas/student'
 import { useClasses, useCreateClass, useUpdateClass, useArchiveClass } from '@/hooks/useClasses'
 import { usePermissions } from '@/hooks/usePermissions'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { Field, inputCls } from '@/components/students/StudentFormSections'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
@@ -174,6 +175,7 @@ function ClassesContent() {
         </div>
       </div>
 
+      <ModuleSurface>
       {actionError && (
         <p role="alert" className="text-sm text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
           {actionError}
@@ -311,6 +313,7 @@ function ClassesContent() {
         }}
         onCancel={() => setPendingArchiveClass(null)}
       />
+      </ModuleSurface>
     </div>
   )
 }

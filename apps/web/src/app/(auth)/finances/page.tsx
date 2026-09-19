@@ -20,6 +20,7 @@
 import { useState, Suspense }    from 'react'
 import { useSearchParams }       from 'next/navigation'
 import { RoleGuard }             from '@/components/shared/RoleGuard'
+import { ModuleSurface }         from '@/components/shared/ModuleSurface'
 import { useAuthStore }          from '@/store/authStore'
 import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
 import { InvoicesTab }           from '@/components/finances/InvoicesTab'
@@ -212,6 +213,7 @@ function FinancesContent() {
         </p>
       </div>
 
+      <ModuleSurface>
       {/* Summary stats — finance staff only (not students, not HR payroll viewers) */}
       {!isStudent && !isHRPayrollViewer && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -278,6 +280,7 @@ function FinancesContent() {
       {activeTab === 'debts'        && <DebtsLoansTab />}
       {activeTab === 'ledger'       && <AccountingLedgerTab />}
       {activeTab === 'reports'      && <ReportsExportPanel academicYear={YEAR} term={TERM} />}
+      </ModuleSurface>
     </div>
   )
 }

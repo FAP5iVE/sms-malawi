@@ -22,6 +22,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { uploadFileDirectly } from '@/lib/directUpload'
 import { Images, ImagePlus, Loader2, Trash2, X } from 'lucide-react'
@@ -228,6 +229,7 @@ function GalleryContent() {
         </button>
       </div>
 
+      <ModuleSurface contentClassName="">
       {deleteError && (
         <p role="alert" className="text-xs text-brand-coral mb-4">{deleteError}</p>
       )}
@@ -319,6 +321,7 @@ function GalleryContent() {
         index={lightboxIndex}
         onIndexChange={setLightboxIndex}
       />
+      </ModuleSurface>
     </div>
   )
 }

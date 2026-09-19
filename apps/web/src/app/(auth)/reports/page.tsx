@@ -44,6 +44,7 @@ import {
   useState, useEffect, useRef, useMemo, useCallback, useContext, createContext,
 } from 'react'
 import { RoleGuard }         from '@/components/shared/RoleGuard'
+import { ModuleSurface }     from '@/components/shared/ModuleSurface'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
 import { chartColorAt } from '@/lib/chartPalette'
 import { useAuthStore }      from '@/store/authStore'
@@ -509,8 +510,8 @@ function AdminOverviewPanel() {
           <ResponsiveContainer width="100%" height={180}>
             <AreaChart data={volume ?? []}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} />
+              <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
               <Tooltip contentStyle={{ fontSize: 12 }} />
               <Area type="monotone" dataKey="value" stroke={chartColorAt(0)} fill={chartColorAt(0)} fillOpacity={0.08} strokeWidth={2} name="Actions" />
             </AreaChart>
@@ -524,8 +525,8 @@ function AdminOverviewPanel() {
             {entity && entity.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={entity} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="category" tick={{ fontSize: 10 }} width={100} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                  <YAxis type="category" dataKey="category" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} width={100} />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [num(v), 'Actions']} />
                   <Bar dataKey="value" fill={chartColorAt(1)} radius={[0, 4, 4, 0]} />
                 </BarChart>
@@ -549,8 +550,8 @@ function AdminActionBreakdownChart() {
   return (
     <ResponsiveContainer width="100%" height={200}>
       <BarChart data={data.slice(0, 8)} layout="vertical">
-        <XAxis type="number" tick={{ fontSize: 10 }} />
-        <YAxis type="category" dataKey="category" tick={{ fontSize: 10 }} width={130} />
+        <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+        <YAxis type="category" dataKey="category" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} width={130} />
         <Tooltip contentStyle={{ fontSize: 12 }} />
         <Bar dataKey="value" fill={chartColorAt(2)} radius={[0, 4, 4, 0]} />
       </BarChart>
@@ -579,8 +580,8 @@ function AdminSecurityPanel() {
             <ResponsiveContainer width="100%" height={220}>
               <ComposedChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                 <Tooltip contentStyle={{ fontSize: 12 }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="successful" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Successful" stackId="a" />
@@ -726,8 +727,8 @@ function HighRankPerformancePanel({ academicYear, term }: { academicYear: string
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={trend.map((t) => ({ ...t, label: `${t.academicYear} T${t.term}` }))}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 9 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                 <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, '']} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Line type="monotone" dataKey="passRate" stroke={chartColorAt(1)} strokeWidth={2} dot name="Pass Rate %" />
@@ -773,8 +774,8 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={classes}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="className" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                <XAxis dataKey="className" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                 <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, '']} />
                 <Bar dataKey="average"  fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Average %" />
                 <Bar dataKey="passRate" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Pass Rate %" />
@@ -789,8 +790,8 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={subjects.slice(0, 12)}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="subject" tick={{ fontSize: 9 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                <XAxis dataKey="subject" tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                 <Tooltip contentStyle={{ fontSize: 12 }} />
                 <Bar dataKey="average" fill={chartColorAt(2)} radius={[4, 4, 0, 0]} name="Average %" />
               </BarChart>
@@ -858,8 +859,8 @@ function HighRankTeachersPanel({ academicYear, term }: { academicYear: string; t
             {teachers && teachers.length > 0 ? (
               <ResponsiveContainer width="100%" height={Math.max(180, teachers.length * 36)}>
                 <BarChart data={teachers} layout="vertical">
-                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="teacherName" tick={{ fontSize: 10 }} width={130} />
+                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                  <YAxis type="category" dataKey="teacherName" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} width={130} />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, '']} />
                   <Bar dataKey="avgStudentScore" fill={chartColorAt(4)} radius={[0, 4, 4, 0]} name="Avg Student Score %" />
                 </BarChart>
@@ -912,8 +913,8 @@ function HighRankEnrollmentPanel() {
             <ResponsiveContainer width="100%" height={220}>
               <ComposedChart data={trend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                 <Tooltip contentStyle={{ fontSize: 12 }} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="enrolled" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="New Enrolled" />
@@ -954,8 +955,8 @@ function HighRankFinancePanel({ academicYear, term }: { academicYear: string; te
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={cashFlow.map((r) => ({ ...r, label: `Term ${r.term}` }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), '']} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="revenue"  fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Revenue" />
@@ -1026,8 +1027,8 @@ function FinanceCollectionPanel() {
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={dayData ?? []}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="label" tick={{ fontSize: 9 }} />
-              <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
+              <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
               <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), 'Collected']} />
               <Bar dataKey="value" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -1039,9 +1040,9 @@ function FinanceCollectionPanel() {
           <ResponsiveContainer width="100%" height={200}>
             <ComposedChart data={monthData ?? []}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-              <YAxis yAxisId="left"  tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
+              <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+              <YAxis yAxisId="left"  tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
               <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), '']} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar      yAxisId="left"  dataKey="collected"  fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Monthly" />
@@ -1076,8 +1077,8 @@ function FinanceOutstandingPanel({ academicYear, term }: { academicYear: string;
             <>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={rows} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
-                  <YAxis type="category" dataKey="className" tick={{ fontSize: 11 }} width={80} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
+                  <YAxis type="category" dataKey="className" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} width={80} />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), 'Outstanding']} />
                   <Bar dataKey="outstanding" fill={chartColorAt(3)} radius={[0, 4, 4, 0]} />
                 </BarChart>
@@ -1141,11 +1142,11 @@ function FinanceExpensesPanel({ academicYear, term }: { academicYear: string; te
             {budgets && budgets.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={budgets} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
                   {/* [R14] Was dataKey="department" — a field that exists on Budget
                       but not on Expense, and therefore never joined. The row's key
                       is now the ExpenseCategory it is actually budgeted against. */}
-                  <YAxis type="category" dataKey="category" tick={{ fontSize: 10 }} width={110} />
+                  <YAxis type="category" dataKey="category" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} width={110} />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), '']} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="allocated" fill={chartColorAt(0)} radius={[0, 4, 4, 0]} name="Allocated" />
@@ -1194,8 +1195,8 @@ function FinanceCashFlowPanel({ academicYear }: { academicYear: string }) {
               <ResponsiveContainer width="100%" height={220}>
                 <ComposedChart data={rows.map((r) => ({ ...r, label: `Term ${r.term}` }))}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), '']} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="revenue"  fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Revenue" />
@@ -1249,8 +1250,8 @@ function FinancePayrollPanel() {
             <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`} />
                 <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), 'Payroll']} />
                 <Area type="monotone" dataKey="value" stroke={chartColorAt(0)} fill={chartColorAt(0)} fillOpacity={0.08} strokeWidth={2} name="Payroll" />
               </AreaChart>
@@ -1291,8 +1292,8 @@ function LibraryOverviewPanel() {
             <>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={top} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="title" tick={{ fontSize: 9 }} width={160} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                  <YAxis type="category" dataKey="title" tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }} width={160} />
                   <Tooltip contentStyle={{ fontSize: 12 }} />
                   <Bar dataKey="borrowCount" fill={chartColorAt(1)} radius={[0, 4, 4, 0]} name="Borrows" />
                 </BarChart>
@@ -1331,8 +1332,8 @@ function LibraryBorrowingPanel() {
             <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                 <Tooltip contentStyle={{ fontSize: 12 }} />
                 <Area type="monotone" dataKey="value" stroke={chartColorAt(1)} fill={chartColorAt(1)} fillOpacity={0.13} strokeWidth={2} name="Books Issued" />
               </AreaChart>
@@ -1375,8 +1376,8 @@ function LibraryDigitalPanel() {
             {stats?.bySubject?.length ? (
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={stats.bySubject} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="category" tick={{ fontSize: 10 }} width={100} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                  <YAxis type="category" dataKey="category" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} width={100} />
                   <Tooltip contentStyle={{ fontSize: 12 }} />
                   <Bar dataKey="value" fill={chartColorAt(4)} radius={[0, 4, 4, 0]} />
                 </BarChart>
@@ -1420,8 +1421,8 @@ function LowerRankApplicationsPanel() {
           {funnel && funnel.length > 0 ? (
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={funnel.filter((s) => s.stage !== 'Denied')}>
-                <XAxis dataKey="stage" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
+                <XAxis dataKey="stage" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                 <Tooltip contentStyle={{ fontSize: 12 }} />
                 <Bar dataKey="count" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -1434,8 +1435,8 @@ function LowerRankApplicationsPanel() {
           {trend && trend.length > 0 ? (
             <ResponsiveContainer width="100%" height={160}>
               <AreaChart data={trend}>
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
+                <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                 <Tooltip contentStyle={{ fontSize: 12 }} />
                 <Area type="monotone" dataKey="value" stroke={chartColorAt(1)} fill={chartColorAt(1)} fillOpacity={0.08} strokeWidth={2} name="Applications" />
               </AreaChart>
@@ -1459,8 +1460,8 @@ function LowerRankEnrollmentPanel({ academicYear }: { academicYear: string }) {
             <>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={rows}>
-                  <XAxis dataKey="className" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
+                  <XAxis dataKey="className" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                   <Tooltip contentStyle={{ fontSize: 12 }} />
                   <Bar dataKey="studentCount" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Students" />
                 </BarChart>
@@ -1501,8 +1502,8 @@ function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; t
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={rows.slice(0, 12)}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="subject" tick={{ fontSize: 9 }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                  <XAxis dataKey="subject" tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, '']} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="average"  fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Average %" />
@@ -1619,8 +1620,8 @@ function StudentPerformancePanel({ studentId, academicYear, term }: { studentId:
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={trend.map((t) => ({ ...t, label: `${t.academicYear} T${t.term}` }))}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 9 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                <XAxis dataKey="label" tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                 <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, '']} />
                 <Line type="monotone" dataKey="average" stroke={chartColorAt(1)} strokeWidth={2} dot name="Average %" />
               </LineChart>
@@ -1634,8 +1635,8 @@ function StudentPerformancePanel({ studentId, academicYear, term }: { studentId:
             <>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={subjects}>
-                  <XAxis dataKey="subject" tick={{ fontSize: 9 }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                  <XAxis dataKey="subject" tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                   <Tooltip contentStyle={{ fontSize: 12 }} />
                   <Bar dataKey="score" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Score">
                     {subjects.map((s, i) => (
@@ -1756,8 +1757,8 @@ function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
             <ChartCard title={`${stat.examType} Grade Distribution`}>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={stat.gradeDistribution}>
-                  <XAxis dataKey="category" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
+                  <XAxis dataKey="category" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                   <Tooltip contentStyle={{ fontSize: 12 }} />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]} name="Students">
                     {stat.gradeDistribution.map((g, i) => (
@@ -1771,8 +1772,8 @@ function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
               {stat.subjectAverages.length > 0 ? (
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={stat.subjectAverages.slice(0, 8)} layout="vertical">
-                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
-                    <YAxis type="category" dataKey="subject" tick={{ fontSize: 9 }} width={100} />
+                    <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                    <YAxis type="category" dataKey="subject" tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }} width={100} />
                     <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, 'Pass Rate']} />
                     <Bar dataKey="passRate" radius={[0, 4, 4, 0]} name="Pass Rate %">
                       {stat.subjectAverages.slice(0, 8).map((s, i) => (
@@ -1826,8 +1827,8 @@ function HRStaffingPanel() {
               </ResponsiveContainer>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={depts} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} />
-                  <YAxis type="category" dataKey="category" tick={{ fontSize: 10 }} width={100} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                  <YAxis type="category" dataKey="category" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} width={100} />
                   <Tooltip contentStyle={{ fontSize: 12 }} />
                   <Bar dataKey="value" fill={chartColorAt(0)} radius={[0, 4, 4, 0]} name="Staff" />
                 </BarChart>
@@ -1868,8 +1869,8 @@ function HRLeavePanel() {
               {trend && trend.length > 0 ? (
                 <ResponsiveContainer width="100%" height={180}>
                   <ComposedChart data={trend}>
-                    <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                    <YAxis tick={{ fontSize: 10 }} />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+                    <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                     <Tooltip contentStyle={{ fontSize: 12 }} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     <Bar dataKey="value"  fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Approved" />
@@ -1928,8 +1929,8 @@ function AttendanceSummaryPanel({ academicYear, term }: { academicYear: string; 
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={data.byClass}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-            <XAxis dataKey="className" tick={{ fontSize: 10 }} />
-            <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+            <XAxis dataKey="className" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+            <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
             <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, 'Attendance']} />
             <ReferenceLine y={85} stroke={chartColorAt(3)} strokeDasharray="4 4" />
             <Bar dataKey="attendanceRate" radius={[4, 4, 0, 0]} name="Attendance %">
@@ -2011,8 +2012,24 @@ function StudentAttendancePanel({ studentId, academicYear, term }: { studentId: 
         <ResponsiveContainer width="100%" height={220}>
           <PieChart>
             <Pie data={breakdown} dataKey="value" nameKey="category" cx="50%" cy="50%" outerRadius={80} label={(p: PieLabelRenderProps) => `${p.name ?? ''} ${num(p.value)}`} fontSize={11}>
-              {breakdown.map((b, i) => (
-                <Cell key={b.category} fill={[chartColorAt(1), chartColorAt(2), chartColorAt(3)][i % 3]} />
+              {/* [PRODUCTION FIX] Colours were picked by array position
+                 ([green, amber, red][i % 3]) against `breakdown`, which
+                 has already been through .filter((b) => b.value > 0) —
+                 so whenever a category had zero days (commonly "Late"),
+                 the remaining categories shifted left and inherited the
+                 wrong colour (e.g. "Absent" landing on amber instead of
+                 red). Mapped by category identity instead of position,
+                 so Present/Late/Absent keep the same colour regardless of
+                 which categories are present in a given student's data. */}
+              {breakdown.map((b) => (
+                <Cell
+                  key={b.category}
+                  fill={
+                    b.category === 'Present' ? chartColorAt(1)
+                    : b.category === 'Late' ? chartColorAt(2)
+                    : chartColorAt(3)
+                  }
+                />
               ))}
             </Pie>
             <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)} days`, '']} />
@@ -2051,8 +2068,8 @@ function FinanceScholarshipsPanel({ academicYear }: { academicYear: string }) {
       <ChartCard title={`Scholarship Value — ${academicYear}`}>
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={data.byScholarship} layout="vertical">
-            <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
-            <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={130} />
+            <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
+            <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} width={130} />
             <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), 'Discount']} />
             <Bar dataKey="totalDiscount" fill={chartColorAt(4)} radius={[0, 4, 4, 0]} name="Discount" />
           </BarChart>
@@ -2126,8 +2143,8 @@ function MarksDistributionPanel() {
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={buckets}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="bucket" tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+              <XAxis dataKey="bucket" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
               <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)} students`, '']} />
               <Bar dataKey="count" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Students" />
             </BarChart>
@@ -2331,8 +2348,8 @@ function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; te
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={data.classStats}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
               <Tooltip contentStyle={{ fontSize: 12 }} />
               <Bar dataKey="_count.students" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Students" />
             </BarChart>
@@ -2345,11 +2362,17 @@ function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; te
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={enrollmentByClass}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
               <Tooltip contentStyle={{ fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="roster" fill={chartColorAt(3)} radius={[4, 4, 0, 0]} name="Total Roster" />
+              {/* [PRODUCTION FIX] "Total Roster" is a neutral headcount, not
+                 a bad/at-risk figure, but chartColorAt(3) put it on the
+                 palette's red — the same colour "Rejected"/"At Risk"/
+                 "Departed" use elsewhere in this file. Moved to neutral
+                 navy so red keeps one consistent meaning across every
+                 chart on this page. */}
+              <Bar dataKey="roster" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Total Roster" />
               <Bar dataKey="active" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Active Students" />
             </BarChart>
           </ResponsiveContainer>
@@ -2425,8 +2448,8 @@ function HRSummaryPanel() {
         <ChartCard title="Staff by Department">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={data.staffByDept} layout="vertical">
-              <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10 }} />
-              <YAxis type="category" dataKey="department" tick={{ fontSize: 10 }} width={120} />
+              <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
+              <YAxis type="category" dataKey="department" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} width={120} />
               <Tooltip contentStyle={{ fontSize: 12 }} />
               <Bar dataKey="_count" fill={chartColorAt(1)} radius={[0, 4, 4, 0]} name="Staff" />
             </BarChart>
@@ -2650,6 +2673,7 @@ function ReportsContent() {
         </div>
       </div>
 
+      <ModuleSurface>
       {/* ── Tab Bar ── */}
       {(ROLE_TABS[role ?? ''] ?? []).length > 1 && (
         <RoleTabs role={role ?? ''} active={activeTab} onChange={setActiveTab} />
@@ -2727,6 +2751,7 @@ function ReportsContent() {
           {role === 'student' && activeTab === 'summary'     && <StudentSummaryPanel studentId={studentId} />}
         </>
       )}
+      </ModuleSurface>
     </div>
   )
 }
@@ -2745,8 +2770,8 @@ function StudentSubjectPanel({ studentId, academicYear, term }: { studentId: str
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={subjects}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="subject" tick={{ fontSize: 9 }} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                  <XAxis dataKey="subject" tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                   <Tooltip contentStyle={{ fontSize: 12 }} />
                   <Bar dataKey="score" radius={[4, 4, 0, 0]} name="Score">
                     {subjects.map((s, i) => (

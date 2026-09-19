@@ -60,6 +60,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { addMonths, subMonths } from 'date-fns'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { useIsMobile } from '@/hooks/use-mobile'
 import {
@@ -235,6 +236,7 @@ function CalendarContent() {
         </p>
       </div>
 
+      <ModuleSurface>
       <DesktopCalendarView
         monthDate={monthDate}
         onNavigateMonth={navigateMonth}
@@ -312,6 +314,7 @@ function CalendarContent() {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+      </ModuleSurface>
     </div>
   )
 }

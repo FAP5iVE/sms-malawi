@@ -54,6 +54,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { getAuth } from 'firebase/auth'
 import { useSearchParams }   from 'next/navigation'
 import { RoleGuard }         from '@/components/shared/RoleGuard'
+import { ModuleSurface }     from '@/components/shared/ModuleSurface'
 import { PermissionGuard }   from '@/components/shared/PermissionGuard'
 import { useAuthStore }      from '@/store/authStore'
 import {
@@ -1494,6 +1495,7 @@ function LibraryContent() {
         </div>
       </div>
 
+      <ModuleSurface>
       {/* Summary stat tiles — [R21] added a 5th "Pending Fines" tile
           (MK amount, from the new pendingFinesAmount stat) matching the
           screenshot's 5-tile layout; On Loan now uses the same Repeat
@@ -2659,6 +2661,7 @@ function LibraryContent() {
           onClose={() => setViewingResource(null)}
         />
       )}
+      </ModuleSurface>
     </div>
   )
 }

@@ -173,9 +173,20 @@ export function AdminDashboard() {
           <Chart
             type="line"
             data={loginData}
+            /* [PRODUCTION FIX] Both series previously omitted `color`, so
+               RechartsRenderer's buildConfig() fell back to
+               chartColorAt(index) — index 0 (successful) got the palette's
+               navy, but index 1 (failed) landed on the palette's emerald
+               GREEN, the same colour "successful"/"good" uses everywhere
+               else in the app. A failed-login count rendering in green
+               read as a positive signal. Colours are now explicit and tied
+               to meaning, matching the app-wide good=teal/bad=coral
+               convention (see ExamsPage's computeResult banner, Reports'
+               Approved/Rejected bars, etc.) instead of an incidental
+               palette-index accident. */
             series={[
-              { key: 'successful', label: 'Successful' },
-              { key: 'failed', label: 'Failed' },
+              { key: 'successful', label: 'Successful', color: 'var(--color-brand-teal, #0e8a6a)' },
+              { key: 'failed', label: 'Failed', color: 'var(--color-brand-coral, #dc4f3a)' },
             ]}
             height={200}
             emptyStateMessage="No login activity recorded in the last 30 days."

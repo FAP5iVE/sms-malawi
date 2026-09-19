@@ -20,6 +20,7 @@
 import { useState } from 'react'
 import { Activity, AlertTriangle, ScrollText, Bell, Video, GitBranch, MessageSquareWarning, Cloud } from 'lucide-react'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { ModuleTabs } from '@/components/shared/ModuleTabs'
 import type { TabItem } from '@/components/shared/ModuleTabs'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -60,6 +61,7 @@ export default function MonitoringPage() {
           </div>
           <p className="text-sm text-muted -mt-4">Live system health, errors, and outages</p>
 
+          <ModuleSurface>
           <MonitoringKpiStrip summary={summary} isLoading={summaryLoading} />
 
           <ModuleTabs<Tab>
@@ -77,6 +79,7 @@ export default function MonitoringPage() {
           {tab === 'releases' && <ReleasesPanel summary={summary} />}
           {tab === 'feedback' && <FeedbackPanel />}
           {tab === 'vercel'   && <VercelPlatformPanel />}
+          </ModuleSurface>
         </div>
       </div>
     </RoleGuard>

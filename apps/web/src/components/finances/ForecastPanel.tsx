@@ -229,7 +229,7 @@ export function ForecastPanel() {
             <AcademicYearSelect
               value={academicYear}
               onChange={(e) => setAcademicYear(e.target.value)}
-              className="min-h-[44px] border border-base rounded-xl px-3 text-sm bg-page text-body w-32 focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body w-32 focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             />
           </div>
           <div>
@@ -237,14 +237,14 @@ export function ForecastPanel() {
               Forecast Months
             </label>
             <select value={forwardMonths} onChange={(e) => setForwardMonths(Number(e.target.value))}
-              className="min-h-[44px] border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25">
+              className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25">
               <option value={1}>+1 month</option>
               <option value={3}>+3 months</option>
               <option value={6}>+6 months</option>
             </select>
           </div>
           <button type="button" onClick={loadForecast} disabled={loading}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2">
+            className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {loading ? 'Loading…' : 'Refresh'}
           </button>
@@ -300,16 +300,16 @@ export function ForecastPanel() {
           </p>
           <ResponsiveContainer width="100%" height={320}>
             <ComposedChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-base, #e5e7eb)" />
+              <CartesianGrid strokeDasharray="none" stroke="var(--color-border)" vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fontSize: 11, fill: 'var(--color-muted, #9ca3af)' }}
+                tick={{ fontSize: 11, fill: 'var(--color-muted-foreground, #64748b)' }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
                 tickFormatter={yFormatter}
-                tick={{ fontSize: 11, fill: 'var(--color-muted, #9ca3af)' }}
+                tick={{ fontSize: 11, fill: 'var(--color-muted-foreground, #64748b)' }}
                 axisLine={false}
                 tickLine={false}
               />

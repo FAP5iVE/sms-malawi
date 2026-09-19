@@ -50,6 +50,7 @@ import { useStudents, useArchiveStudent }          from '@/hooks/useStudents'
 import { useClasses }                             from '@/hooks/useClasses'
 import { usePermissions }                         from '@/hooks/usePermissions'
 import { RoleGuard }                              from '@/components/shared/RoleGuard'
+import { ModuleSurface }                          from '@/components/shared/ModuleSurface'
 import { PermissionGuard }                        from '@/components/shared/PermissionGuard'
 import { StudentForm }                            from '@/components/students/StudentForm'
 import { DataTable }                              from '@/components/shared/DataTable'
@@ -302,7 +303,7 @@ function StudentsContent() {
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1) }}
               placeholder="Search by name or registration no…"
-              className="w-full min-h-[44px] border border-base rounded-xl px-4 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              className="w-full min-h-11 border border-base rounded-xl px-4 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             />
           </div>
           <div className="w-40 sm:w-48">
@@ -311,7 +312,7 @@ function StudentsContent() {
               id="student-class-filter"
               value={classId}
               onChange={(e) => { setClassId(e.target.value); setPage(1) }}
-              className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             >
               <option value="">All classes</option>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -323,7 +324,7 @@ function StudentsContent() {
               id="student-sex-filter"
               value={sex}
               onChange={(e) => { setSex(e.target.value as '' | 'MALE' | 'FEMALE'); setPage(1) }}
-              className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             >
               <option value="">All genders</option>
               <option value="MALE">Male</option>
@@ -339,7 +340,7 @@ function StudentsContent() {
             onClick={() => setShowForm(true)}
             className="
               flex items-center gap-2
-              min-h-[44px] px-5 rounded-xl
+              min-h-11 px-5 rounded-xl
               text-sm font-heading font-semibold
               bg-brand-teal text-white
               hover:bg-brand-teal/90 transition-colors
@@ -351,6 +352,7 @@ function StudentsContent() {
         </PermissionGuard>
       </div>
 
+      <ModuleSurface>
       {actionError && (
         <p
           role="alert"
@@ -436,6 +438,7 @@ function StudentsContent() {
         }}
         onCancel={() => setPendingArchiveIds(null)}
       />
+      </ModuleSurface>
     </div>
   )
 }

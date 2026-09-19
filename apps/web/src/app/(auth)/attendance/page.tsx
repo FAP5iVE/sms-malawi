@@ -25,6 +25,7 @@
 
 import { useMemo, useState } from 'react'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { useStudentMe } from '@/hooks/useStudents'
 import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
 import { useOwnAttendance } from '@/hooks/useAnalytics'
@@ -88,6 +89,7 @@ function AttendanceContent() {
         <p className="text-sm text-muted mt-0.5">Your own attendance record — no other student&apos;s data is shown here.</p>
       </div>
 
+      <ModuleSurface>
       {/* ── Term summary ─────────────────────────────────────────────── */}
       <div className="bg-surface rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
@@ -188,6 +190,7 @@ function AttendanceContent() {
           <span className="flex items-center gap-1.5 text-xs text-muted"><span className="w-3.5 h-3.5 rounded bg-page border border-base inline-block" /> No record</span>
         </div>
       </div>
+      </ModuleSurface>
     </div>
   )
 }

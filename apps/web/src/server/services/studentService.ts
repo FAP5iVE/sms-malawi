@@ -35,7 +35,7 @@
  */
 import 'server-only'
 
-import { prisma }        from '@/lib/prisma'
+import { prisma, withRetry } from '@/lib/prisma'
 import { logger }        from '@/lib/logger'
 import * as auditService from '@/server/services/auditService'
 import * as admin        from 'firebase-admin'
@@ -1152,7 +1152,7 @@ export async function createFromApplication(
   for (let attempt = 0; attempt < REGISTRATION_NO_MAX_ATTEMPTS; attempt++) {
     registrationNo = await nextRegistrationNo()
     try {
-      const [createdStudent] = await prisma.$transaction([
+      const [createdStudent] = await withRetry(() => prisma.$transaction([
         prisma.student.create({
           data: {
             registrationNo,
@@ -1187,7 +1187,7 @@ export async function createFromApplication(
           },
           select: { id: true },
         }),
-      ])
+      ]))
       student = createdStudent
       break
     } catch (err) {

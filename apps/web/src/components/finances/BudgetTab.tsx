@@ -7,6 +7,7 @@ import { formatMWK } from '@shared/constants/malawi'
 import { MOBILE_BREAKPOINT } from '@shared/constants/breakpoints'
 import { Plus, Loader2 } from 'lucide-react'
 import dynamic from 'next/dynamic'
+import { useTheme } from 'next-themes'
 
 // ApexCharts must be dynamically imported — it's not SSR-compatible
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
@@ -24,6 +25,16 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
   // from what departments actually exist.
   const { data: departmentTitles = {} } = useDepartmentTitles()
   const departments = Object.keys(departmentTitles).sort()
+  // [PRODUCTION FIX] chartOptions below previously set no `theme.mode` and
+  // no explicit label/legend/tooltip colours, so ApexCharts fell back to
+  // its own fixed defaults (a dark grey, ~#373d3f) for every axis label,
+  // legend entry, and tooltip — readable on a light page, but nearly
+  // invisible against this app's near-black dark-mode background. Same
+  // fix ApexChartRenderer.tsx (the shared chart module) already applies:
+  // resolve the active theme and pass it through so ApexCharts renders
+  // its own light/dark-correct text and grid colours.
+  const { resolvedTheme } = useTheme()
+  const chartMode: 'light' | 'dark' = resolvedTheme === 'dark' ? 'dark' : 'light'
 
   const [showForm, setShowForm] = useState(false)
   const [term, setTerm] = useState('')
@@ -57,7 +68,9 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
   const spent = budget.map((b) => b.spent)
 
   const chartOptions = {
-    chart: { type: 'bar' as const, toolbar: { show: false }, height: 300 },
+    chart: { type: 'bar' as const, toolbar: { show: false }, height: 300, background: 'transparent' },
+    theme: { mode: chartMode },
+    grid: { borderColor: chartMode === 'dark' ? '#2a2f3a' : '#e5e7eb' },
     plotOptions: { bar: { horizontal: false, columnWidth: '55%' } },
     xaxis: {
       categories,
@@ -73,8 +86,11 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
         formatter: (v: number) => `MWK ${(v / 1_000_000).toFixed(1)}M`,
       },
     },
+    // Allocated (neutral navy) vs Spent (neutral teal) — deliberately NOT
+    // good/bad coloured: spending itself isn't "bad", only overspending
+    // is, and that distinction isn't in this bar pair.
     colors: ['#0F2744', '#0E8A6A'],
-    legend: { position: 'top' as const },
+    legend: { position: 'top' as const, labels: { colors: chartMode === 'dark' ? '#e4eaf3' : '#0f172a' } },
     // Per-bar numeric labels are dropped in favor of the tooltip below and
     // the y-axis scale — exact figures are one tap away, and the chart
     // reads as a clean shape instead of a wall of small numbers on every

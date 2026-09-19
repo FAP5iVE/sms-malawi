@@ -274,9 +274,17 @@ export function HighRankDashboard() {
           <Chart
             type="line"
             data={enrollmentData}
+            /* [PRODUCTION FIX] Colours were previously left implicit,
+               defaulting to chartColorAt(index) — "departed" (index 1)
+               landed on the palette's green, the colour "good"/"enrolled"
+               uses everywhere else, while "enrolled" itself sat on a
+               neutral navy. Reports' own Enrollment tab already colours
+               this exact pair correctly (teal for new/enrolled, coral for
+               departed) — matched here so the same metric doesn't tell two
+               different colour stories depending on which screen shows it. */
             series={[
-              { key: 'enrolled', label: 'Enrolled' },
-              { key: 'departed', label: 'Departed' },
+              { key: 'enrolled', label: 'Enrolled', color: 'var(--color-brand-teal, #0e8a6a)' },
+              { key: 'departed', label: 'Departed', color: 'var(--color-brand-coral, #dc4f3a)' },
             ]}
             height={220}
             emptyStateMessage="No enrollment movement recorded yet."

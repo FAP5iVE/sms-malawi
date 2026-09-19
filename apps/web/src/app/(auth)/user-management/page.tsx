@@ -48,6 +48,7 @@ import { useState, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import Link from 'next/link'
 import { AddUserTypeDialog, type NewUserType } from '@/components/shared/AddUserTypeDialog'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -280,6 +281,7 @@ function UserManagementContent() {
         )}
       </div>
 
+      <ModuleSurface>
       <div className="flex gap-1 border-b border-base">
         {([
           { id: 'users'  as const, label: 'User Accounts', icon: Shield  },
@@ -296,7 +298,7 @@ function UserManagementContent() {
         <>
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-2.5 bg-surface p-4">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <div className="relative flex-1 min-w-50 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" />
               <input
                 value={search}
@@ -420,6 +422,7 @@ function UserManagementContent() {
         }}
         onCancel={() => setPendingDisable(null)}
       />
+      </ModuleSurface>
     </div>
   )
 }

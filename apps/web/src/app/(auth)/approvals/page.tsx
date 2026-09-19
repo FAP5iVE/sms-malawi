@@ -16,6 +16,7 @@
 'use client'
 
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { PendingActionsPanel } from '@/components/shared/PendingActionsPanel'
 
 export default function ApprovalsPage() {
@@ -28,7 +29,9 @@ export default function ApprovalsPage() {
             Requests awaiting review, and the status of your own submissions.
           </p>
         </div>
+        <ModuleSurface>
         <PendingActionsPanel />
+        </ModuleSurface>
       </div>
     </RoleGuard>
   )

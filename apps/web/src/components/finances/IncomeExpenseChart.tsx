@@ -21,6 +21,15 @@
  *   - @/components/shared/chart (R17 Chart)
  *   - @/components/shared/ChartCard (R17 card shell)
  *   - @shared/constants/malawi (formatMWK — display consistency)
+ * 
+ *          [PRODUCTION FIX from line 71] Colours were left implicit, so ApexChartRenderer's
+           chartColorAt(index) fallback put "expenses" (index 1) on the
+           palette's green — the colour this same app uses for "good"/
+           "revenue" everywhere else (see reports/page.tsx's Financial
+           Overview panel) — while revenue itself sat on neutral navy.
+           Explicit colours tie each series to what it means: revenue is
+           the positive figure, expenses the cost, net a neutral summary
+           line.
  */
 
 'use client'
@@ -59,10 +68,11 @@ export function IncomeExpenseChart({
       <Chart
         type="combo"
         data={data}
+
         series={[
-          { key: 'revenue', label: 'Revenue', kind: 'bar' },
-          { key: 'expenses', label: 'Expenses', kind: 'bar' },
-          { key: 'net', label: 'Net', kind: 'line' },
+          { key: 'revenue', label: 'Revenue', kind: 'bar', color: 'var(--color-brand-teal, #0e8a6a)' },
+          { key: 'expenses', label: 'Expenses', kind: 'bar', color: 'var(--color-brand-coral, #dc4f3a)' },
+          { key: 'net', label: 'Net', kind: 'line', color: 'var(--color-brand-navy, #1e3a5f)' },
         ]}
         height={260}
         emptyStateMessage="No income or expense data for this year yet."

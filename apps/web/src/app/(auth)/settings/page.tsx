@@ -57,6 +57,7 @@ import {
   Building2,
 }                               from 'lucide-react'
 import { useAuthStore }         from '@/store/authStore'
+import { ModuleSurface }        from '@/components/shared/ModuleSurface'
 import { ProfileSettings }      from '@/components/settings/ProfileSettings'
 import { SystemConfigSettings } from '@/components/settings/SystemConfigSettings'
 import { AcademicPolicySettings } from '@/components/settings/AcademicPolicySettings'
@@ -239,6 +240,7 @@ function SettingsPageInner() {
         </p>
       </div>
 
+      <ModuleSurface>
       <div className="flex flex-col md:flex-row gap-6 items-start">
 
         {/* ── Sidebar (desktop) ─────────────────────────────────────────── */}
@@ -320,6 +322,7 @@ function SettingsPageInner() {
           <SectionContent sectionId={active} />
         </div>
       </div>
+      </ModuleSurface>
     </div>
   )
 }

@@ -22,6 +22,7 @@
 
 import { useState } from 'react'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { StatCard, StatCardGrid } from '@/components/shared/StatCard'
 import { useStaffDirectory } from '@/hooks/useHR'
@@ -136,6 +137,7 @@ function AssetsContent() {
         </div>
       </div>
 
+      <ModuleSurface>
       <PermissionGuard permission="assets.viewInventoryReports">
         <StatCardGrid className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <StatCard
@@ -206,6 +208,7 @@ function AssetsContent() {
       {tab === 'rooms' && <RoomsTab />}
       {tab === 'mine' && <MyAssignedTab />}
       {tab === 'requests' && <RequestsTab />}
+      </ModuleSurface>
     </div>
   )
 }

@@ -37,6 +37,7 @@ import {
   useConvertToStudent,
 } from '@/hooks/useApplications'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { DataTable } from '@/components/shared/DataTable'
 import type { DataColumn, MobileAction } from '@/components/shared/DataTable'
 import { ModuleTabs } from '@/components/shared/ModuleTabs'
@@ -226,6 +227,7 @@ function ApplicationsContent() {
         <p className="text-sm text-muted mt-0.5">Student admission applications</p>
       </div>
 
+      <ModuleSurface>
       {/* [PRODUCTION FIX] Was variant="pill" — in light mode the active
          chip's navy background rendered behind the page (see
          ModuleTabs.tsx), leaving white active-tab text invisible against
@@ -276,6 +278,7 @@ function ApplicationsContent() {
           emptyMessage="No applications found for this status."
         />
       )}
+      </ModuleSurface>
     </div>
   )
 }

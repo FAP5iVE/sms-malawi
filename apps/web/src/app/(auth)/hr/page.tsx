@@ -59,6 +59,7 @@
 import { useState, Suspense } from 'react'
 import { useSearchParams }  from 'next/navigation'
 import { RoleGuard }        from '@/components/shared/RoleGuard'
+import { ModuleSurface }    from '@/components/shared/ModuleSurface'
 import { useAuthStore }     from '@/store/authStore'
 import { usePermissions }   from '@/hooks/usePermissions'
 import type { LeaveRequestInput } from '@shared/schemas/hr'
@@ -256,6 +257,7 @@ function HRContent() {
         </p>
       </div>
 
+      <ModuleSurface>
       {/* Mobile-scrollable tab navigation — C7 */}
       <ModuleTabs<Tab>
         tabs={TABS}
@@ -600,6 +602,7 @@ function HRContent() {
           ))}
         </div>
       )}
+      </ModuleSurface>
     </div>
   )
 }

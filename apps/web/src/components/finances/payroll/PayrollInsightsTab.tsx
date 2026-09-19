@@ -79,7 +79,7 @@ export function PayrollInsightsTab() {
         <select
           value={months}
           onChange={(e) => setMonths(Number(e.target.value))}
-          className="min-h-[40px] px-3 rounded-xl text-sm border border-base bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+          className="min-h-10 px-3 rounded-xl text-sm border border-base bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
         >
           {MONTH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
@@ -125,9 +125,9 @@ export function PayrollInsightsTab() {
         {!isLoading && points.length > 0 && (
           <ResponsiveContainer width="100%" height={340}>
             <ComposedChart data={points} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-base, #e5e7eb)" />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-muted, #9ca3af)' }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={formatCompactMWK} tick={{ fontSize: 11, fill: 'var(--color-muted, #9ca3af)' }} axisLine={false} tickLine={false} />
+              <CartesianGrid strokeDasharray="none" stroke="var(--color-border)" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground, #64748b)' }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={formatCompactMWK} tick={{ fontSize: 11, fill: 'var(--color-muted-foreground, #64748b)' }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '16px' }} />
               <Bar dataKey="totalGross" name="Gross Payroll" fill="var(--color-brand-teal, #0d9488)" radius={[4, 4, 0, 0]} maxBarSize={28} />

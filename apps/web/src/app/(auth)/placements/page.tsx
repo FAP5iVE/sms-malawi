@@ -31,6 +31,7 @@ import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useMyPlacement, usePlacementsQueue } from '@/hooks/usePlacements'
 import { ModuleTabs, type TabItem } from '@/components/shared/ModuleTabs'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { PlacementRegistryPanel } from '@/components/placements/PlacementRegistryPanel'
 import { PlacementAdvisoryChecker } from '@/components/placements/PlacementAdvisoryChecker'
 import { StaffPlacementEntryPanel } from '@/components/placements/StaffPlacementEntryPanel'
@@ -84,6 +85,7 @@ function PlacementsContent() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      <ModuleSurface>
       <ModuleTabs tabs={tabs} active={activeTab} onChange={setActive} id="placements" />
 
       {activeTab === 'registry' && <PlacementRegistryPanel />}
@@ -91,6 +93,7 @@ function PlacementsContent() {
       {activeTab === 'staffEntry' && canStaffEnter && <StaffPlacementEntryPanel />}
       {activeTab === 'verify' && canVerify && <ClaimsVerificationPanel />}
       {activeTab === 'myClaim' && showMyClaimTab && <StudentClaimPanel />}
+      </ModuleSurface>
     </div>
   )
 }

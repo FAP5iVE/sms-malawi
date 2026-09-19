@@ -36,6 +36,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { useClasses } from '@/hooks/useClasses'
 import { usePublicSchoolInfo } from '@/hooks/usePublic'
 import type { ApiTimetableSlot, ApiClass } from '@shared/types/api'
@@ -90,6 +91,7 @@ function TimetableContent() {
         <h1 className="font-heading text-2xl font-bold text-brand-navy">Timetable</h1>
       </div>
 
+      <ModuleSurface>
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <select
@@ -125,7 +127,7 @@ function TimetableContent() {
         <div className="skeleton h-64 rounded-xl" />
       ) : (
         <div className="bg-surface border border-base rounded-xl overflow-auto">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-160 text-sm">
             <thead>
               <tr className="border-b border-base bg-page">
                 <th className="text-left px-4 py-3 font-heading font-semibold text-xs uppercase tracking-wide text-muted w-24">
@@ -184,6 +186,7 @@ function TimetableContent() {
           </table>
         </div>
       )}
+      </ModuleSurface>
     </div>
   )
 }

@@ -46,6 +46,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAnnouncements, usePendingAnnouncements, useMyDrafts, type Announcement } from '@/hooks/useAnnouncements'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { AnnouncementForm } from '@/components/announcements/AnnouncementForm'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useAuthStore } from '@/store/authStore'
@@ -688,6 +689,7 @@ function AnnouncementsContent() {
           Announcements / Events, each an independent section with its own
           create entry point and its own Published/Pending/Drafts state,
           in place of the four buttons this header used to stack at once. */}
+      <ModuleSurface contentClassName="">
       <ModuleTabs<PostType>
         tabs={CONTENT_TYPE_ORDER.map((id) => ({ id, label: CONTENT_TYPE_META[id].label, icon: CONTENT_TYPE_META[id].icon }))}
         active={activeType}
@@ -788,6 +790,7 @@ function AnnouncementsContent() {
       {formMode && (
         <AnnouncementForm mode={formMode} draft={editingDraft ?? undefined} onClose={closeForm} />
       )}
+      </ModuleSurface>
     </div>
   )
 }
