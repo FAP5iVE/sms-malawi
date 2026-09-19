@@ -68,7 +68,13 @@ import {
   Loader2,
   DoorOpen,
   HandCoins,
+  Warehouse,
+  ClipboardCheck,
+  MapPin,
 } from 'lucide-react'
+import { InventoryOperationsTab } from '@/components/assets/InventoryOperationsTab'
+import { StocktakesTab } from '@/components/assets/StocktakesTab'
+import { LocationsTab } from '@/components/assets/LocationsTab'
 
 const CATEGORIES = [
   'FURNITURE',
@@ -95,12 +101,15 @@ const STATUS_COLOR: Record<string, string> = {
   LOST: 'bg-brand-coral/10 text-brand-coral',
 }
 
-type Tab = 'register' | 'rooms' | 'mine' | 'requests'
+type Tab = 'register' | 'rooms' | 'mine' | 'requests' | 'inventory' | 'stocktakes' | 'locations'
 const TABS = [
   { id: 'register' as Tab, label: 'Register', icon: Boxes },
   { id: 'rooms' as Tab, label: 'By Room/Dept', icon: DoorOpen },
   { id: 'mine' as Tab, label: 'My Assigned', icon: PackageCheck },
   { id: 'requests' as Tab, label: 'Requests', icon: ClipboardList },
+  { id: 'inventory' as Tab, label: 'Inventory', icon: Warehouse },
+  { id: 'stocktakes' as Tab, label: 'Stocktakes', icon: ClipboardCheck },
+  { id: 'locations' as Tab, label: 'Locations', icon: MapPin },
 ]
 
 export default function AssetsPage() {
@@ -208,6 +217,9 @@ function AssetsContent() {
       {tab === 'rooms' && <RoomsTab />}
       {tab === 'mine' && <MyAssignedTab />}
       {tab === 'requests' && <RequestsTab />}
+      {tab === 'inventory' && <InventoryOperationsTab />}
+      {tab === 'stocktakes' && <StocktakesTab />}
+      {tab === 'locations' && <LocationsTab />}
       </ModuleSurface>
     </div>
   )

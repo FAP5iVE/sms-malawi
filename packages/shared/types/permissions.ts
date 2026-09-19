@@ -267,6 +267,32 @@ export type Permission =
   | 'assets.viewAdvances'            // View procurement advances made against requisitions
   | 'assets.manageAdvances'          // Record/reconcile/write off procurement advances
 
+  // ── R22 — Locations, Budget Windows, Procurement, Inventory ────
+  // New domain sitting alongside assets.*, not replacing it. AssetRequest/
+  // AssetAdvance keep using assets.requestItem/approveRequest/viewAdvances/
+  // manageAdvances above unchanged — these are additive.
+  | 'location.view'                   // View departments / buildings / rooms
+  | 'location.manage'                 // Create/edit departments, buildings, rooms; assign room custodians
+
+  | 'finance.manageBudgetWindows'       // Open/close a budget submission window
+  | 'finance.manageBudgetCommitments'   // Release/cancel a budget commitment (reserve/consume happen automatically inside the procurement flow)
+
+  | 'procurement.createRequisition'     // Submit a purchase requisition
+  | 'procurement.viewRequisitions'      // View requisitions — service layer scopes to own/department for non-finance roles
+  | 'procurement.reviewRequisition'     // Approve / reject / return a submitted requisition
+  | 'procurement.manageRFQ'             // Issue RFQs; record and select supplier quotations
+  | 'procurement.manageSuppliers'       // Create/edit the supplier register (incl. bank details — restrict at UI level)
+  | 'procurement.managePurchaseOrders'  // Create, approve and send purchase orders
+  | 'procurement.receiveGoods'          // Record a goods receipt against a purchase order
+
+  | 'inventory.view'                  // View inventory items and transaction history
+  | 'inventory.manageItems'           // Create/edit InventoryItem catalog entries
+  | 'inventory.receive'               // Record a stock receipt
+  | 'inventory.issue'                 // Record a stock issue
+  | 'inventory.transfer'              // Record a stock transfer between rooms
+  | 'inventory.performStocktake'      // Open a stocktake, record counts, submit for review
+  | 'inventory.resolveVariance'       // Resolve or write off a stocktake variance
+
   // ── HR ───────────────────────────────────────────────
   | 'hr.viewOwnProfile'              // View own staff profile
   | 'hr.editOwnLimitedFields'        // Edit own limited fields (phone, address)
@@ -465,6 +491,11 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'assets.viewInventoryReports',
     'assets.viewAdvances',
 
+    // R22 — oversight only, same philosophy as assets.* above
+    'location.view',
+    'inventory.view',
+    'procurement.viewRequisitions',
+
     // HR — system account management, plus self-service payslip access.
     // [PRODUCTION FIX, user-requested] admin previously held none of the
     // payroll permissions at all, including hr.viewOwnPayslips — the
@@ -658,6 +689,14 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'assets.approveRequest',
     'assets.viewAdvances',
 
+    // R22 — reviews requisitions and controls when departments may submit
+    // budget bids, same authority level as assets.approveRequest above
+    'location.view',
+    'inventory.view',
+    'procurement.viewRequisitions',
+    'procurement.reviewRequisition',
+    'finance.manageBudgetWindows',
+
     // HR — full management authority
     'hr.viewOwnProfile',
     'hr.editOwnLimitedFields',
@@ -828,6 +867,27 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'assets.viewOwnAssigned',
     'assets.viewAdvances',
     'assets.manageAdvances',
+
+    // R22 — finance runs the full Assets/Inventory/Procurement operation,
+    // same full-operational-owner role it already has for assets.* above
+    'location.view',
+    'location.manage',
+    'finance.manageBudgetWindows',
+    'finance.manageBudgetCommitments',
+    'procurement.createRequisition',
+    'procurement.viewRequisitions',
+    'procurement.reviewRequisition',
+    'procurement.manageRFQ',
+    'procurement.manageSuppliers',
+    'procurement.managePurchaseOrders',
+    'procurement.receiveGoods',
+    'inventory.view',
+    'inventory.manageItems',
+    'inventory.receive',
+    'inventory.issue',
+    'inventory.transfer',
+    'inventory.performStocktake',
+    'inventory.resolveVariance',
 
     // HR — self-service, plus viewing any staff member's payslips
     // [PRODUCTION FIX, user-requested] finance already holds
@@ -1100,6 +1160,13 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'assets.requestItem',
     'assets.viewOwnAssigned',
 
+    // R22 — HODs/teaching staff can submit departmental purchase
+    // requisitions and see their own department's inventory; they do not
+    // review, approve, or move stock (that stays with finance)
+    'procurement.createRequisition',
+    'procurement.viewRequisitions',
+    'inventory.view',
+
     // HR — self-service only
     'hr.viewOwnProfile',
     'hr.editOwnLimitedFields',
@@ -1181,6 +1248,10 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
 
     // Assets — self-service only
     'assets.viewOwnAssigned',
+
+    // R22 — HR can raise its own department's requisitions (e.g. office
+    // supplies, recruitment costs) but has no review/operational role
+    'procurement.createRequisition',
 
     // HR — full management
     'hr.viewOwnProfile',

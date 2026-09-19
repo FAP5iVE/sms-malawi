@@ -544,6 +544,11 @@ model Expense {
   term         Int
   approvedByUid String?
   approvedAt   DateTime?
+  // R22 note: the field-level spec (§27) proposed a richer target state machine
+  // (DRAFT/SUBMITTED/PENDING_APPROVAL/RETURNED/APPROVED/VERIFIED/PAYABLE/PAID/REJECTED).
+  // That is deliberately deferred — Artefacts 4/6/7/8 all say existing Expense
+  // approval behaviour (Budget.spent update + journal posting) must continue
+  // unchanged this phase. Only nullable procurement-traceability fields are added.
   status       ExpenseStatus   @default(PENDING)
   recordedByUid String
   incurredAt   DateTime
@@ -551,8 +556,24 @@ model Expense {
   paidAt       DateTime?
   paidByUid    String?
 
+  // R22 — procurement traceability (additive, all nullable; direct expenses stay valid)
+  procurementSource      ProcurementSource?
+  supplierId             String?
+  purchaseOrderId        String?
+  goodsReceiptId         String?
+  supplierInvoiceNumber  String?
+  verifiedByUid          String?
+  verifiedAt             DateTime?
+
+  supplier      Supplier?      @relation(fields: [supplierId], references: [id])
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  goodsReceipt  GoodsReceipt?  @relation(fields: [goodsReceiptId], references: [id])
+  commitments   BudgetCommitment[]
+
   @@index([academicYear, term])
   @@index([category])
+  @@index([supplierId])
+  @@index([purchaseOrderId])
   @@map("expenses")
 }
 
@@ -655,16 +676,32 @@ model Budget {
   id           String   @id @default(cuid())
   academicYear String
   term         Int?     // null = annual budget
-  department   String
+  department   String   // legacy free-text — retained; see departmentRef for the structured link
   category     ExpenseCategory
   description  String?
   allocated    Decimal  @db.Decimal(12, 2)
+  // R22 (Artefact 8 §12 — critical rule): `spent` remains the authoritative
+  // accumulator that budgetService.updateBudgetSpent()/getBudgetVsActual() read
+  // and write. It must NOT be removed or reset by this migration.
   spent        Decimal  @db.Decimal(12, 2) @default(0)
   createdByUid String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // R22 — structured references, additive/nullable
+  departmentId   String?
+  budgetWindowId String?
+
+  departmentRef  Department?              @relation(fields: [departmentId], references: [id])
+  budgetWindow   BudgetWindow?            @relation(fields: [budgetWindowId], references: [id])
+  commitments    BudgetCommitment[]
+  assetRequests  AssetRequest[]
+  requisitions   PurchaseRequisition[]
+  requisitionLines PurchaseRequisitionLine[]
+
   @@index([academicYear])
+  @@index([departmentId])
+  @@index([budgetWindowId])
   @@map("budgets")
 }
 
@@ -1043,7 +1080,8 @@ model StaffProfile {
   email               String         @unique
   phone               String?
   role                StaffRole      // R11: was an unenforced String documented as "matches UserRole values" — now a real enum
-  department          String
+  department          String   // legacy free-text — retained; see departmentRef for the structured link
+  departmentId        String?  // R22 — structured, nullable, additive
   jobTitle            String
   employmentType      EmploymentType @default(FULL_TIME)
   status              StaffStatus    @default(ACTIVE)
@@ -1057,10 +1095,13 @@ model StaffProfile {
   performanceNotes    PerformanceNote[]
   borrowings          Borrowing[]
   assetAssignments    AssetAssignment[]
+  departmentRef       Department?    @relation(fields: [departmentId], references: [id])
+  custodianOfRooms    Room[]         @relation("RoomCustodian")
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
   @@index([department])
+  @@index([departmentId])
   @@index([contractExpiry])
   @@map("staff_profiles")
 }
@@ -1777,12 +1818,32 @@ model Asset {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
+  // ── R22 — Structured location / procurement traceability (additive, all nullable) ──
+  assetTag              String?              @unique  // authoritative internal identifier — app-level required for new assets, null on unmigrated legacy rows
+  classification         AssetClassification?         // FIXED_ASSET vs CONTROLLED_ITEM — app-level required for new assets
+  barcodeValue           String?              @unique
+  qrCodeValue             String?              @unique
+  departmentId           String?
+  roomId                 String?
+  sourceType              AssetSourceType?             // how this asset entered the register — OPENING_BALANCE for pre-existing rows with unknown origin
+  purchaseRequisitionId  String?
+  purchaseOrderId        String?
+  goodsReceiptLineId     String?
+
   assignments      AssetAssignment[]
   fulfilledRequests AssetRequest[]
+  departmentRef    Department?          @relation(fields: [departmentId], references: [id])
+  roomRef          Room?                @relation(fields: [roomId], references: [id])
+  purchaseRequisition PurchaseRequisition? @relation(fields: [purchaseRequisitionId], references: [id])
+  purchaseOrder    PurchaseOrder?       @relation(fields: [purchaseOrderId], references: [id])
+  goodsReceiptLine GoodsReceiptLine?    @relation(fields: [goodsReceiptLineId], references: [id])
+  stocktakeLines   StocktakeLine[]
 
   @@index([category])
   @@index([status])
   @@index([name])
+  @@index([departmentId])
+  @@index([roomId])
   @@map("assets")
 }
 
@@ -1816,11 +1877,15 @@ enum AssetStatus {
 model AssetAssignment {
   id                  String              @id @default(cuid())
   assetId             String
-  asset               Asset               @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  // R22 correction (Artefact 8 §2): historical custody records must survive deletion
+  // of the asset or staff row they reference — was Cascade, now Restrict.
+  asset               Asset               @relation(fields: [assetId], references: [id], onDelete: Restrict)
   assignedToType       AssetAssigneeType
   staffId             String?             // set when assignedToType = STAFF
-  staff               StaffProfile?       @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  departmentOrRoom     String?            // set when assignedToType = DEPARTMENT or ROOM
+  staff               StaffProfile?       @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  departmentOrRoom     String?            // legacy free-text — set when assignedToType = DEPARTMENT or ROOM, retained for compatibility
+  departmentId        String?             // structured — set when assignedToType = DEPARTMENT
+  roomId              String?             // structured — set when assignedToType = ROOM
   quantity            Int                 @default(1)
   assignedByUid       String
   assignedAt          DateTime            @default(now())
@@ -1829,9 +1894,14 @@ model AssetAssignment {
   conditionOnReturn   AssetCondition?
   notes               String?
 
+  departmentRef       Department?         @relation(fields: [departmentId], references: [id])
+  roomRef             Room?               @relation(fields: [roomId], references: [id])
+
   @@index([assetId])
   @@index([staffId])
   @@index([status])
+  @@index([departmentId])
+  @@index([roomId])
   @@map("asset_assignments")
 }
 
@@ -1864,8 +1934,20 @@ model AssetRequest {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
+  // R22 — legacy bridge fields (Artefact 8 §7). AssetRequest is NOT renamed or
+  // folded into PurchaseRequisition; it stays the legacy request workflow, with
+  // optional structured references for reporting/backfill continuity.
+  departmentId     String?
+  budgetWindowId   String?
+  budgetId         String?
+
+  departmentRef    Department?       @relation(fields: [departmentId], references: [id])
+  budgetWindow     BudgetWindow?     @relation(fields: [budgetWindowId], references: [id])
+  budgetRef        Budget?           @relation(fields: [budgetId], references: [id])
+
   @@index([status])
   @@index([requestedByUid])
+  @@index([departmentId])
   @@map("asset_requests")
 }
 
@@ -1913,4 +1995,711 @@ enum AssetAdvanceStatus {
   PENDING
   RECONCILED
   WRITTEN_OFF
+}
+// ═══════════════════════════════════════════════════════════════════
+// R22 — Assets/Inventory/Procurement redesign (additive domain)
+//
+// Reconciled from the partner's 20-artefact design process (Artefacts
+// 4-20) against the actual R20/R21 Assets foundation above. Deviations
+// from the partner's draft code/docs, and why, are called out inline.
+//
+// Scope: Department/Building/Room, Budget Windows & Commitments,
+// full Purchase Requisition → RFQ → Quotation → PO → Goods Receipt
+// lifecycle, transaction-derived Inventory, and termly Stocktakes.
+//
+// Nothing above this block was removed. No existing table is dropped,
+// no existing column is deleted, Budget.spent and Expense's existing
+// approval behaviour are untouched. AssetRequest/AssetAdvance remain
+// as legacy bridges, not replaced by PurchaseRequisition.
+// ═══════════════════════════════════════════════════════════════════
+
+// ─── LOCATIONS ────────────────────────────────────────────
+
+model Department {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  staff                StaffProfile[]
+  budgets              Budget[]
+  assets               Asset[]
+  assignments          AssetAssignment[]
+  assetRequests        AssetRequest[]
+  purchaseRequisitions PurchaseRequisition[]
+  rooms                Room[]
+  budgetWindows        BudgetWindow[]
+  stocktakes           Stocktake[]
+  inventoryTransactions InventoryTransaction[]
+
+  @@map("departments")
+}
+
+model Building {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rooms Room[]
+
+  @@map("buildings")
+}
+
+model Room {
+  id           String   @id @default(cuid())
+  buildingId   String
+  code         String
+  name         String
+  roomType     String
+  departmentId String?
+  custodianUid String?  // physical accountability only — does NOT grant financial approval (Artefact 8 §11)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  building    Building      @relation(fields: [buildingId], references: [id])
+  department  Department?   @relation(fields: [departmentId], references: [id])
+  custodian   StaffProfile? @relation("RoomCustodian", fields: [custodianUid], references: [uid])
+
+  assets               Asset[]
+  assignments          AssetAssignment[]
+  stocktakes           Stocktake[]
+  inventoryTransactionsFrom InventoryTransaction[] @relation("InventorySourceRoom")
+  inventoryTransactionsTo   InventoryTransaction[] @relation("InventoryDestinationRoom")
+
+  @@unique([buildingId, code])
+  @@index([departmentId])
+  @@index([custodianUid])
+  @@map("rooms")
+}
+
+// ─── BUDGET WINDOWS & COMMITMENTS ────────────────────────
+
+enum BudgetWindowType {
+  ANNUAL
+  TERM
+  QUARTERLY
+  MONTHLY
+  CUSTOM
+}
+
+enum BudgetWindowStatus {
+  DRAFT
+  OPEN
+  REVIEW
+  CLOSED
+  ARCHIVED
+}
+
+model BudgetWindow {
+  id              String             @id @default(cuid())
+  name            String
+  academicYear    String
+  term            Int?
+  type            BudgetWindowType
+  status          BudgetWindowStatus @default(DRAFT)
+  submissionStart DateTime
+  submissionEnd   DateTime
+  reviewStart     DateTime?
+  reviewEnd       DateTime?
+  approvalStart   DateTime?
+  approvalEnd     DateTime?
+  departmentId    String?            // null = school-wide window
+  isActive        Boolean            @default(true)
+  createdByUid    String
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  department           Department?            @relation(fields: [departmentId], references: [id])
+  budgets              Budget[]
+  assetRequests        AssetRequest[]
+  purchaseRequisitions PurchaseRequisition[]
+  commitments          BudgetCommitment[]
+
+  @@index([academicYear, term, status])
+  @@index([departmentId])
+  @@map("budget_windows")
+}
+
+enum BudgetCommitmentStatus {
+  RESERVED
+  COMMITTED
+  CONSUMED
+  RELEASED
+  CANCELLED
+}
+
+model BudgetCommitment {
+  id                    String                 @id @default(cuid())
+  budgetId              String
+  budgetWindowId        String?
+  purchaseRequisitionId String?
+  purchaseOrderId       String?
+  expenseId             String?
+  amount                Decimal                @db.Decimal(12, 2)
+  status                BudgetCommitmentStatus @default(RESERVED)
+  createdByUid          String
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  budget              Budget               @relation(fields: [budgetId], references: [id])
+  budgetWindow        BudgetWindow?        @relation(fields: [budgetWindowId], references: [id])
+  purchaseRequisition PurchaseRequisition? @relation(fields: [purchaseRequisitionId], references: [id])
+  purchaseOrder       PurchaseOrder?       @relation(fields: [purchaseOrderId], references: [id])
+  expense             Expense?             @relation(fields: [expenseId], references: [id])
+
+  // Artefact 6 §13 / Artefact 8 §14: duplicate reservation of the same obligation
+  // must be prevented. A DB-level unique constraint can't express this correctly
+  // here (both FKs are nullable, and Postgres treats NULLs as distinct, so it
+  // would silently not fire in the common case). Enforce it in the service layer
+  // instead: check for an existing RESERVED/COMMITTED commitment against the same
+  // purchaseRequisitionId or purchaseOrderId inside the same transaction that
+  // creates a new one.
+  @@index([budgetId, status])
+  @@index([purchaseRequisitionId])
+  @@index([purchaseOrderId])
+  @@index([expenseId])
+  @@map("budget_commitments")
+}
+
+// ─── PROCUREMENT ──────────────────────────────────────────
+
+enum AssetClassification {
+  FIXED_ASSET
+  CONTROLLED_ITEM
+}
+
+enum AssetSourceType {
+  PROCUREMENT
+  OPENING_BALANCE
+  DONATION
+  TRANSFER
+  OTHER
+}
+
+enum ProcurementSource {
+  PROCUREMENT
+  DIRECT
+}
+
+enum ProcurementStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  RETURNED
+  CANCELLED
+  CLOSED  // set once every linked PurchaseOrder reaches FULLY_RECEIVED/CLOSED — a summary marker, not a second source of truth for PO/receipt state
+}
+
+enum ProcurementLineClassification {
+  FIXED_ASSET
+  INVENTORY
+  CONSUMABLE
+  SERVICE
+  DIRECT_EXPENSE
+}
+
+model PurchaseRequisition {
+  id                String            @id @default(cuid())
+  requisitionNumber String            @unique  // e.g. PR-2026-0001 — human-readable, id remains the real PK
+  departmentId      String
+  budgetWindowId    String?
+  budgetId          String?
+  requestedByUid    String
+  purpose           String
+  justification     String?
+  isEmergency       Boolean           @default(false)
+  status            ProcurementStatus @default(DRAFT)
+  submittedAt       DateTime?
+  reviewedByUid     String?
+  reviewedAt        DateTime?
+  approvedByUid     String?
+  approvedAt        DateTime?
+  rejectedByUid     String?
+  rejectedAt        DateTime?
+  reviewNote        String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  department    Department                @relation(fields: [departmentId], references: [id])
+  budgetWindow  BudgetWindow?             @relation(fields: [budgetWindowId], references: [id])
+  budget        Budget?                   @relation(fields: [budgetId], references: [id])
+  lines         PurchaseRequisitionLine[]
+  commitments   BudgetCommitment[]
+  rfqs          RFQ[]
+  purchaseOrders PurchaseOrder[]
+  assets        Asset[]
+
+  @@index([departmentId, status])
+  @@index([budgetWindowId, status])
+  @@index([requestedByUid])
+  @@map("purchase_requisitions")
+}
+
+model PurchaseRequisitionLine {
+  id                      String                         @id @default(cuid())
+  purchaseRequisitionId   String
+  description             String
+  category                String?
+  classification          ProcurementLineClassification
+  quantity                Decimal                        @db.Decimal(12, 2)
+  unitOfMeasure           String
+  estimatedUnitCost       Decimal                        @db.Decimal(12, 2)
+  estimatedTotal          Decimal                        @db.Decimal(12, 2)
+  preferredSpecification  String?
+  notes                   String?
+  budgetId                String?  // optional per-line budget override, when a requisition draws from more than one budget
+  // Required when classification is FIXED_ASSET/CONTROLLED_ITEM — Asset.category
+  // is a strict, non-nullable enum with no default, so this must be captured up
+  // front rather than guessed at goods-receipt time (validated in procurementService).
+  assetCategory           AssetCategory?
+
+  purchaseRequisition PurchaseRequisition @relation(fields: [purchaseRequisitionId], references: [id], onDelete: Cascade)
+  budget              Budget?             @relation(fields: [budgetId], references: [id])
+  rfqLines            RFQLine[]
+  quotationLines      QuotationLine[]
+  purchaseOrderLines  PurchaseOrderLine[]
+
+  @@index([purchaseRequisitionId])
+  @@index([budgetId])
+  @@map("purchase_requisition_lines")
+}
+
+model Supplier {
+  id            String   @id @default(cuid())
+  supplierCode  String   @unique
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  taxNumber     String?
+  bankDetails   String?  // access to this field must be permission-restricted at the service layer
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  quotations     Quotation[]
+  purchaseOrders PurchaseOrder[]
+  expenses       Expense[]
+
+  @@map("suppliers")
+}
+
+enum RFQStatus {
+  DRAFT
+  ISSUED
+  RESPONSES_RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+model RFQ {
+  id                    String    @id @default(cuid())
+  rfqNumber             String    @unique
+  purchaseRequisitionId String
+  status                RFQStatus @default(DRAFT)
+  issueDate             DateTime?
+  responseDeadline      DateTime?
+  createdByUid          String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  purchaseRequisition PurchaseRequisition @relation(fields: [purchaseRequisitionId], references: [id])
+  lines               RFQLine[]
+  quotations          Quotation[]
+
+  @@index([purchaseRequisitionId])
+  @@index([status])
+  @@map("rfqs")
+}
+
+// Deliberately thin: quantity only. Description/spec/unit live on the
+// PurchaseRequisitionLine it points to — avoids a second mutable copy
+// of the same line data (Artefact 6 §17).
+model RFQLine {
+  id                        String   @id @default(cuid())
+  rfqId                     String
+  purchaseRequisitionLineId String
+  quantity                  Decimal  @db.Decimal(12, 2)
+
+  rfq                 RFQ                 @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  purchaseRequisitionLine PurchaseRequisitionLine @relation(fields: [purchaseRequisitionLineId], references: [id])
+
+  @@index([rfqId])
+  @@index([purchaseRequisitionLineId])
+  @@map("rfq_lines")
+}
+
+enum QuotationStatus {
+  RECEIVED
+  UNDER_REVIEW
+  SELECTED
+  REJECTED
+  EXPIRED
+}
+
+model Quotation {
+  id              String          @id @default(cuid())
+  rfqId           String
+  supplierId      String
+  quotationNumber String          @unique
+  quotationDate   DateTime
+  validUntil      DateTime?
+  currency        String          @default("MWK")  // imported equipment is often quoted in USD/ZAR
+  subtotal        Decimal         @db.Decimal(12, 2)
+  tax             Decimal         @db.Decimal(12, 2) @default(0)
+  total           Decimal         @db.Decimal(12, 2)
+  status          QuotationStatus @default(RECEIVED)
+  documentKey     String?         // Appwrite file ID for the scanned/uploaded quotation
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  rfq            RFQ             @relation(fields: [rfqId], references: [id])
+  supplier       Supplier        @relation(fields: [supplierId], references: [id])
+  lines          QuotationLine[]
+  purchaseOrders PurchaseOrder[]
+
+  @@index([rfqId])
+  @@index([supplierId, status])
+  @@map("quotations")
+}
+
+model QuotationLine {
+  id                        String  @id @default(cuid())
+  quotationId               String
+  purchaseRequisitionLineId String
+  description                String
+  quantity                   Decimal @db.Decimal(12, 2)
+  unitPrice                  Decimal @db.Decimal(12, 2)
+  tax                         Decimal? @db.Decimal(12, 2)
+  total                       Decimal @db.Decimal(12, 2)
+  notes                       String?
+
+  quotation               Quotation               @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  purchaseRequisitionLine PurchaseRequisitionLine @relation(fields: [purchaseRequisitionLineId], references: [id])
+
+  @@index([quotationId])
+  @@index([purchaseRequisitionLineId])
+  @@map("quotation_lines")
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  SENT
+  PARTIALLY_RECEIVED
+  FULLY_RECEIVED
+  CANCELLED
+  CLOSED
+  CLOSED_WITH_VARIANCE
+}
+
+model PurchaseOrder {
+  id                    String              @id @default(cuid())
+  poNumber              String              @unique
+  purchaseRequisitionId String
+  supplierId            String
+  quotationId           String?             // nullable: emergency/sole-source POs may skip quotation comparison
+  status                PurchaseOrderStatus @default(DRAFT)
+  orderDate             DateTime?
+  expectedDeliveryDate  DateTime?
+  subtotal              Decimal             @db.Decimal(12, 2)
+  tax                   Decimal             @db.Decimal(12, 2) @default(0)
+  total                 Decimal             @db.Decimal(12, 2)
+  approvedByUid         String?
+  approvedAt            DateTime?
+  createdByUid          String
+  notes                 String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  purchaseRequisition PurchaseRequisition @relation(fields: [purchaseRequisitionId], references: [id])
+  supplier            Supplier            @relation(fields: [supplierId], references: [id])
+  quotation           Quotation?          @relation(fields: [quotationId], references: [id])
+  lines               PurchaseOrderLine[]
+  goodsReceipts       GoodsReceipt[]
+  expenses            Expense[]
+  commitments         BudgetCommitment[]
+  assets              Asset[]
+
+  @@index([purchaseRequisitionId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id                        String                         @id @default(cuid())
+  purchaseOrderId           String
+  purchaseRequisitionLineId String?
+  description               String
+  classification            ProcurementLineClassification
+  quantityOrdered           Decimal                        @db.Decimal(12, 2)
+  unitOfMeasure             String
+  unitPrice                 Decimal                        @db.Decimal(12, 2)
+  tax                       Decimal?                       @db.Decimal(12, 2)
+  lineTotal                 Decimal                        @db.Decimal(12, 2)
+  quantityReceived          Decimal                        @db.Decimal(12, 2) @default(0)
+  quantityCancelled         Decimal                        @db.Decimal(12, 2) @default(0)
+  notes                     String?
+  assetCategory             AssetCategory?  // carried forward from the requisition line — see PurchaseRequisitionLine.assetCategory
+
+  purchaseOrder           PurchaseOrder            @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseRequisitionLine PurchaseRequisitionLine? @relation(fields: [purchaseRequisitionLineId], references: [id])
+  goodsReceiptLines       GoodsReceiptLine[]
+
+  @@index([purchaseOrderId])
+  @@index([purchaseRequisitionLineId])
+  @@map("purchase_order_lines")
+}
+
+enum GoodsReceiptStatus {
+  DRAFT
+  RECEIVED
+  PARTIAL
+  COMPLETED
+  REJECTED
+}
+
+model GoodsReceipt {
+  id                         String             @id @default(cuid())
+  receiptNumber              String             @unique
+  purchaseOrderId            String
+  receivedAt                 DateTime           @default(now())
+  receivedByUid              String
+  status                     GoodsReceiptStatus @default(RECEIVED)
+  supplierDeliveryReference  String?
+  notes                      String?
+  createdAt                  DateTime           @default(now())
+  updatedAt                  DateTime           @updatedAt
+
+  purchaseOrder PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id])
+  lines         GoodsReceiptLine[]
+  expenses      Expense[]
+
+  @@index([purchaseOrderId])
+  @@index([receivedAt])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptLine {
+  id                  String   @id @default(cuid())
+  goodsReceiptId      String
+  purchaseOrderLineId String
+  quantityReceived    Decimal  @db.Decimal(12, 2)
+  quantityAccepted    Decimal  @db.Decimal(12, 2)
+  quantityRejected    Decimal  @db.Decimal(12, 2) @default(0)
+  condition           String?
+  notes               String?
+
+  goodsReceipt      GoodsReceipt      @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  purchaseOrderLine PurchaseOrderLine @relation(fields: [purchaseOrderLineId], references: [id])
+  assets            Asset[]           // one row per serialized unit received on this line
+  inventoryTransactions InventoryTransaction[]
+
+  @@index([goodsReceiptId])
+  @@index([purchaseOrderLineId])
+  @@map("goods_receipt_lines")
+}
+
+// ─── INVENTORY (transaction-derived — no separate mutable balance) ──
+
+model InventoryItem {
+  id              String   @id @default(cuid())
+  itemCode        String   @unique
+  name            String
+  category        String?
+  description     String?
+  unitOfMeasure   String
+  reorderLevel    Decimal? @db.Decimal(12, 2)
+  reorderQuantity Decimal? @db.Decimal(12, 2)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  transactions   InventoryTransaction[]
+  stocktakeLines StocktakeLine[]
+
+  @@map("inventory_items")
+}
+
+enum InventoryTransactionType {
+  OPENING_BALANCE
+  RECEIPT
+  ISSUE
+  RETURN
+  TRANSFER
+  ADJUSTMENT
+  DAMAGE
+  LOSS
+  DISPOSAL
+}
+
+model InventoryTransaction {
+  id                 String                    @id @default(cuid())
+  inventoryItemId    String
+  transactionType    InventoryTransactionType
+  quantity           Decimal                   @db.Decimal(12, 2)  // always positive; sign of the effect is implied by transactionType
+  departmentId       String?
+  sourceRoomId       String?
+  destinationRoomId  String?
+  goodsReceiptLineId String?
+  referenceType      String?   // loose polymorphic pointer, e.g. "GoodsReceiptLine", "Stocktake" — deliberately not a hard FK (Artefact 6 §21)
+  referenceId        String?
+  performedByUid     String
+  reason             String?
+  createdAt          DateTime                  @default(now())
+
+  inventoryItem    InventoryItem     @relation(fields: [inventoryItemId], references: [id])
+  department       Department?       @relation(fields: [departmentId], references: [id])
+  sourceRoom       Room?             @relation("InventorySourceRoom", fields: [sourceRoomId], references: [id])
+  destinationRoom  Room?             @relation("InventoryDestinationRoom", fields: [destinationRoomId], references: [id])
+  goodsReceiptLine GoodsReceiptLine? @relation(fields: [goodsReceiptLineId], references: [id])
+
+  @@index([inventoryItemId, createdAt])
+  @@index([departmentId, createdAt])
+  @@index([sourceRoomId])
+  @@index([destinationRoomId])
+  @@map("inventory_transactions")
+}
+
+// ─── STOCKTAKE ────────────────────────────────────────────
+
+enum StocktakeStatus {
+  DRAFT
+  IN_PROGRESS
+  SUBMITTED
+  REVIEWED
+  COMPLETED
+  CANCELLED
+}
+
+model Stocktake {
+  id               String          @id @default(cuid())
+  stocktakeNumber  String          @unique
+  academicYear     String
+  term             Int?
+  departmentId     String?
+  roomId           String?
+  custodianUid     String?         // snapshot of the room custodian at open time — not a live FK, mirrors auditService's actorRole snapshot convention
+  status           StocktakeStatus @default(DRAFT)
+  startedAt        DateTime?
+  startedByUid     String?
+  completedAt      DateTime?
+  completedByUid   String?
+  notes            String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  department Department?          @relation(fields: [departmentId], references: [id])
+  room       Room?                @relation(fields: [roomId], references: [id])
+  lines      StocktakeLine[]
+  variances  InventoryVariance[]
+
+  @@unique([academicYear, term, roomId])
+  @@index([departmentId])
+  @@index([roomId])
+  @@index([status])
+  @@map("stocktakes")
+}
+
+model StocktakeLine {
+  id               String   @id @default(cuid())
+  stocktakeId      String
+  inventoryItemId  String?
+  assetId          String?
+  expectedQuantity Decimal  @db.Decimal(12, 2)
+  actualQuantity   Decimal  @db.Decimal(12, 2)
+  condition        AssetCondition?
+  notes            String?
+
+  stocktake     Stocktake          @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem?     @relation(fields: [inventoryItemId], references: [id])
+  asset         Asset?             @relation(fields: [assetId], references: [id])
+  variance      InventoryVariance?
+
+  @@index([stocktakeId])
+  @@index([inventoryItemId])
+  @@index([assetId])
+  @@map("stocktake_lines")
+}
+
+enum VarianceType {
+  SHORTAGE
+  SURPLUS
+}
+
+enum VarianceStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  WRITTEN_OFF
+}
+
+model InventoryVariance {
+  id               String         @id @default(cuid())
+  stocktakeId      String
+  stocktakeLineId  String         @unique
+  varianceQuantity Decimal        @db.Decimal(12, 2)  // actualQuantity - expectedQuantity, signed
+  varianceType     VarianceType
+  status           VarianceStatus @default(OPEN)
+  reason           String?
+  resolvedByUid    String?
+  resolvedAt       DateTime?
+  resolutionNote   String?
+  createdAt        DateTime       @default(now())
+
+  stocktake     Stocktake     @relation(fields: [stocktakeId], references: [id])
+  stocktakeLine StocktakeLine @relation(fields: [stocktakeLineId], references: [id])
+
+  @@index([stocktakeId, status])
+  @@map("inventory_variances")
+}
+
+// ─── LEGACY MAPPING (backfill audit trail — Artefacts 9/10) ──
+
+enum LegacyMappingType {
+  DEPARTMENT  // canonicalizes StaffProfile.department, Budget.department, AssetRequest.department
+  LOCATION    // canonicalizes Asset.location, AssetAssignment.departmentOrRoom -> a Room (or, per targetType, a Department)
+}
+
+enum LegacyMappingStatus {
+  PROPOSED
+  APPROVED
+  REJECTED
+  APPLIED
+}
+
+model LegacyMapping {
+  id              String              @id @default(cuid())
+  mappingType     LegacyMappingType
+  normalizedValue String              // normalize(legacyValue) — what applyApprovedMappings matches source records against
+  legacyValue     String              // one representative raw spelling, for human review
+  targetType      String
+  targetId        String
+  status          LegacyMappingStatus @default(PROPOSED)
+  notes           String?
+  reviewedByUid   String?
+  reviewedAt      DateTime?
+  appliedAt       DateTime?
+  recordsAffected Int?                // populated once applied — how many source rows were bulk-updated
+  createdByUid    String
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([mappingType, normalizedValue])
+  @@index([mappingType, status])
+  @@index([targetType, targetId])
+  @@map("legacy_mappings")
 }

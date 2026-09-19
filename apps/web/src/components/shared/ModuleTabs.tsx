@@ -76,6 +76,18 @@ interface ModuleTabsProps<T extends string> {
    * Change this when multiple ModuleTabs instances render in the same tree.
    */
   id?: string
+  /**
+   * [NEW] Pill-variant height. 'default' (44px min-height buttons, matching
+   * the WCAG touch-target guideline) is unchanged and used everywhere this
+   * component already appears (Exams, Monitoring, etc.) — this prop has no
+   * effect on the 'underline' variant. 'compact' is opt-in only, added for
+   * Announcements' Published/Pending Approval/Drafts status pill, which
+   * sits in the same row as a 44px-tall search input; the default pill's
+   * own 4px container padding on top of 44px buttons made it taller than
+   * that input. 'compact' trims the outer padding and button height so the
+   * whole control lines up at 44px total instead of 52px.
+   */
+  size?: 'default' | 'compact'
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -137,6 +149,7 @@ export function ModuleTabs<T extends string>({
   onChange,
   variant = 'underline',
   id      = 'tabs',
+  size    = 'default',
 }: ModuleTabsProps<T>) {
   const motionEnabled = useMotionEnabled()
 
@@ -234,11 +247,12 @@ export function ModuleTabs<T extends string>({
   return (
     <TabScrollContainer>
       <div
-        className="
-          inline-flex gap-1
-          bg-surface border border-base rounded-xl p-1
-          min-w-max
-        "
+        className={[
+          'inline-flex gap-1',
+          'bg-surface border border-base rounded-xl',
+          size === 'compact' ? 'p-0.5' : 'p-1',
+          'min-w-max',
+        ].join(' ')}
       >
         {tabs.map((tab) => {
           const Icon     = tab.icon
@@ -263,11 +277,11 @@ export function ModuleTabs<T extends string>({
                 // gives the button its own stacking context so `-z-10`
                 // only reaches behind *this* button, restoring the pill.
                 'relative z-0 flex items-center gap-2',
-                'px-4 py-2 rounded-lg',
+                size === 'compact' ? 'px-3 py-1.5 min-h-[40px]' : 'px-4 py-2 min-h-[44px]',
+                'rounded-lg',
                 'text-sm font-heading font-semibold',
                 'whitespace-nowrap',
                 'transition-colors duration-150',
-                'min-h-[44px]',
                 isActive ? 'text-white' : 'text-muted hover:text-body',
               ].join(' ')}
             >

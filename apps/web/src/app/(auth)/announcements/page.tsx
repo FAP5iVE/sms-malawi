@@ -733,6 +733,7 @@ function AnnouncementsContent() {
                 active={statusTab}
                 onChange={setStatusTab}
                 variant="pill"
+                size="compact"
                 id={`status-tabs-${activeType}`}
               />
               <ContentSearchBox

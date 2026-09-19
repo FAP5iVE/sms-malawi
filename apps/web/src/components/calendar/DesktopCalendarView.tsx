@@ -216,9 +216,11 @@ export function DesktopCalendarView({
       >
         <div className="p-4 pb-3 border-b border-base flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-brand-teal/15 border border-brand-teal/30 flex items-center justify-center text-brand-teal shrink-0">
-              <CalendarIcon className="w-4 h-4" aria-hidden="true" />
-            </div>
+            {/* [PRODUCTION FIX] Was a boxed icon — w-8 h-8 rounded-lg with a
+               teal-tinted background and border. Per request, the icon now
+               renders plain (no background chip), just brighter/larger, so
+               it reads as an icon next to the heading rather than a button. */}
+            <CalendarIcon className="w-5 h-5 text-brand-teal shrink-0" aria-hidden="true" />
             <div className="min-w-0">
               <h2 className="text-sm font-heading font-bold text-body truncate">Calendar Hub</h2>
               {academicYearLabel && (
@@ -386,14 +388,18 @@ export function DesktopCalendarView({
               />
             </div>
 
-            <div className="flex items-center bg-page border border-base rounded-xl p-1">
+            {/* [PRODUCTION FIX] Was `p-1` container + `min-h-9` buttons =
+               44px total, taller than the 36px search input beside it.
+               Trimmed to `p-0.5` + `min-h-8` buttons so the whole control
+               lines up with the search box at the same height. */}
+            <div className="flex items-center bg-page border border-base rounded-xl p-0.5">
               {(['month', 'agenda'] as CalendarViewMode[]).map((mode) => (
                 <button
                   key={mode}
                   type="button"
                   onClick={() => onViewModeChange(mode)}
                   aria-pressed={viewMode === mode}
-                  className={`px-3 py-1.5 min-h-9 rounded-lg text-xs font-heading font-medium capitalize transition-colors ${
+                  className={`px-3 py-1 min-h-8 rounded-lg text-xs font-heading font-medium capitalize transition-colors ${
                     viewMode === mode
                       ? 'bg-brand-navy text-white font-semibold shadow-sm'
                       : 'text-muted hover:text-body'
@@ -468,7 +474,7 @@ export function DesktopCalendarView({
               </div>
 
               <div
-                className="grid grid-cols-7 gap-2 flex-1 min-h-0"
+                className="grid grid-cols-7 gap-2.5 flex-1 min-h-0"
                 style={{ gridTemplateRows: `repeat(${days.length / 7}, minmax(0, 1fr))` }}
               >
                 {days.map((cell) => {
@@ -487,7 +493,7 @@ export function DesktopCalendarView({
                       }}
                       onMouseEnter={() => setHoveredDateKey(cell.dateKey)}
                       onMouseLeave={() => setHoveredDateKey(null)}
-                      className={`relative flex flex-col justify-between p-2 lg:p-2.5 rounded-2xl transition-colors cursor-pointer outline-none ${
+                      className={`relative flex flex-col justify-between p-2.5 lg:p-3 rounded-2xl transition-colors cursor-pointer outline-none ${
                         isSelected
                           ? 'bg-page ring-2 ring-brand-teal/80 shadow-sm'
                           : cell.isToday
@@ -514,18 +520,27 @@ export function DesktopCalendarView({
                         )}
                       </div>
 
-                      <div className="flex flex-col gap-1 my-auto w-full px-0.5">
-                        {cell.events.slice(0, 4).map((evt) => (
+                      {/* [PRODUCTION FIX] Event bars previously ran h-1.5/h-2
+                         tall, up to 4 of them, inset just 2px (px-0.5) from
+                         the cell edge — on a day with many events this read
+                         as a dense, edge-to-edge block that looked like it
+                         was spilling past the day's ring/highlight rather
+                         than sitting inside it. Thinner bars (h-1/h-1.5),
+                         one fewer of them (3, not 4), and a wider inset
+                         (px-1.5) give every bar clear space from the cell's
+                         own border on all sides. */}
+                      <div className="flex flex-col gap-1 my-auto w-full px-1.5">
+                        {cell.events.slice(0, 3).map((evt) => (
                           <div
                             key={evt.id}
-                            className="h-1.5 lg:h-2 w-full rounded-full"
+                            className="h-1 lg:h-1.5 w-full rounded-full"
                             style={{ backgroundColor: categoryColor(evt.category) }}
                             title={evt.title}
                           />
                         ))}
-                        {cell.events.length > 4 && (
+                        {cell.events.length > 3 && (
                           <span className="text-[10px] font-bold text-muted text-center leading-none">
-                            +{cell.events.length - 4} more
+                            +{cell.events.length - 3} more
                           </span>
                         )}
                       </div>

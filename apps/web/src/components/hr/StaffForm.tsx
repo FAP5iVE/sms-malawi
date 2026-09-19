@@ -182,8 +182,13 @@ export function StaffForm({ onClose, staffId }: Props) {
         exit={{ opacity: 0 }}
       >
         <div className="absolute inset-0" onClick={onClose} />
+        {/* [PRODUCTION FIX] Was max-w-lg (512px) — this form's fields run in
+           a 2-column grid (see below) that left each field only ~230px
+           wide at that size. Widened to max-w-2xl, matching StudentForm's
+           equivalent "add user" dialog, for consistency between the two
+           add-a-person flows. */}
         <motion.div
-          className="relative z-10 w-full max-w-lg bg-surface rounded-2xl shadow-xl overflow-hidden"
+          className="relative z-10 w-full max-w-2xl bg-surface rounded-2xl shadow-xl overflow-hidden"
           initial={{ scale: 0.96, y: 12 }}
           animate={{ scale: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}

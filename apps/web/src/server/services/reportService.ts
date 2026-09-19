@@ -244,5 +244,42 @@ export async function getAuditLogs(filters: {
     prisma.auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
     prisma.auditLog.count({ where }),
   ])
-  return { logs, total, page, pages: Math.ceil(total / limit) }
+
+  // [PRODUCTION FIX] The audit table showed only a raw Firebase UID for
+  // "who did this" — no name, no employee/registration number, so
+  // identifying an actor meant manually cross-referencing UIDs elsewhere.
+  // Resolve each page's distinct actorUids against StaffProfile (by `uid`)
+  // and Student (by `firebaseUid`) in two batched queries — not one
+  // lookup per row — and attach whichever matches. An actor can be neither
+  // (a deleted account, or a system/cron actor) — those rows simply carry
+  // no name/identifier, same as before.
+  const actorUids = Array.from(new Set(logs.map((l) => l.actorUid)))
+  const [staffMatches, studentMatches] = actorUids.length > 0
+    ? await prisma.$transaction([
+        prisma.staffProfile.findMany({
+          where:  { uid: { in: actorUids } },
+          select: { uid: true, employeeNo: true, firstName: true, lastName: true },
+        }),
+        prisma.student.findMany({
+          where:  { firebaseUid: { in: actorUids } },
+          select: { firebaseUid: true, registrationNo: true, firstName: true, lastName: true },
+        }),
+      ])
+    : [[], []]
+
+  const staffByUid   = new Map(staffMatches.map((s) => [s.uid, s]))
+  const studentByUid = new Map(studentMatches.map((s) => [s.firebaseUid as string, s]))
+
+  const enrichedLogs = logs.map((log) => {
+    const staff   = staffByUid.get(log.actorUid)
+    const student = studentByUid.get(log.actorUid)
+    return {
+      ...log,
+      actorName:           staff ? `${staff.firstName} ${staff.lastName}` : student ? `${student.firstName} ${student.lastName}` : null,
+      actorEmployeeNo:     staff?.employeeNo ?? null,
+      actorRegistrationNo: student?.registrationNo ?? null,
+    }
+  })
+
+  return { logs: enrichedLogs, total, page, pages: Math.ceil(total / limit) }
 }

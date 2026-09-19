@@ -293,7 +293,12 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
           this same unconstrained container) went off-screen with no way to
           reach them. Capped height + scrollable body; header is sticky so
           the close button stays reachable no matter how far you've scrolled. */}
-      <div className="bg-surface rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
+      {/* [PRODUCTION FIX] Was max-w-lg (512px) — cramped for the richtext
+         editor (News/Announcements body), which is the content type this
+         form spends the most space on. Widened to max-w-3xl so there's
+         comfortable room to type and format, for every content type this
+         shared form handles (News, Academic Ads, Announcements, Events). */}
+      <div className="bg-surface rounded-2xl w-full max-w-3xl shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy">{HEADING[mode]}</h2>
           <button

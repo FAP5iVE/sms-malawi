@@ -1072,6 +1072,11 @@ export interface ApiAuditLogEntry {
   actorUid:   string
   actorRole:  string
   createdAt:  string
+  /** [NEW] Resolved from actorUid against StaffProfile/Student — null when
+   *  the actor is neither (a deleted account, or a system/cron actor). */
+  actorName?:           string | null
+  actorEmployeeNo?:     string | null
+  actorRegistrationNo?: string | null
 }
 
 export interface ApiAuditLogResponse {

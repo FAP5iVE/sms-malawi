@@ -37,6 +37,7 @@ import { LibraryFinesTab }       from '@/components/finances/LibraryFinesTab'
 import { ForecastPanel }         from '@/components/finances/ForecastPanel'
 import { AccountingLedgerTab }   from '@/components/finances/AccountingLedgerTab'
 import { DebtsLoansTab }         from '@/components/finances/DebtsLoansTab'
+import { ProcurementWorkspace }  from '@/components/finances/ProcurementWorkspace'
 import { formatMWK }             from '@shared/constants/malawi'
 import { Banknote, TrendingDown, TrendingUp, PieChart } from 'lucide-react'
 import { ModuleTabs }            from '@/components/shared/ModuleTabs'
@@ -55,6 +56,10 @@ type Tab =
   | 'forecast'
   | 'ledger'
   | 'debts'
+  // R22 — the new Assets/Inventory/Procurement redesign's requisition-through-
+  // goods-receipt workflow. A distinct tab from 'budget' (which stays the
+  // existing Budget/Expense screen, untouched) since this is new territory.
+  | 'procurement'
 
 export default function FinancesPage() {
   return (
@@ -136,6 +141,12 @@ function FinancesContent() {
     // correctly gates its Approve button on this permission.
     { id: 'payroll'      as Tab, label: 'Payroll',                           show: isFinance || isHRPayrollViewer || isHighRank },
     { id: 'budget'       as Tab, label: 'Budget',                            show: !isStudent && !isHRPayrollViewer },
+    // R22 — visible to finance/high_rank (full review + approve authority,
+    // same as Expenses above) and to academic/hr (procurement.createRequisition
+    // only — they can raise and track their own requisitions; ProcurementWorkspace
+    // gates every review/approve/PO/receipt action internally via PermissionGuard,
+    // same pattern this page already uses for Payroll's mixed-role visibility).
+    { id: 'procurement'  as Tab, label: 'Procurement',                       show: isFinance || isHighRank || role === 'academic' || role === 'hr' },
     // [2026-09-05] Relabeled to match the rebuilt component -- this is
     // now the fee catalog *definition* screen (Settings & Fee Catalog);
     // financeFeeStructure below is the new per-student *application* of
@@ -271,6 +282,7 @@ function FinancesContent() {
          file no longer exists. */}
       {activeTab === 'payroll'      && <PayrollTab />}
       {activeTab === 'budget'       && <BudgetTab        academicYear={YEAR} />}
+      {activeTab === 'procurement'  && <ProcurementWorkspace />}
       {activeTab === 'feeStructure'        && <FeeStructureTab        academicYear={YEAR} />}
       {activeTab === 'financeFeeStructure' && <FinanceFeeStructureTab academicYear={YEAR} term={TERM} />}
       {activeTab === 'bulkInvoiceGenerator' && <BulkInvoiceGenerator />}

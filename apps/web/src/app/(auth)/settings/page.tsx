@@ -50,7 +50,6 @@ import {
   Banknote,
   Library,
   Bell,
-  ChevronRight,
   LayoutList,
   CalendarDays, 
   Search,
@@ -58,6 +57,7 @@ import {
 }                               from 'lucide-react'
 import { useAuthStore }         from '@/store/authStore'
 import { ModuleSurface }        from '@/components/shared/ModuleSurface'
+import { ModuleTabs }           from '@/components/shared/ModuleTabs'
 import { ProfileSettings }      from '@/components/settings/ProfileSettings'
 import { SystemConfigSettings } from '@/components/settings/SystemConfigSettings'
 import { AcademicPolicySettings } from '@/components/settings/AcademicPolicySettings'
@@ -202,7 +202,6 @@ function SectionContent({ sectionId }: { sectionId: SectionId }) {
 function SettingsPageInner() {
   const { role }  = useAuthStore()
   const [manualSection, setManualSection] = useState<SectionId | null>(null)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const visibleSections = SECTIONS.filter(
     (s) => role && s.roles.includes(role),
@@ -215,11 +214,11 @@ function SettingsPageInner() {
   // read window.location.search and called setActive. `role` — and
   // therefore `visibleSections` — resolves asynchronously after mount, so
   // rather than a one-time lazy initializer, `active` is split into a
-  // manual override (set only by an explicit sidebar/mobile-menu click) and
-  // a derived fallback: `?section=` is re-validated against
-  // `visibleSections` on every render, so it still takes effect once role
-  // resolves post-mount, but a manual pick — once made — is never clobbered
-  // by the URL param again, exactly mirroring the old effect's behavior.
+  // manual override (set only by an explicit tab click) and a derived
+  // fallback: `?section=` is re-validated against `visibleSections` on
+  // every render, so it still takes effect once role resolves post-mount,
+  // but a manual pick — once made — is never clobbered by the URL param
+  // again, exactly mirroring the old effect's behavior.
   const searchParams = useSearchParams()
   const sectionParam = searchParams.get('section')
   const urlSection: SectionId | null =
@@ -227,8 +226,6 @@ function SettingsPageInner() {
 
   const active: SectionId = manualSection ?? urlSection ?? 'profile'
   const setActive = setManualSection
-
-  const activeSection = visibleSections.find((s) => s.id === active) ?? visibleSections[0]
 
   return (
     <div className="space-y-5">
@@ -241,86 +238,22 @@ function SettingsPageInner() {
       </div>
 
       <ModuleSurface>
-      <div className="flex flex-col md:flex-row gap-6 items-start">
+      {/* [PRODUCTION FIX] Was a vertical section list (desktop: a left
+         sidebar of stacked buttons; mobile: a dropdown accordion) —
+         replaced with the same horizontal ModuleTabs bar every other
+         module page uses (Exams, Finance, HR, etc.), which already
+         handles small-screen horizontal scrolling on its own, so the
+         separate mobile dropdown markup is no longer needed. */}
+      <ModuleTabs<SectionId>
+        id="settings-sections"
+        tabs={visibleSections}
+        active={active}
+        onChange={setActive}
+      />
 
-        {/* ── Sidebar (desktop) ─────────────────────────────────────────── */}
-        <aside className="hidden md:flex flex-col w-52 shrink-0 bg-surface border border-base rounded-2xl overflow-hidden">
-          {visibleSections.map((section) => {
-            const Icon     = section.icon
-            const isActive = section.id === active
-            return (
-              <button
-                key={section.id}
-                type="button"
-                onClick={() => setActive(section.id)}
-                className={[
-                  'flex items-center gap-3 px-4 py-3 text-sm font-medium text-left transition-colors border-l-2',
-                  isActive
-                    ? 'border-brand-teal bg-brand-teal/6 text-brand-teal font-semibold'
-                    : 'border-transparent text-muted hover:bg-page hover:text-body',
-                ].join(' ')}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <Icon className="w-4 h-4 shrink-0" aria-hidden />
-                <span className="truncate">{section.label}</span>
-              </button>
-            )
-          })}
-        </aside>
-
-        {/* ── Mobile section select ─────────────────────────────────────── */}
-        <div className="md:hidden w-full">
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="w-full flex items-center justify-between gap-3 bg-surface border border-base rounded-xl px-4 py-3 min-h-11"
-          >
-            <div className="flex items-center gap-3">
-              {activeSection && (
-                <>
-                  <activeSection.icon className="w-4 h-4 text-brand-teal" aria-hidden />
-                  <span className="text-sm font-heading font-semibold text-body">
-                    {activeSection.label}
-                  </span>
-                </>
-              )}
-            </div>
-            <ChevronRight
-              className={`w-4 h-4 text-muted transition-transform ${mobileMenuOpen ? 'rotate-90' : ''}`}
-              aria-hidden
-            />
-          </button>
-
-          {mobileMenuOpen && (
-            <div className="mt-2 bg-surface border border-base rounded-xl overflow-hidden shadow-lg">
-              {visibleSections.map((section) => {
-                const Icon     = section.icon
-                const isActive = section.id === active
-                return (
-                  <button
-                    key={section.id}
-                    type="button"
-                    onClick={() => { setActive(section.id); setMobileMenuOpen(false) }}
-                    className={[
-                      'flex items-center gap-3 w-full px-4 py-3 text-sm text-left transition-colors border-b border-base last:border-0',
-                      isActive
-                        ? 'bg-brand-teal/8 text-brand-teal font-semibold'
-                        : 'text-muted hover:bg-page hover:text-body',
-                    ].join(' ')}
-                  >
-                    <Icon className="w-4 h-4 shrink-0" aria-hidden />
-                    {section.label}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-       {/* ── Content panel ─────────────────────────────────────────────── */}
-        <div className="flex-1 min-w-0 bg-surface border border-base rounded-2xl p-6 space-y-6">
-          <SectionContent sectionId={active} />
-        </div>
+      {/* ── Content panel ─────────────────────────────────────────────── */}
+      <div className="bg-surface border border-base rounded-2xl p-6 space-y-6">
+        <SectionContent sectionId={active} />
       </div>
       </ModuleSurface>
     </div>

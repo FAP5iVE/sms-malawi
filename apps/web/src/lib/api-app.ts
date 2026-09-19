@@ -118,6 +118,10 @@ import { holidaysRouter }      from '@/server/routes/holidays'
 import { placementsRouter }    from '@/server/routes/placements'
 import { monitoringRouter }    from '@/server/routes/monitoring'
 import { monitoringVercelRouter } from '@/server/routes/monitoring-vercel'
+import { procurementRouter }   from '@/server/routes/procurement'
+import { inventoryRouter }     from '@/server/routes/inventory'
+import { stocktakesRouter }    from '@/server/routes/stocktakes'
+import { locationsRouter }     from '@/server/routes/locations'
 
 
 
@@ -241,6 +245,11 @@ export function createApiApp() {
   app.use('/placements',      placementsRouter)
   app.use('/monitoring',      monitoringRouter)
   app.use('/monitoring/vercel', monitoringVercelRouter)
+  // R22 — Assets/Inventory/Procurement redesign (additive; /assets above is untouched)
+  app.use('/procurement',     procurementRouter)
+  app.use('/inventory',       inventoryRouter)
+  app.use('/stocktakes',      stocktakesRouter)
+  app.use('/locations',       locationsRouter)
 
   // ── 7. 404 fallback ───────────────────────────────────────────────────────
   app.use((_req: Request, res: Response) => {

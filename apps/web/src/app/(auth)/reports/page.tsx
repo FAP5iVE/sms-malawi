@@ -647,12 +647,15 @@ function AdminAuditPanel() {
   const { data: audit } = useAuditLog({ page: 1 })
 
   useExportable<ApiAuditLogEntry>('Audit Log', audit?.logs, [
-    { label: 'Action',    value: (l) => l.action },
-    { label: 'Entity',    value: (l) => l.entityType },
-    { label: 'Entity ID', value: (l) => l.entityId },
-    { label: 'Actor',     value: (l) => l.actorUid },
-    { label: 'Role',      value: (l) => l.actorRole },
-    { label: 'Time',      value: (l) => l.createdAt },
+    { label: 'Action',       value: (l) => l.action },
+    { label: 'Entity',       value: (l) => l.entityType },
+    { label: 'Entity ID',    value: (l) => l.entityId },
+    { label: 'Actor UID',    value: (l) => l.actorUid },
+    { label: 'Actor Name',   value: (l) => l.actorName ?? '' },
+    { label: 'Employee No.', value: (l) => l.actorEmployeeNo ?? '' },
+    { label: 'Reg. No.',     value: (l) => l.actorRegistrationNo ?? '' },
+    { label: 'Role',         value: (l) => l.actorRole },
+    { label: 'Time',         value: (l) => l.createdAt },
   ])
 
   return (
@@ -661,23 +664,54 @@ function AdminAuditPanel() {
         <p className="text-sm text-muted">{audit?.total ?? 0} total entries</p>
       </div>
       <div className="border border-base rounded-2xl overflow-hidden">
+        {/* [PRODUCTION FIX] Table previously had no explicit column widths
+           — with automatic table layout, a long Entity value could shrink
+           its neighbours to fit, which is what let the Actor UID column
+           visually run into the next one ("swallowed"). `table-fixed` +
+           a <colgroup> give every column a guaranteed minimum width that
+           doesn't depend on any other column's content; the container's
+           existing `overflow-x-auto` still handles horizontal scrolling
+           on narrow screens once the table's natural width (now larger,
+           with the two new columns) exceeds it. */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
+          <table className="w-full text-sm border-collapse table-fixed min-w-[920px]">
+            <colgroup>
+              <col className="w-[13%]" /> {/* Action */}
+              <col className="w-[10%]" /> {/* Entity */}
+              <col className="w-[10%]" /> {/* Entity ID */}
+              <col className="w-[10%]" /> {/* Actor UID */}
+              <col className="w-[16%]" /> {/* Name */}
+              <col className="w-[13%]" /> {/* ID No. */}
+              <col className="w-[9%]" />  {/* Role */}
+              <col className="w-[13%]" /> {/* Time */}
+            </colgroup>
             <thead>
               <tr className="bg-page border-b border-base">
-                {['Action', 'Entity', 'Entity ID', 'Actor', 'Role', 'Time'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap">{h}</th>
+                {['Action', 'Entity', 'Entity ID', 'Actor', 'Name', 'ID No.', 'Role', 'Time'].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap truncate">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-base">
               {audit?.logs.map((log) => (
                 <tr key={log.id} className="hover:bg-page transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-brand-teal whitespace-nowrap">{log.action}</td>
-                  <td className="px-4 py-3 text-xs">{log.entityType}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted">{log.entityId.slice(0, 10)}…</td>
-                  <td className="px-4 py-3 font-mono text-xs">{log.actorUid.slice(0, 8)}…</td>
-                  <td className="px-4 py-3"><span className="text-xs bg-base rounded-lg px-2 py-0.5">{log.actorRole}</span></td>
+                  <td className="px-4 py-3 font-mono text-xs text-brand-teal whitespace-nowrap truncate">{log.action}</td>
+                  <td className="px-4 py-3 text-xs whitespace-nowrap truncate">{log.entityType}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted whitespace-nowrap truncate">{log.entityId.slice(0, 10)}…</td>
+                  <td className="px-4 py-3 font-mono text-xs whitespace-nowrap truncate">{log.actorUid.slice(0, 8)}…</td>
+                  {/* [NEW] Resolved server-side against StaffProfile (by
+                     uid) / Student (by firebaseUid) — see
+                     reportService.getAuditLogs(). Neither match (a
+                     deleted account, or a system/cron actor) renders an
+                     em dash rather than blank, so it reads as "checked,
+                     nothing found" rather than a missing value. */}
+                  <td className="px-4 py-3 text-xs whitespace-nowrap truncate" title={log.actorName ?? undefined}>
+                    {log.actorName ?? <span className="text-muted">—</span>}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted whitespace-nowrap truncate">
+                    {log.actorEmployeeNo ?? log.actorRegistrationNo ?? <span>—</span>}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap"><span className="text-xs bg-base rounded-lg px-2 py-0.5">{log.actorRole}</span></td>
                   <td className="px-4 py-3 text-xs text-muted whitespace-nowrap">{new Date(log.createdAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</td>
                 </tr>
               ))}

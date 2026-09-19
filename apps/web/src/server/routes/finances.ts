@@ -107,6 +107,8 @@ import { prisma } from '@/lib/prisma'
 import { bulkGenerateInvoices } from '@/server/services/bulkInvoiceService'
 import * as Sentry from '@sentry/nextjs'
 import { logger } from '@/lib/logger'
+import * as budgetWindowService from '@/server/services/budgetWindowService'
+import { CreateBudgetWindowSchema } from '@shared/schemas/assetsInventoryProcurement'
 import { sendError } from '@/server/lib/sendError'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
@@ -1172,3 +1174,38 @@ financesRouter.get(
     })))
   }
 )
+// ── BUDGET WINDOWS (R22 — additive; does not touch existing Budget/Expense routes above) ──
+// finance.manageBudgetWindows — POST/status-change. Viewing a window's status feeds
+// procurementService.createPurchaseRequisition's budgetWindowId flow; kept here rather
+// than a new router since it's a Finance-owned concept the UI already expects at
+// /finances/budget-windows.
+
+financesRouter.get('/budget-windows', verifyAuth, requirePermission('finance.viewBudget'),
+  async (req, res) => {
+    const { academicYear, status } = req.query as { academicYear?: string; status?: string }
+    return res.json(await budgetWindowService.listBudgetWindows({ academicYear, status }))
+  })
+
+financesRouter.post('/budget-windows', verifyAuth, requirePermission('finance.manageBudgetWindows'),
+  async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated.' })
+    const parsed = CreateBudgetWindowSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    return res.status(201).json(await budgetWindowService.createBudgetWindow(parsed.data, req.user.uid, req.user.role))
+  })
+
+financesRouter.post('/budget-windows/:id/open', verifyAuth, requirePermission('finance.manageBudgetWindows'),
+  async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated.' })
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    if (!id) return res.status(400).json({ error: 'Budget window id is required.' })
+    return res.json(await budgetWindowService.setBudgetWindowStatus(id, 'OPEN', req.user.uid, req.user.role))
+  })
+
+financesRouter.post('/budget-windows/:id/close', verifyAuth, requirePermission('finance.manageBudgetWindows'),
+  async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated.' })
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    if (!id) return res.status(400).json({ error: 'Budget window id is required.' })
+    return res.json(await budgetWindowService.setBudgetWindowStatus(id, 'CLOSED', req.user.uid, req.user.role))
+  })

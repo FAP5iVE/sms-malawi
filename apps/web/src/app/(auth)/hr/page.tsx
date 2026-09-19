@@ -93,6 +93,8 @@ import {
   Wallet,
   X,
   ChevronRight,
+  LayoutGrid,
+  List,
 }                           from 'lucide-react'
 import Link                 from 'next/link'
 import { ModuleTabs }       from '@/components/shared/ModuleTabs'
@@ -162,6 +164,17 @@ function HRContent() {
   const filterDepartments = Object.keys(departmentTitles).sort()
   const filterTitles = deptFilter ? (departmentTitles[deptFilter] ?? []) : []
   const [showStaffForm, setShowStaffForm] = useState(false)
+  // [NEW] Staff Directory list/grid toggle — persisted per-browser so the
+  // choice survives a refresh, same pattern as any other pure display
+  // preference (no server round-trip needed, nothing to sync across users).
+  const [directoryView, setDirectoryView] = useState<'grid' | 'list'>(() => {
+    if (typeof window === 'undefined') return 'grid'
+    return window.localStorage.getItem('hr-directory-view') === 'list' ? 'list' : 'grid'
+  })
+  function setDirectoryViewPersisted(view: 'grid' | 'list') {
+    setDirectoryView(view)
+    if (typeof window !== 'undefined') window.localStorage.setItem('hr-directory-view', view)
+  }
 
   const isHR         = ['admin', 'hr', 'high_rank'].includes(role ?? '')
   const canApplyLoan = can('hr.applyLoan')
@@ -302,16 +315,53 @@ function HRContent() {
                 {filterTitles.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
-            {canCreateStaff && (
-              <button
-                type="button"
-                onClick={() => setShowStaffForm(true)}
-                className="shrink-0 inline-flex items-center gap-2 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+            <div className="flex items-center gap-2 shrink-0">
+              {/* [NEW] List/grid view toggle for Staff Directory. */}
+              <div
+                role="group"
+                aria-label="Staff directory view"
+                className="flex items-center bg-surface border border-base rounded-xl p-1"
               >
-                <UserPlus className="w-4 h-4" aria-hidden />
-                Add Staff
-              </button>
-            )}
+                <button
+                  type="button"
+                  onClick={() => setDirectoryViewPersisted('grid')}
+                  aria-pressed={directoryView === 'grid'}
+                  aria-label="Grid view"
+                  title="Grid view"
+                  className={`flex items-center justify-center w-9 h-9 rounded-lg transition-colors ${
+                    directoryView === 'grid'
+                      ? 'bg-brand-teal text-white'
+                      : 'text-muted hover:text-body hover:bg-page'
+                  }`}
+                >
+                  <LayoutGrid className="w-4 h-4" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDirectoryViewPersisted('list')}
+                  aria-pressed={directoryView === 'list'}
+                  aria-label="List view"
+                  title="List view"
+                  className={`flex items-center justify-center w-9 h-9 rounded-lg transition-colors ${
+                    directoryView === 'list'
+                      ? 'bg-brand-teal text-white'
+                      : 'text-muted hover:text-body hover:bg-page'
+                  }`}
+                >
+                  <List className="w-4 h-4" aria-hidden />
+                </button>
+              </div>
+              {canCreateStaff && (
+                <button
+                  type="button"
+                  onClick={() => setShowStaffForm(true)}
+                  className="shrink-0 inline-flex items-center gap-2 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+                >
+                  <UserPlus className="w-4 h-4" aria-hidden />
+                  Add Staff
+                </button>
+              )}
+            </div>
           </div>
 
           {showStaffForm && <StaffForm onClose={() => setShowStaffForm(false)} />}
@@ -322,7 +372,7 @@ function HRContent() {
                 <div key={i} className="h-16 rounded-xl bg-surface animate-pulse" />
               ))}
             </div>
-          ) : (
+          ) : directoryView === 'grid' ? (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {(staff as ApiStaffProfile[]).map((s) => (
                 <Link
@@ -351,6 +401,41 @@ function HRContent() {
                       {s.status}
                     </span>
                   </div>
+                  <ChevronRight className="w-4 h-4 text-muted shrink-0" aria-hidden />
+                </Link>
+              ))}
+            </div>
+          ) : (
+            // [NEW] List view — same records, one compact row per staff
+            // member instead of a card, so more of the directory fits on
+            // screen at once. Same navigation target and status styling
+            // as the grid view; only the layout differs.
+            <div className="bg-surface border border-base rounded-xl divide-y divide-base overflow-hidden">
+              {(staff as ApiStaffProfile[]).map((s) => (
+                <Link
+                  key={s.id}
+                  href={`/hr/${s.id}`}
+                  className="flex items-center gap-3 px-4 py-3 text-left hover:bg-page active:bg-page transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-brand-navy/10 flex items-center justify-center text-brand-navy font-semibold text-xs shrink-0">
+                    {s.firstName[0]}
+                    {s.lastName[0]}
+                  </div>
+                  <p className="font-semibold text-body truncate w-40 shrink-0">
+                    {s.firstName} {s.lastName}
+                  </p>
+                  <p className="text-xs text-muted truncate flex-1 min-w-0">
+                    {s.jobTitle} · {s.department}
+                  </p>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
+                      s.status === 'ACTIVE'
+                        ? 'bg-green-50 text-green-700'
+                        : 'bg-amber-50 text-amber-700'
+                    }`}
+                  >
+                    {s.status}
+                  </span>
                   <ChevronRight className="w-4 h-4 text-muted shrink-0" aria-hidden />
                 </Link>
               ))}
