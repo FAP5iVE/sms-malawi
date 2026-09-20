@@ -68,6 +68,7 @@ export function VercelAlertsPanel({ canManage }: Props) {
         rowKey="id"
         columns={columns}
         emptyMessage="No platform alerts. These are computed from deployment status and error-log volume — see the panel description in docs/vercel-native-monitoring-research.md §3 Phase 5."
+        bordered={false}
       />
     </div>
   )

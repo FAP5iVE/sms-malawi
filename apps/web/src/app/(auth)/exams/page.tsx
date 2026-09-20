@@ -379,13 +379,23 @@ function ExamsPageInner() {
               )}
 
               {!examsLoading && exams.length === 0 && (
-                <div className="text-center py-20 text-muted text-sm border border-base rounded-2xl">
+                // [PRODUCTION FIX] This empty state previously had its own
+                // border+rounded-2xl "card" wrapper — now nested inside
+                // ModuleSurface's own bg-surface/border/rounded-3xl panel,
+                // that read as a second box-within-a-box (and ate into the
+                // panel's own side padding). Removed so the content sits
+                // directly on the panel, matching every other section.
+                <div className="text-center py-20 text-muted text-sm">
                   No exams scheduled yet.{canScheduleExam && ' Click "Schedule Exam" to add one.'}
                 </div>
               )}
 
               {exams.length > 0 && (
-                <div className="border border-base rounded-2xl overflow-hidden bg-surface">
+                // [PRODUCTION FIX] Was its own bordered/bg-surface card;
+                // same reasoning as the empty state above. The header row's
+                // bg-page and the row dividers/hover states already give
+                // the table visual structure without an outer card.
+                <div className="overflow-hidden">
                   <table className="w-full text-sm border-collapse">
                     <thead>
                       <tr className="bg-page border-b border-base">
@@ -543,7 +553,7 @@ function ExamsPageInner() {
                   term={term}
                 />
               ) : (
-                <div className="text-center py-16 text-muted text-sm border border-base rounded-2xl">
+                <div className="text-center py-16 text-muted text-sm">
                   Select a class above to review its results release status.
                 </div>
               )}
@@ -558,7 +568,7 @@ function ExamsPageInner() {
               passing the Firebase UID, which never matched any row. */}
           {tab === 'results' && role === 'student' && (
             myStudent?.id ? (
-              <StudentResultsView studentId={myStudent.id} />
+              <StudentResultsView studentId={myStudent.id} bordered={false} />
             ) : (
               <p className="text-sm text-muted text-center py-16" role="status">
                 {myStudentLoading

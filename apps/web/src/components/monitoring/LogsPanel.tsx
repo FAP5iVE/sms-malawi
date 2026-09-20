@@ -60,6 +60,7 @@ export function LogsPanel() {
         rowKey="id"
         columns={columns}
         emptyMessage="No log entries for this filter in the last 24 hours."
+        bordered={false}
       />
     </div>
   )

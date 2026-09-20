@@ -393,6 +393,7 @@ function StudentsContent() {
           onPageChange: setPage,
         }}
         emptyMessage="No students found for this filter."
+        bordered={false}
       />
 
       {/* ── StudentForm — create ─────────────────────────────────────────── */}

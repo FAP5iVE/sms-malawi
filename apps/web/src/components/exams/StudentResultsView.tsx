@@ -45,7 +45,18 @@ import { PrintableReportCard } from '@/components/shared/PrintableReportCard'
 import { AlertTriangle, FileText, TrendingUp, Loader2 } from 'lucide-react'
 import type { ApiTermResult } from '@shared/types/api'
 
-interface Props { studentId: string }
+interface Props {
+  studentId: string
+  /**
+   * [NEW] Whether this view renders its own bordered card around the
+   * results table. Defaults to `true` — needed for StudentDashboard's
+   * usage, which has no other panel around it. exams/page.tsx passes
+   * `false` since it already renders this inside ModuleSurface's own
+   * bg-surface/border panel, where a second nested card read as a
+   * box-within-a-box.
+   */
+  bordered?: boolean
+}
 
 /** Renders a percentage value, or an em dash if it isn't a real number.
  *  Coerces numeric STRINGS as well as numbers: Prisma Decimal columns
@@ -57,7 +68,7 @@ function pct(value: number | string | null | undefined): string {
   return typeof n === 'number' && Number.isFinite(n) ? `${n.toFixed(1)}%` : '—'
 }
 
-export function StudentResultsView({ studentId }: Props) {
+export function StudentResultsView({ studentId, bordered = true }: Props) {
   const { academicYear, isLoading: periodLoading } = useCurrentAcademicPeriod()
   const [term, setTerm] = useState(1)
   const [showReportCard, setShowReportCard] = useState(false)
@@ -212,7 +223,7 @@ export function StudentResultsView({ studentId }: Props) {
         </div>
       </div>
 
-      <div className="border border-base rounded-xl overflow-hidden">
+      <div className={bordered ? 'border border-base rounded-xl overflow-hidden' : 'overflow-hidden'}>
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-page border-b border-base">

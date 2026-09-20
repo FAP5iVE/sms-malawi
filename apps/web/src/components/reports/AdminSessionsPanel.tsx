@@ -253,6 +253,7 @@ export function AdminSessionsPanel() {
         onQuickFilter={(v) => setSessionWindow(v as ApiSessionWindow)}
         onRowClick={(s) => setSelectedSessionId(s.id)}
         emptyMessage="No sessions match this window."
+        bordered={false}
       />
 
       {selectedSessionId && (

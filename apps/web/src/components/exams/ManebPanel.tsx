@@ -319,14 +319,17 @@ export function ManebPanel({ academicYear }: Props) {
       {isLoading && <div className="text-center py-12 text-muted text-sm animate-pulse">Loading records…</div>}
 
       {!isLoading && filtered.length === 0 && (
-        <div className="text-center py-16 text-muted text-sm border border-base rounded-xl">
+        // [PRODUCTION FIX] Was its own bordered card — redundant once
+        // nested inside ModuleSurface's panel. See AnalyticsPanel.tsx for
+        // the same fix applied to this tab's neighbours.
+        <div className="text-center py-16 text-muted text-sm">
           No {examType} records for {academicYear}.
           {['admin', 'exam_officer'].includes(role ?? '') && ' Use “Bulk entry” to add candidates.'}
         </div>
       )}
 
       {filtered.length > 0 && (
-        <div className="border border-base rounded-xl overflow-hidden">
+        <div className="overflow-hidden">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-page border-b border-base">

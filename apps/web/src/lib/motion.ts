@@ -118,13 +118,27 @@ export const TRANSITION = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const PAGE_VARIANTS: Variants = {
+  // [PRODUCTION FIX] `initial`/`animate`/`exit` previously included a `y`
+  // offset (10px slide-up on enter, -5px micro-slide on exit). Framer
+  // Motion implements `y` via an inline CSS `transform` — and a
+  // `transform` on ANY ancestor (even `translateY(0px)` at rest, which is
+  // still a non-`none` transform) creates a new *containing block* for
+  // every `position: fixed` descendant. This <motion.div> wraps every
+  // page's entire content, so EVERY modal/dialog in the app that uses
+  // `position: fixed` (AnnouncementForm, StaffForm, StudentForm, event
+  // dialogs, etc.) was being positioned and sized relative to this
+  // wrapper's own box — which starts below PageHeader — instead of the
+  // real viewport. That's what made pop-ups render with their top edge
+  // tucked behind/under the header instead of centered on the full
+  // screen. Opacity-only transitions don't touch `transform` at all, so
+  // this removes the containing-block trap for every fixed-position
+  // pop-up in the app in one place, rather than needing to fix each
+  // modal individually. The slide micro-motion is gone; the fade remains.
   initial: {
     opacity: 0,
-    y: 10,
   },
   animate: {
     opacity: 1,
-    y: 0,
     transition: {
       duration: DURATION.normal,
       ease: EASE.out,
@@ -132,7 +146,6 @@ export const PAGE_VARIANTS: Variants = {
   },
   exit: {
     opacity: 0,
-    y: -5,
     transition: {
       duration: DURATION.fast,
       ease: EASE.in,

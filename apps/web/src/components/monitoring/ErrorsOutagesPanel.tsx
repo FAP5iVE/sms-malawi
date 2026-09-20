@@ -66,6 +66,7 @@ export function ErrorsOutagesPanel() {
         rowKey="id"
         columns={columns}
         emptyMessage="No unresolved issues \u2014 the system is quiet."
+        bordered={false}
       />
     </div>
   )

@@ -54,6 +54,7 @@ export function AlertsPanel({ canManage }: Props) {
         rowKey="id"
         columns={columns}
         emptyMessage="No alerts configured yet."
+        bordered={false}
       />
     </div>
   )

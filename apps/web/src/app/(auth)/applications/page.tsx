@@ -276,6 +276,7 @@ function ApplicationsContent() {
             onPageChange: setPage,
           }}
           emptyMessage="No applications found for this status."
+          bordered={false}
         />
       )}
       </ModuleSurface>

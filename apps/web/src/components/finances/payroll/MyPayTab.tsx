@@ -289,6 +289,7 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
           columns={columns}
           rowKey="id"
           emptyMessage="No payslips yet."
+          bordered={false}
         />
       </div>
     </div>

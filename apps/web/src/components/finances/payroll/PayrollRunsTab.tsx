@@ -442,6 +442,7 @@ function RunDetailModal({ runId, onClose }: { runId: string; onClose: () => void
           columns={columns}
           rowKey="id"
           emptyMessage="No payslip lines on this run."
+          bordered={false}
         />
       </div>
     </div>
@@ -724,6 +725,7 @@ export function PayrollRunsTab() {
           columns={columns}
           rowKey="id"
           emptyMessage="No payroll runs match these filters."
+          bordered={false}
         />
       </div>
 

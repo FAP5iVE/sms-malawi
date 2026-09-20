@@ -410,14 +410,15 @@ export function ReportCardGenerator() {
         </div>
       )}
 
-      {/* Student rows */}
+      {/* Student rows — [PRODUCTION FIX] was its own bordered card,
+         redundant nested inside ModuleSurface's panel. */}
       {rows.length > 0 && (
         <motion.div
           key={`rows-${rows.length}`}
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="border border-base rounded-xl overflow-hidden"
+          className="overflow-hidden"
         >
           {rows.map((row) => (
             <motion.div

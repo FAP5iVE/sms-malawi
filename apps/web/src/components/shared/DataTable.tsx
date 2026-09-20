@@ -178,6 +178,16 @@ export interface DataTableProps<T> {
    * behaviour is unchanged.
    */
   onRowClick?: (row: T) => void
+  /**
+   * [NEW] Whether the table view renders its own bordered `bg-surface`
+   * card. Defaults to `true` (unchanged from before) — needed for any
+   * DataTable that isn't already sitting inside another card (e.g. a
+   * detail page's own panel). Pass `false` when the DataTable is already
+   * inside a ModuleSurface panel or other bg-surface/border container, so
+   * the table doesn't render a second, redundant card nested inside the
+   * first — which also eats into the outer panel's side padding twice.
+   */
+  bordered?: boolean
 }
 
 type SortDir = 'asc' | 'desc' | null
@@ -645,6 +655,7 @@ export function DataTable<T extends object>({
   onColumnVisibilityChange,
   onSort,
   onRowClick,
+  bordered = true,
 }: DataTableProps<T>) {
   const motionEnabled = useMotionEnabled()
 
@@ -870,7 +881,7 @@ export function DataTable<T extends object>({
 
       {/* ── TABLE VIEW (md+, default) ─────────────────────────────────────── */}
       {view === 'table' && (
-        <div className="hidden md:block border border-base rounded-xl overflow-hidden bg-surface">
+        <div className={bordered ? 'hidden md:block border border-base rounded-xl overflow-hidden bg-surface' : 'hidden md:block overflow-hidden'}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>

@@ -54,6 +54,7 @@ export function VercelDeploymentsPanel() {
       rowKey="id"
       columns={columns}
       emptyMessage="No deployments found yet."
+      bordered={false}
     />
   )
 }

@@ -67,6 +67,7 @@ export function FeedbackPanel() {
         rowKey="id"
         columns={columns}
         emptyMessage="No feedback submitted yet."
+        bordered={false}
       />
     </div>
   )

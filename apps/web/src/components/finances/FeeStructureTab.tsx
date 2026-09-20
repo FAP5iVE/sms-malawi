@@ -262,6 +262,7 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
             onClick: (row) => (row.isActive ? setArchiveTarget(row) : updateFee.mutate({ id: row.id, data: { isActive: true } })),
           },
         ]}
+        bordered={false}
       />
 
       {/* System Configured Payment Modes — these are the channels the

@@ -374,8 +374,9 @@ export function PromotionEngine() {
       {/* Student list */}
       {preview && filteredStudents.length > 0 && (
         <>
-          {/* Desktop table */}
-          <div className="hidden md:block border border-base rounded-xl overflow-hidden">
+          {/* Desktop table — [PRODUCTION FIX] was its own bordered card,
+             redundant nested inside ModuleSurface's panel. */}
+          <div className="hidden md:block overflow-hidden">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-page border-b border-base">

@@ -74,7 +74,12 @@ function RankList({
 
 function PerClassTable({ rows }: { rows: ApiClassAnalyticsSummary[] }) {
   return (
-    <div className="border border-base rounded-xl overflow-hidden bg-surface">
+    // [PRODUCTION FIX] Was its own bordered/bg-surface card — now nested
+    // inside ModuleSurface's own panel (exams/page.tsx), which made this
+    // read as a box-within-a-box and ate into the panel's side padding.
+    // The header row's bg-page + row dividers already give the table
+    // definition without a second outer card.
+    <div className="overflow-hidden">
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="bg-page border-b border-base">

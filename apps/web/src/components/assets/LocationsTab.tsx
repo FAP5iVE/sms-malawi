@@ -136,7 +136,7 @@ function MappingsSection() {
     {(proposeDept.error || proposeLoc.error) && <p className="text-sm text-brand-coral">{(proposeDept.error ?? proposeLoc.error) instanceof Error ? (proposeDept.error ?? proposeLoc.error)?.message : 'Scan failed.'}</p>}
     {isLoading ? <Loading /> : proposed.length === 0 ? <p className="text-sm text-muted py-6 text-center">No pending mappings to review.</p> : <div className="space-y-2">
       {proposed.map(m => <div key={m.id} className="border border-base rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
-        <div><p className="text-sm font-medium">"{m.legacyValue}" <span className="text-muted">→</span> {humanize(m.targetType)} {m.targetId}</p><p className="text-xs text-muted">{humanize(m.mappingType)} mapping</p></div>
+        <div><p className="text-sm font-medium">{m.legacyValue} <span className="text-muted">→</span> {humanize(m.targetType)} {m.targetId}</p><p className="text-xs text-muted">{humanize(m.mappingType)} mapping</p></div>
         <div className="flex gap-2">
           <button type="button" onClick={() => approve.mutate({ id: m.id })} disabled={approve.isPending} className="min-h-10 px-3 rounded-lg bg-brand-navy text-white text-xs font-semibold inline-flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Approve</button>
           <button type="button" onClick={() => reject.mutate({ id: m.id })} disabled={reject.isPending} className="min-h-10 px-3 rounded-lg border border-base text-xs inline-flex items-center gap-1"><X className="w-3.5 h-3.5" /> Reject</button>
@@ -148,5 +148,10 @@ function MappingsSection() {
 
 function Header({ title, action }: { title: string; action?: ReactNode }) { return <div className="flex items-center justify-between gap-3 flex-wrap"><h3 className="font-heading font-semibold text-brand-navy">{title}</h3>{action}</div> }
 function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="block"><span className="text-xs text-muted block mb-1">{label}</span>{children}</label> }
-function DataTable({ headers, children }: { headers: string[]; children: ReactNode }) { return <div className="bg-surface border border-base rounded-xl overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-base bg-page">{headers.map(h => <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wide text-muted font-semibold">{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div></div> }
+// [PRODUCTION FIX] Was `bg-surface border border-base rounded-xl overflow-hidden`
+// — this tab now renders inside ModuleSurface's own bg-surface/border
+// panel (assets/page.tsx), so the extra card here was a redundant second
+// layer nested inside the first. Header row's bg-page + row dividers
+// already give the table definition without an outer card.
+function DataTable({ headers, children }: { headers: string[]; children: ReactNode }) { return <div className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-base bg-page">{headers.map(h => <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wide text-muted font-semibold">{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div></div> }
 function Loading() { return <div className="p-8 text-center text-muted"><Loader2 className="inline w-5 h-5 animate-spin" /></div> }

@@ -177,6 +177,7 @@ export function PlacementRegistryPanel() {
                 ? `No confirmed placements recorded for ${effectiveYear} yet.`
                 : 'No placements match your search/filters.'
             }
+            bordered={false}
           />
         )}
       </div>

@@ -60,6 +60,7 @@ export function VercelErrorsPanel() {
         rowKey="id"
         columns={columns}
         emptyMessage="No runtime errors in the captured window. Note: Vercel's free tier only retains 1 hour of runtime logs, so gaps longer than that between syncs may miss data — see docs/vercel-native-monitoring-research.md §1.12."
+        bordered={false}
       />
     </div>
   )
