@@ -39,6 +39,7 @@
  */
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useStudentResults, useReportCardData } from '@/hooks/useExams'
 import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
 import { PrintableReportCard } from '@/components/shared/PrintableReportCard'
@@ -262,8 +263,13 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
         </table>
       </div>
 
-      {/* SR-3: same modal shape as the staff-side student profile screen. */}
-      {showReportCard && (
+      {/* SR-3: same modal shape as the staff-side student profile screen.
+         [PRODUCTION FIX] Portals directly under <body> — same reasoning as
+         AnnouncementForm.tsx and the other hand-built modals fixed
+         alongside this one. Only this conditional block portals (not the
+         whole component's return), since the results table above needs to
+         stay in normal page flow. */}
+      {showReportCard && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="absolute inset-0" onClick={() => setShowReportCard(false)} />
           <div className="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl p-4">
@@ -287,7 +293,8 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
               <PrintableReportCard data={reportCardData} onClose={() => setShowReportCard(false)} />
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

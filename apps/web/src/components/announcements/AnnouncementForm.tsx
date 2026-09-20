@@ -39,6 +39,7 @@
  */
 'use client'
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
 import { AnnouncementSchema, AnnouncementDraftSchema } from '@shared/schemas/announcement'
@@ -285,7 +286,22 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
     ads: draft ? 'Continue Draft — Academic Advertisement' : 'New Academic Advertisement',
   }
 
-  return (
+  // [PRODUCTION FIX] This modal now portals directly under <body> instead
+  // of rendering inline in the page tree. Every page in the app fades in
+  // via a shared <motion.div> wrapper (see (auth)/layout.tsx +
+  // lib/motion.ts) — Framer Motion animations like that one apply via CSS
+  // `transform`, and any `transform` on an ancestor changes the
+  // containing block for `position: fixed` descendants, which is what
+  // made this dialog (and others like it) render mis-positioned relative
+  // to that wrapper instead of the real viewport. That transform has
+  // separately been removed (motion.ts no longer animates `y`), but
+  // portaling here removes the dependency on that invariant entirely —
+  // this dialog now escapes ALL ancestor CSS (stacking contexts,
+  // `overflow: hidden`, any future transform/filter another component
+  // might add) the same way ConfirmDialog.tsx already does.
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       {/* [PRODUCTION FIX 2026-07-28] Had no height cap and no scroll — once
           the image preview pushed content taller than the viewport, the
@@ -545,6 +561,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

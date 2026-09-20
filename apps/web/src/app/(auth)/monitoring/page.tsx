@@ -53,34 +53,42 @@ export default function MonitoringPage() {
 
   return (
     <RoleGuard allowed={['admin', 'high_rank']}>
-      <div className="min-h-screen bg-page">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-          <div className="flex items-center gap-2">
-            <Activity className="w-6 h-6 text-brand-navy" aria-hidden />
-            <h1 className="font-heading text-2xl font-bold text-brand-navy">Monitoring</h1>
-          </div>
-          <p className="text-sm text-muted -mt-4">Live system health, errors, and outages</p>
-
-          <ModuleSurface>
-          <MonitoringKpiStrip summary={summary} isLoading={summaryLoading} />
-
-          <ModuleTabs<Tab>
-            id="monitoring"
-            tabs={tabs}
-            active={tab}
-            onChange={setTab}
-            variant="pill"
-          />
-
-          {tab === 'errors'   && <ErrorsOutagesPanel />}
-          {tab === 'logs'     && <LogsPanel />}
-          {tab === 'alerts'   && <AlertsPanel canManage={can('monitoring.manage')} />}
-          {tab === 'replays'  && <ReplaysPanel />}
-          {tab === 'releases' && <ReleasesPanel summary={summary} />}
-          {tab === 'feedback' && <FeedbackPanel />}
-          {tab === 'vercel'   && <VercelPlatformPanel />}
-          </ModuleSurface>
+      {/* [PRODUCTION FIX] This page previously wrapped its whole content in
+         its own `min-h-screen bg-page` div — redundant, since the
+         authenticated shell (apps/web/src/app/(auth)/layout.tsx) already
+         paints `bg-page` on its own root, with the ambient background
+         artwork sitting behind it. Re-declaring an opaque `bg-page` here
+         painted over that ambient layer for this entire page, producing a
+         large, flat, page-spanning rectangle behind the "Monitoring"
+         heading that no other module page has (Students, HR, Finance,
+         etc. render their heading directly on the shell's own
+         background). Removed so this page matches every other module. */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div className="flex items-center gap-2">
+          <Activity className="w-6 h-6 text-brand-navy" aria-hidden />
+          <h1 className="font-heading text-2xl font-bold text-brand-navy">Monitoring</h1>
         </div>
+        <p className="text-sm text-muted -mt-4">Live system health, errors, and outages</p>
+
+        <ModuleSurface>
+        <MonitoringKpiStrip summary={summary} isLoading={summaryLoading} />
+
+        <ModuleTabs<Tab>
+          id="monitoring"
+          tabs={tabs}
+          active={tab}
+          onChange={setTab}
+          variant="pill"
+        />
+
+        {tab === 'errors'   && <ErrorsOutagesPanel />}
+        {tab === 'logs'     && <LogsPanel />}
+        {tab === 'alerts'   && <AlertsPanel canManage={can('monitoring.manage')} />}
+        {tab === 'replays'  && <ReplaysPanel />}
+        {tab === 'releases' && <ReleasesPanel summary={summary} />}
+        {tab === 'feedback' && <FeedbackPanel />}
+        {tab === 'vercel'   && <VercelPlatformPanel />}
+        </ModuleSurface>
       </div>
     </RoleGuard>
   )

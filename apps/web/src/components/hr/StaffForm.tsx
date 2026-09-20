@@ -31,6 +31,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { z } from 'zod'
 import { useForm, useWatch } from 'react-hook-form'
 import type { Resolver } from 'react-hook-form'
@@ -173,7 +174,13 @@ export function StaffForm({ onClose, staffId }: Props) {
     }
   }
 
-  return (
+  // [PRODUCTION FIX] Portals directly under <body>, same reasoning as
+  // AnnouncementForm.tsx — escapes the page-transition wrapper's stacking
+  // context/containing-block entirely, rather than depending on that
+  // wrapper never re-introducing a transform.
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <AnimatePresence>
       <motion.div
         className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40"
@@ -385,7 +392,8 @@ export function StaffForm({ onClose, staffId }: Props) {
           )}
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
 

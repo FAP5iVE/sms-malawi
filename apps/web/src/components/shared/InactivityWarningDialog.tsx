@@ -45,6 +45,7 @@
  */
 
 import { useEffect, useState }   from 'react'
+import { createPortal }          from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AlertTriangle }          from 'lucide-react'
 import { useMotionEnabled }       from '@/store/motionStore'
@@ -188,7 +189,13 @@ export function InactivityWarningDialog({
     damping:   28,
   })
 
-  return (
+  // [PRODUCTION FIX] This dialog can appear on top of any page in the app,
+  // so it's especially important that it portals directly under <body>
+  // rather than relying on every page's DOM never trapping it — same
+  // reasoning as the other hand-built modals fixed alongside this one.
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <motion.div
       key="inactivity-backdrop"
       variants={backdropVariants}
@@ -280,6 +287,7 @@ export function InactivityWarningDialog({
           </button>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body,
   )
 }

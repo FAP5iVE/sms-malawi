@@ -261,8 +261,17 @@ function ExamsPageInner() {
 
   return (
     <RoleGuard allowed={[...ALLOWED_ROLES]}>
-      <div className="min-h-screen bg-page">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      {/* [PRODUCTION FIX] This page previously wrapped its whole content in
+         its own `min-h-screen bg-page` div — but the authenticated shell
+         (apps/web/src/app/(auth)/layout.tsx) already paints `bg-page` on
+         its own root, with the ambient background artwork sitting behind
+         it. Re-declaring an opaque `bg-page` here painted over that
+         ambient layer for this entire page, which is what produced the
+         large, flat, page-spanning rectangle behind the "Exams" heading —
+         a page-level background that no other module page adds (Students,
+         HR, Finance, etc. render their heading directly on the shell's own
+         background). Removed so this page matches every other module. */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           {/* R19 — real page heading (was absent, unlike sibling module pages),
              giving assistive tech and E2E heading-role checks a landmark. */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -650,7 +659,6 @@ function ExamsPageInner() {
             </div>
           </div>
         )}
-      </div>
     </RoleGuard>
   )
 }

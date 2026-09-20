@@ -27,6 +27,7 @@
  */
 'use client'
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { format, parseISO } from 'date-fns'
 import { Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Loader2, X } from 'lucide-react'
 import { MotionBottomSheet } from '@/components/shared/MotionBottomSheet'
@@ -381,7 +382,14 @@ export function CalendarEventFormDialog({
 
   if (!open) return null
 
-  return (
+  // [PRODUCTION FIX] The 'sheet' presentation above (MotionBottomSheet)
+  // already portals correctly. This 'dialog' presentation didn't — a
+  // plain inline `fixed inset-0`, same class of bug as the other
+  // hand-built forms fixed alongside this one. Portals directly under
+  // <body> now, for the same reason.
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
       onClick={onClose}
@@ -406,6 +414,7 @@ export function CalendarEventFormDialog({
         </div>
         <div className="p-6">{formBody}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

@@ -37,6 +37,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { z } from 'zod'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -120,7 +121,11 @@ export function TimetableSlotForm({ classId, academicYear, term, onClose }: Prop
     )
   }
 
-  return (
+  // [PRODUCTION FIX] Portals directly under <body> — same reasoning as
+  // AnnouncementForm.tsx/StaffForm.tsx/StudentForm.tsx/ExamForm.tsx.
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <AnimatePresence>
       <motion.div
         className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40"
@@ -296,6 +301,7 @@ export function TimetableSlotForm({ classId, academicYear, term, onClose }: Prop
           </form>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }

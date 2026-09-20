@@ -49,6 +49,7 @@
  */
 
 import { useState, useEffect }      from 'react'
+import { createPortal }             from 'react-dom'
 import { z }                        from 'zod'
 import { useForm }                  from 'react-hook-form'
 import { zodResolver }              from '@hookform/resolvers/zod'
@@ -444,12 +445,18 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     <ContactSection  key="contact"  {...sectionProps} />,
   ]
 
+  // [PRODUCTION FIX] Both render paths below now portal directly under
+  // <body> instead of rendering inline in the page tree — same reasoning
+  // as AnnouncementForm.tsx/StaffForm.tsx: escapes the page-transition
+  // wrapper's stacking context/containing-block entirely.
+  if (typeof document === 'undefined') return null
+
   // ═══════════════════════════════════════════════════════════════════════════
   // MOBILE RENDER — bottom sheet + stepped navigation
   // ═══════════════════════════════════════════════════════════════════════════
 
   if (isMobile) {
-    return (
+    return createPortal(
       <AnimatePresence onExitComplete={onClose}>
         {visible && (
           <>
@@ -612,7 +619,8 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body,
     )
   }
 
@@ -620,7 +628,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   // DESKTOP RENDER — centred dialog, all sections visible simultaneously
   // ═══════════════════════════════════════════════════════════════════════════
 
-  return (
+  return createPortal(
     <AnimatePresence onExitComplete={onClose}>
       {visible && (
         <motion.div
@@ -752,6 +760,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }

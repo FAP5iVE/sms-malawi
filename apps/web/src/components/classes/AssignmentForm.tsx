@@ -16,6 +16,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useForm } from 'react-hook-form'
 import type { Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -135,8 +136,13 @@ export default function AssignmentForm({ classId, onClose }: AssignmentFormProps
     </>
   )
 
+  // [PRODUCTION FIX] Both render paths below now portal directly under
+  // <body> — same reasoning as StudentForm.tsx (this file has the same
+  // mobile/desktop dual-render structure).
+  if (typeof document === 'undefined') return null
+
   if (isMobile) {
-    return (
+    return createPortal(
       <AnimatePresence onExitComplete={onClose}>
         {visible && (
           <>
@@ -200,11 +206,12 @@ export default function AssignmentForm({ classId, onClose }: AssignmentFormProps
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body,
     )
   }
 
-  return (
+  return createPortal(
     <AnimatePresence onExitComplete={onClose}>
       {visible && (
         <motion.div
@@ -279,6 +286,7 @@ export default function AssignmentForm({ classId, onClose }: AssignmentFormProps
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }

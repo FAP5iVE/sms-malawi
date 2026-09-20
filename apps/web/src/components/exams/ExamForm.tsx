@@ -33,6 +33,7 @@
  */
 'use client'
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -117,7 +118,11 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
     })
   }
 
-  return (
+  // [PRODUCTION FIX] Portals directly under <body> — same reasoning as
+  // AnnouncementForm.tsx/StaffForm.tsx/StudentForm.tsx.
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <AnimatePresence>
       <motion.div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -216,6 +221,7 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
           </form>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }

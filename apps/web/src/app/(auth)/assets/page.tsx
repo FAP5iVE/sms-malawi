@@ -141,7 +141,7 @@ function AssetsContent() {
         <div>
           <h1 className="font-heading font-bold text-xl text-brand-navy">Assets &amp; Inventory</h1>
           <p className="text-sm text-muted mt-0.5">
-            Furniture, IT/lab/sports/kitchen equipment, vehicles and tools — not library books.
+             centralized tracking, monitoring, and management of the physical and digital resources.
           </p>
         </div>
       </div>
