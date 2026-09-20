@@ -314,15 +314,35 @@ export interface SessionActivity {
 }
 
 /**
- * Everything a session's owner did, scoped to that session's own window
- * (loginAt → loggedOutAt, or loginAt → now for a still-open session) —
- * reuses auditService.queryByActor as-is rather than a new query.
+ * Everything a session's owner did, scoped to that session's own window.
+ * The upper bound is always loginAt → loggedOutAt (or now, if still open).
+ * The LOWER bound is loginAt itself — UNLESS this is the uid's very first
+ * tracked session ever (no earlier UserSession row exists for them), in
+ * which case it's left unbounded below.
+ *
+ * Why: this feature only started recording sessions from the moment it
+ * shipped. A person's first session afterwards still has real prior
+ * history sitting in AuditLog from before session tracking existed — the
+ * kind of gap that stops mattering once every session has a predecessor
+ * to bound against, but shows up immediately after rollout as actions
+ * that visibly happened (audit log has them) yet don't appear under any
+ * session (none existed yet to own them). Rather than a confusing "0
+ * actions" next to activity that's plainly visible one tab over, a
+ * person's first tracked session shows everything on record up to that
+ * session's own end — every session after their second behaves exactly
+ * as documented, strictly bounded on both ends.
  */
 export async function getSessionActivity(sessionId: string): Promise<SessionActivity | null> {
   const row = await prisma.userSession.findUnique({ where: { id: sessionId } })
   if (!row) return null
 
-  const { byUid, employeeNoByUid, registrationNoByUid } = await resolveDisplayInfo([row.uid])
+  const [{ byUid, employeeNoByUid, registrationNoByUid }, earlierSession] = await Promise.all([
+    resolveDisplayInfo([row.uid]),
+    prisma.userSession.findFirst({
+      where: { uid: row.uid, loginAt: { lt: row.loginAt } },
+      select: { id: true },
+    }),
+  ])
   const info = byUid.get(row.uid)
   const now = new Date()
   const isActiveNow = row.loggedOutAt === null && (now.getTime() - row.lastSeenAt.getTime()) <= ACTIVE_GRACE_MS
@@ -345,7 +365,7 @@ export async function getSessionActivity(sessionId: string): Promise<SessionActi
   }
 
   const entries = await auditService.queryByActor(row.uid, {
-    dateFrom: row.loginAt,
+    dateFrom: earlierSession ? row.loginAt : undefined,
     dateTo: row.loggedOutAt ?? now,
     limit: 200,
   })

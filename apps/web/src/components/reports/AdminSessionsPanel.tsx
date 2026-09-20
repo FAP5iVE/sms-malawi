@@ -201,9 +201,7 @@ export function AdminSessionsPanel() {
     {
       key: 'isActiveNow', label: 'Status', priority: 'critical',
       render: (s) => (
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-          s.isActiveNow ? 'bg-brand-teal/15 text-brand-teal' : 'bg-page text-muted'
-        }`}>
+        <span className={`text-xs font-semibold ${s.isActiveNow ? 'text-brand-teal' : 'text-muted'}`}>
           {s.isActiveNow ? 'Active now' : s.endReason === 'forced' ? 'Force-logged out' : 'Ended'}
         </span>
       ),
@@ -253,7 +251,6 @@ export function AdminSessionsPanel() {
         onQuickFilter={(v) => setSessionWindow(v as ApiSessionWindow)}
         onRowClick={(s) => setSelectedSessionId(s.id)}
         emptyMessage="No sessions match this window."
-        bordered={false}
       />
 
       {selectedSessionId && (

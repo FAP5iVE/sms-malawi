@@ -38,12 +38,20 @@ export function useSessionsSummary() {
 }
 
 // Enabled only once a session is actually selected — sessionId is null
-// until the admin clicks a row.
+// until the admin clicks a row. Polls at the same interval as the list
+// itself, but only while the session it's showing is still OPEN — an
+// action performed after opening the card (in another tab, or by the
+// viewed person themself) then appears without needing to close and
+// reopen it. refetchInterval as a function reads the query's own latest
+// data (TanStack Query v5), so this needs no separate "is it open" input
+// from the caller: a closed session's activity can't change, so once
+// isActiveNow flips false, polling stops on its own.
 export function useSessionActivity(sessionId: string | null) {
   return useQuery({
     queryKey: queryKeys.sessions.activity(sessionId ?? ''),
     queryFn: () => apiFetch<ApiSessionActivityResponse>(`/sessions/${sessionId}/activity`),
     enabled: sessionId !== null,
+    refetchInterval: (query) => (query.state.data?.session.isActiveNow ? SESSIONS_REFETCH_MS : false),
   })
 }
 

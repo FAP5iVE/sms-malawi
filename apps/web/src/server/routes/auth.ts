@@ -37,13 +37,18 @@ export const authRouter = Router()
 // actually succeeded, so a valid ID token exists and verifyAuth can
 // resolve the real uid/role.
 authRouter.post('/log-login-success', verifyAuth, async (req, res) => {
-  await auditService.log({
-    action:     'LOGIN_SUCCESS',
-    entityType: 'Auth',
-    entityId:   req.user!.uid,
-    actorUid:   req.user!.uid,
-    actorRole:  req.user!.role,
-  })
+  // [PRODUCTION FIX — Sessions tab] recordLogin() runs BEFORE the audit
+  // write, not after. Both use their table's own @default(now()), and
+  // this handler awaits each in turn rather than firing them together —
+  // so whichever call is made second is guaranteed a strictly later
+  // timestamp. With the audit write second, this LOGIN_SUCCESS entry's
+  // createdAt is always >= the session's own loginAt, so
+  // sessionService.getSessionActivity()'s dateFrom: loginAt bound
+  // (queryByActor's `gte`) is guaranteed to include it. The previous
+  // order did this backwards — the audit entry (written first) landed a
+  // few milliseconds BEFORE loginAt (written second), so every session's
+  // own opening LOGIN_SUCCESS event fell just outside its own activity
+  // window and silently never appeared there.
   await sessionService.recordLogin({
     uid: req.user!.uid,
     role: req.user!.role,
@@ -51,6 +56,13 @@ authRouter.post('/log-login-success', verifyAuth, async (req, res) => {
     // req.ip reads Vercel's edge hop unless 'trust proxy' is set — it is,
     // in api-app.ts's createApiApp() (R4 fix, same reasoning applies here).
     ipAddress: req.ip,
+  })
+  await auditService.log({
+    action:     'LOGIN_SUCCESS',
+    entityType: 'Auth',
+    entityId:   req.user!.uid,
+    actorUid:   req.user!.uid,
+    actorRole:  req.user!.role,
   })
   res.status(204).end()
 })

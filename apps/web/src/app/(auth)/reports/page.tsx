@@ -47,6 +47,8 @@ import { RoleGuard }         from '@/components/shared/RoleGuard'
 import { ModuleSurface }     from '@/components/shared/ModuleSurface'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
 import { AdminSessionsPanel } from '@/components/reports/AdminSessionsPanel'
+import { useResizableColumns } from '@/hooks/useResizableColumns'
+import { CopyableId } from '@/components/shared/CopyableId'
 import { chartColorAt } from '@/lib/chartPalette'
 import { useAuthStore }      from '@/store/authStore'
 import { usePublicSettings } from '@/hooks/useSettings'
@@ -645,6 +647,29 @@ function AdminHeatmapPanel() {
   )
 }
 
+// Static column specs for AdminAuditPanel's table — hoisted out of the
+// component so useResizableColumns doesn't see a new array identity on
+// every render (harmless either way given its ref-based design, but no
+// reason to recreate static data each render).
+const AUDIT_COLUMNS: { key: string; defaultWidth: number; minWidth: number }[] = [
+  { key: 'action',   defaultWidth: 140, minWidth: 90  },
+  { key: 'entity',   defaultWidth: 110, minWidth: 70  },
+  { key: 'entityId', defaultWidth: 150, minWidth: 90  },
+  { key: 'actor',    defaultWidth: 170, minWidth: 100 },
+  { key: 'idNo',     defaultWidth: 130, minWidth: 80  },
+  { key: 'role',     defaultWidth: 100, minWidth: 70  },
+  { key: 'time',     defaultWidth: 150, minWidth: 110 },
+]
+const AUDIT_HEADERS: { key: string; label: string }[] = [
+  { key: 'action',   label: 'Action' },
+  { key: 'entity',   label: 'Entity' },
+  { key: 'entityId', label: 'Entity ID' },
+  { key: 'actor',    label: 'Actor' },
+  { key: 'idNo',     label: 'ID No.' },
+  { key: 'role',     label: 'Role' },
+  { key: 'time',     label: 'Time' },
+]
+
 function AdminAuditPanel() {
   const { data: audit } = useAuditLog({ page: 1 })
 
@@ -660,61 +685,85 @@ function AdminAuditPanel() {
     { label: 'Time',      value: (l) => l.createdAt },
   ])
 
+  // [PRODUCTION FIX] Column widths are now admin-adjustable (drag the
+  // handle at each header's right edge) rather than a fixed best-guess
+  // split — long Entity/Actor ID values were getting clipped no matter
+  // what fixed percentages this table shipped with, because "long enough
+  // to matter" depends on what's actually in the data on a given day, not
+  // something a static width can predict. Widths persist per-admin via
+  // localStorage (reports.auditLog.columnWidths), the same "adjust once,
+  // stays adjusted" convention as Notion/Linear/Airtable's own resizable
+  // columns.
+  //
+  // The standalone Actor UID column from the previous version is gone —
+  // it's now the copy icon on the Actor cell below. Showing the raw UID
+  // as its own column stopped pulling weight the moment the Name/ID No.
+  // columns existed right next to it: everyone identifies an actor by
+  // name, and the one time the raw UID itself is actually needed (cross-
+  // referencing against a database record, a support ticket) is exactly
+  // what a copy button is for — one click of the real ID, not a
+  // permanent extra column of one for the other 99% of the time.
+  const { widths, startResize } = useResizableColumns(AUDIT_COLUMNS, 'reports.auditLog.columnWidths')
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted">{audit?.total ?? 0} total entries</p>
       </div>
       <div className="border border-base rounded-2xl overflow-hidden">
-        {/* [PRODUCTION FIX] Table previously had no explicit column widths
-           — with automatic table layout, a long Entity value could shrink
-           its neighbours to fit, which is what let the Actor UID column
-           visually run into the next one ("swallowed"). `table-fixed` +
-           a <colgroup> give every column a guaranteed minimum width that
-           doesn't depend on any other column's content; the container's
-           existing `overflow-x-auto` still handles horizontal scrolling
-           on narrow screens once the table's natural width (now larger,
-           with the two new columns) exceeds it. */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse table-fixed min-w-[920px]">
+          <table className="w-full text-sm border-collapse table-fixed">
             <colgroup>
-              <col className="w-[13%]" /> {/* Action */}
-              <col className="w-[10%]" /> {/* Entity */}
-              <col className="w-[10%]" /> {/* Entity ID */}
-              <col className="w-[10%]" /> {/* Actor UID */}
-              <col className="w-[16%]" /> {/* Name */}
-              <col className="w-[13%]" /> {/* ID No. */}
-              <col className="w-[9%]" />  {/* Role */}
-              <col className="w-[13%]" /> {/* Time */}
+              {AUDIT_HEADERS.map((h) => <col key={h.key} style={{ width: widths[h.key] }} />)}
             </colgroup>
             <thead>
               <tr className="bg-page border-b border-base">
-                {['Action', 'Entity', 'Entity ID', 'Actor', 'Role', 'Time'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap">{h}</th>
+                {AUDIT_HEADERS.map((h) => (
+                  <th
+                    key={h.key}
+                    className="relative px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap select-none"
+                  >
+                    {h.label}
+                    {/* Drag handle — grab the right edge of any header to
+                       resize that column. Widens the hit target well past
+                       the visible 1.5px line since a pixel-perfect border
+                       is nearly impossible to grab with a mouse. */}
+                    <span
+                      onMouseDown={startResize(h.key)}
+                      className="absolute top-0 right-0 h-full w-2 -mr-1 cursor-col-resize hover:bg-brand-teal/40 active:bg-brand-teal/60 z-10"
+                    />
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-base">
               {audit?.logs.map((log) => (
                 <tr key={log.id} className="hover:bg-page transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-brand-teal whitespace-nowrap truncate">{log.action}</td>
-                  <td className="px-4 py-3 text-xs whitespace-nowrap truncate">{log.entityType}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted whitespace-nowrap truncate">{log.entityId.slice(0, 10)}…</td>
-                  <td className="px-4 py-3 font-mono text-xs whitespace-nowrap truncate">{log.actorUid.slice(0, 8)}…</td>
-                  {/* [NEW] Resolved server-side against StaffProfile (by
-                     uid) / Student (by firebaseUid) — see
-                     reportService.getAuditLogs(). Neither match (a
-                     deleted account, or a system/cron actor) renders an
-                     em dash rather than blank, so it reads as "checked,
-                     nothing found" rather than a missing value. */}
-                  <td className="px-4 py-3 text-xs whitespace-nowrap truncate" title={log.actorName ?? undefined}>
-                    {log.actorName ?? <span className="text-muted">—</span>}
+                  <td className="px-4 py-3 font-mono text-xs text-brand-teal truncate">{log.action}</td>
+                  <td className="px-4 py-3 text-xs truncate">{log.entityType}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted overflow-hidden">
+                    <CopyableId value={log.entityId} display={`${log.entityId.slice(0, 10)}…`} />
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted whitespace-nowrap truncate">
+                  {/* [NEW] Name/ID resolved server-side against StaffProfile
+                     (by uid) / Student (by firebaseUid) — see
+                     reportService.getAuditLogs(). Neither match (a deleted
+                     account, or a system/cron actor) renders an em dash
+                     rather than blank, so it reads as "checked, nothing
+                     found" rather than a missing value. The copy icon
+                     copies the actual actorUid — still one click away for
+                     the rare case it's genuinely needed, just not taking
+                     up a whole column of its own any more. */}
+                  <td className="px-4 py-3 text-xs overflow-hidden">
+                    <CopyableId
+                      value={log.actorUid}
+                      display={log.actorName ?? <span className="text-muted">—</span>}
+                    />
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted truncate">
                     {log.actorEmployeeNo ?? log.actorRegistrationNo ?? <span>—</span>}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap"><span className="text-xs bg-base rounded-lg px-2 py-0.5">{log.actorRole}</span></td>
-                  <td className="px-4 py-3 text-xs text-muted whitespace-nowrap">{new Date(log.createdAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                  <td className="px-4 py-3 truncate"><span className="text-xs bg-base rounded-lg px-2 py-0.5">{log.actorRole}</span></td>
+                  <td className="px-4 py-3 text-xs text-muted truncate">{new Date(log.createdAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</td>
                 </tr>
               ))}
             </tbody>
