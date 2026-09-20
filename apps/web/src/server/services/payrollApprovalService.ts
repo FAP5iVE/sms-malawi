@@ -146,6 +146,44 @@ export async function approve(
 }
 
 /**
+ * [NEW — Approvals Hub] high_rank sends a submitted run back to Finance.
+ * The workflow had no way to decline a submission — a reviewer who spotted a
+ * wrong figure could only approve it or leave it sitting in PENDING_APPROVAL.
+ * The run returns to COMPLETED (the state Finance submits from), the
+ * submitter stamp is cleared so it reads as un-submitted, and the reason is
+ * kept in the audit trail.
+ */
+export async function returnToFinance(
+  runId:      string,
+  reason:     string,
+  actorUid:   string,
+  actorRole:  UserRole,
+): Promise<PayrollRun> {
+  const run = await prisma.payrollRun.findUniqueOrThrow({ where: { id: runId } })
+  assertStatus(run, 'PENDING_APPROVAL', 'return')
+
+  const updated = await prisma.payrollRun.update({
+    where: { id: runId },
+    data:  { status: 'COMPLETED', submittedByUid: null },
+  })
+
+  await auditService.log({
+    action:     'finance.payroll_returned',
+    entityType: 'PayrollRun',
+    entityId:   runId,
+    actorUid,
+    actorRole,
+    metadata:   {
+      before:  { status: run.status, submittedByUid: run.submittedByUid },
+      after:   { status: 'COMPLETED' },
+      context: { reason },
+    },
+  })
+  logger.info({ event: 'payroll.returned', runId, actorUid })
+  return updated
+}
+
+/**
  * finance locks an approved run — no further edits are possible after
  * this point. Posts the payroll journal entry:
  *   DR 5000 Staff Salaries Expense   (gross payroll)

@@ -34,7 +34,7 @@ import { useMemo }             from 'react'
 import { usePathname }         from 'next/navigation'
 import { useAuthStore }        from '@/store/authStore'
 import { usePermissions }      from '@/hooks/usePermissions'
-import { usePendingActionCounts } from '@/hooks/usePendingActions'
+import { useApprovalBadge }      from '@/hooks/useApprovals'
 import { NAV_ITEMS }           from '@/config/navigation'
 import type { NavItem, NavBadgeKey } from '@/config/navigation'
 
@@ -101,9 +101,9 @@ export function useNavigation(): UseNavigationReturn {
   const { role, initialized }      = useAuthStore()
   const { can }                    = usePermissions()
 
-  // Pending actions count — only fetched for admin and high_rank.
-  // usePendingActionCounts() has its own `enabled` guard for other roles.
-  const { data: pendingCounts } = usePendingActionCounts()
+  // Requests awaiting THIS user's review, across every module (Approvals Hub).
+  // Non-reviewers get 0 back from the server, so no badge is drawn for them.
+  const { data: approvalBadge } = useApprovalBadge()
 
   // ── isActive ──────────────────────────────────────────────────────────────
   // Stable function reference — not memoized because it's recreated on every
@@ -121,7 +121,7 @@ export function useNavigation(): UseNavigationReturn {
 
     switch (key) {
       case 'pendingActions': {
-        const count = pendingCounts?.pending
+        const count = approvalBadge?.awaitingMyReview
         return count !== undefined && count > 0 ? count : undefined
       }
       case 'unreadNotifications': {
@@ -152,10 +152,10 @@ export function useNavigation(): UseNavigationReturn {
         badgeCount: resolveBadgeCount(item.badge),
       }))
     // isActive and resolveBadgeCount are intentionally excluded from deps —
-    // they are pure functions that close over `pathname` and `pendingCounts`
+    // they are pure functions that close over `pathname` and `approvalBadge`
     // which ARE listed as deps below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, initialized, pathname, pendingCounts, can])
+  }, [role, initialized, pathname, approvalBadge, can])
 
   // ── Primary / overflow split ──────────────────────────────────────────────
   // The mobile bottom nav has 5 slots:

@@ -77,7 +77,7 @@ function rolesFor(href: string): readonly UserRole[] {
 /**
  * Named sources for numeric badge counts on navigation items.
  *
- * 'pendingActions'      — PENDING approval count from /pending-actions/counts.
+ * 'pendingActions'      — requests awaiting THIS user's review (/approvals/badge).
  * 'unreadNotifications' — Unread Firestore notification document count.
  */
 export type NavBadgeKey = 'pendingActions' | 'unreadNotifications'
@@ -293,7 +293,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href:        '/user-management',
     icon:        ShieldCheck,
     roles:       rolesFor('/user-management'),
-    badge:       'pendingActions',
+    // [Approvals Hub] The 'pendingActions' badge used to sit here too, which
+    // showed the same number on two nav items. It now lives on Approvals only.
   },
   {
     label:       'Settings',

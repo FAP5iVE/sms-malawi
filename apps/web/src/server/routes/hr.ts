@@ -292,6 +292,12 @@ hrRouter.post('/leave/apply', verifyAuth,
     return res.status(201).json(await hrService.applyForLeave(staffProfile.id, parsed.data))
   })
 
+// [NEW — Approvals Hub] Applicant withdraws their own pending request.
+hrRouter.patch('/leave/requests/:id/cancel', verifyAuth,
+  async (req, res) => {
+    return res.json(await hrService.cancelLeave(String(req.params.id), req.user!.uid))
+  })
+
 hrRouter.patch('/leave/requests/:id/review', verifyAuth, requireRole([...REVIEWERS]),
   async (req, res) => {
     const parsed = ReviewLeaveSchema.safeParse(req.body)
@@ -345,6 +351,15 @@ hrRouter.post('/loans/request', verifyAuth,
 // either action in the matrix, so there is no real mismatch to correct.
 hrRouter.patch('/loans/:id/approve', verifyAuth, requirePermission('hr.approveLoan'),
   async (req, res) => {return res.json(await hrService.approveLoan(String(req.params.id), req.user!.uid))})
+
+// [NEW — Approvals Hub] The missing half of loan review — the schema has a
+// REJECTED status but nothing could ever set it.
+hrRouter.patch('/loans/:id/reject', verifyAuth, requirePermission('hr.approveLoan'),
+  async (req, res) => {
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : ''
+    if (!reason) return res.status(400).json({ error: 'A reason is required to reject a loan.' })
+    return res.json(await hrService.rejectLoan(String(req.params.id), req.user!.uid, req.user!.role, reason))
+  })
 
 hrRouter.patch('/loans/:id/disburse', verifyAuth, requireRole(['admin','finance']),
   async (req, res) => {return res.json(await hrService.disburseLoan(String(req.params.id)))})

@@ -88,6 +88,7 @@ import {
 import { Prisma, InvoiceStatus, FineStatus } from '@prisma/client'
 import * as feeService from '@/server/services/feeService'
 import * as budgetService from '@/server/services/budgetService'
+import * as expenseApprovalService from '@/server/services/expenseApprovalService'
 import * as installmentService from '@/server/services/installmentService'
 import * as studentService from '@/server/services/studentService'
 // [BUG FIX 2026-09-06] See lib/serialize.ts's header comment -- Decimal
@@ -521,21 +522,6 @@ financesRouter.post('/expenses', verifyAuth, requireRole(['admin', 'finance']), 
   res.status(201).json(expense)
 })
 
-// [R9] Maps each ExpenseCategory to the chart-of-accounts expense code
-// accountingService.seedChartOfAccounts() seeds. LIBRARY and TRANSPORT
-// have no dedicated seeded account — mapped to 5900 Miscellaneous Expense
-// rather than adding new accounts, since this phase makes no change to
-// accountingService.ts's own ledger logic (the seeded chart is untouched).
-const EXPENSE_CATEGORY_ACCOUNT: Record<string, string> = {
-  SALARIES: '5000',
-  UTILITIES: '5100',
-  MAINTENANCE: '5200',
-  PROCUREMENT: '5300',
-  LIBRARY: '5900',
-  TRANSPORT: '5900',
-  MISCELLANEOUS: '5900',
-}
-
 // [R9] Receipt upload — an Appwrite file ID stored on Expense.receiptKey,
 // matching the field this session's schema.prisma comment fix corrects
 // from a stale "R2 object key" reference. Mirrors assignments.ts's
@@ -588,64 +574,28 @@ financesRouter.get(
   }
 )
 
+// [Approvals Hub] The approve/reject logic now lives in
+// expenseApprovalService so this route and the Approvals page share one
+// implementation — and both now refuse a non-PENDING expense (the inline
+// version could be approved twice, posting the journal entry and the budget
+// spend twice).
 financesRouter.patch(
   '/expenses/:id/approve',
   verifyAuth,
   requireRole(['admin', 'high_rank']),
   async (req, res) => {
-    // [PRODUCTION FIX 2026-07-27] paidImmediately decides which ledger
-    // account the approval posts against: Cash (already paid) or Accounts
-    // Payable (owed — a vendor/company debt, cleared later via mark-paid).
-    // Defaults to true so any caller that doesn't yet send this field keeps
-    // today's behaviour (approval = paid) rather than silently starting to
-    // create payables it never intended.
+    // paidImmediately decides which ledger account the approval posts
+    // against: Cash (already paid) or Accounts Payable (owed). Defaults to
+    // true so callers that don't send it keep approval = paid.
     const paidImmediately = req.body?.paidImmediately !== false
-    const expense = await prisma.expense.update({
-      where: { id: String(req.params.id) },
-      data: {
-        status: 'APPROVED',
-        approvedByUid: req.user!.uid,
-        approvedAt: new Date(),
-        ...(paidImmediately ? { paidAt: new Date(), paidByUid: req.user!.uid } : {}),
-      },
-    })
-    await budgetService.updateBudgetSpent(expense.category, expense.academicYear, Number(expense.amount))
-    // [R9] Reconnect approved expenses to the double-entry ledger — Phase
-    // 4B confirmed no money-movement operation reached accountingService
-    // before this session (not just payments). A posting failure is
-    // logged for reconciliation rather than reverting the already-applied
-    // approval, matching feeService.recordPayment()'s identical pattern.
     try {
-      const accountCode = EXPENSE_CATEGORY_ACCOUNT[expense.category] ?? '5900'
-      const entryId = await accountingService.createJournalEntry({
-        reference: `EXP-${expense.id.slice(-8).toUpperCase()}`,
-        description: `Expense approved — ${expense.description} (${expense.category})`,
-        entryDate: new Date(),
-        actorUid: req.user!.uid,
-        lines: paidImmediately
-          ? [
-              { accountCode, debit: Number(expense.amount), description: expense.description },
-              { accountCode: '1000', credit: Number(expense.amount), description: 'Cash paid for expense' },
-            ]
-          : [
-              { accountCode, debit: Number(expense.amount), description: expense.description },
-              { accountCode: '2000', credit: Number(expense.amount), description: `Owed — ${expense.description}` },
-            ],
-      })
-      await accountingService.postEntry(entryId, req.user!.uid)
-    } catch (err) {
-      // Best-effort accounting-ledger posting — the primary operation
-      // (expense/fine record) already succeeded and stays 200; this is
-      // purely a secondary-write failure. Previously only logger.error'd,
-      // meaning a real financial-integrity gap (a record exists with no
-      // posted journal entry) was invisible to Sentry. Now captured, tagged
-      // 'finances' — sentry.server.config.ts's own beforeSend additionally
-      // auto-escalates to level:fatal + critical_module:'finance' if the
-      // thrown message mentions JOURNAL/PAYROLL/INVOICE.
-      logger.error({ event: 'accounting.expense_posting_failed', expenseId: expense.id, err })
-      Sentry.captureException(err, { tags: { module: 'finances', event: 'accounting.expense_posting_failed' } })
+      const expense = await expenseApprovalService.approveExpense(
+        String(req.params.id), req.user!.uid, req.user!.role, paidImmediately,
+      )
+      res.json(expense)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'expense-approve' } })
     }
-    res.json(expense)
   }
 )
 
@@ -730,11 +680,15 @@ financesRouter.patch(
   verifyAuth,
   requirePermission('finance.rejectExpense'),
   async (req, res) => {
-    const expense = await prisma.expense.update({
-      where: { id: String(req.params.id) },
-      data: { status: 'REJECTED' },
-    })
-    res.json(expense)
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : undefined
+    try {
+      const expense = await expenseApprovalService.rejectExpense(
+        String(req.params.id), req.user!.uid, req.user!.role, reason,
+      )
+      res.json(expense)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'finances', route: 'expense-reject' } })
+    }
   }
 )
 

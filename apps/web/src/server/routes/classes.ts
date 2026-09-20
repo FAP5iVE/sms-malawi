@@ -133,6 +133,29 @@ classesRouter.patch('/:id', requirePermission('class.edit'), async (req, res) =>
   const { user } = req
   if (!user) return res.status(401).json({ error: 'Not authenticated.' })
 
+  // [Approvals Hub] lower_rank holds class.edit "with approval required" (see
+  // the permission matrix), exactly like class.create above — but this route
+  // applied their edit directly, so it never reached a reviewer. Now queued.
+  if (user.role === 'lower_rank') {
+    const alreadyPending = await pendingActionService.hasPendingAction('Class', id, 'class.edit')
+    if (alreadyPending) {
+      return res.status(409).json({ error: 'A pending edit request already exists for this class.' })
+    }
+    const pendingAction = await pendingActionService.create({
+      entityType:      'Class',
+      entityId:        id,
+      action:          'class.edit',
+      description:     `Edit class ${id}`,
+      requestedByUid:  user.uid,
+      requestedByRole: user.role,
+      targetState:     parsed.data,
+    })
+    return res.status(202).json({
+      message: 'Class edit submitted for approval.',
+      pendingActionId: pendingAction.id,
+    })
+  }
+
   const cls = await classService.updateClass(id, parsed.data, user.uid, user.role)
   return res.json(cls)
 })
@@ -142,6 +165,28 @@ classesRouter.delete('/:id', requirePermission('class.softDelete'), async (req, 
   const id = String(req.params.id)
   const { user } = req
   if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+
+  // [Approvals Hub] Same gap as PATCH above — lower_rank holds class.softDelete
+  // with approval required, but archived the class outright.
+  if (user.role === 'lower_rank') {
+    const alreadyPending = await pendingActionService.hasPendingAction('Class', id, 'class.softDelete')
+    if (alreadyPending) {
+      return res.status(409).json({ error: 'A pending archive request already exists for this class.' })
+    }
+    const pendingAction = await pendingActionService.create({
+      entityType:      'Class',
+      entityId:        id,
+      action:          'class.softDelete',
+      description:     `Archive class ${id}`,
+      requestedByUid:  user.uid,
+      requestedByRole: user.role,
+      targetState:     { action: 'archive' },
+    })
+    return res.status(202).json({
+      message: 'Class archival submitted for approval.',
+      pendingActionId: pendingAction.id,
+    })
+  }
 
   const cls = await classService.archiveClass(id, user.uid, user.role)
   return res.json(cls)

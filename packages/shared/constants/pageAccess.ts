@@ -67,7 +67,12 @@ export const PAGE_ACCESS: Record<string, readonly UserRole[]> = {
   // reviewers who hold PENDING_ACTION_REVIEWER_ROLES. Same role set the
   // panel's own internal canAccess check already assumes (reviewers plus
   // the two requester roles, so requesters can track their own submissions).
-  '/approvals': ['admin', 'high_rank', 'lower_rank', 'academic'],
+  // [Approvals Hub] Now the unified inbox for EVERY module's approval flow
+  // (leave, expenses, procurement, library, announcements, …), so every role
+  // that can submit a request — not just the four student/class roles — needs
+  // to open it to track its own submissions. What each person sees inside is
+  // decided per request type by the server (approvalHubService), not here.
+  '/approvals': ALL_ROLES,
   '/user-management': ['admin'],
   '/settings': ALL_ROLES,
   // R18 — University Placement Module. [OVERHAUL] The old two-page split

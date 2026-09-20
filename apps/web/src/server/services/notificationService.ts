@@ -644,7 +644,9 @@ export async function sendPendingActionCreated(
   params: PendingActionParams
 ): Promise<BulkNotificationResult> {
   const school = await getSchoolBranding()
-  const loginUrl = `${school.loginUrl}/user-management`
+  // [FIX] Was /user-management — an admin-only page, so a high_rank reviewer
+  // who tapped this link landed on "access denied" instead of the request.
+  const loginUrl = `${school.loginUrl}/approvals`
 
   const subject = `⏳ Action pending your approval — ${params.entityType}: ${params.action}`
   const htmlBody = `
@@ -688,7 +690,7 @@ export async function sendPendingActionCreated(
       const pushResult = await sendToUser(uid, {
         title: 'Action Pending Approval',
         body: `${params.action} on ${params.entityType} requires your approval.`,
-        clickAction: '/user-management',
+        clickAction: '/approvals',
         tag: `pending_action_${params.entityId}`,
         data: { type: 'pending_action', entityType: params.entityType, entityId: params.entityId },
       })

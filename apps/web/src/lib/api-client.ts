@@ -392,6 +392,14 @@ export const queryKeys = {
     detail: (id: string) => ['applications', 'detail', id] as const,
   },
 
+  // ── Approvals Hub
+  approvals: {
+    all:     ['approvals'] as const,
+    list:    (params: unknown) => ['approvals', 'list', params] as const,
+    summary: (scope: string)   => ['approvals', 'summary', scope] as const,
+    badge:   ()                => ['approvals', 'badge'] as const,
+  },
+
   // ── Announcements
   announcements: {
     all: () => ['announcements'] as const,

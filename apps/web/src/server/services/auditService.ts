@@ -131,6 +131,7 @@ export const ACTION_SEVERITY: Readonly<Record<string, Severity>> = {
   'finance.payroll_run_started':  SEVERITY.CRITICAL,
   'finance.payroll_run_completed':SEVERITY.CRITICAL,
   'finance.payroll_approved':     SEVERITY.CRITICAL,
+  'finance.payroll_returned':     SEVERITY.CRITICAL,
   'finance.payroll_locked':       SEVERITY.CRITICAL,
   'finance.payroll_rolled_back':  SEVERITY.CRITICAL,
   'finance.salary_structure_updated':SEVERITY.CRITICAL,
@@ -213,6 +214,12 @@ export const ACTION_SEVERITY: Readonly<Record<string, Severity>> = {
   'system.ip_unblocked':          SEVERITY.HIGH,
   'system.session_terminated':    SEVERITY.HIGH,
   'system.cache_cleared':         SEVERITY.MEDIUM,
+
+  // ── Approvals Hub — one entry per decision taken from /approvals
+  'approval.approved':            SEVERITY.HIGH,
+  'approval.rejected':            SEVERITY.HIGH,
+  'approval.returned':            SEVERITY.HIGH,
+  'approval.cancelled':           SEVERITY.MEDIUM,
 
   // ── Reports / exports
   'report.exported':              SEVERITY.MEDIUM,

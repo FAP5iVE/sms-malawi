@@ -26,8 +26,27 @@ import { requireAnyPermission }                 from '@/server/middleware/verify
 import * as pendingActionService                from '@/server/services/pendingActionService'
 import type { PendingActionStatus }             from '@prisma/client'
 import type { PendingActionType }               from '@/server/services/pendingActionService'
+import { hasPermission, type Permission }      from '@shared/types/permissions'
 
 export const pendingActionsRouter = Router()
+
+/**
+ * [FIX] Approving a pending action now APPLIES its stored change
+ * (pendingActionExecutor), so POST / can no longer be an open door: the
+ * caller must hold the permission for the underlying operation, and only
+ * action types the executor knows how to apply may be queued. The dedicated
+ * student/class routes already enforce the same permissions when they queue
+ * a lower_rank request themselves.
+ */
+const REQUEST_PERMISSION: Readonly<Record<string, Permission>> = {
+  'student.create':       'student.create',
+  'student.edit':         'student.edit',
+  'student.softDelete':   'student.softDelete',
+  'student.statusChange': 'student.edit',
+  'class.create':         'class.create',
+  'class.edit':           'class.edit',
+  'class.softDelete':     'class.softDelete',
+}
 
 /**
  * Grants access to either:
@@ -70,9 +89,12 @@ pendingActionsRouter.use(verifyAuth)
 //  Other roles see only their own submitted actions.
 // ─────────────────────────────────────────────────────────
 
+// [FIX] Was gated on the approver permissions, which made the comment above
+// ("other roles see only their own") unreachable — the people who submit
+// requests (lower_rank, academic) got a 403 and could never track them. The
+// handler already scopes non-reviewers to their own rows.
 pendingActionsRouter.get(
   '/',
-  requireAnyPermission(['student.approvePendingAction', 'class.approvePendingAction']),
   async (req: Request, res: Response) => {
     const { user } = req
     if (!user) { res.status(401).json({ error: 'Not authenticated.' }); return }
@@ -202,6 +224,16 @@ pendingActionsRouter.post('/', async (req: Request, res: Response) => {
 
   if (!pendingActionService.PENDING_ACTION_TYPES.includes(action as PendingActionType)) {
     res.status(400).json({ error: `Unknown action type: "${action}".` })
+    return
+  }
+
+  const requiredPermission = REQUEST_PERMISSION[action]
+  if (!requiredPermission) {
+    res.status(400).json({ error: `"${action}" requests cannot be submitted through this endpoint.` })
+    return
+  }
+  if (!hasPermission(user.role, requiredPermission)) {
+    res.status(403).json({ error: 'You do not have permission to request this change.', required: requiredPermission })
     return
   }
 

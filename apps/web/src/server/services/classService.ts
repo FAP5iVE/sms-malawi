@@ -475,6 +475,40 @@ export async function approveTimetableSlot(slotId: string, actorUid: string, act
   return slot
 }
 
+/**
+ * [NEW — Approvals Hub] Rejects a pending (exam_officer-created) timetable
+ * slot. Only approve existed, so a slot an approver did not want could never
+ * be turned down — it just sat pending. The slot has never been visible on a
+ * class timetable (approvedAt is null), so rejection removes it; the reason
+ * is kept in the audit trail. An already-approved slot is never touched here.
+ */
+export async function rejectTimetableSlot(
+  slotId: string,
+  reason: string,
+  actorUid: string,
+  actorRole: UserRole,
+) {
+  const slot = await prisma.timetableSlot.findUnique({ where: { id: slotId } })
+  if (!slot) throw Object.assign(new Error('Timetable slot not found.'), { status: 404 })
+
+  const removed = await prisma.timetableSlot.deleteMany({ where: { id: slotId, approvedAt: null } })
+  if (removed.count === 0) {
+    throw Object.assign(new Error('This timetable slot is already approved and cannot be rejected.'), { status: 409 })
+  }
+
+  await auditService.log({
+    action: 'timetable.slot_rejected',
+    entityType: 'TimetableSlot',
+    entityId: slotId,
+    actorUid,
+    actorRole,
+    metadata: {
+      before: { classId: slot.classId, day: slot.day, subject: slot.subject, periodStart: slot.periodStart, periodEnd: slot.periodEnd },
+      context: { reason },
+    },
+  })
+}
+
 // ─────────────────────────────────────────────────────────
 //  CLASS SUBJECT PRESETS  (what subjects a class offers)
 //  Distinct from CLASS SUBJECT ASSIGNMENT below, which pairs a teacher to

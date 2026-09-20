@@ -1,37 +1,33 @@
-/**
- * [CHANGE TYPE]: NEW FILE
- * [FILE]: apps/web/src/app/(auth)/approvals/page.tsx
- * [PURPOSE]: PendingActionsPanel.tsx (student/class edit-request approval
- *   queue — full backend already live: pendingActionService.ts,
- *   /pending-actions routes, usePendingActions.ts hooks) had a complete
- *   implementation and nowhere to render. This is that page: the full,
- *   non-compact view with filters, review dialogs, and pagination. Reached
- *   from the sidebar (config/navigation.ts, badge: 'pendingActions') and
- *   from the High Rank dashboard's Quick Actions and compact panel.
- *   Route-level access is enforced by proxy.ts + NAV_ITEMS via the shared
- *   PAGE_ACCESS['/approvals'] entry — RoleGuard here is defense-in-depth,
- *   the same pattern monitoring/page.tsx and exams/page.tsx use.
- * [DEPENDS ON]: @/components/shared/{RoleGuard,PendingActionsPanel}
- */
 'use client'
 
+/**
+ * [CHANGE TYPE]: MAJOR REWRITE
+ * [FILE]: apps/web/src/app/(auth)/approvals/page.tsx
+ * [PURPOSE]: The Approvals page — one inbox for every request that needs or
+ *   needed a decision, from every module. All roles can open it: reviewers
+ *   see what is waiting on them, everyone else tracks their own submissions.
+ *
+ *   The page previously wrapped PendingActionsPanel, which only ever knew
+ *   about student/class change requests, and drew its own counter boxes and
+ *   a "Pending / All Actions" toggle. It now uses the same status-tab layout
+ *   as HR, Finance and Library (see ApprovalsCenter).
+ */
+
 import { RoleGuard } from '@/components/shared/RoleGuard'
-import { ModuleSurface } from '@/components/shared/ModuleSurface'
-import { PendingActionsPanel } from '@/components/shared/PendingActionsPanel'
+import { ApprovalsCenter } from '@/components/approvals/ApprovalsCenter'
+import { USER_ROLES } from '@shared/types/roles'
 
 export default function ApprovalsPage() {
   return (
-    <RoleGuard allowed={['admin', 'high_rank', 'lower_rank', 'academic']}>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <RoleGuard allowed={[...USER_ROLES]}>
+      <div className="space-y-6">
         <div>
           <h1 className="font-heading text-2xl font-bold text-brand-navy">Approvals</h1>
-          <p className="text-sm text-muted mt-0.5">
-            Requests awaiting review, and the status of your own submissions.
+          <p className="mt-1 text-sm text-muted">
+            Requests awaiting review, and the status of your own submissions — from every module in one place.
           </p>
         </div>
-        <ModuleSurface>
-        <PendingActionsPanel />
-        </ModuleSurface>
+        <ApprovalsCenter />
       </div>
     </RoleGuard>
   )

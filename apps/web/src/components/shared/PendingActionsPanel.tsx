@@ -1,752 +1,94 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { formatDistanceToNow, format } from 'date-fns'
-import {
-  usePendingActions,
-  usePendingActionCounts,
-  useApprovePendingAction,
-  useRejectPendingAction,
-  useCancelPendingAction,
-  type PendingActionRow,
-} from '@/hooks/usePendingActions'
-import { usePermissions }            from '@/hooks/usePermissions'
-import { useAuthStore }              from '@/store/authStore'
-import { Button }                    from '@/components/ui/button'
-import { Badge }                     from '@/components/ui/badge'
-import { Skeleton }                  from '@/components/ui/skeleton'
-import { Textarea }                  from '@/components/ui/textarea'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from '@/components/ui/dialog'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
-import {
-  CheckCircle2,
-  XCircle,
-  Clock,
-  AlertTriangle,
-  ChevronDown,
-  ChevronRight,
-  RefreshCw,
-  ShieldOff,
-  FileText,
-} from 'lucide-react'
-import type { PendingActionStatus } from '@prisma/client'
-import { PENDING_ACTION_LABELS, PENDING_ACTION_STATUS_CONFIG, type PendingActionIconName } from '@shared/constants/pendingActions'
+/**
+ * [CHANGE TYPE]: MAJOR REWRITE
+ * [FILE]: apps/web/src/components/shared/PendingActionsPanel.tsx
+ * [PURPOSE]: Compact "Pending Approvals" widget for dashboards.
+ *
+ *   This component used to be the whole approvals UI, but it only ever read
+ *   the generic PendingAction table (student/class change requests), so a
+ *   pending leave request, expense or purchase order never appeared in it.
+ *   It is now a small window onto the Approvals Hub: the oldest requests
+ *   waiting on the viewer, from every module, each linking to /approvals
+ *   where the full inbox, filters and decision tools live.
+ *
+ *   `compact` and `entityType` are retained so existing call sites keep
+ *   compiling; the widget is always compact and always cross-module.
+ */
 
-const STATUS_ICONS: Record<PendingActionIconName, React.ElementType> = {
-  clock: Clock,
-  check: CheckCircle2,
-  x: XCircle,
-  alert: AlertTriangle,
-}
-
-// ─────────────────────────────────────────────────────────
-//  CONFIG
-// ─────────────────────────────────────────────────────────
-
-
-
-// ─────────────────────────────────────────────────────────
-//  REVIEW DIALOG
-// ─────────────────────────────────────────────────────────
-
-interface ReviewDialogProps {
-  action:    PendingActionRow | null
-  mode:      'approve' | 'reject' | null
-  onClose:   () => void
-  onConfirm: (notes: string) => void
-  isPending: boolean
-}
-
-function ReviewDialog({ action, mode, onClose, onConfirm, isPending }: ReviewDialogProps) {
-  const [notes, setNotes] = useState('')
-
-  if (!action || !mode) return null
-
-  const isApprove    = mode === 'approve'
-  const actionLabel  = PENDING_ACTION_LABELS[action.action] ?? action.action
-  const title        = isApprove ? 'Approve Action' : 'Reject Action'
-  const description  = isApprove
-    ? `Confirm you want to approve "${actionLabel}" for ${action.entityType} ${action.entityId}. This will immediately apply the requested change.`
-    : `Confirm you want to reject "${actionLabel}". The change will not be applied and the requester will be notified.`
-
-  return (
-    <Dialog open={Boolean(action && mode)} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {isApprove
-              ? <CheckCircle2 className="w-5 h-5 text-green-600" />
-              : <XCircle      className="w-5 h-5 text-red-600"   />
-            }
-            {title}
-          </DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
-            {description}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-3 py-2">
-          <div className="rounded-md bg-muted/40 border p-3 space-y-1.5 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Action</span>
-              <span className="font-medium">{actionLabel}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Entity</span>
-              <span className="font-medium font-mono text-xs">{action.entityType} / {action.entityId.slice(0, 12)}…</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Requested by</span>
-              <span className="font-medium font-mono text-xs">{action.requestedByRole}</span>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground">
-              {isApprove ? 'Notes (optional)' : 'Reason for rejection'}
-              {!isApprove && <span className="text-red-500 ml-0.5">*</span>}
-            </label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder={isApprove ? 'Add approval notes…' : 'Explain why this action is being rejected…'}
-              rows={3}
-              className="resize-none text-sm"
-            />
-          </div>
-        </div>
-
-        <DialogFooter className="gap-2">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={isPending}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            variant={isApprove ? 'default' : 'destructive'}
-            onClick={() => onConfirm(notes)}
-            disabled={isPending || (!isApprove && !notes.trim())}
-            className={isApprove ? 'bg-green-600 hover:bg-green-700 text-white' : ''}
-          >
-            {isPending
-              ? (isApprove ? 'Approving…' : 'Rejecting…')
-              : (isApprove ? 'Approve'    : 'Reject')
-            }
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ─────────────────────────────────────────────────────────
-//  TARGET STATE VIEWER
-// ─────────────────────────────────────────────────────────
-
-function TargetStateViewer({ targetState }: { targetState: Record<string, unknown> | null }) {
-  const [open, setOpen] = useState(false)
-
-  if (!targetState || Object.keys(targetState).length === 0) return null
-
-  return (
-    <div>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        <FileText className="w-3 h-3" />
-        View change payload
-      </button>
-      {open && (
-        <pre className="mt-2 text-xs bg-muted/40 rounded p-2.5 overflow-x-auto max-h-36 leading-relaxed">
-          {JSON.stringify(targetState, null, 2)}
-        </pre>
-      )}
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────
-//  SINGLE ACTION CARD
-// ─────────────────────────────────────────────────────────
-
-interface ActionCardProps {
-  action:     PendingActionRow
-  isReviewer: boolean
-  currentUid: string
-  onApprove:  (action: PendingActionRow) => void
-  onReject:   (action: PendingActionRow) => void
-  onCancel:   (id: string)              => void
-  isCancelling: boolean
-}
-
-function ActionCard({
-  action,
-  isReviewer,
-  currentUid,
-  onApprove,
-  onReject,
-  onCancel,
-  isCancelling,
-}: ActionCardProps) {
-  const cfg         = PENDING_ACTION_STATUS_CONFIG[action.status]
-  const StatusIcon  = STATUS_ICONS[cfg.icon]
-  const actionLabel = PENDING_ACTION_LABELS[action.action] ?? action.action
-  const isOwn       = action.requestedByUid === currentUid
-  const isPending   = action.status === 'PENDING'
-  const isExpired   = action.status === 'EXPIRED'
-
-  return (
-    <div className={`rounded-lg border bg-card transition-colors ${
-      isPending
-        ? 'border-amber-200 dark:border-amber-800/50'
-        : isExpired
-          ? 'opacity-60 border-dashed'
-          : 'opacity-80'
-    }`}>
-      {/* ── Header */}
-      <div className="flex items-start justify-between gap-3 p-4">
-        <div className="flex items-start gap-3 min-w-0">
-          <StatusIcon className={`w-4 h-4 mt-0.5 shrink-0 ${
-            action.status === 'PENDING'
-              ? 'text-amber-500'
-              : action.status === 'APPROVED'
-                ? 'text-green-500'
-                : action.status === 'REJECTED'
-                  ? 'text-red-500'
-                  : 'text-muted-foreground'
-          }`} />
-
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground leading-snug truncate">
-              {actionLabel}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-              {action.description}
-            </p>
-          </div>
-        </div>
-
-        <Badge variant="outline" className={`text-[10px] font-semibold shrink-0 ${cfg.badgeClass}`}>
-          {cfg.label}
-        </Badge>
-      </div>
-
-      {/* ── Meta */}
-      <div className="px-4 pb-3 space-y-2.5">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <span>
-            <span className="font-medium">Entity:</span>{' '}
-            <span className="font-mono">{action.entityType} / {action.entityId.slice(0, 10)}…</span>
-          </span>
-          <span>
-            <span className="font-medium">By:</span>{' '}
-            <Badge variant="secondary" className="text-[10px] font-normal py-0">
-              {action.requestedByRole}
-            </Badge>
-          </span>
-          <span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="cursor-default underline decoration-dotted">
-                  {formatDistanceToNow(new Date(action.createdAt), { addSuffix: true })}
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
-                {format(new Date(action.createdAt), 'dd MMM yyyy, HH:mm:ss')}
-              </TooltipContent>
-            </Tooltip>
-          </span>
-          {action.expiresAt && isPending && (
-            <span className="text-amber-600 font-medium">
-              Expires {formatDistanceToNow(new Date(action.expiresAt), { addSuffix: true })}
-            </span>
-          )}
-        </div>
-
-        {/* Target state diff */}
-        <TargetStateViewer targetState={action.targetState} />
-
-        {/* Review notes */}
-        {action.reviewNotes && (
-          <div className="text-xs text-muted-foreground italic bg-muted/30 rounded px-3 py-1.5">
-            {action.status === 'REJECTED' ? '❌ ' : '✓ '}
-            {action.reviewNotes}
-          </div>
-        )}
-
-        {/* ── Action buttons */}
-        {isPending && (
-          <div className="flex items-center gap-2 pt-1">
-            {isReviewer && (
-              <>
-                <Button
-                  size="sm"
-                  className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white gap-1"
-                  onClick={() => onApprove(action)}
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  className="h-7 text-xs gap-1"
-                  onClick={() => onReject(action)}
-                >
-                  <XCircle className="w-3.5 h-3.5" />
-                  Reject
-                </Button>
-              </>
-            )}
-            {(isOwn || isReviewer) && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => onCancel(action.id)}
-                disabled={isCancelling}
-              >
-                Cancel
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────
-//  SKELETON
-// ─────────────────────────────────────────────────────────
-
-function PendingActionsSkeleton() {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <Skeleton key={i} className="h-24 w-full rounded-lg" />
-      ))}
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────
-//  EMPTY STATE
-// ─────────────────────────────────────────────────────────
-
-function EmptyState({ label }: { label: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-36 border rounded-lg bg-muted/20 text-muted-foreground gap-2">
-      <CheckCircle2 className="w-8 h-8 opacity-30" />
-      <p className="text-sm">{label}</p>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────
-//  MAIN COMPONENT
-// ─────────────────────────────────────────────────────────
+import Link from 'next/link'
+import { ArrowRight, CheckCircle2 } from 'lucide-react'
+import { useApprovalList, useApprovalSummary } from '@/hooks/useApprovals'
+import { MODULE_ICONS, timeAgo } from '@/components/approvals/approvalDisplay'
+import { APPROVAL_MODULE_LABELS } from '@shared/constants/approvals'
 
 interface PendingActionsPanelProps {
-  /**
-   * When true, shows a compact panel suitable for the dashboard.
-   * Only PENDING actions are shown, no tabs.
-   */
+  /** Retained for compatibility — the widget is always compact. */
   compact?: boolean
-  /** Optional entity type filter — locks the panel to a specific domain. */
+  /** Retained for compatibility — the widget is always cross-module. */
   entityType?: string
-  /** Title override */
   title?: string
-  /** Maximum actions to show in compact mode. Default: 5 */
+  /** Maximum requests to list. Default: 5 */
   compactLimit?: number
 }
 
-export function PendingActionsPanel({
-  compact      = false,
-  entityType,
-  title        = 'Pending Approvals',
-  compactLimit = 5,
-}: PendingActionsPanelProps) {
-  const { user, role, initialized } = useAuthStore()
-  const { can }                     = usePermissions()
+export function PendingActionsPanel({ title = 'Pending Approvals', compactLimit = 5 }: PendingActionsPanelProps) {
+  const summary = useApprovalSummary('review')
+  const list = useApprovalList({ scope: 'review', status: 'PENDING', sort: 'oldest', page: 1, pageSize: compactLimit })
 
-  const canReview  = can('student.approvePendingAction') || can('class.approvePendingAction')
-  const canAccess  = canReview || role === 'lower_rank' || role === 'academic'
-
-  const [activeTab,     setActiveTab]     = useState<'pending' | 'all'>('pending')
-  const [reviewTarget,  setReviewTarget]  = useState<PendingActionRow | null>(null)
-  const [reviewMode,    setReviewMode]    = useState<'approve' | 'reject' | null>(null)
-  const [page,          setPage]          = useState(1)
-  // [PRODUCTION FIX 2026-07-27] action/dateFrom/dateTo already worked
-  // server-side (usePendingActions already threads them through) — nothing
-  // in the panel exposed controls for them. Full view only; the compact
-  // dashboard widget stays as a quick-glance list.
-  const [actionFilter,  setActionFilter]  = useState('')
-  const [dateFrom,      setDateFrom]      = useState('')
-  const [dateTo,        setDateTo]        = useState('')
-
-  const statusFilter = compact
-    ? 'PENDING'
-    : activeTab === 'pending'
-      ? 'PENDING'
-      : 'ALL'
-
-  const { data, isLoading, isError, refetch, isFetching } = usePendingActions({
-    status:     statusFilter as 'PENDING' | 'ALL',
-    entityType: entityType,
-    action:     !compact && actionFilter ? actionFilter : undefined,
-    dateFrom:   !compact && dateFrom ? dateFrom : undefined,
-    dateTo:     !compact && dateTo ? dateTo : undefined,
-    page,
-    pageSize:   compact ? compactLimit : 25,
-  })
-
-  const { data: counts } = usePendingActionCounts()
-
-  const approveAction  = useApprovePendingAction()
-  const rejectAction   = useRejectPendingAction()
-  const cancelAction   = useCancelPendingAction()
-
-  const openApprove = useCallback((action: PendingActionRow) => {
-    setReviewTarget(action)
-    setReviewMode('approve')
-  }, [])
-
-  const openReject  = useCallback((action: PendingActionRow) => {
-    setReviewTarget(action)
-    setReviewMode('reject')
-  }, [])
-
-  const closeReview = useCallback(() => {
-    setReviewTarget(null)
-    setReviewMode(null)
-  }, [])
-
-  const handleConfirmReview = useCallback(
-    (notes: string) => {
-      if (!reviewTarget || !reviewMode) return
-
-      const mutate = reviewMode === 'approve'
-        ? approveAction.mutate
-        : rejectAction.mutate
-
-      mutate(
-        { id: reviewTarget.id, notes: notes || undefined },
-        { onSuccess: closeReview, onError: closeReview }
-      )
-    },
-    [reviewTarget, reviewMode, approveAction, rejectAction, closeReview]
-  )
-
-  // ── Access denied
-  if (initialized && !canAccess) {
-    return (
-      <div className="flex flex-col items-center justify-center h-32 gap-2 text-muted-foreground">
-        <ShieldOff className="w-8 h-8 opacity-30" />
-        <p className="text-sm">You do not have access to pending actions.</p>
-      </div>
-    )
-  }
-
-  const actions        = data?.actions ?? []
-  const pendingCount   = counts?.pending ?? data?.pendingCount ?? 0
-  const isReviewerUser = canReview
-  const currentUid     = user?.uid ?? ''
-
-  // ─────────────────────────────────────────────────────
-  //  COMPACT MODE
-  // ─────────────────────────────────────────────────────
-
-  if (compact) {
-    return (
-      <>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h3 className="font-heading text-sm font-semibold text-foreground">{title}</h3>
-              {pendingCount > 0 && (
-                <Badge variant="outline" className="text-[10px] font-bold bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400">
-                  {pendingCount}
-                </Badge>
-              )}
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => void refetch()}
-              disabled={isFetching}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-
-          {isLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 rounded-lg" />
-              ))}
-            </div>
-          ) : isError ? (
-            <div className="text-xs text-muted-foreground text-center py-4">
-              Failed to load. <button onClick={() => void refetch()} className="underline">Retry</button>
-            </div>
-          ) : actions.length === 0 ? (
-            <div className="flex items-center justify-center h-20 border rounded-lg bg-muted/20 text-muted-foreground">
-              <p className="text-xs">No pending approvals</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {actions.map((action) => (
-                <ActionCard
-                  key={action.id}
-                  action={action}
-                  isReviewer={isReviewerUser}
-                  currentUid={currentUid}
-                  onApprove={openApprove}
-                  onReject={openReject}
-                  onCancel={(id) => cancelAction.mutate(id)}
-                  isCancelling={cancelAction.isPending}
-                />
-              ))}
-              {pendingCount > compactLimit && (
-                <p className="text-xs text-muted-foreground text-center py-1">
-                  {/* [PRODUCTION FIX] Pointed at /user-management, an
-                     admin-only page that doesn't render this panel at all
-                     and that high_rank — one of the two actual reviewer
-                     roles (PENDING_ACTION_REVIEWER_ROLES) — can't even
-                     open. /approvals is this panel's own real, full-view
-                     page. */}
-                  +{pendingCount - compactLimit} more pending — view all in{' '}
-                  <a href="/approvals" className="underline hover:text-foreground">Approvals</a>
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-
-        <ReviewDialog
-          action={reviewTarget}
-          mode={reviewMode}
-          onClose={closeReview}
-          onConfirm={handleConfirmReview}
-          isPending={approveAction.isPending || rejectAction.isPending}
-        />
-      </>
-    )
-  }
-
-  // ─────────────────────────────────────────────────────
-  //  FULL MODE
-  // ─────────────────────────────────────────────────────
+  const total = summary.data?.byStatus.PENDING ?? 0
+  const items = list.data?.items ?? []
 
   return (
-    <>
-      <div className="space-y-4">
-
-        {/* ── Header */}
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <h2 className="font-heading text-lg font-semibold text-foreground">{title}</h2>
-            {pendingCount > 0 && (
-              <Badge variant="outline" className="font-bold bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400">
-                {pendingCount} pending
-              </Badge>
-            )}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void refetch()}
-            disabled={isFetching}
-            className="gap-1.5"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-
-        {/* ── Status summary */}
-        {counts && (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {(
-              [
-                { key: 'pending',   label: 'Pending',   color: 'text-amber-600' },
-                { key: 'approved',  label: 'Approved',  color: 'text-green-600' },
-                { key: 'rejected',  label: 'Rejected',  color: 'text-red-600'   },
-                { key: 'cancelled', label: 'Cancelled', color: 'text-muted-foreground' },
-                { key: 'expired',   label: 'Expired',   color: 'text-muted-foreground' },
-              ] as const
-            ).map(({ key, label, color }) => (
-              <div key={key} className="bg-muted/30 rounded-lg p-3 text-center border">
-                <p className={`text-lg font-bold tabular-nums ${color}`}>{counts[key]}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ── Filters (full view only) */}
-        {!compact && (
-          <div className="flex flex-wrap items-end gap-2 mb-4">
-            <div>
-              <label htmlFor="pa-action-filter" className="block text-[11px] text-muted-foreground mb-1">Action</label>
-              <input
-                id="pa-action-filter"
-                value={actionFilter}
-                onChange={(e) => { setActionFilter(e.target.value); setPage(1) }}
-                placeholder="e.g. STUDENT_ARCHIVED"
-                className="h-9 text-xs border border-base rounded-lg px-3 bg-surface w-44"
-              />
-            </div>
-            <div>
-              <label htmlFor="pa-date-from" className="block text-[11px] text-muted-foreground mb-1">From</label>
-              <input
-                id="pa-date-from"
-                type="date"
-                value={dateFrom}
-                onChange={(e) => { setDateFrom(e.target.value); setPage(1) }}
-                className="h-9 text-xs border border-base rounded-lg px-3 bg-surface"
-              />
-            </div>
-            <div>
-              <label htmlFor="pa-date-to" className="block text-[11px] text-muted-foreground mb-1">To</label>
-              <input
-                id="pa-date-to"
-                type="date"
-                value={dateTo}
-                onChange={(e) => { setDateTo(e.target.value); setPage(1) }}
-                className="h-9 text-xs border border-base rounded-lg px-3 bg-surface"
-              />
-            </div>
-            {(actionFilter || dateFrom || dateTo) && (
-              <button
-                type="button"
-                onClick={() => { setActionFilter(''); setDateFrom(''); setDateTo(''); setPage(1) }}
-                className="h-9 text-xs text-muted-foreground hover:text-body underline"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* ── Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as 'pending' | 'all'); setPage(1) }}>
-          <TabsList className="h-9">
-            <TabsTrigger value="pending" className="text-xs gap-1.5">
-              Pending
-              {pendingCount > 0 && (
-                <Badge variant="secondary" className="h-4 text-[10px] px-1.5">{pendingCount}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="all" className="text-xs">All Actions</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="pending" className="mt-4">
-            {isLoading ? (
-              <PendingActionsSkeleton />
-            ) : isError ? (
-              <div className="flex flex-col items-center justify-center h-32 text-muted-foreground gap-2">
-                <p className="text-sm">Failed to load pending actions.</p>
-                <Button size="sm" variant="outline" onClick={() => void refetch()}>Retry</Button>
-              </div>
-            ) : actions.length === 0 ? (
-              <EmptyState label="No pending actions — everything is up to date." />
-            ) : (
-              <div className="space-y-3">
-                {actions.map((action) => (
-                  <ActionCard
-                    key={action.id}
-                    action={action}
-                    isReviewer={isReviewerUser}
-                    currentUid={currentUid}
-                    onApprove={openApprove}
-                    onReject={openReject}
-                    onCancel={(id) => cancelAction.mutate(id)}
-                    isCancelling={cancelAction.isPending}
-                  />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="all" className="mt-4">
-            {isLoading ? (
-              <PendingActionsSkeleton />
-            ) : isError ? (
-              <div className="flex flex-col items-center justify-center h-32 text-muted-foreground gap-2">
-                <p className="text-sm">Failed to load actions.</p>
-                <Button size="sm" variant="outline" onClick={() => void refetch()}>Retry</Button>
-              </div>
-            ) : actions.length === 0 ? (
-              <EmptyState label="No actions found." />
-            ) : (
-              <>
-                <div className="space-y-3">
-                  {actions.map((action) => (
-                    <ActionCard
-                      key={action.id}
-                      action={action}
-                      isReviewer={isReviewerUser}
-                      currentUid={currentUid}
-                      onApprove={openApprove}
-                      onReject={openReject}
-                      onCancel={(id) => cancelAction.mutate(id)}
-                      isCancelling={cancelAction.isPending}
-                    />
-                  ))}
-                </div>
-
-                {data && data.pages > 1 && (
-                  <div className="flex items-center justify-between pt-4 text-sm">
-                    <p className="text-muted-foreground">
-                      Page {data.page} of {data.pages} &bull; {data.total.toLocaleString()} total
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline" size="sm"
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        disabled={data.page <= 1 || isFetching}
-                      >
-                        Previous
-                      </Button>
-                      <Button
-                        variant="outline" size="sm"
-                        onClick={() => setPage((p) => Math.min(data.pages, p + 1))}
-                        disabled={data.page >= data.pages || isFetching}
-                      >
-                        Next
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </TabsContent>
-        </Tabs>
+    <section className="rounded-2xl border border-base bg-surface p-4" aria-label={title}>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="font-heading text-base font-semibold text-body">{title}</h2>
+        {total > 0 ? (
+          <span className="rounded-full bg-brand-coral px-2 text-xs font-bold leading-5 text-white">{total}</span>
+        ) : null}
       </div>
 
-      <ReviewDialog
-        action={reviewTarget}
-        mode={reviewMode}
-        onClose={closeReview}
-        onConfirm={handleConfirmReview}
-        isPending={approveAction.isPending || rejectAction.isPending}
-      />
-    </>
+      {list.isLoading ? (
+        <div className="space-y-2" role="status" aria-label="Loading approvals">
+          {[0, 1, 2].map((i) => <div key={i} className="skeleton h-12 w-full rounded-xl" />)}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-6 text-center">
+          <CheckCircle2 className="h-8 w-8 text-emerald-500" aria-hidden="true" />
+          <p className="text-sm text-muted">No pending approvals — everything is up to date.</p>
+        </div>
+      ) : (
+        <ul className="space-y-1.5">
+          {items.map((item) => {
+            const Icon = MODULE_ICONS[item.module]
+            return (
+              <li key={item.key}>
+                <Link
+                  href="/approvals"
+                  className="flex min-h-[44px] items-center gap-3 rounded-xl px-2 py-2 hover:bg-page focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/40"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-teal/10 text-brand-teal">
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-body">{item.title}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {APPROVAL_MODULE_LABELS[item.module]} · {item.requester.name} · {timeAgo(item.createdAt)}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      <Link
+        href="/approvals"
+        className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-brand-teal hover:underline"
+      >
+        {total > items.length ? `View all ${total}` : 'Open approvals'} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      </Link>
+    </section>
   )
 }

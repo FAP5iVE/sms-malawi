@@ -105,6 +105,7 @@ import { settingsRouter }      from '@/server/routes/settings'
 import { auditRouter }         from '@/server/routes/audit'
 import { sessionsRouter }      from '@/server/routes/sessions'
 import { pendingActionsRouter }from '@/server/routes/pendingActions'
+import { approvalsRouter }      from '@/server/routes/approvals'
 import { notificationsRouter } from '@/server/routes/notifications'
 import { promotionRouter }     from '@/server/routes/promotion'
 import { createRateLimiter }   from '@/lib/ratelimit'
@@ -231,6 +232,8 @@ export function createApiApp() {
   app.use('/audit',           auditRouter)
   app.use('/sessions',        sessionsRouter)
   app.use('/pending-actions', pendingActionsRouter)
+  // [Approvals Hub] unified inbox across every module's approval workflow.
+  app.use('/approvals', approvalsRouter)
   app.use('/notifications',   notificationsRouter)
   app.use('/promotion',       verifyAuth, requireRole(['admin', 'exam_officer', 'high_rank']), promotionRouter)
   app.use('/hr',              hrRouter)

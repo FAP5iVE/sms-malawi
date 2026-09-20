@@ -7,6 +7,7 @@ import { sendPendingActionCreated }from '@/server/services/notificationService'
 import {Prisma, type PendingActionStatus } from '@prisma/client'
 import type { UserRole }           from '@shared/types/roles'
 import { PENDING_ACTION_REVIEWER_ROLES } from '@shared/constants/pendingActions'
+import { applyApproved } from '@/server/services/pendingActionExecutor'
 
 // ─────────────────────────────────────────────────────────
 //  ALLOWED ACTIONS
@@ -207,16 +208,24 @@ async function notifyReviewers(
 // ─────────────────────────────────────────────────────────
 
 /**
- * Approve a pending action.
- * Sets status to APPROVED and records reviewer details.
+ * Approve a pending action AND apply it.
  *
- * The calling route handler is responsible for executing the
- * actual business operation (e.g., applying the soft-delete,
- * publishing the announcement) AFTER this call succeeds.
- * This separation keeps the service single-responsibility.
+ * [FIX] This used to only flip the status to APPROVED and rely on "the
+ * calling route handler" to execute the change — which no caller did, so
+ * approving a student/class request never changed a single record. The
+ * stored change is now applied here through pendingActionExecutor, which
+ * delegates to the same service functions the direct path uses.
+ *
+ * Ordering is claim → apply → (revert on failure): the row is first moved
+ * PENDING → APPROVED with a conditional update, so two reviewers clicking at
+ * once cannot both apply the change; if applying then fails (duplicate,
+ * record gone, validation), the claim is released back to PENDING and the
+ * error is surfaced to the reviewer instead of leaving an "approved" request
+ * whose change never happened.
  *
  * @throws Error with status 400 if action is not in PENDING state
  * @throws Error with status 403 if reviewer role is not authorised
+ * @throws Error with status 409 if another reviewer decided it first
  */
 export async function approve(
   input: ReviewPendingActionInput
@@ -256,8 +265,8 @@ export async function approve(
   }
 
   const now = new Date()
-  const updated = await prisma.pendingAction.update({
-    where: { id: input.id },
+  const claim = await prisma.pendingAction.updateMany({
+    where: { id: input.id, status: 'PENDING' },
     data: {
       status:        'APPROVED',
       reviewedByUid: input.reviewedByUid,
@@ -265,6 +274,41 @@ export async function approve(
       reviewNotes:   input.notes ?? null,
     },
   })
+  if (claim.count === 0) {
+    throw Object.assign(
+      new Error('This request was already decided by someone else.'),
+      { status: 409 }
+    )
+  }
+
+  let applyNote: string | null = null
+  try {
+    const target = existing.targetState
+    const result = await applyApproved(
+      {
+        id:          existing.id,
+        action:      existing.action,
+        entityId:    existing.entityId,
+        targetState: target && typeof target === 'object' && !Array.isArray(target)
+          ? (target as Record<string, unknown>)
+          : null,
+      },
+      { uid: input.reviewedByUid, role: input.reviewedByRole },
+    )
+    applyNote = result.note
+  } catch (err) {
+    await prisma.pendingAction.updateMany({
+      where: { id: input.id, status: 'APPROVED' },
+      data: { status: 'PENDING', reviewedByUid: null, reviewedAt: null, reviewNotes: null },
+    })
+    logger.error(
+      { err, pendingActionId: input.id, action: existing.action },
+      '[pendingActionService] Applying approved change failed — approval rolled back'
+    )
+    throw err
+  }
+
+  const updated = await prisma.pendingAction.findUniqueOrThrow({ where: { id: input.id } })
 
   await auditService.log({
     action:     'student.pending_action_approved',
@@ -277,6 +321,7 @@ export async function approve(
         pendingActionId: input.id,
         pendingAction:   existing.action,
         reviewNotes:     input.notes,
+        ...(applyNote ? { applyNote } : {}),
       },
     },
   })

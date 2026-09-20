@@ -61,7 +61,7 @@ export function ProcurementWorkspace() {
 function Requisitions() {
   const { data = [], isLoading } = useRequisitions(); const [show, setShow] = useState(false)
   return <section className="space-y-4">
-    <Header title="Purchase requisitions" subtitle="New procurement requests. Legacy AssetRequest records remain separate."
+    <Header title="Purchase requisitions"
       action={<PermissionGuard permission="procurement.createRequisition"><button type="button" onClick={() => setShow(true)} className="min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold inline-flex items-center gap-2"><Plus className="w-4 h-4" /> New requisition</button></PermissionGuard>} />
     {show && <RequisitionForm onClose={() => setShow(false)} />}
     {isLoading ? <Loading /> : <DataTable headers={['Requisition', 'Department', 'Purpose', 'Status', 'Amount', 'Actions']}>{data.map((r) => <RequisitionRow key={r.id} row={r} />)}</DataTable>}
@@ -436,7 +436,7 @@ function Suppliers() {
       { onSuccess: () => { setSupplierCode(''); setName(''); setContactPerson(''); setPhone(''); setEmail(''); setShow(false) } })
   }
   return <section className="space-y-4">
-    <Header title="Suppliers" subtitle="Bank details aren't shown here — access to them is separately restricted."
+    <Header title="Suppliers"
       action={<PermissionGuard permission="procurement.manageSuppliers"><button type="button" onClick={() => setShow(v => !v)} className="button-primary"><Plus className="w-4 h-4" /> New supplier</button></PermissionGuard>} />
     {show && <div className="bg-surface border border-base rounded-xl p-4 grid sm:grid-cols-2 gap-3">
       <Field label="Supplier code"><input value={supplierCode} onChange={e => setSupplierCode(e.target.value)} className="input" placeholder="SUP-001" /></Field>

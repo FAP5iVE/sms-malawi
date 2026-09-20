@@ -553,6 +553,41 @@ export async function reviewLeave(requestId: string, data: ReviewLeaveInput, act
   }
 }
 
+/**
+ * [NEW — Approvals Hub] A staff member withdraws their OWN leave request
+ * while it is still pending. Releases the reserved days exactly the way a
+ * rejection does. Nothing else in the system could cancel a request, so a
+ * mistaken application stayed on the reviewer's queue until someone rejected
+ * it on the applicant's behalf.
+ */
+export async function cancelLeave(requestId: string, actorUid: string) {
+  const req = await prisma.leaveRequest.findUniqueOrThrow({
+    where:   { id: requestId },
+    include: { staff: { select: { uid: true } } },
+  })
+  if (req.staff.uid !== actorUid) {
+    throw Object.assign(new Error('You can only withdraw your own leave requests.'), { status: 403 })
+  }
+  if (req.status !== 'PENDING') {
+    throw Object.assign(new Error('Only a pending leave request can be withdrawn.'), { status: 409 })
+  }
+
+  const updated = await prisma.leaveRequest.update({
+    where: { id: requestId },
+    data:  { status: 'CANCELLED', reviewedAt: new Date(), reviewNotes: 'Withdrawn by the applicant.' },
+  })
+
+  if (['ANNUAL', 'SICK'].includes(req.leaveType)) {
+    await prisma.leaveBalance.update({
+      where: { staffId_leaveType_year: { staffId: req.staffId, leaveType: req.leaveType, year: req.startDate.getFullYear() } },
+      data:  { pendingDays: { decrement: req.days } },
+    })
+  }
+
+  logger.info({ event: 'leave.cancelled', requestId, actorUid })
+  return updated
+}
+
 export async function listLeaveRequests(filters: { staffId?: string; status?: string } = {}) {
   return prisma.leaveRequest.findMany({
     where: {
@@ -623,10 +658,44 @@ export async function requestLoan(staffId: string, data: LoanRequestInput) {
 }
 
 export async function approveLoan(loanId: string, actorUid: string) {
+  // [FIX] No status guard before — any loan (even a REJECTED/REPAYING one)
+  // could be flipped back to APPROVED and re-stamped by a stray call.
+  const loan = await prisma.staffLoan.findUnique({ where: { id: loanId }, select: { status: true } })
+  if (!loan) throw Object.assign(new Error('Loan not found.'), { status: 404 })
+  if (loan.status !== 'PENDING') {
+    throw Object.assign(new Error('Only a pending loan can be approved.'), { status: 409 })
+  }
   return prisma.staffLoan.update({
     where: { id: loanId },
     data: { status: 'APPROVED', approvedByUid: actorUid, approvedAt: new Date() },
   })
+}
+
+/**
+ * [NEW — Approvals Hub] StaffLoan already has a REJECTED status but no code
+ * path ever set it, so a reviewer who did not want to grant a loan had no
+ * way to say so. The reason is written to the audit trail (the loan row has
+ * no notes column) and shown back to the requester by the Approvals page.
+ */
+export async function rejectLoan(loanId: string, actorUid: string, actorRole: string, reason: string) {
+  const loan = await prisma.staffLoan.findUnique({ where: { id: loanId }, select: { status: true } })
+  if (!loan) throw Object.assign(new Error('Loan not found.'), { status: 404 })
+  if (loan.status !== 'PENDING') {
+    throw Object.assign(new Error('Only a pending loan can be rejected.'), { status: 409 })
+  }
+  const updated = await prisma.staffLoan.update({
+    where: { id: loanId },
+    data:  { status: 'REJECTED' },
+  })
+  await auditService.log({
+    action:     'hr.loan_rejected',
+    entityType: 'StaffLoan',
+    entityId:   loanId,
+    actorUid,
+    actorRole,
+    metadata:   { context: { reason } },
+  })
+  return updated
 }
 
 // [POST-R11] Disbursing a loan now also wires its monthly deduction into

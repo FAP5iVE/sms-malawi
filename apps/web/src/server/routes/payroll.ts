@@ -201,6 +201,21 @@ payrollRouter.post(
   }
 )
 
+// [NEW — Approvals Hub] Decline a submitted run — sends it back to Finance.
+payrollRouter.post(
+  '/runs/:id/return',
+  verifyAuth,
+  requirePermission('finance.approvePayroll'),
+  async (req, res) => {
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 500) : ''
+    if (!reason) return res.status(400).json({ error: 'A reason is required to return a payroll run.' })
+    const run = await payrollApprovalService.returnToFinance(
+      String(req.params.id), reason, req.user!.uid, req.user!.role
+    )
+    res.json(run)
+  }
+)
+
 payrollRouter.post(
   '/runs/:id/lock',
   verifyAuth,
