@@ -1214,11 +1214,18 @@ export async function createFromApplication(
       : new Error('Failed to generate a unique registration number after multiple attempts.')
   }
 
-  // Update convertedStudentId after we have the student ID
-  await prisma.application.update({
+  // Update convertedStudentId after we have the student ID.
+  // [PRODUCTION FIX] Wrapped in its own `withRetry`: the student+ADMITTED
+  // change above already committed atomically, so from here on a transient
+  // connection drop must be retried in place, not by letting the error
+  // escape this function — an outer retry around the whole call would
+  // re-run the precondition check (line ~1103) against an application
+  // that's already ADMITTED and throw a false "does not allow conversion"
+  // error (idempotent to retry: re-setting the same convertedStudentId).
+  await withRetry(() => prisma.application.update({
     where: { id: applicationId },
     data:  { convertedStudentId: student.id },
-  })
+  }))
 
   // Student row committed successfully — safe to email the credentials now.
   // [PRODUCTION FIX] Previously provisionStudentAuthAccount() sent this email
@@ -1233,7 +1240,14 @@ export async function createFromApplication(
   }
 
   // ── 6. Audit log
-  await auditService.log({
+  // [PRODUCTION FIX] Wrapped in `withRetry` — this is the call that was
+  // observed hitting a transient Neon connection drop and, unretried,
+  // propagating out to an outer retry wrapper that re-ran this whole
+  // function (see note above). Same idempotency reasoning: a retried
+  // audit-log insert is an accepted, existing risk class in this codebase
+  // (matches `withRetry(() => prisma.$transaction(...))` elsewhere), not a
+  // new one introduced here.
+  await withRetry(() => auditService.log({
     action:     'application.converted_to_student',
     entityType: 'Application',
     entityId:   applicationId,
@@ -1248,14 +1262,14 @@ export async function createFromApplication(
         firebaseCreated:Boolean(createLoginAccount),
       },
     },
-  })
+  }))
 
   logger.info(
     { studentId: student.id, applicationId, registrationNo, firebaseUid },
     '[studentService] Application converted to student'
   )
 
-  const detail = await getById(student.id) as ApiStudentDetail
+  const detail = await withRetry(() => getById(student.id)) as ApiStudentDetail
 
   return { student: detail, firebaseUid, tempPassword }
 }

@@ -218,10 +218,10 @@ export function ApprovalsCenter() {
     return `No ${APPROVAL_STATUS_CONFIG[filters.status].label.toLowerCase()} requests yet.`
   })()
 
-  const scopes: { id: ApprovalScope; label: string; count?: number }[] = [
+  const scopes: { id: ApprovalScope; label: string }[] = [
     { id: 'all', label: 'Everything' },
-    { id: 'review', label: 'Needs my review', ...(summary?.awaitingMyReview ? { count: summary.awaitingMyReview } : {}) },
-    { id: 'mine', label: 'My requests', ...(summary?.myPending ? { count: summary.myPending } : {}) },
+    { id: 'review', label: 'Needs my review' },
+    { id: 'mine', label: 'My requests' },
   ]
 
   return (
@@ -238,25 +238,27 @@ export function ApprovalsCenter() {
       <div className="space-y-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           {summary?.canReview ? (
-            <div role="group" aria-label="Which requests to show" className="flex flex-wrap gap-1.5">
-              {scopes.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  aria-pressed={filters.scope === s.id}
-                  onClick={() => update({ scope: s.id })}
-                  className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border px-3.5 text-sm font-semibold transition-colors ${
-                    filters.scope === s.id
-                      ? 'border-brand-teal bg-brand-teal/10 text-brand-teal'
-                      : 'border-base text-muted hover:text-body'
-                  }`}
-                >
-                  {s.label}
-                  {s.count ? (
-                    <span className="rounded-full bg-brand-coral px-1.5 text-[11px] font-bold leading-5 text-white">{s.count}</span>
-                  ) : null}
-                </button>
-              ))}
+            <div role="group" aria-label="Which requests to show" className="flex flex-col gap-1">
+              {scopes.map((s) => {
+                const active = filters.scope === s.id
+                return (
+                  <label
+                    key={s.id}
+                    className={`flex min-h-[36px] cursor-pointer items-center gap-2 text-sm transition-colors ${
+                      active ? 'font-semibold text-brand-teal' : 'text-muted hover:text-body'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      onChange={() => update({ scope: s.id })}
+                      aria-label={s.label}
+                      className="h-4 w-4 shrink-0 cursor-pointer accent-[var(--brand-teal,#0d9488)]"
+                    />
+                    <span>{s.label}</span>
+                  </label>
+                )
+              })}
             </div>
           ) : null}
 
