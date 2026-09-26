@@ -238,13 +238,13 @@ export function ApprovalsCenter() {
       <div className="space-y-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           {summary?.canReview ? (
-            <div role="group" aria-label="Which requests to show" className="flex flex-col gap-1">
+            <div role="group" aria-label="Which requests to show" className="flex flex-col gap-0.5">
               {scopes.map((s) => {
                 const active = filters.scope === s.id
                 return (
                   <label
                     key={s.id}
-                    className={`flex min-h-[36px] cursor-pointer items-center gap-2 text-sm transition-colors ${
+                    className={`flex min-h-[28px] cursor-pointer items-center gap-2 text-sm transition-colors ${
                       active ? 'font-semibold text-brand-teal' : 'text-muted hover:text-body'
                     }`}
                   >
