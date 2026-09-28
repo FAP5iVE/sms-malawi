@@ -17,15 +17,13 @@
 
 import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
-import { usePublicSchoolInfo } from '@/hooks/usePublic'
+import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
 import { usePlacementRegistry, usePlacementCatalogue } from '@/hooks/usePlacements'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { DataTable, type DataColumn } from '@/components/shared/DataTable'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
 import { PlacementStatusBadge } from '@/components/placements/PlacementStatusBadge'
 import type { ApiUniversityPlacement } from '@shared/types/api'
-
-const FALLBACK_YEAR = '2025/2026'
 
 function studentName(row: ApiUniversityPlacement): string {
   if (!row.student) return row.studentId
@@ -38,10 +36,11 @@ const ENTRY_SOURCE_LABEL: Record<string, string> = {
 }
 
 export function PlacementRegistryPanel() {
-  const { data: schoolInfo } = usePublicSchoolInfo()
+  // The school's stored current year (SystemSettings), never a literal.
+  const { academicYear: currentYear } = useEffectiveAcademicPeriod()
   const { data: catalogue = [] } = usePlacementCatalogue()
   const [academicYear, setAcademicYear] = useState<string>('')
-  const effectiveYear = academicYear || schoolInfo?.currentYear || FALLBACK_YEAR
+  const effectiveYear = academicYear || currentYear
 
   const { data: placements = [], isLoading, isError, error } = usePlacementRegistry(effectiveYear)
 

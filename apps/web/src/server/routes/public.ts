@@ -91,7 +91,7 @@ publicRouter.get('/school-info', async (_req, res) => {
     // [NEW] See resolution above — one entry per card that has a photo set,
     // absent entries mean "no photo yet, use the default tint".
     discoverCards,
-    currentYear: settings[SETTING_KEYS.CURRENT_ACADEMIC_YEAR] ?? '2025/2026',
+    currentYear: settings[SETTING_KEYS.CURRENT_ACADEMIC_YEAR] ?? (await settingsService.getCurrentPeriod()).academicYear,
     // [PRODUCTION FIX 2026-07-28] Footer social icons — real URLs now,
     // editable under Settings -> School Identity. Empty string = hide icon.
     social: {
@@ -109,7 +109,7 @@ publicRouter.get('/school-info', async (_req, res) => {
 // Returns aggregated MANEB pass rates for the landing page stats section.
 
 publicRouter.get('/maneb-stats', async (req, res) => {
-  const year = String(req.query.year ?? '2025/2026')
+  const { academicYear: year } = await settingsService.resolvePeriod({ academicYear: req.query.year })
 
   const [records, enrolledStudents] = await Promise.all([
     prisma.manebRecord.findMany({
@@ -455,7 +455,7 @@ publicRouter.get('/placements', async (req, res) => {
 })
 
 publicRouter.get('/placement-stats', async (req, res) => {
-  const year = String(req.query.year ?? '2025/2026')
+  const { academicYear: year } = await settingsService.resolvePeriod({ academicYear: req.query.year })
 
   const [candidates, placements] = await Promise.all([
     getManebCandidateList(year, 'MSCE'),

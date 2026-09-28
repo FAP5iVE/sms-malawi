@@ -17,14 +17,12 @@
 'use client'
 
 import { useState } from 'react'
-import { usePublicSchoolInfo } from '@/hooks/usePublic'
+import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
 import { usePlacementsQueue, useApprovePlacementClaim, useRejectPlacementClaim } from '@/hooks/usePlacements'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { MotionBottomSheet } from '@/components/shared/MotionBottomSheet'
 import { ShieldCheck, Clock, FileCheck, Check, X, Loader2 } from 'lucide-react'
 import type { ApiUniversityPlacement } from '@shared/types/api'
-
-const FALLBACK_YEAR = '2025/2026'
 
 function studentName(row: ApiUniversityPlacement): string {
   if (!row.student) return row.studentId
@@ -101,9 +99,10 @@ function ClaimCard({
 }
 
 export function ClaimsVerificationPanel() {
-  const { data: schoolInfo } = usePublicSchoolInfo()
+  // The school's stored current year (SystemSettings), never a literal.
+  const { academicYear: currentYear } = useEffectiveAcademicPeriod()
   const [academicYear, setAcademicYear] = useState<string>('')
-  const effectiveYear = academicYear || schoolInfo?.currentYear || FALLBACK_YEAR
+  const effectiveYear = academicYear || currentYear
 
   const { data: queue = [], isLoading, isError, error } = usePlacementsQueue(effectiveYear)
   const approve = useApprovePlacementClaim()

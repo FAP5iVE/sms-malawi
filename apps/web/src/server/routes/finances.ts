@@ -91,6 +91,7 @@ import * as budgetService from '@/server/services/budgetService'
 import * as expenseApprovalService from '@/server/services/expenseApprovalService'
 import * as installmentService from '@/server/services/installmentService'
 import * as studentService from '@/server/services/studentService'
+import * as settingsService from '@/server/services/settingsService'
 // [BUG FIX 2026-09-06] See lib/serialize.ts's header comment -- Decimal
 // fields (FeeStructure.amount, Invoice.totalAmount/balance,
 // InvoiceLineItem.amount/balance, StudentCredit.amount, ...) serialize to
@@ -124,10 +125,20 @@ const VALID_REPORT_TYPES: ReportType[] = [
   'fee_collection', 'outstanding_balances', 'expense_breakdown', 'payroll_summary',
 ]
 
+/** Academic year from an explicit ?academicYear=, otherwise the school's
+ *  CURRENT year from SystemSettings. Every route below that used to default
+ *  to a literal '2025/2026' goes through this instead — a literal default
+ *  quietly queries a stale (often empty) slice of data once the calendar
+ *  moves on, which is exactly how the Finances summary cards ended up
+ *  showing MK 0.00 against a fully-seeded database. */
+async function yearFrom(value: unknown): Promise<string> {
+  return (await settingsService.resolvePeriod({ academicYear: value })).academicYear
+}
+
 // ── SUMMARY
 financesRouter.get('/summary', verifyAuth, requireRole([...FINANCE_ROLES]), async (req, res) => {
-  const { academicYear = '2025/2026', term = '1' } = req.query
-  const summary = await feeService.getFinanceSummary(academicYear as string, Number(term))
+  const { academicYear, term } = await settingsService.resolvePeriod(req.query)
+  const summary = await feeService.getFinanceSummary(academicYear, term)
   res.json(summary)
 })
 
@@ -143,7 +154,12 @@ financesRouter.get(
   requireRole([...FINANCE_ROLES, 'high_rank', 'student']),
   async (req, res) => {
     try {
-      const { academicYear = '2025/2026', studentId, term, includeArchived } = req.query
+      const { studentId, term, includeArchived } = req.query
+      // Year and (for per-student eligibility) term default to the school's
+      // CURRENT period. `term` deliberately stays optional for the catalog
+      // listing below, where omitting it means "every term".
+      const period = await settingsService.resolvePeriod(req.query)
+      const academicYear = period.academicYear
 
       if (req.user!.role === 'student') {
         // A student-role client only ever knows its own Firebase UID --
@@ -155,8 +171,8 @@ financesRouter.get(
         }
         const fees = await feeService.getEligibleFeeStructuresForStudent(
           student.id,
-          academicYear as string,
-          term ? Number(term) : 1,
+          academicYear,
+          term ? Number(term) : period.term,
         )
         return res.json(serializeDecimals(fees))
       }
@@ -171,8 +187,8 @@ financesRouter.get(
       if (studentId) {
         const fees = await feeService.getEligibleFeeStructuresForStudent(
           String(studentId),
-          academicYear as string,
-          term ? Number(term) : 1,
+          academicYear,
+          term ? Number(term) : period.term,
         )
         return res.json(serializeDecimals(fees))
       }
@@ -254,10 +270,10 @@ financesRouter.get(
   verifyAuth,
   requireRole([...FINANCE_ROLES, 'high_rank']),
   async (req, res) => {
-    const { studentId, academicYear = '2025/2026' } = req.query
+    const { studentId } = req.query
     if (!studentId) return res.status(400).json({ error: 'studentId is required' })
     try {
-      const commitments = await feeService.listStudentFeeCommitments(String(studentId), academicYear as string)
+      const commitments = await feeService.listStudentFeeCommitments(String(studentId), await yearFrom(req.query.academicYear))
       res.json(serializeDecimals(commitments))
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'finances', route: 'fee-commitments-list' } })
@@ -421,8 +437,7 @@ financesRouter.get(
       }
       id = student.id
     }
-    const { academicYear = '2025/2026' } = req.query
-    const result = await feeService.getStudentBalance(id, academicYear as string)
+    const result = await feeService.getStudentBalance(id, await yearFrom(req.query.academicYear))
     res.json(serializeDecimals(result))
   }
 )
@@ -502,8 +517,8 @@ financesRouter.get(
 
 // ── EXPENSES
 financesRouter.get('/expenses', verifyAuth, requireRole([...FINANCE_ROLES]), async (req, res) => {
-  const { academicYear = '2025/2026', term } = req.query
-  const where: Prisma.ExpenseWhereInput = { academicYear: academicYear as string }
+  const { term } = req.query
+  const where: Prisma.ExpenseWhereInput = { academicYear: await yearFrom(req.query.academicYear) }
   if (term) where.term = Number(term)
   const expenses = await prisma.expense.findMany({ where, orderBy: { incurredAt: 'desc' } })
   res.json(expenses)
@@ -726,9 +741,9 @@ financesRouter.post('/scholarships', verifyAuth, requireRole(['admin', 'finance'
 
 // ── BUDGET
 financesRouter.get('/budget', verifyAuth, requireRole([...FINANCE_ROLES, 'high_rank']), async (req, res) => {
-  const { academicYear = '2025/2026', term } = req.query
+  const { term } = req.query
   const data = await budgetService.getBudgetVsActual(
-    academicYear as string,
+    await yearFrom(req.query.academicYear),
     term ? Number(term) : undefined
   )
   res.json(data)
@@ -802,12 +817,11 @@ financesRouter.get(
   verifyAuth,
   requireRole([...FINANCE_ROLES]),
   async (req, res) => {
-    const { academicYear = '2025/2026', forwardMonths } = req.query as {
-      academicYear?: string
+    const { forwardMonths } = req.query as {
       forwardMonths?: string
     }
     const report = await forecastService.getCashFlowForecast(
-      academicYear,
+      await yearFrom(req.query.academicYear),
       forwardMonths ? Number(forwardMonths) : undefined
     )
     res.json(report)
@@ -1050,11 +1064,8 @@ financesRouter.post(
   verifyAuth,
   requireRole(['admin', 'finance', 'high_rank']),
   async (req, res) => {
-    const { type, academicYear = '2025/2026', term = 1 } = req.body as {
-      type: string
-      academicYear: string
-      term: number
-    }
+    const { type } = req.body as { type: string }
+    const { academicYear, term } = await settingsService.resolvePeriod(req.body)
     if (!VALID_REPORT_TYPES.includes(type as ReportType)) {
       return res.status(400).json({ error: `type must be one of: ${VALID_REPORT_TYPES.join(', ')}` })
     }
@@ -1075,15 +1086,12 @@ financesRouter.get(
   verifyAuth,
   requireRole(['admin', 'finance', 'high_rank']),
   async (req, res) => {
-    const { type, academicYear = '2025/2026', term = '1' } = req.query as {
-      type: string
-      academicYear: string
-      term: string
-    }
+    const { type } = req.query as { type: string }
+    const { academicYear, term } = await settingsService.resolvePeriod(req.query)
     if (!VALID_REPORT_TYPES.includes(type as ReportType)) {
       return res.status(400).json({ error: `type must be one of: ${VALID_REPORT_TYPES.join(', ')}` })
     }
-    const yearNum = Number(term)
+    const yearNum = term
 
     if (type === 'fee_collection') {
       const invoices = await prisma.invoice.findMany({

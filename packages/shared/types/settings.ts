@@ -21,6 +21,18 @@
  */
 
 import { DEFAULT_PAYE_BRACKETS } from '../constants/malawi/finance'
+import { getAcademicYearForDate, getCurrentTerm, getTermDatesForYear, parseAcademicYear } from '../constants/malawi/academic'
+
+// First-install defaults for the academic period, DERIVED from the calendar
+// and the single term-date table (ACADEMIC_TERMS) — not literals. A literal
+// here ('2025/2026', '2025-09-01', ...) silently becomes wrong the moment
+// the calendar moves on, and it had already drifted from ACADEMIC_TERMS
+// (Term 1 end '12-05' here vs '12-15' there). These only apply when no
+// value has been stored yet; once seedDefaults() persists them (or an admin
+// sets the real ones) the stored SETTING_KEYS value is the sole authority.
+const DEFAULT_ACADEMIC_YEAR = getAcademicYearForDate()
+const DEFAULT_TERM_DATES    = getTermDatesForYear(DEFAULT_ACADEMIC_YEAR)
+const DEFAULT_TERM_NUMBER   = getCurrentTerm(new Date(), DEFAULT_ACADEMIC_YEAR)
 
 // ─────────────────────────────────────────────────────────
 //  COMPLEX VALUE INTERFACES
@@ -372,56 +384,56 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'The currently active academic year in "YYYY/YYYY" format.',
-    defaultValue: '2025/2026',
+    defaultValue: DEFAULT_ACADEMIC_YEAR,
   },
   [SETTING_KEYS.CURRENT_TERM]: {
     key: SETTING_KEYS.CURRENT_TERM,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'The currently active term (1, 2, or 3).',
-    defaultValue: 1,
+    defaultValue: DEFAULT_TERM_NUMBER,
   },
   [SETTING_KEYS.TERM1_START]: {
     key: SETTING_KEYS.TERM1_START,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'Term 1 start date (ISO date YYYY-MM-DD). Malawi: typically September.',
-    defaultValue: '2025-09-01',
+    defaultValue: DEFAULT_TERM_DATES[0]!.start,
   },
   [SETTING_KEYS.TERM1_END]: {
     key: SETTING_KEYS.TERM1_END,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'Term 1 end date (ISO date YYYY-MM-DD). Malawi: typically early December.',
-    defaultValue: '2025-12-05',
+    defaultValue: DEFAULT_TERM_DATES[0]!.end,
   },
   [SETTING_KEYS.TERM2_START]: {
     key: SETTING_KEYS.TERM2_START,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'Term 2 start date. Malawi: typically January.',
-    defaultValue: '2026-01-12',
+    defaultValue: DEFAULT_TERM_DATES[1]!.start,
   },
   [SETTING_KEYS.TERM2_END]: {
     key: SETTING_KEYS.TERM2_END,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'Term 2 end date. Malawi: typically April.',
-    defaultValue: '2026-04-10',
+    defaultValue: DEFAULT_TERM_DATES[1]!.end,
   },
   [SETTING_KEYS.TERM3_START]: {
     key: SETTING_KEYS.TERM3_START,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'Term 3 start date. Malawi: typically May.',
-    defaultValue: '2026-05-04',
+    defaultValue: DEFAULT_TERM_DATES[2]!.start,
   },
   [SETTING_KEYS.TERM3_END]: {
     key: SETTING_KEYS.TERM3_END,
     category: SETTING_CATEGORIES.ACADEMIC,
     isPublic: true,
     description: 'Term 3 end date. Malawi: typically late July.',
-    defaultValue: '2026-07-24',
+    defaultValue: DEFAULT_TERM_DATES[2]!.end,
   },
 
   // ── School identity
@@ -593,7 +605,7 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     category: SETTING_CATEGORIES.EXAM,
     isPublic: false,
     description: 'MANEB candidate registration deadline for the current academic year (ISO date).',
-    defaultValue: '2026-03-31',
+    defaultValue: `${parseAcademicYear(DEFAULT_ACADEMIC_YEAR).endYear}-03-31`,
   },
 
   // ── Promotion

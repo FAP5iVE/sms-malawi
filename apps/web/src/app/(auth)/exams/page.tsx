@@ -80,7 +80,7 @@ import { PromotionEngine } from '@/components/exams/PromotionEngine'
 import { ResultsReleaseWorkflow } from '@/components/exams/ResultsReleaseWorkflow'
 import { useExams, useApproveResults, useReleaseResults } from '@/hooks/useExams'
 import { useClasses } from '@/hooks/useClasses'
-import { usePublicSchoolInfo } from '@/hooks/usePublic'
+import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
 import { usePermissions } from '@/hooks/usePermissions'
 import { apiFetch } from '@/lib/api-client'
 import { EXAM_MARKS_ENTERABLE_STATUSES } from '@shared/schemas/exam'
@@ -130,10 +130,6 @@ const TABS = [
 
 type Tab = (typeof TABS)[number]['id']
 
-// Fallback used only while usePublicSchoolInfo() is still loading —
-// matches the same fallback settingsService.ts itself uses server-side.
-const FALLBACK_YEAR = '2025/2026'
-
 function ExamsPageInner() {
   const { role, setTitle, setSubtitle } = useAuthStore()
   // R19 — the active tab is derived from ?tab= during render via Next's
@@ -149,7 +145,11 @@ function ExamsPageInner() {
   const initialTab: Tab = tabParam && TABS.some((x) => x.id === tabParam) ? (tabParam as Tab) : 'exams'
 
   const [tab, setTab] = useState<Tab>(initialTab)
-  const [term, setTerm] = useState(1)
+  // Term (like the year, below) follows the school's stored current period
+  // until the user explicitly picks a different one.
+  const { academicYear: currentYear, term: currentTerm } = useEffectiveAcademicPeriod()
+  const [pickedTerm, setTerm] = useState<number | null>(null)
+  const term = pickedTerm ?? currentTerm
   const [selectedClassId, setSelectedClassId] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [marksExamId, setMarksExamId] = useState<string | null>(null)
@@ -165,7 +165,6 @@ function ExamsPageInner() {
   const [computeResult, setComputeResult] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
 
   const { data: myStudent, isLoading: myStudentLoading } = useStudentMe()
-  const { data: schoolInfo } = usePublicSchoolInfo()
   // [PRODUCTION FIX] Academic year was a fixed read-only value derived
   // straight from schoolInfo.currentYear — no way to look at a past year's
   // exams, analytics, or MANEB records at all. Every other multi-year
@@ -174,7 +173,7 @@ function ExamsPageInner() {
   // as ClaimsVerificationPanel.tsx: empty state = "follow the school's
   // current year"; once the user picks one, it sticks.
   const [selectedAcademicYear, setSelectedAcademicYear] = useState('')
-  const academicYear = selectedAcademicYear || schoolInfo?.currentYear || FALLBACK_YEAR
+  const academicYear = selectedAcademicYear || currentYear
 
   useEffect(() => {
     setTitle('Exams & Results')

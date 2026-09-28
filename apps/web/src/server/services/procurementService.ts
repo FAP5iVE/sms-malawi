@@ -1126,7 +1126,7 @@ export async function createGoodsReceipt(
         }
 
         return created
-      })
+      }, { timeout: 30_000 })
 
       await auditService.log({
         action: 'procurement.goodsReceipt.create',

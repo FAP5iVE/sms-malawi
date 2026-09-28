@@ -51,15 +51,9 @@ import {
 import { TrendingUp, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 import { apiFetch }             from '@/lib/api-client'
 import { formatMWK }            from '@shared/constants/malawi'
+import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
 import { AcademicYearSelect }   from '@/components/shared/AcademicYearSelect'
 import type { ForecastReport, MonthlyDataPoint } from '@/server/services/forecastService'
-
-// Seeds the mount-effect's eager first fetch (below) synchronously, before
-// usePublicSchoolInfo() has had a chance to resolve — matches the same
-// fallback-while-loading convention used elsewhere (apps/web/src/hooks/
-// usePublic.ts, exams/page.tsx). The <AcademicYearSelect> field itself
-// always offers the real, live current year regardless of this seed.
-const FALLBACK_YEAR = '2025/2026'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CHART DATA TRANSFORM
@@ -158,7 +152,10 @@ function buildForecastUrl(academicYear: string, forwardMonths: number): string {
 }
 
 export function ForecastPanel() {
-  const [academicYear, setAcademicYear] = useState(FALLBACK_YEAR)
+  // Seeded from the school's stored current year (SystemSettings) — the
+  // finances page header has already loaded it by the time this tab mounts.
+  const { academicYear: currentYear } = useEffectiveAcademicPeriod()
+  const [academicYear, setAcademicYear] = useState(currentYear)
   const [forwardMonths, setForwardMonths] = useState(3)
   const [report,   setReport]   = useState<ForecastReport | null>(null)
   // R19 — starts `true`, not `false`: the mount effect below always kicks

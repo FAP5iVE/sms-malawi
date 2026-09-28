@@ -540,14 +540,72 @@ export async function applyLatePenalties(penaltyRate?: number): Promise<number> 
   })
   for (const inv of overdue) {
     const penalty = Number(inv.balance) * rate
-    const updated = await prisma.invoice.update({
-      where: { id: inv.id },
-      data: { latePenalty: { increment: penalty }, totalAmount: { increment: penalty }, balance: { increment: penalty }, status: 'OVERDUE' },
+    if (penalty <= 0) continue
+    // [FIX] Previously this only bumped the invoice's own totalAmount/
+    // balance fields — nothing ever represented the penalty as a line a
+    // parent/student can see an itemised breakdown of, and (more
+    // importantly) it silently broke the invariant every other charge on
+    // an invoice honours: sum(lineItems.amount) === invoice.totalAmount.
+    // A late penalty is a real, distinct charge like any fee line, so it
+    // gets its own InvoiceLineItem, created atomically with the invoice
+    // update so the two can never drift apart (a crash between them is
+    // impossible, not just unlikely).
+    const updated = await prisma.$transaction(async (tx) => {
+      const bumped = await tx.invoice.update({
+        where: { id: inv.id },
+        data: { latePenalty: { increment: penalty }, totalAmount: { increment: penalty }, balance: { increment: penalty }, status: 'OVERDUE' },
+      })
+      await tx.invoiceLineItem.create({
+        data: {
+          invoiceId: inv.id,
+          feeStructureId: null,
+          feeName: 'Late Payment Penalty',
+          amount: penalty,
+          paidAmount: 0,
+          balance: penalty,
+        },
+      })
+      return bumped
     })
     void algolia.updateInvoice({ objectID: updated.id, status: updated.status, balance: Number(updated.balance) })
   }
   logger.info({ event: 'late_penalties.applied', count: overdue.length, rate })
   return overdue.length
+}
+
+// [REPAIR] One-time-per-invoice backfill for invoices that already accrued
+// a late penalty before the fix above existed (applyLatePenalties() used to
+// bump invoice.totalAmount/balance with no matching InvoiceLineItem, so
+// sum(lineItems.amount) permanently under-counted totalAmount by exactly
+// the penalty). Safe to call any number of times: it only ever adds the
+// missing line once per invoice (guarded by feeName below) and only when a
+// real gap exists, so a clean invoice is always a no-op.
+export async function repairMissingLatePenaltyLineItems(): Promise<{ checked: number; repaired: number }> {
+  const candidates = await prisma.invoice.findMany({
+    where: { latePenalty: { gt: 0 } },
+    include: { lineItems: true },
+  })
+  let repaired = 0
+  for (const inv of candidates) {
+    const lineTotal = inv.lineItems.reduce((s, li) => s + Number(li.amount), 0)
+    const gap = Number(inv.totalAmount) - lineTotal
+    const alreadyRepaired = inv.lineItems.some((li) => li.feeName === 'Late Payment Penalty')
+    if (gap > 1 && !alreadyRepaired) {
+      await prisma.invoiceLineItem.create({
+        data: {
+          invoiceId: inv.id,
+          feeStructureId: null,
+          feeName: 'Late Payment Penalty',
+          amount: gap,
+          paidAmount: 0,
+          balance: gap,
+        },
+      })
+      repaired++
+    }
+  }
+  if (repaired > 0) logger.info({ event: 'late_penalties.repaired', checked: candidates.length, repaired })
+  return { checked: candidates.length, repaired }
 }
 
 // [ALGOLIA ROLLOUT — Tier 2 item 7] Bulk seed — same pattern as the other

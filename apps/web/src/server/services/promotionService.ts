@@ -96,6 +96,7 @@ import { prisma }              from '@/lib/prisma'
 import { logger }              from '@/lib/logger'
 import * as settingsService    from '@/server/services/settingsService'
 import { SETTING_KEYS }        from '@shared/types/settings'
+import { parseAcademicYear }   from '@shared/constants/malawi'
 import { isDistinctionOrCredit, getGradeInfo, type ExamTypeKey } from '@/server/services/gradeService'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,6 +123,11 @@ export interface StudentPromotionResult {
   outcome:         PromotionOutcome
   nextClassId?:    string
   nextClassName?:  string
+  /** REPEATED students only: the NEXT academic year's class for the SAME
+   *  form, when next-year classes exist. Classes are per academic year, so a
+   *  repeater whose classId is left pointing at last year's class silently
+   *  drops off every later year's roll — commitPromotion() moves them here. */
+  repeatClassId?:  string
   reason:          string
 }
 
@@ -314,18 +320,54 @@ export async function runPromotion(
 
   const { minAverage, minPasses } = await getPromotionThresholds()
 
+  // Only the students actually on THIS academic year's roll. Classes are per
+  // academic year (Class.academicYear), so "every ACTIVE student in the
+  // school" is only equivalent to "this year's students" while exactly one
+  // year of classes exists — with several years present it re-promotes
+  // students who belong to other years.
   const students = await prisma.student.findMany({
-    where:   { status: 'ACTIVE' },
-    include: { class: { select: { id: true, name: true, form: true } } },
+    where:   { status: 'ACTIVE', class: { academicYear } },
+    include: { class: { select: { id: true, name: true, form: true, stream: true } } },
   })
 
-  const allClasses = await prisma.class.findMany({
+  // DESTINATION CLASSES. Promotion moves a student into the NEXT academic
+  // year's class for the next form. This used to build ONE map of form →
+  // "the first ACTIVE class the query returned" across ALL years and
+  // streams, so every promoted student in the school landed in the same
+  // single class (the oldest year's stream A) — e.g. Form 2A holding 81
+  // students while Form 2B held 2, and later years' classes left empty.
+  //
+  // When the next academic year has no classes yet (a deployment that
+  // hasn't created them), fall back to the previous behaviour: promote into
+  // this year's own next-form class, and leave repeaters where they are.
+  const activeClasses = await prisma.class.findMany({
     where:  { status: 'ACTIVE' },
-    select: { id: true, name: true, form: true },
+    select: { id: true, name: true, form: true, stream: true, academicYear: true },
   })
-  const classByForm = new Map<number, { id: string; name: string }>()
-  for (const c of allClasses) {
-    if (!classByForm.has(c.form)) classByForm.set(c.form, { id: c.id, name: c.name })
+  const nextYear = (() => {
+    const { startYear, endYear } = parseAcademicYear(academicYear)
+    return `${startYear + 1}/${endYear + 1}`
+  })()
+  const nextYearClasses = activeClasses.filter((c) => c.academicYear === nextYear)
+  const carriesOverToNextYear = nextYearClasses.length > 0
+  const destinationPool = carriesOverToNextYear
+    ? nextYearClasses
+    : activeClasses.filter((c) => c.academicYear === academicYear)
+
+  // Keeps a cohort together: a stream-A student goes to the next form's
+  // stream A when it exists; otherwise (or as a tie-break) the least-filled
+  // class of that form, so no single class absorbs everyone.
+  const placedInto = new Map<string, number>()
+  const pickDestination = (form: number, stream: string | null) => {
+    const ofForm = destinationPool.filter((c) => c.form === form)
+    if (ofForm.length === 0) return undefined
+    const sameStream = ofForm.filter((c) => (c.stream ?? null) === stream)
+    const pool = sameStream.length > 0 ? sameStream : ofForm
+    const chosen = [...pool].sort(
+      (a, b) => (placedInto.get(a.id) ?? 0) - (placedInto.get(b.id) ?? 0) || a.name.localeCompare(b.name),
+    )[0]!
+    placedInto.set(chosen.id, (placedInto.get(chosen.id) ?? 0) + 1)
+    return chosen
   }
 
   const results: StudentPromotionResult[] = []
@@ -392,12 +434,14 @@ export async function runPromotion(
     let nextClassName: string | undefined
     let reason: string
 
+    let repeatClassId: string | undefined
     if (ruleResult.passes) {
-      const nextCls = nextForm ? classByForm.get(nextForm) : undefined
+      const nextCls = nextForm ? pickDestination(nextForm, klass.stream ?? null) : undefined
       if (!nextCls) {
         outcome = 'REPEATED'
         reason  = `No Form ${nextForm} class found — student held back`
         repeated++
+        if (carriesOverToNextYear) repeatClassId = pickDestination(classForm, klass.stream ?? null)?.id
       } else {
         outcome       = 'PROMOTED'
         nextClassId   = nextCls.id
@@ -409,13 +453,14 @@ export async function runPromotion(
       outcome = 'REPEATED'
       reason  = ruleResult.reason
       repeated++
+      if (carriesOverToNextYear) repeatClassId = pickDestination(classForm, klass.stream ?? null)?.id
     }
 
     results.push({
       studentId: student.id, registrationNo: student.registrationNo, fullName,
       currentClassId: klass.id, currentClass: klass.name, currentForm: classForm,
       annualAverage: average, passStatus: ruleResult.passes, subjectPasses,
-      outcome, nextClassId, nextClassName, reason,
+      outcome, nextClassId, nextClassName, repeatClassId, reason,
     })
   }
 
@@ -527,7 +572,15 @@ export async function commitPromotion(
         prisma.student.update({ where: { id: entry.studentId }, data: { classId: entry.nextClassId } }),
       ]
     }
-    // REPEATED — annual result recorded; classId intentionally unchanged.
+    // REPEATED — annual result recorded. With next-year classes in place the
+    // student repeats the SAME form in next year's class; otherwise (no
+    // next-year classes yet) classId is intentionally left unchanged.
+    if (entry.outcome === 'REPEATED' && entry.repeatClassId) {
+      return [
+        annualResultUpsert,
+        prisma.student.update({ where: { id: entry.studentId }, data: { classId: entry.repeatClassId } }),
+      ]
+    }
     return [annualResultUpsert]
   })
 

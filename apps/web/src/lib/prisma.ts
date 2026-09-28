@@ -75,7 +75,44 @@ export function resetPrismaClient(): void {
   globalForPrisma.__prisma = undefined
 }
 
+// Prisma error codes that mean the underlying DB session/transaction was
+// dropped, never usable, or timed out waiting for one — never a data or
+// business-logic problem. All of these are safe to blindly retry because
+// Postgres transactions are all-or-nothing: none of them can leave a
+// partial write behind, so redoing the whole operation from scratch (which
+// is what withRetry does, one level up) can never duplicate anything.
+//   P1001 — Can't reach the database server
+//   P1002 — The database server was reached but then timed out
+//   P1008 — Operations timed out
+//   P1017 — Server has closed the connection
+//   P2024 — Timed out fetching a new connection from the pool
+//   P2028 — Transaction API error. This is the one that actually hit in
+//           practice: an interactive `prisma.$transaction(async (tx) =>
+//           ...)` whose Neon session dropped between two statements comes
+//           back as "Transaction not found. Transaction ID is invalid,
+//           refers to an old closed transaction Prisma doesn't have
+//           information about anymore, or was obtained before
+//           disconnecting." — a dropped-session symptom in every way
+//           except message shape, which is why the regex below never
+//           caught it and the whole seed run died instead of retrying.
+const TRANSIENT_PRISMA_ERROR_CODES = new Set(['P1001', 'P1002', 'P1008', 'P1017', 'P2024', 'P2028'])
+
+/** Reads `.code` off a Prisma error without requiring `instanceof` against
+ *  a specific error class — the driver-adapter path (Neon here) doesn't
+ *  always throw the exact same subclass the binary engine would for the
+ *  same underlying condition, so matching on the stable `code` string is
+ *  more robust than pinning to `PrismaClientKnownRequestError`. */
+function prismaErrorCode(err: unknown): string | undefined {
+  if (typeof err === 'object' && err !== null && 'code' in err) {
+    const code = (err as { code?: unknown }).code
+    return typeof code === 'string' ? code : undefined
+  }
+  return undefined
+}
+
 function isTransientConnectionError(err: unknown): boolean {
+  const code = prismaErrorCode(err)
+  if (code && TRANSIENT_PRISMA_ERROR_CODES.has(code)) return true
   if (err instanceof Error) {
     return /connection error|not queryable|ECONNRESET|fetch failed/i.test(err.message)
   }

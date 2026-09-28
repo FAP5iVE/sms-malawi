@@ -49,8 +49,14 @@ interface AcademicPolicy {
 
 export function AcademicPolicySettings() {
   const [policy,  setPolicy]  = useState<AcademicPolicy>({
-    current_academic_year: '2025/2026',
-    current_term:          '1',
+    // Deliberately blank until the stored values arrive from
+    // /settings/academic-policy. These used to be '2025/2026' / '1' — if
+    // that load failed and someone pressed Save, the form would have
+    // silently overwritten the school's REAL current year and term with
+    // those stale literals. A blank is rejected by the server's
+    // "YYYY/YYYY" validation instead.
+    current_academic_year: '',
+    current_term:          '',
     next_term_date:        '',
     term1_start:            '',
     term1_end:              '',

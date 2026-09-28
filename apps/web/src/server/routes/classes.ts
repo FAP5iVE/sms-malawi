@@ -337,12 +337,10 @@ classesRouter.get(
   requirePermission('timetable.view'),
   async (req, res) => {
     const id = String(req.params.id)
-    const { term = '1' } = req.query
-    let { academicYear } = req.query
-    if (!academicYear) {
-      academicYear = await settingsService.get(SETTING_KEYS.CURRENT_ACADEMIC_YEAR)
-    }
-    const slots = await classService.getTimetableForClass(id, Number(term), academicYear as string)
+    // Year AND term default to the school's current period (SystemSettings).
+    // The term used to default to a literal '1' regardless of the real term.
+    const { academicYear, term } = await settingsService.resolvePeriod(req.query)
+    const slots = await classService.getTimetableForClass(id, term, academicYear)
     res.json(slots)
   }
 )

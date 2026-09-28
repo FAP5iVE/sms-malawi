@@ -34,7 +34,7 @@ import { useRef } from 'react'
 import { useReactToPrint } from 'react-to-print'
 import { useStudent } from '@/hooks/useStudents'
 import { useReportCardData } from '@/hooks/useExams'
-import { usePublicSchoolInfo } from '@/hooks/usePublic'
+import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { StudentForm } from '@/components/students/StudentForm'
@@ -72,10 +72,12 @@ function ProfileContent() {
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({ contentRef: printRef })
 
-  const { data: schoolInfo } = usePublicSchoolInfo()
-  const academicYear = schoolInfo?.currentYear ?? '2025/2026'
+  // Year and default report-card term both come from the school's stored
+  // current period; the term selector below overrides only once used.
+  const { academicYear, term: currentTerm } = useEffectiveAcademicPeriod()
   const [showReportCard, setShowReportCard] = useState(false)
-  const [reportCardTerm, setReportCardTerm] = useState<1 | 2 | 3>(3)
+  const [pickedReportCardTerm, setReportCardTerm] = useState<1 | 2 | 3 | null>(null)
+  const reportCardTerm = (pickedReportCardTerm ?? currentTerm) as 1 | 2 | 3
   const {
     data:      reportCardData,
     isLoading: reportCardLoading,

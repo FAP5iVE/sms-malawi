@@ -73,7 +73,9 @@ export type EmailResult = EmailSuccess | EmailFailure
 export type EmailErrorCode =
   | 'MISSING_API_KEY'         // RESEND_API_KEY not configured
   | 'INVALID_RECIPIENT'       // Malformed email address
-  | 'RATE_LIMITED'            // Resend rate limit hit
+  | 'RATE_LIMITED'            // Resend per-second rate limit hit (transient, worth retrying)
+  | 'QUOTA_EXCEEDED'          // Resend daily/plan sending quota exhausted (will not clear until
+                              // the next billing day — retrying within this run can never succeed)
   | 'UNVERIFIED_DOMAIN'       // From domain not verified on Resend
   | 'RECIPIENT_BLOCKED'       // Resend suppression list / bounced address
   | 'RESEND_API_ERROR'        // 4xx from Resend (bad payload)
@@ -178,6 +180,32 @@ function validateRecipients(recipients: string[]): string | null {
 }
 
 // ─────────────────────────────────────────────────────────
+//  SESSION-LEVEL QUOTA CACHE
+//
+// [FIX] QUOTA_EXCEEDED already halts a single batch fast (see
+// sendBatchEmails below) instead of retrying every remaining recipient.
+// But that only helps the batch that discovered it — a caller making
+// several separate sendEmail()/sendBatchEmails() calls in the same process
+// (e.g. the demo seed firing one announcement's email fan-out after
+// another) still burns one real network round trip per call re-discovering
+// the exact same "exhausted for today" answer. Resend's daily quota only
+// clears on their next billing day, which no in-process flag can predict —
+// so this deliberately never tries to guess when to clear itself. It just
+// remembers "already confirmed exhausted" for the rest of this process's
+// lifetime; a fresh process (new deploy, new seed run) always starts clean
+// and re-discovers the current state on its own first real attempt.
+// ─────────────────────────────────────────────────────────
+
+let quotaExhaustedAt: Date | null = null
+
+/** True once this process has directly observed a `daily_quota_exceeded`
+ *  response from Resend. Exposed mainly so callers (and tests) can check
+ *  without needing to attempt a send first. */
+export function isEmailQuotaKnownExhausted(): boolean {
+  return quotaExhaustedAt !== null
+}
+
+// ─────────────────────────────────────────────────────────
 //  ERROR CLASSIFICATION
 // ─────────────────────────────────────────────────────────
 
@@ -213,6 +241,32 @@ function classifyResendError(err: unknown): {
     const statusCode = e.statusCode ?? 0
 
     if (statusCode === 429) {
+      // Resend returns 429 for two very different conditions that we must
+      // NOT treat the same way:
+      //   - a per-second burst limit ("rate_limit_exceeded") — genuinely
+      //     transient, clears within a second or two, worth retrying.
+      //   - the account's daily/plan sending quota ("daily_quota_exceeded")
+      //     — a hard cap that will not lift again until Resend's next
+      //     billing day. No amount of retrying inside this process can ever
+      //     make it succeed.
+      // Previously both were classified identically as retryable, so a
+      // quota-exhausted run would retry every single email (up to
+      // MAX_RETRIES times each, with real sleeps) across every recipient in
+      // every batch, purely to fail the exact same way every time. Beyond
+      // wasting minutes, that produced a wall of near-identical error
+      // output that reads exactly like a hang — real risk of someone
+      // force-killing the process mid-write, which is a much worse outcome
+      // (see checkpoint.ts's write-then-rename comment) than just failing
+      // this one batch fast and moving on.
+      const name = (e.name ?? '').toLowerCase()
+      if (name.includes('quota')) {
+        if (!quotaExhaustedAt) quotaExhaustedAt = new Date()
+        return {
+          message:   'Resend daily sending quota exhausted for today — will not clear until Resend\u2019s next billing day.',
+          code:      'QUOTA_EXCEEDED',
+          retryable: false,
+        }
+      }
       return {
         message:   'Resend rate limit exceeded.',
         code:      'RATE_LIMITED',
@@ -349,6 +403,18 @@ export async function sendEmail(
   const client = getResendClient()
   if (!client) {
     return devLogEmail(input)
+  }
+
+  // ── Already-confirmed-exhausted quota — skip the network round trip
+  // entirely rather than rediscover the same answer again.
+  if (quotaExhaustedAt) {
+    return {
+      ok:        false,
+      to:        primaryTo,
+      error:     `Skipped — Resend daily sending quota was already confirmed exhausted earlier in this run (at ${quotaExhaustedAt.toISOString()}).`,
+      code:      'QUOTA_EXCEEDED',
+      retryable: false,
+    }
   }
 
   // ── Require at least one body
@@ -506,6 +572,27 @@ export async function sendBatchEmails(
         { index: i, to: result.to, error: result.error, code: result.code },
         '[email] Batch item failed'
       )
+      // QUOTA_EXCEEDED is a whole-account, whole-day condition, not a
+      // per-recipient one — every remaining email in this batch (and every
+      // later batch, until the quota resets) would fail identically. This
+      // overrides continueOnError: that flag exists so one bad recipient
+      // doesn't stop mail to everyone else, which is a different situation
+      // from "sending is completely unavailable right now." Stopping here
+      // turns what used to be a wall of duplicate log lines for every
+      // remaining recipient into one clear line.
+      if (result.code === 'QUOTA_EXCEEDED') {
+        const remaining = emails.length - 1 - i
+        logger.warn(
+          { failedAt: i, skipped: remaining, totalEmails: emails.length },
+          '[email] Batch halted — Resend daily sending quota exhausted, skipping remaining recipients rather than retrying a doomed request for each one'
+        )
+        for (let j = i + 1; j < emails.length; j++) {
+          const skippedTo = normaliseRecipients(emails[j]?.to ?? '')[0] ?? ''
+          results.push({ ok: false, to: skippedTo, error: 'Skipped — daily email quota already exhausted for this run.', code: 'QUOTA_EXCEEDED', retryable: false })
+          failureCount++
+        }
+        break
+      }
       if (!continueOnError && result.retryable === false) {
         // Hard failure — stop the batch
         logger.warn(

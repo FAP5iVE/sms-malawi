@@ -66,6 +66,37 @@ import { STAFF_ROLES } from '@shared/types/roles'
 import { getAdminApp } from '@/lib/verifyAuth'
 import { sanitizeRichText } from '@/server/lib/sanitizeRichText'
 
+// [FIX] createAnnouncement() deliberately fires notifyAudience() with
+// `void` — correct for an HTTP handler, which must not hold the response
+// open for a large audience's email/push fan-out (see the comment at that
+// call site). But nothing tracked those promises anywhere, so nothing
+// could ever wait for them either. That's invisible in production (the
+// process keeps running regardless), but it bit the demo seed script
+// directly: it would print its final summary and run post-seed validation
+// while several announcements' background sends were still in flight,
+// producing interleaved/confusing logs and, worse, validation queries
+// racing real traffic against the same connection pool. This registry
+// costs production nothing (nobody calls waitForPendingAnnouncementWork()
+// outside the seed script) and lets the seed opt into "actually wait for
+// the thing I just fired" without changing the fire-and-forget contract
+// every real caller relies on.
+const pendingBackgroundWork = new Set<Promise<unknown>>()
+
+function trackBackground(p: Promise<unknown>): void {
+  pendingBackgroundWork.add(p)
+  void p.finally(() => pendingBackgroundWork.delete(p))
+}
+
+/** Waits for every notifyAudience()-and-descendants call fired so far to
+ *  settle (success or failure — failures are already logged internally,
+ *  never thrown here). Intended for scripts (the demo seed) that need a
+ *  deterministic "everything this run triggered is actually done" point
+ *  before disconnecting Prisma or reporting final results; no production
+ *  code path calls this. */
+export async function waitForPendingAnnouncementWork(): Promise<void> {
+  await Promise.allSettled(Array.from(pendingBackgroundWork))
+}
+
 export type AnnouncementStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'SCHEDULED'
 
 export interface CreateAnnouncementInput {
@@ -328,12 +359,21 @@ async function notifyAudience(announcementId: string, payload: NotifyPayload): P
 
   // [FIX] These two are independent of the internal targeting above and of
   // each other's success/failure — run outside the try/catch that guards
-  // the internal send so one failing never blocks the other.
+  // the internal send so one failing never blocks the other. Previously
+  // fired with `void` each, which meant notifyAudience()'s own returned
+  // promise resolved before either of these actually finished — anyone
+  // (i.e. the seed script, via trackBackground below) awaiting
+  // notifyAudience() itself would think all the work was done while these
+  // two were still running. Promise.allSettled here folds both into
+  // notifyAudience()'s own completion — still fully non-blocking for
+  // createAnnouncement's caller, since createAnnouncement itself still
+  // calls notifyAudience() with `void`/trackBackground, never awaits it.
   if (payload.publicWebsite) {
-    void notifyNewsletterSubscribers(announcementId, { title: payload.title, body: payload.body })
+    const extra: Promise<void>[] = [notifyNewsletterSubscribers(announcementId, { title: payload.title, body: payload.body })]
     if (!payload.targetAll) {
-      void notifyAllSystemUsers(announcementId, { title: payload.title, body: payload.body })
+      extra.push(notifyAllSystemUsers(announcementId, { title: payload.title, body: payload.body }))
     }
+    await Promise.allSettled(extra)
   }
 }
 
@@ -419,7 +459,7 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
     // must not hold the HTTP response open, especially for a large
     // targetAll audience (notifyAudience() never rejects — it has its own
     // internal try/catch).
-    void notifyAudience(ref.id, {
+    trackBackground(notifyAudience(ref.id, {
       title: data.title,
       body,
       targetAll,
@@ -428,7 +468,7 @@ export async function createAnnouncement(data: CreateAnnouncementInput, directPu
       eventDate: data.eventDate,
       createdByUid: data.createdByUid,
       publicWebsite,
-    })
+    }))
   }
 
   return { id: ref.id, title: data.title, body, status }
@@ -590,7 +630,7 @@ export async function publishDraft(
   })
 
   if (status === 'PUBLISHED') {
-    void notifyAudience(id, {
+    trackBackground(notifyAudience(id, {
       title: data.title,
       body,
       targetAll,
@@ -599,7 +639,7 @@ export async function publishDraft(
       eventDate: data.eventDate,
       createdByUid: uid,
       publicWebsite,
-    })
+    }))
   }
 
   void algolia.updateAnnouncement({
@@ -631,7 +671,7 @@ export async function publishAnnouncement(id: string, approvedByUid: string) {
   })
 
   // [BE-005] Not awaited — same reasoning as createAnnouncement() above.
-  void notifyAudience(id, {
+  trackBackground(notifyAudience(id, {
     title: existing.title as string,
     body: existing.body as string,
     targetAll: (existing.targetAll as boolean | undefined) ?? false,
@@ -640,7 +680,7 @@ export async function publishAnnouncement(id: string, approvedByUid: string) {
     eventDate: existing.eventDate as string | null | undefined,
     createdByUid: existing.createdByUid as string,
     publicWebsite: (existing.publicWebsite as boolean | undefined) ?? false,
-  })
+  }))
 
   void algolia.updateAnnouncement({ objectID: id, status: 'PUBLISHED' })
 
@@ -715,7 +755,7 @@ export async function promoteDueScheduled(): Promise<{ promoted: number }> {
     })
 
     // Fire-and-forget the fan-out — same posture as createAnnouncement.
-    void notifyAudience(doc.id, {
+    trackBackground(notifyAudience(doc.id, {
       title: data.title as string,
       body: data.body as string,
       targetAll: (data.targetAll as boolean | undefined) ?? false,
@@ -724,7 +764,7 @@ export async function promoteDueScheduled(): Promise<{ promoted: number }> {
       eventDate: data.eventDate as string | null | undefined,
       createdByUid: data.createdByUid as string,
       publicWebsite: (data.publicWebsite as boolean | undefined) ?? false,
-    })
+    }))
     void algolia.updateAnnouncement({ objectID: doc.id, status: 'PUBLISHED' })
     promoted++
   }

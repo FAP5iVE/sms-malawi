@@ -38,7 +38,7 @@ import { apiFetch, queryKeys } from '@/lib/api-client'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { useClasses } from '@/hooks/useClasses'
-import { usePublicSchoolInfo } from '@/hooks/usePublic'
+import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
 import type { ApiTimetableSlot, ApiClass } from '@shared/types/api'
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'] as const
@@ -49,10 +49,6 @@ const DAY_LABELS = {
   THURSDAY: 'Thu',
   FRIDAY: 'Fri',
 }
-
-// Fallback used only while usePublicSchoolInfo() is still loading — matches
-// the same constant name/value already used for this in (auth)/exams/page.tsx.
-const FALLBACK_YEAR = '2025/2026'
 
 export default function TimetablePage() {
   return (
@@ -65,10 +61,13 @@ export default function TimetablePage() {
 }
 
 function TimetableContent() {
-  const { data: schoolInfo } = usePublicSchoolInfo()
-  const { data: classes = [] } = useClasses(schoolInfo?.currentYear ?? FALLBACK_YEAR)
+  // Year AND term follow the school's stored current period (SystemSettings)
+  // until the user picks a different term from the selector.
+  const { academicYear: currentYear, term: currentTerm } = useEffectiveAcademicPeriod()
+  const { data: classes = [] } = useClasses(currentYear)
   const [selectedClassId, setSelectedClassId] = useState('')
-  const [term, setTerm] = useState(1)
+  const [pickedTerm, setTerm] = useState<number | null>(null)
+  const term = pickedTerm ?? currentTerm
 
   const { data: slots = [], isLoading } = useQuery<ApiTimetableSlot[]>({
     queryKey: queryKeys.classes.timetable(selectedClassId, undefined, term),

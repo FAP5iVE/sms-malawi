@@ -19,15 +19,15 @@
 
 import { useFeeStructures, useInvoices, useStudentCredits } from '@/hooks/useFinances'
 import { formatMWK } from '@shared/constants/malawi'
+import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
 import { Wallet, CheckCircle2 } from 'lucide-react'
 
-// Matches the hardcoded default used elsewhere (finances/page.tsx) —
-// there's no centralized "current academic year" source in this codebase
-// yet.
-const CURRENT_YEAR = '2025/2026'
-const CURRENT_TERM = 1
-
 export function StudentFeeStructure({ studentId }: { studentId: string }) {
+  // The school's stored current academic year + term (SystemSettings) — this
+  // used to be a pair of module-level literals ('2025/2026', 1), which is
+  // why a student's fee panel could show nothing while their invoices sat
+  // under the term the school was really in.
+  const { academicYear: CURRENT_YEAR, term: CURRENT_TERM } = useEffectiveAcademicPeriod()
   const { data: feeStructures = [], isLoading: feesLoading } = useFeeStructures(
     CURRENT_YEAR, studentId, CURRENT_TERM,
   )

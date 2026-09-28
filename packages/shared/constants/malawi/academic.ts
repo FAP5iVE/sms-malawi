@@ -209,6 +209,22 @@ export function getCurrentTerm(date: Date, academicYear: string): TermNumber {
   return current
 }
 
+/** The academic year ("YYYY/YYYY") a calendar date falls in. Malawi's
+ *  academic year opens in September (ACADEMIC_TERMS.TERM_1), so September–
+ *  December belongs to the year that STARTS in that calendar year and
+ *  January–August to the one that started the year before.
+ *
+ *  This is a CALENDAR derivation, not "the school's current year": the
+ *  school's actual current year is the SETTING_KEYS.CURRENT_ACADEMIC_YEAR
+ *  setting, which an admin controls. Use this ONLY where no setting exists
+ *  yet — first-install defaults (SETTING_META) and the seed. Everything
+ *  else must read the setting (settingsService / useCurrentAcademicPeriod). */
+export function getAcademicYearForDate(date: Date = new Date()): string {
+  const month = date.getUTCMonth() + 1 // 1–12
+  const startYear = month >= 9 ? date.getUTCFullYear() : date.getUTCFullYear() - 1
+  return `${startYear}/${startYear + 1}`
+}
+
 export interface AcademicYearOptionsConfig {
   /** How many academic years before the current one to include. Default 2. */
   back?: number

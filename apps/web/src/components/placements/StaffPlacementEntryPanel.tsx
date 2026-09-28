@@ -27,7 +27,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { usePublicSchoolInfo } from '@/hooks/usePublic'
+import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
 import {
   useEligibleCohort,
   useRecordStaffPlacement,
@@ -38,8 +38,6 @@ import { PlacementStatusBadge } from '@/components/placements/PlacementStatusBad
 import { groupProgramsByFaculty, formatPrerequisites } from '@/lib/placementCatalogueHelpers'
 import type { ApiPlacementEligibleStudent } from '@shared/types/api'
 import { Search, Building2, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
-
-const FALLBACK_YEAR = '2025/2026'
 
 function abbreviate(subject: string): string {
   if (!subject) return ''
@@ -53,10 +51,11 @@ function nextIntakeYear(academicYear: string): string {
 }
 
 export function StaffPlacementEntryPanel() {
-  const { data: schoolInfo } = usePublicSchoolInfo()
+  // The school's stored current year (SystemSettings), never a literal.
+  const { academicYear: currentYear } = useEffectiveAcademicPeriod()
   const { data: catalogue = [] } = usePlacementCatalogue()
   const [academicYear, setAcademicYear] = useState<string>('')
-  const effectiveYear = academicYear || schoolInfo?.currentYear || FALLBACK_YEAR
+  const effectiveYear = academicYear || currentYear
 
   const { data: cohort = [], isLoading, isError, error } = useEligibleCohort(effectiveYear)
   const recordEntry = useRecordStaffPlacement(effectiveYear)

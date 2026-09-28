@@ -49,6 +49,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useClass, useClassTimetable } from '@/hooks/useClasses'
 import { useAuthStore } from '@/store/authStore'
+import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
 import type { ApiTimetableSlot } from '@shared/types/api'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
@@ -95,7 +96,10 @@ function ClassDetailContent() {
   const { id } = useParams<{ id: string }>()
   const { data: cls, isLoading } = useClass(id)
   const { role, user } = useAuthStore()
-  const [term, setTerm] = useState(1)
+  // Follows the school's stored current term until the user picks another.
+  const { term: currentTerm } = useEffectiveAcademicPeriod()
+  const [pickedTerm, setTerm] = useState<number | null>(null)
+  const term = pickedTerm ?? currentTerm
   const { data: slots = [] } = useClassTimetable(id, term)
   const [activeTab, setActiveTab] = useState<Tab>('roster')
   const [showAssignmentForm, setShowAssignmentForm] = useState(false)
