@@ -442,13 +442,13 @@ export default function LandingPage() {
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center gap-6">
             <button onClick={() => scrollTo('top')} className="flex items-center gap-3 shrink-0">
-              <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center p-1.5 transition-colors ${
-                  scrolled ? 'bg-brand-navy' : 'bg-white/15'
-                }`}
-              >
-                <Image src="/favicon.png" alt="" width={40} height={40} className="w-full h-full object-contain" />
-              </div>
+              <Image
+                src="/favicon.png"
+                alt=""
+                width={56}
+                height={56}
+                className="w-14 h-14 object-contain shrink-0"
+              />
               <div className="text-left leading-tight hidden sm:block">
                 <div className={`font-heading font-extrabold text-sm tracking-tight transition-colors ${scrolled ? 'text-brand-navy dark:text-white' : 'text-white'}`}>
                   {schoolInfo?.schoolName?.toUpperCase() ?? 'SMS MALAWI'}
