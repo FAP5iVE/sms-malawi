@@ -49,13 +49,15 @@
  *   - Role badge footer, item tooltips in collapsed mode
  */
 
-import Link                    from 'next/link'
+import Image                    from 'next/image'
+import Link                     from 'next/link'
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useAuthStore }          from '@/store/authStore'
 import { useMotionEnabled }      from '@/store/motionStore'
 import { useNavigation }         from '@/hooks/useNavigation'
+import { usePublicSchoolInfo }   from '@/hooks/usePublic'
 import {
   SIDEBAR_WIDTH_VARIANTS,
   SIDEBAR_LABEL_VARIANTS,
@@ -80,6 +82,7 @@ export function Sidebar() {
   const { role }      = useAuthStore()
   const motionEnabled = useMotionEnabled()
   const { items }     = useNavigation()
+  const { data: schoolInfo } = usePublicSchoolInfo()
 
   // collapsed: true  → 60px icon rail
   //            false → 240px expanded panel
@@ -203,11 +206,12 @@ export function Sidebar() {
         role="navigation"
       >
         {/* ── Brand / logo row ──────────────────────────────────────────────── */}
-        <div className="h-16 flex items-center justify-between px-3 border-b border-base shrink-0">
+        <div className={`h-16 flex items-center border-b border-base shrink-0 ${collapsed ? 'justify-center px-0' : 'justify-between px-3'}`}>
 
-          {/* Brand icon — always visible */}
+          {/* School logo — the same live application mark used by the public page.
+              No coloured/rounded placeholder sits behind it. */}
           <motion.div
-            className="w-8 h-8 rounded-lg bg-brand-navy flex items-center justify-center shrink-0"
+            className="w-14 h-14 flex items-center justify-center shrink-0"
             whileHover={motionEnabled ? { scale: 1.06 } : undefined}
             transition={reducedMotionTransition(motionEnabled, {
               type: 'spring',
@@ -215,7 +219,13 @@ export function Sidebar() {
               damping: 40,
             })}
           >
-            <span className="text-white text-sm font-bold font-heading">S</span>
+            <Image
+              src="/favicon.png"
+              alt=""
+              width={56}
+              height={56}
+              className="w-14 h-14 object-contain"
+            />
           </motion.div>
 
           {/* Brand name + collapse button — animated out when collapsing */}
@@ -230,7 +240,7 @@ export function Sidebar() {
                   exit="hidden"
                   className="font-heading font-bold text-sm text-brand-navy truncate flex-1 ml-2.5"
                 >
-                  SMS Malawi
+                  {schoolInfo?.schoolName ?? ''}
                 </motion.span>
 
                 <motion.button
