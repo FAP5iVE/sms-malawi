@@ -222,8 +222,8 @@ export function Sidebar() {
             <Image
               src="/favicon.png"
               alt=""
-              width={56}
-              height={56}
+              width={40}
+              height={40}
               className="w-14 h-14 object-contain"
             />
           </motion.div>
