@@ -3,9 +3,9 @@
 /**
  * apps/web/src/app/(public)/events/page.tsx
  * [CHANGE TYPE]: TARGETED EDIT
- * [PHASE]: N6 — Event disambiguation + public pagination fix (AUDIT Finding H)
+ * [PHASE]: N6, Event disambiguation + public pagination fix (AUDIT Finding H)
  * [PURPOSE]: Was fetching a page of /public/announcements and filtering
- *   eventDate CLIENT-SIDE — so a page of 20 announcements could contain zero
+ *   eventDate CLIENT-SIDE, so a page of 20 announcements could contain zero
  *   events, `total` counted all announcements (breaking page count), and some
  *   events were unreachable. Now reads the dedicated /public/events route
  *   (usePublicEvents), which filters by eventDate server-side, orders by
@@ -13,7 +13,7 @@
  * [DEPENDS ON]: usePublicEvents (GET /public/events)
  * [FIX] Was hardcoded to skip the event's attached photo entirely and
  *   crashed into an "Invalid Date"/NaN display for any event with no
- *   eventDate — same root cause and fix as page.tsx's Events section (see
+ *   eventDate, same root cause and fix as page.tsx's Events section (see
  *   that file's fix note 12).
  */
 
@@ -62,7 +62,7 @@ export default function EventsPage() {
           <>
             <div className="space-y-4">
               {events.map((ev) => {
-                // [FIX] Same root cause as the homepage Events section —
+                // [FIX] Same root cause as the homepage Events section,
                 // see page.tsx's fix note 12. Guard first, never call
                 // .getMonth()/.getDate()/.toLocaleDateString() on an
                 // Invalid Date.
@@ -72,7 +72,7 @@ export default function EventsPage() {
                   <article key={ev.id} className="flex gap-5 border border-base rounded-2xl bg-surface p-5">
                     {/* [FIX] This archive listing never rendered the
                         event's attached photo at all (unlike the detail
-                        page) — now shown alongside the date badge when one
+                        page), now shown alongside the date badge when one
                         exists. */}
                     {ev.imageUrl && (
                       // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL

@@ -3,7 +3,7 @@
 /**
  * apps/web/src/app/(public)/news/[id]/page.tsx
  * [CHANGE TYPE]: NEW FILE
- * [PURPOSE]: The full news article — only reachable via a "Read more" link
+ * [PURPOSE]: The full news article, only reachable via a "Read more" link
  *   from /news. Pressing Back returns to that same list, never expands
  *   inline. GET /public/news/:id is postType-scoped server-side, so this
  *   URL can never resolve an announcement or an ad even if the id is

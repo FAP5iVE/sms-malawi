@@ -37,7 +37,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import type { UserRole } from '@shared/types/roles'
-import { getAllowedRolesForPath } from '@shared/constants/pageAccess'
+import { PAGE_ACCESS, getAllowedRolesForPath } from '@shared/constants/pageAccess'
 
 // ─── COOKIE NAMES ─────────────────────────────────────────
 // These constants must stay in sync with AuthProvider.tsx
@@ -74,6 +74,7 @@ const PUBLIC_PATHS = [
   '/login',
   '/apply',
   '/forgot-password',
+  '/reset-password',   // [SEO FIX] emailed reset links land here while signed out
   '/change-password',
   '/privacy',
   '/terms',
@@ -97,6 +98,7 @@ const PUBLIC_PATHS = [
   // page-level auth check, reading the unauthenticated /public/* routes.
   '/notices',
   '/academic-advertisements',
+  '/placement-results', // [SEO FIX] linked from the landing-page nav; was redirecting visitors to /login
   '/',           // landing page
 ] as const
 
@@ -123,6 +125,23 @@ const BYPASS_PREFIXES = [
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
+  )
+}
+
+/**
+ * [SEO FIX] True for the signed-in portal's own pages (the keys of
+ * PAGE_ACCESS, which covers every folder under app/(auth)). Only these send
+ * an anonymous visitor to /login. Any other unknown URL is passed through so
+ * Next.js can render the real 404 page; previously a mistyped or dead link
+ * redirected to /login, which showed visitors a login form for a page that
+ * does not exist and told search engines the URL was valid.
+ *
+ * Adding a page under app/(auth)/ requires adding it to PAGE_ACCESS (the
+ * navigation already needs that), and proxy.test.ts fails if one is missed.
+ */
+function isPortalPath(pathname: string): boolean {
+  return Object.keys(PAGE_ACCESS).some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   )
 }
@@ -170,8 +189,12 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   // ── Layer 3: Authentication gate
-  // Every path that is NOT public and NOT bypassed requires a session
+  // Every portal path requires a session. Paths that belong to neither the
+  // public site nor the portal fall through to Next.js's 404 page.
   if (!session) {
+    if (!isPortalPath(pathname)) {
+      return applySecurityHeaders(NextResponse.next())
+    }
     return buildLoginRedirect(request)
   }
 

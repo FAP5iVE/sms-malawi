@@ -2,7 +2,7 @@
 
 /**
  * FILE: apps/web/src/app/(public)/page.tsx
- * [CHANGE TYPE]: MAJOR REWRITE — full visual redesign per
+ * [CHANGE TYPE]: MAJOR REWRITE, full visual redesign per
  *   Teller_Public_Landing_Redesign.zip (the new design is the source of
  *   truth for layout/visuals). Every interactive element and every real
  *   data point is re-wired to the app's actual backend; nothing in this
@@ -10,19 +10,19 @@
  * [PURPOSE]:
  *   1. Theme toggle uses the app's real next-themes system (useTheme +
  *      useHasMounted), not the original design mockup's manual DOM
- *      color-swapping — dark mode works via the existing bg-page/bg-surface/
+ *      color-swapping, dark mode works via the existing bg-page/bg-surface/
  *      text-body/border-base token system everywhere in this file.
  *   2. [PRODUCTION FIX, this phase] News, Announcements, Academic
- *      Advertisements, and Events are now four genuinely separate feeds —
+ *      Advertisements, and Events are now four genuinely separate feeds,
  *      usePublicNews()/usePublicAnnouncements()/usePublicAdverts()/
- *      usePublicEvents() — each backed by its own /public/* route filtered
+ *      usePublicEvents(), each backed by its own /public/* route filtered
  *      on the server by an explicit postType tag (see
  *      server/routes/public.ts and @shared/schemas/announcement). Previously
  *      all three non-Event sections drew from one usePublicAnnouncements()
  *      feed with no postType distinction at all (announcements WITHOUT an
  *      eventDate powered the rail, News, AND Academic Advertisements as
  *      three different slices of the exact same items), and Events was only
- *      inferred from eventDate being set rather than a real tag — nothing
+ *      inferred from eventDate being set rather than a real tag, nothing
  *      stopped a plain announcement or news article from also carrying one.
  *      Each section's "Read more"/"See all" links now go to that section's
  *      own archive + detail pages (/news, /notices,
@@ -31,41 +31,41 @@
  *   3. Performance stats map generically over usePublicManebStats().stats
  *      (works for however many exam types exist, not hardcoded to MSCE+JCE),
  *      plus a real University Placement card from the new
- *      usePublicPlacementStats() endpoint (see public.ts — every
+ *      usePublicPlacementStats() endpoint (see public.ts, every
  *      /placements/* route required auth; nothing was public before this).
  *      "Learners enrolled" has no live source anywhere in the system; kept
  *      the prior page's own precedent of substituting "Total candidates"
  *      (sum of MANEB stats totals) rather than a fabricated number.
  *   4. Mission, Vision and Core Values (schoolInfo.vision/mission/
  *      coreValues) are real Settings-backed fields that the previous page
- *      fetched but never rendered anywhere — given a real home here.
+ *      fetched but never rendered anywhere, given a real home here.
  *   5. The "Send us a message" contact form is wired to a new
- *      POST /public/contact (useContactForm()) — it had no backend at all
+ *      POST /public/contact (useContactForm()), it had no backend at all
  *      in either the previous page or the new design (pure decoration in
  *      both). Emails the school's real contact address with Reply-To set to
  *      the visitor.
- *   6. Newsletter subscribe is single-email only — the design's topic
+ *   6. Newsletter subscribe is single-email only, the design's topic
  *      selector pills (Admissions/Exam results/Events/Newsletter) have no
  *      backing field anywhere on NewsletterSubscriber (confirmed: email,
  *      name, token, confirmed, unsubscribedAt only), so a selector that
  *      silently did nothing would be misleading. Dropped per instruction.
  *   7. Social icons use react-icons/fa (already an installed, working
  *      dependency, already used by the previous footer) rather than lucide
- *      — lucide-react deliberately excludes trademarked brand marks, so
+ *     , lucide-react deliberately excludes trademarked brand marks, so
  *      there is no lucide Facebook/Twitter/Instagram/YouTube/LinkedIn icon
  *      to import.
  *   8. Hero background is a real campus photo (apps/web/public/images/
  *      hero-campus.webp) via next/image with `fill` + `object-cover`, which
  *      crops to fill the banner on any viewport without ever stretching or
- *      squishing the source image — safe from mobile up. The gallery grid
+ *      squishing the source image, safe from mobile up. The gallery grid
  *      still uses ImagePlaceholder as a genuine "no photo in this slot"
  *      fallback; News and Events cards now show the article/event's own
  *      attached photo (imageUrl) when one exists and only fall back to
- *      ImagePlaceholder when it doesn't — see fix note 12.
+ *      ImagePlaceholder when it doesn't, see fix note 12.
  *   9. The header/footer "S" badge is now the real favicon.png mark
- *      (apps/web/public/favicon.png — already in the repo, was only used
+ *      (apps/web/public/favicon.png, already in the repo, was only used
  *      as a favicon before) instead of a plain letter "S" in a coloured box.
- *  10. Added a shared decorative "scribble" background — the same organic
+ *  10. Added a shared decorative "scribble" background, the same organic
  *      line-art language as the login page's background (ScribbleDefs +
  *      ScribbleArt below), scattered across the sections that were a single
  *      flat colour with no texture at all (Announcement Rail, Academic
@@ -77,22 +77,22 @@
  *      the solid brand-colour bands, so it never fights legibility.
  *  11. [BUG FIX] Six spots in the header (both nav-link classes, the search
  *      and theme-toggle buttons, the search-close button, and search-result
- *      rows) used `hover:bg-page` / `hover:text-body` — like `text-muted/70`
+ *      rows) used `hover:bg-page` / `hover:text-body`, like `text-muted/70`
  *      on the login page, these are hand-rolled `@layer utilities` classes
  *      (not Tailwind `@theme` tokens), so `hover:` never compiled for them;
  *      confirmed absent from the compiled CSS output before this fix. Now
- *      `hover:bg-background` / `hover:text-foreground` — the token-backed
- *      equivalents of the same two colours — which do support variants.
+ *      `hover:bg-background` / `hover:text-foreground`, the token-backed
+ *      equivalents of the same two colours, which do support variants.
  *      These hover states had never actually worked; unrelated to this
  *      change's stated purpose, but caught while re-verifying the file.
  *  12. [BUG FIX] News (featured + secondary) and Events cards were
  *      hardcoded to ImagePlaceholder regardless of whether the underlying
- *      article/event actually had a cover photo attached — the real photo
+ *      article/event actually had a cover photo attached, the real photo
  *      already resolved correctly via imageUrl everywhere else (detail
  *      pages, /news and /notices archives), it just wasn't read here. Also
  *      fixes the Events section's "NaN" date badge: an EVENT with no valid
  *      eventDate now falls back to a "TBA" badge instead of
- *      new Date("").getDate() rendering literally as "NaN" — see
+ *      new Date("").getDate() rendering literally as "NaN", see
  *      @shared/schemas/announcement for the companion fix that stops a new
  *      dateless EVENT from being saved in the first place.
 
@@ -122,7 +122,7 @@ import {
   useNewsletterSubscribe,
   useContactForm,
 } from '@/hooks/usePublic'
-// [NEW] Shared hierarchical grid + full-size lightbox — see those files'
+// [NEW] Shared hierarchical grid + full-size lightbox, see those files'
 // headers. Reused as-is by /gallery; gallery-admin keeps its own plain
 // grid and only picks up the lightbox.
 import { HierarchicalPhotoGrid } from '@/components/shared/HierarchicalPhotoGrid'
@@ -134,7 +134,7 @@ import { stripHtml } from '@/components/shared/PublicArchive'
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Placeholder for a section that would show a real per-item photo once
- *  those assets exist — used for gallery/news/event cards. The hero banner
+ *  those assets exist, used for gallery/news/event cards. The hero banner
  *  now has a real photo (see file header note 8); these per-item images
  *  still don't exist anywhere in the project. */
 function ImagePlaceholder({ label, className = '' }: { label?: string; className?: string }) {
@@ -162,7 +162,7 @@ function formatRelativeDate(iso: string): string {
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
 
-/** Gradient defs shared by every <ScribbleArt> instance on this page — SVG
+/** Gradient defs shared by every <ScribbleArt> instance on this page, SVG
  *  gradient ids are addressable anywhere in the document, so this renders
  *  once (0×0, visually hidden) and every scribble below just references
  *  these by url(#id) instead of redeclaring the same five gradients per
@@ -187,7 +187,7 @@ function ScribbleDefs() {
           <stop offset="100%" stopColor="var(--color-brand-navy)" />
         </linearGradient>
         <linearGradient id="scribblePurple" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="var(--color-brand-purple)" />
+          <stop offset="0%" stopColor="var(--color-brand-navy-light)" />
           <stop offset="100%" stopColor="var(--color-brand-navy-mid)" />
         </linearGradient>
         <linearGradient id="scribbleAmber" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -199,7 +199,7 @@ function ScribbleDefs() {
   )
 }
 
-/** Decorative organic line-art — same visual language as the login page's
+/** Decorative organic line-art, same visual language as the login page's
  *  background scribbles, scattered across this page's plain flat-colour
  *  sections. `variant` picks one of five different shape arrangements so
  *  the same motif doesn't repeat identically down the page (mirrors how
@@ -274,7 +274,7 @@ export default function LandingPage() {
   const { data: manebStats }   = usePublicManebStats()
   const { data: placementStats } = usePublicPlacementStats()
   // [PRODUCTION FIX] Four genuinely separate feeds now, each postType-
-  // filtered server-side (see public.ts) — previously all four sections
+  // filtered server-side (see public.ts), previously all four sections
   // below shared one usePublicAnnouncements() call and were sliced apart
   // client-side with no real distinction between them.
   const { data: announcementsPage, isLoading: announcementsLoading } = usePublicAnnouncements(2)
@@ -283,7 +283,7 @@ export default function LandingPage() {
   const { data: eventsPage,        isLoading: eventsLoading }        = usePublicEvents(3)
   const { data: galleryPage, isLoading: galleryLoading } = usePublicGallery(5)
   const galleryPhotos = galleryPage?.photos ?? []
-  // [NEW] Which "Life at our school" photo is open full-size, if any —
+  // [NEW] Which "Life at our school" photo is open full-size, if any,
   // null means the lightbox is closed. Index into `galleryPhotos`.
   const [galleryLightboxIndex, setGalleryLightboxIndex] = useState<number | null>(null)
 
@@ -296,23 +296,23 @@ export default function LandingPage() {
   const eventItems = eventsPage?.events ?? []
 
   // [PRODUCTION FIX 2026-07-28] Search previously only matched announcements
-  // — the new static pages (Academics, Admissions, Student Life, Leadership,
+  //, the new static pages (Academics, Admissions, Student Life, Leadership,
   // Gallery) were invisible to it. There's still no real search backend
   // (see the header flyout's comment), so this stays a client-side filter,
   // just widened to a static index of every real page/section that exists
   // on the site, searched alongside the live announcements.
   const SEARCHABLE_PAGES = [
-    { title: 'Academics — Curriculum', href: '/academics#curriculum', keywords: 'academics curriculum subjects JCE MSCE form syllabus' },
-    { title: 'Academics — MANEB Standards', href: '/academics', keywords: 'maneb standards grading exam board' },
-    { title: 'Academics — Facilities', href: '/academics#facilities', keywords: 'facilities laboratory library computer classroom' },
-    { title: 'Admissions — How to Apply', href: '/admissions#how-to-apply', keywords: 'apply admission enrol enrolment steps' },
-    { title: 'Admissions — Entry Requirements', href: '/admissions#entry-requirements', keywords: 'entry requirements pslce jce transcript' },
-    { title: 'Admissions — Fees Structure', href: '/admissions#fees', keywords: 'fees tuition boarding cost pay price' },
-    { title: 'Admissions — Scholarships', href: '/admissions#scholarships', keywords: 'scholarship bursary financial aid' },
-    { title: 'Student Life — Clubs & Societies', href: '/student-life', keywords: 'clubs societies innovation debate drama choir' },
-    { title: 'Student Life — Wellness & Support', href: '/student-life', keywords: 'wellness support pastoral care wellbeing' },
-    { title: 'Student Life — Sports', href: '/student-life', keywords: 'sport football netball athletics extracurricular' },
-    { title: 'Student Life — Boarding', href: '/student-life', keywords: 'boarding dormitory residential accommodation' },
+    { title: 'Academics: Curriculum', href: '/academics#curriculum', keywords: 'academics curriculum subjects JCE MSCE form syllabus' },
+    { title: 'Academics: MANEB Standards', href: '/academics', keywords: 'maneb standards grading exam board' },
+    { title: 'Academics: Facilities', href: '/academics#facilities', keywords: 'facilities laboratory library computer classroom' },
+    { title: 'Admissions: How to Apply', href: '/admissions#how-to-apply', keywords: 'apply admission enrol enrolment steps' },
+    { title: 'Admissions: Entry Requirements', href: '/admissions#entry-requirements', keywords: 'entry requirements pslce jce transcript' },
+    { title: 'Admissions: Fees Structure', href: '/admissions#fees', keywords: 'fees tuition boarding cost pay price' },
+    { title: 'Admissions: Scholarships', href: '/admissions#scholarships', keywords: 'scholarship bursary financial aid' },
+    { title: 'Student Life: Clubs & Societies', href: '/student-life', keywords: 'clubs societies innovation debate drama choir' },
+    { title: 'Student Life: Wellness & Support', href: '/student-life', keywords: 'wellness support pastoral care wellbeing' },
+    { title: 'Student Life: Sports', href: '/student-life', keywords: 'sport football netball athletics extracurricular' },
+    { title: 'Student Life: Boarding', href: '/student-life', keywords: 'boarding dormitory residential accommodation' },
     { title: 'School Leadership', href: '/leadership', keywords: 'leadership head teacher management board' },
     { title: 'School Gallery', href: '/gallery', keywords: 'gallery photos pictures images' },
     { title: 'Performance & MANEB Results', href: '/#performance', keywords: 'performance results pass rate msce jce placement university' },
@@ -344,7 +344,7 @@ export default function LandingPage() {
       ].slice(0, 8)
     : []
 
-  // ── Newsletter (single email — see file header note 6) ─────────────────
+  // ── Newsletter (single email, see file header note 6) ─────────────────
   const [newsletterEmail, setNewsletterEmail] = useState('')
   const [newsletterMsg, setNewsletterMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
   const newsletterSubscribe = useNewsletterSubscribe()
@@ -361,7 +361,7 @@ export default function LandingPage() {
     )
   }
 
-  // ── Contact form (real backend — see file header note 5) ───────────────
+  // ── Contact form (real backend, see file header note 5) ───────────────
   const [contactForm, setContactForm] = useState({ name: '', email: '', subject: '', message: '' })
   const [contactMsg, setContactMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
   const contactSubmit = useContactForm()
@@ -430,7 +430,7 @@ export default function LandingPage() {
       <div className="bg-page text-body font-sans">
         <ScribbleDefs />
         {/* ══════════════════════════════════════════════════════════════
-            HEADER — fixed, transparent over hero, solid once scrolled
+            HEADER, fixed, transparent over hero, solid once scrolled
         ══════════════════════════════════════════════════════════════ */}
         <header
           ref={headerRef}
@@ -441,7 +441,7 @@ export default function LandingPage() {
           }`}
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center gap-6">
-            <button onClick={() => scrollTo('top')} className="flex items-center gap-3 shrink-0">
+            <button onClick={() => scrollTo('top')} aria-label="Back to top" className="flex items-center gap-3 shrink-0">
               <Image
                 src="/favicon.png"
                 alt=""
@@ -529,7 +529,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Search flyout — [PRODUCTION FIX 2026-07-28] real client-side
+          {/* Search flyout, [PRODUCTION FIX 2026-07-28] real client-side
               filter over the already-fetched announcements (title/body
               substring match). There is no search backend anywhere in the
               system (no Algolia wiring, no full-text endpoint) for public
@@ -663,13 +663,13 @@ export default function LandingPage() {
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 pt-[180px] w-full">
             <div className="max-w-3xl fade-up">
               <h1 className="font-heading font-extrabold text-white leading-[1.04] tracking-tight text-5xl md:text-6xl lg:text-7xl mb-4">
-                Welcome to {schoolInfo?.schoolName ?? 'Malawi Scondary School'}
+                {schoolInfo?.schoolName ?? 'SMS Malawi'}
               </h1>
               <p className="font-heading font-semibold text-xl text-white/80 mb-1.5">
                 {schoolInfo?.systemTagline ?? 'Secondary School Management System'}
               </p>
               <p className="text-lg text-white/55 max-w-xl leading-relaxed mb-8">
-                {schoolInfo?.heroSubtitle ?? 'Excellence in Education — from Form 1 through MSCE.'}
+                {schoolInfo?.heroSubtitle ?? 'Secondary education from Form 1 through MSCE.'}
               </p>
               <div className="flex gap-3 flex-wrap">
                 <button
@@ -685,27 +685,22 @@ export default function LandingPage() {
                   Apply for Admission
                 </Link>
               </div>
-              <div className="flex items-center gap-3.5 mt-11 font-heading font-extrabold text-[13px] tracking-[3px] uppercase text-white/35">
-                <span>Learn</span><span className="text-brand-teal-light">/</span>
-                <span>Lead</span><span className="text-brand-teal-light">/</span>
-                <span>Excel</span>
-              </div>
             </div>
           </div>
         </section>
 
         {/* ══════════════════════════════════════════════════════════════
-            ANNOUNCEMENT RAIL — id="announcements", latest 2 general
-            announcements (postType ANNOUNCEMENT — its own feed, see
+            ANNOUNCEMENT RAIL, id="announcements", latest 2 general
+            announcements (postType ANNOUNCEMENT, its own feed, see
             usePublicAnnouncements above)
         ══════════════════════════════════════════════════════════════ */}
         <section id="announcements" className="relative overflow-hidden bg-brand-navy">
           <ScribbleArt variant={1} className="opacity-[0.16]" />
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 grid md:grid-cols-[200px_1fr] gap-8 items-center">
             <div>
-              <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal-light mb-1.5">
+              <h2 className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal-light mb-1.5">
                 Announcements
-              </div>
+              </h2>
               <Link href="/notices" className="text-[13px] text-white/50 hover:text-white transition-colors">
                 View all →
               </Link>
@@ -717,13 +712,13 @@ export default function LandingPage() {
                   <div className="h-20 bg-white/5 rounded-lg animate-pulse" />
                 </>
               ) : railItems.length === 0 ? (
-                <p className="text-sm text-white/40 sm:col-span-2">No announcements yet — check back soon.</p>
+                <p className="text-sm text-white/40 sm:col-span-2">No announcements yet, check back soon.</p>
               ) : (
                 railItems.map((a) => (
                   <Link href={`/notices/${a.id}`} key={a.id} className="border-l-2 border-brand-teal-light/55 pl-4.5 block group">
-                    <h4 className="font-heading font-bold text-[15px] text-white mb-1.5 leading-snug line-clamp-2 group-hover:underline">
+                    <h3 className="font-heading font-bold text-[15px] text-white mb-1.5 leading-snug line-clamp-2 group-hover:underline">
                       {a.title}
-                    </h4>
+                    </h3>
                     <p className="text-[13.5px] text-white/50 mb-2 leading-relaxed line-clamp-2">{a.body}</p>
                     <span className="font-mono text-[11px] text-white/35">{formatRelativeDate(a.createdAt)}</span>
                   </Link>
@@ -744,7 +739,7 @@ export default function LandingPage() {
               </h2>
               <Link
                 href="/news"
-                className="inline-flex items-center gap-2 border border-base text-body px-4.5 py-2.5 rounded-full font-heading font-bold text-[13px] hover:border-brand-teal hover:text-brand-teal transition-colors"
+                className="inline-flex items-center gap-2 border border-base text-body px-4.5 py-2.5 rounded-xl font-heading font-bold text-[13px] hover:border-brand-teal hover:text-brand-teal transition-colors"
               >
                 All News →
               </Link>
@@ -758,13 +753,13 @@ export default function LandingPage() {
                 </div>
               </div>
             ) : newsItems.length === 0 ? (
-              <div className="text-center py-14 text-muted text-sm">No news articles have been published yet — check back soon.</div>
+              <div className="text-center py-14 text-muted text-sm">No news articles have been published yet, check back soon.</div>
             ) : (
               <div className="grid lg:grid-cols-[1.15fr_1fr] gap-10">
                 {/* Featured */}
                 <article>
                   {/* [FIX] Was hardcoded to ImagePlaceholder regardless of
-                      whether the article actually had a cover photo — the
+                      whether the article actually had a cover photo, the
                       real photo already resolves correctly on the detail
                       page (PublicArchiveDetail) via the same imageUrl this
                       list already receives from usePublicNews(). */}
@@ -799,9 +794,9 @@ export default function LandingPage() {
                         <ImagePlaceholder className="h-24 rounded-lg" />
                       )}
                       <div>
-                        <h4 className="font-heading font-bold text-[15px] sm:text-base leading-snug text-brand-navy dark:text-white mb-2 line-clamp-2">
+                        <h3 className="font-heading font-bold text-[15px] sm:text-base leading-snug text-brand-navy dark:text-white mb-2 line-clamp-2">
                           {a.title}
-                        </h4>
+                        </h3>
                         <div className="font-mono text-[11px] text-muted mb-2">{formatRelativeDate(a.createdAt)}</div>
                         <Link href={`/news/${a.id}`} className="font-heading font-bold text-xs text-brand-teal hover:underline">
                           Read more →
@@ -816,10 +811,10 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════════
-            ACADEMIC ADVERTISEMENTS — id="ads"
+            ACADEMIC ADVERTISEMENTS, id="ads"
             [PRODUCTION FIX] Now a genuinely standalone section: its own
             postType (ADVERTISEMENT), its own /public/academic-advertisements
-            feed, its own archive + detail pages — previously this was just
+            feed, its own archive + detail pages, previously this was just
             another slice of the same feed as News, and every link here
             (section "See all" and every item) pointed at /news.
         ══════════════════════════════════════════════════════════════ */}
@@ -835,7 +830,7 @@ export default function LandingPage() {
               </p>
               <Link
                 href="/academic-advertisements"
-                className="inline-flex items-center gap-2 border border-base bg-surface text-body px-4.5 py-2.5 rounded-full font-heading font-bold text-[13px] hover:border-brand-teal hover:text-brand-teal transition-colors"
+                className="inline-flex items-center gap-2 border border-base bg-surface text-body px-4.5 py-2.5 rounded-xl font-heading font-bold text-[13px] hover:border-brand-teal hover:text-brand-teal transition-colors"
               >
                 All Advertisements →
               </Link>
@@ -864,7 +859,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════════
-            DISCOVER — id="about"
+            DISCOVER, id="about"
         ══════════════════════════════════════════════════════════════ */}
         <section id="about" className="relative overflow-hidden bg-surface py-20 sm:py-24">
           <ScribbleArt variant={3} className="opacity-[0.08] dark:opacity-[0.14]" />
@@ -888,8 +883,8 @@ export default function LandingPage() {
               {[
                 { title: 'Leadership', cardKey: 'leadership' as const, desc: 'A head teacher and board committed to transparent, forward-thinking school governance.', href: '/leadership', tint: 'from-brand-navy-light/40 to-brand-navy' },
                 { title: 'Academics', cardKey: 'academics' as const, desc: 'A rigorous curriculum aligned to MANEB standards for both JCE and MSCE candidates.', href: '/academics', tint: 'from-brand-teal/70 to-brand-navy' },
-                { title: 'Student Life', cardKey: 'student_life' as const, desc: 'Sport, drama, choir, debate and community service alongside a full boarding programme.', href: '/student-life', tint: 'from-brand-purple/70 to-brand-navy' },
-                { title: 'Admissions', cardKey: 'admissions' as const, desc: 'Everything a prospective family needs — entry requirements, fees and application steps.', href: '/admissions', tint: 'from-brand-amber/70 to-brand-navy' },
+                { title: 'Student Life', cardKey: 'student_life' as const, desc: 'Sport, drama, choir, debate and community service alongside a full boarding programme.', href: '/student-life', tint: 'from-brand-navy-light/70 to-brand-navy' },
+                { title: 'Admissions', cardKey: 'admissions' as const, desc: 'Everything a prospective family needs, entry requirements, fees and application steps.', href: '/admissions', tint: 'from-brand-amber/70 to-brand-navy' },
               ].map((card) => {
                 const photoUrl = schoolInfo?.discoverCards?.find((d) => d.cardKey === card.cardKey)?.photoUrl ?? null
                 return (
@@ -912,7 +907,7 @@ export default function LandingPage() {
               })}
             </div>
 
-            {/* Mission, Vision & Core Values — real Settings-backed fields.
+            {/* Mission, Vision & Core Values, real Settings-backed fields.
                 [PRODUCTION FIX 2026-07-28] Merged into a single flat card
                 (was three separate cards); core values render as a plain
                 list, not pills. */}
@@ -922,7 +917,7 @@ export default function LandingPage() {
                   <div>
                     <div className="flex items-center gap-2.5 mb-3">
                       <Target className="w-5 h-5 text-brand-teal shrink-0" />
-                      <h4 className="font-heading font-bold text-lg text-brand-teal">Our Mission</h4>
+                      <h3 className="font-heading font-bold text-lg text-brand-teal">Our Mission</h3>
                     </div>
                     <p className="text-sm text-muted leading-relaxed">{schoolInfo.mission}</p>
                   </div>
@@ -931,7 +926,7 @@ export default function LandingPage() {
                   <div>
                     <div className="flex items-center gap-2.5 mb-3">
                       <Compass className="w-5 h-5 text-brand-purple shrink-0" />
-                      <h4 className="font-heading font-bold text-lg text-brand-purple">Our Vision</h4>
+                      <h3 className="font-heading font-bold text-lg text-brand-purple">Our Vision</h3>
                     </div>
                     <p className="text-sm text-muted leading-relaxed">{schoolInfo.vision}</p>
                   </div>
@@ -940,7 +935,7 @@ export default function LandingPage() {
                   <div className="sm:col-span-2 pt-2 border-t border-base">
                     <div className="flex items-center gap-2.5 mb-3 mt-6">
                       <Sparkles className="w-5 h-5 text-brand-amber shrink-0" />
-                      <h4 className="font-heading font-bold text-lg text-brand-navy dark:text-white">Our Core Values</h4>
+                      <h3 className="font-heading font-bold text-lg text-brand-navy dark:text-white">Our Core Values</h3>
                     </div>
                     <ul className="grid sm:grid-cols-2 gap-x-8 gap-y-2">
                       {schoolInfo.coreValues.map((v) => (
@@ -983,7 +978,7 @@ export default function LandingPage() {
                 // [PRODUCTION FIX] Was a flat uniform grid of contain-fit
                 // thumbnails with no way to see a photo larger. Hierarchical
                 // grid + click-to-view full size (see those components'
-                // headers) — same pattern as /gallery.
+                // headers), same pattern as /gallery.
                 <HierarchicalPhotoGrid
                   photos={galleryPhotos.map((p) => ({
                     id: p.id,
@@ -1011,7 +1006,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════════
-            PERFORMANCE — id="academics" anchors here too (see file header)
+            PERFORMANCE, id="academics" anchors here too (see file header)
         ══════════════════════════════════════════════════════════════ */}
         <div id="academics" />
         <section id="performance" className="relative overflow-hidden bg-brand-navy py-20 sm:py-24 text-white">
@@ -1023,7 +1018,7 @@ export default function LandingPage() {
                   Academic Performance
                 </div>
                 <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight mb-3">
-                  Results That Speak for Themselves
+                  MANEB Examination Results
                 </h2>
                 <p className="text-white/55 text-base leading-relaxed">
                   Our latest MANEB examination results, published from the school records system as they become available.
@@ -1033,15 +1028,15 @@ export default function LandingPage() {
                 href="https://www.maneb.edu.mw/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 border border-white/25 text-white px-5 py-2.75 rounded-full font-heading font-bold text-[13px] hover:bg-white/10 transition-colors whitespace-nowrap"
+                className="inline-flex items-center gap-2 border border-white/25 text-white px-5 py-2.75 rounded-xl font-heading font-bold text-[13px] hover:bg-white/10 transition-colors whitespace-nowrap"
               >
                 MANEB Portal <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
 
-            {/* [PRODUCTION FIX 2026-07-28] Fixed 4-slot grid — MSCE pass
+            {/* [PRODUCTION FIX 2026-07-28] Fixed 4-slot grid, MSCE pass
                 rate / JCE pass rate / Learners enrolled / Years of
-                excellence — matching the redesign exactly. Previously this
+                excellence, matching the redesign exactly. Previously this
                 whole section (grid + detail cards) vanished entirely
                 whenever no MANEB records existed for the year, and the
                 grid generically mapped over whatever exam types existed
@@ -1094,7 +1089,7 @@ export default function LandingPage() {
                     ].map((card) => (
                       <div key={card.key} className="p-6">
                         <div className="flex items-center justify-between mb-4.5">
-                          <h4 className="font-heading font-bold text-sm">{card.key}</h4>
+                          <h3 className="font-heading font-bold text-sm">{card.key}</h3>
                           {card.stat && (
                             <span className="font-mono text-[11.5px] text-brand-teal-light">
                               {card.year}
@@ -1128,7 +1123,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════════
-            EVENTS — dated announcements
+            EVENTS, dated announcements
         ══════════════════════════════════════════════════════════════ */}
         <section id="events" className="relative overflow-hidden bg-surface py-20 sm:py-24">
           <ScribbleArt variant={5} className="opacity-[0.08] dark:opacity-[0.14]" />
@@ -1139,7 +1134,7 @@ export default function LandingPage() {
               </h2>
               <Link
                 href="/events"
-                className="inline-flex items-center gap-2 border border-base text-body px-4.5 py-2.5 rounded-full font-heading font-bold text-[13px] hover:border-brand-teal hover:text-brand-teal transition-colors"
+                className="inline-flex items-center gap-2 border border-base text-body px-4.5 py-2.5 rounded-xl font-heading font-bold text-[13px] hover:border-brand-teal hover:text-brand-teal transition-colors"
               >
                 All events →
               </Link>
@@ -1152,7 +1147,7 @@ export default function LandingPage() {
             ) : eventItems.length === 0 ? (
               <div className="text-center py-14 text-muted text-sm flex flex-col items-center gap-3">
                 <CalendarDays className="w-8 h-8 text-muted/40" aria-hidden />
-                No upcoming events have been scheduled yet — check back soon.
+                No upcoming events have been scheduled yet, check back soon.
               </div>
             ) : (
               <div className="grid md:grid-cols-3 gap-6">
@@ -1216,10 +1211,10 @@ export default function LandingPage() {
                 Admissions {schoolInfo?.currentYear ?? currentYearNum + 1}
               </div>
               <h2 className="font-heading font-extrabold text-3xl sm:text-[40px] leading-tight tracking-tight text-white mb-3">
-                Your child deserves the very best start.
+                Apply for the new intake.
               </h2>
               <p className="text-[16.5px] text-white/80 max-w-xl leading-relaxed">
-                Applications for the new intake are open — limited places available.
+                Applications for the new intake are open.
               </p>
             </div>
             <div className="flex gap-3 flex-wrap">
@@ -1240,7 +1235,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════════
-            STAY CONNECTED — newsletter + contact
+            STAY CONNECTED, newsletter + contact
         ══════════════════════════════════════════════════════════════ */}
         <section id="contact" className="relative overflow-hidden bg-page py-20 sm:py-24 border-b border-base">
           <ScribbleArt variant={1} className="opacity-[0.08] dark:opacity-[0.14]" />
@@ -1291,7 +1286,7 @@ export default function LandingPage() {
                 </p>
               )}
 
-              {/* Map — stacked directly below Newsletter in the same
+              {/* Map, stacked directly below Newsletter in the same
                   left-hand column, per the confirmed sketch. */}
               <div className="mt-10">
                 <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal mb-2.5">
@@ -1334,12 +1329,12 @@ export default function LandingPage() {
                     <div className="font-heading font-bold text-[11px] uppercase tracking-wider text-brand-teal mb-2">
                       Postal Address
                     </div>
-                    <p className="text-sm text-body mb-3 leading-relaxed">{schoolInfo?.address ?? '—'}</p>
+                    <p className="text-sm text-body mb-3 leading-relaxed">{schoolInfo?.address ?? 'Not available'}</p>
                     <p className="text-sm text-muted leading-snug">
-                      <span className="font-semibold text-body">Phone:</span> {schoolInfo?.phone ?? '—'}
+                      <span className="font-semibold text-body">Phone:</span> {schoolInfo?.phone ?? 'Not available'}
                     </p>
                     <p className="text-sm text-muted leading-snug">
-                      <span className="font-semibold text-body">Email:</span> {schoolInfo?.email ?? '—'}
+                      <span className="font-semibold text-body">Email:</span> {schoolInfo?.email ?? 'Not available'}
                     </p>
                   </div>
                   <div className="p-5">
@@ -1375,7 +1370,7 @@ export default function LandingPage() {
                     required
                     value={contactForm.subject}
                     onChange={(e) => setContactForm((f) => ({ ...f, subject: e.target.value }))}
-                    placeholder="Subject — e.g. Admissions enquiry"
+                    placeholder="Subject, e.g. Admissions enquiry"
                     className="w-full border border-base bg-page rounded-xl px-3.5 py-3 text-[14.5px] text-body placeholder:text-muted outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-colors mb-3"
                   />
                   <textarea
@@ -1413,7 +1408,7 @@ export default function LandingPage() {
             FOOTER
         ══════════════════════════════════════════════════════════════ */}
         <footer className="relative bg-brand-navy text-white pt-16 overflow-hidden rounded-t-[2.5rem]">
-          {/* Background photo — same hero campus image + treatment as the
+          {/* Background photo, same hero campus image + treatment as the
               HERO section above, reused here so the page's two navy
               bookends share one visual language instead of the footer
               being a flat colour. `fill` + `object-cover` + `sizes="100vw"`
@@ -1465,11 +1460,13 @@ export default function LandingPage() {
                 {
                   title: 'Academics',
                   links: [
+                    { label: 'Academics Overview', href: '/academics' },
                     { label: 'Curriculum', href: '/academics#curriculum' },
                     { label: 'MANEB Performance', anchor: 'performance' },
                     { label: 'Timetable', href: '/login' },
                     { label: 'Library', href: '/login' },
                     { label: 'Facilities', href: '/academics#facilities' },
+                    { label: 'University Placements', href: '/placement-results' },
                   ],
                 },
                 {
@@ -1478,6 +1475,7 @@ export default function LandingPage() {
                     { label: 'Login Portal (Students & Staff)', href: '/login' },
                     { label: 'Change Password', href: '/change-password' },
                     { label: 'Student Life', href: '/student-life' },
+                    { label: 'School Leadership', href: '/leadership' },
                     { label: 'Gallery', href: '/gallery' },
                   ],
                 },
@@ -1503,7 +1501,7 @@ export default function LandingPage() {
                 },
               ].map((col) => (
                 <div key={col.title}>
-                  <h4 className="font-heading font-bold text-[13px] mb-4 text-brand-teal-light">{col.title}</h4>
+                  <h3 className="font-heading font-bold text-[13px] mb-4 text-brand-teal-light">{col.title}</h3>
                   <div className="flex flex-col gap-2.75 text-[13.5px]">
                     {col.links.map((l) =>
                       'external' in l && l.external ? (

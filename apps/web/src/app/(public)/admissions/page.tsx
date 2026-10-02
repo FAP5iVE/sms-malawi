@@ -6,7 +6,7 @@
  * [PURPOSE]: Discover -> Admissions destination. Footer's "Prospective
  *   Students" column (How to Apply/Entry Requirements/Fees Structure/
  *   Scholarships) all anchor into sections on this one page. Fee figures
- *   are real (usePublicFeeStructure, FeeStructure table) — not fabricated.
+ *   are real (usePublicFeeStructure, FeeStructure table), not fabricated.
  */
 
 import Link from 'next/link'
@@ -65,7 +65,7 @@ export default function AdmissionsPage() {
               { step: 1, title: 'Complete the online application', desc: 'Fill in the applicant, guardian, and academic history details on our Apply page.' },
               { step: 2, title: 'Submit supporting information', desc: 'Provide your most recent school report and any other requested academic records.' },
               { step: 3, title: 'Application review', desc: 'The admissions office reviews your application against available places and entry requirements.' },
-              { step: 4, title: 'Admission decision', desc: 'You will be contacted with the outcome, and — if admitted — next steps for enrolment and fees.' },
+              { step: 4, title: 'Admission decision', desc: 'You will be contacted with the outcome, and, if admitted, next steps for enrolment and fees.' },
             ].map((s) => (
               <div key={s.step} className="flex gap-4">
                 <div className="shrink-0 w-9 h-9 rounded-full bg-brand-teal/10 text-brand-teal font-heading font-bold flex items-center justify-center text-sm">
@@ -151,21 +151,21 @@ export default function AdmissionsPage() {
               <MapPin className="w-4.5 h-4.5 text-brand-teal shrink-0 mt-0.5" aria-hidden />
               <div>
                 <div className="text-xs text-muted mb-1">Address</div>
-                <div className="text-sm text-body">{schoolInfo?.address ?? '—'}</div>
+                <div className="text-sm text-body">{schoolInfo?.address ?? 'Not available'}</div>
               </div>
             </div>
             <div className="border border-base rounded-xl p-5 flex items-start gap-3">
               <Phone className="w-4.5 h-4.5 text-brand-teal shrink-0 mt-0.5" aria-hidden />
               <div>
                 <div className="text-xs text-muted mb-1">Phone</div>
-                <div className="text-sm text-body">{schoolInfo?.phone ?? '—'}</div>
+                <div className="text-sm text-body">{schoolInfo?.phone ?? 'Not available'}</div>
               </div>
             </div>
             <div className="border border-base rounded-xl p-5 flex items-start gap-3">
               <Mail className="w-4.5 h-4.5 text-brand-teal shrink-0 mt-0.5" aria-hidden />
               <div>
                 <div className="text-xs text-muted mb-1">Email</div>
-                <div className="text-sm text-body">{schoolInfo?.email ?? '—'}</div>
+                <div className="text-sm text-body">{schoolInfo?.email ?? 'Not available'}</div>
               </div>
             </div>
           </div>

@@ -1,52 +1,52 @@
 /**
  * [CHANGE TYPE]: TARGETED EDIT
  * [FILE]: apps/web/src/app/(public)/apply/page.tsx
- * [R-PHASE]: R5 — Academics I: Admissions & Student Records
+ * [R-PHASE]: R5, Academics I: Admissions & Student Records
  * [PURPOSE]: Imports the unified ApplicationSchema from
  *   @shared/schemas/student in place of the local ApplicationSchema
- *   definition — the local schema's field set (firstName/otherNames/
+ *   definition, the local schema's field set (firstName/otherNames/
  *   surname/classApplying/guardianRelationship/countryCode/
  *   guardianCountryCode) is now the canonical, server-validated shape, so
  *   no field renaming is needed here. The one real change: `sex`'s <select>
  *   options move from lowercase 'male'/'female' to uppercase 'MALE'/
  *   'FEMALE', matching SexSchema (the canonical schema now used for both
- *   client and server validation) and the real Prisma Sex enum — the
+ *   client and server validation) and the real Prisma Sex enum, the
  *   previous lowercase values matched neither. No other change to the
  *   5-step form UI structure.
  * [DEPENDS ON]: @shared/schemas/student (ApplicationSchema)
  *
  * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-25).
  * [PURPOSE]: Academic Year dropdown was a hardcoded ['2026','2027','2028']
- *   array — a fixed, unmaintained placeholder (would run out entirely once
+ *   array, a fixed, unmaintained placeholder (would run out entirely once
  *   2029 arrived), in the wrong format besides ("2026" vs the "YYYY/YYYY"
  *   format used everywhere else in the system for an academic year), and
  *   the value it collected was never read back anywhere downstream
  *   (applicationService.ts only writes it; the staff review pages and the
- *   application→student conversion route never read it — conversion takes
+ *   application→student conversion route never read it, conversion takes
  *   an explicit classId instead). NOTE: this exact fix was previously
  *   *documented* right here without actually being applied to the code
  *   below (the hardcoded array and the '2027' default were both still
- *   live) — this revision is the one that actually wires it in.
- * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-27) — three fixes
+ *   live), this revision is the one that actually wires it in.
+ * [CHANGE TYPE]: TARGETED EDIT (production fix, 2026-08-27), three fixes
  *   in the same session:
  *   1. Academic Year dropdown now genuinely uses the shared
  *      <AcademicYearSelect> (apps/web/src/components/shared/
  *      AcademicYearSelect.tsx, new this session) instead of the stale
- *      hardcoded array — it computes options from
+ *      hardcoded array, it computes options from
  *      getAcademicYearOptions(schoolInfo.currentYear, { back: 0, forward: 1 })
  *      (`back: 0` since an applicant only ever applies for the current or
  *      next intake, never a past one), where schoolInfo comes from
- *      usePublicSchoolInfo() (GET /public/school-info, unauthenticated —
+ *      usePublicSchoolInfo() (GET /public/school-info, unauthenticated,
  *      the same call the landing page already makes for the same
  *      SETTING_KEYS.CURRENT_ACADEMIC_YEAR value). No useEffect/setValue
  *      dance is needed: it's a plain register()-based uncontrolled
  *      `<select>`, so the browser's normal "select the first rendered
- *      option" behaviour already lands on the current year — the
+ *      option" behaviour already lands on the current year, the
  *      hardcoded `academicYear: '2027'` default is removed from
  *      defaultValues entirely rather than fought with.
  *   2. Background redesigned to match (public)/login/page.tsx's ambient
  *      backdrop exactly (vignette, colour glow orbs, organic SVG line
- *      art) — extracted into the new shared, zero-prop
+ *      art), extracted into the new shared, zero-prop
  *      <AmbientBackground> (apps/web/src/components/shared/
  *      AmbientBackground.tsx) rather than copy-pasted, since it's now used
  *      by two pages. Only the page background changes; the form/success
@@ -55,7 +55,7 @@
  *      the same tree position swapped its `type` attribute between
  *      "button" (steps 0-3) and "submit" (step 4) with no distinguishing
  *      `key`, so React reused the same DOM node and mutated its `type` in
- *      place — under React's event-dispatch order, the *same* interaction
+ *      place, under React's event-dispatch order, the *same* interaction
  *      that advanced the wizard into step 4 could still have its default
  *      browser action evaluated against the button's new "submit" type,
  *      firing the actual application submission before the Review step
@@ -66,7 +66,7 @@
  *      explicit `onClick={handleSubmit(onSubmit)}` on the Review step's
  *      button (no more reliance on native form submission at all), and
  *      the `<form>` itself now only ever calls `e.preventDefault()` on its
- *      own onSubmit — so an Enter keypress on any earlier step can no
+ *      own onSubmit, so an Enter keypress on any earlier step can no
  *      longer trigger an implicit submit either.
  *  [CHANGE TYPE]: TARGETED EDIT (2026-08-27, follow-up).
  *  [PURPOSE]: Swapped this page's background from its own local
@@ -74,7 +74,7 @@
  *   over to the shared <PublicAmbientBackground> (apps/web/src/components/
  *   shared/PublicAmbientBackground.tsx) that now backs every other public
  *   content page (Events, News, the Discover pages, Gallery, Change
- *   Password, Privacy, Terms) — so Apply matches that same artwork, the
+ *   Password, Privacy, Terms), so Apply matches that same artwork, the
  *   same `fixed`-positioning fix for long pages, and the same theme-aware
  *   readability scrim, instead of drifting from it as a second,
  *   independently-maintained copy. Only the import and the two render
@@ -117,7 +117,7 @@ const inputCls =
 const inputError =
   'border-brand-coral focus:ring-brand-coral/25 focus:border-brand-coral bg-brand-coral/5'
 const inputBase = 'border-base'
-// Deliberately has no `w-full` (unlike inputCls) — this sits next to the phone
+// Deliberately has no `w-full` (unlike inputCls), this sits next to the phone
 // number input in a flex row, so it needs a fixed, compact width instead of
 // stretching. Sized to fit the longest calling code in COUNTRY_CALLING_CODES
 // (4 characters, e.g. '+265') plus the browser's native dropdown arrow.
@@ -389,7 +389,7 @@ export default function ApplyPage() {
         </div>
 
         {/* Form card */}
-        {/* [PRODUCTION FIX 2026-08-27] Never rely on native <form> submission —
+        {/* [PRODUCTION FIX 2026-08-27] Never rely on native <form> submission,
             see this file's header comment for the full auto-submit defect this
             closes. onSubmit here only ever prevents the browser's default
             action; the Review step's button below calls handleSubmit(onSubmit)
@@ -534,7 +534,7 @@ export default function ApplyPage() {
                   <Field
                     label="Email Address"
                     error={errors.email?.message}
-                    hint="Required — your student login and password will be sent here once admitted"
+                    hint="Required, your student login and password will be sent here once admitted"
                     className="col-span-full"
                   >
                     <input
@@ -752,7 +752,7 @@ export default function ApplyPage() {
                       {rows.map(([label, value]) => (
                         <div key={label} className="flex gap-4 text-sm">
                           <dt className="text-muted font-sans w-36 shrink-0">{label}</dt>
-                          <dd className="text-body font-sans font-medium">{value || '—'}</dd>
+                          <dd className="text-body font-sans font-medium">{value || 'Not provided'}</dd>
                         </div>
                       ))}
                     </dl>

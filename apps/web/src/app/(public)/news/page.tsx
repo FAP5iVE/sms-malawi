@@ -3,12 +3,12 @@
 /**
  * apps/web/src/app/(public)/news/page.tsx
  * [CHANGE TYPE]: MAJOR REWRITE
- * [PURPOSE]: [PRODUCTION FIX] Real news archive — postType NEWS only (via
+ * [PURPOSE]: [PRODUCTION FIX] Real news archive, postType NEWS only (via
  *   usePublicNews / GET /public/news), no longer a client-side
  *   `!a.eventDate` slice of the general /public/announcements feed shared
  *   with plain announcements. Cards are now collapsed (3-line excerpt) with
  *   a "Read more" link to a real detail page (/news/[id]) instead of
- *   showing the full body inline — clicking through and pressing Back
+ *   showing the full body inline, clicking through and pressing Back
  *   returns to this same list. See PublicArchiveList/PublicArchiveDetail in
  *   components/shared/PublicArchive.tsx, shared with the /announcements and
  *   /academic-advertisements archives.

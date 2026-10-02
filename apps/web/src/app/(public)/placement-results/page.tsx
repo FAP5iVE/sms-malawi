@@ -3,12 +3,12 @@
 /**
  * apps/web/src/app/(public)/placement-results/page.tsx
  * [CHANGE TYPE]: NEW FILE
- * [PURPOSE]: Public university-placement results — the actual NCHE selection
+ * [PURPOSE]: Public university-placement results, the actual NCHE selection
  *   list (student name, university, programme, status), not just aggregate
  *   stats. This IS public information (selection results are published by
  *   the school once NCHE releases them), so the page and its data source are
  *   deliberately unauthenticated. The server only ever returns VERIFIED
- *   PLACED/CONFIRMED rows — a student's own pending self-claim never shows
+ *   PLACED/CONFIRMED rows, a student's own pending self-claim never shows
  *   up here, and no grades or internal ids are exposed.
  * [DEPENDS ON]: usePublicPlacements (GET /public/placements, no auth),
  *   usePublicPlacementStats (GET /public/placement-stats, already public)

@@ -3,18 +3,18 @@
  *
  * [CHANGE TYPE]: NEW FILE (mobile UI audit fix).
  * [PURPOSE]: The password-reset email previously sent users to Firebase's
- *   own default-hosted action-handler page (*.firebaseapp.com) — plain,
- *   unstyled, completely inconsistent with the rest of the app — because
+ *   own default-hosted action-handler page (*.firebaseapp.com), plain,
+ *   unstyled, completely inconsistent with the rest of the app, because
  *   forgot-password/page.tsx called sendPasswordResetEmail() without an
  *   actionCodeSettings argument. That call now points the emailed link at
  *   this route instead. This page reads Firebase's oobCode query param,
  *   verifies it, and lets the user set a new password inside the app's own
- *   branded shell — same two-column layout, same copy conventions, same
+ *   branded shell, same two-column layout, same copy conventions, same
  *   Tailwind design tokens as forgot-password/page.tsx, so the whole
  *   request → email → reset journey feels like one continuous experience.
  * [DEPENDS ON]: W/lib/firebase.ts (auth), firebase/auth
  *   (verifyPasswordResetCode, confirmPasswordReset). Suspense-wraps its
- *   useSearchParams() call — same convention (auth)/library/page.tsx and
+ *   useSearchParams() call, same convention (auth)/library/page.tsx and
  *   (public)/login/page.tsx already use ("`next build` fails its
  *   static-generation bailout check" without it).
  */
@@ -28,7 +28,7 @@ import { auth } from '@/lib/firebase'
 import { ArrowLeft, Lock, CheckCircle2, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react'
 
 // `useSearchParams()` requires a Suspense boundary or `next build` fails its
-// static-generation bailout check — same convention as (public)/login/page.tsx
+// static-generation bailout check, same convention as (public)/login/page.tsx
 // and (auth)/library/page.tsx.
 export default function ResetPasswordPage() {
   return (
@@ -51,7 +51,7 @@ export default function ResetPasswordPage() {
 function ResetPasswordForm() {
   const searchParams = useSearchParams()
   const oobCode = searchParams.get('oobCode') ?? ''
-  // Knowable synchronously from the URL — no need to round-trip this
+  // Knowable synchronously from the URL, no need to round-trip this
   // through an effect + state just to render the "link expired" case.
   const missingCode = !oobCode
 
@@ -67,7 +67,7 @@ function ResetPasswordForm() {
 
   useEffect(() => {
     // missingCode is handled directly in the render below; nothing to do
-    // here in that case (and no setState — a bare early return is fine).
+    // here in that case (and no setState, a bare early return is fine).
     if (!auth || missingCode) return
     verifyPasswordResetCode(auth, oobCode)
       .then((resolvedEmail) => setEmail(resolvedEmail))

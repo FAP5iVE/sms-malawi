@@ -4,11 +4,11 @@
  * apps/web/src/app/(public)/academics/page.tsx
  * [CHANGE TYPE]: NEW FILE (production fix, 2026-07-28)
  * [PURPOSE]: Discover -> Academics destination. Services offered, the
- *   Malawian secondary curriculum, MANEB standards, and facilities —
+ *   Malawian secondary curriculum, MANEB standards, and facilities,
  *   footer's "Curriculum" and "Facilities" links anchor into this page's
  *   #curriculum and #facilities sections.
  * [DEPENDS ON]: usePublicManebStats for the real MANEB pass-rate figures
- *   already live on the landing page — not duplicated data, same source.
+ *   already live on the landing page, not duplicated data, same source.
  */
 
 import Link from 'next/link'
@@ -73,7 +73,7 @@ export default function AcademicsPage() {
           <h2 className="font-heading font-bold text-xl text-brand-navy dark:text-white mb-2">The Malawian Secondary Curriculum</h2>
           <p className="text-sm text-muted leading-relaxed mb-6">
             Secondary education in Malawi runs four years, split into two examined stages set and marked
-            externally by the Malawi National Examinations Board (MANEB) — the school teaches to this
+            externally by the Malawi National Examinations Board (MANEB), the school teaches to this
             national syllabus at every level, never setting or marking these external exams itself.
           </p>
           <div className="grid sm:grid-cols-2 gap-6">
@@ -111,7 +111,7 @@ export default function AcademicsPage() {
             MANEB grades JCE on an A–F scale and MSCE on a 1–9 point scale, with promotion between forms
             based on a student&apos;s continuous assessment and, at Form 2 and Form 4, the externally-set national
             exam result. The school&apos;s own grading and promotion records follow these same national scales
-            throughout — nothing is set or marked internally at those two exam points.
+            throughout, nothing is set or marked internally at those two exam points.
           </p>
           {manebStats && manebStats.stats.length > 0 && (
             <div className="flex flex-wrap gap-4 mb-4">

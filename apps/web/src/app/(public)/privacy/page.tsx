@@ -1,13 +1,13 @@
 /**
  * [CHANGE TYPE]: MAJOR REWRITE
  * [FILE]: apps/web/src/app/(public)/privacy/page.tsx
- * [R-PHASE]: R5 — Academics I: Admissions & Student Records (content follow-up)
+ * [R-PHASE]: R5, Academics I: Admissions & Student Records (content follow-up)
  * [PURPOSE]: Replaces the R5 placeholder Privacy Policy body with the school's
  *   real policy text, drafted against Malawi's Data Protection Act, 2024 and
  *   section 21 of the Constitution. Page shell (header/nav, container widths,
  *   design tokens) unchanged from the R5 NEW FILE version; only the content
  *   column and the closing disclaimer are rewritten.
- * [NOTE]: Deliberate departures from the pasted source text — see chat notes.
+ * [NOTE]: Deliberate departures from the pasted source text, see chat notes.
  * [DEPENDS ON]: none
  */
 import Link from 'next/link'
@@ -51,7 +51,7 @@ export default function PrivacyPolicyPage() {
             <p>
               [School&apos;s full legal name] (&quot;the School&quot;, &quot;we&quot;,
               &quot;us&quot;) respects your privacy and is committed to protecting the
-              personal data of everyone who interacts with us — prospective and current
+              personal data of everyone who interacts with us, prospective and current
               students, parents and guardians, staff, and visitors to our website. This
               Privacy Policy explains what personal data we collect, why, how we use and
               protect it, and what rights you have over it.
@@ -69,7 +69,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="font-heading font-bold text-lg text-brand-navy mb-2">1. Who we are</h2>
             <p>
               [School&apos;s full legal name] is the <strong>data controller</strong>{' '}
-              responsible for the personal data described in this Policy — meaning we
+              responsible for the personal data described in this Policy, meaning we
               decide why and how it is processed. Our contact details are set out in{' '}
               <Link href="#contact-us" className="text-brand-teal hover:underline">
                 section 14
@@ -92,7 +92,7 @@ export default function PrivacyPolicyPage() {
               <li>
                 when you interact with our public pages (for example, published examination
                 or placement results, which we treat as public information once officially
-                released — see{' '}
+                released, see{' '}
                 <Link href="#what-is-public" className="text-brand-teal hover:underline">
                   section 6
                 </Link>
@@ -309,7 +309,7 @@ export default function PrivacyPolicyPage() {
             <p className="mb-3">
               Many of the individuals whose data we process are children under the age of
               18. Where the legal basis for processing a child&apos;s personal data is
-              consent — for example, using a student&apos;s photograph in a newsletter — we
+              consent, for example, using a student&apos;s photograph in a newsletter, we
               obtain that consent from the student&apos;s parent or legal guardian, and we
               take reasonable steps to verify that the person giving consent holds parental
               responsibility for the child. Where a student is themselves an adult (18 or
@@ -317,8 +317,8 @@ export default function PrivacyPolicyPage() {
               how the law defines a child.
             </p>
             <p>
-              For most of what we do — enrolling, teaching, assessing, and safeguarding a
-              student — our legal basis is our contract with the family and our legal
+              For most of what we do, enrolling, teaching, assessing, and safeguarding a
+              student, our legal basis is our contract with the family and our legal
               obligations as a school, rather than consent, because these activities are
               necessary for us to educate the child safely and are not optional.
             </p>
@@ -329,15 +329,15 @@ export default function PrivacyPolicyPage() {
               6. What is public, and what is not
             </h2>
             <p>
-              Certain information — such as officially released examination or university
-              placement results — is published information once released by the relevant
+              Certain information, such as officially released examination or university
+              placement results, is published information once released by the relevant
               examining or placing authority, and we may display it on public pages of our
               website (for example, a list of students placed at universities). We only
               publish what has been officially confirmed; we do not publish provisional,
               unconfirmed, or self-reported outcomes, and we do not publish grades, marks,
               or any other personal data beyond what is necessary to communicate the
-              outcome. Everything else described in this Policy — including a
-              student&apos;s academic record, contact details, and health information — is
+              outcome. Everything else described in this Policy, including a
+              student&apos;s academic record, contact details, and health information, is
               private and is not made public.
             </p>
           </section>
@@ -355,8 +355,8 @@ export default function PrivacyPolicyPage() {
               </li>
               <li>
                 <strong>Service providers</strong> who process data on our behalf under our
-                instructions — for example, providers of our website hosting, database,
-                authentication, file storage, and email delivery services — bound by
+                instructions, for example, providers of our website hosting, database,
+                authentication, file storage, and email delivery services, bound by
                 confidentiality and data protection obligations;
               </li>
               <li>
@@ -405,7 +405,7 @@ export default function PrivacyPolicyPage() {
               Some of the service providers we use to host and operate our website and
               Portal store or process data outside Malawi. Where personal data is
               transferred outside Malawi, we take steps to ensure it remains protected to a
-              standard consistent with the Data Protection Act, 2024 — for example, by
+              standard consistent with the Data Protection Act, 2024, for example, by
               using providers that maintain recognised international security standards and
               by putting appropriate contractual safeguards in place.
             </p>
@@ -432,7 +432,7 @@ export default function PrivacyPolicyPage() {
             </h2>
             <p>
               We implement appropriate technical and organisational measures to protect
-              personal data against unauthorised access, loss, misuse, or disclosure —
+              personal data against unauthorised access, loss, misuse, or disclosure,
               including access controls, encryption in transit, and restricting access to
               those who need it to do their jobs. No system can be guaranteed completely
               secure, but we review and improve our safeguards on an ongoing basis, and we
@@ -471,7 +471,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <p className="mt-3">
               To exercise any of these rights, please contact the School&apos;s
-              administration office — see the details on our{' '}
+              administration office, see the details on our{' '}
               <Link href="/#contact" className="text-brand-teal hover:underline">
                 homepage
               </Link>
@@ -511,7 +511,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="font-heading font-bold text-lg text-brand-navy mb-2">14. Contact us</h2>
             <p>
               Questions about this Policy or your personal information can be directed to
-              the School&apos;s administration office — see the contact details on our{' '}
+              the School&apos;s administration office, see the contact details on our{' '}
               <Link href="/#contact" className="text-brand-teal hover:underline">
                 homepage
               </Link>

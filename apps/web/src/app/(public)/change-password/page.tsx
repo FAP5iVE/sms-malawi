@@ -2,10 +2,10 @@
  * apps/web/src/app/(public)/change-password/page.tsx
  *
  * [CHANGE TYPE]: TARGETED EDIT
- * [R-PHASE]: R2 — Auth Session & Login Flow Correctness
+ * [R-PHASE]: R2, Auth Session & Login Flow Correctness
  * [PURPOSE]: The previous flow called updatePassword() then
  *   user.getIdToken(true), with a comment claiming the force-refresh
- *   "clears the requiresPasswordChange claim." It does not — getIdToken(true)
+ *   "clears the requiresPasswordChange claim." It does not, getIdToken(true)
  *   only re-fetches a token reflecting whatever custom claims already exist
  *   server-side; nothing in that sequence ever called the Admin SDK to
  *   change them, so every new account was permanently locked out after its
@@ -14,7 +14,7 @@
  *   the claim via userManagementService.clearPasswordChangeRequirement)
  *   between updatePassword() and getIdToken(true), so the force-refresh
  *   that follows actually reflects the cleared claim.
- * [DEPENDS ON]: R1 (apiFetch singleton) — this file's new API call is
+ * [DEPENDS ON]: R1 (apiFetch singleton), this file's new API call is
  *   written against the R1-consolidated client.
  */
 'use client'
@@ -42,7 +42,7 @@ export default function ChangePasswordPage() {
       const user = getAuth().currentUser
       if (!user) throw new Error('Not authenticated')
       await updatePassword(user, password)
-      // Clear the requiresPasswordChange claim server-side — this is the
+      // Clear the requiresPasswordChange claim server-side, this is the
       // step the previous flow was missing. Must happen before the
       // force-refresh below, or the refreshed token would still carry the
       // stale (true) claim.

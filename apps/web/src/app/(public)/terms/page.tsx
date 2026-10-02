@@ -1,13 +1,13 @@
 /**
  * [CHANGE TYPE]: NEW FILE
  * [FILE]: apps/web/src/app/(public)/terms/page.tsx
- * [R-PHASE]: R5 — Academics I: Admissions & Student Records
+ * [R-PHASE]: R5, Academics I: Admissions & Student Records
  * [PURPOSE]: Gives the landing page footer's "Terms of Use" link a real,
  *   non-broken destination (it previously pointed at href="#"). Minimal
  *   static page with a shared header/footer and a single content column,
  *   matching the site's public-page visual language and the sibling
  *   privacy policy page's layout. Populating final, legally-reviewed terms
- *   is a content task outside this phase's scope — the placeholder copy
+ *   is a content task outside this phase's scope, the placeholder copy
  *   below is clearly generic and should be replaced by the school's actual
  *   terms before this page is relied on for compliance purposes.
  * [DEPENDS ON]: none

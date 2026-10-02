@@ -5,11 +5,11 @@
  * [CHANGE TYPE]: MAJOR REWRITE (card redesign)
  * [PURPOSE]: Discover -> Leadership destination. Lists the school's public
  *   leadership/management team (admin/hr/high_rank-curated via Settings ->
- *   School Identity — deliberately not real StaffProfile records; see
+ *   School Identity, deliberately not real StaffProfile records; see
  *   SETTING_KEYS.SCHOOL_LEADERSHIP_TEAM's comment for why).
  *   Card layout: full-bleed photo covering a uniform top area (same size
- *   whether or not a member has a photo set), then name, title, bio —
- *   matching the reference design exactly. No skills/rating bars — that
+ *   whether or not a member has a photo set), then name, title, bio,
+ *   matching the reference design exactly. No skills/rating bars, that
  *   part of the reference sketch was an artifact of the found template,
  *   not real data this app has (LeadershipMember only has name/title/
  *   bio/photoKey/order).

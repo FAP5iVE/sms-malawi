@@ -1,24 +1,24 @@
 /**
  * apps/web/src/app/(public)/login/page.tsx
  *
- * R2 — Auth Session & Login Flow Correctness.
+ * R2, Auth Session & Login Flow Correctness.
  *
  * Fixes two confirmed defects from the audit:
  *  1. A manual session cookie write using a bogus literal "1" instead
  *     of the real Firebase UID, which also raced AuthProvider's own
  *     cookie-setting. Cookie writes belong exclusively to AuthProvider's
- *     onIdTokenChanged listener (see sms-erp-security Rule 1) — this page
+ *     onIdTokenChanged listener (see sms-erp-security Rule 1), this page
  *     no longer touches `document.cookie` at all.
  *  2. `router.push('/dashboard')` fired immediately after sign-in, before the
  *     role cookie/claim had actually propagated, producing a visible
  *     redirect-loop-back-through-dashboard. The redirect now waits for the
  *     auth store's `role`/`initialized` fields (set by AuthProvider once the
  *     ID token's custom claims are read) before navigating, and honors the
- *     `?from=` deep-link param proxy.ts already attaches — validated to
+ *     `?from=` deep-link param proxy.ts already attaches, validated to
  *     reject protocol-relative/external targets.
  *
  * [CHANGE TYPE]: VISUAL REDESIGN ONLY (login-page-redesign.zip is the source
- *   of truth for layout/visuals) — a single centred "frosted glass" card on
+ *   of truth for layout/visuals), a single centred "frosted glass" card on
  *   an ambient, colour-rich backdrop. Nothing about auth, redirects, or
  *   state was touched: sanitizeRedirectTarget, the Suspense boundary,
  *   signInWithEmailAndPassword, the useAuthStore/useRouter/useSearchParams
@@ -26,7 +26,7 @@
  *   log-login-success/failed fire-and-forget calls are byte-for-byte the
  *   same logic as before this change, just re-wrapped in new markup.
  *
- * [REVISION 2 — visual fixes after review]:
+ * [REVISION 2, visual fixes after review]:
  *   - The outer wrapper no longer carries `overflow-hidden`. It was clipping
  *     real card content (the "Ready to apply?" footer, part of the auth
  *     notice) on shorter viewports instead of letting the page scroll.
@@ -36,22 +36,22 @@
  *   - Removed every opacity-modifier on the project's hand-rolled utility
  *     classes (`text-muted/70`, `text-body/70`, `text-body/90`). Those
  *     classes (bg-page, bg-surface, text-body, text-muted, border-base) are
- *     plain `@layer utilities` rules, not Tailwind `@theme` colour tokens —
+ *     plain `@layer utilities` rules, not Tailwind `@theme` colour tokens,
  *     Tailwind's `/NN` opacity-modifier syntax only compiles for utilities
  *     registered via `@theme` (confirmed by compiling this file's classes
  *     through the Tailwind v4 CLI directly). A modifier on a non-token class
  *     silently produces no rule, which is exactly why the "Contact your
  *     school administrator" line was unreadable. Hierarchy is now expressed
  *     with the existing distinct tokens (text-body vs text-muted) instead.
- *   - The login card is genuinely translucent in BOTH themes now — dark
+ *   - The login card is genuinely translucent in BOTH themes now, dark
  *     mode keeps the frosted look, and light mode uses a soft white/blur
  *     glass (not a flat opaque `bg-surface`) with a visible border + shadow,
  *     so it reads as a distinct card instead of white-on-white.
  *   - Background art reworked to be denser, more varied in colour (teal,
- *     coral, amber, purple, navy — all existing brand-* tokens, referenced
+ *     coral, amber, purple, navy, all existing brand-* tokens, referenced
  *     in the SVG via var(--color-brand-*) rather than invented hex), and
  *     rendered with `preserveAspectRatio="xMidYMid slice"` on a plain
- *     `inset-0 w-full h-full` box instead of arbitrary min-w/min-h — the
+ *     `inset-0 w-full h-full` box instead of arbitrary min-w/min-h, the
  *     previous sizing could scale unevenly depending on viewport aspect
  *     ratio, which is almost certainly why shapes rendered distorted.
  *   - Card widens further on desktop (lg:max-w-4xl outer / lg:max-w-2xl
@@ -67,10 +67,10 @@
  *   - The "Ready to apply?" footer links to the app's real /apply route
  *     rather than the mockup's inert onApply callback prop.
  *
- * [REVISION 3 — visual fixes after second review]:
+ * [REVISION 3, visual fixes after second review]:
  *   - Home/theme-toggle chips switched from translucent glass to a solid
  *     bg-brand-navy fill (white icon/text) so they read as buttons sitting
- *     directly on the background, not glass panels — matches the request
+ *     directly on the background, not glass panels, matches the request
  *     to make them "a strong solid color" rather than another frosted card.
  *   - Muted secondary text (the subtitle, the two authorisation-notice
  *     lines, "Ready to apply?") now uses `text-muted-foreground
@@ -80,7 +80,7 @@
  *     full-contrast foreground colour in dark mode while keeping the softer
  *     muted tone in light mode (unaffected, per the original report).
  *   - The authorisation-notice box's dark-mode fill changed from
- *     `dark:bg-white/[0.04]` to `dark:bg-black/25` — a white-tinted overlay
+ *     `dark:bg-white/[0.04]` to `dark:bg-black/25`, a white-tinted overlay
  *     was brightening whatever colourful blur sat behind it (working
  *     against the light-gray text on top of it); a black-tinted scrim dims
  *     it instead, which is what that text actually needs to stay readable.
@@ -92,9 +92,9 @@
  *     mobile and desktop.
  *   - Logo replaced with the 5iveStack Labs mark, switched by resolved
  *     theme: the black-on-transparent (BVO) variant in light mode, and a
- *     white-on-transparent (WVO) variant — generated from the supplied BVO
+ *     white-on-transparent (WVO) variant, generated from the supplied BVO
  *     artwork by remapping its black shape layer to white and leaving the
- *     orange unchanged, since a true WVO file wasn't provided — in dark
+ *     orange unchanged, since a true WVO file wasn't provided, in dark
  *     mode, so the mark keeps contrast against the card behind it either
  *     way. Both files ship at apps/web/public/images/. Sized up
  *     (w-56/64/72 vs. the old w-14/16 icon-only mark) to match the
@@ -128,7 +128,7 @@ import {
 /**
  * Only allow an internal, same-origin path as a post-login redirect target.
  * Rejects absolute URLs ("https://evil.example") and protocol-relative
- * targets ("//evil.example") — both of which would otherwise send an
+ * targets ("//evil.example"), both of which would otherwise send an
  * authenticated user off the app's own origin.
  */
 function sanitizeRedirectTarget(from: string | null): string | null {
@@ -166,7 +166,7 @@ function LoginForm() {
   // NOTE: bare store destructure, no selector. An object-returning selector
   // (`(s) => ({ role: s.role, initialized: s.initialized })`) allocates a new
   // object every render, so useSyncExternalStore's getSnapshot never compares
-  // equal to the previous snapshot — React then re-renders forever
+  // equal to the previous snapshot, React then re-renders forever
   // ("Maximum update depth exceeded"). Matches every other useAuthStore
   // consumer in this codebase.
   const { role, initialized } = useAuthStore()
@@ -182,11 +182,11 @@ function LoginForm() {
   const safeFrom = sanitizeRedirectTarget(searchParams.get('from'))
 
   // Sign-in succeeded, AuthProvider finished initialising, but the account
-  // carries no `role` custom claim — AuthProvider's bounded retry has already
+  // carries no `role` custom claim, AuthProvider's bounded retry has already
   // given up and called setUser(user, null). Without this, the effect below
   // simply returned on `!role` and `loading` stayed true forever (it is only
   // cleared in handleLogin's catch block), so the button span indefinitely
-  // with no explanation. Derived during render — not assigned from an effect —
+  // with no explanation. Derived during render, not assigned from an effect,
   // so no setState-in-effect is introduced.
   const noRoleAssigned = submitted && initialized && !role
   const isBusy = loading && !noRoleAssigned
@@ -211,11 +211,11 @@ function LoginForm() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password)
-      // Do not set cookies or navigate here — AuthProvider's onIdTokenChanged
+      // Do not set cookies or navigate here, AuthProvider's onIdTokenChanged
       // listener owns both, and the useEffect above navigates once it has.
       setSubmitted(true)
       // [PRODUCTION FIX 2026-07-28] The admin dashboard's login-trend graph
-      // has always queried AuditLog for LOGIN_SUCCESS/LOGIN_FAILED rows —
+      // has always queried AuditLog for LOGIN_SUCCESS/LOGIN_FAILED rows,
       // nothing ever wrote them. Fire-and-forget: a logging hiccup must
       // never block or delay the actual login.
       apiFetch('/auth/log-login-success', { method: 'POST' }).catch(() => {})
@@ -233,7 +233,7 @@ function LoginForm() {
     }
   }
 
-  // ── Theme toggle — reuses the exact cycleTheme/themeIcons pattern already
+  // ── Theme toggle, reuses the exact cycleTheme/themeIcons pattern already
   // shipped on the public homepage (apps/web/src/app/(public)/page.tsx),
   // just wired up locally here since this page doesn't share that file's
   // header component.
@@ -263,7 +263,6 @@ function LoginForm() {
         <div className="absolute top-[6%] left-[4%] w-64 h-64 sm:w-[420px] sm:h-[420px] rounded-full bg-brand-teal/15 dark:bg-brand-teal/25 blur-[100px] sm:blur-[130px]" />
         <div className="absolute bottom-[8%] right-[6%] w-64 h-64 sm:w-[420px] sm:h-[420px] rounded-full bg-brand-coral/15 dark:bg-brand-coral/22 blur-[110px] sm:blur-[140px]" />
         <div className="absolute top-[18%] right-[12%] w-52 h-52 sm:w-72 sm:h-72 rounded-full bg-brand-amber/12 dark:bg-brand-amber/20 blur-[90px] sm:blur-[110px]" />
-        <div className="absolute bottom-[16%] left-[10%] w-52 h-52 sm:w-72 sm:h-72 rounded-full bg-brand-purple/12 dark:bg-brand-purple/20 blur-[90px] sm:blur-[110px]" />
         <div className="absolute top-[42%] left-[46%] w-56 h-56 sm:w-80 sm:h-80 rounded-full bg-brand-navy-light/10 dark:bg-brand-navy-light/18 blur-[90px] sm:blur-[110px]" />
 
         {/* Organic tube/ring line art in a full brand colour spread */}
@@ -290,7 +289,7 @@ function LoginForm() {
               <stop offset="100%" stopColor="var(--color-brand-navy)" />
             </linearGradient>
             <linearGradient id="loginPurple" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="var(--color-brand-purple)" />
+              <stop offset="0%" stopColor="var(--color-brand-navy-light)" />
               <stop offset="100%" stopColor="var(--color-brand-navy-mid)" />
             </linearGradient>
             <linearGradient id="loginAmber" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -302,7 +301,7 @@ function LoginForm() {
             </filter>
           </defs>
 
-          {/* Top-centre ring — teal */}
+          {/* Top-centre ring, teal */}
           <g filter="url(#loginSoftShadow)">
             <path
               d="M 590 130 C 590 85 640 50 695 50 C 750 50 790 90 790 145 C 790 200 745 240 690 240 C 640 240 600 200 600 155"
@@ -313,7 +312,7 @@ function LoginForm() {
             />
           </g>
 
-          {/* Centre-left zigzag pill — navy */}
+          {/* Centre-left zigzag pill, navy */}
           <g filter="url(#loginSoftShadow)" transform="translate(330, 300)">
             <path
               d="M 40 40 L 90 40 C 110 40 120 50 120 70 L 120 100 C 120 120 110 130 90 130 L 40 130 C 20 130 10 140 10 160 L 10 190 C 10 210 20 220 40 220 L 90 220"
@@ -325,7 +324,7 @@ function LoginForm() {
             />
           </g>
 
-          {/* Bottom-centre C-curve — coral/amber */}
+          {/* Bottom-centre C-curve, coral/amber */}
           <g filter="url(#loginSoftShadow)" transform="translate(470, 560)">
             <path
               d="M 120 20 C 50 30 10 90 10 150 C 10 215 65 265 140 265 C 200 265 245 225 245 170"
@@ -336,7 +335,7 @@ function LoginForm() {
             />
           </g>
 
-          {/* Right-side spiral ribbon — purple */}
+          {/* Right-side spiral ribbon, purple */}
           <g filter="url(#loginSoftShadow)">
             <path
               d="M 950 170 C 1040 180 1100 240 1090 330 C 1080 420 990 470 920 460 C 850 450 830 370 860 300 C 890 230 970 200 1050 220 C 1130 240 1170 320 1160 410 C 1150 500 1080 590 1010 650 C 930 720 840 770 760 810"
@@ -347,7 +346,7 @@ function LoginForm() {
             />
           </g>
 
-          {/* Bottom-right sausage pillow — amber */}
+          {/* Bottom-right sausage pillow, amber */}
           <g filter="url(#loginSoftShadow)" transform="translate(1070, 660)">
             <path
               d="M 30 50 C 90 10 180 30 250 90 C 310 140 330 200 280 230"
@@ -358,12 +357,12 @@ function LoginForm() {
             />
           </g>
 
-          {/* Top-right accent ring — amber */}
+          {/* Top-right accent ring, amber */}
           <g filter="url(#loginSoftShadow)">
             <circle cx="1250" cy="120" r="74" stroke="url(#loginAmber)" strokeWidth="42" fill="none" />
           </g>
 
-          {/* Bottom-left arc — purple/navy */}
+          {/* Bottom-left arc, purple/navy */}
           <g filter="url(#loginSoftShadow)">
             <path
               d="M 40 830 A 170 170 0 0 1 380 850"
@@ -406,9 +405,9 @@ function LoginForm() {
       <main className="relative z-10 flex-1 flex items-start justify-center px-4 pt-0 pb-6 sm:pb-8">
         {/* Wide frosted plate */}
         <div className="w-full max-w-sm sm:max-w-2xl lg:max-w-4xl rounded-[28px] sm:rounded-[36px] bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/10 backdrop-blur-md p-2.5 sm:p-5 shadow-xl">
-          {/* Login glass card — translucent + blurred in BOTH themes */}
+          {/* Login glass card, translucent + blurred in BOTH themes */}
           <div className="w-full max-w-sm sm:max-w-lg lg:max-w-2xl mx-auto rounded-[24px] sm:rounded-[30px] bg-white/80 dark:bg-white/[0.07] border border-black/5 dark:border-white/15 backdrop-blur-2xl p-6 sm:p-8 shadow-2xl flex flex-col">
-            {/* Logo + system name — BVO (dark-on-light) mark in light mode,
+            {/* Logo + system name, BVO (dark-on-light) mark in light mode,
                 WVO (light-on-dark) mark in dark mode, so the mark always
                 has contrast against the card behind it. */}
             <div className="flex flex-col items-center justify-center mb-5 text-center">

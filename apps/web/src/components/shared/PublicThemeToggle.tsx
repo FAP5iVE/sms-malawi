@@ -4,7 +4,7 @@
  * apps/web/src/components/shared/PublicThemeToggle.tsx
  *
  * [PURPOSE]: The theme-toggle button shown on the public homepage and the
- *   login page — a solid square icon button (Sun / Moon / Monitor) matching
+ *   login page, a solid square icon button (Sun / Moon / Monitor) matching
  *   the Home-button chip already used next to it on those pages.
  *
  * [R15 fix]: Previously cycled light -> dark -> system on every click with
@@ -12,12 +12,12 @@
  *   listing all three options with a checkmark on the current one. Both
  *   rendered as a near-identical square icon chip in a near-identical
  *   position, so the visual similarity actively promised "these behave the
- *   same way" when they didn't — a user who learned "click the icon, pick
+ *   same way" when they didn't, a user who learned "click the icon, pick
  *   from a list" on the authenticated side hit a completely different,
  *   undiscoverable cycling interaction the moment they landed on /login or
  *   the public site. Now opens the same three-option dropdown ModeToggle
  *   uses, keeping this component's own solid-chip trigger styling (which
- *   matches the public site's hero sections — ModeToggle's ghost-button
+ *   matches the public site's hero sections, ModeToggle's ghost-button
  *   style is built for PageHeader's lighter chrome and wouldn't fit here).
  *
  * [USAGE]: <PublicThemeToggle /> inside a page's header/back-link row.

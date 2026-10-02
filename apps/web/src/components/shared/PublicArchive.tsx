@@ -5,13 +5,13 @@
  *
  * [CHANGE TYPE]: NEW FILE
  * [PURPOSE]: Shared presentation for the public News, Announcements, and
- *   Academic Advertisements archive + detail pages — three genuinely
+ *   Academic Advertisements archive + detail pages, three genuinely
  *   separate postType feeds (see server/routes/public.ts) that otherwise
  *   render identically: a collapsed list of cards (title + date + a
  *   3-line-clamped excerpt) with a "Read more" link that goes to a real
  *   full-page detail view, and a Back link from the detail page that
  *   returns to the list. Modeled on how mubas.ac.mw's own News/
- *   Announcements/Events sections behave — a snippet card that expands only
+ *   Announcements/Events sections behave, a snippet card that expands only
  *   on its own page, never inline.
  * [DEPENDS ON]: apps/web/src/hooks/usePublic.ts (PublicAnnouncement shape)
  */
@@ -28,9 +28,9 @@ export function formatArchiveDate(iso: string): string {
 
 /**
  * [FIX] `body` can now contain HTML written via RichTextEditor.tsx (bold,
- * lists, alignment, highlight — see AnnouncementForm.tsx). The list cards
+ * lists, alignment, highlight, see AnnouncementForm.tsx). The list cards
  * below only ever show a plain, line-clamped excerpt, so tags need to be
- * stripped first — otherwise a bold News intro would show its literal
+ * stripped first, otherwise a bold News intro would show its literal
  * "<strong>...</strong>" markup instead of being bold, and block tags
  * (</p><p>) would run words together with no separating space.
  * A body with no HTML at all (every article written before this change)
@@ -57,12 +57,12 @@ interface ListProps {
   totalPages: number
   onPageChange: (page: number) => void
   /** Optional right-aligned header slot (e.g. PublicThemeToggle), rendered
-   *  alongside the Back link — avoids every caller re-implementing the
+   *  alongside the Back link, avoids every caller re-implementing the
    *  same flex header row. */
   headerRight?: ReactNode
 }
 
-/** Collapsed cards — a 3-line excerpt with "Read more", never the full
+/** Collapsed cards, a 3-line excerpt with "Read more", never the full
  *  body. Only the detail page (PublicArchiveDetail below) shows the whole
  *  thing. */
 export function PublicArchiveList({
@@ -104,7 +104,7 @@ export function PublicArchiveList({
                   <div className="p-6 min-w-0">
                     <div className="font-mono text-xs text-muted mb-2">{formatArchiveDate(a.createdAt)}</div>
                     <h2 className="font-heading font-bold text-xl text-brand-navy dark:text-white mb-2">{a.title}</h2>
-                    {/* [PRODUCTION FIX] Collapsed with a 3-line clamp — the
+                    {/* [PRODUCTION FIX] Collapsed with a 3-line clamp, the
                         full body only ever shows on the detail page below,
                         never inline in the list. */}
                     <p className="text-sm text-muted leading-relaxed line-clamp-3">{stripHtml(a.body)}</p>
@@ -153,7 +153,7 @@ interface DetailProps {
   backLabel: string
 }
 
-/** The full, un-truncated post — only reachable via a list's "Read more"
+/** The full, un-truncated post, only reachable via a list's "Read more"
  *  link. Back always returns to that same list. */
 export function PublicArchiveDetail({ post, isLoading, notFoundText, backHref, backLabel }: DetailProps) {
   return (
@@ -174,7 +174,7 @@ export function PublicArchiveDetail({ post, isLoading, notFoundText, backHref, b
           <div className="text-center py-20 text-muted">{notFoundText}</div>
         ) : (
           <article>
-            {/* [NEW] Byline — bold, same line as the date, only rendered
+            {/* [NEW] Byline, bold, same line as the date, only rendered
                 when the author filled it in. */}
             <div className="font-mono text-xs text-muted mb-3 flex flex-wrap items-center gap-x-2">
               <span>{formatArchiveDate(post.createdAt)}</span>
@@ -190,12 +190,12 @@ export function PublicArchiveDetail({ post, isLoading, notFoundText, backHref, b
             </h1>
             {post.imageUrl && (
               // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
-              <img src={post.imageUrl} alt="" className="w-full h-auto rounded-2xl border border-base mb-6" />
+              <img src={post.imageUrl} alt={post.title} className="w-full h-auto rounded-2xl border border-base mb-6" />
             )}
             {/* [FIX] post.body is HTML now (written via RichTextEditor.tsx),
                 sanitized server-side on every write path in
                 announcementService.ts / the editOwn route before it ever
-                reaches Firestore — safe to render directly here. A
+                reaches Firestore, safe to render directly here. A
                 plain-text body (every article written before this change)
                 has no tags to interpret and renders exactly as before. */}
             <div

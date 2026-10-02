@@ -3,9 +3,9 @@
 /**
  * apps/web/src/app/(public)/events/[id]/page.tsx
  * [CHANGE TYPE]: NEW FILE
- * [PURPOSE]: The full event — only reachable via "Read more" from /events.
+ * [PURPOSE]: The full event, only reachable via "Read more" from /events.
  *   GET /public/events/:id is scoped to postType EVENT server-side, so this
- *   URL can never resolve a News article, Announcement, or Ad — the same
+ *   URL can never resolve a News article, Announcement, or Ad, the same
  *   explicit-tag guarantee /public/events (list) now enforces.
  * [DEPENDS ON]: usePublicPost('events', id)
  */

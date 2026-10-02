@@ -1,18 +1,18 @@
 /**
  * apps/web/src/app/(public)/forgot-password/page.tsx
  *
- * [CHANGE TYPE]: VISUAL REDESIGN ONLY — no auth logic touched.
+ * [CHANGE TYPE]: VISUAL REDESIGN ONLY, no auth logic touched.
  *   sendPasswordResetEmail, the auth/user-not-found -> still show the
  *   generic "sent" state (never leak which emails exist), and every other
  *   error branch are byte-for-byte the same as before.
  *
- * [PURPOSE]: This page used to be its own thing — a two-column split
+ * [PURPOSE]: This page used to be its own thing, a two-column split
  *   (`grid lg:grid-cols-[1fr_1fr]`) with a solid navy hero panel on the
  *   left (desktop only) and the form on the right, using
  *   PublicAmbientBackground as a `fixed` layer but WITHOUT giving either
  *   grid column `relative`/a z-index. Per CSS stacking rules, a
- *   `position: fixed` element with no z-index paints *after* — i.e. on
- *   top of — plain in-flow non-positioned block content in the same
+ *   `position: fixed` element with no z-index paints *after*, i.e. on
+ *   top of, plain in-flow non-positioned block content in the same
  *   stacking context, regardless of DOM order. Neither grid column here
  *   was positioned, so the ambient artwork (plus its readability scrim)
  *   was rendering ON TOP of the form and hero text instead of behind it,
@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
       if (code === 'auth/user-not-found') {
-        // Deliberately still show the "sent" state — never reveal whether
+        // Deliberately still show the "sent" state, never reveal whether
         // an email address is registered.
         setSent(true)
       } else if (code === 'auth/invalid-email') {
@@ -76,7 +76,7 @@ export default function ForgotPasswordPage() {
     <div className="relative min-h-screen w-full bg-page flex flex-col font-sans">
       <PublicAmbientBackground />
 
-      {/* ── Top bar: home + theme toggle — same chips as the login page ── */}
+      {/* ── Top bar: home + theme toggle, same chips as the login page ── */}
       <header className="relative z-30 flex items-center justify-between p-3 sm:p-4">
         <Link
           href="/"
@@ -94,7 +94,7 @@ export default function ForgotPasswordPage() {
       <main className="relative z-10 flex-1 flex items-start justify-center px-4 pt-0 pb-6 sm:pb-8">
         {/* Wide frosted plate */}
         <div className="w-full max-w-sm sm:max-w-xl rounded-[28px] sm:rounded-[36px] bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/10 backdrop-blur-md p-2.5 sm:p-5 shadow-xl">
-          {/* Glass card — translucent + blurred in BOTH themes, same recipe as login */}
+          {/* Glass card, translucent + blurred in BOTH themes, same recipe as login */}
           <div className="w-full max-w-sm sm:max-w-md mx-auto rounded-[24px] sm:rounded-[30px] bg-white/80 dark:bg-white/[0.07] border border-black/5 dark:border-white/15 backdrop-blur-2xl p-6 sm:p-8 shadow-2xl flex flex-col">
             <Link
               href="/login"

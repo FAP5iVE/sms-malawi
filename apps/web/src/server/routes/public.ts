@@ -80,7 +80,7 @@ publicRouter.get('/school-info', async (_req, res) => {
     slogan:      settings[SETTING_KEYS.SCHOOL_SLOGAN]         ?? 'Where Minds Ignite & Futures Begin.',
     // [PRODUCTION FIX 2026-07-28] Previously hardcoded in page.tsx.
     systemTagline: settings[SETTING_KEYS.SCHOOL_SYSTEM_TAGLINE] ?? 'Secondary School Management System',
-    heroSubtitle:  settings[SETTING_KEYS.SCHOOL_HERO_SUBTITLE]  ?? 'Excellence in Education — from Form 1 through MSCE.',
+    heroSubtitle:  settings[SETTING_KEYS.SCHOOL_HERO_SUBTITLE]  ?? 'Secondary education from Form 1 through MSCE.',
     founded:     settings[SETTING_KEYS.SCHOOL_FOUNDED_YEAR]   ?? 1979,
     address:     settings[SETTING_KEYS.SCHOOL_ADDRESS]        ?? 'P.O. Box 123, Blantyre, Malawi',
     phone:       settings[SETTING_KEYS.SCHOOL_PHONE]          ?? '+265 999 123 456',
@@ -427,7 +427,7 @@ publicRouter.post('/contact', async (req, res) => {
     return res.status(502).json({ error: 'Failed to send your message. Please try again or contact us by phone.' })
   }
 
-  res.status(201).json({ message: 'Thank you — the admissions office will respond within two working days.' })
+  res.status(201).json({ message: 'Thank you. The admissions office will respond within two working days.' })
 })
 
 // ─── PUBLIC PLACEMENT STATISTICS ──────────────────────────────────────────────
