@@ -132,7 +132,7 @@ export function ReportsExportPanel({ academicYear, term }: { academicYear: strin
   }
 
   return (
-    <div className="bg-surface border border-base rounded-xl p-5">
+    <div>
       <p className="font-heading font-semibold text-sm text-brand-navy mb-4">
         Reports
       </p>

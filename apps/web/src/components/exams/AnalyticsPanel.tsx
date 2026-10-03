@@ -45,7 +45,7 @@ function RankList({
 }) {
   if (rows.length === 0) return null
   return (
-    <div className="bg-surface border border-base rounded-xl p-5">
+    <div className="pb-2">
       <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide mb-3">{title}</h3>
       <ol className="divide-y divide-base">
         {rows.map((r) => (
@@ -158,7 +158,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
 
       {isLoading && <div className="text-center py-16 text-muted text-sm animate-pulse">Computing analytics…</div>}
       {error && (
-        <div role="alert" className="border border-base rounded-xl px-4 py-3 text-sm text-brand-coral bg-surface">
+        <div role="alert" className="py-3 text-sm text-brand-coral">
           {(error as Error).message}
         </div>
       )}
@@ -166,7 +166,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
       {/* Empty state now names the actual cause and the next step, instead of
           one flat sentence that covered four different situations. */}
       {!isLoading && !error && data && data.total === 0 && (
-        <div className="border border-base rounded-xl px-5 py-8 bg-surface flex items-start gap-3 max-w-2xl mx-auto">
+        <div className="px-5 py-8 flex items-start gap-3 max-w-2xl mx-auto">
           <Info className="w-5 h-5 text-muted shrink-0 mt-0.5" aria-hidden />
           <p className="text-sm text-muted">
             {data.emptyReason ?? 'No results computed for this selection yet.'}
@@ -202,7 +202,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
           {/* School-wide: per-class breakdown INSTEAD of a merged ranking. */}
           {data.schoolWide && (
             <>
-              <div className="border border-base rounded-xl px-4 py-3 text-xs text-muted bg-surface flex items-start gap-2">
+              <div className="py-1 text-xs text-muted flex items-start gap-2">
                 <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
                 <span>
                   Classes are summarised separately because Forms 1–2 are graded on the
@@ -217,7 +217,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
           {!data.schoolWide && (
             <>
               {data.gradeDistribution.length > 0 && (
-                <div className="bg-surface border border-base rounded-xl p-5">
+                <div className="pb-2">
                   <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide mb-3">
                     {usePoints ? 'Aggregate distribution' : 'Grade distribution'}
                   </h3>
@@ -233,7 +233,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
               )}
 
               {chartData.length > 0 && (
-                <div className="bg-surface border border-base rounded-xl p-5">
+                <div className="pb-2">
                   <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide mb-4">
                     Top performers, {data.className} ({metricLabel})
                   </h3>

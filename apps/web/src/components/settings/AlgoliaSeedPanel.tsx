@@ -130,7 +130,7 @@ export function AlgoliaSeedPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-surface border border-base rounded-2xl p-5 space-y-4">
+      <div className="space-y-4">
         <div>
           <h3 className="font-heading font-semibold text-brand-navy">Algolia Search Index</h3>
           <p className="text-xs text-muted mt-0.5">
@@ -171,7 +171,7 @@ export function AlgoliaSeedPanel() {
           {(Object.keys(ENTITY_LABELS) as Entity[]).map((entity) => {
             const s = states[entity]
             return (
-              <div key={entity} className="border border-base rounded-xl p-4 space-y-3">
+              <div key={entity} className="pb-4 border-b border-base last:border-b-0 space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-brand-navy">{ENTITY_LABELS[entity]}</p>
                   {dbCounts && dbCounts[entity] !== undefined && (

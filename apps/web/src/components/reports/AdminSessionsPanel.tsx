@@ -76,7 +76,7 @@ function SessionActivityLog({ sessionId, onClose }: { sessionId: string; onClose
   const { data, isLoading } = useSessionActivity(sessionId)
 
   return (
-    <div className="border border-base rounded-2xl bg-surface overflow-hidden">
+    <div className="overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-base bg-page">
         <div>
           <p className="text-sm font-heading font-semibold text-brand-navy">
@@ -242,6 +242,7 @@ export function AdminSessionsPanel() {
       )}
 
       <DataTable<ApiUserSession>
+        bordered={false}
         data={sessions}
         isLoading={isLoading}
         rowKey="id"

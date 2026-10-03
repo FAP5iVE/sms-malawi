@@ -119,13 +119,13 @@ function TimetableContent() {
       </div>
 
       {!selectedClassId ? (
-        <div className="bg-surface border border-base rounded-xl p-12 text-center text-muted text-sm">
+        <div className="py-12 text-center text-muted text-sm">
           Select a class above to view its timetable
         </div>
       ) : isLoading ? (
         <div className="skeleton h-64 rounded-xl" />
       ) : (
-        <div className="bg-surface border border-base rounded-xl overflow-auto">
+        <div className="overflow-auto">
           <table className="w-full min-w-160 text-sm">
             <thead>
               <tr className="border-b border-base bg-page">

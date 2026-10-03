@@ -84,7 +84,7 @@ function PlacementsContent() {
   }, [setTitle, setSubtitle])
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="space-y-5">
       <ModuleSurface>
       <ModuleTabs tabs={tabs} active={activeTab} onChange={setActive} id="placements" />
 

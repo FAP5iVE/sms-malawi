@@ -147,7 +147,7 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
         </div>
       )}
 
-      <div className="bg-surface border border-base rounded-xl overflow-hidden">
+      <div className="overflow-hidden">
         <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[640px]">
           <thead>

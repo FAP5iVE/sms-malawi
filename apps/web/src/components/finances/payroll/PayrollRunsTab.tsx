@@ -473,7 +473,7 @@ function CurrentCycleCard({
   const staffCount = currentRun?._count?.payslips ?? runWindow?.enrolledStaffCount ?? 0
 
   return (
-    <div className="bg-surface border border-base rounded-2xl p-5 sm:p-6">
+    <div>
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
         <div className="flex items-start gap-3">
           <div className="w-12 h-12 rounded-xl bg-brand-navy text-white flex items-center justify-center font-heading font-bold text-lg shrink-0">
@@ -684,7 +684,7 @@ export function PayrollRunsTab() {
     <div className="space-y-6">
       <CurrentCycleCard currentRun={currentRun} onInspect={() => currentRun && setInspectRunId(currentRun.id)} />
 
-      <div className="bg-surface border border-base rounded-2xl p-5 sm:p-6">
+      <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
             <h3 className="font-heading font-bold text-body">Payroll Runs History &amp; Ledger Records</h3>

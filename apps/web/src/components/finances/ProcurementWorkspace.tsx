@@ -121,7 +121,7 @@ function RequisitionForm({ onClose }: { onClose: () => void }) {
       }],
     }, { onSuccess: onClose })
   }
-  return <div className="bg-surface border border-base rounded-xl p-5 space-y-4">
+  return <div className="space-y-4">
     <div className="flex justify-between"><h4 className="font-semibold text-brand-navy">New purchase requisition</h4><button type="button" onClick={onClose} className="text-muted">Close</button></div>
     <div className="grid sm:grid-cols-2 gap-3">
       <Field label="Department"><select value={departmentId} onChange={e => setDepartmentId(e.target.value)} className="input"><option value="">Select a department…</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
@@ -172,7 +172,7 @@ function RFQForm({ onClose }: { onClose: () => void }) {
     if (!prId || selectedLines.size === 0) return
     create.mutate({ purchaseRequisitionId: prId, lineIds: Array.from(selectedLines), responseDeadline: deadline || undefined }, { onSuccess: onClose })
   }
-  return <div className="bg-surface border border-base rounded-xl p-5 space-y-4">
+  return <div className="space-y-4">
     <div className="flex justify-between"><h4 className="font-semibold text-brand-navy">New RFQ</h4><button type="button" onClick={onClose} className="text-muted">Close</button></div>
     <Field label="Approved requisition">
       <select value={prId} onChange={e => { setPrId(e.target.value); setSelectedLines(new Set()) }} className="input">
@@ -237,7 +237,7 @@ function QuotationForm({ onClose }: { onClose: () => void }) {
     if (!rfqId || !supplierId || !quotationNumber || lines.length === 0 || lines.some(l => l.unitPrice <= 0)) return
     create.mutate({ rfqId, supplierId, quotationNumber, quotationDate, lines }, { onSuccess: onClose })
   }
-  return <div className="bg-surface border border-base rounded-xl p-5 space-y-4">
+  return <div className="space-y-4">
     <div className="flex justify-between"><h4 className="font-semibold text-brand-navy">Record a received quotation</h4><button type="button" onClick={onClose} className="text-muted">Close</button></div>
     <div className="grid sm:grid-cols-2 gap-3">
       <Field label="RFQ">
@@ -305,7 +305,7 @@ function PurchaseOrderForm({ onClose }: { onClose: () => void }) {
     if (!quotation) return
     create.mutate({ purchaseRequisitionId: prId, supplierId: quotation.supplierId, quotationId, expectedDeliveryDate: expectedDeliveryDate || undefined }, { onSuccess: onClose })
   }
-  return <div className="bg-surface border border-base rounded-xl p-5 space-y-4">
+  return <div className="space-y-4">
     <div className="flex justify-between"><h4 className="font-semibold text-brand-navy">New purchase order</h4><button type="button" onClick={onClose} className="text-muted">Close</button></div>
     <p className="text-xs text-muted">Emergency/sole-source POs with manually-entered lines are not supported from this form yet — only ordering against a selected quotation.</p>
     <div className="grid sm:grid-cols-2 gap-3">
@@ -363,7 +363,7 @@ function GoodsReceiptForm({ onClose }: { onClose: () => void }) {
     if (lines.length === 0) return
     create.mutate({ purchaseOrderId: poId, supplierDeliveryReference: supplierRef || undefined, lines }, { onSuccess: onClose })
   }
-  return <div className="bg-surface border border-base rounded-xl p-5 space-y-4">
+  return <div className="space-y-4">
     <div className="flex justify-between"><h4 className="font-semibold text-brand-navy">New goods receipt</h4><button type="button" onClick={onClose} className="text-muted">Close</button></div>
     <div className="grid sm:grid-cols-2 gap-3">
       <Field label="Purchase order">
@@ -438,7 +438,7 @@ function Suppliers() {
   return <section className="space-y-4">
     <Header title="Suppliers"
       action={<PermissionGuard permission="procurement.manageSuppliers"><button type="button" onClick={() => setShow(v => !v)} className="button-primary"><Plus className="w-4 h-4" /> New supplier</button></PermissionGuard>} />
-    {show && <div className="bg-surface border border-base rounded-xl p-4 grid sm:grid-cols-2 gap-3">
+    {show && <div className="grid sm:grid-cols-2 gap-3">
       <Field label="Supplier code"><input value={supplierCode} onChange={e => setSupplierCode(e.target.value)} className="input" placeholder="SUP-001" /></Field>
       <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} className="input" /></Field>
       <Field label="Contact person"><input value={contactPerson} onChange={e => setContactPerson(e.target.value)} className="input" /></Field>

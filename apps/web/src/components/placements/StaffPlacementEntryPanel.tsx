@@ -144,7 +144,7 @@ export function StaffPlacementEntryPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-surface border border-base rounded-xl p-4 flex items-start gap-3">
+      <div className="pb-4 border-b border-base flex items-start gap-3">
         <div className="w-10 h-10 rounded-lg bg-brand-teal/10 text-brand-teal flex items-center justify-center shrink-0">
           <Building2 className="w-5 h-5" />
         </div>
@@ -168,7 +168,7 @@ export function StaffPlacementEntryPanel() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* ── PANEL 1: SELECT COHORT GRADUATE ─────────────────────────── */}
-        <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
+        <div className="pb-5 border-b border-base space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-heading font-semibold text-sm flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-full bg-brand-navy text-white text-xs font-bold flex items-center justify-center">
@@ -284,7 +284,7 @@ export function StaffPlacementEntryPanel() {
         </div>
 
         {/* ── PANEL 2: ASSIGN UNIVERSITY, FACULTY & COURSE ────────────── */}
-        <div className="bg-surface border border-base rounded-xl p-4 space-y-4">
+        <div className="space-y-4">
           <h4 className="font-heading font-semibold text-sm flex items-center gap-1.5">
             <span className="w-5 h-5 rounded-full bg-brand-navy text-white text-xs font-bold flex items-center justify-center">
               2

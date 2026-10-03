@@ -125,7 +125,7 @@ export function ClaimsVerificationPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="bg-surface border border-base rounded-xl p-4 flex items-start gap-3">
+      <div className="pb-4 border-b border-base flex items-start gap-3">
         <div className="w-10 h-10 rounded-lg bg-brand-amber/10 text-brand-amber flex items-center justify-center shrink-0">
           <ShieldCheck className="w-5 h-5" />
         </div>

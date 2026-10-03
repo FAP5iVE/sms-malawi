@@ -84,7 +84,7 @@ function ActiveLoanCard({ loan }: {
     : 0
 
   return (
-    <div className="bg-surface border border-base rounded-2xl p-5">
+    <div>
       <div className="flex items-center gap-2 mb-4">
         <PiggyBank className="w-4 h-4 text-brand-navy" aria-hidden />
         <h3 className="text-xs font-heading font-semibold text-muted uppercase tracking-wider">Staff Welfare &amp; Savings</h3>
@@ -203,7 +203,7 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Monthly Earnings Structure */}
-        <div className="bg-surface border border-base rounded-2xl p-5">
+        <div>
           <h3 className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-3">Monthly Earnings Structure</h3>
           {salaryLoading && <p className="text-sm text-muted">Loading…</p>}
           {!salaryLoading && !salary && <p className="text-sm text-muted">No salary structure on record yet.</p>}
@@ -280,7 +280,7 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
       </div>
 
       {/* Payslip records */}
-      <div className="bg-surface border border-base rounded-2xl p-5 sm:p-6">
+      <div>
         <h3 className="font-heading font-bold text-body mb-1">My Official Payslip Records</h3>
         <p className="text-sm text-muted mb-4">Instant access to view and print official school payslip advice slips.</p>
         <DataTable

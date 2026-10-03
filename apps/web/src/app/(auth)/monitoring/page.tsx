@@ -63,12 +63,14 @@ export default function MonitoringPage() {
          heading that no other module page has (Students, HR, Finance,
          etc. render their heading directly on the shell's own
          background). Removed so this page matches every other module. */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <div className="flex items-center gap-2">
-          <Activity className="w-6 h-6 text-brand-navy" aria-hidden />
-          <h1 className="font-heading text-2xl font-bold text-brand-navy">Monitoring</h1>
+      <div className="space-y-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <Activity className="w-6 h-6 text-brand-navy" aria-hidden />
+            <h1 className="font-heading text-2xl font-bold text-brand-navy">Monitoring</h1>
+          </div>
+          <p className="text-sm text-muted mt-0.5">Live system health, errors, and outages</p>
         </div>
-        <p className="text-sm text-muted -mt-4">Live system health, errors, and outages</p>
 
         <ModuleSurface>
         <MonitoringKpiStrip summary={summary} isLoading={summaryLoading} />

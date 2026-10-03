@@ -1739,7 +1739,7 @@ function LibraryContent() {
                exist in this system yet, so a BookOpen glyph stands in. */
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {(books as ApiBook[]).length === 0 && (
-                <div className="col-span-full text-center py-12 text-muted text-sm border border-base rounded-xl">No books found.</div>
+                <div className="col-span-full text-center py-12 text-muted text-sm">No books found.</div>
               )}
               {(books as ApiBook[]).map((b) => (
                 <div key={b.id} className="bg-surface border border-base rounded-xl p-4 flex flex-col gap-2">
@@ -1772,7 +1772,7 @@ function LibraryContent() {
               ))}
             </div>
           ) : (
-            <div className="border border-base rounded-xl overflow-hidden">
+            <div className="overflow-hidden">
               {/* Mobile card list — books */}
               <div className="divide-y divide-base md:hidden">
                 {(books as ApiBook[]).map((b) => (
@@ -1936,7 +1936,7 @@ function LibraryContent() {
                 </div>
               )}
 
-              <div className="border border-base rounded-xl overflow-hidden">
+              <div className="overflow-hidden">
                 {/* Mobile card list — borrowings */}
                 <div className="divide-y divide-base md:hidden">
                   {visibleLoans.length === 0 && <div className="text-center py-10 text-muted text-sm">No matching loans.</div>}
@@ -2038,7 +2038,7 @@ function LibraryContent() {
 
           {borrowingsSubTab === 'waivers' && (
             <div className="space-y-4">
-              <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
+              <div className="space-y-3 pb-4 border-b border-base">
                 <h3 className="font-heading font-semibold text-sm text-body">Request a Fine Waiver</h3>
                 <p className="text-xs text-muted">
                   Have an outstanding library fine you&apos;d like reviewed? Submit the fine ID with your reason below.
@@ -2065,7 +2065,7 @@ function LibraryContent() {
               </div>
 
               <PermissionGuard permission="library.waiveFine">
-                <div className="bg-surface border border-base rounded-xl p-4">
+                <div className="pt-1">
                   <h3 className="font-heading font-semibold text-sm text-body mb-3">Pending Fine Waiver Requests</h3>
                   {fineWaivers.length === 0 ? (
                     <p className="text-sm text-muted">No pending waiver requests.</p>
@@ -2140,7 +2140,7 @@ function LibraryContent() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {(digitalResources as ApiDigitalResource[]).length === 0 && (
-              <div className="col-span-full text-center py-16 text-muted text-sm border border-base rounded-xl">
+              <div className="col-span-full text-center py-16 text-muted text-sm">
                 No digital resources match these filters.
               </div>
             )}
@@ -2192,7 +2192,7 @@ function LibraryContent() {
             ))}
 
             {(digitalResources as ApiDigitalResource[]).length === 0 && (
-              <div className="col-span-3 text-center py-16 text-muted text-sm border border-base rounded-xl">
+              <div className="col-span-3 text-center py-16 text-muted text-sm">
                 No digital resources yet.
               </div>
             )}
@@ -2251,7 +2251,7 @@ function LibraryContent() {
               acquire) — the underlying listing/review workflow below is
               unchanged, per instruction. */}
           <PermissionGuard permission="library.recommendResource">
-            <div className="bg-surface border border-base rounded-xl p-5 space-y-4">
+            <div className="space-y-4 pb-5 border-b border-base">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-brand-amber" aria-hidden />
                 <h3 className="font-heading font-semibold text-sm text-body">Recommend a Resource</h3>
@@ -2313,7 +2313,7 @@ function LibraryContent() {
           {/* [R21] Listing/approve/reject workflow unchanged — only the
               row now also shows the requester fields when present. */}
           <PermissionGuard permission="library.approveRecommendation">
-            <div className="bg-surface border border-base rounded-xl p-4">
+            <div className="pt-1">
               <h3 className="font-heading font-semibold text-sm text-body mb-3">Pending Recommendations</h3>
               {recommendations.length === 0 ? (
                 <p className="text-sm text-muted">No pending recommendations.</p>
@@ -2408,7 +2408,7 @@ function LibraryContent() {
                   </div>
                 </div>
 
-                <div className="bg-surface border border-base rounded-xl p-4">
+                <div className="pt-1">
                   <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
                     <div>
                       <h3 className="font-heading font-semibold text-sm text-body">Library Fines &amp; Damages</h3>
@@ -2469,7 +2469,7 @@ function LibraryContent() {
 
                 {/* [R21] "no where to see how many and what books are
                     lost, damaged" — libraryService.getConditionReport(). */}
-                <div className="bg-surface border border-base rounded-xl p-4">
+                <div className="pt-1">
                   <h3 className="font-heading font-semibold text-sm text-body mb-1">Damaged &amp; Lost Books</h3>
                   <p className="text-xs text-muted mb-3">
                     {conditionReport.filter((c) => c.condition === 'DAMAGED').length} damaged · {conditionReport.filter((c) => c.condition === 'LOST').length} lost
@@ -2498,7 +2498,7 @@ function LibraryContent() {
             {/* ── Circulation & Popularity Insights ────────────────────── */}
             {reportsSubTab === 'circulation' && (
               <div className="grid sm:grid-cols-2 gap-4">
-                <div className="bg-surface border border-base rounded-xl p-4">
+                <div className="pt-1">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-heading font-semibold text-sm text-body">Most Borrowed Books</h3>
                     <span className="text-xs bg-base rounded-full px-2 py-0.5 text-muted">Physical Catalog</span>
@@ -2521,7 +2521,7 @@ function LibraryContent() {
                     </div>
                   )}
                 </div>
-                <div className="bg-surface border border-base rounded-xl p-4">
+                <div className="pt-1">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-heading font-semibold text-sm text-body">Most Read (Digital)</h3>
                     <span className="text-xs bg-base rounded-full px-2 py-0.5 text-muted">Digital E-Library</span>
@@ -2549,7 +2549,7 @@ function LibraryContent() {
 
             {/* ── Catalog Distribution ─────────────────────────────────── */}
             {reportsSubTab === 'catalogDist' && (
-              <div className="bg-surface border border-base rounded-xl p-4">
+              <div className="pt-1">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="font-heading font-semibold text-sm text-body">Catalog by Category</h3>
@@ -2616,7 +2616,7 @@ function LibraryContent() {
             {/* ── Clearance & Audit Reports ────────────────────────────── */}
             {reportsSubTab === 'clearance' && (
               <div className="space-y-4">
-                <div className="bg-surface border border-base rounded-xl p-4 flex items-center justify-between gap-3 flex-wrap">
+                <div className="pb-4 border-b border-base flex items-center justify-between gap-3 flex-wrap">
                   <div>
                     <h3 className="font-heading font-semibold text-sm text-body">Student Library Clearance Audit</h3>
                     <p className="text-xs text-muted">Official verification system for examination admit cards and school leaving certificates.</p>
@@ -2626,14 +2626,14 @@ function LibraryContent() {
                   </button>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="bg-surface border border-base rounded-xl p-4">
+                  <div className="pt-1">
                     <h3 className="font-heading font-semibold text-sm text-body">Treasury Settlement Report</h3>
                     <p className="text-xs text-muted mt-1 mb-3">Summary of all fines collected in cash and school fee deductions this term.</p>
                     <button type="button" onClick={downloadTreasuryCsv} className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3 py-2 text-sm text-body hover:bg-page">
                       <Download className="w-3.5 h-3.5" aria-hidden /> Download Treasury Audit (CSV)
                     </button>
                   </div>
-                  <div className="bg-surface border border-base rounded-xl p-4">
+                  <div className="pt-1">
                     <h3 className="font-heading font-semibold text-sm text-body">Overdue Loans Defaulter List</h3>
                     <p className="text-xs text-muted mt-1 mb-3">Print notice letters for students with books overdue past 14 days.</p>
                     <button type="button" onClick={printDefaultersNotice} className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3 py-2 text-sm text-body hover:bg-page">

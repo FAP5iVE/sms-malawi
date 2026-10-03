@@ -128,12 +128,12 @@ export function HRDepartmentsSettings() {
       {/* Department cards */}
       <div className="space-y-4">
         {departments.length === 0 ? (
-          <div className="text-center py-10 text-muted text-sm border border-base rounded-xl">
+          <div className="text-center py-10 text-muted text-sm">
             No departments defined yet. Add one above to get started.
           </div>
         ) : (
           departments.map((dept) => (
-            <div key={dept} className="border border-base rounded-xl p-4">
+            <div key={dept} className="pb-4 border-b border-base last:border-b-0">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-heading font-semibold text-sm text-body flex items-center gap-2">
                   <Building2 className="w-4 h-4 text-brand-teal" aria-hidden />

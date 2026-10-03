@@ -81,7 +81,7 @@ function GradeScaleTable({
   if (rows.length === 0) return null
 
   return (
-    <div className="border border-base rounded-xl overflow-hidden">
+    <div className="overflow-hidden">
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="bg-page border-b border-base">

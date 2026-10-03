@@ -156,7 +156,7 @@ export function NotificationSettings() {
         <p className="text-sm text-muted mt-0.5">Choose which notifications you receive via push and email.</p>
       </div>
 
-      <div className="bg-surface border border-base rounded-xl px-5 divide-y divide-base">
+      <div className="divide-y divide-base">
         {visiblePrefs.map((pref) => (
           <ToggleRow
             key={pref.key}

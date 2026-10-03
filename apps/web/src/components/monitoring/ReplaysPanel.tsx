@@ -41,7 +41,7 @@ export function ReplaysPanel() {
           href={`https://5ivestack-labs.sentry.io/replays/${r.id}/`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-4 bg-surface border border-base rounded-xl p-4 hover:border-brand-teal/40 transition-colors"
+          className="flex items-center gap-4 border-b border-base py-4 hover:bg-page transition-colors"
         >
           <div className="w-10 h-10 rounded-lg bg-brand-navy/10 flex items-center justify-center shrink-0">
             <Video className="w-5 h-5 text-brand-navy" aria-hidden />

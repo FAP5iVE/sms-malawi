@@ -190,14 +190,14 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
       {deleteError && (
         <p role="alert" className="text-xs text-brand-coral">
           {deleteError}
         </p>
       )}
       {announcements.map((a) => (
-        <div key={a.id} className="bg-surface border border-base rounded-2xl p-5">
+        <div key={a.id} className="pb-5 border-b border-base last:border-b-0">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -375,14 +375,14 @@ function PendingApprovalList({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
       {error && (
         <p role="alert" className="text-xs text-brand-coral">
           {error}
         </p>
       )}
       {filtered.map((a) => (
-        <div key={a.id} className="bg-surface border border-base rounded-2xl p-5">
+        <div key={a.id} className="pb-5 border-b border-base last:border-b-0">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h3 className="font-heading font-semibold text-body">{a.title}</h3>
@@ -538,14 +538,14 @@ function DraftsList({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
       {deleteError && (
         <p role="alert" className="text-xs text-brand-coral">
           {deleteError}
         </p>
       )}
       {filtered.map((d) => (
-        <div key={d.id} className="bg-surface border border-base rounded-2xl p-5">
+        <div key={d.id} className="pb-5 border-b border-base last:border-b-0">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h3 className="font-heading font-semibold text-body">{d.title || 'Untitled draft'}</h3>
@@ -727,7 +727,7 @@ function AnnouncementsContent() {
           <>
             {/* Published / Pending Approval / Drafts, badge-counted, plus
                 the search box — same row, matching the reference layout. */}
-            <div className="bg-surface border border-base rounded-2xl p-4 mb-4 flex items-center justify-between gap-3 flex-wrap">
+            <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
               <ModuleTabs<StatusTab>
                 tabs={statusTabs}
                 active={statusTab}

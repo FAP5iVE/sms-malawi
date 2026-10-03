@@ -472,7 +472,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
       {/* ONE consolidated card, well-spaced internal sections separated by
           a single hairline each -- not a stack of separately-bordered
           cards with gaps between them. */}
-      <div className="bg-surface border border-base rounded-xl divide-y divide-base">
+      <div className="divide-y divide-base">
         {/* Bill To */}
         <div className="p-4 sm:p-6">
           <label className="text-xs text-muted mb-1.5 block font-semibold uppercase tracking-wide">
@@ -871,7 +871,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
       {existingInvoice && (
         <div className="space-y-4">
           {existingInvoice.payments && existingInvoice.payments.length > 0 && (
-            <div className="bg-surface border border-base rounded-xl overflow-hidden">
+            <div className="overflow-hidden">
               <div className="px-4 py-3 border-b border-base">
                 <h3 className="font-heading text-sm font-semibold text-body">
                   Payments &amp; Receipts

@@ -48,7 +48,7 @@ function DepartmentsSection() {
   function submit() { if (!code.trim() || !name.trim()) return; create.mutate({ code: code.trim(), name: name.trim(), description: description.trim() || undefined }, { onSuccess: () => { setCode(''); setName(''); setDescription(''); setShow(false) } }) }
   return <section className="space-y-4">
     <Header title="Departments" action={<PermissionGuard permission="location.manage"><button type="button" onClick={() => setShow(v => !v)} className="button-primary"><Plus className="w-4 h-4" /> New department</button></PermissionGuard>} />
-    {show && <div className="bg-surface border border-base rounded-xl p-4 grid sm:grid-cols-3 gap-3">
+    {show && <div className="pb-4 border-b border-base grid sm:grid-cols-3 gap-3">
       <Field label="Code"><input value={code} onChange={e => setCode(e.target.value)} className="input" placeholder="SCIENCE" /></Field>
       <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} className="input" placeholder="Science Department" /></Field>
       <Field label="Description (optional)"><input value={description} onChange={e => setDescription(e.target.value)} className="input" /></Field>
@@ -69,7 +69,7 @@ function BuildingsSection() {
   function submit() { if (!code.trim() || !name.trim()) return; create.mutate({ code: code.trim(), name: name.trim() }, { onSuccess: () => { setCode(''); setName(''); setShow(false) } }) }
   return <section className="space-y-4">
     <Header title="Buildings" action={<PermissionGuard permission="location.manage"><button type="button" onClick={() => setShow(v => !v)} className="button-primary"><Plus className="w-4 h-4" /> New building</button></PermissionGuard>} />
-    {show && <div className="bg-surface border border-base rounded-xl p-4 grid sm:grid-cols-2 gap-3">
+    {show && <div className="pb-4 border-b border-base grid sm:grid-cols-2 gap-3">
       <Field label="Code"><input value={code} onChange={e => setCode(e.target.value)} className="input" placeholder="MAIN" /></Field>
       <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} className="input" placeholder="Main Block" /></Field>
       <div className="sm:col-span-2"><button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create'}</button>
@@ -97,7 +97,7 @@ function RoomsSection() {
   }
   return <section className="space-y-4">
     <Header title="Rooms" action={<PermissionGuard permission="location.manage"><button type="button" onClick={() => setShow(v => !v)} className="button-primary"><Plus className="w-4 h-4" /> New room</button></PermissionGuard>} />
-    {show && <div className="bg-surface border border-base rounded-xl p-4 grid sm:grid-cols-2 gap-3">
+    {show && <div className="pb-4 border-b border-base grid sm:grid-cols-2 gap-3">
       <Field label="Building"><select value={buildingId} onChange={e => setBuildingId(e.target.value)} className="input"><option value="">Select a building…</option>{buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></Field>
       <Field label="Code"><input value={code} onChange={e => setCode(e.target.value)} className="input" placeholder="LAB1" /></Field>
       <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} className="input" placeholder="Science Lab 1" /></Field>

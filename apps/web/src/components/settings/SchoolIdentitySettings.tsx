@@ -579,7 +579,7 @@ export function SchoolIdentitySettings() {
                   </div>
                 </div>
               ) : (
-                <div key={`${m.name}-${i}`} className="flex items-center justify-between border border-base rounded-xl p-3">
+                <div key={`${m.name}-${i}`} className="flex items-center justify-between border-b border-base py-3 last:border-b-0">
                   <div className="flex items-center gap-3">
                     {m.photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element -- Appwrite-hosted photo, not a local Next asset
@@ -610,7 +610,7 @@ export function SchoolIdentitySettings() {
             )
           )}
         </div>
-        <div className="border border-base rounded-xl p-4 space-y-2">
+        <div className="pb-4 border-b border-base space-y-2">
           <div className="grid sm:grid-cols-2 gap-2">
             <input value={newLeader.name} onChange={(e) => setNewLeader((p) => ({ ...p, name: e.target.value }))} placeholder="Full name" className={`${inputCls} min-h-9 text-xs`} />
             <input value={newLeader.title} onChange={(e) => setNewLeader((p) => ({ ...p, title: e.target.value }))} placeholder="Title (e.g. Head Teacher)" className={`${inputCls} min-h-9 text-xs`} />
@@ -657,7 +657,7 @@ export function SchoolIdentitySettings() {
             const entry = data.discoverCards.find((c) => c.cardKey === cardKey)
             const isUploading = uploadingDiscoverKey === cardKey
             return (
-              <div key={cardKey} className="border border-base rounded-xl p-3 flex flex-col items-center gap-2 text-center">
+              <div key={cardKey} className="border-b border-base pb-3 flex flex-col items-center gap-2 text-center">
                 {entry?.photoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element -- local blob: preview or Appwrite-hosted photo, not a local Next asset
                   <img src={entry.photoUrl} alt="" className="w-full aspect-video rounded-lg object-cover border border-base" />

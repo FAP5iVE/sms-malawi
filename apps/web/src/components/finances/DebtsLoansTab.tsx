@@ -74,15 +74,15 @@ export function DebtsLoansTab() {
           Vendor &amp; Company Debts
         </h2>
         {vendorDebts.length === 0 ? (
-          <div className="text-center py-10 text-muted text-sm border border-base rounded-xl">
+          <div className="text-center py-10 text-muted text-sm">
             No outstanding vendor debts — every approved expense is fully paid.
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="divide-y divide-base">
             {vendorDebts.map((e) => (
               <div
                 key={e.id}
-                className="bg-surface border border-base rounded-xl p-4 flex items-center justify-between gap-4 flex-wrap"
+                className="py-3 flex items-center justify-between gap-4 flex-wrap"
               >
                 <div>
                   <p className="font-semibold text-body">{e.description}</p>
@@ -130,15 +130,15 @@ export function DebtsLoansTab() {
           </Link>
         </div>
         {staffLoans.length === 0 ? (
-          <div className="text-center py-10 text-muted text-sm border border-base rounded-xl">
+          <div className="text-center py-10 text-muted text-sm">
             No active staff loans.
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="divide-y divide-base">
             {staffLoans.map((l) => (
               <div
                 key={l.id}
-                className="bg-surface border border-base rounded-xl p-4 flex items-center justify-between gap-4 flex-wrap"
+                className="py-3 flex items-center justify-between gap-4 flex-wrap"
               >
                 <div>
                   <p className="font-semibold text-body">

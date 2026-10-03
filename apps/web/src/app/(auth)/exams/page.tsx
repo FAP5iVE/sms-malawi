@@ -270,7 +270,7 @@ function ExamsPageInner() {
          a page-level background that no other module page adds (Students,
          HR, Finance, etc. render their heading directly on the shell's own
          background). Removed so this page matches every other module. */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="space-y-5">
           {/* R19 — real page heading (was absent, unlike sibling module pages),
              giving assistive tech and E2E heading-role checks a landmark. */}
           <div className="flex items-center justify-between gap-3 flex-wrap">

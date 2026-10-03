@@ -116,7 +116,7 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
       </div>
 
       {/* Table */}
-      <div className="bg-surface border border-base rounded-xl overflow-hidden">
+      <div className="overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-base bg-page">

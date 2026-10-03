@@ -114,7 +114,7 @@ export function PayrollInsightsTab() {
       </div>
 
       {/* Chart */}
-      <div className="bg-surface border border-base rounded-2xl p-5">
+      <div>
         <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-4">
           Gross Payroll, PAYE &amp; Pension, and Net Disbursed
         </p>

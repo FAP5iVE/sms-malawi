@@ -55,7 +55,7 @@ function StaffPicker({
   onSearch: (v: string) => void
 }) {
   return (
-    <div className="bg-surface border border-base rounded-2xl overflow-hidden lg:col-span-1">
+    <div className="overflow-hidden lg:col-span-1 lg:border-r lg:border-base lg:pr-5">
       <div className="p-4 border-b border-base">
         <div className="relative">
           <Search
@@ -282,7 +282,7 @@ function SalaryEditor({ staff }: { staff: ApiStaffProfile }) {
   }
 
   return (
-    <div className="bg-surface border border-base rounded-2xl p-5 sm:p-6 lg:col-span-2 space-y-6">
+    <div className="lg:col-span-2 space-y-6">
       <div className="flex items-center gap-3">
         <div className="w-11 h-11 rounded-xl bg-brand-navy/10 flex items-center justify-center shrink-0">
           <Wallet className="w-5 h-5 text-brand-navy" aria-hidden />
@@ -440,7 +440,7 @@ export function SalaryStructureTab() {
       {selected ? (
         <SalaryEditor key={selected.id} staff={selected} />
       ) : (
-        <div className="lg:col-span-2 bg-surface border border-dashed border-base rounded-2xl flex items-center justify-center p-12 text-sm text-muted text-center">
+        <div className="lg:col-span-2 flex items-center justify-center p-12 text-sm text-muted text-center">
           Select a staff member to view or edit their salary structure and allowances.
         </div>
       )}

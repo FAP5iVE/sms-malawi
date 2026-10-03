@@ -291,7 +291,7 @@ export function ForecastPanel() {
 
       {/* Chart */}
       {report && chartData.length > 0 && (
-        <div className="bg-surface border border-base rounded-2xl p-5">
+        <div>
           <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-4">
             Monthly Cash Flow — Actual (solid) vs Forecast (light)
           </p>

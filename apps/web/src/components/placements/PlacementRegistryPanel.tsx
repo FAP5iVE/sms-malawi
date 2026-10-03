@@ -161,7 +161,7 @@ export function PlacementRegistryPanel() {
           <span className="text-xs text-muted">Showing {filtered.length} of {placements.length} confirmed</span>
         </div>
         {isError ? (
-          <div className="text-sm text-brand-coral py-6 text-center px-4 border border-base rounded-xl">
+          <div className="text-sm text-brand-coral py-6 text-center px-4">
             <p className="font-medium">Could not load the registry.</p>
             <p className="text-xs text-muted mt-1">{(error as Error)?.message ?? 'Unknown error — check your connection and try again.'}</p>
           </div>

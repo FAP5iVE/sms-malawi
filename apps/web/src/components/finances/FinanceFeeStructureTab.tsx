@@ -113,7 +113,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
 
       <div className="grid lg:grid-cols-[320px_1fr] gap-5 items-start">
         {/* ── STUDENT ROSTER DIRECTORY ── */}
-        <div className="bg-surface border border-base rounded-xl overflow-hidden">
+        <div className="overflow-hidden">
           <div className="p-3 border-b border-base space-y-2">
             <div className="flex items-center justify-between">
               <h3 className="font-heading text-sm font-semibold text-body">Student Roster</h3>
@@ -167,12 +167,12 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
 
         {/* ── SELECTED STUDENT DETAIL ── */}
         {!selectedStudent ? (
-          <div className="bg-surface border border-base rounded-xl p-12 text-center text-muted text-sm">
+          <div className="py-12 text-center text-muted text-sm">
             Select a student to view their fee structure.
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="bg-surface border border-base rounded-xl p-4">
+            <div>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -221,7 +221,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
             </div>
 
             {/* Itemized commitments table */}
-            <div className="bg-surface border border-base rounded-xl overflow-hidden">
+            <div className="overflow-hidden">
               <div className="px-4 py-3 border-b border-base">
                 <h3 className="font-heading text-sm font-semibold text-body">
                   Itemized Term Commitments ({fees.length})

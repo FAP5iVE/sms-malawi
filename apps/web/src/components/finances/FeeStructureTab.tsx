@@ -268,7 +268,7 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
       {/* System Configured Payment Modes — these are the channels the
           system itself supports end to end (receipts, allocation, ledger
           posting); not a free-text list an admin edits here. */}
-      <div className="bg-surface border border-base rounded-xl p-4">
+      <div className="pt-2">
         <h3 className="font-heading text-sm font-semibold text-body mb-1">System Configured Payment Modes</h3>
         <p className="text-xs text-muted mb-3">
           These payment options populate the mode-of-payment picker in Invoice Entry &amp; Allocation.

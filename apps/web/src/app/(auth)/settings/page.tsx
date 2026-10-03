@@ -252,7 +252,7 @@ function SettingsPageInner() {
       />
 
       {/* ── Content panel ─────────────────────────────────────────────── */}
-      <div className="bg-surface border border-base rounded-2xl p-6 space-y-6">
+      <div className="space-y-6">
         <SectionContent sectionId={active} />
       </div>
       </ModuleSurface>

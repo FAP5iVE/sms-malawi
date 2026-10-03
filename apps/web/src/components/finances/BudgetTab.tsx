@@ -131,7 +131,7 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
       </div>
 
       {showForm && (
-        <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
+        <div className="space-y-3">
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <label htmlFor="budget-department" className="text-xs text-muted mb-1 block">Department</label>
@@ -218,13 +218,13 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
       {isLoading ? (
         <div className="skeleton h-64 rounded-xl" />
       ) : budget.length === 0 ? (
-        <div className="bg-surface border border-base rounded-xl p-12 text-center text-muted text-sm">
+        <div className="py-12 text-center text-muted text-sm">
           No budget data for {academicYear}
         </div>
       ) : (
         <>
           {/* Chart */}
-          <div className="bg-surface border border-base rounded-xl p-5">
+          <div>
             <p className="font-heading font-semibold text-sm text-brand-navy mb-4">
               Budget vs Actual Spending
             </p>
@@ -232,7 +232,7 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
           </div>
 
           {/* Table */}
-          <div className="bg-surface border border-base rounded-xl overflow-hidden">
+          <div className="overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-base bg-page">

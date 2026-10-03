@@ -18,7 +18,7 @@
  * [DEPENDS ON]: W/lib/api-client.ts, S/types/api.ts
  */
 'use client'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import type {
   ApiAdminReport,
@@ -45,11 +45,11 @@ export function useStudentReport(id: string) {
 }
 
 export function useAuditLog(filters: {
-  entityType?: string; actorUid?: string; action?: string; from?: string; to?: string; page?: number
+  entityType?: string; actorUid?: string; action?: string; from?: string; to?: string; page?: number; limit?: number
 } = {}) {
   const params = new URLSearchParams()
   Object.entries(filters).forEach(([k, v]) => { if (v !== undefined) params.set(k, String(v)) })
-  return useQuery({ queryKey: queryKeys.reports.auditLogs(filters), queryFn: () => apiFetch<ApiAuditLogResponse>(`/reports/audit?${params}`) })
+  return useQuery({ queryKey: queryKeys.reports.auditLogs(filters), queryFn: () => apiFetch<ApiAuditLogResponse>(`/reports/audit?${params}`), placeholderData: keepPreviousData })
 }
 
 export function useSystemHealth() { return useQuery({ queryKey: queryKeys.admin.systemHealth(), queryFn: () => apiFetch('/health'), refetchInterval: 60_000 }) }

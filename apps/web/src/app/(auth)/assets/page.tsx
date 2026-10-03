@@ -294,7 +294,7 @@ function RegisterTab() {
         </PermissionGuard>
       </div>
 
-      <div className="bg-surface border border-base rounded-xl overflow-x-auto">
+      <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-base text-left text-xs text-muted">
@@ -949,7 +949,7 @@ function RoomsTab() {
 
   if (groups?.length === 0) {
     return (
-      <div className="bg-surface border border-base rounded-xl p-8 text-center text-muted text-sm">
+      <div className="p-8 text-center text-muted text-sm">
         Nothing is currently allocated to a room or department.
       </div>
     )
@@ -960,7 +960,7 @@ function RoomsTab() {
       {groups?.map((g) => (
         <div
           key={`${g.assignedToType}:${g.departmentOrRoom}`}
-          className="bg-surface border border-base rounded-xl p-5"
+          className="pb-5 border-b border-base"
         >
           <div className="flex items-center gap-2 mb-3">
             <DoorOpen className="w-4 h-4 text-brand-navy" />
@@ -996,7 +996,7 @@ function MyAssignedTab() {
   const { data: assignments, isLoading } = useMyAssignedAssets()
 
   return (
-    <div className="bg-surface border border-base rounded-xl overflow-x-auto">
+    <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-base text-left text-xs text-muted">
@@ -1066,7 +1066,7 @@ function RequestsTab() {
   return (
     <div className="space-y-6">
       <PermissionGuard permission="assets.requestItem">
-        <div className="bg-surface border border-base rounded-xl p-5">
+        <div className="pb-2">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-heading font-semibold text-brand-navy text-sm">My Requests</h2>
             <button
@@ -1111,7 +1111,7 @@ function RequestsTab() {
       </PermissionGuard>
 
       <PermissionGuard permission="assets.approveRequest">
-        <div className="bg-surface border border-base rounded-xl p-5">
+        <div className="pb-2">
           <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
             <h2 className="font-heading font-semibold text-brand-navy text-sm">Pending Review</h2>
             <input
@@ -1165,7 +1165,7 @@ function AdvancesPanel() {
   const writeOff = useWriteOffAdvance()
 
   return (
-    <div className="bg-surface border border-base rounded-xl p-5">
+    <div className="pb-2">
       <h2 className="font-heading font-semibold text-brand-navy text-sm mb-3">
         Procurement Advances
       </h2>

@@ -77,7 +77,7 @@ export function HolidaysManager() {
   }
 
   return (
-    <div className="bg-surface border border-base rounded-2xl p-5 space-y-5">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CalendarDays className="w-4 h-4 text-brand-teal" />
@@ -93,7 +93,7 @@ export function HolidaysManager() {
       </div>
 
       {/* Add holiday form */}
-      <div className="border border-base rounded-xl p-4 space-y-3">
+      <div className="space-y-3 pb-5 border-b border-base">
         <p className="text-xs font-heading font-semibold text-muted uppercase">Add Holiday</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <input
@@ -137,7 +137,7 @@ export function HolidaysManager() {
           {[1,2,3].map((i) => <div key={i} className="h-10 bg-base rounded-xl animate-pulse" />)}
         </div>
       ) : (
-        <div className="divide-y divide-base border border-base rounded-xl overflow-hidden">
+        <div className="divide-y divide-base overflow-hidden">
           {holidays.length === 0 ? (
             <p className="px-4 py-6 text-sm text-muted text-center">No holidays for {year}. Add them above.</p>
           ) : (

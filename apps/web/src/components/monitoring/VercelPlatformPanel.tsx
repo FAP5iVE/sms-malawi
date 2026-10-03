@@ -58,7 +58,7 @@ export function VercelPlatformPanel() {
 
   if (summary && !summary.configured) {
     return (
-      <div className="bg-surface border border-base rounded-xl p-6 text-center space-y-2">
+      <div className="p-6 text-center space-y-2">
         <p className="font-semibold text-brand-navy">Vercel monitoring is not set up yet</p>
         <p className="text-sm text-muted">
           Set <code className="text-xs">VERCEL_API_TOKEN</code> and <code className="text-xs">VERCEL_PROJECT_ID</code> in

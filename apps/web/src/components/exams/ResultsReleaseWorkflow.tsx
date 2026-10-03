@@ -201,7 +201,7 @@ function ExamRow({ exam, onAction, loading, canApprove, canRelease, onShowFeeBlo
   const showReleaseBtn = canRelease && exam.status === 'RESULTS_APPROVED'
 
   return (
-    <div className="bg-surface border border-base rounded-xl p-5 space-y-4">
+    <div className="pb-5 border-b border-base last:border-b-0 space-y-4">
       {/* Header row */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -447,7 +447,7 @@ export function ResultsReleaseWorkflow({
       )}
 
       {releaseNote && (
-        <div role="status" className="border border-base rounded-xl px-4 py-3 text-sm text-brand-teal flex items-center gap-2">
+        <div role="status" className="py-2 text-sm text-brand-teal flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           {releaseNote}
         </div>
@@ -496,7 +496,7 @@ export function ResultsReleaseWorkflow({
           className="space-y-4"
         >
           {filteredExams.length === 0 ? (
-            <div className="text-center py-16 text-muted text-sm border border-base rounded-xl">
+            <div className="text-center py-16 text-muted text-sm">
               No exams match this filter.
             </div>
           ) : (

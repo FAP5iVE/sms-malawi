@@ -86,7 +86,7 @@ export function LibraryFinesTab() {
       {fines.length === 0 ? (
         <p className="text-center text-muted text-sm py-8">No library fines recorded.</p>
       ) : (
-        <div className="divide-y divide-base border border-base rounded-xl overflow-hidden bg-surface">
+        <div className="divide-y divide-base overflow-hidden">
           {fines.map((fine) => (
             <div key={fine.id} className="flex items-center gap-4 px-5 py-3">
               <div className="flex-1 min-w-0">

@@ -72,7 +72,7 @@ export function PayrollWorkspace({ defaultTab }: PayrollWorkspaceProps) {
 
   if (tabs.length === 0) {
     return (
-      <div className="text-center py-16 px-6 text-sm border border-dashed border-base rounded-xl">
+      <div className="text-center py-16 px-6 text-sm">
         <p className="text-body font-heading font-semibold mb-1">No payroll access on this account</p>
         {/* [Reverted, user-requested] admin now holds hr.viewOwnPayslips
             (see S/types/permissions.ts) — every non-student role holds at

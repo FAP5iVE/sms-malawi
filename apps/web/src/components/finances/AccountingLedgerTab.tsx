@@ -98,7 +98,7 @@ function IncomeStatementPanel() {
 
           <div className="grid md:grid-cols-2 gap-5">
             {/* Revenue */}
-            <div className="border border-base rounded-xl overflow-hidden">
+            <div className="overflow-hidden">
               <div className="bg-emerald-50 border-b border-emerald-100 px-4 py-3 flex items-center justify-between">
                 <span className="font-heading font-semibold text-sm text-emerald-700 flex items-center gap-2">
                   <TrendingUp className="w-4 h-4" /> Revenue
@@ -116,7 +116,7 @@ function IncomeStatementPanel() {
             </div>
 
             {/* Expenses */}
-            <div className="border border-base rounded-xl overflow-hidden">
+            <div className="overflow-hidden">
               <div className="bg-brand-coral/8 border-b border-brand-coral/20 px-4 py-3 flex items-center justify-between">
                 <span className="font-heading font-semibold text-sm text-brand-coral flex items-center gap-2">
                   <TrendingDown className="w-4 h-4" /> Expenses
@@ -164,7 +164,7 @@ function TrialBalancePanel() {
   if (loading) return <div className="text-center py-12 text-muted text-sm">Loading trial balance…</div>
 
   return (
-    <div className="border border-base rounded-xl overflow-hidden">
+    <div className="overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
@@ -268,7 +268,7 @@ function AccountLedgerPanel() {
       </div>
 
       {lines.length > 0 && (
-        <div className="border border-base rounded-xl overflow-hidden">
+        <div className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>

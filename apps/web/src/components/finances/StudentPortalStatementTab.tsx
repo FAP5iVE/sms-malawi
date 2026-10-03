@@ -99,7 +99,7 @@ export function StudentPortalStatementTab({
       </div>
 
       {/* Verified profile + current account state */}
-      <div className="bg-surface border border-base rounded-xl p-4">
+      <div>
         {isLoading ? (
           <div className="h-16 rounded-lg bg-page animate-pulse" />
         ) : !me ? (
@@ -145,7 +145,7 @@ export function StudentPortalStatementTab({
       </div>
 
       {/* Approved Standard Term Fee Schedule */}
-      <div className="bg-surface border border-base rounded-xl overflow-hidden">
+      <div className="overflow-hidden">
         <div className="px-4 py-3 border-b border-base flex items-center justify-between">
           <h3 className="font-heading text-sm font-semibold text-body">
             Approved Standard Term Fee Schedule
@@ -213,7 +213,7 @@ export function StudentPortalStatementTab({
       </div>
 
       {/* Student Invoices & Receipts */}
-      <div className="bg-surface border border-base rounded-xl overflow-hidden">
+      <div className="overflow-hidden">
         <div className="px-4 py-3 border-b border-base">
           <h3 className="font-heading text-sm font-semibold text-body">
             Student Invoices &amp; Receipts ({payments.length} document

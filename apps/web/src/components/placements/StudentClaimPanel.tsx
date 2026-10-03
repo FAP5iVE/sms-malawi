@@ -108,7 +108,7 @@ export function StudentClaimPanel() {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {/* ── SUBMISSION FORM ──────────────────────────────────────────── */}
-      <div className="bg-surface border border-base rounded-xl p-4 space-y-4">
+      <div className="pb-5 border-b border-base space-y-4">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-brand-navy" />
           <h3 className="font-heading font-semibold text-sm">Placement Claim Submission Form</h3>
@@ -246,7 +246,7 @@ export function StudentClaimPanel() {
       </div>
 
       {/* ── CLAIMS TRACKER ───────────────────────────────────────────── */}
-      <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-brand-navy" />
@@ -258,7 +258,7 @@ export function StudentClaimPanel() {
         {!record ? (
           <p className="text-sm text-muted py-6 text-center">You have not submitted a placement claim yet.</p>
         ) : (
-          <div className="border border-base rounded-xl p-3 space-y-2">
+          <div className="border-b border-base pb-3 last:border-b-0 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <PlacementStatusBadge status={record.status} />
               {record.status === 'CONFIRMED' && <CheckCircle2 className="w-4 h-4 text-brand-teal" />}

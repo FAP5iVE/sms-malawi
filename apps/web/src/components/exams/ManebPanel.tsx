@@ -163,7 +163,7 @@ export function ManebPanel({ academicYear }: Props) {
         </div>
       </div>
 
-      <div className="border border-base rounded-xl px-4 py-3 text-sm text-brand-amber flex items-start gap-2">
+      <div className="py-1 text-sm text-brand-amber flex items-start gap-2">
         <GraduationCap className="w-4 h-4 mt-0.5 shrink-0" />
         <span>
           {examType === 'MSCE' ? (
@@ -187,7 +187,7 @@ export function ManebPanel({ academicYear }: Props) {
       </div>
 
       {showIndividual && canManage && (
-        <div className="border border-base rounded-xl p-4 space-y-3">
+        <div className="pb-4 border-b border-base space-y-3">
           <p className="text-sm font-heading font-semibold">Individual {examType} entry — {academicYear}</p>
           <p className="text-xs text-muted">
             For a single candidate. Grades are entered per subject; leave a subject blank if the candidate did not
@@ -258,7 +258,7 @@ export function ManebPanel({ academicYear }: Props) {
       )}
 
       {showBulk && canManage && (
-        <div className="border border-base rounded-xl p-4 space-y-3">
+        <div className="pb-4 border-b border-base space-y-3">
           <p className="text-sm font-heading font-semibold">Bulk {examType} entry — {academicYear}</p>
           <p className="text-xs text-muted">
             Add one row per candidate. Grades are entered per subject; leave a subject blank if the candidate did not

@@ -415,7 +415,7 @@ export function BulkInvoiceGenerator() {
 
       <div className="grid lg:grid-cols-3 gap-4 items-start">
         {/* 1. Cohort & target selection */}
-        <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
+        <div className="space-y-3">
           <h3 className="font-heading text-xs font-semibold uppercase tracking-wide text-muted flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5" /> Cohort &amp; Target Selection
           </h3>
@@ -457,7 +457,7 @@ export function BulkInvoiceGenerator() {
         </div>
 
         {/* 2. Accounting rules & fee automation */}
-        <div className="bg-surface border border-base rounded-xl p-4 space-y-2.5">
+        <div className="space-y-2.5">
           <h3 className="font-heading text-xs font-semibold uppercase tracking-wide text-muted flex items-center gap-1.5">
             <Wallet2 className="w-3.5 h-3.5" /> Accounting Rules &amp; Fee Automation
           </h3>
@@ -541,7 +541,7 @@ export function BulkInvoiceGenerator() {
               </button>
             </div>
           </div>
-          <div className="border border-base rounded-xl overflow-hidden">
+          <div className="overflow-hidden">
             {[...eligibleRows, ...nonEligibleRows].map((row) => (
               <RosterRow
                 key={row.studentId}
@@ -595,7 +595,7 @@ export function BulkInvoiceGenerator() {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            className="border border-base rounded-xl overflow-hidden"
+            className="overflow-hidden"
           >
             {filteredFinalStudents.length === 0 ? (
               <div className="text-center py-12 text-muted text-sm">

@@ -43,7 +43,7 @@ export function InventoryOperationsTab() {
         </PermissionGuard>
       </div>
 
-      <div className="bg-surface border border-base rounded-xl overflow-hidden">
+      <div className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-base bg-page">

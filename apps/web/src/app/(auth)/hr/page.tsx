@@ -67,7 +67,7 @@ import {
   useStaffDirectory,
   useLeaveRequests,
   useApplyForLeave,
-  useContractAlerts,
+  useUpcomingContractExpiries,
   useReviewLeave,
   useRequestLoan,
   useLoans,
@@ -219,13 +219,20 @@ function HRContent() {
     )
   }
   const [alertDays, setAlertDays]                              = useState(60)
-  const { data: contracts = [] }                               = useContractAlerts(alertDays)
+  // Captured once on mount (a lazy initializer is allowed to be impure) so the
+  // render stays pure — see react-hooks/purity. Only used for the "days left" label.
+  const [nowMs] = useState(() => Date.now())
+  // [FIX] Was useContractAlerts(alertDays) — an exact-day match (today + N) that
+  // is empty on almost every visit. The HR dashboard's stat card/widget use the
+  // range query (every contract expiring within the next N days); this tab and
+  // its badge now read the same source so they always agree.
+  const { data: contracts = [], isLoading: contractsLoading, isError: contractsError } = useUpcomingContractExpiries(alertDays)
   const reviewLeave = useReviewLeave()
 
   const [conflictPanel, setConflictPanel] = useState<{ staffName: string; result: ConflictCheckResult } | null>(null)
 
   const pendingLeave     = (pendingLeaveForBadge as ApiLeaveRequest[]).length
-  const expiringContracts = (contracts   as ApiContractAlert[]).length
+  const expiringContracts = (contracts as ApiContractAlert[]).length
 
   function handleReview(req: ApiLeaveRequest, status: 'APPROVED' | 'REJECTED') {
     reviewLeave.mutate(
@@ -410,7 +417,7 @@ function HRContent() {
             // member instead of a card, so more of the directory fits on
             // screen at once. Same navigation target and status styling
             // as the grid view; only the layout differs.
-            <div className="bg-surface border border-base rounded-xl divide-y divide-base overflow-hidden">
+            <div className="divide-y divide-base overflow-hidden">
               {(staff as ApiStaffProfile[]).map((s) => (
                 <Link
                   key={s.id}
@@ -462,7 +469,7 @@ function HRContent() {
             </div>
 
             {showLeaveForm && (
-              <div className="border border-base rounded-xl p-4 mb-4 space-y-3 bg-surface">
+              <div className="mb-4 pb-4 space-y-3 border-b border-base">
                 <div className="grid sm:grid-cols-3 gap-3">
                   <div>
                     <label htmlFor="leave-type" className="text-xs text-muted mb-1 block">Leave type</label>
@@ -514,7 +521,7 @@ function HRContent() {
             ) : (
               <div className="space-y-2">
                 {(myLeaveRequests as ApiLeaveRequest[]).map((req) => (
-                  <div key={req.id} className="flex items-center justify-between border border-base rounded-lg px-4 py-2.5 bg-surface">
+                  <div key={req.id} className="flex items-center justify-between border-b border-base py-2.5 last:border-b-0">
                     <div>
                       <p className="text-sm font-medium text-body">{req.leaveType} · {req.days} day(s)</p>
                       <p className="text-xs text-muted">{new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()}</p>
@@ -549,14 +556,14 @@ function HRContent() {
             </select>
           </div>
           {(leaveRequests as ApiLeaveRequest[]).length === 0 && (
-            <div className="text-center py-16 text-muted text-sm border border-base rounded-xl">
+            <div className="text-center py-16 text-muted text-sm">
               No {leaveStatusFilter ? leaveStatusFilter.toLowerCase() : ''} leave requests.
             </div>
           )}
           {(leaveRequests as ApiLeaveRequest[]).map((req) => (
             <div
               key={req.id}
-              className="bg-surface border border-base rounded-xl p-5 flex items-center justify-between gap-4 flex-wrap"
+              className="border-b border-base pb-4 last:border-b-0 flex items-center justify-between gap-4 flex-wrap"
             >
               <div>
                 <p className="font-semibold text-body">
@@ -663,28 +670,46 @@ function HRContent() {
             </select>
           </div>
 
-          {(contracts as ApiContractAlert[]).length === 0 && (
-            <div className="text-center py-16 text-muted text-sm border border-base rounded-xl">
+          {contractsLoading && (
+            <div className="space-y-2" role="status" aria-label="Loading contract alerts">
+              {[1, 2].map((i) => <div key={i} className="h-14 rounded-xl bg-page animate-pulse" />)}
+            </div>
+          )}
+
+          {contractsError && !contractsLoading && (
+            <p role="alert" className="text-center py-10 text-brand-coral text-sm">
+              Could not load contract alerts. Please refresh and try again.
+            </p>
+          )}
+
+          {!contractsLoading && !contractsError && (contracts as ApiContractAlert[]).length === 0 && (
+            <div className="text-center py-16 text-muted text-sm">
               No contracts expiring in the next {alertDays} days.
             </div>
           )}
-          {(contracts as ApiContractAlert[]).map((s) => (
-            <div
-              key={s.id}
-              className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3"
-            >
-              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
-              <div>
-                <p className="font-semibold text-amber-900">
-                  {s.firstName} {s.lastName} — {s.department}
-                </p>
-                <p className="text-sm text-amber-700">
-                  Contract expires:{' '}
-                  {new Date(s.contractExpiry).toLocaleDateString('en-MW')}
-                </p>
+          {!contractsLoading && !contractsError && (contracts as ApiContractAlert[]).map((s) => {
+            const daysLeft = Math.max(0, Math.ceil((new Date(s.contractExpiry).getTime() - nowMs) / 86_400_000))
+            return (
+              <div
+                key={s.id}
+                className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3"
+              >
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-amber-900">
+                    {s.firstName} {s.lastName} — {s.department}
+                  </p>
+                  <p className="text-sm text-amber-700">
+                    Contract expires:{' '}
+                    {new Date(s.contractExpiry).toLocaleDateString('en-MW')}
+                  </p>
+                </div>
+                <span className="shrink-0 text-xs font-semibold text-amber-800">
+                  {daysLeft === 0 ? 'Today' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`}
+                </span>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
       </ModuleSurface>
@@ -765,7 +790,7 @@ function LoansTab({
     <div className="space-y-6">
       {/* Request a Loan */}
       {canApplyLoan && (
-        <div className="bg-surface border border-base rounded-xl p-5">
+        <div className="pb-5 border-b border-base">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Banknote className="w-4 h-4 text-brand-teal" />
@@ -850,7 +875,7 @@ function LoansTab({
           {myLoansLoading ? (
             <div className="h-16 rounded-xl bg-surface animate-pulse" />
           ) : (myLoans as ApiStaffLoan[]).length === 0 ? (
-            <div className="text-center py-10 text-muted text-sm border border-base rounded-xl">
+            <div className="text-center py-10 text-muted text-sm">
               You have no loan requests on record.
             </div>
           ) : (
@@ -858,7 +883,7 @@ function LoansTab({
               {(myLoans as ApiStaffLoan[]).map((loan) => (
                 <div
                   key={loan.id}
-                  className="bg-surface border border-base rounded-xl p-4 flex items-center justify-between gap-4 flex-wrap"
+                  className="border-b border-base pb-4 last:border-b-0 flex items-center justify-between gap-4 flex-wrap"
                 >
                   <div>
                     <p className="text-sm font-medium text-body">
@@ -906,13 +931,13 @@ function LoansTab({
               {[1, 2].map((i) => <div key={i} className="h-20 rounded-xl bg-surface animate-pulse" />)}
             </div>
           ) : (loans as ApiStaffLoan[]).length === 0 ? (
-            <div className="text-center py-16 text-muted text-sm border border-base rounded-xl">
+            <div className="text-center py-16 text-muted text-sm">
               No loan requests.
             </div>
           ) : (
             <div className="space-y-3">
               {(loans as ApiStaffLoan[]).map((loan) => (
-                <div key={loan.id} className="bg-surface border border-base rounded-xl p-4">
+                <div key={loan.id} className="border-b border-base pb-4 last:border-b-0">
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div>
                       <p className="font-semibold text-body">
@@ -994,7 +1019,7 @@ function LoansTab({
       )}
 
       {!canApplyLoan && !canManage && (
-        <div className="text-center py-16 text-muted text-sm border border-base rounded-xl">
+        <div className="text-center py-16 text-muted text-sm">
           You do not have access to loan management.
         </div>
       )}

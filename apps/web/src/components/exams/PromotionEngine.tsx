@@ -432,7 +432,7 @@ export function PromotionEngine() {
                 key={s.studentId}
                 variants={itemVariants}
                 transition={itemTransition}
-                className="bg-surface border border-base rounded-xl px-4 py-3 space-y-1.5"
+                className="border-b border-base py-3 last:border-b-0 space-y-1.5"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -454,7 +454,7 @@ export function PromotionEngine() {
       )}
 
       {preview && filteredStudents.length === 0 && (
-        <div className="text-center py-16 text-muted text-sm border border-base rounded-xl">
+        <div className="text-center py-16 text-muted text-sm">
           No students match the current filter.
         </div>
       )}

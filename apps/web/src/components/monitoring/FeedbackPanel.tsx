@@ -38,7 +38,7 @@ export function FeedbackPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-surface border border-base rounded-xl p-4 space-y-3">
+      <div className="pb-4 border-b border-base space-y-3">
         <h2 className="font-heading font-semibold text-sm">Report a problem</h2>
         <textarea
           value={message}
