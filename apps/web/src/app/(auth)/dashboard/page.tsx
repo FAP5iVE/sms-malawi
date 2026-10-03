@@ -20,8 +20,8 @@
  * [DEPENDS ON]: W/components/dashboards/* (this phase's rewrites)
  */
 
-import { Hand } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import { WelcomeHeader } from '@/components/shared/WelcomeHeader'
 import { AdminDashboard } from '@/components/dashboards/AdminDashboard'
 import { HighRankDashboard } from '@/components/dashboards/HighRankDashboard'
 import { FinanceDashboard } from '@/components/dashboards/FinanceDashboard'
@@ -61,21 +61,16 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-brand-navy flex items-center gap-2">
-          {greetingForHour(new Date().getHours())}, {displayName}
-          <Hand className="w-5 h-5 text-brand-amber" aria-hidden />
-        </h1>
-        <p className="text-muted text-sm mt-0.5">
-          {/* [PRODUCTION FIX 2026-07-28] subtitle (a real per-staff job
-              title, e.g. "Head Teacher") is null for many roles — the old
-              `{subtitle} · {role}` concatenation then rendered as a bare
-              "· exam officer" with nothing before the bullet, looking like
-              a leftover hardcoded fragment. Only show the bullet+role when
-              there's an actual subtitle to pair it with. */}
-          {subtitle ? <>{subtitle} · {role?.replace('_', ' ')}</> : role?.replace('_', ' ')}
-        </p>
-      </div>
+      {/* [PRODUCTION FIX 2026-07-28] subtitle (a real per-staff job
+          title, e.g. "Head Teacher") is null for many roles, so the old
+          `{subtitle} · {role}` concatenation rendered as a bare
+          "· exam officer" with nothing before the bullet. Only show the
+          bullet+role when there is an actual subtitle to pair it with. */}
+      <WelcomeHeader
+        greeting={greetingForHour(new Date().getHours())}
+        name={displayName}
+        detail={subtitle ? <>{subtitle} · {role?.replace('_', ' ')}</> : role?.replace('_', ' ')}
+      />
 
       {role === 'admin' && <AdminDashboard />}
       {role === 'high_rank' && <HighRankDashboard />}
