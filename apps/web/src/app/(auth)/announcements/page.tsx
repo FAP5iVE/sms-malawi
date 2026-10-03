@@ -675,9 +675,9 @@ function AnnouncementsContent() {
   ]
 
   return (
-    <div className="p-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="mb-6">
+      <div>
         <div className="flex items-center gap-2">
           <Megaphone className="w-5 h-5 text-brand-teal" aria-hidden="true" />
           <h1 className="font-heading font-bold text-xl text-brand-navy">Announcements</h1>

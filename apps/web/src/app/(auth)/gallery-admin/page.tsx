@@ -215,8 +215,8 @@ function GalleryContent() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <Images className="w-5 h-5 text-brand-teal" aria-hidden="true" />
           <h1 className="font-heading font-bold text-xl text-brand-navy">Gallery</h1>
