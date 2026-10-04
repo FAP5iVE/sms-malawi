@@ -72,13 +72,13 @@ function TeamSnapshot({ entries }: { entries: TeamLeaveEntry[] }) {
   }
 
   const LEAVE_COLORS: Record<string, string> = {
-    ANNUAL:           'bg-blue-100 text-blue-700',
-    SICK:             'bg-brand-coral/10 text-brand-coral',
-    MATERNITY:        'bg-purple-100 text-purple-700',
-    PATERNITY:        'bg-purple-100 text-purple-700',
-    STUDY:            'bg-emerald-100 text-emerald-700',
-    EMERGENCY:        'bg-brand-amber/15 text-brand-amber',
-    UNPAID:           'bg-base text-muted',
+    ANNUAL:           'text-status-info',
+    SICK:             'text-status-danger',
+    MATERNITY:        'text-status-accent',
+    PATERNITY:        'text-status-accent',
+    STUDY:            'text-status-success',
+    EMERGENCY:        'text-status-warning',
+    UNPAID:           'text-muted',
   }
 
   return (
@@ -97,8 +97,8 @@ function TeamSnapshot({ entries }: { entries: TeamLeaveEntry[] }) {
           </div>
           <span
             className={`
-              shrink-0 text-xs font-heading font-semibold px-2 py-1 rounded-full
-              ${LEAVE_COLORS[e.leaveType] ?? 'bg-base text-muted'}
+              shrink-0 text-xs font-heading font-semibold
+              ${LEAVE_COLORS[e.leaveType] ?? 'text-muted'}
             `}
           >
             {e.leaveType}

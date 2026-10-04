@@ -79,7 +79,7 @@ export function ApprovalDecisionDialog({ target, busy, error, onClose, onConfirm
   const confirmClass =
     action === 'approve' ? ACTION_BUTTON_CLASS.approve
     : action === 'reject' ? 'bg-red-600 text-white hover:bg-red-700'
-    : 'bg-brand-navy text-white hover:opacity-90'
+    : 'bg-brand-deep text-white hover:opacity-90'
 
   return (
     <Dialog open={target !== null} onOpenChange={(open) => { if (!open && !busy) onClose() }}>

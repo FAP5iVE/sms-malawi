@@ -78,7 +78,7 @@ export function ApprovalCard({ item, selectable, selected, onToggleSelect, onOpe
               {item.requester.role && !item.isMine ? ` (${humanize(item.requester.role)})` : ''}
             </span>
             {item.amount !== null ? (
-              <span className="rounded-full bg-page px-2.5 py-0.5 text-xs font-semibold text-body">
+              <span className="text-xs font-semibold text-body">
                 {formatMwk(item.amount)}
               </span>
             ) : null}

@@ -137,7 +137,7 @@ export function ManebPanel({ academicYear }: Props) {
           {(['JCE', 'MSCE'] as const).map((t) => (
             <button key={t} onClick={() => setExamType(t)}
               className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-colors ${
-                examType === t ? 'bg-brand-navy text-white border-brand-navy' : 'border-base text-muted hover:border-brand-navy'
+                examType === t ? 'bg-brand-deep text-white border-brand-navy' : 'border-base text-muted hover:border-brand-navy'
               }`}>
               {t === 'JCE' ? 'JCE — Form 2' : 'MSCE — Form 4'}
             </button>
@@ -152,7 +152,7 @@ export function ManebPanel({ academicYear }: Props) {
           )}
           {canManage && (
             <button onClick={() => setShowBulk((v) => !v)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-navy text-white text-sm font-semibold">
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-deep text-white text-sm font-semibold">
               <Upload className="w-4 h-4" /> {showBulk ? 'Close bulk entry' : 'Bulk entry'}
             </button>
           )}
@@ -250,7 +250,7 @@ export function ManebPanel({ academicYear }: Props) {
               )
             }}
             disabled={createRecord.isPending}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-navy text-white text-sm font-semibold disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-deep text-white text-sm font-semibold disabled:opacity-60"
           >
             {createRecord.isPending ? 'Saving…' : 'Save Record'}
           </button>
@@ -306,7 +306,7 @@ export function ManebPanel({ academicYear }: Props) {
               <Plus className="w-4 h-4" /> Add candidate
             </button>
             <button onClick={submit} disabled={bulkCreate.isPending}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-navy text-white text-sm font-semibold disabled:opacity-60 ml-auto">
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-deep text-white text-sm font-semibold disabled:opacity-60 ml-auto">
               {bulkCreate.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               Import {rows.length} candidate{rows.length === 1 ? '' : 's'}
             </button>

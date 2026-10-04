@@ -260,7 +260,7 @@ export function DesktopCalendarView({
               {formatDisplayDate(selectedDateKey)}
             </h3>
           </div>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-page text-muted border border-base shrink-0">
+          <span className="text-xs font-semibold text-muted shrink-0">
             {selectedDayEvents.length} {selectedDayEvents.length === 1 ? 'event' : 'events'}
           </span>
         </div>
@@ -401,7 +401,7 @@ export function DesktopCalendarView({
                   aria-pressed={viewMode === mode}
                   className={`px-3 py-1 min-h-8 rounded-lg text-xs font-heading font-medium capitalize transition-colors ${
                     viewMode === mode
-                      ? 'bg-brand-navy text-white font-semibold shadow-sm'
+                      ? 'bg-brand-deep text-white font-semibold shadow-sm'
                       : 'text-muted hover:text-body'
                   }`}
                 >

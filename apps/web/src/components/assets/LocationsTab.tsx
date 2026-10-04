@@ -52,12 +52,12 @@ function DepartmentsSection() {
       <Field label="Code"><input value={code} onChange={e => setCode(e.target.value)} className="input" placeholder="SCIENCE" /></Field>
       <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} className="input" placeholder="Science Department" /></Field>
       <Field label="Description (optional)"><input value={description} onChange={e => setDescription(e.target.value)} className="input" /></Field>
-      <div className="sm:col-span-3"><button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create'}</button>
+      <div className="sm:col-span-3"><button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create'}</button>
         {create.error && <p className="text-sm text-brand-coral mt-2">{create.error instanceof Error ? create.error.message : 'Could not create department.'}</p>}</div>
     </div>}
     {isLoading ? <Loading /> : <DataTable headers={['Code', 'Name', 'Status']}>{data.map(d => <tr key={d.id} className="border-b border-base last:border-0">
       <td className="px-4 py-3 font-mono text-xs">{d.code}</td><td className="px-4 py-3 font-medium">{d.name}</td>
-      <td className="px-4 py-3"><span className="text-xs rounded px-2 py-1 bg-base">{d.isActive ? 'Active' : 'Inactive'}</span></td>
+      <td className="px-4 py-3"><span className="text-xs">{d.isActive ? 'Active' : 'Inactive'}</span></td>
     </tr>)}</DataTable>}
   </section>
 }
@@ -72,13 +72,13 @@ function BuildingsSection() {
     {show && <div className="pb-4 border-b border-base grid sm:grid-cols-2 gap-3">
       <Field label="Code"><input value={code} onChange={e => setCode(e.target.value)} className="input" placeholder="MAIN" /></Field>
       <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} className="input" placeholder="Main Block" /></Field>
-      <div className="sm:col-span-2"><button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create'}</button>
+      <div className="sm:col-span-2"><button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create'}</button>
         {create.error && <p className="text-sm text-brand-coral mt-2">{create.error instanceof Error ? create.error.message : 'Could not create building.'}</p>}</div>
     </div>}
     {isLoading ? <Loading /> : <DataTable headers={['Code', 'Name', 'Rooms', 'Status']}>{data.map(b => <tr key={b.id} className="border-b border-base last:border-0">
       <td className="px-4 py-3 font-mono text-xs">{b.code}</td><td className="px-4 py-3 font-medium">{b.name}</td>
       <td className="px-4 py-3 text-right">{b._count?.rooms ?? 0}</td>
-      <td className="px-4 py-3"><span className="text-xs rounded px-2 py-1 bg-base">{b.isActive ? 'Active' : 'Inactive'}</span></td>
+      <td className="px-4 py-3"><span className="text-xs">{b.isActive ? 'Active' : 'Inactive'}</span></td>
     </tr>)}</DataTable>}
   </section>
 }
@@ -103,7 +103,7 @@ function RoomsSection() {
       <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} className="input" placeholder="Science Lab 1" /></Field>
       <Field label="Room type"><input value={roomType} onChange={e => setRoomType(e.target.value)} className="input" placeholder="Laboratory" /></Field>
       <Field label="Department (optional)"><select value={departmentId} onChange={e => setDepartmentId(e.target.value)} className="input"><option value="">None</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
-      <div className="sm:col-span-2"><button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create'}</button>
+      <div className="sm:col-span-2"><button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create'}</button>
         {create.error && <p className="text-sm text-brand-coral mt-2">{create.error instanceof Error ? create.error.message : 'Could not create room.'}</p>}</div>
     </div>}
     {isLoading ? <Loading /> : <DataTable headers={['Room', 'Building', 'Type', 'Department', 'Custodian']}>{rooms.map(r => <tr key={r.id} className="border-b border-base last:border-0">
@@ -138,7 +138,7 @@ function MappingsSection() {
       {proposed.map(m => <div key={m.id} className="border border-base rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
         <div><p className="text-sm font-medium">{m.legacyValue} <span className="text-muted">→</span> {humanize(m.targetType)} {m.targetId}</p><p className="text-xs text-muted">{humanize(m.mappingType)} mapping</p></div>
         <div className="flex gap-2">
-          <button type="button" onClick={() => approve.mutate({ id: m.id })} disabled={approve.isPending} className="min-h-10 px-3 rounded-lg bg-brand-navy text-white text-xs font-semibold inline-flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Approve</button>
+          <button type="button" onClick={() => approve.mutate({ id: m.id })} disabled={approve.isPending} className="min-h-10 px-3 rounded-lg bg-brand-deep text-white text-xs font-semibold inline-flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Approve</button>
           <button type="button" onClick={() => reject.mutate({ id: m.id })} disabled={reject.isPending} className="min-h-10 px-3 rounded-lg border border-base text-xs inline-flex items-center gap-1"><X className="w-3.5 h-3.5" /> Reject</button>
         </div>
       </div>)}

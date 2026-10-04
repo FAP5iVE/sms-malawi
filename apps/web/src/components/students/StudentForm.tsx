@@ -600,7 +600,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                     <button
                       type="button"
                       onClick={handleNext}
-                      className="flex items-center gap-1.5 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors"
+                      className="flex items-center gap-1.5 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors"
                     >
                       Next
                       <ChevronRight className="w-4 h-4" aria-hidden />
@@ -749,7 +749,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="min-h-11 px-6 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors flex items-center gap-2 disabled:opacity-60"
+                  className="min-h-11 px-6 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors flex items-center gap-2 disabled:opacity-60"
                 >
                   {isPending && (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />

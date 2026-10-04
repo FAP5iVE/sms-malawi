@@ -66,10 +66,10 @@ function SessionKpiCard({ label, value }: { label: string; value: string | numbe
 // ─────────────────────────────────────────────────────────
 
 const SEVERITY_STYLE: Record<ApiSessionAuditEntry['severity'], string> = {
-  CRITICAL: 'bg-brand-coral/15 text-brand-coral',
-  HIGH:     'bg-brand-amber/15 text-brand-amber',
-  MEDIUM:   'bg-brand-teal/10 text-brand-teal',
-  LOW:      'bg-page text-muted',
+  CRITICAL: 'text-status-danger',
+  HIGH:     'text-status-warning',
+  MEDIUM:   'text-status-success',
+  LOW:      'text-muted',
 }
 
 function SessionActivityLog({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
@@ -128,7 +128,7 @@ function SessionActivityLog({ sessionId, onClose }: { sessionId: string; onClose
                   <td className="px-4 py-2.5 text-xs">{entry.entityType}</td>
                   <td className="px-4 py-2.5 font-mono text-xs text-muted">{entry.entityId.slice(0, 12)}…</td>
                   <td className="px-4 py-2.5">
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-lg ${SEVERITY_STYLE[entry.severity]}`}>
+                    <span className={`text-[10px] font-semibold ${SEVERITY_STYLE[entry.severity]}`}>
                       {entry.severity}
                     </span>
                   </td>
@@ -184,7 +184,7 @@ export function AdminSessionsPanel() {
     },
     {
       key: 'role', label: 'Role', priority: 'important',
-      render: (s) => <span className="text-xs bg-page rounded-lg px-2 py-0.5">{s.role}</span>,
+      render: (s) => <span className="text-xs">{s.role}</span>,
     },
     {
       key: 'loginAt', label: 'Logged In', priority: 'important', sortable: true,

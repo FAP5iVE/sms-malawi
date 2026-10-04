@@ -105,7 +105,7 @@ function ConfirmDialog({ preview, onConfirm, onCancel, committing }: ConfirmDial
       aria-modal="true"
       aria-labelledby="promo-confirm-title"
     >
-      <div className="w-full max-w-md modal-panel bg-surface rounded-3xl shadow-2xl border border-base p-7 space-y-5">
+      <div className="w-full max-w-md bg-surface rounded-3xl shadow-2xl border border-base p-7 space-y-5">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-2xl bg-brand-amber/15 flex items-center justify-center shrink-0">
             <AlertTriangle className="w-5 h-5 text-brand-amber" aria-hidden />
@@ -152,7 +152,7 @@ function ConfirmDialog({ preview, onConfirm, onCancel, committing }: ConfirmDial
             type="button"
             onClick={onConfirm}
             disabled={committing}
-            className="flex-1 min-h-[44px] rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+            className="flex-1 min-h-[44px] rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
           >
             {committing && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
             {committing ? 'Committing…' : 'Yes, Commit'}
@@ -282,7 +282,7 @@ export function PromotionEngine() {
           onClick={handlePreview}
           disabled={loading || committed || Boolean(blockedReason)}
           title={blockedReason ?? undefined}
-          className="flex items-center gap-2 min-h-[44px] px-6 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60"
+          className="flex items-center gap-2 min-h-[44px] px-6 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60"
         >
           {loading
             ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>

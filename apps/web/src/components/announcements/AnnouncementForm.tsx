@@ -551,7 +551,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
             <button
               type="submit"
               disabled={loading || savingDraft}
-              className="px-5 py-2 text-sm bg-brand-navy text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 min-h-11"
+              className="px-5 py-2 text-sm bg-brand-deep text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 min-h-11"
             >
               {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {canPublishDirectly

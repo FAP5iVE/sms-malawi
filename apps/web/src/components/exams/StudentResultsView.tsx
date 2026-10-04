@@ -144,7 +144,7 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
           {[1,2,3].map((t) => (
             <button key={t} onClick={() => setTerm(t)}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                term === t ? 'bg-brand-navy text-white border-brand-navy' : 'border-base text-muted'
+                term === t ? 'bg-brand-deep text-white border-brand-navy' : 'border-base text-muted'
               }`}>
               Term {t}
             </button>

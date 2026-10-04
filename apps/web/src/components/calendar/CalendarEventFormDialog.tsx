@@ -355,7 +355,7 @@ export function CalendarEventFormDialog({
         <button
           type="submit"
           disabled={pending}
-          className="px-5 py-2 text-sm bg-brand-navy text-white rounded-xl font-heading font-semibold flex items-center gap-2 disabled:opacity-60 min-h-[44px]"
+          className="px-5 py-2 text-sm bg-brand-deep text-white rounded-xl font-heading font-semibold flex items-center gap-2 disabled:opacity-60 min-h-[44px]"
         >
           {pending && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
           {isEditing ? 'Save Changes' : 'Create Event'}

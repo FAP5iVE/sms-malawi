@@ -271,7 +271,7 @@ export function MobileCalendarView({
                 aria-pressed={viewMode === mode}
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-md text-xs font-heading font-medium capitalize transition-colors ${
                   viewMode === mode
-                    ? 'bg-brand-navy text-white font-semibold shadow-sm'
+                    ? 'bg-brand-deep text-white font-semibold shadow-sm'
                     : 'text-muted'
                 }`}
               >
@@ -354,7 +354,7 @@ export function MobileCalendarView({
             <h3 className="text-sm font-heading font-bold text-body truncate">
               {formatDisplayDate(selectedDateKey)}
             </h3>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-page text-muted border border-base shrink-0">
+            <span className="text-[11px] font-semibold text-muted shrink-0">
               {selectedDayEvents.length}
             </span>
           </div>

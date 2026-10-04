@@ -532,7 +532,7 @@ function SalarySection({ staffId }: { staffId: string }) {
                 type="button"
                 onClick={handleSaveBase}
                 disabled={updateSalary.isPending || !baseSalary}
-                className="shrink-0 px-4 py-2 text-xs font-semibold bg-brand-navy text-white rounded-lg disabled:opacity-60 flex items-center gap-2 min-h-11"
+                className="shrink-0 px-4 py-2 text-xs font-semibold bg-brand-deep text-white rounded-lg disabled:opacity-60 flex items-center gap-2 min-h-11"
               >
                 {updateSalary.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 {salary ? 'Update' : 'Set'}

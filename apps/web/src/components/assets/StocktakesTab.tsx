@@ -18,7 +18,7 @@ export function StocktakesTab() {
   function createStocktake() { if (!academicYear || !term || !roomId.trim()) return; create.mutate({ academicYear, term, roomId: roomId.trim() }, { onSuccess: () => { setShowForm(false); setRoomId('') } }) }
 
   return <div className="space-y-4">
-    <div className="flex items-center justify-between gap-3 flex-wrap"><div><h2 className="font-heading font-semibold text-brand-navy">Termly Stocktakes</h2><p className="text-sm text-muted">Physical verification by room. Variances remain open until resolved.</p></div><PermissionGuard permission="inventory.performStocktake"><button type="button" onClick={() => setShowForm((v) => !v)} className="inline-flex items-center gap-2 min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold"><Plus className="w-4 h-4" /> Schedule stocktake</button></PermissionGuard></div>
+    <div className="flex items-center justify-between gap-3 flex-wrap"><div><h2 className="font-heading font-semibold text-brand-navy">Termly Stocktakes</h2><p className="text-sm text-muted">Physical verification by room. Variances remain open until resolved.</p></div><PermissionGuard permission="inventory.performStocktake"><button type="button" onClick={() => setShowForm((v) => !v)} className="inline-flex items-center gap-2 min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold"><Plus className="w-4 h-4" /> Schedule stocktake</button></PermissionGuard></div>
     {showForm && <div className="bg-surface border border-base rounded-xl p-4 flex gap-3 flex-wrap"><input value={roomId} onChange={(e) => setRoomId(e.target.value)} placeholder="Room ID" className="flex-1 min-w-60 border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" /><button type="button" onClick={createStocktake} disabled={create.isPending || !academicYear || !term || !roomId.trim()} className="min-h-11 px-4 rounded-lg bg-brand-teal text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Creating…' : 'Create'}</button></div>}
     <div className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-base bg-page"><th className="text-left px-4 py-3">Room</th><th className="text-left px-4 py-3">Period</th><th className="text-left px-4 py-3">Status</th><th className="text-right px-4 py-3">Actions</th></tr></thead><tbody>{isLoading && <tr><td colSpan={4} className="p-8 text-center"><Loader2 className="inline w-5 h-5 animate-spin" /></td></tr>}{!isLoading && rows.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-muted">No stocktake scheduled for this term.</td></tr>}{rows.map((row) => <StocktakeRow key={row.id} row={row} onOpen={() => setSelectedId(row.id)} />)}</tbody></table></div></div>
     {selectedId && <StocktakeDetail id={selectedId} onClose={() => setSelectedId(null)} />}
@@ -26,7 +26,7 @@ export function StocktakesTab() {
 }
 
 // DRAFT is the schema's actual pre-start status (was 'SCHEDULED' — not a real StocktakeStatus value).
-function StocktakeRow({ row, onOpen }: { row: Stocktake; onOpen: () => void }) { const start = useStartStocktake(); return <tr className="border-b border-base last:border-0 hover:bg-page"><td className="px-4 py-3 font-medium">{row.roomId}</td><td className="px-4 py-3">{row.academicYear} · Term {row.term}</td><td className="px-4 py-3"><span className="text-xs rounded px-2 py-1 bg-base">{humanize(row.status)}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><PermissionGuard permission="inventory.performStocktake">{row.status === 'DRAFT' && <button type="button" onClick={() => start.mutate(row.id)} disabled={start.isPending} className="min-h-11 px-3 rounded-lg border border-base text-sm inline-flex items-center gap-1.5"><Play className="w-4 h-4" /> Start</button>}</PermissionGuard><button type="button" onClick={onOpen} className="min-h-11 px-3 rounded-lg bg-page text-brand-navy text-sm inline-flex items-center gap-1.5"><ClipboardCheck className="w-4 h-4" /> Open</button></div></td></tr> }
+function StocktakeRow({ row, onOpen }: { row: Stocktake; onOpen: () => void }) { const start = useStartStocktake(); return <tr className="border-b border-base last:border-0 hover:bg-page"><td className="px-4 py-3 font-medium">{row.roomId}</td><td className="px-4 py-3">{row.academicYear} · Term {row.term}</td><td className="px-4 py-3"><span className="text-xs">{humanize(row.status)}</span></td><td className="px-4 py-3"><div className="flex justify-end gap-2"><PermissionGuard permission="inventory.performStocktake">{row.status === 'DRAFT' && <button type="button" onClick={() => start.mutate(row.id)} disabled={start.isPending} className="min-h-11 px-3 rounded-lg border border-base text-sm inline-flex items-center gap-1.5"><Play className="w-4 h-4" /> Start</button>}</PermissionGuard><button type="button" onClick={onOpen} className="min-h-11 px-3 rounded-lg bg-page text-brand-navy text-sm inline-flex items-center gap-1.5"><ClipboardCheck className="w-4 h-4" /> Open</button></div></td></tr> }
 
 function StocktakeDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const { data, isLoading } = useStocktake(id)
@@ -75,7 +75,7 @@ function StocktakeLineRow({ stocktakeId, line }: { stocktakeId: string; line: St
     <input type="number" min="0" step="1" value={actual} onChange={(e) => setActual(e.target.value)} className="input w-24" />
     <button type="button" disabled={record.isPending}
       onClick={() => record.mutate({ stocktakeId, lineId: line.id, actualQuantity: num(actual) })}
-      className="min-h-11 px-3 rounded-lg bg-brand-navy text-white text-xs font-semibold disabled:opacity-60">
+      className="min-h-11 px-3 rounded-lg bg-brand-deep text-white text-xs font-semibold disabled:opacity-60">
       {record.isPending ? '…' : 'Save'}
     </button>
   </div>
@@ -96,7 +96,7 @@ function VarianceRow({ stocktakeId, varianceId, varianceQuantity, varianceType, 
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Resolution note (optional)" className="input flex-1" />
           <button type="button" disabled={resolve.isPending}
             onClick={() => resolve.mutate({ stocktakeId, varianceId, resolution: 'RESOLVED', resolutionNote: note.trim() || undefined }, { onSuccess: () => setNote('') })}
-            className="min-h-11 px-3 rounded-lg bg-brand-navy text-white text-sm">Resolve</button>
+            className="min-h-11 px-3 rounded-lg bg-brand-deep text-white text-sm">Resolve</button>
           <button type="button" disabled={resolve.isPending}
             onClick={() => resolve.mutate({ stocktakeId, varianceId, resolution: 'WRITTEN_OFF', resolutionNote: note.trim() || undefined }, { onSuccess: () => setNote('') })}
             className="min-h-11 px-3 rounded-lg border border-base text-sm">Write off</button>

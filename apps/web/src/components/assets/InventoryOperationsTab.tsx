@@ -39,7 +39,7 @@ export function InventoryOperationsTab() {
           <input type="checkbox" checked={lowStock} onChange={(e) => setLowStock(e.target.checked)} /> Low stock only
         </label>
         <PermissionGuard permission="inventory.manageItems">
-          <button type="button" onClick={() => setShowCreate(true)} className="min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold inline-flex items-center gap-2"><Plus className="w-4 h-4" /> New item</button>
+          <button type="button" onClick={() => setShowCreate(true)} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold inline-flex items-center gap-2"><Plus className="w-4 h-4" /> New item</button>
         </PermissionGuard>
       </div>
 
@@ -112,7 +112,7 @@ function InventoryItemForm({ item, onClose }: { item?: InventoryItem; onClose: (
         <Field label="Reorder quantity"><input type="number" min="0" value={reorderQuantity} onChange={(e) => setReorderQuantity(e.target.value)} className="input" /></Field>
       </div>
       {error && <p className="text-sm text-brand-coral">{error}</p>}
-      <button type="button" onClick={submit} disabled={mutation.isPending} className="w-full min-h-11 rounded-lg bg-brand-navy text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60">{mutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />} {item ? 'Save changes' : 'Create item'}</button>
+      <button type="button" onClick={submit} disabled={mutation.isPending} className="w-full min-h-11 rounded-lg bg-brand-deep text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60">{mutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />} {item ? 'Save changes' : 'Create item'}</button>
     </div>
   </Modal>
 }
@@ -144,7 +144,7 @@ function InventoryOperationModal({ item, operation, onClose }: { item: Inventory
       {(operation === 'receive' || operation === 'transfer') && <Field label="To room / location"><input value={to} onChange={(e) => setTo(e.target.value)} className="input" placeholder="Room ID" /></Field>}
       {(operation !== 'receive') && <Field label={operation === 'adjust' ? 'Reason (required)' : 'Reason'}><textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className="input" /></Field>}
       {error && <p className="text-sm text-brand-coral">{error}</p>}
-      <button type="button" onClick={submit} disabled={mutation.isPending} className="w-full min-h-11 rounded-lg bg-brand-navy text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60">{mutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Confirm</button>
+      <button type="button" onClick={submit} disabled={mutation.isPending} className="w-full min-h-11 rounded-lg bg-brand-deep text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60">{mutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Confirm</button>
     </div>
   </Modal>
 }

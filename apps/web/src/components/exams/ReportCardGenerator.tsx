@@ -374,7 +374,7 @@ export function ReportCardGenerator() {
             type="button"
             onClick={handleGenerate}
             disabled={generating || !classId}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {generating
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>

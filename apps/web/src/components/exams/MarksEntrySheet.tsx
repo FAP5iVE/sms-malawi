@@ -278,7 +278,7 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
                 Save Draft
               </button>
               <button type="button" onClick={requestFinalize} disabled={finalizeMarks.isPending || !hydrated}
-                className="flex items-center gap-2 px-5 py-2 text-sm bg-brand-navy text-white rounded-xl font-semibold disabled:opacity-60 hover:bg-brand-navy-mid">
+                className="flex items-center gap-2 px-5 py-2 text-sm bg-brand-deep text-white rounded-xl font-semibold disabled:opacity-60 hover:brightness-125">
                 {finalizeMarks.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
                 Finalize Marks
               </button>

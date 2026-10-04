@@ -113,10 +113,10 @@ const STATUS_CONFIG: Record<ExamStatus, {
   chip:   string
   step:   number
 }> = {
-  SCHEDULED:        { label: 'Scheduled',       icon: Clock,         chip: 'bg-base text-muted border-base',                   step: 0 },
-  IN_PROGRESS:      { label: 'In Progress',     icon: Clock,         chip: 'text-brand-navy', step: 1 },
-  MARKS_PENDING:    { label: 'Marks Pending',   icon: Clock,         chip: 'text-brand-amber', step: 2 },
-  MARKS_DRAFT:      { label: 'Marks (Draft)',   icon: Clock,         chip: 'bg-brand-amber/10 text-brand-amber border-brand-amber/25', step: 2 },
+  SCHEDULED:        { label: 'Scheduled',       icon: Clock,         chip: 'text-muted',                   step: 0 },
+  IN_PROGRESS:      { label: 'In Progress',     icon: Clock,         chip: 'text-status-info', step: 1 },
+  MARKS_PENDING:    { label: 'Marks Pending',   icon: Clock,         chip: 'text-status-warning', step: 2 },
+  MARKS_DRAFT:      { label: 'Marks (Draft)',   icon: Clock,         chip: 'text-status-warning', step: 2 },
   MARKS_FINAL:      { label: 'Marks Final',     icon: CheckCircle2,  chip: 'text-brand-teal', step: 3 },
   RESULTS_APPROVED: { label: 'Exam Approved',   icon: CheckCircle2,  chip: 'text-brand-teal', step: 4 },
   RESULTS_RELEASED: { label: 'Released',        icon: Eye,           chip: 'text-brand-purple', step: 5 },
@@ -162,7 +162,7 @@ function PipelineBar({ currentStep }: { currentStep: number }) {
                 className={`
                   w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold
                   ${done   ? 'bg-brand-teal text-white'
-                  : active ? 'bg-brand-navy text-white ring-2 ring-brand-navy/30'
+                  : active ? 'bg-brand-deep text-white ring-2 ring-brand-navy/30'
                   :          'bg-base text-muted border border-base'}
                 `}
               >
@@ -252,7 +252,7 @@ function ExamRow({ exam, onAction, loading, canApprove, canRelease, onShowFeeBlo
             <>
               {exam.feeBlockedCount > 0 && (
                 <button type="button" onClick={onShowFeeBlocked}
-                  className="flex items-center gap-1.5 text-xs text-brand-amber bg-brand-amber/10 border border-brand-amber/25 px-3 py-2 rounded-xl hover:bg-brand-amber/15 transition-colors">
+                  className="flex items-center gap-1.5 text-xs font-semibold text-status-warning border border-status-warning/60 px-3 py-2 rounded-xl hover:bg-status-warning/10 transition-colors">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                   {exam.feeBlockedCount} students will not see results until fees are cleared. View list
                 </button>
@@ -261,7 +261,7 @@ function ExamRow({ exam, onAction, loading, canApprove, canRelease, onShowFeeBlo
                 type="button"
                 disabled={loading}
                 onClick={() => onAction(exam.id, 'release')}
-                className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60"
+                className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60"
               >
                 {loading
                   ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -415,7 +415,7 @@ export function ResultsReleaseWorkflow({
           type="button"
           onClick={fetchExams}
           disabled={fetchLoading}
-          className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60"
+          className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60"
         >
           {fetchLoading
             ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -471,7 +471,7 @@ export function ResultsReleaseWorkflow({
               className={`
                 px-3 py-1.5 rounded-full text-xs font-heading font-semibold border transition-colors min-h-[36px]
                 ${filterStatus === s
-                  ? 'bg-brand-navy text-white border-brand-navy'
+                  ? 'bg-brand-deep text-white border-brand-navy'
                   : 'bg-surface border-base text-muted hover:border-brand-navy/30 hover:text-body'}
               `}
             >

@@ -63,9 +63,9 @@ const ACTIVE_CLS: Record<Status, string> = {
   LATE:    'bg-brand-amber border-brand-amber text-white',
 }
 const BADGE_CLS: Record<Status, string> = {
-  PRESENT: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-  ABSENT:  'bg-brand-coral/10 text-brand-coral',
-  LATE:    'bg-brand-amber/10 text-brand-amber',
+  PRESENT: 'text-status-success',
+  ABSENT:  'text-status-danger',
+  LATE:    'text-status-warning',
 }
 
 export function AttendanceSheet({ classId, students, readOnly = false }: AttendanceSheetProps) {
@@ -253,7 +253,7 @@ export function AttendanceSheet({ classId, students, readOnly = false }: Attenda
 
                 {readOnly ? (
                   status ? (
-                    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full shrink-0 ${BADGE_CLS[status]}`}>
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold shrink-0 ${BADGE_CLS[status]}`}>
                       {STATUS_CONFIG[status].label}
                     </span>
                   ) : (

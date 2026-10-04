@@ -53,7 +53,7 @@ export function CategoryFilterBar({
           compact ? 'min-h-[40px] px-3.5 py-2 text-sm' : 'px-3 py-1.5 text-xs'
         } ${
           isAllActive
-            ? 'bg-brand-navy text-white border-brand-navy'
+            ? 'bg-brand-deep text-white border-brand-navy'
             : 'border-base text-muted bg-surface hover:bg-page'
         }`}
       >
