@@ -70,14 +70,14 @@ function StaffProfileContent() {
         <h1 className="font-heading text-xl font-bold text-brand-navy">
           {staff.firstName} {staff.lastName}
         </h1>
-        <span className="font-mono text-xs text-muted bg-page px-2 py-1 rounded border border-base">
+        <span className="font-mono text-xs text-muted">
           {staff.employeeNo}
         </span>
         <span
-          className={`text-xs font-semibold px-2 py-1 rounded-full ${
+          className={`text-xs font-semibold ${
             staff.status === 'ACTIVE'
-              ? 'bg-brand-teal/10 text-brand-teal'
-              : 'bg-muted/10 text-muted'
+              ? 'text-status-success'
+              : 'text-muted'
           }`}
         >
           {staff.status}

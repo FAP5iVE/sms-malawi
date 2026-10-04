@@ -147,6 +147,30 @@
   --color-brand-coral:      hsl(var(--brand-coral));
   --color-brand-purple:     hsl(var(--brand-purple));
 
+  /* ── Section surface for the public site's blue bands (hero, performance,
+        footer…). --brand-navy flips to a bright #4a9bd4 in dark mode so it
+        can work as TEXT on dark pages, which made every `bg-brand-navy`
+        band a dull, washed-out light blue when used as a BACKGROUND. This
+        is the dedicated background token: a rich mid-navy in dark mode —
+        clearly lighter than the near-black page so it never gets swallowed,
+        but deep enough that white text stays crisp. */
+  --color-brand-deep:       hsl(var(--brand-deep));
+
+  /* ── Status text colours
+        Status / category / schedule labels are plain coloured TEXT — no
+        pill background, no border (the old filled pills were removed
+        system-wide). Because they now sit directly on the page or card,
+        each tone has a strong shade for light surfaces and a bright shade
+        for dark surfaces (both ≥ 4.5:1 contrast on their surface). Use
+        e.g. `text-status-success`; the dark-mode swap is automatic. */
+  --color-status-success:   hsl(var(--status-success));
+  --color-status-warning:   hsl(var(--status-warning));
+  --color-status-danger:    hsl(var(--status-danger));
+  --color-status-info:      hsl(var(--status-info));
+  --color-status-accent:    hsl(var(--status-accent));
+  --color-status-cyan:      hsl(var(--status-cyan));
+  --color-status-neutral:   hsl(var(--status-neutral));
+
   /* ── Radius tokens */
   --radius-sm: 0.25rem;
   --radius:    0.5rem;
@@ -261,6 +285,16 @@
     --brand-amber:       32  93% 44%;  /* #d97706 */
     --brand-coral:       8   68% 53%;  /* #dc4f3a */
     --brand-purple:      271 43% 43%;  /* #6b3fa0 */
+    --brand-deep:        213 51% 24%;  /* #1e3a5f — same as --brand-navy in light mode */
+
+    /* Status text colours — light surfaces (≥ 4.5:1 on white) */
+    --status-success:    162 93% 24%;  /* #047857 */
+    --status-warning:    26  90% 37%;  /* #b45309 */
+    --status-danger:     0   74% 42%;  /* #b91c1c */
+    --status-info:       224 76% 48%;  /* #1d4ed8 */
+    --status-accent:     272 72% 47%;  /* #7e22ce */
+    --status-cyan:       192 82% 31%;  /* #0e7490 */
+    --status-neutral:    215 19% 35%;  /* #475569 */
   }
 
   /* ── DARK MODE ──────────────────────────────────────── */
@@ -341,6 +375,20 @@
     --brand-amber:       38  92% 60%;
     --brand-coral:       8   85% 68%;
     --brand-purple:      258 90% 76%;
+    /* Public-site blue bands. The old dark value (--brand-navy = #4a9bd4)
+       was a dull light blue; the original deep navy before that swallowed
+       the background art. This sits between: rich, clearly blue, clearly
+       lighter than the #070e1a page. */
+    --brand-deep:        213 52% 30%;  /* #244f74 */
+
+    /* Status text colours — dark surfaces (bright, ≥ 7:1 on #111827) */
+    --status-success:    158 64% 52%;  /* #34d399 */
+    --status-warning:    43  96% 56%;  /* #fbbf24 */
+    --status-danger:     0   91% 71%;  /* #f87171 */
+    --status-info:       213 94% 68%;  /* #60a5fa */
+    --status-accent:     255 92% 76%;  /* #a78bfa-ish */
+    --status-cyan:       188 86% 53%;  /* #22d3ee */
+    --status-neutral:    213 27% 84%;  /* #cbd5e1 */
   }
 
   /* ── GLOBAL RESETS ─────────────────────────────────── */

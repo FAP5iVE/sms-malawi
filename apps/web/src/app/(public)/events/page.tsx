@@ -78,7 +78,7 @@ export default function EventsPage() {
                       // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
                       <img src={ev.imageUrl} alt="" className="shrink-0 w-20 h-20 rounded-xl object-cover hidden sm:block" />
                     )}
-                    <div className="shrink-0 w-16 h-16 rounded-xl bg-brand-navy text-white flex flex-col items-center justify-center">
+                    <div className="shrink-0 w-16 h-16 rounded-xl bg-brand-deep text-white flex flex-col items-center justify-center">
                       {d ? (
                         <>
                           <span className="font-heading text-[10px] font-bold tracking-wide text-brand-teal-light">

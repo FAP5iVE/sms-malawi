@@ -69,7 +69,7 @@
  *
  * [REVISION 3, visual fixes after second review]:
  *   - Home/theme-toggle chips switched from translucent glass to a solid
- *     bg-brand-navy fill (white icon/text) so they read as buttons sitting
+ *     bg-brand-deep fill (white icon/text) so they read as buttons sitting
  *     directly on the background, not glass panels, matches the request
  *     to make them "a strong solid color" rather than another frosted card.
  *   - Muted secondary text (the subtitle, the two authorisation-notice
@@ -386,7 +386,7 @@ function LoginForm() {
           href="/"
           aria-label="Back to homepage"
           title="Back to homepage"
-          className="w-9 h-9 rounded-lg bg-brand-navy hover:bg-brand-navy-mid text-white shadow-md flex items-center justify-center transition-colors"
+          className="w-9 h-9 rounded-lg bg-brand-deep hover:brightness-125 text-white shadow-md flex items-center justify-center transition-colors"
         >
           <Home className="w-4 h-4" />
         </Link>
@@ -395,7 +395,7 @@ function LoginForm() {
           type="button"
           onClick={cycleTheme}
           aria-label={mounted ? `Theme: ${theme}. Click to change.` : 'Toggle theme'}
-          className="w-9 h-9 rounded-lg bg-brand-navy hover:bg-brand-navy-mid text-white shadow-md flex items-center justify-center transition-colors"
+          className="w-9 h-9 rounded-lg bg-brand-deep hover:brightness-125 text-white shadow-md flex items-center justify-center transition-colors"
         >
           {mounted ? themeIcons[(theme as keyof typeof themeIcons) ?? 'system'] : <Monitor className="w-4 h-4" aria-hidden />}
         </button>
@@ -519,7 +519,7 @@ function LoginForm() {
               <button
                 type="submit"
                 disabled={isBusy}
-                className="w-full py-3 bg-brand-navy hover:bg-brand-navy-mid active:bg-brand-navy text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-4 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 border border-transparent dark:border-white/10 dark:hover:border-brand-teal/40"
+                className="w-full py-3 bg-brand-deep hover:brightness-125 active:brightness-90 text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-4 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 border border-transparent dark:border-white/10 dark:hover:border-brand-teal/40"
               >
                 {isBusy && <Loader2 className="w-4 h-4 animate-spin" />}
                 {isBusy ? 'Signing in…' : 'Sign in'}

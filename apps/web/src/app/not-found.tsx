@@ -66,7 +66,7 @@ export default function NotFound() {
 
             <Link
               href="/"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-navy px-6 font-heading text-sm font-bold text-white transition-colors hover:bg-brand-navy-mid"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-deep px-6 font-heading text-sm font-bold text-white transition-colors hover:brightness-125"
             >
               <ArrowLeft className="h-4 w-4" aria-hidden /> Back to home
             </Link>

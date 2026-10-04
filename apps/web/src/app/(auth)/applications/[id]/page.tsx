@@ -28,11 +28,11 @@ export default function ApplicationDetailPage() {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  PENDING:             'bg-brand-gold/15 text-brand-gold border-brand-gold/30',
-  APPROVED:            'bg-brand-teal/15 text-brand-teal border-brand-teal/30',
-  DENIED:              'bg-brand-coral/15 text-brand-coral border-brand-coral/30',
-  AWAITING_ADMISSION:  'bg-brand-navy/10 text-brand-navy border-brand-navy/25',
-  ADMITTED:            'bg-brand-teal/15 text-brand-teal border-brand-teal/30',
+  PENDING:             'text-status-warning',
+  APPROVED:            'text-status-success',
+  DENIED:              'text-status-danger',
+  AWAITING_ADMISSION:  'text-status-info',
+  ADMITTED:            'text-status-success',
 }
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -81,7 +81,7 @@ function ApplicationDetailContent() {
   }
 
   const statusClass =
-    STATUS_STYLES[app.status] ?? 'bg-page text-muted border-base'
+    STATUS_STYLES[app.status] ?? 'text-muted'
 
   return (
     <div className="space-y-5">

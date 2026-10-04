@@ -70,8 +70,8 @@
  *      ScribbleArt below), scattered across the sections that were a single
  *      flat colour with no texture at all (Announcement Rail, Academic
  *      Advertisements, Discover, Performance, Events, Admissions CTA,
- *      Contact). Hero and Footer already had their own decorative blobs and
- *      are unchanged. Each section gets a different shape arrangement
+ *      Contact). The Hero is unchanged; the Footer's animated blob layer was
+ *      later removed entirely (it now sits directly on its photo). Each section gets a different shape arrangement
  *      (`variant`) so it doesn't read as one stamp repeated down the page,
  *      and opacity is tuned much lower on text-dense light sections than on
  *      the solid brand-colour bands, so it never fights legibility.
@@ -413,11 +413,6 @@ export default function LandingPage() {
   return (
     <>
       <style>{`
-        @keyframes blobRotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .blob-slow  { animation: blobRotate 20s linear infinite; }
-        .blob-med   { animation: blobRotate 25s linear infinite; }
-        .blob-fast  { animation: blobRotate 15s linear infinite; }
-        .blob-slower{ animation: blobRotate 10s linear infinite; }
         @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
         .fade-up { animation: fadeUp 0.7s ease both; }
         .card-hover { transition: transform 0.25s ease, box-shadow 0.25s ease; }
@@ -582,7 +577,7 @@ export default function LandingPage() {
 
           {/* Mega menu */}
           {menuOpen && (
-            <div className="border-t border-base bg-brand-navy text-white">
+            <div className="border-t border-base bg-brand-deep text-white">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-9 grid grid-cols-2 md:grid-cols-4 gap-8">
                 {[
                   {
@@ -649,7 +644,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════════
             HERO
         ══════════════════════════════════════════════════════════════ */}
-        <section id="top" className="relative bg-brand-navy overflow-hidden min-h-[640px] flex items-end">
+        <section id="top" className="relative bg-brand-deep overflow-hidden min-h-[640px] flex items-end">
           <Image
             src="/images/hero-campus.webp"
             alt={`${schoolInfo?.schoolName ?? 'School'} campus entrance`}
@@ -694,7 +689,7 @@ export default function LandingPage() {
             announcements (postType ANNOUNCEMENT, its own feed, see
             usePublicAnnouncements above)
         ══════════════════════════════════════════════════════════════ */}
-        <section id="announcements" className="relative overflow-hidden bg-brand-navy">
+        <section id="announcements" className="relative overflow-hidden bg-brand-deep">
           <ScribbleArt variant={1} className="opacity-[0.16]" />
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 grid md:grid-cols-[200px_1fr] gap-8 items-center">
             <div>
@@ -1009,7 +1004,7 @@ export default function LandingPage() {
             PERFORMANCE, id="academics" anchors here too (see file header)
         ══════════════════════════════════════════════════════════════ */}
         <div id="academics" />
-        <section id="performance" className="relative overflow-hidden bg-brand-navy py-20 sm:py-24 text-white">
+        <section id="performance" className="relative overflow-hidden bg-brand-deep py-20 sm:py-24 text-white">
           <ScribbleArt variant={4} className="opacity-[0.16]" />
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-end justify-between gap-8 mb-11 flex-wrap">
@@ -1020,7 +1015,7 @@ export default function LandingPage() {
                 <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight mb-3">
                   MANEB Examination Results
                 </h2>
-                <p className="text-white/55 text-base leading-relaxed">
+                <p className="text-white/80 text-base leading-relaxed">
                   Our latest MANEB examination results, published from the school records system as they become available.
                 </p>
               </div>
@@ -1050,20 +1045,20 @@ export default function LandingPage() {
               const jce  = manebStats?.stats.find((s) => s.examType === 'JCE')
               return (
                 <>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/10 border border-white/10 rounded-2xl overflow-hidden mb-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/15 border border-white/15 rounded-2xl overflow-hidden mb-6">
                     {[
                       { value: msce ? `${msce.passRate}%` : null, label: 'MSCE pass rate' },
                       { value: jce ? `${jce.passRate}%` : null, label: 'JCE pass rate' },
                       { value: manebStats ? manebStats.enrolledStudents.toLocaleString() : null, label: 'Learners enrolled' },
                       { value: yearsOfExcellence != null ? `${yearsOfExcellence}+` : null, label: 'Years of excellence' },
                     ].map((s) => (
-                      <div key={s.label} className="bg-brand-navy p-7">
+                      <div key={s.label} className="bg-brand-deep p-7">
                         {s.value != null ? (
                           <div className="font-heading font-extrabold text-[44px] leading-none tracking-tight">{s.value}</div>
                         ) : (
-                          <div className="font-heading font-semibold text-sm text-white/35 h-[44px] flex items-center">Data unavailable</div>
+                          <div className="font-heading font-semibold text-sm text-white/75 h-[44px] flex items-center">Data unavailable</div>
                         )}
-                        <div className="text-[13.5px] text-white/50 mt-2">{s.label}</div>
+                        <div className="text-[13.5px] text-white/75 mt-2">{s.label}</div>
                       </div>
                     ))}
                   </div>
@@ -1071,7 +1066,7 @@ export default function LandingPage() {
                   {/* [PRODUCTION FIX 2026-07-28] Was three separate
                       side-by-side cards; now one unified card with MSCE,
                       JCE, and University Placement as internal rows. */}
-                  <div className="bg-white/5 border border-white/10 rounded-2xl grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/10">
+                  <div className="bg-white/[0.07] border border-white/15 rounded-2xl grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/15">
                     {[
                       { key: 'MSCE', stat: msce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: msce ? `${msce.passed} passed / ${msce.total} total` : null, rate: msce?.passRate, year: manebStats?.year },
                       { key: 'JCE', stat: jce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: jce ? `${jce.passed} passed / ${jce.total} total` : null, rate: jce?.passRate, year: manebStats?.year },
@@ -1099,19 +1094,19 @@ export default function LandingPage() {
                         {card.stat ? (
                           <>
                             <div className="flex justify-between text-xs mb-2">
-                              <span className="text-white/50">{card.rateLabel}</span>
+                              <span className="text-white/75">{card.rateLabel}</span>
                               <span className="font-heading font-bold">{card.rate}%</span>
                             </div>
                             <div className="h-1.75 bg-white/10 rounded-full overflow-hidden mb-3.5">
                               <div className="h-full bg-brand-teal rounded-full" style={{ width: `${card.rate}%` }} />
                             </div>
                             <div className="flex justify-between text-xs">
-                              <span className="text-white/50">{card.totalLabel}</span>
-                              <span className="text-white/75 font-semibold">{card.totalText}</span>
+                              <span className="text-white/75">{card.totalLabel}</span>
+                              <span className="text-white/90 font-semibold">{card.totalText}</span>
                             </div>
                           </>
                         ) : (
-                          <div className="py-4 text-center text-sm text-white/35">Data unavailable</div>
+                          <div className="py-4 text-center text-sm text-white/75">Data unavailable</div>
                         )}
                       </div>
                     ))}
@@ -1173,7 +1168,7 @@ export default function LandingPage() {
                       ) : (
                         <ImagePlaceholder className="h-[170px]" />
                       )}
-                      <div className="absolute top-3 left-3 bg-brand-navy text-white rounded-lg px-3 py-2 text-center min-w-[52px]">
+                      <div className="absolute top-3 left-3 bg-brand-deep text-white rounded-lg px-3 py-2 text-center min-w-[52px]">
                         {d ? (
                           <>
                             <div className="font-heading text-[10.5px] font-bold tracking-wide text-brand-teal-light">{MONTHS[d.getMonth()]}</div>
@@ -1270,7 +1265,7 @@ export default function LandingPage() {
                 <button
                   type="submit"
                   disabled={newsletterSubscribe.isPending}
-                  className="flex items-center justify-center gap-2 bg-brand-navy text-white rounded-xl px-6 py-3.25 font-heading font-bold text-[13.5px] hover:bg-brand-navy-mid transition-colors disabled:opacity-60 min-h-11"
+                  className="flex items-center justify-center gap-2 bg-brand-deep text-white rounded-xl px-6 py-3.25 font-heading font-bold text-[13.5px] hover:brightness-125 transition-colors disabled:opacity-60 min-h-11"
                 >
                   {newsletterSubscribe.isPending && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
                   Subscribe now
@@ -1384,7 +1379,7 @@ export default function LandingPage() {
                   <button
                     type="submit"
                     disabled={contactSubmit.isPending}
-                    className="w-full bg-brand-navy text-white rounded-xl py-3.5 font-heading font-bold text-[13.5px] flex items-center justify-center gap-2 hover:bg-brand-navy-mid transition-colors disabled:opacity-60 min-h-11"
+                    className="w-full bg-brand-deep text-white rounded-xl py-3.5 font-heading font-bold text-[13.5px] flex items-center justify-center gap-2 hover:brightness-125 transition-colors disabled:opacity-60 min-h-11"
                   >
                     {contactSubmit.isPending ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Send className="w-4 h-4" aria-hidden />}
                     Send Message
@@ -1407,7 +1402,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════════
             FOOTER
         ══════════════════════════════════════════════════════════════ */}
-        <footer className="relative bg-brand-navy text-white pt-16 overflow-hidden rounded-t-[2.5rem]">
+        <footer className="relative bg-brand-deep text-white pt-16 overflow-hidden rounded-t-[2.5rem]">
           {/* Background photo, same hero campus image + treatment as the
               HERO section above, reused here so the page's two navy
               bookends share one visual language instead of the footer
@@ -1428,13 +1423,6 @@ export default function LandingPage() {
           />
           <div className="absolute inset-0 bg-linear-to-b from-[rgba(11,29,51,.82)] via-[rgba(11,29,51,.90)] to-[rgba(11,29,51,.98)]" />
 
-          <svg preserveAspectRatio="xMidYMid slice" viewBox="10 10 80 80" aria-hidden className="absolute inset-0 w-full h-full blur-[14px] opacity-[0.07] pointer-events-none">
-            <path fill="#D98A0B" className="blob-med" style={{ transformOrigin: '13px 25px' }} d="M37-5C25.1-14.7,5.7-19.1-9.2-10-28.5,1.8-32.7,31.1-19.8,49c15.5,21.5,52.6,22,67.2,2.3C59.4,35,53.7,8.5,37-5Z" />
-            <path fill="#24507F" className="blob-slower" style={{ transformOrigin: '13px 25px' }} d="M20.6,4.1C11.6,1.5-1.9,2.5-8,11.2-16.3,23.1-8.2,45.6,7.4,50S42.1,38.9,41,24.5C40.2,14.1,29.4,6.6,20.6,4.1Z" />
-            <path fill="#0E8A6A" className="blob-slow" style={{ transformOrigin: '84px 93px' }} d="M105.9,48.6c-12.4-8.2-29.3-4.8-39.4.8-23.4,12.8-37.7,51.9-19.1,74.1s63.9,15.3,76-5.6c7.6-13.3,1.8-31.1-2.3-43.8C117.6,63.3,114.7,54.3,105.9,48.6Z" />
-            <path fill="#17B187" className="blob-fast" style={{ transformOrigin: '84px 93px' }} d="M102,67.1c-9.6-6.1-22-3.1-29.5,2-15.4,10.7-19.6,37.5-7.6,47.8s35.9,3.9,44.5-12.5C115.5,92.6,113.9,74.6,102,67.1Z" />
-          </svg>
-
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 lg:grid-cols-[1.2fr_1fr_1fr_1fr_1fr] gap-10 pb-12 border-b border-white/10">
               <div className="col-span-2 lg:col-span-1">
@@ -1447,7 +1435,7 @@ export default function LandingPage() {
                 <div className="flex gap-2.5 font-heading font-bold text-[11px] tracking-[2.2px] uppercase text-brand-teal-light mb-5">
                   <span>Learn</span><span>Lead</span><span>Excel</span>
                 </div>
-                <div className="text-[13.5px] text-white/50 leading-loose">
+                <div className="text-[13.5px] text-white/70 leading-loose">
                   The Head Teacher<br />
                   {schoolInfo?.schoolName ?? 'SMS Malawi'}<br />
                   {schoolInfo?.address ?? ''}<br />
@@ -1505,15 +1493,15 @@ export default function LandingPage() {
                   <div className="flex flex-col gap-2.75 text-[13.5px]">
                     {col.links.map((l) =>
                       'external' in l && l.external ? (
-                        <a key={l.label} href={l.href} target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white transition-colors">
+                        <a key={l.label} href={l.href} target="_blank" rel="noopener noreferrer" className="text-white/70 hover:text-white transition-colors">
                           {l.label}
                         </a>
                       ) : 'anchor' in l && l.anchor ? (
-                        <button key={l.label} onClick={() => scrollTo(l.anchor!)} className="text-left text-white/50 hover:text-white transition-colors">
+                        <button key={l.label} onClick={() => scrollTo(l.anchor!)} className="text-left text-white/70 hover:text-white transition-colors">
                           {l.label}
                         </button>
                       ) : (
-                        <Link key={l.label} href={l.href!} className="text-white/50 hover:text-white transition-colors">
+                        <Link key={l.label} href={l.href!} className="text-white/70 hover:text-white transition-colors">
                           {l.label}
                         </Link>
                       ),
@@ -1557,14 +1545,14 @@ export default function LandingPage() {
             </div>
 
             <div className="py-5.5 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <p className="text-[12.5px] text-white/35">
+              <p className="text-[12.5px] text-white/60">
                 © {currentYearNum} {schoolInfo?.schoolName ?? 'SMS Malawi'}. All rights reserved.
               </p>
               <div className="flex items-center gap-5">
-                <p className="text-[12.5px] text-white/30">The system designed by 5iveStack Labs</p>
+                <p className="text-[12.5px] text-white/55">The system designed by 5iveStack Labs</p>
                 <div className="flex gap-4.5 text-[12.5px]">
-                  <Link href="/privacy" className="text-white/35 hover:text-white transition-colors">Privacy Policy</Link>
-                  <Link href="/terms" className="text-white/35 hover:text-white transition-colors">Terms of Use</Link>
+                  <Link href="/privacy" className="text-white/60 hover:text-white transition-colors">Privacy Policy</Link>
+                  <Link href="/terms" className="text-white/60 hover:text-white transition-colors">Terms of Use</Link>
                 </div>
               </div>
             </div>

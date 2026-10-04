@@ -103,7 +103,7 @@ function ResetPasswordForm() {
 
   return (
     <div className="min-h-screen grid lg:grid-cols-[1fr_1fr] font-sans">
-      <div className="hidden lg:flex flex-col justify-between bg-brand-navy p-12">
+      <div className="hidden lg:flex flex-col justify-between bg-brand-deep p-12">
         <Link href="/" className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm w-fit">
           <ArrowLeft className="w-4 h-4" />
           <span className="font-heading font-medium">Back to homepage</span>
@@ -144,7 +144,7 @@ function ResetPasswordForm() {
               </p>
               <Link
                 href="/forgot-password"
-                className="inline-flex items-center gap-2 bg-brand-navy text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:bg-brand-navy-mid transition-colors"
+                className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
               >
                 Request a new link
               </Link>
@@ -160,7 +160,7 @@ function ResetPasswordForm() {
               </p>
               <Link
                 href="/login"
-                className="inline-flex items-center gap-2 bg-brand-navy text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:bg-brand-navy-mid transition-colors"
+                className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" /> Return to login
               </Link>
@@ -212,7 +212,7 @@ function ResetPasswordForm() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-brand-navy text-white py-3 rounded-xl font-heading font-semibold text-sm hover:bg-brand-navy-mid transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                  className="w-full bg-brand-deep text-white py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
                 >
                   {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                   {loading ? 'Saving…' : 'Save New Password'}

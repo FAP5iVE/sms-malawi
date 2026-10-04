@@ -101,7 +101,7 @@ export default function ChangePasswordPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-brand-navy text-white py-3 rounded-xl font-heading font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60"
+            className="w-full bg-brand-deep text-white py-3 rounded-xl font-heading font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             {loading ? 'Saving…' : 'Set Password & Continue'}

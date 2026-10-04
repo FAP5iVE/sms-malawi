@@ -124,7 +124,7 @@ export function HolidaysManager() {
         <button
           onClick={handleAdd}
           disabled={createMut.isPending}
-          className="flex items-center gap-2 bg-brand-navy text-white px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50 hover:bg-brand-navy/80 transition-colors"
+          className="flex items-center gap-2 bg-brand-deep text-white px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50 hover:brightness-110 transition-colors"
         >
           {createMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
           Add Holiday

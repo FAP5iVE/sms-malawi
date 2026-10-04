@@ -31,7 +31,7 @@ export default function PrivacyPolicyPage() {
           </Link>
           <div className="h-4 w-px bg-base shrink-0" />
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-brand-navy flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-brand-deep flex items-center justify-center">
               <span className="text-white text-xs font-heading font-bold">S</span>
             </div>
             <span className="font-heading font-semibold text-sm text-primary">

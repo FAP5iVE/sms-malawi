@@ -399,10 +399,10 @@ function HRContent() {
                       {s.jobTitle} · {s.department}
                     </p>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
+                      className={`text-xs ${
                         s.status === 'ACTIVE'
-                          ? 'bg-green-50 text-green-700'
-                          : 'bg-amber-50 text-amber-700'
+                          ? 'text-status-success'
+                          : 'text-status-warning'
                       }`}
                     >
                       {s.status}
@@ -440,10 +440,10 @@ function HRContent() {
                     </p>
                   </div>
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
+                    className={`text-xs shrink-0 ${
                       s.status === 'ACTIVE'
-                        ? 'bg-green-50 text-green-700'
-                        : 'bg-amber-50 text-amber-700'
+                        ? 'text-status-success'
+                        : 'text-status-warning'
                     }`}
                   >
                     {s.status}
@@ -509,7 +509,7 @@ function HRContent() {
                   type="button"
                   onClick={submitLeaveRequest}
                   disabled={applyForLeave.isPending}
-                  className="bg-brand-navy text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
+                  className="bg-brand-deep text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
                 >
                   {applyForLeave.isPending ? 'Submitting…' : 'Submit Request'}
                 </button>
@@ -531,10 +531,10 @@ function HRContent() {
                       <p className="text-sm font-medium text-body">{req.leaveType} · {req.days} day(s)</p>
                       <p className="text-xs text-muted">{new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()}</p>
                     </div>
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                      req.status === 'APPROVED' ? 'bg-green-50 text-green-700 border-green-200'
-                        : req.status === 'REJECTED' ? 'bg-brand-coral/10 text-brand-coral border-brand-coral/20'
-                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    <span className={`text-xs font-semibold ${
+                      req.status === 'APPROVED' ? 'text-status-success'
+                        : req.status === 'REJECTED' ? 'text-status-danger'
+                        : 'text-status-warning'
                     }`}>
                       {req.status}
                     </span>
@@ -587,7 +587,7 @@ function HRContent() {
                     type="button"
                     onClick={() => handleReview(req, 'APPROVED')}
                     disabled={reviewLeave.isPending}
-                    className="flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 min-h-11 disabled:opacity-60"
+                    className="flex items-center gap-1 text-xs font-semibold border border-status-success/60 text-status-success px-3 py-1.5 rounded-lg hover:bg-status-success/10 transition-colors min-h-11 disabled:opacity-60"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" /> Approve
                   </button>
@@ -595,16 +595,16 @@ function HRContent() {
                     type="button"
                     onClick={() => handleReview(req, 'REJECTED')}
                     disabled={reviewLeave.isPending}
-                    className="flex items-center gap-1 text-xs bg-brand-coral/10 text-brand-coral border border-brand-coral/20 px-3 py-1.5 rounded-lg hover:bg-brand-coral/20 min-h-11 disabled:opacity-60"
+                    className="flex items-center gap-1 text-xs font-semibold border border-status-danger/60 text-status-danger px-3 py-1.5 rounded-lg hover:bg-status-danger/10 transition-colors min-h-11 disabled:opacity-60"
                   >
                     <XCircle className="w-3.5 h-3.5" /> Reject
                   </button>
                 </div>
               ) : (
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border shrink-0 ${
+                <span className={`text-xs font-semibold shrink-0 ${
                   req.status === 'APPROVED'
-                    ? 'bg-green-50 text-green-700 border-green-200'
-                    : 'bg-brand-coral/10 text-brand-coral border-brand-coral/20'
+                    ? 'text-status-success'
+                    : 'text-status-danger'
                 }`}>
                   {req.status}
                 </span>
@@ -727,12 +727,12 @@ function HRContent() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const LOAN_STATUS_COLORS: Record<string, string> = {
-  PENDING:   'bg-brand-amber/10 text-brand-amber border-brand-amber/25',
-  APPROVED:  'bg-blue-50 text-blue-700 border-blue-200',
-  DISBURSED: 'bg-purple-50 text-purple-700 border-purple-200',
-  REPAYING:  'bg-brand-teal/10 text-brand-teal border-brand-teal/25',
-  SETTLED:   'bg-emerald-50 text-emerald-700 border-emerald-200',
-  REJECTED:  'bg-brand-coral/10 text-brand-coral border-brand-coral/25',
+  PENDING:   'text-status-warning',
+  APPROVED:  'text-status-info',
+  DISBURSED: 'text-status-accent',
+  REPAYING:  'text-status-success',
+  SETTLED:   'text-status-success',
+  REJECTED:  'text-status-danger',
 }
 
 function LoansTab({
@@ -901,7 +901,7 @@ function LoansTab({
                       </p>
                     )}
                   </div>
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border shrink-0 ${LOAN_STATUS_COLORS[loan.status] ?? ''}`}>
+                  <span className={`text-xs font-semibold shrink-0 ${LOAN_STATUS_COLORS[loan.status] ?? ''}`}>
                     {loan.status}
                   </span>
                 </div>
@@ -955,7 +955,7 @@ function LoansTab({
                       <p className="text-xs text-muted mt-1">{loan.reason}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${LOAN_STATUS_COLORS[loan.status] ?? ''}`}>
+                      <span className={`text-xs font-semibold ${LOAN_STATUS_COLORS[loan.status] ?? ''}`}>
                         {loan.status}
                       </span>
                       {loan.status === 'PENDING' && canApprove && (
@@ -963,7 +963,7 @@ function LoansTab({
                           type="button"
                           onClick={() => approveLoan.mutate(loan.id)}
                           disabled={approveLoan.isPending}
-                          className="text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 min-h-11 disabled:opacity-60"
+                          className="text-xs font-semibold border border-status-success/60 text-status-success px-3 py-1.5 rounded-lg hover:bg-status-success/10 transition-colors min-h-11 disabled:opacity-60"
                         >
                           Approve
                         </button>
@@ -973,7 +973,7 @@ function LoansTab({
                           type="button"
                           onClick={() => disburseLoan.mutate(loan.id)}
                           disabled={disburseLoan.isPending}
-                          className="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-3 py-1.5 rounded-lg hover:bg-purple-100 min-h-11 disabled:opacity-60"
+                          className="text-xs font-semibold border border-status-accent/60 text-status-accent px-3 py-1.5 rounded-lg hover:bg-status-accent/10 transition-colors min-h-11 disabled:opacity-60"
                         >
                           Disburse
                         </button>
@@ -982,7 +982,7 @@ function LoansTab({
                         <button
                           type="button"
                           onClick={() => setRepayTargetId(loan.id)}
-                          className="text-xs bg-brand-teal/10 text-brand-teal border border-brand-teal/25 px-3 py-1.5 rounded-lg hover:bg-brand-teal/20 min-h-11"
+                          className="text-xs font-semibold border border-status-success/60 text-status-success px-3 py-1.5 rounded-lg hover:bg-status-success/10 transition-colors min-h-11"
                         >
                           Record Repayment
                         </button>

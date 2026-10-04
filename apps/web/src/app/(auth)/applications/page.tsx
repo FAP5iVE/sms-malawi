@@ -146,7 +146,7 @@ function ApplicationsContent() {
                 <button
                   onClick={() => handleUpdateStatus(app.id, 'APPROVED')}
                   disabled={updating}
-                  className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg hover:bg-emerald-100 min-h-[44px] sm:min-h-0"
+                  className="flex items-center gap-1 text-xs font-semibold border border-status-success/60 text-status-success px-2.5 py-1 rounded-lg hover:bg-status-success/10 transition-colors disabled:opacity-60 min-h-[44px] sm:min-h-0"
                   aria-label={`Approve application from ${app.firstName} ${app.lastName}`}
                 >
                   <CheckCircle className="w-3.5 h-3.5" aria-hidden /> Approve
@@ -156,7 +156,7 @@ function ApplicationsContent() {
                 <button
                   onClick={() => handleUpdateStatus(app.id, 'DENIED')}
                   disabled={updating}
-                  className="flex items-center gap-1 text-xs text-brand-coral bg-brand-coral/10 border border-brand-coral/20 px-2.5 py-1 rounded-lg hover:bg-brand-coral/20 min-h-[44px] sm:min-h-0"
+                  className="flex items-center gap-1 text-xs font-semibold border border-status-danger/60 text-status-danger px-2.5 py-1 rounded-lg hover:bg-status-danger/10 transition-colors disabled:opacity-60 min-h-[44px] sm:min-h-0"
                   aria-label={`Deny application from ${app.firstName} ${app.lastName}`}
                 >
                   <XCircle className="w-3.5 h-3.5" aria-hidden /> Deny
@@ -168,7 +168,7 @@ function ApplicationsContent() {
             <button
               onClick={() => handleConvert(app.id)}
               disabled={converting}
-              className="flex items-center gap-1 text-xs text-brand-teal bg-brand-teal/10 border border-brand-teal/20 px-2.5 py-1 rounded-lg hover:bg-brand-teal/20 min-h-[44px] sm:min-h-0"
+              className="flex items-center gap-1 text-xs font-semibold border border-status-success/60 text-status-success px-2.5 py-1 rounded-lg hover:bg-status-success/10 transition-colors disabled:opacity-60 min-h-[44px] sm:min-h-0"
               aria-label={`Admit ${app.firstName} ${app.lastName} as a student`}
             >
               {converting ? (

@@ -94,11 +94,11 @@ function humanize(s: string) {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  IN_STORE: 'bg-brand-teal/10 text-brand-teal',
-  ALLOCATED: 'bg-brand-navy/10 text-brand-navy',
-  UNDER_REPAIR: 'bg-amber-100 text-amber-700',
-  DISPOSED: 'bg-base text-muted',
-  LOST: 'bg-brand-coral/10 text-brand-coral',
+  IN_STORE: 'text-status-success',
+  ALLOCATED: 'text-status-info',
+  UNDER_REPAIR: 'text-status-warning',
+  DISPOSED: 'text-muted',
+  LOST: 'text-status-danger',
 }
 
 type Tab = 'register' | 'rooms' | 'mine' | 'requests' | 'inventory' | 'stocktakes' | 'locations'
@@ -287,7 +287,7 @@ function RegisterTab() {
           <button
             type="button"
             onClick={() => setFormAsset(null)}
-            className="inline-flex items-center gap-1.5 bg-brand-navy text-white rounded-lg px-4 py-2.5 text-sm font-semibold min-h-11 shrink-0"
+            className="inline-flex items-center gap-1.5 bg-brand-deep text-white rounded-lg px-4 py-2.5 text-sm font-semibold min-h-11 shrink-0"
           >
             <Plus className="w-4 h-4" /> Add Asset
           </button>
@@ -335,7 +335,7 @@ function RegisterTab() {
                   {a.serialNumber && <p className="text-xs text-muted">S/N {a.serialNumber}</p>}
                 </td>
                 <td className="px-4 py-3">
-                  <span className="text-xs bg-base rounded px-2 py-0.5">
+                  <span className="text-xs">
                     {humanize(a.category)}
                   </span>
                 </td>
@@ -343,7 +343,7 @@ function RegisterTab() {
                 <td className="px-4 py-3 text-xs">{humanize(a.condition)}</td>
                 <td className="px-4 py-3">
                   <span
-                    className={`text-xs rounded px-2 py-0.5 font-medium ${STATUS_COLOR[a.status] ?? 'bg-base text-muted'}`}
+                    className={`text-xs font-medium ${STATUS_COLOR[a.status] ?? 'text-muted'}`}
                   >
                     {humanize(a.status)}
                   </span>
@@ -582,7 +582,7 @@ function AssetFormModal({ asset, onClose }: { asset: ApiAsset | null; onClose: (
             type="button"
             onClick={handleSave}
             disabled={pending || !name.trim()}
-            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
           >
             {pending ? 'Saving…' : asset ? 'Save Changes' : 'Add to Register'}
           </button>
@@ -627,7 +627,7 @@ function AllocateModal({ asset, onClose }: { asset: ApiAsset; onClose: () => voi
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md modal-panel bg-surface rounded-2xl shadow-xl">
+      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy">Allocate — {asset.name}</h2>
           <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
@@ -702,7 +702,7 @@ function AllocateModal({ asset, onClose }: { asset: ApiAsset; onClose: () => voi
             type="button"
             onClick={handleAllocate}
             disabled={allocate.isPending || !valid}
-            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
           >
             {allocate.isPending ? 'Allocating…' : 'Allocate'}
           </button>
@@ -727,7 +727,7 @@ function ConditionModal({ asset, onClose }: { asset: ApiAsset; onClose: () => vo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md modal-panel bg-surface rounded-2xl shadow-xl">
+      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy">Condition — {asset.name}</h2>
           <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
@@ -776,7 +776,7 @@ function ConditionModal({ asset, onClose }: { asset: ApiAsset; onClose: () => vo
               )
             }
             disabled={markCondition.isPending}
-            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
           >
             {markCondition.isPending ? 'Saving…' : 'Update Condition'}
           </button>
@@ -967,7 +967,7 @@ function RoomsTab() {
             <h3 className="font-heading font-semibold text-sm text-brand-navy">
               {g.departmentOrRoom}
             </h3>
-            <span className="text-xs bg-base rounded px-2 py-0.5 text-muted">
+            <span className="text-xs text-muted">
               {g.assignedToType === 'ROOM' ? 'Room' : 'Department'}
             </span>
           </div>
@@ -1025,7 +1025,7 @@ function MyAssignedTab() {
             <tr key={a.id} className="border-b border-base last:border-0">
               <td className="px-4 py-3 font-medium">{a.asset?.name ?? '—'}</td>
               <td className="px-4 py-3">
-                <span className="text-xs bg-base rounded px-2 py-0.5">
+                <span className="text-xs">
                   {a.asset ? humanize(a.asset.category) : '—'}
                 </span>
               </td>
@@ -1034,7 +1034,7 @@ function MyAssignedTab() {
               </td>
               <td className="px-4 py-3">
                 <span
-                  className={`text-xs rounded px-2 py-0.5 font-medium ${a.status === 'ACTIVE' ? 'bg-brand-navy/10 text-brand-navy' : 'bg-base text-muted'}`}
+                  className={`text-xs font-medium ${a.status === 'ACTIVE' ? 'text-status-info' : 'text-muted'}`}
                 >
                   {a.status === 'ACTIVE' ? 'With you' : 'Returned'}
                 </span>
@@ -1094,12 +1094,12 @@ function RequestsTab() {
                   </p>
                 </div>
                 <span
-                  className={`rounded px-2 py-0.5 font-medium ${
+                  className={`font-medium ${
                     r.status === 'PENDING'
-                      ? 'bg-amber-100 text-amber-700'
+                      ? 'text-status-warning'
                       : r.status === 'REJECTED'
-                        ? 'bg-brand-coral/10 text-brand-coral'
-                        : 'bg-brand-teal/10 text-brand-teal'
+                        ? 'text-status-danger'
+                        : 'text-status-success'
                   }`}
                 >
                   {humanize(r.status)}
@@ -1263,7 +1263,7 @@ function RecordAdvanceModal({ requestId, onClose }: { requestId: string; onClose
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-sm modal-panel bg-surface rounded-2xl shadow-xl">
+      <div className="relative z-10 w-full max-w-sm bg-surface rounded-2xl shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy">Record Advance</h2>
           <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
@@ -1323,7 +1323,7 @@ function RecordAdvanceModal({ requestId, onClose }: { requestId: string; onClose
                 { onSuccess: onClose }
               )
             }
-            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
           >
             {recordAdvance.isPending ? 'Recording…' : 'Record Advance'}
           </button>
@@ -1418,7 +1418,7 @@ function RequestFormModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md modal-panel bg-surface rounded-2xl shadow-xl">
+      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy">Request Equipment</h2>
           <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
@@ -1509,7 +1509,7 @@ function RequestFormModal({ onClose }: { onClose: () => void }) {
                 { onSuccess: onClose }
               )
             }
-            className="w-full bg-brand-navy text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
           >
             {createRequest.isPending ? 'Submitting…' : 'Submit Request'}
           </button>

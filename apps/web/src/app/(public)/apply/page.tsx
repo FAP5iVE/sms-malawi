@@ -295,7 +295,7 @@ export default function ApplyPage() {
           </div>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 bg-brand-navy text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:bg-brand-navy-mid transition-colors"
+            className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" /> Back to Homepage
           </Link>
@@ -321,7 +321,7 @@ export default function ApplyPage() {
           </Link>
           <div className="h-4 w-px bg-base shrink-0" />
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-brand-navy flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-brand-deep flex items-center justify-center">
               <span className="text-white text-xs font-heading font-bold">S</span>
             </div>
             <span className="font-heading font-semibold text-sm text-primary">
@@ -366,7 +366,7 @@ export default function ApplyPage() {
                       done
                         ? 'bg-brand-teal border-brand-teal text-white'
                         : active
-                          ? 'bg-brand-navy border-brand-navy text-white'
+                          ? 'bg-brand-deep border-brand-navy text-white'
                           : 'bg-surface border-base text-muted',
                     ].join(' ')}
                   >
@@ -790,7 +790,7 @@ export default function ApplyPage() {
                 key="next-btn"
                 type="button"
                 onClick={goNext}
-                className="flex items-center gap-2 bg-brand-navy text-white px-6 py-2.5 rounded-xl text-sm font-heading font-semibold hover:bg-brand-navy-mid transition-colors"
+                className="flex items-center gap-2 bg-brand-deep text-white px-6 py-2.5 rounded-xl text-sm font-heading font-semibold hover:brightness-125 transition-colors"
               >
                 Next <ChevronRight className="w-4 h-4" />
               </button>

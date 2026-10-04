@@ -106,7 +106,7 @@ function ProfileContent() {
         <h1 className="font-heading text-xl font-bold text-brand-navy">
           {student.firstName} {student.otherNames ? `${student.otherNames} ` : ''}{student.lastName}
         </h1>
-        <span className="ml-auto font-mono text-xs text-muted bg-page px-2 py-1 rounded border border-base">
+        <span className="ml-auto font-mono text-xs text-muted">
           {student.registrationNo}
         </span>
         <PermissionGuard permission="student.edit">

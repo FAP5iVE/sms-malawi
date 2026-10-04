@@ -579,7 +579,7 @@ function RoleTabs({
           onClick={() => onChange(t.id)}
           className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors ${
             active === t.id
-              ? 'bg-brand-navy text-white'
+              ? 'bg-brand-deep text-white'
               : 'text-muted hover:bg-base hover:text-brand-navy'
           }`}
         >
@@ -976,7 +976,7 @@ function AdminAuditPanel() {
                     {log.actorEmployeeNo ?? log.actorRegistrationNo ?? <span>—</span>}
                   </td>
                   <td className="px-4 py-3 truncate">
-                    <span className="text-xs bg-base rounded-lg px-2 py-0.5">{log.actorRole}</span>
+                    <span className="text-xs">{log.actorRole}</span>
                   </td>
                   <td className="px-4 py-3 text-xs text-muted truncate">
                     {new Date(log.createdAt).toLocaleString('en-GB', {
@@ -2006,7 +2006,7 @@ function LibraryOverviewPanel() {
                     className="flex items-center justify-between py-2 border-b border-base last:border-0"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full bg-brand-navy text-white text-xs flex items-center justify-center font-bold">
+                      <span className="w-6 h-6 rounded-full bg-brand-deep text-white text-xs flex items-center justify-center font-bold">
                         {i + 1}
                       </span>
                       <div>
@@ -2614,14 +2614,14 @@ function StudentFeesPanel({ studentId }: { studentId: string }) {
                   <p className="text-xs text-muted">Due {inv.dueDate}</p>
                 </div>
                 <span
-                  className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                  className={`text-xs font-semibold ${
                     inv.status === 'PAID'
-                      ? 'bg-green-50 text-green-700'
+                      ? 'text-status-success'
                       : inv.status === 'OVERDUE'
-                        ? 'bg-red-50 text-red-700'
+                        ? 'text-status-danger'
                         : inv.status === 'PARTIAL'
-                          ? 'bg-amber-50 text-amber-700'
-                          : 'bg-base text-muted'
+                          ? 'text-status-warning'
+                          : 'text-muted'
                   }`}
                 >
                   {inv.status}
@@ -2686,7 +2686,7 @@ function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
       {stats?.map((stat) => (
         <div key={stat.examType} className="space-y-4">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-brand-navy text-white">
+            <span className="text-xs font-bold text-status-info">
               {stat.examType}
             </span>
             <span className="text-sm text-muted">{stat.total} candidates</span>

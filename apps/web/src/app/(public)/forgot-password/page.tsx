@@ -82,7 +82,7 @@ export default function ForgotPasswordPage() {
           href="/"
           aria-label="Back to homepage"
           title="Back to homepage"
-          className="w-9 h-9 rounded-lg bg-brand-navy hover:bg-brand-navy-mid text-white shadow-md flex items-center justify-center transition-colors"
+          className="w-9 h-9 rounded-lg bg-brand-deep hover:brightness-125 text-white shadow-md flex items-center justify-center transition-colors"
         >
           <Home className="w-4 h-4" />
         </Link>
@@ -115,7 +115,7 @@ export default function ForgotPasswordPage() {
                 </p>
                 <Link
                   href="/login"
-                  className="inline-flex items-center gap-2 bg-brand-navy text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:bg-brand-navy-mid transition-colors"
+                  className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4" /> Return to login
                 </Link>
@@ -160,7 +160,7 @@ export default function ForgotPasswordPage() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 bg-brand-navy hover:bg-brand-navy-mid active:bg-brand-navy text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-2 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 border border-transparent dark:border-white/10 dark:hover:border-brand-teal/40"
+                    className="w-full py-3 bg-brand-deep hover:brightness-125 active:brightness-90 text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-2 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 border border-transparent dark:border-white/10 dark:hover:border-brand-teal/40"
                   >
                     {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                     {loading ? 'Sending…' : 'Send Reset Link'}

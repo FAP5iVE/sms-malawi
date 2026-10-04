@@ -203,7 +203,7 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-heading font-semibold text-body">{a.title}</h3>
                 {a.eventDate && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-heading font-bold px-2 py-0.5 rounded-full bg-brand-navy/10 text-brand-navy">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-heading font-bold text-status-info">
                     <CalendarDays className="w-3 h-3" aria-hidden />
                     {new Date(a.eventDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
@@ -213,12 +213,12 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
             </div>
             <div className="shrink-0 flex items-center gap-2">
               <span
-                className={`text-[10px] font-heading font-bold px-2.5 py-1 rounded-full ${
+                className={`text-[10px] font-heading font-bold ${
                   a.status === 'PUBLISHED'
-                    ? 'bg-brand-teal/15 text-brand-teal'
+                    ? 'text-status-success'
                     : a.status === 'PENDING_APPROVAL'
-                      ? 'bg-brand-amber/15 text-brand-amber'
-                      : 'bg-base text-muted'
+                      ? 'text-status-warning'
+                      : 'text-muted'
                 }`}
               >
                 {a.status}
