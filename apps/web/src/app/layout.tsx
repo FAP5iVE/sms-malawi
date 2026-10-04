@@ -57,6 +57,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  // `cover` makes env(safe-area-inset-*) report real values on notched /
+  // home-indicator devices. Without it they were always 0, so the bottom
+  // nav's safe-area padding (MobileBottomNav, .main-scroll-pad) never applied.
+  viewportFit: 'cover',
   themeColor: BRAND_NAVY,
 }
 

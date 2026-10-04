@@ -855,3 +855,95 @@
     padding-bottom: 1.5rem !important;
   }
 }
+
+
+/* ─────────────────────────────────────────────────────────
+   MOBILE UI SYSTEM  (below 768px — the same breakpoint as
+   Tailwind's `md`, which is where the shell swaps Sidebar for
+   MobileBottomNav, so there is exactly one mobile/desktop seam)
+
+   Decisions, after reviewing "8 rules for perfect mobile design"
+   and "58 rules for beautiful UI design" (neither gives numbers,
+   so the values below come from the platform guidelines they
+   point at — Material 3 compact / Apple HIG — not from the articles):
+
+   • Screen-edge gutter: 16px. This is the guideline minimum, and it
+     also covers the articles' "curved displays need extra padding"
+     rule. Space is saved INSIDE cards instead (see --space-card),
+     where nested padding was stacking up (page 16 + card 16 + cell 16).
+   • Card padding: 12px, 8px gaps between tightly related items, on the
+     4/8pt grid. Desktop (md+) is untouched.
+   • Touch targets: 44px minimum (HIG; Material says 48dp).
+   • Text inputs: 16px, below which iOS Safari zooms the page on focus
+     (the existing `.input` class and shadcn primitives already did this;
+     this extends it to the many hand-written inputs).
+   • NOT adopted from the articles: golden ratio / rule of thirds,
+     F/Z-patterns, gamification, storytelling, video, "novelty" and
+     most of the 58 rules — product/brand guidance, not layout
+     constraints for a data-dense admin app.
+
+   These rules are deliberately UNLAYERED, like .main-scroll-pad below:
+   unlayered CSS beats Tailwind's `@layer utilities`, so one rule here
+   can override a utility class on many pages without touching each one.
+   ───────────────────────────────────────────────────────── */
+
+:root {
+  --space-gutter: 1rem;      /* 16px — screen-edge margin on mobile */
+  --space-card:   0.75rem;   /* 12px — padding inside nested cards on mobile */
+  --touch-min:    2.75rem;   /* 44px — minimum interactive target */
+}
+
+@media (max-width: 767px) {
+  /* Every page repeats a `text-2xl` <h1> directly under a mobile header
+     that already shows the page title. Keep the h1 (it carries subtitle
+     context and is the page landmark) but stop it dominating the viewport. */
+  main h1 {
+    font-size: 1.25rem;
+    line-height: 1.3;
+  }
+
+  /* 16px text controls — prevents iOS focus-zoom. Checkbox/radio/range etc.
+     are excluded; they have no text to zoom. */
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']):not([type='button']):not([type='submit']):not([type='reset']):not([type='hidden']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Horizontally scrollable data region with scroll-edge shadows (a shadow
+   only appears on a side that still has content to scroll to). Replaces the
+   bare `overflow-hidden` wrappers that clipped table columns on phones, and
+   the missing wrappers that let a wide <table> stretch the whole page. */
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  background:
+    linear-gradient(to right, hsl(var(--card)) 30%, transparent) left center,
+    linear-gradient(to left,  hsl(var(--card)) 30%, transparent) right center,
+    radial-gradient(farthest-side at 0 50%,    rgb(0 0 0 / 0.16), transparent) left center,
+    radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 0.16), transparent) right center;
+  background-repeat: no-repeat;
+  background-size: 2rem 100%, 2rem 100%, 0.75rem 100%, 0.75rem 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* Dialog panels: never taller than the visible viewport (dvh follows the
+   on-screen keyboard / collapsing browser bars) and scroll inside instead of
+   being cut off top and bottom by the flex-centred overlay. */
+.modal-panel {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Minimum 44×44 hit area for icon-only buttons. */
+.touch-target {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+}

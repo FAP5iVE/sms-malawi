@@ -6,7 +6,7 @@
  * Responsive page header with distinct mobile and desktop variants.
  *
  * Mobile layout (< md, h-14):
- *   [BookOpen logo] — [Current page title — animated] — [Search icon | Bell icon]
+ *   [School logo] — [Current page title — animated] — [Search icon | Bell icon]
  *   • Page title derived from pathname matched against all role-visible nav items.
  *   • Search icon → full-width slide-down overlay with auto-focused input.
  *   • Bell icon → fixed notification panel anchored below header.
@@ -64,11 +64,11 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import Image                            from 'next/image'
 import { usePathname, useRouter }       from 'next/navigation'
 import { AnimatePresence, motion }       from 'framer-motion'
 import {
   Bell,
-  BookOpen,
   ChevronDown,
   LogOut,
   Search,
@@ -545,19 +545,24 @@ export function PageHeader() {
             ════════════════════════════════════════════════════════════════════ */}
         <div className="flex items-center h-14 px-4 gap-2 md:hidden">
 
-          {/* Left: Logo icon — taps navigate to dashboard */}
+          {/* Left: school logo — taps navigate to dashboard.
+              Same live mark the desktop Sidebar renders (/favicon.png), with
+              no tinted placeholder behind it, so the two shells stay in sync.
+              44×44 hit area (touch-target minimum) around a 40px mark. */}
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
-            className="
-              shrink-0 w-8 h-8 rounded-xl
-              bg-brand-teal/10
-              flex items-center justify-center
-              transition-colors hover:bg-brand-teal/20
-            "
+            className="shrink-0 w-11 h-11 -ml-1.5 flex items-center justify-center rounded-xl active:bg-page transition-colors"
             aria-label="Go to Dashboard"
           >
-            <BookOpen className="w-4 h-4 text-brand-teal" aria-hidden />
+            <Image
+              src="/favicon.png"
+              alt=""
+              width={40}
+              height={40}
+              priority
+              className="w-10 h-10 object-contain"
+            />
           </button>
 
           {/* Center: Animated page title — fills remaining space */}
@@ -573,7 +578,7 @@ export function PageHeader() {
                 setSearchOpen(true)
                 setMobileBellOpen(false)
               }}
-              className="p-2 rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
+              className="touch-target rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
               aria-label="Open search"
               aria-expanded={searchOpen}
             >
@@ -583,7 +588,7 @@ export function PageHeader() {
             <button
               type="button"
               onClick={openMobileBell}
-              className="relative p-2 rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
+              className="relative touch-target rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
               aria-label={bellAriaLabel}
               aria-expanded={mobileBellOpen}
             >
@@ -591,7 +596,7 @@ export function PageHeader() {
               {unreadCount > 0 && (
                 <span
                   className="
-                    absolute top-1 right-1
+                    absolute top-2 right-2
                     min-w-[14px] h-3.5
                     bg-brand-coral rounded-full
                     text-white text-[8px] font-heading font-bold

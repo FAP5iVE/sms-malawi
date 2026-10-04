@@ -136,8 +136,8 @@ export function HRDashboard() {
   })
 
   return (
-    <div className="space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard
           label="Total Staff"
           value={statValue(staffLoading, staff?.length)}
@@ -176,7 +176,7 @@ export function HRDashboard() {
         />
       </StatCardGrid>
       <QuickActions actions={QUICK_ACTIONS} />
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
           title="Contract Expiry Alerts"
           sub={`Expiring in the next ${CONTRACT_ALERT_DAYS} days`}

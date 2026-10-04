@@ -232,8 +232,8 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
           </div>
 
           {/* Table */}
-          <div className="overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="table-scroll">
+            <table className="w-full text-sm min-w-140">
               <thead>
                 <tr className="border-b border-base bg-page">
                   <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">

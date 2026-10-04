@@ -258,6 +258,57 @@ function ExamsPageInner() {
     return true
   })
 
+  // Per-exam workflow actions. One definition shared by the desktop table row
+  // and the mobile card, so the two layouts can never drift apart.
+  function renderExamActions(exam: ApiExam) {
+    return (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            {canEnterMarks &&
+              (EXAM_MARKS_ENTERABLE_STATUSES as readonly string[]).includes(exam.status) && (
+                <button
+                  onClick={() => setMarksExamId(exam.id)}
+                  className="text-xs text-brand-teal hover:underline flex items-center gap-1 min-h-11 md:min-h-0"
+                >
+                  Enter Marks <ChevronRight className="w-3 h-3" />
+                </button>
+              )}
+            {(canApprove || canCorrect) && (exam.status === 'MARKS_FINAL' || exam.status === 'RESULTS_APPROVED') && (
+              <button
+                onClick={() => setReviewExamId(exam.id)}
+                className="text-xs text-brand-teal hover:underline flex items-center gap-1 min-h-11 md:min-h-0"
+              >
+                {canCorrect ? 'Review / Correct' : 'Review Marks'} <ChevronRight className="w-3 h-3" />
+              </button>
+            )}
+            {canApprove && exam.status === 'MARKS_FINAL' && (
+              /* [ACTION AFFORDANCE] Approve and Release are
+                 state-changing actions on exam results, but
+                 they rendered as bare underlined text,
+                 visually identical to the "Review / Correct"
+                 navigation link beside them. Both are now
+                 real buttons so an irreversible action looks
+                 like one. */
+              <button
+                onClick={() => approveResults.mutate(exam.id)}
+                disabled={approveResults.isPending}
+                className="text-xs font-semibold px-3 py-1.5 min-h-11 md:min-h-0 rounded-lg border border-brand-navy text-brand-navy hover:bg-brand-navy hover:text-white transition-colors disabled:opacity-60"
+              >
+                {approveResults.isPending ? 'Approving…' : 'Approve'}
+              </button>
+            )}
+            {canRelease && exam.status === 'RESULTS_APPROVED' && (
+              <button
+                onClick={() => releaseResults.mutate(exam.id)}
+                disabled={releaseResults.isPending}
+                className="text-xs font-semibold px-3 py-1.5 min-h-11 md:min-h-0 rounded-lg bg-brand-teal text-white hover:bg-brand-teal-light transition-colors disabled:opacity-60"
+              >
+                {releaseResults.isPending ? 'Releasing…' : 'Release to Students'}
+              </button>
+            )}
+          </div>
+    )
+  }
+
   return (
     <RoleGuard allowed={[...ALLOWED_ROLES]}>
       {/* [PRODUCTION FIX] This page previously wrapped its whole content in
@@ -403,8 +454,45 @@ function ExamsPageInner() {
                 // same reasoning as the empty state above. The header row's
                 // bg-page and the row dividers/hover states already give
                 // the table visual structure without an outer card.
-                <div className="overflow-hidden">
-                  <table className="w-full text-sm border-collapse">
+                <>
+                {/* Mobile (< md): one card per exam. The 5-column table below
+                    was clipped by an `overflow-hidden` wrapper on phones, which
+                    hid Status and Actions entirely. */}
+                <ul className="md:hidden divide-y divide-base">
+                  {exams.map((exam) => (
+                    <li key={exam.id} className="py-3 space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => exam.status === 'RESULTS_RELEASED' ? setViewMarksExamId(exam.id) : setDetailExamId(exam.id)}
+                        className="block w-full text-left min-h-11"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-medium text-body wrap-break-word min-w-0">{exam.title}</p>
+                          <span
+                            className={`shrink-0 text-[11px] font-semibold uppercase tracking-wide ${
+                              exam.status === 'RESULTS_RELEASED' || exam.status === 'RESULTS_APPROVED'
+                                ? 'text-brand-teal'
+                                : exam.status === 'MARKS_FINAL'
+                                  ? 'text-brand-navy'
+                                  : exam.status.includes('MARKS')
+                                    ? 'text-brand-amber'
+                                    : 'text-muted'
+                            }`}
+                          >
+                            {exam.status.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted mt-0.5">
+                          {exam.type.replace(/_/g, ' ')} · {exam.subject} · {new Date(exam.date).toLocaleDateString('en-MW')}
+                        </p>
+                      </button>
+                      {renderExamActions(exam)}
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="hidden md:block table-scroll">
+                  <table className="w-full text-sm border-collapse min-w-160">
                     <thead>
                       <tr className="bg-page border-b border-base">
                         {['Title', 'Subject', 'Date', 'Status', 'Actions'].map((h) => (
@@ -461,56 +549,14 @@ function ExamsPageInner() {
                             </span>
                           </td>
                           <td className="px-5 py-3">
-                            <div className="flex items-center gap-2">
-                              {canEnterMarks &&
-                                (EXAM_MARKS_ENTERABLE_STATUSES as readonly string[]).includes(exam.status) && (
-                                  <button
-                                    onClick={() => setMarksExamId(exam.id)}
-                                    className="text-xs text-brand-teal hover:underline flex items-center gap-1"
-                                  >
-                                    Enter Marks <ChevronRight className="w-3 h-3" />
-                                  </button>
-                                )}
-                              {(canApprove || canCorrect) && (exam.status === 'MARKS_FINAL' || exam.status === 'RESULTS_APPROVED') && (
-                                <button
-                                  onClick={() => setReviewExamId(exam.id)}
-                                  className="text-xs text-brand-teal hover:underline flex items-center gap-1"
-                                >
-                                  {canCorrect ? 'Review / Correct' : 'Review Marks'} <ChevronRight className="w-3 h-3" />
-                                </button>
-                              )}
-                              {canApprove && exam.status === 'MARKS_FINAL' && (
-                                /* [ACTION AFFORDANCE] Approve and Release are
-                                   state-changing actions on exam results, but
-                                   they rendered as bare underlined text,
-                                   visually identical to the "Review / Correct"
-                                   navigation link beside them. Both are now
-                                   real buttons so an irreversible action looks
-                                   like one. */
-                                <button
-                                  onClick={() => approveResults.mutate(exam.id)}
-                                  disabled={approveResults.isPending}
-                                  className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-brand-navy text-brand-navy hover:bg-brand-navy hover:text-white transition-colors disabled:opacity-60"
-                                >
-                                  {approveResults.isPending ? 'Approving…' : 'Approve'}
-                                </button>
-                              )}
-                              {canRelease && exam.status === 'RESULTS_APPROVED' && (
-                                <button
-                                  onClick={() => releaseResults.mutate(exam.id)}
-                                  disabled={releaseResults.isPending}
-                                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-teal text-white hover:bg-brand-teal-light transition-colors disabled:opacity-60"
-                                >
-                                  {releaseResults.isPending ? 'Releasing…' : 'Release to Students'}
-                                </button>
-                              )}
-                            </div>
+                            {renderExamActions(exam)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
             </div>
           )}
@@ -626,7 +672,7 @@ function ExamsPageInner() {
         {detailExamId && detailExam && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="Exam details">
             <div className="absolute inset-0" onClick={() => setDetailExamId(null)} />
-            <div className="relative z-10 w-full max-w-lg bg-surface rounded-2xl shadow-xl overflow-hidden">
+      <div className="relative z-10 w-full max-w-lg modal-panel bg-surface rounded-2xl shadow-xl ">
               <div className="flex items-center justify-between px-6 py-4 border-b border-base">
                 <div>
                   <h2 className="font-heading font-bold text-brand-navy">{detailExam.title}</h2>

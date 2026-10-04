@@ -16,6 +16,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useIsMobileSync } from '@/hooks/use-mobile'
 import { createPortal } from 'react-dom'
 import { useForm } from 'react-hook-form'
 import type { Resolver } from 'react-hook-form'
@@ -47,9 +48,8 @@ export default function AssignmentForm({ classId, onClose }: AssignmentFormProps
   const [visible, setVisible] = useState(true)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  const [isMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false,
-  )
+  // Live breakpoint — see useIsMobileSync() (was a one-shot read at mount).
+  const isMobile = useIsMobileSync()
 
   const {
     register,

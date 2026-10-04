@@ -129,7 +129,7 @@ function TabScrollContainer({ children }: { children: React.ReactNode }) {
       className="
         overflow-x-auto
         [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
-        -mx-4 px-4 sm:mx-0 sm:px-0
+        -mx-3 px-3 sm:mx-0 sm:px-0
       "
       role="tablist"
       aria-label="Module tabs"

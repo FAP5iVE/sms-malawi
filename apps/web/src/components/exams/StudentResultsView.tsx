@@ -226,8 +226,8 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
         </div>
       </div>
 
-      <div className={bordered ? 'border border-base rounded-xl overflow-hidden' : 'overflow-hidden'}>
-        <table className="w-full text-sm border-collapse">
+      <div className={bordered ? 'border border-base rounded-xl table-scroll' : 'table-scroll'}>
+        <table className="w-full text-sm border-collapse min-w-120">
           <thead>
             <tr className="bg-page border-b border-base">
               {['Subject','Average','Grade','Result'].map((h) => (

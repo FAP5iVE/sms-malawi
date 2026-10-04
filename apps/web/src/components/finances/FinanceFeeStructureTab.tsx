@@ -234,7 +234,8 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
                   No fee commitments for {selectedStudent.firstName} this term yet.
                 </p>
               ) : (
-                <table className="w-full text-sm">
+                <div className="table-scroll">
+                <table className="w-full text-sm min-w-130">
                   <thead>
                     <tr className="border-b border-base bg-page">
                       <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">Fee Category &amp; Code</th>
@@ -269,6 +270,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </div>

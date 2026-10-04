@@ -75,7 +75,10 @@ export function WelcomeHeader({ greeting, name, detail }: WelcomeHeaderProps) {
   return (
     <div className="flex items-center gap-3 sm:gap-4">
       <div
-        className="shrink-0 overflow-hidden rounded-full bg-[#e4e9f7]"
+        // The avatar is sized from the text block's height (JS, below). On a phone a
+        // two-line greeting made it ~88px — a quarter of the viewport width for
+        // decoration. max-w/max-h clamp it to 48px below `sm`; no effect at sm+.
+        className="shrink-0 overflow-hidden rounded-full bg-[#e4e9f7] max-w-12 max-h-12 sm:max-w-none sm:max-h-none"
         style={{ width: size, height: size }}
         aria-hidden="true"
       >

@@ -627,7 +627,7 @@ function AllocateModal({ asset, onClose }: { asset: ApiAsset; onClose: () => voi
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
+      <div className="relative z-10 w-full max-w-md modal-panel bg-surface rounded-2xl shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy">Allocate — {asset.name}</h2>
           <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
@@ -727,7 +727,7 @@ function ConditionModal({ asset, onClose }: { asset: ApiAsset; onClose: () => vo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
+      <div className="relative z-10 w-full max-w-md modal-panel bg-surface rounded-2xl shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy">Condition — {asset.name}</h2>
           <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
@@ -1263,7 +1263,7 @@ function RecordAdvanceModal({ requestId, onClose }: { requestId: string; onClose
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-sm bg-surface rounded-2xl shadow-xl">
+      <div className="relative z-10 w-full max-w-sm modal-panel bg-surface rounded-2xl shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy">Record Advance</h2>
           <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
@@ -1418,7 +1418,7 @@ function RequestFormModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
+      <div className="relative z-10 w-full max-w-md modal-panel bg-surface rounded-2xl shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-base">
           <h2 className="font-heading font-bold text-brand-navy">Request Equipment</h2>
           <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">

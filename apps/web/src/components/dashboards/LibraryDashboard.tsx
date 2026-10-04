@@ -89,8 +89,8 @@ export function LibraryDashboard() {
   }))
 
   return (
-    <div className="space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard
           label="Total Books"
           value={statValue(isLoading, stats?.totalBooks)}
@@ -133,7 +133,7 @@ export function LibraryDashboard() {
         />
       </StatCardGrid>
       <QuickActions actions={QUICK_ACTIONS} />
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ChartCard
           title="Borrow Trends"
           sub="Weekly borrowing activity (last 12 weeks)"

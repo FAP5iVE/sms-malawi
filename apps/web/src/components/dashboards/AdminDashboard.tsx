@@ -119,10 +119,10 @@ export function AdminDashboard() {
   const recentAnnouncements = announcements.slice(0, 5)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
 
       {/* Stat row — StatCardGrid orchestrates stagger animation (B8 + C6) */}
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard
           label="Total Users"
           value={statValue(usersLoading, users?.users.length)}
@@ -163,7 +163,7 @@ export function AdminDashboard() {
 
       <QuickActions actions={QUICK_ACTIONS} />
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ChartCard
           title="User Activity"
           sub="Login success vs failure (last 30 days)"

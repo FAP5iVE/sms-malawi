@@ -1561,7 +1561,7 @@ export default function LandingPage() {
                 © {currentYearNum} {schoolInfo?.schoolName ?? 'SMS Malawi'}. All rights reserved.
               </p>
               <div className="flex items-center gap-5">
-                <p className="text-[12.5px] text-white/30">The system designed by 5ive Stack Labs</p>
+                <p className="text-[12.5px] text-white/30">The system designed by 5iveStack Labs</p>
                 <div className="flex gap-4.5 text-[12.5px]">
                   <Link href="/privacy" className="text-white/35 hover:text-white transition-colors">Privacy Policy</Link>
                   <Link href="/terms" className="text-white/35 hover:text-white transition-colors">Terms of Use</Link>

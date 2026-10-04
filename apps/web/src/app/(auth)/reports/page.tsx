@@ -1315,8 +1315,8 @@ function HighRankTeachersPanel({ academicYear, term }: { academicYear: string; t
             )}
           </ChartCard>
           {teachers && teachers.length > 0 && (
-            <div className="overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="table-scroll">
+              <table className="w-full text-sm min-w-130">
                 <thead>
                   <tr className="bg-page border-b border-base">
                     {['Teacher', 'Department', 'Classes', 'Avg Score', 'Pass Rate'].map((h) => (
@@ -1652,8 +1652,8 @@ function FinanceOutstandingPanel({ academicYear, term }: { academicYear: string;
                   <Bar dataKey="outstanding" fill={chartColorAt(3)} radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-              <div className="mt-4 overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="mt-4 table-scroll">
+                <table className="w-full text-sm min-w-130">
                   <thead>
                     <tr className="bg-page border-b border-base">
                       {['Class', 'Students', 'Outstanding'].map((h) => (
@@ -1851,8 +1851,8 @@ function FinanceCashFlowPanel({ academicYear }: { academicYear: string }) {
                   />
                 </ComposedChart>
               </ResponsiveContainer>
-              <div className="mt-4 overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="mt-4 table-scroll">
+                <table className="w-full text-sm min-w-130">
                   <thead>
                     <tr className="bg-page border-b border-base">
                       {['Term', 'Revenue', 'Expenses', 'Payroll', 'Net'].map((h) => (
@@ -2328,8 +2328,8 @@ function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; t
             )}
           </ChartCard>
           {rows && rows.length > 0 && (
-            <div className="overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="table-scroll">
+              <table className="w-full text-sm min-w-130">
                 <thead>
                   <tr className="bg-page border-b border-base">
                     {['Subject', 'Class', 'Students', 'Avg Score', 'Pass Rate'].map((h) => (

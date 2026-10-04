@@ -49,6 +49,7 @@
  */
 
 import { useState, useEffect }      from 'react'
+import { useIsMobileSync }          from '@/hooks/use-mobile'
 import { createPortal }             from 'react-dom'
 import { z }                        from 'zod'
 import { useForm }                  from 'react-hook-form'
@@ -302,10 +303,10 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   const [direction, setDirection]     = useState<1 | -1>(1)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // Detect mobile at mount time — safe: component only ever mounts on click
-  const [isMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false,
-  )
+  // Live breakpoint (was a one-shot read at mount, so resizing or rotating
+  // with the form open left the wrong layout). Form state lives in this
+  // component, so switching sheet <-> dialog keeps everything the user typed.
+  const isMobile = useIsMobileSync()
 
   const {
     register,

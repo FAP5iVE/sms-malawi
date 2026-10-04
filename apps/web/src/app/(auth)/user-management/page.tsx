@@ -66,7 +66,7 @@ export default function UserManagementPage() {
     <RoleGuard allowed={['admin']}>
       {/* useSearchParams() requires a Suspense boundary or `next build` fails —
           same convention as (public)/login/page.tsx and (auth)/exams/page.tsx. */}
-      <Suspense fallback={<div className="p-6 space-y-3"><div className="h-8 w-40 rounded-lg bg-surface animate-pulse" /><div className="h-48 rounded-xl bg-surface animate-pulse" /></div>}>
+      <Suspense fallback={<div className="p-3 sm:p-6 space-y-3"><div className="h-8 w-40 rounded-lg bg-surface animate-pulse" /><div className="h-48 rounded-xl bg-surface animate-pulse" /></div>}>
         <UserManagementContent />
       </Suspense>
     </RoleGuard>
@@ -266,8 +266,83 @@ function UserManagementContent() {
     )
   }
 
+  // ── Mobile (< md) card renderer ──────────────────────────────────────────
+  // A six-column <table> cannot fit a phone: with no scroll container it
+  // stretched past the ModuleSurface card and dragged the whole page sideways.
+  // Below md each account is a stacked card instead (same data, same handlers
+  // as renderUserRow); md+ keeps the table. Both are always in the DOM and
+  // swapped by CSS only, so resizing across the breakpoint is seamless and
+  // keeps filters/sort/scroll state.
+  function renderUserCard(u: ApiFirebaseUser) {
+    const profileHref = u.staffProfileId
+      ? `/hr/${u.staffProfileId}`
+      : u.studentId
+        ? `/students/${u.studentId}`
+        : null
+    const identity = (
+      <>
+        <p className="font-medium text-body wrap-break-word">{u.displayName || u.email}</p>
+        <p className="text-xs text-muted break-all">{u.email}</p>
+      </>
+    )
+    const refNo = u.employeeNo ?? u.registrationNo
+
+    return (
+      <li key={u.uid} className="py-3 space-y-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            {profileHref ? (
+              <Link href={profileHref} className="block active:underline">{identity}</Link>
+            ) : identity}
+            <p className="text-[10.5px] text-muted/70 font-mono mt-0.5 truncate">{u.uid}</p>
+          </div>
+          <span className={`shrink-0 text-xs font-semibold ${u.disabled ? 'text-brand-coral' : 'text-brand-teal'}`}>
+            {u.disabled ? 'Disabled' : 'Active'}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
+          {refNo && <span className="font-mono">{refNo}</span>}
+          <span>Last sign-in: {u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString('en-MW') : 'Never'}</span>
+          {u.requiresPasswordChange && <span className="text-brand-amber">Must change PW</span>}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <select
+            aria-label={`Role for ${u.displayName ?? u.email}`}
+            value={u.role ?? ''}
+            onChange={(e) => updateRole.mutate({ uid: u.uid, role: e.target.value })}
+            className="flex-1 min-w-0 min-h-11 border border-base rounded-lg px-2 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+          >
+            {USER_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+          </select>
+          <button
+            type="button"
+            onClick={() =>
+              u.disabled
+                ? toggleDisabled.mutate({ uid: u.uid, disabled: false })
+                : setPendingDisable(u)
+            }
+            aria-label={u.disabled ? `Enable ${u.displayName ?? u.email}` : `Disable ${u.displayName ?? u.email}`}
+            className="touch-target shrink-0 border border-base rounded-lg text-muted active:bg-page"
+          >
+            <Power className="w-4 h-4" aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => resetPassword.mutate(u.uid)}
+            aria-label={`Send password reset to ${u.displayName ?? u.email}`}
+            className="touch-target shrink-0 border border-base rounded-lg text-muted active:bg-page"
+          >
+            <Key className="w-4 h-4" aria-hidden />
+          </button>
+        </div>
+      </li>
+    )
+  }
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 md:space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-heading text-2xl font-bold text-brand-navy dark:text-white">System Administration</h1>
@@ -275,20 +350,21 @@ function UserManagementContent() {
         </div>
         {tab === 'users' && (
           <button onClick={() => setShowTypeChooser(true)}
-            className="flex items-center gap-2 bg-brand-teal text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-teal-light">
+            className="flex items-center justify-center gap-2 min-h-11 bg-brand-teal text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-teal-light">
             <UserPlus className="w-4 h-4" /> Add User
           </button>
         )}
       </div>
 
       <ModuleSurface>
-      <div className="flex gap-1 border-b border-base">
+      <div className="flex gap-1 border-b border-base" role="tablist">
         {([
           { id: 'users'  as const, label: 'User Accounts', icon: Shield  },
           { id: 'health' as const, label: 'System Health', icon: Activity },
         ]).map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === id ? 'border-brand-teal text-brand-teal' : 'border-transparent text-muted hover:text-body'}`}>
+            role="tab" aria-selected={tab === id}
+            className={`flex flex-1 sm:flex-none items-center justify-center gap-1.5 min-h-11 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === id ? 'border-brand-teal text-brand-teal' : 'border-transparent text-muted hover:text-body'}`}>
             <Icon className="w-4 h-4" /> {label}
           </button>
         ))}
@@ -297,20 +373,20 @@ function UserManagementContent() {
       {tab === 'users' && (
         <>
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-2.5 bg-surface p-4">
-            <div className="relative flex-1 min-w-50 max-w-sm">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 bg-surface sm:p-4">
+            <div className="relative w-full sm:w-auto sm:flex-1 sm:min-w-50 sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted pointer-events-none" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search name, email, UID, employee/reg. no…"
-                className="w-full pl-9 pr-3 py-2 text-sm border border-base rounded-lg bg-page text-body placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+                className="w-full min-h-11 md:min-h-0 pl-9 pr-3 py-2 text-sm border border-base rounded-lg bg-page text-body placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
               />
             </div>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="border border-base rounded-lg px-3 py-2 text-sm bg-page text-body focus:outline-none"
+              className="flex-1 min-w-0 sm:flex-none min-h-11 md:min-h-0 border border-base rounded-lg px-3 py-2 text-sm bg-page text-body focus:outline-none"
               aria-label="Filter by role"
             >
               <option value="">All roles</option>
@@ -319,22 +395,63 @@ function UserManagementContent() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as '' | 'active' | 'disabled')}
-              className="border border-base rounded-lg px-3 py-2 text-sm bg-page text-body focus:outline-none"
+              className="flex-1 min-w-0 sm:flex-none min-h-11 md:min-h-0 border border-base rounded-lg px-3 py-2 text-sm bg-page text-body focus:outline-none"
               aria-label="Filter by status"
             >
               <option value="">All statuses</option>
               <option value="active">Active</option>
               <option value="disabled">Disabled</option>
             </select>
-            <label className="flex items-center gap-2 text-sm text-body cursor-pointer ml-auto">
-              <input type="checkbox" checked={groupByRole} onChange={(e) => setGroupByRole(e.target.checked)} className="accent-brand-teal" />
+            {/* Sort — mobile only. md+ sorts via the table's column headers,
+                which don't exist in the card layout. */}
+            <div className="flex w-full items-center gap-2 md:hidden">
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                aria-label="Sort by"
+                className="flex-1 min-w-0 min-h-11 border border-base rounded-lg px-3 py-2 text-sm bg-page text-body focus:outline-none"
+              >
+                <option value="user">Sort: User</option>
+                <option value="role">Sort: Role</option>
+                <option value="status">Sort: Status</option>
+                <option value="lastSignIn">Sort: Last sign-in</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                aria-label={sortDir === 'asc' ? 'Ascending — tap for descending' : 'Descending — tap for ascending'}
+                className="touch-target shrink-0 border border-base rounded-lg text-muted active:bg-page"
+              >
+                <ArrowUpDown className={`w-4 h-4 ${sortDir === 'desc' ? 'rotate-180' : ''}`} aria-hidden />
+              </button>
+            </div>
+            <label className="flex items-center gap-2 min-h-11 md:min-h-0 text-sm text-body cursor-pointer md:ml-auto">
+              <input type="checkbox" checked={groupByRole} onChange={(e) => setGroupByRole(e.target.checked)} className="accent-brand-teal w-4 h-4" />
               Group by role
             </label>
           </div>
 
-          {/* Table(s) */}
-          <div className="bg-surface">
-            <table className="w-full text-sm border-collapse">
+          {/* Mobile (< md): stacked account cards */}
+          <div className="md:hidden">
+            {grouped ? (
+              grouped.map(([role, rows]) => (
+                <section key={role}>
+                  <h2 className="py-2 text-xs font-heading font-bold text-brand-teal uppercase tracking-wider border-b border-base">
+                    {role === 'unassigned' ? 'No role assigned' : ROLE_LABELS[role as keyof typeof ROLE_LABELS] ?? role} · {rows.length}
+                  </h2>
+                  <ul className="divide-y divide-base">{rows.map(renderUserCard)}</ul>
+                </section>
+              ))
+            ) : (
+              <ul className="divide-y divide-base">{filteredSorted.map(renderUserCard)}</ul>
+            )}
+          </div>
+
+          {/* Desktop (md+): table. `table-scroll` is the safety net — if the
+              columns ever exceed the card on a narrow tablet, the table pans
+              inside its own region instead of stretching the page. */}
+          <div className="hidden md:block bg-surface table-scroll">
+            <table className="w-full text-sm border-collapse min-w-180">
               <thead>
                 <tr className="bg-page border-b border-base">
                   <th className="px-4 py-3 text-left"><SortHeader label="User" sortKeyVal="user" activeSortKey={sortKey} onToggle={toggleSort} /></th>
@@ -362,10 +479,11 @@ function UserManagementContent() {
                 </tbody>
               )}
             </table>
-            {filteredSorted.length === 0 && (
-              <p className="text-center py-10 text-sm text-muted">No users match these filters.</p>
-            )}
           </div>
+
+          {filteredSorted.length === 0 && (
+            <p className="text-center py-10 text-sm text-muted">No users match these filters.</p>
+          )}
         </>
       )}
 

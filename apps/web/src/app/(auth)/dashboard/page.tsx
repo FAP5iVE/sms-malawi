@@ -47,7 +47,7 @@ export default function DashboardPage() {
     return (
       <div className="space-y-4 animate-pulse">
         <div className="skeleton h-9 w-72 rounded-lg" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="skeleton h-28 rounded-xl" />
           ))}
@@ -60,7 +60,7 @@ export default function DashboardPage() {
   const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'there'
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* [PRODUCTION FIX 2026-07-28] subtitle (a real per-staff job
           title, e.g. "Head Teacher") is null for many roles, so the old
           `{subtitle} · {role}` concatenation rendered as a bare

@@ -217,8 +217,8 @@ export function HighRankDashboard() {
   }))
 
   return (
-    <div className="space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard
           label="Total Students"
           value={statValue(studentsLoading, studentsData?.total)}
@@ -264,7 +264,7 @@ export function HighRankDashboard() {
         />
       </StatCardGrid>
       <QuickActions actions={QUICK_ACTIONS} />
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ChartCard
           title="Student Population Trend"
           sub="New vs outgoing (last 12 months)"
@@ -298,7 +298,7 @@ export function HighRankDashboard() {
         />
       </div>
       {/* [PRODUCTION FIX] Was a dead PlaceholderWidget — see file header. */}
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <div className="bg-surface border border-base rounded-xl p-5">
           <PendingActionsPanel compact title="Pending Approvals" />
         </div>
@@ -323,13 +323,13 @@ export function HighRankDashboard() {
           School Attendance {academicYear ? `— ${academicYear} Term ${term}` : ''}
         </p>
         {attendanceLoadingAll ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3" role="status" aria-label="Attendance — loading">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3" role="status" aria-label="Attendance — loading">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="skeleton h-14 rounded-lg" aria-hidden />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
             <div className="bg-page rounded-lg p-3 text-center">
               <p className="text-lg font-heading font-bold text-brand-navy">
                 {attendance ? `${attendance.attendanceRate}%` : '—'}
@@ -363,7 +363,7 @@ export function HighRankDashboard() {
          covered academic performance and finance. All three endpoints
          below already exist and already serve /reports; this is the first
          time they're pulled onto the High Rank home screen itself. */}
-      <div className="grid md:grid-cols-3 gap-4">
+      <div className="grid md:grid-cols-3 gap-3 md:gap-4">
         <ChartCard
           title="Admissions Funnel"
           sub="Applications by stage"

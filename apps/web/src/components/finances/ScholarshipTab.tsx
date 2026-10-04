@@ -116,8 +116,8 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="table-scroll">
+        <table className="w-full text-sm min-w-140">
           <thead>
             <tr className="border-b border-base bg-page">
               <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
@@ -182,7 +182,7 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
       {/* Add scholarship modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-md modal-panel p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-heading font-bold text-lg text-brand-navy">Add Scholarship</h3>
               <button

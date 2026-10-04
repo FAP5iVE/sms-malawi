@@ -42,8 +42,8 @@ export function ChartCard({
   className = '',
 }: ChartCardProps) {
   return (
-    <div className={`bg-surface border border-base rounded-xl p-5 ${className}`}>
-      <div className="mb-4">
+    <div className={`bg-surface border border-base rounded-xl p-3 sm:p-5 ${className}`}>
+      <div className="mb-3 sm:mb-4">
         <p className="font-heading font-semibold text-sm text-brand-navy">{title}</p>
         {sub ? <p className="text-xs text-muted mt-1">{sub}</p> : null}
       </div>

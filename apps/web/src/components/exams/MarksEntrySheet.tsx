@@ -210,7 +210,8 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
                 Loading students and saved marks…
               </div>
             ) : (
-              <table className="w-full text-sm border-collapse">
+              <div className="table-scroll">
+              <table className="w-full text-sm border-collapse min-w-75">
                 <thead>
                   <tr className="border-b border-base bg-page">
                     <th className="px-5 py-3 text-left font-heading text-xs uppercase tracking-wide text-muted">Student</th>
@@ -256,6 +257,7 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
           <div className="px-6 py-4 border-t border-base flex items-center justify-between gap-3 shrink-0">

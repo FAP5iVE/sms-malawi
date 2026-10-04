@@ -85,7 +85,7 @@ function FinancesLoadingSkeleton() {
   return (
     <div className="space-y-5" role="status" aria-label="Loading finances">
       <div className="h-8 w-40 rounded-lg bg-surface animate-pulse" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {[1, 2, 3, 4].map((i) => <div key={i} className="h-20 rounded-xl bg-surface animate-pulse" />)}
       </div>
       <div className="h-64 rounded-xl bg-surface animate-pulse" />
@@ -227,7 +227,7 @@ function FinancesContent() {
       <ModuleSurface>
       {/* Summary stats — finance staff only (not students, not HR payroll viewers) */}
       {!isStudent && !isHRPayrollViewer && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <SummaryCard
             label="Total Collected"
             value={summaryLoading ? '…' : formatMWK(summary?.totalCollected ?? 0)}

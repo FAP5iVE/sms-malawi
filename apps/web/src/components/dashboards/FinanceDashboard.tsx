@@ -106,8 +106,8 @@ export function FinanceDashboard() {
     v === undefined ? undefined : formatMWK(v)
 
   return (
-    <div className="space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard
           label="Total Collected"
           value={statValue(isLoading, mwk(summary?.totalCollected))}
@@ -152,7 +152,7 @@ export function FinanceDashboard() {
         />
       </StatCardGrid>
       <QuickActions actions={QUICK_ACTIONS} />
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <FeeCollectionRadial
           academicYear={academicYear ?? ''}
           term={term ?? 0}

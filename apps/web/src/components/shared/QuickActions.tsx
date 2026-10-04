@@ -29,16 +29,16 @@ interface QuickActionsProps {
 
 export function QuickActions({ actions }: QuickActionsProps) {
   return (
-    <div className="bg-surface border border-base rounded-xl p-5">
-      <h3 className="font-heading font-semibold text-sm text-brand-navy mb-4">Quick Actions</h3>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+    <div className="bg-surface border border-base rounded-xl p-3 sm:p-5">
+      <h3 className="font-heading font-semibold text-sm text-brand-navy mb-3 sm:mb-4">Quick Actions</h3>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
         {actions.map((action) => {
           const Icon = action.icon
           return (
             <Link
               key={action.label}
               href={action.href}
-              className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-page border border-transparent hover:border-base transition-all group text-center"
+              className="flex flex-col items-center gap-1.5 sm:gap-2 p-2 sm:p-3 min-h-11 rounded-lg hover:bg-page border border-transparent hover:border-base transition-all group text-center"
             >
               <div
                 className={`w-10 h-10 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 ${action.color ?? 'bg-brand-navy/8'}`}

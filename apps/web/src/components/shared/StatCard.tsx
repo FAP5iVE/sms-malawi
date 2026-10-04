@@ -211,7 +211,7 @@ export function StatCard({
       initial="hidden"
       animate="visible"
       className={cn(
-        'bg-surface border border-base rounded-xl p-5 flex flex-col gap-3',
+        'bg-surface border border-base rounded-xl p-3 sm:p-5 flex flex-col gap-2 sm:gap-3',
         href ? 'cursor-pointer hover:border-brand-teal/40 transition-colors' : 'cursor-default',
         className
       )}

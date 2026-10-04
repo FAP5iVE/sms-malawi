@@ -329,8 +329,8 @@ export function ManebPanel({ academicYear }: Props) {
       )}
 
       {filtered.length > 0 && (
-        <div className="overflow-hidden">
-          <table className="w-full text-sm border-collapse">
+        <div className="table-scroll">
+          <table className="w-full text-sm border-collapse min-w-140">
             <thead>
               <tr className="bg-page border-b border-base">
                 {['Candidate No','Student','Centre','Subjects','Overall Grade','Status'].map((h) => (

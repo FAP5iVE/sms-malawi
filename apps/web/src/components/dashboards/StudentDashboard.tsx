@@ -136,8 +136,8 @@ export function StudentDashboard() {
   const { data: timetableToday, isLoading: timetableLoading } = useMyTimetableToday()
 
   return (
-    <div className="space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard
           label="My Class"
           value={statValue(meLoading, me?.className)}
@@ -200,7 +200,7 @@ export function StudentDashboard() {
       )}
 
       <QuickActions actions={QUICK_ACTIONS} />
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ChartCard
           title="My Performance"
           sub="Average score per term"

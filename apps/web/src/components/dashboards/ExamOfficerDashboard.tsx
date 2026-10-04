@@ -105,8 +105,8 @@ export function ExamOfficerDashboard() {
   const isLoading = periodLoading || examsLoading
 
   return (
-    <div className="space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard
           label="Exams This Week"
           value={statValue(isLoading, examsInNextSevenDays(exams).length)}
@@ -149,7 +149,7 @@ export function ExamOfficerDashboard() {
         />
       </StatCardGrid>
       <QuickActions actions={QUICK_ACTIONS} />
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         {/* [PRODUCTION FIX 2026-07-28] Was a permanent PlaceholderWidget
             skeleton ("wired in R17" — never happened). exams is already
             fetched on this dashboard for the stat cards above; both lists

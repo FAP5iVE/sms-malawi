@@ -79,8 +79,8 @@ function PerClassTable({ rows }: { rows: ApiClassAnalyticsSummary[] }) {
     // read as a box-within-a-box and ate into the panel's side padding.
     // The header row's bg-page + row dividers already give the table
     // definition without a second outer card.
-    <div className="overflow-hidden">
-      <table className="w-full text-sm border-collapse">
+    <div className="table-scroll">
+      <table className="w-full text-sm border-collapse min-w-130">
         <thead>
           <tr className="bg-page border-b border-base">
             {['Class', 'Graded as', 'Students', 'Average', 'Aggregate', 'Pass rate', 'At risk'].map((h) => (

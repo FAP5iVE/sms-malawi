@@ -165,7 +165,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           1. Sidebar wrapper — `hidden md:flex` collapses it on mobile
           2. Main column  — always fills remaining width
       */}
-      <div className="flex h-dvh overflow-hidden bg-page">
+      {/* Left/right safe-area insets matter in landscape on notched phones now
+          that the viewport uses `viewport-fit=cover` (see app/layout.tsx); they
+          are 0 everywhere else, including all of desktop. */}
+      <div className="flex h-dvh overflow-hidden bg-page pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]">
         {/* Same shared backdrop every public page uses — set once here so
             every authenticated page inherits it with no per-page changes.
             `fixed inset-0` + `pointer-events-none` means it costs nothing
@@ -251,7 +254,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                 a flex-1 child at all, independent of the bug above.
             ───────────────────────────────────────────────────────────────
           */}
-          <main className="flex-1 min-h-0 overflow-y-auto pt-4 px-4 main-scroll-pad md:p-6 relative">
+          {/* Mobile: 16px side gutter (guideline minimum; also clears curved screen
+              edges), 12px top. `overflow-x-hidden` is a safety net — a single
+              over-wide child (a table, a long unbroken string) must never make
+              the whole page pan sideways; wide data scrolls inside its own
+              `.table-scroll` region instead. */}
+          <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-3 px-4 main-scroll-pad md:p-6 relative">
             <ErrorBoundary>
               <PageTransitionWrapper>{children}</PageTransitionWrapper>
             </ErrorBoundary>

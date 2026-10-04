@@ -422,18 +422,23 @@ function HRContent() {
                 <Link
                   key={s.id}
                   href={`/hr/${s.id}`}
-                  className="flex items-center gap-3 px-4 py-3 text-left hover:bg-page active:bg-page transition-colors"
+                  className="flex items-center gap-3 px-3 sm:px-4 py-3 min-h-11 text-left hover:bg-page active:bg-page transition-colors"
                 >
                   <div className="w-8 h-8 rounded-full bg-brand-navy/10 flex items-center justify-center text-brand-navy font-semibold text-xs shrink-0">
                     {s.firstName[0]}
                     {s.lastName[0]}
                   </div>
-                  <p className="font-semibold text-body truncate w-40 shrink-0">
-                    {s.firstName} {s.lastName}
-                  </p>
-                  <p className="text-xs text-muted truncate flex-1 min-w-0">
-                    {s.jobTitle} · {s.department}
-                  </p>
+                  {/* Stacked on phones (name over job title); side by side from
+                      sm up. The fixed 160px name column used to leave the job
+                      title ~0px wide on a 360px screen. */}
+                  <div className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-3">
+                    <p className="font-semibold text-body truncate sm:w-40 sm:shrink-0">
+                      {s.firstName} {s.lastName}
+                    </p>
+                    <p className="text-xs text-muted truncate sm:flex-1 sm:min-w-0">
+                      {s.jobTitle} · {s.department}
+                    </p>
+                  </div>
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
                       s.status === 'ACTIVE'

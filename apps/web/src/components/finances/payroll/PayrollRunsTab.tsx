@@ -174,7 +174,7 @@ function RollbackDialog({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]" onClick={onCancel}>
       <div
-        className="w-full max-w-sm bg-surface border border-base rounded-2xl shadow-xl p-5"
+        className="w-full max-w-sm modal-panel bg-surface border border-base rounded-2xl shadow-xl p-5"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

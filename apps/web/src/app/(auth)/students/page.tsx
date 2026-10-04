@@ -294,8 +294,11 @@ function StudentsContent() {
         </div>
 
         {/* R19 — server-backed search (GET /students already supports `search`) */}
-        <div className="flex w-full sm:w-auto gap-2">
-          <div className="flex-1 sm:w-72">
+        {/* Wraps on phones: search takes a full row, the two filters split the
+            next one. Previously all three sat on a single row, which at 360px
+            left the search field ~24px wide. */}
+        <div className="flex flex-wrap w-full sm:w-auto sm:flex-nowrap gap-2">
+          <div className="w-full sm:flex-1 sm:w-72">
             <label htmlFor="student-search" className="sr-only">Search students</label>
             <input
               id="student-search"
@@ -306,7 +309,7 @@ function StudentsContent() {
               className="w-full min-h-11 border border-base rounded-xl px-4 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             />
           </div>
-          <div className="w-40 sm:w-48">
+          <div className="flex-1 min-w-0 sm:flex-none sm:w-48">
             <label htmlFor="student-class-filter" className="sr-only">Filter by class</label>
             <select
               id="student-class-filter"
@@ -318,7 +321,7 @@ function StudentsContent() {
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-          <div className="w-32 sm:w-40">
+          <div className="flex-1 min-w-0 sm:flex-none sm:w-40">
             <label htmlFor="student-sex-filter" className="sr-only">Filter by gender</label>
             <select
               id="student-sex-filter"

@@ -535,7 +535,7 @@ export function ResultsReleaseWorkflow({
             role="dialog" aria-modal="true" aria-label="Fee-blocked students"
           >
             <div className="absolute inset-0" onClick={() => setFeeBlocked(null)} />
-            <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl overflow-hidden">
+      <div className="relative z-10 w-full max-w-md modal-panel bg-surface rounded-2xl shadow-xl ">
               <div className="flex items-center justify-between px-5 py-4 border-b border-base">
                 <h3 className="font-heading font-bold text-brand-navy flex items-center gap-2">
                   <Users className="w-4 h-4" /> Fee-blocked students

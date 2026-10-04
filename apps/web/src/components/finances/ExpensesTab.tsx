@@ -289,7 +289,7 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
       {/* Log Expense Modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-sm modal-panel p-6 space-y-4">
             <h3 className="font-heading font-bold text-lg text-brand-navy">Log Expense</h3>
             <div className="space-y-3">
               <div>

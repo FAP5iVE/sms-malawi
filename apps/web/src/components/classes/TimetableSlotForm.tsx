@@ -135,7 +135,7 @@ export function TimetableSlotForm({ classId, academicYear, term, onClose }: Prop
       >
         <div className="absolute inset-0" onClick={onClose} />
         <motion.div
-          className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl overflow-hidden"
+     className="relative z-10 w-full max-w-md modal-panel bg-surface rounded-2xl shadow-xl "
           initial={{ scale: 0.96, y: 12 }}
           animate={{ scale: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}

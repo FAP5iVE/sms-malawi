@@ -48,9 +48,9 @@ interface ModuleSurfaceProps {
   contentClassName?: string
 }
 
-export function ModuleSurface({ children, className = '', contentClassName = 'space-y-5' }: ModuleSurfaceProps) {
+export function ModuleSurface({ children, className = '', contentClassName = 'space-y-4 md:space-y-5' }: ModuleSurfaceProps) {
   return (
-    <div className={`relative rounded-3xl border border-base bg-surface p-4 sm:p-6 ${className}`}>
+    <div className={`relative rounded-2xl sm:rounded-3xl border border-base bg-surface p-3 sm:p-6 ${className}`}>
       {/* Decorative line-art — same family as PublicAmbientBackground's
           artwork, redrawn small enough to sit inside a panel rather than
           behind a whole page. Muted opacity in both modes so it reads as
@@ -65,7 +65,7 @@ export function ModuleSurface({ children, className = '', contentClassName = 'sp
           sibling that contains only decoration removes that risk
           entirely, regardless of how any given page's modals position
           themselves. */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-3xl" aria-hidden="true">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl sm:rounded-3xl" aria-hidden="true">
         <svg
           className="absolute -right-10 -top-10 h-64 w-64 opacity-[0.05] dark:opacity-[0.08]"
           viewBox="0 0 400 400"

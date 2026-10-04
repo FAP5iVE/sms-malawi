@@ -114,8 +114,8 @@ export function AcademicDashboard() {
   const examsLoadingAll = periodLoading || examsLoading
 
   return (
-    <div className="space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard
           label="Active Classes"
           value={statValue(periodLoading || classesLoading, classes?.length)}
@@ -154,7 +154,7 @@ export function AcademicDashboard() {
         />
       </StatCardGrid>
       <QuickActions actions={QUICK_ACTIONS} />
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
           title="Today's Timetable"
           sub="Your classes today"

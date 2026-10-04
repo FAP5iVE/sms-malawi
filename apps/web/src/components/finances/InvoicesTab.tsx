@@ -976,7 +976,7 @@ function OverpaymentConfirmModal({
       role="dialog"
       aria-modal="true"
     >
-      <div className="bg-surface rounded-xl shadow-xl max-w-sm w-full">
+      <div className="bg-surface rounded-xl shadow-xl max-w-sm modal-panel w-full">
         <div className="flex items-center justify-between px-5 py-4 border-b border-base">
           <h3 className="font-heading font-semibold text-body flex items-center gap-2">
             <AlertTriangle className="w-4.5 h-4.5 text-amber-500" /> Confirm Overpayment
