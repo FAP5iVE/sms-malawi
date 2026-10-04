@@ -309,6 +309,21 @@ export async function sendPasswordReset(uid: string) {
   }
 }
 
+// ─── OWN PROFILE PICTURE ─────────────────────────────────
+/**
+ * The signed-in user's recorded sex, for choosing the dashboard profile
+ * picture. Students are matched on Student.firebaseUid and staff on
+ * StaffProfile.uid. Returns null when no record is linked to the account
+ * (for example a bootstrap admin with no staff profile) or when staff HR has
+ * not recorded it yet; the client then shows an initials badge.
+ */
+export async function getMySex(uid: string): Promise<'MALE' | 'FEMALE' | null> {
+  const student = await prisma.student.findUnique({ where: { firebaseUid: uid }, select: { sex: true } })
+  if (student) return student.sex
+  const staff = await prisma.staffProfile.findUnique({ where: { uid }, select: { sex: true } })
+  return staff?.sex ?? null
+}
+
 // ─── NOTIFICATION PREFERENCES ────────────────────────────
 export async function getNotificationPrefs(uid: string) {
   return prisma.userNotificationPref.upsert({

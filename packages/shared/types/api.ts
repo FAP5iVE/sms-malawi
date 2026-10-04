@@ -749,6 +749,8 @@ export interface ApiStaffProfile {
   employeeNo: string
   firstName: string
   lastName: string
+  /** Null until HR records it; drives the dashboard profile picture. */
+  sex?: 'MALE' | 'FEMALE' | null
   role: string
   department: string
   jobTitle: string

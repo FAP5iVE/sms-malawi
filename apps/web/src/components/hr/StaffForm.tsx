@@ -131,9 +131,9 @@ export function StaffForm({ onClose, staffId }: Props) {
   function onSubmit(data: CreateStaffInput) {
     setSubmitError(null)
     if (isEdit) {
-      const { firstName, lastName, email, phone, department, jobTitle, employmentType, contractExpiry } = data
+      const { firstName, lastName, sex, email, phone, department, jobTitle, employmentType, contractExpiry } = data
       updateStaff.mutate(
-        { id: staffId!, data: { firstName, lastName, email, phone, department, jobTitle, employmentType, contractExpiry } as UpdateStaffInput },
+        { id: staffId!, data: { firstName, lastName, sex, email, phone, department, jobTitle, employmentType, contractExpiry } as UpdateStaffInput },
         {
           onSuccess: () => onClose(),
           onError: (err) => {
@@ -266,6 +266,23 @@ export function StaffForm({ onClose, staffId }: Props) {
                   <label className={lbl} htmlFor="sf-lastName">Last name</label>
                   <input id="sf-lastName" {...register('lastName')} className={ic} placeholder="e.g. Banda" />
                   {errors.lastName && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.lastName.message}</p>}
+                </div>
+                <div>
+                  <label className={lbl} htmlFor="sf-sex">Sex</label>
+                  {/* Optional. Used to pick the staff member's dashboard profile
+                      picture; they see initials until this is set. An empty
+                      choice is sent as "not provided" rather than as "". */}
+                  <select
+                    id="sf-sex"
+                    {...register('sex', { setValueAs: (v: string) => (v === '' ? undefined : v) })}
+                    className={ic}
+                    defaultValue=""
+                  >
+                    <option value="">Not specified</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                  </select>
+                  {errors.sex && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.sex.message}</p>}
                 </div>
                 <div className="col-span-full">
                   <label className={lbl} htmlFor="sf-email">Email (login)</label>
@@ -692,6 +709,7 @@ function mapStaffToFormValues(s: ApiStaffDetail): Partial<StaffFormValues> {
   return {
     firstName:         s.firstName,
     lastName:          s.lastName,
+    sex:               s.sex ?? undefined,
     email:             s.email,
     phone:             s.phone,
     department:        s.department,

@@ -7,12 +7,11 @@
  *   picture on the left, then the time-of-day greeting with the user's name,
  *   then their job title and role underneath.
  *
- * [PICTURE]: Students get the male or female illustration according to
- *   Student.sex (read through useStudentMe(), the same cached request the
- *   student dashboard already makes, so it costs nothing extra). Staff
- *   profiles do not store a sex today, so staff and any account whose record
- *   cannot be read get a neutral initials badge instead of a guessed picture.
- *   When a sex field is added to StaffProfile, extend `pickSex` below.
+ * [PICTURE]: The male or female illustration according to the signed-in
+ *   user's recorded sex (Student.sex for students, StaffProfile.sex for
+ *   staff, via useMySex / GET /users/me/sex). When none is recorded (an
+ *   account with no linked record, or staff whose sex HR has not entered
+ *   yet) a neutral initials badge is shown instead of a guessed picture.
  *
  * [SIZE]: The picture is a square whose side equals the height of the text
  *   block beside it, so it runs from the top of the greeting to the bottom of
@@ -22,7 +21,7 @@
  */
 
 import { useLayoutEffect, useRef, useState } from 'react'
-import { useStudentMe } from '@/hooks/useStudents'
+import { useMySex } from '@/hooks/useMySex'
 
 const MIN_SIZE = 44
 const MAX_SIZE = 88
@@ -54,10 +53,8 @@ export function WelcomeHeader({ greeting, name, detail }: WelcomeHeaderProps) {
   const textRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState(FIRST_PAINT_SIZE)
 
-  // Only enabled for the student role inside the hook; idle for everyone else.
-  const me = useStudentMe()
-  const pickSex = (): Sex | null => (me.data?.sex === 'MALE' || me.data?.sex === 'FEMALE' ? me.data.sex : null)
-  const sex = pickSex()
+  const mySex = useMySex()
+  const sex: Sex | null = mySex.data === 'MALE' || mySex.data === 'FEMALE' ? mySex.data : null
 
   useLayoutEffect(() => {
     const el = textRef.current
@@ -85,7 +82,7 @@ export function WelcomeHeader({ greeting, name, detail }: WelcomeHeaderProps) {
         {sex ? (
           // eslint-disable-next-line @next/next/no-img-element -- local SVG, next/image does not optimise SVG
           <img src={PICTURES[sex]} alt="" width={size} height={size} className="block h-full w-full" />
-        ) : me.isLoading ? (
+        ) : mySex.isLoading ? (
           <div className="h-full w-full animate-pulse bg-black/5 dark:bg-black/10" />
         ) : (
           <div

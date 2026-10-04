@@ -1112,6 +1112,7 @@ model StaffProfile {
   employeeNo          String         @unique
   firstName           String
   lastName            String
+  sex                 Sex?           // optional: drives the dashboard profile picture; null until HR records it
   email               String         @unique
   phone               String?
   role                StaffRole      // R11: was an unenforced String documented as "matches UserRole values" — now a real enum

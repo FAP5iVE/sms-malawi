@@ -106,7 +106,7 @@ export async function listStaff(filters: {
     where,
     orderBy: [{ department: 'asc' }, { lastName: 'asc' }],
     select: {
-      id: true, uid: true, employeeNo: true, firstName: true, lastName: true,
+      id: true, uid: true, employeeNo: true, firstName: true, lastName: true, sex: true,
       role: true, department: true, jobTitle: true, status: true,
       employmentType: true, contractExpiry: true, photoKey: true, dateJoined: true,
     },
@@ -210,6 +210,7 @@ export async function updateStaff(id: string, input: UpdateStaffInput) {
   const updateData: Prisma.StaffProfileUncheckedUpdateInput = {}
   if (input.firstName         !== undefined) updateData.firstName         = input.firstName
   if (input.lastName          !== undefined) updateData.lastName          = input.lastName
+  if (input.sex               !== undefined) updateData.sex               = input.sex
   if (input.email             !== undefined) updateData.email             = input.email
   if (input.phone             !== undefined) updateData.phone             = input.phone
   if (input.department        !== undefined) updateData.department        = input.department
@@ -333,6 +334,7 @@ export async function createStaff(data: CreateStaffInput, actorUid: string) {
         employeeNo:        data.employeeNo,
         firstName:         data.firstName,
         lastName:          data.lastName,
+        sex:               data.sex ?? null,
         email:             data.email,
         role:              data.role,
         department:        data.department,

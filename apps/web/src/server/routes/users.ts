@@ -68,6 +68,12 @@ usersRouter.post('/:uid/reset-password', verifyAuth, requireRole(['admin']),
     return res.json({ success: true })
   })
 
+// GET /users/me/sex — self-service only: the caller's own recorded sex, used
+// to pick their dashboard profile picture. Returns { sex: null } when none
+// is recorded. No requireRole gate, same reasoning as clear-password-change-flag.
+usersRouter.get('/me/sex', verifyAuth,
+  async (req, res) => res.json({ sex: await userService.getMySex(req.user!.uid) }))
+
 // GET /users/me/notification-prefs
 usersRouter.get('/me/notification-prefs', verifyAuth,
   async (req, res) => res.json(await userService.getNotificationPrefs(req.user!.uid)))

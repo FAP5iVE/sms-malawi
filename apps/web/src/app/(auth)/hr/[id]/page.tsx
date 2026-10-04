@@ -104,6 +104,7 @@ function StaffProfileContent() {
                 ['Role', ROLE_LABELS[staff.role as keyof typeof ROLE_LABELS] ?? staff.role],
                 ['Department', staff.department],
                 ['Job Title', staff.jobTitle],
+                ['Sex', staff.sex === 'MALE' ? 'Male' : staff.sex === 'FEMALE' ? 'Female' : 'Not recorded'],
                 ['Employment Type', staff.employmentType.replace('_', '-')],
                 ['Date Joined', new Date(staff.dateJoined).toLocaleDateString()],
                 ['Contract Expiry', staff.contractExpiry ? new Date(staff.contractExpiry).toLocaleDateString() : '—'],

@@ -556,6 +556,12 @@ export const queryKeys = {
       ['admin', 'pending-actions', filters ?? {}] as const,
   },
 
+  // ── Signed-in user's own profile bits
+  me: {
+    /** GET /users/me/sex: picks the dashboard profile picture. */
+    sex: (uid: string) => ['me', 'sex', uid] as const,
+  },
+
   // ── Calendar
   calendar: {
     all: () => ['calendar'] as const,

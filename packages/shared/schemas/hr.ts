@@ -23,6 +23,9 @@
 import { z } from 'zod'
 import { USER_ROLES } from '../types/roles'
 
+// Same two values as the Sex enum in schema.prisma (used by Student too).
+export const STAFF_SEX = ['MALE', 'FEMALE'] as const
+
 export const CreateStaffSchema = z.object({
   // NOTE: no `uid` field. A staff member's Firebase Auth UID is minted
   // server-side by hrService.createStaff() when it provisions their login,
@@ -32,6 +35,7 @@ export const CreateStaffSchema = z.object({
   employeeNo:     z.string().min(1),
   firstName:      z.string().min(1),
   lastName:       z.string().min(1),
+  sex:            z.enum(STAFF_SEX).optional(),
   email:          z.string().email(),
   phone:          z.string().optional(),
   role:           z.enum(USER_ROLES),
@@ -52,6 +56,7 @@ export const CreateStaffSchema = z.object({
 export const UpdateStaffSchema = z.object({
   firstName:      z.string().min(1).optional(),
   lastName:       z.string().min(1).optional(),
+  sex:            z.enum(STAFF_SEX).optional(),
   email:          z.string().email().optional(),
   phone:          z.string().optional(),
   department:     z.string().min(1).optional(),
