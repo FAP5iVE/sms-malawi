@@ -170,10 +170,10 @@ function CardVariant({ riskLevel, factors = [] }: { riskLevel: RiskLevel; factor
             <li key={f.id} className="text-xs flex items-start gap-2">
               <span
                 className={`
-                  shrink-0 mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide
-                  ${f.severity === 'HIGH'   ? 'bg-red-100 text-red-700 dark:bg-red-900/30'
-                  : f.severity === 'MEDIUM' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30'
-                  :                           'bg-blue-100 text-blue-700 dark:bg-blue-900/30'}
+                  shrink-0 mt-0.5 text-[9px] font-bold uppercase tracking-wide
+                  ${f.severity === 'HIGH'   ? 'text-status-danger'
+                  : f.severity === 'MEDIUM' ? 'text-status-warning'
+                  :                           'text-status-info'}
                 `}
               >
                 {f.severity}

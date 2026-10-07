@@ -81,8 +81,8 @@ function GradeScaleTable({
   if (rows.length === 0) return null
 
   return (
-    <div className="table-scroll">
-      <table className="w-full text-sm border-collapse min-w-120">
+    <div className="overflow-hidden">
+      <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="bg-page border-b border-base">
             {['Grade', 'Min %', 'Max %', 'Label', 'Pass?'].map((h) => (

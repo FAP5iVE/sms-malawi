@@ -247,7 +247,7 @@ export default function ConfirmDialog({
                     'disabled:opacity-70 disabled:pointer-events-none',
                     destructive
                       ? 'bg-brand-coral hover:bg-brand-coral/90 active:bg-brand-coral/80'
-                      : 'bg-brand-navy hover:bg-brand-navy/90 active:bg-brand-navy/80',
+                      : 'bg-brand-deep hover:brightness-110 active:brightness-95',
                   ].join(' ')}
                 >
                   {confirming && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}

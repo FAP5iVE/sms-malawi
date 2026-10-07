@@ -202,7 +202,7 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
             type="button"
             onClick={submitBudget}
             disabled={createBudget.isPending || !department || !category || !allocatedAmount}
-            className="inline-flex items-center gap-2 bg-brand-navy text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className="inline-flex items-center gap-2 bg-brand-deep text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
           >
             {createBudget.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {createBudget.isPending ? 'Creating…' : 'Save Budget'}

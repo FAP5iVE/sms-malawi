@@ -286,7 +286,7 @@ export function PlacementAdvisoryChecker() {
         type="button"
         onClick={handleSubmit}
         disabled={advisory.isPending}
-        className="flex items-center gap-2 min-h-11 px-6 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60"
+        className="flex items-center gap-2 min-h-11 px-6 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60"
       >
         {advisory.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
         Check what I qualify for

@@ -47,19 +47,19 @@ import { Plus, Loader2, Globe, Pencil, Archive, ArchiveRestore, X, Wallet } from
 // ─────────────────────────────────────────────────────────────────────────
 
 const CATEGORY_TONE: Record<string, string> = {
-  TUITION:   'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/25 dark:text-blue-400 dark:border-blue-800/50',
-  TRANSPORT: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/25 dark:text-amber-400 dark:border-amber-800/50',
-  UNIFORM:   'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/25 dark:text-purple-400 dark:border-purple-800/50',
-  BOARDING:  'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/25 dark:text-cyan-400 dark:border-cyan-800/50',
-  LEVY:      'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800/40 dark:text-slate-300 dark:border-slate-700',
-  ACTIVITY:  'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/25 dark:text-emerald-400 dark:border-emerald-800/50',
-  OTHER:     'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800/40 dark:text-gray-300 dark:border-gray-700',
+  TUITION:   'text-status-info',
+  TRANSPORT: 'text-status-warning',
+  UNIFORM:   'text-status-accent',
+  BOARDING:  'text-status-cyan',
+  LEVY:      'text-status-neutral',
+  ACTIVITY:  'text-status-success',
+  OTHER:     'text-status-neutral',
 }
 
 function CategoryBadge({ category }: { category: string }) {
   const tone = CATEGORY_TONE[category] ?? CATEGORY_TONE.OTHER
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-heading font-semibold border ${tone}`}>
+    <span className={`inline-flex items-center text-xs font-heading font-semibold ${tone}`}>
       {FEE_CATEGORY_LABELS[category as keyof typeof FEE_CATEGORY_LABELS] ?? category}
     </span>
   )
@@ -67,10 +67,10 @@ function CategoryBadge({ category }: { category: string }) {
 
 function ScheduleBadge({ mandatory, schedule }: { mandatory: boolean; schedule: string }) {
   const tone = mandatory
-    ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/25 dark:text-amber-400 dark:border-amber-800/50'
-    : 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/25 dark:text-blue-400 dark:border-blue-800/50'
+    ? 'text-status-warning'
+    : 'text-status-info'
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-heading font-semibold border ${tone} whitespace-nowrap`}>
+    <span className={`inline-flex items-center text-xs font-heading font-semibold ${tone} whitespace-nowrap`}>
       {formatFeeScheduleBadge(mandatory, schedule as 'PER_TERM' | 'ANNUAL' | 'ONE_TIME')}
     </span>
   )
@@ -236,7 +236,7 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
             type="button"
             onClick={() => setFilter(f)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize ${
-              filter === f ? 'bg-brand-navy text-white' : 'bg-page text-muted hover:text-body'
+              filter === f ? 'bg-brand-deep text-white' : 'bg-page text-muted hover:text-body'
             }`}
           >
             {f} ({counts[f]})
@@ -277,7 +277,7 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
           {PAYMENT_METHOD_OPTIONS.map((m) => (
             <span
               key={m.value}
-              className="inline-flex items-center gap-1.5 bg-page border border-base rounded-full px-3 py-1.5 text-xs font-medium text-body"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-body"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               {m.label}
@@ -506,7 +506,7 @@ function FeeFormModal({
           </button>
           <button
             type="button" onClick={handleSubmit} disabled={isPending || !canSubmit}
-            className="inline-flex items-center gap-2 bg-brand-navy text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className="inline-flex items-center gap-2 bg-brand-deep text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
           >
             {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {isPending ? 'Saving…' : isEditing ? 'Save Changes' : 'Save Fee Category'}

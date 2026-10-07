@@ -158,7 +158,7 @@ export function AlgoliaSeedPanel() {
           <button
             onClick={configureIndices}
             disabled={configureState.status === 'loading'}
-            className="flex items-center justify-center gap-2 py-2 px-4 text-xs font-semibold bg-brand-navy text-white rounded-lg disabled:opacity-50 hover:bg-brand-navy/80 transition-colors"
+            className="flex items-center justify-center gap-2 py-2 px-4 text-xs font-semibold bg-brand-deep text-white rounded-lg disabled:opacity-50 hover:brightness-110 transition-colors"
           >
             {configureState.status === 'loading'
               ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Configuring…</>

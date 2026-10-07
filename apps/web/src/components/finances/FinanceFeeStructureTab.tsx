@@ -104,7 +104,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
           type="button"
           onClick={billNow}
           disabled={!selectedStudent}
-          className="inline-flex items-center gap-1.5 bg-brand-navy text-white rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-navy-light disabled:opacity-50 min-h-11"
+          className="inline-flex items-center gap-1.5 bg-brand-deep text-white rounded-lg px-3.5 py-2 text-sm font-semibold hover:brightness-125 disabled:opacity-50 min-h-11"
         >
           <Receipt className="w-4 h-4" />
           {selectedStudent ? `Bill ${selectedStudent.firstName} Now` : 'Bill Now'}
@@ -180,7 +180,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
                     <h3 className="font-heading font-semibold text-body">
                       {selectedStudent.firstName} {selectedStudent.lastName}
                     </h3>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-page border border-base text-muted">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-muted">
                       <GraduationCap className="w-3 h-3" /> {selectedStudent.class?.name ?? 'Unassigned'}
                     </span>
                   </div>
@@ -253,10 +253,10 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell">
                           <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-heading font-semibold border ${
+                            className={`inline-flex items-center text-xs font-heading font-semibold ${
                               f.mandatory
-                                ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/25 dark:text-amber-400 dark:border-amber-800/50'
-                                : 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/25 dark:text-blue-400'
+                                ? 'text-status-warning'
+                                : 'text-status-info'
                             }`}
                           >
                             {f.mandatory ? 'Mandatory / Statutory' : 'Enrolled Service'}
@@ -307,7 +307,7 @@ function SummaryStat({
   label, value, icon: Icon, highlight, emphasis,
 }: { label: string; value: string; icon: React.ElementType; highlight?: boolean; emphasis?: boolean }) {
   return (
-    <div className={`rounded-xl border p-3.5 min-w-0 ${emphasis ? 'bg-brand-navy border-brand-navy' : 'bg-surface border-base'}`}>
+    <div className={`rounded-xl border p-3.5 min-w-0 ${emphasis ? 'bg-brand-deep border-brand-navy' : 'bg-surface border-base'}`}>
       <div className={`flex items-center gap-1.5 text-xs mb-1 ${emphasis ? 'text-white/70' : 'text-muted'}`}>
         <Icon className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{label}</span>
       </div>
@@ -416,7 +416,7 @@ function AddOnCommitmentsModal({
         <div className="flex items-center justify-end px-5 py-4 border-t border-base">
           <button
             type="button" onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold bg-brand-navy text-white rounded-lg min-h-11"
+            className="px-4 py-2 text-sm font-semibold bg-brand-deep text-white rounded-lg min-h-11"
           >
             Done
           </button>

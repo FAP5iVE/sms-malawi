@@ -151,7 +151,7 @@ export function StudentClaimPanel() {
                         type="button"
                         onClick={() => { setUniversityId(u.id); setFaculty(''); setProgrammeId('') }}
                         className={`text-left rounded-xl border p-2.5 transition-colors ${
-                          universityId === u.id ? 'border-brand-navy bg-brand-navy text-white' : 'border-base bg-page hover:border-brand-navy/40'
+                          universityId === u.id ? 'border-brand-navy bg-brand-deep text-white' : 'border-base bg-page hover:border-brand-navy/40'
                         }`}
                       >
                         <p className="text-xs font-bold">{u.shortName ?? u.id.toUpperCase()}</p>

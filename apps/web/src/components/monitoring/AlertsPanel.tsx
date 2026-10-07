@@ -29,8 +29,8 @@ export function AlertsPanel({ canManage }: Props) {
           disabled={!canManage || toggle.isPending}
           onClick={() => toggle.mutate({ id: row.sentryAlertId, enabled: !row.enabled })}
           aria-pressed={row.enabled}
-          className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors disabled:opacity-50 ${
-            row.enabled ? 'bg-brand-teal/15 text-brand-teal' : 'bg-page text-muted'
+          className={`px-3 py-1 rounded-lg border text-xs font-semibold transition-colors disabled:opacity-50 ${
+            row.enabled ? 'border-status-success/60 text-status-success hover:bg-status-success/10' : 'border-base text-muted hover:bg-page'
           }`}
         >
           {row.enabled ? 'Enabled' : 'Disabled'}

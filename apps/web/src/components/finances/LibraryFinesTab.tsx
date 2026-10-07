@@ -97,12 +97,12 @@ export function LibraryFinesTab() {
                 {formatMWK(fine.amount)}
               </p>
               <span
-                className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
+                className={`text-[10px] font-bold shrink-0 ${
                   fine.status === 'PAID'
-                    ? 'bg-brand-teal/15 text-brand-teal'
+                    ? 'text-status-success'
                     : fine.status === 'WAIVED'
-                      ? 'bg-base text-muted'
-                      : 'bg-brand-amber/15 text-brand-amber'
+                      ? 'text-muted'
+                      : 'text-status-warning'
                 }`}
               >
                 {fine.status}

@@ -171,7 +171,7 @@ export function StaffPlacementEntryPanel() {
         <div className="pb-5 border-b border-base space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-heading font-semibold text-sm flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-brand-navy text-white text-xs font-bold flex items-center justify-center">
+              <span className="w-5 h-5 rounded-full bg-brand-deep text-white text-xs font-bold flex items-center justify-center">
                 1
               </span>
               Select Cohort Graduate

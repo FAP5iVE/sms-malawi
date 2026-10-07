@@ -228,7 +228,7 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
         </div>
 
         {/* Latest Monthly Net Pay */}
-        <div className="bg-brand-navy text-white rounded-2xl p-5">
+        <div className="bg-brand-deep text-white rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-1">
             <Wallet className="w-4 h-4 text-emerald-300" aria-hidden />
             <span className="text-xs font-heading font-semibold uppercase tracking-wider text-emerald-300">Latest Monthly Net Pay</span>

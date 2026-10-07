@@ -86,7 +86,7 @@ export function WelcomeHeader({ greeting, name, detail }: WelcomeHeaderProps) {
           <div className="h-full w-full animate-pulse bg-black/5 dark:bg-black/10" />
         ) : (
           <div
-            className="flex h-full w-full items-center justify-center bg-brand-navy font-heading font-bold text-white"
+            className="flex h-full w-full items-center justify-center bg-brand-deep font-heading font-bold text-white"
             style={{ fontSize: Math.round(size * 0.36) }}
           >
             {initialsOf(name)}

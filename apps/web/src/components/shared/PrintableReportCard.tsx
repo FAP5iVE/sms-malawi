@@ -878,7 +878,7 @@ export function PrintableReportCard({ data, onClose }: PrintableReportCardProps)
           <button
             type="button"
             onClick={() => handlePrint()}
-            className="flex items-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors"
+            className="flex items-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors"
           >
             <Printer className="w-4 h-4" aria-hidden />
             Print / Save PDF

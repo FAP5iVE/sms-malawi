@@ -396,7 +396,7 @@ export function MobileBottomNav() {
                   {/* Avatar */}
                   <div className="
                     w-9 h-9 rounded-xl shrink-0
-                    bg-brand-navy
+                    bg-brand-deep
                     flex items-center justify-center
                   ">
                     <span className="text-white text-xs font-bold font-heading">

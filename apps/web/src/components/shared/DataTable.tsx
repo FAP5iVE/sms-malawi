@@ -753,7 +753,7 @@ export function DataTable<T extends object>({
                 className={[
                   'px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors',
                   activeQuickFilter === f.value
-                    ? 'bg-brand-navy text-white border-brand-navy'
+                    ? 'bg-brand-deep text-white border-brand-navy'
                     : 'bg-surface border-base text-muted hover:border-brand-navy/40 hover:text-body',
                 ].join(' ')}
               >
@@ -770,7 +770,7 @@ export function DataTable<T extends object>({
             <button
               type="button"
               onClick={() => { onBulkArchive(selected); setSelected([]) }}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-coral/15 text-brand-coral border border-brand-coral/20 hover:bg-brand-coral/25 transition-colors"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-status-danger/60 text-status-danger hover:bg-status-danger/10 transition-colors"
             >
               Archive {selected.length}
             </button>
@@ -807,7 +807,7 @@ export function DataTable<T extends object>({
               onClick={() => setView('table')}
               aria-label="Table view"
               aria-pressed={view === 'table'}
-              className={`p-1.5 transition-colors ${view === 'table' ? 'bg-brand-navy text-white' : 'hover:bg-page text-muted'}`}
+              className={`p-1.5 transition-colors ${view === 'table' ? 'bg-brand-deep text-white' : 'hover:bg-page text-muted'}`}
             >
               <List className="w-3.5 h-3.5" />
             </button>
@@ -816,7 +816,7 @@ export function DataTable<T extends object>({
               onClick={() => setView('card')}
               aria-label="Card view"
               aria-pressed={view === 'card'}
-              className={`p-1.5 transition-colors ${view === 'card' ? 'bg-brand-navy text-white' : 'hover:bg-page text-muted'}`}
+              className={`p-1.5 transition-colors ${view === 'card' ? 'bg-brand-deep text-white' : 'hover:bg-page text-muted'}`}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
             </button>

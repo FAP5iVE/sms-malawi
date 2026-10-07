@@ -15,13 +15,13 @@ import { useVercelDeployments } from '@/hooks/useVercelMonitoring'
 import type { ApiVercelDeployment } from '@shared/types/vercel-monitoring'
 
 const STATE_STYLE: Record<string, string> = {
-  READY: 'bg-brand-teal/15 text-brand-teal',
-  ERROR: 'bg-brand-coral/15 text-brand-coral',
-  BUILDING: 'bg-brand-amber/15 text-brand-amber',
-  QUEUED: 'bg-page text-muted',
-  INITIALIZING: 'bg-page text-muted',
-  CANCELED: 'bg-page text-muted',
-  BLOCKED: 'bg-brand-amber/15 text-brand-amber',
+  READY: 'text-status-success',
+  ERROR: 'text-status-danger',
+  BUILDING: 'text-status-warning',
+  QUEUED: 'text-muted',
+  INITIALIZING: 'text-muted',
+  CANCELED: 'text-muted',
+  BLOCKED: 'text-status-warning',
 }
 
 export function VercelDeploymentsPanel() {
@@ -31,7 +31,7 @@ export function VercelDeploymentsPanel() {
     {
       key: 'state', label: 'Status', priority: 'critical',
       render: (row) => (
-        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATE_STYLE[row.state] ?? 'bg-page text-muted'}`}>
+        <span className={`text-xs font-semibold ${STATE_STYLE[row.state] ?? 'text-muted'}`}>
           {row.state}
         </span>
       ),

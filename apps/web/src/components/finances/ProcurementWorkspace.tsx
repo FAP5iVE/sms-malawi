@@ -62,7 +62,7 @@ function Requisitions() {
   const { data = [], isLoading } = useRequisitions(); const [show, setShow] = useState(false)
   return <section className="space-y-4">
     <Header title="Purchase requisitions"
-      action={<PermissionGuard permission="procurement.createRequisition"><button type="button" onClick={() => setShow(true)} className="min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold inline-flex items-center gap-2"><Plus className="w-4 h-4" /> New requisition</button></PermissionGuard>} />
+      action={<PermissionGuard permission="procurement.createRequisition"><button type="button" onClick={() => setShow(true)} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold inline-flex items-center gap-2"><Plus className="w-4 h-4" /> New requisition</button></PermissionGuard>} />
     {show && <RequisitionForm onClose={() => setShow(false)} />}
     {isLoading ? <Loading /> : <DataTable headers={['Requisition', 'Department', 'Purpose', 'Status', 'Amount', 'Actions']}>{data.map((r) => <RequisitionRow key={r.id} row={r} />)}</DataTable>}
   </section>
@@ -81,7 +81,7 @@ function RequisitionRow({ row }: { row: PurchaseRequisition }) {
     <td className="px-4 py-3 font-medium">{row.requisitionNumber}</td>
     <td className="px-4 py-3 text-xs font-mono">{row.departmentId}</td>
     <td className="px-4 py-3 max-w-xs">{row.purpose}</td>
-    <td className="px-4 py-3"><span className="text-xs rounded px-2 py-1 bg-base">{humanize(row.status)}</span></td>
+    <td className="px-4 py-3"><span className="text-xs">{humanize(row.status)}</span></td>
     <td className="px-4 py-3 text-right tabular">{money(amount)}</td>
     <td className="px-4 py-3">
       <div className="flex justify-end gap-1">
@@ -139,7 +139,7 @@ function RequisitionForm({ onClose }: { onClose: () => void }) {
     <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={emergency} onChange={e => setEmergency(e.target.checked)} /> Emergency request</label>
     <div className="flex items-center justify-between border-t border-base pt-3">
       <span className="text-sm text-muted">Estimated total <strong className="text-brand-navy">{money(total)}</strong></span>
-      <button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create draft'}</button>
+      <button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create draft'}</button>
     </div>
     {create.error && <p className="text-sm text-brand-coral">{errorMessage(create.error, 'Could not create requisition.')}</p>}
   </div>
@@ -189,7 +189,7 @@ function RFQForm({ onClose }: { onClose: () => void }) {
       </label>)}
     </div>}
     <Field label="Response deadline (optional)"><input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="input" /></Field>
-    <button type="button" onClick={submit} disabled={create.isPending || !prId || selectedLines.size === 0} className="min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Creating…' : 'Create RFQ'}</button>
+    <button type="button" onClick={submit} disabled={create.isPending || !prId || selectedLines.size === 0} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Creating…' : 'Create RFQ'}</button>
     {create.error && <p className="text-sm text-brand-coral">{errorMessage(create.error, 'Could not create RFQ.')}</p>}
   </div>
 }
@@ -264,7 +264,7 @@ function QuotationForm({ onClose }: { onClose: () => void }) {
       </div>)}
       {lines.length > 0 && <p className="text-sm text-right text-muted">Subtotal <strong className="text-brand-navy">{money(subtotal)}</strong></p>}
     </div>}
-    <button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Saving…' : 'Save quotation'}</button>
+    <button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Saving…' : 'Save quotation'}</button>
     {create.error && <p className="text-sm text-brand-coral">{errorMessage(create.error, 'Could not save quotation.')}</p>}
   </div>
 }
@@ -323,7 +323,7 @@ function PurchaseOrderForm({ onClose }: { onClose: () => void }) {
       </Field>
       <Field label="Expected delivery date"><input type="date" value={expectedDeliveryDate} onChange={e => setExpectedDeliveryDate(e.target.value)} className="input" /></Field>
     </div>
-    <button type="button" onClick={submit} disabled={create.isPending || !prId || !quotationId} className="min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Creating…' : 'Create PO'}</button>
+    <button type="button" onClick={submit} disabled={create.isPending || !prId || !quotationId} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Creating…' : 'Create PO'}</button>
     {create.error && <p className="text-sm text-brand-coral">{errorMessage(create.error, 'Could not create purchase order.')}</p>}
   </div>
 }
@@ -388,7 +388,7 @@ function GoodsReceiptForm({ onClose }: { onClose: () => void }) {
         </div>
       })}
     </div>}
-    <button type="button" onClick={submit} disabled={create.isPending || !poId} className="min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Saving…' : 'Record receipt'}</button>
+    <button type="button" onClick={submit} disabled={create.isPending || !poId} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Saving…' : 'Record receipt'}</button>
     {create.error && <p className="text-sm text-brand-coral">{errorMessage(create.error, 'Could not record goods receipt.')}</p>}
   </div>
 }
@@ -444,7 +444,7 @@ function Suppliers() {
       <Field label="Contact person"><input value={contactPerson} onChange={e => setContactPerson(e.target.value)} className="input" /></Field>
       <Field label="Phone"><input value={phone} onChange={e => setPhone(e.target.value)} className="input" /></Field>
       <Field label="Email"><input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input" /></Field>
-      <div className="sm:col-span-2"><button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-navy text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create'}</button>
+      <div className="sm:col-span-2"><button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create'}</button>
         {create.error && <p className="text-sm text-brand-coral mt-2">{errorMessage(create.error, 'Could not create supplier.')}</p>}</div>
     </div>}
     {isLoading ? <Loading /> : <DataTable headers={['Code', 'Name', 'Contact', 'Phone', 'Email']}>{data.map((s: Supplier) => <tr key={s.id} className="border-b border-base last:border-0">

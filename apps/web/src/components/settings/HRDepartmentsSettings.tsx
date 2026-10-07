@@ -119,7 +119,7 @@ export function HRDepartmentsSettings() {
           type="button"
           onClick={addDepartment}
           disabled={!newDept.trim()}
-          className="min-h-[44px] px-4 rounded-xl bg-brand-navy text-white text-sm font-semibold disabled:opacity-40 flex items-center gap-1.5"
+          className="min-h-[44px] px-4 rounded-xl bg-brand-deep text-white text-sm font-semibold disabled:opacity-40 flex items-center gap-1.5"
         >
           <Plus className="w-4 h-4" /> Add
         </button>

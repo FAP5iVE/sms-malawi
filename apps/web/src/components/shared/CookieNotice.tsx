@@ -65,7 +65,7 @@ export function CookieNotice() {
       <button
         type="button"
         onClick={dismiss}
-        className="mt-3 min-h-11 rounded-xl bg-brand-navy px-5 font-heading text-[13px] font-bold text-white transition-colors hover:bg-brand-navy-mid"
+        className="mt-3 min-h-11 rounded-xl bg-brand-deep px-5 font-heading text-[13px] font-bold text-white transition-colors hover:brightness-125"
       >
         Got it
       </button>

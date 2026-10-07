@@ -85,18 +85,18 @@ type Outcome = ApiBulkInvoiceStudentResult['outcome']
 const OUTCOME_CONFIG: Record<Outcome, { icon: React.ElementType; chip: string; label: string }> = {
   CREATED: {
     icon: CheckCircle2,
-    chip: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/25 dark:text-emerald-400 dark:border-emerald-800/50',
+    chip: 'text-status-success',
     label: 'Created',
   },
   EXISTING: {
     icon: SkipForward,
-    chip: 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/25 dark:text-blue-400 dark:border-blue-800/50',
+    chip: 'text-status-info',
     label: 'Existing',
   },
-  SKIPPED: { icon: SkipForward, chip: 'bg-page text-muted border-base', label: 'Skipped' },
+  SKIPPED: { icon: SkipForward, chip: 'text-muted', label: 'Skipped' },
   ERROR: {
     icon: XCircle,
-    chip: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/25 dark:text-rose-400 dark:border-rose-800/50',
+    chip: 'text-status-danger',
     label: 'Error',
   },
 }
@@ -105,7 +105,7 @@ function OutcomeBadge({ outcome }: { outcome: Outcome }) {
   const { icon: Icon, chip, label } = OUTCOME_CONFIG[outcome]
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${chip}`}
+      className={`inline-flex items-center gap-1 text-xs font-semibold ${chip}`}
     >
       <Icon className="w-3 h-3" aria-hidden /> {label}
     </span>
@@ -258,7 +258,7 @@ function ImpactProjection({
   ]
 
   return (
-    <div className="bg-brand-navy rounded-xl p-4 text-white space-y-2.5">
+    <div className="bg-brand-deep rounded-xl p-4 text-white space-y-2.5">
       <h3 className="font-heading text-xs font-semibold uppercase tracking-wide text-white/70 flex items-center gap-1.5">
         <PiggyBank className="w-3.5 h-3.5" /> Financial Impact Projection
       </h3>
@@ -500,7 +500,7 @@ export function BulkInvoiceGenerator() {
           type="button"
           onClick={runPreview}
           disabled={previewMutation.isPending || commitMutation.isPending || !academicYear}
-          className="inline-flex items-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy-light disabled:opacity-60"
+          className="inline-flex items-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-125 disabled:opacity-60"
         >
           {previewMutation.isPending ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -577,7 +577,7 @@ export function BulkInvoiceGenerator() {
                 onClick={() => setFilterOutcome(o)}
                 className={`px-3 py-1.5 rounded-full text-xs font-heading font-semibold border min-h-9 ${
                   filterOutcome === o
-                    ? 'bg-brand-navy text-white border-brand-navy'
+                    ? 'bg-brand-deep text-white border-brand-navy'
                     : 'bg-surface border-base text-muted hover:border-brand-navy/30'
                 }`}
               >

@@ -94,13 +94,13 @@ import {
 } from 'lucide-react'
 
 const STATUS_COLORS: Record<string, string> = {
-  PAID: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/25 dark:text-emerald-400 dark:border-emerald-800/50',
+  PAID: 'text-status-success',
   PARTIAL:
-    'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/25 dark:text-blue-400 dark:border-blue-800/50',
+    'text-status-info',
   UNPAID:
-    'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/25 dark:text-amber-400 dark:border-amber-800/50',
+    'text-status-warning',
   OVERDUE:
-    'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/25 dark:text-rose-400 dark:border-rose-800/50',
+    'text-status-danger',
 }
 
 type PaymentMethodValue = (typeof PAYMENT_METHOD_OPTIONS)[number]['value']
@@ -559,7 +559,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
               {existingInvoice && (
                 <div className="flex items-center gap-2 text-sm">
                   <span
-                    className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold border ${STATUS_COLORS[existingInvoice.status] ?? ''}`}
+                    className={`inline-flex text-xs font-semibold ${STATUS_COLORS[existingInvoice.status] ?? ''}`}
                   >
                     {existingInvoice.status}
                   </span>
@@ -831,7 +831,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                   type="button"
                   onClick={() => submit(false)}
                   disabled={!canSubmit}
-                  className="inline-flex items-center gap-2 bg-brand-navy text-white rounded-lg px-5 py-2.5 text-sm font-semibold disabled:opacity-50 min-h-11"
+                  className="inline-flex items-center gap-2 bg-brand-deep text-white rounded-lg px-5 py-2.5 text-sm font-semibold disabled:opacity-50 min-h-11"
                 >
                   {isBusy ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

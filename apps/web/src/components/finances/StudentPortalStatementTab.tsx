@@ -188,10 +188,10 @@ export function StudentPortalStatementTab({
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-heading font-semibold border ${
+                        className={`inline-flex items-center text-xs font-heading font-semibold ${
                           f.mandatory
-                            ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/25 dark:text-amber-400 dark:border-amber-800/50'
-                            : 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/25 dark:text-blue-400'
+                            ? 'text-status-warning'
+                            : 'text-status-info'
                         }`}
                       >
                         {f.mandatory ? 'Mandatory Statutory' : 'Enrolled Add-on'}

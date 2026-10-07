@@ -138,7 +138,7 @@ function WorkflowStepper({ run }: { run: ApiPayrollRun | undefined }) {
                   isCurrent
                     ? 'bg-brand-teal text-white'
                     : isDone
-                      ? 'bg-brand-navy text-white'
+                      ? 'bg-brand-deep text-white'
                       : 'bg-base text-muted',
                 ].join(' ')}
               >
@@ -273,7 +273,7 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
 
         {run.status === 'COMPLETED' && canRun && (
           <button type="button" onClick={() => setConfirmAction('submit')}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-navy hover:bg-brand-navy/90 transition-colors flex items-center gap-2">
+            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-deep hover:brightness-110 transition-colors flex items-center gap-2">
             {submitMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
             <Send className="w-4 h-4" aria-hidden /> Submit for Approval
           </button>
@@ -295,7 +295,7 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
 
         {run.status === 'APPROVED' && canLock && (
           <button type="button" onClick={() => setConfirmAction('lock')}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-navy hover:bg-brand-navy/90 transition-colors flex items-center gap-2">
+            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-deep hover:brightness-110 transition-colors flex items-center gap-2">
             {lockMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
             <Lock className="w-4 h-4" aria-hidden /> Lock &amp; Post Journal
           </button>
@@ -476,7 +476,7 @@ function CurrentCycleCard({
     <div>
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
         <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-xl bg-brand-navy text-white flex items-center justify-center font-heading font-bold text-lg shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-brand-deep text-white flex items-center justify-center font-heading font-bold text-lg shrink-0">
             {String(CURRENT_MONTH).padStart(2, '0')}
           </div>
           <div>
@@ -484,7 +484,7 @@ function CurrentCycleCard({
               <h2 className="font-heading font-bold text-lg text-body">
                 Current Cycle: {formatRunPeriod(CURRENT_MONTH, CURRENT_YEAR)}
               </h2>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-heading font-semibold bg-current/10 ${meta.textClassName}`}>
+              <span className={`text-xs font-heading font-semibold ${meta.textClassName}`}>
                 {currentRun ? meta.badge : 'Not Started'}
               </span>
             </div>
@@ -552,7 +552,7 @@ function CurrentCycleCard({
               type="button"
               disabled={!runWindow?.isOpen || windowLoading}
               onClick={() => setConfirmRun(true)}
-              className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-navy hover:bg-brand-navy/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-deep hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
             >
               {runMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               Run {formatRunPeriodShort(CURRENT_MONTH, CURRENT_YEAR)} Payroll
@@ -656,7 +656,7 @@ export function PayrollRunsTab() {
                 to help it. */}
             <span className={`text-xs font-heading font-semibold whitespace-nowrap ${meta.textClassName}`}>{meta.badge}</span>
             {actionable && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-brand-amber/10 text-brand-amber text-[10px] font-heading font-bold uppercase tracking-wide whitespace-nowrap">
+              <span className="inline-flex items-center gap-1 text-status-warning text-[10px] font-heading font-bold uppercase tracking-wide whitespace-nowrap">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-amber" aria-hidden /> Action needed
               </span>
             )}

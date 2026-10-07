@@ -52,7 +52,7 @@ export function FeedbackPanel() {
             type="button"
             onClick={handleSubmit}
             disabled={!message.trim() || submit.isPending}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-navy text-white text-sm font-semibold disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-deep text-white text-sm font-semibold disabled:opacity-50"
           >
             <Send className="w-4 h-4" aria-hidden />
             {submit.isPending ? 'Sending\u2026' : 'Submit'}

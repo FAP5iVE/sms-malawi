@@ -42,8 +42,8 @@ function ClaimCard({
     <div className={`rounded-xl border p-4 space-y-3 ${isPending ? 'border-brand-amber/40 bg-brand-amber/5' : 'border-base bg-page'}`}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
-            isPending ? 'bg-brand-amber/15 text-brand-amber' : row.status === 'CONFIRMED' ? 'bg-brand-teal/15 text-brand-teal' : 'bg-brand-coral/15 text-brand-coral'
+          <span className={`inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide ${
+            isPending ? 'text-status-warning' : row.status === 'CONFIRMED' ? 'text-status-success' : 'text-status-danger'
           }`}>
             {isPending ? 'Pending Physical Inspection' : row.status === 'CONFIRMED' ? 'Approved & Confirmed' : 'Rejected'}
           </span>

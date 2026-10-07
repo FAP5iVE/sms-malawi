@@ -81,7 +81,7 @@ function IncomeStatementPanel() {
             className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
         </div>
         <button type="button" onClick={load} disabled={loading}
-          className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
+          className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60">
           {loading ? 'Loading…' : 'Generate'}
         </button>
       </div>
@@ -262,7 +262,7 @@ function AccountLedgerPanel() {
             className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
         </div>
         <button type="button" onClick={load} disabled={loading || !code.trim()}
-          className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60">
+          className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60">
           {loading ? 'Loading…' : 'Load Ledger'}
         </button>
       </div>

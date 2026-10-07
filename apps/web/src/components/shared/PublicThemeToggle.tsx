@@ -63,7 +63,7 @@ export function PublicThemeToggle({ className = '' }: PublicThemeToggleProps) {
         <button
           type="button"
           aria-label={mounted ? `Theme: ${theme}. Click to change.` : 'Toggle theme'}
-          className={`w-9 h-9 rounded-lg bg-brand-navy hover:bg-brand-navy-mid text-white shadow-md flex items-center justify-center transition-colors shrink-0 cursor-pointer ${className}`}
+          className={`w-9 h-9 rounded-lg bg-brand-deep hover:brightness-125 text-white shadow-md flex items-center justify-center transition-colors shrink-0 cursor-pointer ${className}`}
         >
           <ActiveIcon className="w-4 h-4" aria-hidden />
         </button>

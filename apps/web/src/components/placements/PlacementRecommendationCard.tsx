@@ -79,13 +79,13 @@ export function PlacementRecommendationCard({ recommendation: r, action, rank, g
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex items-start gap-2">
           {rank !== undefined && (
-            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-navy text-white text-xs font-bold flex items-center justify-center mt-0.5">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-deep text-white text-xs font-bold flex items-center justify-center mt-0.5">
               {rank}
             </span>
           )}
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center rounded bg-brand-navy/10 text-brand-navy text-[11px] font-bold px-1.5 py-0.5 uppercase tracking-wide">
+              <span className="inline-flex items-center text-status-info text-[11px] font-bold uppercase tracking-wide">
                 {r.universityId}
               </span>
               <span className="text-xs text-muted">{r.universityName}</span>
@@ -101,10 +101,10 @@ export function PlacementRecommendationCard({ recommendation: r, action, rank, g
           </div>
         </div>
         <span
-          className={`inline-flex items-center gap-1 text-xs font-semibold shrink-0 rounded-full px-2.5 py-1 ${
+          className={`inline-flex items-center gap-1 text-xs font-semibold shrink-0 ${
             eligible
-              ? r.meetsCutOff === false ? 'bg-brand-amber/10 text-brand-amber' : 'bg-brand-teal/10 text-brand-teal'
-              : 'bg-brand-coral/10 text-brand-coral'
+              ? r.meetsCutOff === false ? 'text-status-warning' : 'text-status-success'
+              : 'text-status-danger'
           }`}
         >
           {eligible ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}

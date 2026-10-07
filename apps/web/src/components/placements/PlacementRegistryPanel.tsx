@@ -102,7 +102,7 @@ export function PlacementRegistryPanel() {
     {
       key: 'entrySource', label: 'Entry Source', priority: 'optional',
       render: (row) => (
-        <span className="inline-flex items-center rounded-full bg-page border border-base px-2 py-0.5 text-xs">
+        <span className="inline-flex items-center text-xs">
           {ENTRY_SOURCE_LABEL[row.entrySource] ?? row.entrySource}
         </span>
       ),

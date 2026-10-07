@@ -46,7 +46,7 @@ export function ErrorsOutagesPanel() {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setShowOutagesOnly(false)}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${!showOutagesOnly ? 'bg-brand-navy text-white' : 'bg-page text-muted'}`}>
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${!showOutagesOnly ? 'bg-brand-deep text-white' : 'bg-page text-muted'}`}>
           All ({issues?.length ?? 0})
         </button>
         <button type="button" onClick={() => setShowOutagesOnly(true)}

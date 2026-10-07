@@ -43,12 +43,12 @@ export function VercelErrorsPanel() {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => setLevel(undefined)}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${!level ? 'bg-brand-navy text-white' : 'bg-page text-muted'}`}>
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold ${!level ? 'bg-brand-deep text-white' : 'bg-page text-muted'}`}>
           All
         </button>
         {LEVELS.map((l) => (
           <button key={l} type="button" onClick={() => setLevel(l)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize ${level === l ? 'bg-brand-navy text-white' : 'bg-page text-muted'}`}>
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize ${level === l ? 'bg-brand-deep text-white' : 'bg-page text-muted'}`}>
             {l}
           </button>
         ))}

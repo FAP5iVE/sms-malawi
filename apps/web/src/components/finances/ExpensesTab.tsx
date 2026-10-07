@@ -42,9 +42,9 @@ import { Plus, Check, X, Paperclip, FileText, Loader2 } from 'lucide-react'
 type ExpenseCategoryType = z.infer<typeof ExpenseCategorySchema>
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING: 'bg-brand-amber/10 text-brand-amber border-brand-amber/30',
-  APPROVED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  REJECTED: 'bg-brand-coral/10 text-brand-coral border-brand-coral/30',
+  PENDING: 'text-status-warning',
+  APPROVED: 'text-status-success',
+  REJECTED: 'text-status-danger',
 }
 
 const CATEGORY_OPTIONS: ExpenseCategoryType[] = [
@@ -207,7 +207,7 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_COLORS[e.status] ?? ''}`}
+                      className={`inline-flex text-xs font-semibold ${STATUS_COLORS[e.status] ?? ''}`}
                     >
                       {e.status}
                     </span>
@@ -289,7 +289,7 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
       {/* Log Expense Modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-sm modal-panel p-6 space-y-4">
+          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
             <h3 className="font-heading font-bold text-lg text-brand-navy">Log Expense</h3>
             <div className="space-y-3">
               <div>

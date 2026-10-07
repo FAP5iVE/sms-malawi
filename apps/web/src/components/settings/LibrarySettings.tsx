@@ -141,7 +141,7 @@ export function LibrarySettings() {
         {error && <p className="text-sm text-brand-coral">{error}</p>}
         <div className="flex items-center gap-3">
           <button type="submit" disabled={saving}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2">
+            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60 flex items-center gap-2">
             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Settings</>}
           </button>
           {saved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}

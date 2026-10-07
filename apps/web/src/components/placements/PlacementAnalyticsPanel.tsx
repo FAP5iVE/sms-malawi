@@ -82,7 +82,7 @@ export function PlacementAnalyticsPanel({ academicYear }: { academicYear: string
             {data.topUniversities.map((u) => (
               <span
                 key={u.universityId}
-                className="inline-flex items-center gap-1.5 rounded-full border border-base bg-page px-3 py-1 text-xs font-medium text-body"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-body"
               >
                 {u.universityName}
                 <span className="text-muted">·</span>

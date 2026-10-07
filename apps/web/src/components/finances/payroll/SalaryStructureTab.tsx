@@ -233,7 +233,7 @@ function AddAllowanceForm({ staffId, onDone }: { staffId: string; onDone: () => 
           type="button"
           onClick={submit}
           disabled={addAllowance.isPending}
-          className="min-h-[40px] px-4 rounded-lg text-sm font-heading font-semibold text-white bg-brand-navy hover:bg-brand-navy/90 disabled:opacity-50 flex items-center gap-2"
+          className="min-h-[40px] px-4 rounded-lg text-sm font-heading font-semibold text-white bg-brand-deep hover:brightness-110 disabled:opacity-50 flex items-center gap-2"
         >
           {addAllowance.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           Add Allowance
@@ -315,7 +315,7 @@ function SalaryEditor({ staff }: { staff: ApiStaffProfile }) {
             type="button"
             onClick={saveBaseSalary}
             disabled={!isDirty || updateSalary.isPending}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-navy hover:bg-brand-navy/90 disabled:opacity-50 transition-colors flex items-center gap-2"
+            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-deep hover:brightness-110 disabled:opacity-50 transition-colors flex items-center gap-2"
           >
             {updateSalary.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
             Save
