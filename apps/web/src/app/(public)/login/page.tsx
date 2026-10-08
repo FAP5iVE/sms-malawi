@@ -99,19 +99,35 @@
  *     way. Both files ship at apps/web/public/images/. Sized up
  *     (w-56/64/72 vs. the old w-14/16 icon-only mark) to match the
  *     requested larger footprint. "SMS Malawi" stays printed beneath it.
+ *
+ * [REVISION 4, shared public header + AuthShell]:
+ *   - The page-level top bar (loose Home + theme chips) is gone. Every public
+ *     page now gets the same header from (public)/layout.tsx
+ *     (components/shared/PublicHeader.tsx), rendered here in its frosted
+ *     "glass" look so it matches this page's cards. Its Home link and theme
+ *     dropdown replace the two chips and the local cycleTheme() code.
+ *   - The frame, glass card, logo and background moved into the shared
+ *     <AuthShell> (components/shared/AuthShell.tsx) so /forgot-password,
+ *     /change-password and /reset-password render at exactly the same size.
+ *     On desktop the card is now a wide two-pane layout (brand + authorised
+ *     access notice on the left, the form on the right); on phones it is a
+ *     single compact column. The ambient artwork is the shared
+ *     <PublicAmbientBackground vivid />, identical artwork, de-duplicated.
+ *   - No change to any auth logic: sanitizeRedirectTarget, signInWith
+ *     EmailAndPassword, the redirect effect, noRoleAssigned/isBusy and the
+ *     login-log calls are untouched. The sign-in error box gained
+ *     role="alert" and decorative icons gained aria-hidden.
  */
 'use client'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useTheme } from 'next-themes'
 import { signInWithEmailAndPassword } from 'firebase/auth'
 import { apiFetch } from '@/lib/api-client'
 import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/authStore'
-import { useHasMounted } from '@/hooks/useHasMounted'
+import { AuthShell } from '@/components/shared/AuthShell'
 import {
   Eye,
   EyeOff,
@@ -119,10 +135,6 @@ import {
   AlertCircle,
   ArrowRight,
   ShieldCheck,
-  Home,
-  Sun,
-  Moon,
-  Monitor,
 } from 'lucide-react'
 
 /**
@@ -146,7 +158,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen w-full bg-page flex items-center justify-center p-4">
+        <div className="flex-1 w-full bg-page flex items-start justify-center p-4">
           <div className="w-full max-w-[420px] rounded-[28px] border border-base bg-surface p-8 space-y-4">
             <div className="mx-auto h-16 w-16 rounded-full bg-page animate-pulse" />
             <div className="h-7 w-28 rounded-lg bg-page animate-pulse" />
@@ -233,329 +245,133 @@ function LoginForm() {
     }
   }
 
-  // ── Theme toggle, reuses the exact cycleTheme/themeIcons pattern already
-  // shipped on the public homepage (apps/web/src/app/(public)/page.tsx),
-  // just wired up locally here since this page doesn't share that file's
-  // header component.
-  const { theme, setTheme, resolvedTheme } = useTheme()
-  const mounted = useHasMounted()
-  const themeIcons = {
-    light: <Sun className="w-4 h-4" />,
-    dark: <Moon className="w-4 h-4" />,
-    system: <Monitor className="w-4 h-4" />,
-  } as const
-  function cycleTheme() {
-    const order: Array<keyof typeof themeIcons> = ['light', 'dark', 'system']
-    const current = (theme as keyof typeof themeIcons) ?? 'system'
-    setTheme(order[(order.indexOf(current) + 1) % order.length] ?? 'system')
-  }
-
   return (
-    <div className="relative min-h-screen w-full bg-page flex flex-col font-sans">
-      {/* ── Ambient background: vignette + colourful glow + organic line art.
-          overflow-hidden is scoped to THIS layer only, never to the page
-          wrapper, so decorative blur can never clip real card content. */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Soft vignette plate for depth */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1600px] h-[1000px] max-w-[94vw] rounded-[80px] blur-3xl bg-gradient-to-br from-brand-teal-light/[0.07] via-transparent to-brand-coral/[0.06] dark:from-brand-navy-mid/25 dark:via-brand-navy/55 dark:to-black/60" />
-
-        {/* Colourful glow orbs, spread and varied */}
-        <div className="absolute top-[6%] left-[4%] w-64 h-64 sm:w-[420px] sm:h-[420px] rounded-full bg-brand-teal/15 dark:bg-brand-teal/25 blur-[100px] sm:blur-[130px]" />
-        <div className="absolute bottom-[8%] right-[6%] w-64 h-64 sm:w-[420px] sm:h-[420px] rounded-full bg-brand-coral/15 dark:bg-brand-coral/22 blur-[110px] sm:blur-[140px]" />
-        <div className="absolute top-[18%] right-[12%] w-52 h-52 sm:w-72 sm:h-72 rounded-full bg-brand-amber/12 dark:bg-brand-amber/20 blur-[90px] sm:blur-[110px]" />
-        <div className="absolute top-[42%] left-[46%] w-56 h-56 sm:w-80 sm:h-80 rounded-full bg-brand-navy-light/10 dark:bg-brand-navy-light/18 blur-[90px] sm:blur-[110px]" />
-
-        {/* Organic tube/ring line art in a full brand colour spread */}
-        <svg
-          className="absolute inset-0 w-full h-full opacity-[0.18] dark:opacity-90 transition-opacity duration-300"
-          viewBox="0 0 1440 900"
-          preserveAspectRatio="xMidYMid slice"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient id="loginTeal" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="var(--color-brand-teal-light)" />
-              <stop offset="100%" stopColor="var(--color-brand-teal)" />
-            </linearGradient>
-            <linearGradient id="loginCoral" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="var(--color-brand-coral)" />
-              <stop offset="100%" stopColor="var(--color-brand-amber)" />
-            </linearGradient>
-            <linearGradient id="loginNavy" x1="20%" y1="0%" x2="80%" y2="100%">
-              <stop offset="0%" stopColor="var(--color-brand-navy-light)" />
-              <stop offset="55%" stopColor="var(--color-brand-navy-mid)" />
-              <stop offset="100%" stopColor="var(--color-brand-navy)" />
-            </linearGradient>
-            <linearGradient id="loginPurple" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="var(--color-brand-navy-light)" />
-              <stop offset="100%" stopColor="var(--color-brand-navy-mid)" />
-            </linearGradient>
-            <linearGradient id="loginAmber" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="var(--color-brand-amber)" />
-              <stop offset="100%" stopColor="var(--color-brand-coral)" />
-            </linearGradient>
-            <filter id="loginSoftShadow" x="-30%" y="-30%" width="160%" height="160%">
-              <feDropShadow dx="0" dy="16" stdDeviation="20" floodColor="#000000" floodOpacity="0.32" />
-            </filter>
-          </defs>
-
-          {/* Top-centre ring, teal */}
-          <g filter="url(#loginSoftShadow)">
-            <path
-              d="M 590 130 C 590 85 640 50 695 50 C 750 50 790 90 790 145 C 790 200 745 240 690 240 C 640 240 600 200 600 155"
-              stroke="url(#loginTeal)"
-              strokeWidth="54"
-              strokeLinecap="round"
-              fill="none"
-            />
-          </g>
-
-          {/* Centre-left zigzag pill, navy */}
-          <g filter="url(#loginSoftShadow)" transform="translate(330, 300)">
-            <path
-              d="M 40 40 L 90 40 C 110 40 120 50 120 70 L 120 100 C 120 120 110 130 90 130 L 40 130 C 20 130 10 140 10 160 L 10 190 C 10 210 20 220 40 220 L 90 220"
-              stroke="url(#loginNavy)"
-              strokeWidth="48"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </g>
-
-          {/* Bottom-centre C-curve, coral/amber */}
-          <g filter="url(#loginSoftShadow)" transform="translate(470, 560)">
-            <path
-              d="M 120 20 C 50 30 10 90 10 150 C 10 215 65 265 140 265 C 200 265 245 225 245 170"
-              stroke="url(#loginCoral)"
-              strokeWidth="58"
-              strokeLinecap="round"
-              fill="none"
-            />
-          </g>
-
-          {/* Right-side spiral ribbon, purple */}
-          <g filter="url(#loginSoftShadow)">
-            <path
-              d="M 950 170 C 1040 180 1100 240 1090 330 C 1080 420 990 470 920 460 C 850 450 830 370 860 300 C 890 230 970 200 1050 220 C 1130 240 1170 320 1160 410 C 1150 500 1080 590 1010 650 C 930 720 840 770 760 810"
-              stroke="url(#loginPurple)"
-              strokeWidth="50"
-              strokeLinecap="round"
-              fill="none"
-            />
-          </g>
-
-          {/* Bottom-right sausage pillow, amber */}
-          <g filter="url(#loginSoftShadow)" transform="translate(1070, 660)">
-            <path
-              d="M 30 50 C 90 10 180 30 250 90 C 310 140 330 200 280 230"
-              stroke="url(#loginAmber)"
-              strokeWidth="66"
-              strokeLinecap="round"
-              fill="none"
-            />
-          </g>
-
-          {/* Top-right accent ring, amber */}
-          <g filter="url(#loginSoftShadow)">
-            <circle cx="1250" cy="120" r="74" stroke="url(#loginAmber)" strokeWidth="42" fill="none" />
-          </g>
-
-          {/* Bottom-left arc, purple/navy */}
-          <g filter="url(#loginSoftShadow)">
-            <path
-              d="M 40 830 A 170 170 0 0 1 380 850"
-              stroke="url(#loginPurple)"
-              strokeWidth="46"
-              strokeLinecap="round"
-              fill="none"
-            />
-          </g>
-
-          {/* Small floating teal ring, upper-mid */}
-          <g filter="url(#loginSoftShadow)">
-            <circle cx="240" cy="120" r="46" stroke="url(#loginTeal)" strokeWidth="34" fill="none" />
-          </g>
-        </svg>
+    <AuthShell
+      footer={
+        /* Authorisation notice, sits under the logo on desktop and after the
+           form on smaller screens (AuthShell decides where). */
+        <div className="p-3 rounded-2xl bg-black/[0.02] dark:bg-black/25 border border-base backdrop-blur-md text-center">
+          <div className="flex items-center justify-center gap-1.5 mb-1 text-body">
+            <ShieldCheck className="w-4 h-4 text-brand-teal" aria-hidden />
+            <span className="text-[11px] font-heading font-semibold tracking-wide uppercase">
+              Authorised access
+            </span>
+          </div>
+          <p className="text-xs leading-relaxed text-muted-foreground dark:text-foreground font-sans">
+            This portal is for authorised students and staff only.
+          </p>
+          <p className="text-xs leading-relaxed text-muted-foreground dark:text-foreground font-sans mt-0.5">
+            Contact your school administrator if you need access.
+          </p>
+        </div>
+      }
+    >
+      {/* Form title */}
+      <div className="mb-4 text-left">
+        <h1 className="text-2xl sm:text-[26px] font-heading font-bold text-body tracking-tight">
+          Welcome back
+        </h1>
+        <p className="text-muted-foreground dark:text-foreground text-sm mt-1">Sign in to your school account</p>
       </div>
 
-      {/* ── Top bar: home + theme toggle ── */}
-      <header className="relative z-30 flex items-center justify-between p-3 sm:p-4">
-        <Link
-          href="/"
-          aria-label="Back to homepage"
-          title="Back to homepage"
-          className="w-9 h-9 rounded-lg bg-brand-deep hover:brightness-125 text-white shadow-md flex items-center justify-center transition-colors"
+      {/* Status alerts */}
+      {error && (
+        <div
+          role="alert"
+          className="mb-4 p-3 rounded-xl bg-brand-coral/10 border border-brand-coral/30 text-brand-coral text-xs flex items-center gap-2 animate-fade-in"
         >
-          <Home className="w-4 h-4" />
-        </Link>
+          <AlertCircle className="w-4 h-4 shrink-0" aria-hidden />
+          <span>{error}</span>
+        </div>
+      )}
 
-        <button
-          type="button"
-          onClick={cycleTheme}
-          aria-label={mounted ? `Theme: ${theme}. Click to change.` : 'Toggle theme'}
-          className="w-9 h-9 rounded-lg bg-brand-deep hover:brightness-125 text-white shadow-md flex items-center justify-center transition-colors"
+      {noRoleAssigned && !error && (
+        <div
+          role="alert"
+          className="mb-4 p-3 rounded-xl bg-brand-amber/10 border border-brand-amber/30 text-brand-amber text-xs flex items-start gap-2 animate-fade-in"
         >
-          {mounted ? themeIcons[(theme as keyof typeof themeIcons) ?? 'system'] : <Monitor className="w-4 h-4" aria-hidden />}
-        </button>
-      </header>
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+          <span>
+            Your sign-in worked, but this account has no role assigned yet, so
+            there is nothing it can open. An administrator needs to set the
+            account&rsquo;s role before you can continue.
+          </span>
+        </div>
+      )}
 
-      {/* ── Centred content ── */}
-      <main className="relative z-10 flex-1 flex items-start justify-center px-4 pt-0 pb-6 sm:pb-8">
-        {/* Wide frosted plate */}
-        <div className="w-full max-w-sm sm:max-w-2xl lg:max-w-4xl rounded-[28px] sm:rounded-[36px] bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/10 backdrop-blur-md p-2.5 sm:p-5 shadow-xl">
-          {/* Login glass card, translucent + blurred in BOTH themes */}
-          <div className="w-full max-w-sm sm:max-w-lg lg:max-w-2xl mx-auto rounded-[24px] sm:rounded-[30px] bg-white/80 dark:bg-white/[0.07] border border-black/5 dark:border-white/15 backdrop-blur-2xl p-6 sm:p-8 shadow-2xl flex flex-col">
-            {/* Logo + system name, BVO (dark-on-light) mark in light mode,
-                WVO (light-on-dark) mark in dark mode, so the mark always
-                has contrast against the card behind it. */}
-            <div className="flex flex-col items-center justify-center mb-5 text-center">
-              <Link
-                href="/"
-                className="flex items-center justify-center transition-transform hover:scale-105"
-                title="Home"
-              >
-                <Image
-                  src={
-                    mounted && resolvedTheme === 'dark'
-                      ? '/images/5ivestacks-labs-logo-wvo.svg'
-                      : '/images/5ivestacks-labs-logo-bvo.svg'
-                  }
-                  alt="5iveStack Labs logo"
-                  width={380}
-                  height={150}
-                  loading="eager"
-                  className="w-56 sm:w-64 lg:w-72 h-auto object-contain drop-shadow-lg"
-                />
-              </Link>
-              <span className="mt-2.5 font-heading font-bold text-sm sm:text-base text-body tracking-tight">
-                SMS Malawi
-              </span>
-            </div>
+      {/* Login form */}
+      <form onSubmit={handleLogin} className="space-y-4 text-left">
+        <div>
+          <label htmlFor="email" className="block text-xs sm:text-sm font-heading font-medium text-body mb-1.5">
+            Email address
+          </label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@school.edu.mw"
+            className="w-full px-3.5 py-2.5 sm:py-3 bg-page text-body placeholder:text-muted-foreground rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
+          />
+        </div>
 
-            {/* Form title */}
-            <div className="mb-4 text-left">
-              <h1 className="text-2xl sm:text-[26px] font-heading font-bold text-body tracking-tight">
-                Welcome back
-              </h1>
-              <p className="text-muted-foreground dark:text-foreground text-sm mt-1">Sign in to your school account</p>
-            </div>
-
-            {/* Status alerts */}
-            {error && (
-              <div className="mb-4 p-3 rounded-xl bg-brand-coral/10 border border-brand-coral/30 text-brand-coral text-xs flex items-center gap-2 animate-fade-in">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {noRoleAssigned && !error && (
-              <div
-                role="alert"
-                className="mb-4 p-3 rounded-xl bg-brand-amber/10 border border-brand-amber/30 text-brand-amber text-xs flex items-start gap-2 animate-fade-in"
-              >
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  Your sign-in worked, but this account has no role assigned yet, so
-                  there is nothing it can open. An administrator needs to set the
-                  account&rsquo;s role before you can continue.
-                </span>
-              </div>
-            )}
-
-            {/* Login form */}
-            <form onSubmit={handleLogin} className="space-y-4 text-left">
-              <div>
-                <label htmlFor="email" className="block text-xs sm:text-sm font-heading font-medium text-body mb-1.5">
-                  Email address
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@school.edu.mw"
-                  className="w-full px-3.5 py-2.5 sm:py-3 bg-page text-body placeholder:text-muted-foreground rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label htmlFor="password" className="text-xs sm:text-sm font-heading font-medium text-body">
-                    Password
-                  </label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs font-bold text-brand-teal-light hover:text-brand-teal transition-colors font-heading"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={showPass ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full px-3.5 py-2.5 sm:py-3 pr-11 bg-page text-body placeholder:text-muted-foreground rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPass(!showPass)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-foreground focus:outline-none cursor-pointer transition-colors"
-                    aria-label={showPass ? 'Hide password' : 'Show password'}
-                  >
-                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isBusy}
-                className="w-full py-3 bg-brand-deep hover:brightness-125 active:brightness-90 text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-4 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 border border-transparent dark:border-white/10 dark:hover:border-brand-teal/40"
-              >
-                {isBusy && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isBusy ? 'Signing in…' : 'Sign in'}
-              </button>
-            </form>
-
-            {/* Authorisation notice */}
-            <div className="mt-5 p-3 rounded-2xl bg-black/[0.02] dark:bg-black/25 border border-base backdrop-blur-md text-center">
-              <div className="flex items-center justify-center gap-1.5 mb-1 text-body">
-                <ShieldCheck className="w-4 h-4 text-brand-teal" />
-                <span className="text-[11px] font-heading font-semibold tracking-wide uppercase">
-                  Authorised access
-                </span>
-              </div>
-              <p className="text-xs leading-relaxed text-muted-foreground dark:text-foreground font-sans">
-                This portal is for authorised students and staff only.
-              </p>
-              <p className="text-xs leading-relaxed text-muted-foreground dark:text-foreground font-sans mt-0.5">
-                Contact your school administrator if you need access.
-              </p>
-            </div>
-
-            {/* Footer: apply link */}
-            <div className="mt-4 text-center text-xs text-muted-foreground dark:text-foreground font-sans flex items-center justify-center gap-1.5">
-              <span>Ready to apply?</span>
-              <Link
-                href="/apply"
-                className="inline-flex items-center gap-1 font-bold text-brand-teal hover:text-brand-teal-light transition-all underline-offset-4 hover:underline"
-              >
-                <span>Apply</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label htmlFor="password" className="text-xs sm:text-sm font-heading font-medium text-body">
+              Password
+            </label>
+            <Link
+              href="/forgot-password"
+              className="text-xs font-bold text-brand-teal-light hover:text-brand-teal transition-colors font-heading"
+            >
+              Forgot password?
+            </Link>
+          </div>
+          <div className="relative">
+            <input
+              id="password"
+              type={showPass ? 'text' : 'password'}
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full px-3.5 py-2.5 sm:py-3 pr-11 bg-page text-body placeholder:text-muted-foreground rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPass(!showPass)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-foreground focus:outline-none cursor-pointer transition-colors"
+              aria-label={showPass ? 'Hide password' : 'Show password'}
+            >
+              {showPass ? <EyeOff className="w-4 h-4" aria-hidden /> : <Eye className="w-4 h-4" aria-hidden />}
+            </button>
           </div>
         </div>
-      </main>
-    </div>
+
+        <button
+          type="submit"
+          disabled={isBusy}
+          className="w-full py-3 bg-brand-deep hover:brightness-125 active:brightness-90 text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-4 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 border border-transparent dark:border-white/10 dark:hover:border-brand-teal/40"
+        >
+          {isBusy && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+          {isBusy ? 'Signing in…' : 'Sign in'}
+        </button>
+      </form>
+
+      {/* Footer: apply link */}
+      <div className="mt-5 text-center text-xs text-muted-foreground dark:text-foreground font-sans flex items-center justify-center gap-1.5">
+        <span>Ready to apply?</span>
+        <Link
+          href="/apply"
+          className="inline-flex items-center gap-1 font-bold text-brand-teal hover:text-brand-teal-light transition-all underline-offset-4 hover:underline"
+        >
+          <span>Apply</span>
+          <ArrowRight className="w-3.5 h-3.5" aria-hidden />
+        </Link>
+      </div>
+    </AuthShell>
   )
 }

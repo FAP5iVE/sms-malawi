@@ -20,12 +20,22 @@
  */
 'use client'
 
+/*
+ * [CHANGE (2026-10-08)]: Restyled to the shared <AuthShell> glass frame, same
+ * size and look as /login, /forgot-password and /change-password, and gets the
+ * shared header from (public)/layout.tsx. Previously this page was its own
+ * split layout (solid navy panel + plain form) with no header and no ambient
+ * background. Reset logic (verifyPasswordResetCode / confirmPasswordReset and
+ * every error branch) is unchanged.
+ */
+
 import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { ArrowLeft, Lock, CheckCircle2, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react'
+import { AuthShell } from '@/components/shared/AuthShell'
 
 // `useSearchParams()` requires a Suspense boundary or `next build` fails its
 // static-generation bailout check, same convention as (public)/login/page.tsx
@@ -34,7 +44,7 @@ export default function ResetPasswordPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen w-full bg-page flex items-center justify-center p-4">
+        <div className="flex-1 w-full bg-page flex items-start justify-center p-4">
           <div className="w-full max-w-sm rounded-2xl border border-base bg-surface p-8 space-y-4">
             <div className="mx-auto h-16 w-16 rounded-full bg-page animate-pulse" />
             <div className="h-7 w-40 mx-auto rounded-lg bg-page animate-pulse" />
@@ -102,126 +112,112 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-[1fr_1fr] font-sans">
-      <div className="hidden lg:flex flex-col justify-between bg-brand-deep p-12">
-        <Link href="/" className="flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm w-fit">
-          <ArrowLeft className="w-4 h-4" />
-          <span className="font-heading font-medium">Back to homepage</span>
-        </Link>
-        <div>
-          <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center mb-6">
-            <Lock className="w-8 h-8 text-white/60" />
+    <AuthShell>
+      {verifying && !missingCode ? (
+        <div className="text-center py-8" role="status" aria-live="polite">
+          <Loader2 className="w-8 h-8 text-brand-teal animate-spin mx-auto mb-4" aria-hidden />
+          <p className="text-muted-foreground dark:text-foreground text-sm">Verifying your reset link…</p>
+        </div>
+      ) : invalidCode || missingCode ? (
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-brand-coral/15 flex items-center justify-center mx-auto mb-5">
+            <AlertTriangle className="w-8 h-8 text-brand-coral" aria-hidden />
           </div>
-          <h2 className="font-heading font-bold text-3xl text-white mb-3">Reset Your Password</h2>
-          <p className="text-white/40 text-sm font-sans leading-relaxed max-w-xs">
-            Choose a new password to get back into your school account.
+          <h1 className="font-heading font-bold text-2xl text-body mb-2">Link expired</h1>
+          <p className="text-muted-foreground dark:text-foreground text-sm font-sans leading-relaxed mb-8">
+            This password reset link has expired or has already been used. Request a new one to continue.
           </p>
+          <Link
+            href="/forgot-password"
+            className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
+          >
+            Request a new link
+          </Link>
         </div>
-        <p className="text-white/25 text-xs font-sans">
-          &copy; {new Date().getFullYear()} SMS Malawi. All rights reserved.
-        </p>
-      </div>
+      ) : done ? (
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-brand-teal/15 flex items-center justify-center mx-auto mb-5">
+            <CheckCircle2 className="w-8 h-8 text-brand-teal" aria-hidden />
+          </div>
+          <h1 className="font-heading font-bold text-2xl text-body mb-2">Password updated</h1>
+          <p className="text-muted-foreground dark:text-foreground text-sm font-sans leading-relaxed mb-8">
+            Your password has been changed. You can now sign in with your new password.
+          </p>
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" aria-hidden /> Return to login
+          </Link>
+        </div>
+      ) : (
+        <>
+          <Link
+            href="/login"
+            className="inline-flex min-h-11 items-center gap-1.5 text-muted-foreground dark:text-foreground text-sm mb-3 hover:text-body transition-colors w-fit"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" aria-hidden /> Back to login
+          </Link>
 
-      <div className="flex flex-col justify-center px-6 sm:px-12 lg:px-16 py-12 bg-page">
-        <Link href="/login" className="flex items-center gap-1.5 text-muted text-sm mb-12 hover:text-body transition-colors w-fit">
-          <ArrowLeft className="w-3.5 h-3.5" /> Back to login
-        </Link>
-
-        <div className="w-full max-w-sm mx-auto">
-          {verifying && !missingCode ? (
-            <div className="text-center py-8">
-              <Loader2 className="w-8 h-8 text-brand-teal animate-spin mx-auto mb-4" />
-              <p className="text-muted text-sm">Verifying your reset link…</p>
+          <div className="flex flex-col items-center text-center mb-6">
+            <div className="w-14 h-14 rounded-2xl bg-brand-deep flex items-center justify-center mb-4 shadow-md">
+              <Lock className="w-7 h-7 text-white" aria-hidden />
             </div>
-          ) : invalidCode || missingCode ? (
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-brand-coral/15 flex items-center justify-center mx-auto mb-5">
-                <AlertTriangle className="w-8 h-8 text-brand-coral" />
-              </div>
-              <h1 className="font-heading font-bold text-2xl text-brand-navy mb-2">Link expired</h1>
-              <p className="text-muted text-sm font-sans leading-relaxed mb-8">
-                This password reset link has expired or has already been used. Request a new one to continue.
-              </p>
-              <Link
-                href="/forgot-password"
-                className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
-              >
-                Request a new link
-              </Link>
-            </div>
-          ) : done ? (
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-brand-teal/15 flex items-center justify-center mx-auto mb-5">
-                <CheckCircle2 className="w-8 h-8 text-brand-teal" />
-              </div>
-              <h1 className="font-heading font-bold text-2xl text-brand-navy mb-2">Password updated</h1>
-              <p className="text-muted text-sm font-sans leading-relaxed mb-8">
-                Your password has been changed. You can now sign in with your new password.
-              </p>
-              <Link
-                href="/login"
-                className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" /> Return to login
-              </Link>
-            </div>
-          ) : (
-            <>
-              <div className="mb-8">
-                <h1 className="font-heading text-3xl font-bold text-brand-navy mb-2 tracking-tight">
-                  Set a new password
-                </h1>
-                <p className="text-muted text-sm font-sans">
-                  {email ? <>for <strong className="text-body">{email}</strong></> : 'Choose a new password for your account.'}
-                </p>
-              </div>
+            <h1 className="font-heading text-2xl sm:text-[26px] font-bold text-body tracking-tight">
+              Set a new password
+            </h1>
+            <p className="text-muted-foreground dark:text-foreground text-sm font-sans mt-1">
+              {email ? <>for <strong className="text-body">{email}</strong></> : 'Choose a new password for your account.'}
+            </p>
+          </div>
 
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <label htmlFor="password" className="block text-sm font-heading font-medium text-body mb-1.5">
-                    New password
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      autoComplete="new-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="At least 6 characters"
-                      className="w-full border border-base rounded-xl px-4 py-3 pr-11 text-sm bg-surface text-body placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-body"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                {error && (
-                  <div className="text-sm text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
-                    {error}
-                  </div>
-                )}
-
+          <form onSubmit={handleSubmit} className="space-y-4 text-left">
+            <div>
+              <label htmlFor="password" className="block text-xs sm:text-sm font-heading font-medium text-body mb-1.5">
+                New password
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  className="w-full px-3.5 py-2.5 sm:py-3 pr-11 bg-page text-body placeholder:text-muted-foreground rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
+                />
                 <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-brand-deep text-white py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-foreground focus:outline-none cursor-pointer transition-colors"
                 >
-                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {loading ? 'Saving…' : 'Save New Password'}
+                  {showPassword ? <EyeOff className="w-4 h-4" aria-hidden /> : <Eye className="w-4 h-4" aria-hidden />}
                 </button>
-              </form>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+              </div>
+            </div>
+
+            {error && (
+              <div
+                role="alert"
+                className="p-3 rounded-xl bg-brand-coral/10 border border-brand-coral/30 text-brand-coral text-xs"
+              >
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-brand-deep hover:brightness-125 active:brightness-90 text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-2 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 border border-transparent dark:border-white/10 dark:hover:border-brand-teal/40"
+            >
+              {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+              {loading ? 'Saving…' : 'Save New Password'}
+            </button>
+          </form>
+        </>
+      )}
+    </AuthShell>
   )
 }

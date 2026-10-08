@@ -2,7 +2,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { ArrowLeft } from 'lucide-react'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
-import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
+import { PublicHeader } from '@/components/shared/PublicHeader'
 
 export const metadata: Metadata = {
   title: 'Page not found',
@@ -20,14 +20,14 @@ const LINKS = [
 
 export default function NotFound() {
   return (
-    <div className="relative min-h-screen bg-page">
+    <div className="relative flex min-h-screen flex-col bg-page">
       <PublicAmbientBackground />
 
-      <main className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-6 sm:px-6 lg:px-8">
-        <div className="flex justify-end">
-          <PublicThemeToggle />
-        </div>
+      {/* Outside the (public) route group, so it doesn't get the layout's
+          header, render the same shared bar with an explicit title. */}
+      <PublicHeader title="Page not found" />
 
+      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6 sm:px-6 lg:px-8">
         {/* Stacked on phones (picture first), side by side from lg. */}
         <div className="flex flex-1 flex-col items-center justify-center gap-8 py-10 lg:flex-row lg:gap-16">
           <div className="w-full max-w-md shrink-0 lg:order-2 lg:max-w-xl lg:flex-1">

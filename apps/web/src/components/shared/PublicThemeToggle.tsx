@@ -20,6 +20,11 @@
  *   matches the public site's hero sections, ModeToggle's ghost-button
  *   style is built for PageHeader's lighter chrome and wouldn't fit here).
  *
+ * [CHANGE]: Rendered by <PublicHeader /> (components/shared/PublicHeader.tsx),
+ *   which every public page now gets from (public)/layout.tsx, pages no longer
+ *   place their own toggle. Chip enlarged from 36px to the project's 44px
+ *   minimum touch target (sms-erp-ux, "Touch targets").
+ *
  * [USAGE]: <PublicThemeToggle /> inside a page's header/back-link row.
  *   Pass a `className` to override sizing/position (e.g. `ml-auto` to push
  *   it to the far end of a flex row that isn't already `justify-between`).
@@ -63,7 +68,7 @@ export function PublicThemeToggle({ className = '' }: PublicThemeToggleProps) {
         <button
           type="button"
           aria-label={mounted ? `Theme: ${theme}. Click to change.` : 'Toggle theme'}
-          className={`w-9 h-9 rounded-lg bg-brand-deep hover:brightness-125 text-white shadow-md flex items-center justify-center transition-colors shrink-0 cursor-pointer ${className}`}
+          className={`w-11 h-11 rounded-lg bg-brand-deep hover:brightness-125 text-white shadow-md flex items-center justify-center transition-colors shrink-0 cursor-pointer ${className}`}
         >
           <ActiveIcon className="w-4 h-4" aria-hidden />
         </button>

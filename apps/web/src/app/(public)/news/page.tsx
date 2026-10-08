@@ -20,7 +20,6 @@ import { Newspaper } from 'lucide-react'
 import { usePublicNews } from '@/hooks/usePublic'
 import { PublicArchiveList } from '@/components/shared/PublicArchive'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
-import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
 
 const PAGE_SIZE = 12
 
@@ -37,7 +36,6 @@ export default function NewsPage() {
         title="Latest News"
         subtitle="News and stories from around the school."
         basePath="/news"
-        backHref="/#news"
         items={items}
         isLoading={isLoading}
         emptyIcon={Newspaper}
@@ -45,7 +43,6 @@ export default function NewsPage() {
         page={page}
         totalPages={totalPages}
         onPageChange={setPage}
-        headerRight={<PublicThemeToggle />}
       />
     </>
   )

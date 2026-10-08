@@ -14,12 +14,18 @@
  *   Announcements/Events sections behave, a snippet card that expands only
  *   on its own page, never inline.
  * [DEPENDS ON]: apps/web/src/hooks/usePublic.ts (PublicAnnouncement shape)
+ *
+ * [CHANGE (2026-10-08)]: The list's own "Back to home" row and the
+ *   `backHref` / `headerRight` props are gone, Home and the theme toggle now
+ *   live in the shared <PublicHeader /> that (public)/layout.tsx renders above
+ *   every public page. The detail view keeps its "Back to <list>" link, that
+ *   goes to the list, not home, so it is not redundant with the header.
+ *   Roots use `flex-1` (not `min-h-screen`) to fill the space below the header.
  */
 
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
 import type { PublicAnnouncement } from '@/hooks/usePublic'
 
 export function formatArchiveDate(iso: string): string {
@@ -48,7 +54,6 @@ interface ListProps {
   title: string
   subtitle: string
   basePath: string
-  backHref: string
   items: PublicAnnouncement[]
   isLoading: boolean
   emptyIcon: LucideIcon
@@ -56,28 +61,18 @@ interface ListProps {
   page: number
   totalPages: number
   onPageChange: (page: number) => void
-  /** Optional right-aligned header slot (e.g. PublicThemeToggle), rendered
-   *  alongside the Back link, avoids every caller re-implementing the
-   *  same flex header row. */
-  headerRight?: ReactNode
 }
 
 /** Collapsed cards, a 3-line excerpt with "Read more", never the full
  *  body. Only the detail page (PublicArchiveDetail below) shows the whole
  *  thing. */
 export function PublicArchiveList({
-  title, subtitle, basePath, backHref, items, isLoading, emptyIcon: EmptyIcon, emptyText,
-  page, totalPages, onPageChange, headerRight,
+  title, subtitle, basePath, items, isLoading, emptyIcon: EmptyIcon, emptyText,
+  page, totalPages, onPageChange,
 }: ListProps) {
   return (
-    <div className="min-h-screen bg-page">
+    <div className="flex-1 bg-page">
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="flex items-center justify-between mb-6">
-          <Link href={backHref} className="inline-flex items-center gap-2 text-sm text-brand-teal hover:underline">
-            <ArrowLeft className="w-4 h-4" /> Back to home
-          </Link>
-          {headerRight}
-        </div>
         <h1 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white mb-2">
           {title}
         </h1>
@@ -157,7 +152,7 @@ interface DetailProps {
  *  link. Back always returns to that same list. */
 export function PublicArchiveDetail({ post, isLoading, notFoundText, backHref, backLabel }: DetailProps) {
   return (
-    <div className="min-h-screen bg-page">
+    <div className="flex-1 bg-page">
       <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <Link href={backHref} className="inline-flex items-center gap-2 text-sm text-brand-teal hover:underline mb-6">
           <ArrowLeft className="w-4 h-4" /> {backLabel}

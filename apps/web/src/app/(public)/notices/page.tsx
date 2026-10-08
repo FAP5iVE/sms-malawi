@@ -25,7 +25,6 @@ import { Bell } from 'lucide-react'
 import { usePublicAnnouncements } from '@/hooks/usePublic'
 import { PublicArchiveList } from '@/components/shared/PublicArchive'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
-import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
 
 const PAGE_SIZE = 12
 
@@ -42,7 +41,6 @@ export default function AnnouncementsArchivePage() {
         title="Announcements"
         subtitle="General notices from the school, separate from News and Academic Advertisements."
         basePath="/notices"
-        backHref="/#announcements"
         items={items}
         isLoading={isLoading}
         emptyIcon={Bell}
@@ -50,7 +48,6 @@ export default function AnnouncementsArchivePage() {
         page={page}
         totalPages={totalPages}
         onPageChange={setPage}
-        headerRight={<PublicThemeToggle />}
       />
     </>
   )

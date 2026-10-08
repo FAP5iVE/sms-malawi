@@ -19,7 +19,6 @@ import { Landmark } from 'lucide-react'
 import { usePublicAdverts } from '@/hooks/usePublic'
 import { PublicArchiveList } from '@/components/shared/PublicArchive'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
-import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
 
 const PAGE_SIZE = 12
 
@@ -36,7 +35,6 @@ export default function AcademicAdvertisementsPage() {
         title="Academic Advertisements"
         subtitle="Calls for applications, intake notices and examination circulars, published as they are issued."
         basePath="/academic-advertisements"
-        backHref="/#ads"
         items={items}
         isLoading={isLoading}
         emptyIcon={Landmark}
@@ -44,7 +42,6 @@ export default function AcademicAdvertisementsPage() {
         page={page}
         totalPages={totalPages}
         onPageChange={setPage}
-        headerRight={<PublicThemeToggle />}
       />
     </>
   )

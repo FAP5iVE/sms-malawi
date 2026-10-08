@@ -27,6 +27,13 @@
  *   extra shapes were added for long pages, full, undistorted coverage
  *   comes from the positioning, not from scattering more artwork.
  *
+ * [`vivid` PROP]: The sign-in family of pages (login, forgot / change / reset
+ *   password) sit their content inside frosted-glass cards, so the card itself
+ *   provides the readability and the artwork should be shown at full strength
+ *   exactly as the login page always rendered it. `vivid` drops the readability
+ *   scrim for those pages; every other public page keeps the default (scrimmed)
+ *   behaviour because its text sits directly on the page background.
+ *
  * [USAGE]: Render as the very first child inside a page's existing
  *   `bg-page` wrapper (same slot the login page uses for its own background
  *   div), then give the real content wrapper `relative z-10` so it stacks
@@ -45,7 +52,7 @@
  *   content for exactly this reason; see its own comment further down for
  *   the alpha values.
  */
-export function PublicAmbientBackground() {
+export function PublicAmbientBackground({ vivid = false }: { vivid?: boolean } = {}) {
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
       {/* Soft vignette plate for depth */}
@@ -164,28 +171,32 @@ export function PublicAmbientBackground() {
         </g>
       </svg>
 
-      {/* Readability scrim, sits above the glow orbs and line art, below the
-          page content (content wrappers use `relative z-10`, this component
-          has no z-index so it always paints underneath them). Not a solid
-          fill: it's the page's own `--background` colour at partial alpha,
-          so it recedes the artwork just enough to read text placed directly
-          on the page (not every section here sits inside a card) without
-          blanking the decoration out entirely. Sized to `inset-0` of this
-          same `fixed` wrapper, so it exactly matches the artwork's coverage
-          on every screen size.
-          Two different alpha values because the artwork itself isn't
-          equally intense in both themes, the SVG above is `opacity-[0.18]`
-          in light mode (already subtle, so a light 30% wash is enough) but
-          jumps to `dark:opacity-90` in dark mode (very saturated against the
-          near-black page background), so dark mode needs a much stronger
-          82% wash to bring it back down to a comfortable, readable level,
-          still short of 100%, so the shapes stay faintly visible rather
-          than vanishing outright.
-          Using `hsl(var(--background) / alpha)` rather than a hardcoded
-          white/black means this automatically tracks whatever the theme
-          toggle sets `--background` to, light or dark, with no extra logic
-          here. */}
-      <div className="absolute inset-0 bg-[hsl(var(--background)/0.3)] dark:bg-[hsl(var(--background)/0.82)] transition-colors duration-300" />
+      {!vivid && (
+        <>
+          {/* Readability scrim, sits above the glow orbs and line art, below the
+            page content (content wrappers use `relative z-10`, this component
+            has no z-index so it always paints underneath them). Not a solid
+            fill: it's the page's own `--background` colour at partial alpha,
+            so it recedes the artwork just enough to read text placed directly
+            on the page (not every section here sits inside a card) without
+            blanking the decoration out entirely. Sized to `inset-0` of this
+            same `fixed` wrapper, so it exactly matches the artwork's coverage
+            on every screen size.
+            Two different alpha values because the artwork itself isn't
+            equally intense in both themes, the SVG above is `opacity-[0.18]`
+            in light mode (already subtle, so a light 30% wash is enough) but
+            jumps to `dark:opacity-90` in dark mode (very saturated against the
+            near-black page background), so dark mode needs a much stronger
+            82% wash to bring it back down to a comfortable, readable level,
+            still short of 100%, so the shapes stay faintly visible rather
+            than vanishing outright.
+            Using `hsl(var(--background) / alpha)` rather than a hardcoded
+            white/black means this automatically tracks whatever the theme
+            toggle sets `--background` to, light or dark, with no extra logic
+            here. */}
+        <div className="absolute inset-0 bg-[hsl(var(--background)/0.3)] dark:bg-[hsl(var(--background)/0.82)] transition-colors duration-300" />
+        </>
+      )}
     </div>
   )
 }

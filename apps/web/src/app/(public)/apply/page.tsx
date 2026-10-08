@@ -81,6 +81,18 @@
  *   sites change; nothing else on this page is touched.
  * [DEPENDS ON]: apps/web/src/components/shared/AcademicYearSelect.tsx,
  *   apps/web/src/components/shared/PublicAmbientBackground.tsx
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (2026-10-08).
+ *  1. This page's own sticky header (Home, "Student Application", theme
+ *     toggle) was the model for the new shared <PublicHeader />
+ *     (components/shared/PublicHeader.tsx), which (public)/layout.tsx now
+ *     renders on every public page, so the local copy is removed. Page roots
+ *     use `flex-1` instead of `min-h-screen` so they fill the space BELOW
+ *     that header rather than overflowing the viewport by its height.
+ *  2. Review step: the four detail groups (Personal / Contact / Academic /
+ *     Guardian) are no longer wrapped in their own bordered cards inside the
+ *     Review panel; they sit directly on the panel, separated by their
+ *     headings and spacing.
  */
 'use client'
 import { useState } from 'react'
@@ -94,7 +106,6 @@ import { getCountriesForForm, COUNTRY_CALLING_CODES } from '@shared/constants/co
 import { GUARDIAN_RELATIONSHIPS } from '@shared/constants/admissions'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
-import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -260,7 +271,7 @@ export default function ApplyPage() {
   // -- SUCCESS STATE ----------------------------------------------------------
   if (submitted) {
     return (
-      <div className="relative min-h-screen bg-page flex items-center justify-center px-4">
+      <div className="relative flex-1 bg-page flex items-center justify-center px-4 py-10">
         <PublicAmbientBackground />
         <div className="relative z-10 text-center max-w-md">
           <div className="w-20 h-20 rounded-full bg-brand-teal/15 flex items-center justify-center mx-auto mb-6">
@@ -307,30 +318,11 @@ export default function ApplyPage() {
   const values = getValues()
 
   return (
-    <div className="relative min-h-screen bg-page">
+    <div className="relative flex-1 bg-page">
       <PublicAmbientBackground />
 
-      {/* -- HEADER -- */}
-      <header className="relative z-30 bg-surface border-b border-base sticky top-0">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-4">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-muted hover:text-body text-sm transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> Home
-          </Link>
-          <div className="h-4 w-px bg-base shrink-0" />
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-brand-deep flex items-center justify-center">
-              <span className="text-white text-xs font-heading font-bold">S</span>
-            </div>
-            <span className="font-heading font-semibold text-sm text-primary">
-              Student Application
-            </span>
-          </div>
-          <PublicThemeToggle className="ml-auto" />
-        </div>
-      </header>
+      {/* The top bar (Home, "Student Application" title, theme toggle) is the
+          shared <PublicHeader />, rendered by (public)/layout.tsx. */}
 
       <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-10">
         {/* Title */}
@@ -744,19 +736,21 @@ export default function ApplyPage() {
                     ],
                   },
                 ].map(({ heading, rows }) => (
-                  <div key={heading} className="mb-5 bg-page rounded-2xl p-5 border border-base">
+                  // No inner card: each group sits directly on the Review
+                  // panel and is told apart by its own heading, not a box.
+                  <section key={heading} className="mb-7">
                     <h4 className="font-heading font-semibold text-sm text-primary mb-3">
                       {heading}
                     </h4>
-                    <dl className="space-y-1.5">
+                    <dl className="space-y-2">
                       {rows.map(([label, value]) => (
                         <div key={label} className="flex gap-4 text-sm">
                           <dt className="text-muted font-sans w-36 shrink-0">{label}</dt>
-                          <dd className="text-body font-sans font-medium">{value || 'Not provided'}</dd>
+                          <dd className="text-body font-sans font-medium min-w-0 break-words">{value || 'Not provided'}</dd>
                         </div>
                       ))}
                     </dl>
-                  </div>
+                  </section>
                 ))}
                 <p className="text-xs text-muted font-sans leading-relaxed bg-brand-amber/8 border border-brand-amber/20 rounded-xl px-4 py-3 mt-4">
                   By submitting this application you confirm that all information provided is

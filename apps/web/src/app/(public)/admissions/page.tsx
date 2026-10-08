@@ -10,10 +10,9 @@
  */
 
 import Link from 'next/link'
-import { ArrowLeft, ClipboardCheck, ListChecks, Banknote, Award, Phone, Mail, MapPin } from 'lucide-react'
+import { ClipboardCheck, ListChecks, Banknote, Award, Phone, Mail, MapPin } from 'lucide-react'
 import { usePublicSchoolInfo, usePublicFeeStructure } from '@/hooks/usePublic'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
-import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
 
 function formatMWK(amount: number): string {
   return `MWK ${amount.toLocaleString()}`
@@ -25,15 +24,9 @@ export default function AdmissionsPage() {
   const fees = feeData?.items ?? []
 
   return (
-    <div className="min-h-screen bg-page">
+    <div className="flex-1 bg-page">
       <PublicAmbientBackground />
       <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="flex items-center justify-between mb-6">
-          <Link href="/#discover" className="inline-flex items-center gap-2 text-sm text-brand-teal hover:underline">
-            <ArrowLeft className="w-4 h-4" /> Back to home
-          </Link>
-          <PublicThemeToggle />
-        </div>
         <h1 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white mb-3">
           Admissions
         </h1>

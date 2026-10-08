@@ -13,35 +13,12 @@
  * [DEPENDS ON]: none
  */
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
-import { PublicThemeToggle } from '@/components/shared/PublicThemeToggle'
 
 export default function TermsOfUsePage() {
   return (
-    <div className="min-h-screen bg-page">
+    <div className="flex-1 bg-page">
       <PublicAmbientBackground />
-      <header className="bg-surface border-b border-base sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-4">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-muted hover:text-body text-sm transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" aria-hidden /> Home
-          </Link>
-          <div className="h-4 w-px bg-base shrink-0" />
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-brand-deep flex items-center justify-center">
-              <span className="text-white text-xs font-heading font-bold">S</span>
-            </div>
-            <span className="font-heading font-semibold text-sm text-primary">
-              Terms of Use
-            </span>
-          </div>
-          <PublicThemeToggle className="ml-auto" />
-        </div>
-      </header>
-
       <main className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-12">
         <h1 className="font-heading font-bold text-3xl text-brand-navy mb-2">Terms of Use</h1>
         <p className="text-muted text-sm font-sans mb-10">Last updated: {new Date().getFullYear()}</p>
