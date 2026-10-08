@@ -62,8 +62,8 @@ import type { AdapterItem, AdapterQuery, ApprovalActor, DecisionInput, StatusCou
 const passesGate = passesApprovalGate
 const canReviewSource = canReviewApprovalSource
 
-export function reviewableSources(role: UserRole): ApprovalSource[] {
-  return APPROVAL_SOURCES.filter((s) => canReviewSource(role, APPROVAL_SOURCE_META[s]))
+export function reviewableSources(role: UserRole, superUser = false): ApprovalSource[] {
+  return APPROVAL_SOURCES.filter((s) => canReviewSource(role, APPROVAL_SOURCE_META[s], superUser))
 }
 
 function computeCapabilities(item: AdapterItem, actor: ApprovalActor): { capabilities: ApprovalCapabilities; isMine: boolean } {
@@ -72,9 +72,9 @@ function computeCapabilities(item: AdapterItem, actor: ApprovalActor): { capabil
   const isMine = !!item.requester.uid && item.requester.uid === actor.uid
   const selfBlocked = meta.blockSelfReview && isMine
 
-  const mayApprove = pending && passesGate(actor.role, meta.approve)
-  const mayReject = pending && !!meta.reject && passesGate(actor.role, meta.reject)
-  const mayReturn = pending && !!meta.return && passesGate(actor.role, meta.return)
+  const mayApprove = pending && passesGate(actor.role, meta.approve, actor.superUser === true)
+  const mayReject = pending && !!meta.reject && passesGate(actor.role, meta.reject, actor.superUser === true)
+  const mayReturn = pending && !!meta.return && passesGate(actor.role, meta.return, actor.superUser === true)
 
   return {
     isMine,
@@ -115,7 +115,7 @@ function planFor(
     const meta = APPROVAL_SOURCE_META[source]
     if (filter.source && filter.source !== source) continue
     if (filter.module && filter.module !== meta.module) continue
-    const reviewable = canReviewSource(actor.role, meta)
+    const reviewable = canReviewSource(actor.role, meta, actor.superUser === true)
 
     if (scope === 'review') {
       if (reviewable) plans.push({ source, requesterUid: null })
@@ -282,7 +282,7 @@ function addCounts(into: StatusCounts, from: StatusCounts): void {
 
 export async function getSummary(scope: ApprovalScope, actor: ApprovalActor): Promise<ApprovalSummary> {
   const warnings: string[] = []
-  const reviewable = new Set(reviewableSources(actor.role))
+  const reviewable = new Set(reviewableSources(actor.role, actor.superUser === true))
 
   const perSource = await Promise.all(
     APPROVAL_SOURCES.map(async (source) => {
@@ -330,7 +330,7 @@ export async function getSummary(scope: ApprovalScope, actor: ApprovalActor): Pr
 
 /** Lightweight count for the sidebar badge — reviewable sources only. */
 export async function getBadgeCount(actor: ApprovalActor): Promise<number> {
-  const sources = reviewableSources(actor.role)
+  const sources = reviewableSources(actor.role, actor.superUser === true)
   if (sources.length === 0) return 0
   const warnings: string[] = []
   const rows = await Promise.all(
@@ -357,7 +357,7 @@ export async function getApproval(source: ApprovalSource, id: string, actor: App
   // modules, everyone else only their own submissions.
   const meta = APPROVAL_SOURCE_META[source]
   const isMine = !!item.requester.uid && item.requester.uid === actor.uid
-  if (!canReviewSource(actor.role, meta) && !isMine) {
+  if (!canReviewSource(actor.role, meta, actor.superUser === true) && !isMine) {
     throw Object.assign(new Error('You do not have access to this request.'), { status: 403 })
   }
 

@@ -12,6 +12,8 @@
     "seed:demo": "cross-env NODE_OPTIONS=--require=./scripts/seed/lib/stub-server-only.cjs DEMO_MODE=true tsx scripts/seed/index.ts",
     "seed:demo:reset": "cross-env NODE_OPTIONS=--require=./scripts/seed/lib/stub-server-only.cjs DEMO_MODE=true tsx scripts/seed/reset.ts",
     "seed:demo:validate": "cross-env NODE_OPTIONS=--require=./scripts/seed/lib/stub-server-only.cjs tsx scripts/seed/validate.ts",
+    "seed:superadmin": "cross-env NODE_OPTIONS=--require=./scripts/seed/lib/stub-server-only.cjs DEMO_MODE=true tsx scripts/seed/superAdmin.ts",
+    "seed:staff-sex": "cross-env NODE_OPTIONS=--require=./scripts/seed/lib/stub-server-only.cjs DEMO_MODE=true tsx scripts/seed/backfillStaffSex.ts",
     "seed:repair": "cross-env NODE_OPTIONS=--require=./scripts/seed/lib/stub-server-only.cjs DEMO_MODE=true tsx scripts/seed/repair-existing.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",

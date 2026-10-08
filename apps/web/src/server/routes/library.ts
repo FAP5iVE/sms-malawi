@@ -156,7 +156,7 @@ libraryRouter.patch('/:id/condition', verifyAuth, requireAnyPermission(['library
     const parsed = MarkBookConditionSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     const requiredPermission = parsed.data.condition === 'LOST' ? 'library.markLost' : 'library.markDamaged'
-    if (!hasPermission(req.user!.role, requiredPermission)) {
+    if (!hasPermission(req.user!.role, requiredPermission, req.user!.superUser === true)) {
       return res.status(403).json({ error: 'You do not have permission to perform this action.', required: requiredPermission })
     }
     try {

@@ -126,7 +126,7 @@ applicationsRouter.patch(
     const status = parsedStatus.data
 
     const requiredPermission = status === 'DENIED' ? 'application.deny' : 'application.approve'
-    if (!hasPermission(req.user!.role, requiredPermission)) {
+    if (!hasPermission(req.user!.role, requiredPermission, req.user!.superUser === true)) {
       return res.status(403).json({
         error: 'You do not have permission to perform this action.',
         required: requiredPermission,

@@ -1457,13 +1457,25 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
 
 // ─────────────────────────────────────────────────────────
 //  HELPER UTILITIES
+//
+//  Every helper takes an optional trailing `superUser` flag (the `superUser`
+//  Firebase claim — see @shared/constants/superUser). When true the check
+//  always passes: the super user (alpha_admin) holds EVERY permission,
+//  including any permission that is declared in the `Permission` union but
+//  not granted to any role. Callers pass `req.user.superUser` (server) or the
+//  auth store's `superUser` (client); omitting it keeps the old behaviour.
 // ─────────────────────────────────────────────────────────
 
 /**
  * Check whether a given role has a specific permission.
  * O(1) — uses Set.prototype.has() internally.
  */
-export function hasPermission(role: UserRole, permission: Permission): boolean {
+export function hasPermission(
+  role: UserRole,
+  permission: Permission,
+  superUser = false
+): boolean {
+  if (superUser) return true
   return (ROLE_PERMISSIONS[role] as ReadonlySet<Permission>).has(permission)
 }
 
@@ -1473,8 +1485,10 @@ export function hasPermission(role: UserRole, permission: Permission): boolean {
  */
 export function hasAllPermissions(
   role: UserRole,
-  permissions: readonly Permission[]
+  permissions: readonly Permission[],
+  superUser = false
 ): boolean {
+  if (superUser) return true
   const set = ROLE_PERMISSIONS[role] as ReadonlySet<Permission>
   return permissions.every((p) => set.has(p))
 }
@@ -1485,17 +1499,34 @@ export function hasAllPermissions(
  */
 export function hasAnyPermission(
   role: UserRole,
-  permissions: readonly Permission[]
+  permissions: readonly Permission[],
+  superUser = false
 ): boolean {
+  if (superUser) return true
   const set = ROLE_PERMISSIONS[role] as ReadonlySet<Permission>
   return permissions.some((p) => set.has(p))
 }
 
 /**
+ * Every permission granted to at least one role — the union of all nine
+ * role sets. Used to list what the super user holds. (The super user also
+ * passes checks for permissions in no role's set; see hasPermission.)
+ */
+export const ALL_GRANTED_PERMISSIONS: readonly Permission[] = Array.from(
+  new Set<Permission>(
+    (Object.values(ROLE_PERMISSIONS) as ReadonlySet<Permission>[]).flatMap((set) =>
+      Array.from(set)
+    )
+  )
+)
+
+/**
  * Return the full permission set for a role as a plain array.
  * Useful for debugging and audit log enrichment — not for runtime checks
  * (use hasPermission / hasAllPermissions / hasAnyPermission instead).
+ * For the super user this is the union of every role's permissions.
  */
-export function getPermissionsForRole(role: UserRole): Permission[] {
+export function getPermissionsForRole(role: UserRole, superUser = false): Permission[] {
+  if (superUser) return [...ALL_GRANTED_PERMISSIONS]
   return Array.from(ROLE_PERMISSIONS[role] as ReadonlySet<Permission>)
 }

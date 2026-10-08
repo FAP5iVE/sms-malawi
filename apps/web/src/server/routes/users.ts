@@ -50,21 +50,21 @@ usersRouter.patch('/role', verifyAuth, requireRole(['admin']),
   async (req, res) => {
     const parsed = UpdateUserRoleSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    return res.json(await userService.updateUserRole(parsed.data.uid, parsed.data.role as UserRole, req.user!.uid))
+    return res.json(await userService.updateUserRole(parsed.data.uid, parsed.data.role as UserRole, req.user!.uid, req.user!.superUser === true))
   })
 
 // PATCH /users/:uid/disable
 usersRouter.patch('/:uid/disable', verifyAuth, requireRole(['admin']),
   async (req, res) => {
     const { disabled } = req.body as { disabled: boolean }
-    await userService.toggleUserDisabled(String(req.params.uid), disabled, req.user!.uid)
+    await userService.toggleUserDisabled(String(req.params.uid), disabled, req.user!.uid, req.user!.superUser === true)
     return res.json({ success: true })
   })
 
 // POST /users/:uid/reset-password
 usersRouter.post('/:uid/reset-password', verifyAuth, requireRole(['admin']),
   async (req, res) => {
-    await userService.sendPasswordReset(String(req.params.uid))
+    await userService.sendPasswordReset(String(req.params.uid), req.user!.superUser === true)
     return res.json({ success: true })
   })
 

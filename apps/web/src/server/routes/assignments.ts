@@ -80,7 +80,7 @@ async function requireAssignmentViewAccess(
   const { classId } = req.params as { classId: string }
   const user = req.user!
 
-  if (hasAnyPermission(user.role, STAFF_ASSIGNMENT_VIEW_PERMISSIONS) && user.role !== 'student') {
+  if (hasAnyPermission(user.role, STAFF_ASSIGNMENT_VIEW_PERMISSIONS, user.superUser === true) && user.role !== 'student') {
     next()
     return
   }

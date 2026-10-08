@@ -51,8 +51,28 @@ import { sendEmail } from '@/lib/email'
 import * as algolia from '@/server/services/algoliaService'
 import type { CreateUserInput, NotificationPrefInput } from '@shared/schemas/admin'
 import type { UserRole } from '@shared/types/roles'
+import { isSuperUserClaim } from '@shared/constants/superUser'
 
 function getAuth() { return admin.auth() }
+
+/**
+ * The alpha_admin super user is protected from everyone except itself: no
+ * other account — not even another admin — may change its role, disable it,
+ * or trigger a password reset for it. Without this, "absolute, non-negotiable
+ * access" could be revoked by any admin with one click in User Management.
+ * Claims are Admin-SDK-only, so nobody can use this path to *grant*
+ * super-user status either (updateUserRole preserves existing claims as-is).
+ */
+async function assertAccountNotProtected(targetUid: string, actorIsSuperUser: boolean): Promise<void> {
+  if (actorIsSuperUser) return
+  const target = await getAuth().getUser(targetUid)
+  if (isSuperUserClaim(target.customClaims?.['superUser'])) {
+    throw Object.assign(
+      new Error('This account is protected and can only be managed by itself.'),
+      { status: 403 },
+    )
+  }
+}
 
 // ─── CREATE USER ─────────────────────────────────────────
 export async function createUser(data: CreateUserInput, actorUid: string) {
@@ -195,6 +215,7 @@ export async function listUsers(pageToken?: string) {
       email:       u.email,
       displayName: u.displayName,
       role:        u.customClaims?.['role'] as UserRole | undefined,
+      superUser:   isSuperUserClaim(u.customClaims?.['superUser']),
       requiresPasswordChange: u.customClaims?.['requiresPasswordChange'] === true,
       disabled:    u.disabled,
       createdAt:   u.metadata.creationTime,
@@ -244,7 +265,8 @@ export async function seedAllUserAccountsToAlgolia(): Promise<algolia.BulkIndexR
 }
 
 // ─── UPDATE ROLE ─────────────────────────────────────────
-export async function updateUserRole(uid: string, role: UserRole, actorUid: string) {
+export async function updateUserRole(uid: string, role: UserRole, actorUid: string, actorIsSuperUser = false) {
+  await assertAccountNotProtected(uid, actorIsSuperUser)
   const existing = await getAuth().getUser(uid)
   await getAuth().setCustomUserClaims(uid, { ...existing.customClaims, role })
   logger.info({ event: 'user.role_updated', uid, role, actorUid })
@@ -253,7 +275,8 @@ export async function updateUserRole(uid: string, role: UserRole, actorUid: stri
 }
 
 // ─── DISABLE / ENABLE USER ───────────────────────────────
-export async function toggleUserDisabled(uid: string, disabled: boolean, actorUid: string) {
+export async function toggleUserDisabled(uid: string, disabled: boolean, actorUid: string, actorIsSuperUser = false) {
+  await assertAccountNotProtected(uid, actorIsSuperUser)
   await getAuth().updateUser(uid, { disabled })
   if (disabled) {
     // Stop push notifications immediately for a disabled account rather
@@ -288,7 +311,8 @@ export async function clearPasswordChangeRequirement(uid: string): Promise<void>
 }
 
 // ─── RESET PASSWORD ──────────────────────────────────────
-export async function sendPasswordReset(uid: string) {
+export async function sendPasswordReset(uid: string, actorIsSuperUser = false) {
+  await assertAccountNotProtected(uid, actorIsSuperUser)
   const user = await getAuth().getUser(uid)
   if (!user.email) throw new Error('User has no email address.')
   const link = await getAuth().generatePasswordResetLink(user.email)

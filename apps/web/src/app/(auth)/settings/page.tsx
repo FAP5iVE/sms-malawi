@@ -200,11 +200,12 @@ function SectionContent({ sectionId }: { sectionId: SectionId }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SettingsPageInner() {
-  const { role }  = useAuthStore()
+  const { role, superUser }  = useAuthStore()
   const [manualSection, setManualSection] = useState<SectionId | null>(null)
 
+  // alpha_admin sees every settings section regardless of the role list.
   const visibleSections = SECTIONS.filter(
-    (s) => role && s.roles.includes(role),
+    (s) => role && (superUser || s.roles.includes(role)),
   )
 
   // R19 — the active section is derived during render via Next's

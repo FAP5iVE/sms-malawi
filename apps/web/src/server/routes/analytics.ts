@@ -521,11 +521,12 @@ analyticsRouter.get('/capabilities',
   verifyAuth,
   async (req, res) => {
     const role = req.user!.role
+    const superUser = req.user!.superUser === true
     res.json({
       role,
-      canExport: hasPermission(role, 'report.export'),
-      canViewAnyStudent: hasPermission(role, 'report.viewAnyStudentPerformance'),
-      canViewAttendanceSummary: hasPermission(role, 'report.viewAttendanceSummary'),
-      canViewScholarshipSummary: hasPermission(role, 'report.viewScholarshipSummary'),
+      canExport: hasPermission(role, 'report.export', superUser),
+      canViewAnyStudent: hasPermission(role, 'report.viewAnyStudentPerformance', superUser),
+      canViewAttendanceSummary: hasPermission(role, 'report.viewAttendanceSummary', superUser),
+      canViewScholarshipSummary: hasPermission(role, 'report.viewScholarshipSummary', superUser),
     })
   })

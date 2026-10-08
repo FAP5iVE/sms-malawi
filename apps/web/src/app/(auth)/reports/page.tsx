@@ -42,6 +42,7 @@
 'use client'
 import { useState, useEffect, useRef, useMemo, useCallback, useContext, createContext } from 'react'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { SuperUserRoleSwitcher } from '@/components/shared/SuperUserRoleSwitcher'
 import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
 import { AdminSessionsPanel } from '@/components/reports/AdminSessionsPanel'
@@ -51,6 +52,7 @@ import { chartColorAt } from '@/lib/chartPalette'
 import { useAuthStore } from '@/store/authStore'
 import { usePublicSettings } from '@/hooks/useSettings'
 import { SETTING_KEYS } from '@shared/types/settings'
+import type { UserRole } from '@shared/types/roles'
 import { downloadCsv, csvFilename } from '@/lib/csv'
 import type { CsvColumn } from '@/lib/csv'
 import {
@@ -3860,7 +3862,10 @@ function ExportProvider({ children }: { children: React.ReactNode }) {
 }
 
 function ReportsContent() {
-  const { role, user } = useAuthStore()
+  const { role: authRole, user, superUser } = useAuthStore()
+  // alpha_admin can open every staff role's report tabs; everyone else sees their own.
+  const [viewAs, setViewAs] = useState<UserRole>('admin')
+  const role = superUser ? viewAs : authRole
 
   // [R14] The current academic year and term come from SystemSettings — the
   // same source R14's routes default from — not from a hardcoded '2025/2026'.
@@ -3905,6 +3910,15 @@ function ReportsContent() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {superUser && (
+            <SuperUserRoleSwitcher
+              value={viewAs}
+              onChange={(r) => {
+                setViewAs(r)
+                setActiveTab(ROLE_TABS[r]?.[0]?.id ?? 'overview')
+              }}
+            />
+          )}
           <select
             value={term ?? ''}
             onChange={(e) => setTerm(Number(e.target.value))}

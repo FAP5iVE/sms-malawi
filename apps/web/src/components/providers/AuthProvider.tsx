@@ -65,8 +65,9 @@ import { auth, getFcmToken, removeFcmToken } from '@/lib/firebase'
 import * as Sentry from '@sentry/nextjs'
 import { apiFetch }          from '@/lib/api-client'
 import { useAuthStore }      from '@/store/authStore'
-import { SESSION_COOKIE, ROLE_COOKIE } from '@/proxy'
+import { SESSION_COOKIE, ROLE_COOKIE, SUPER_COOKIE } from '@/proxy'
 import type { UserRole } from '@shared/types/roles'
+import { isSuperUserClaim } from '@shared/constants/superUser'
 
 // ─── COOKIE UTILITIES ─────────────────────────────────────
 // These must stay in sync with proxy.ts SESSION_COOKIE / ROLE_COOKIE.
@@ -95,6 +96,7 @@ function clearCookie(name: string): void {
 function clearAuthCookies(): void {
   clearCookie(SESSION_COOKIE)
   clearCookie(ROLE_COOKIE)
+  clearCookie(SUPER_COOKIE)
 }
 
 // ─── MODULE-LEVEL FCM TOKEN STATE ─────────────────────────
@@ -366,6 +368,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const role     = (claims.role     ?? null) as UserRole | null
       const subtitle = (claims.subtitle ?? null) as string   | null
+      // alpha_admin: strict boolean-true check on the verified token claim.
+      const superUser = isSuperUserClaim(claims.superUser)
 
       // ── No role claim yet ────────────────────────────────
       // Can happen briefly after account creation before the Firebase Admin SDK
@@ -406,9 +410,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // ── Set routing cookies (Edge Runtime reads these in proxy.ts) ──
       setCookie(SESSION_COOKIE, user.uid)
       setCookie(ROLE_COOKIE, role)
+      if (superUser) setCookie(SUPER_COOKIE, '1')
+      else clearCookie(SUPER_COOKIE)
 
       // ── Update Zustand store (client-side role context) ──
-      setUser(user, role, subtitle)
+      setUser(user, role, subtitle, superUser)
 
       // ── Sentry user context (required for Crash-Free Users %) ──
       // ID ONLY — never name/email. See sentry-scrub.ts for the matching

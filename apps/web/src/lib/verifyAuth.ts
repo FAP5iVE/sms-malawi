@@ -15,6 +15,7 @@ import * as admin from 'firebase-admin'
 import type { App } from 'firebase-admin/app'
 import type { UserRole } from '@shared/types/roles'
 import { type NextRequest } from 'next/server'
+import { isSuperUserClaim } from '@shared/constants/superUser'
 
 let adminApp: App | undefined
 
@@ -56,7 +57,10 @@ export async function verifyAuth(req: Request, res: Response, next: NextFunction
     const decoded = await admin.auth(getAdminApp()).verifyIdToken(token, true)
     const role = decoded['role'] as UserRole | undefined
     if (!role) return res.status(403).json({ error: 'No role assigned to user' })
-    req.user = { uid: decoded.uid, role, email: decoded.email ?? '' }
+    // alpha_admin: the `superUser` custom claim (Admin-SDK-only, so it cannot
+    // be self-granted) lets this request through every role/permission gate.
+    const superUser = isSuperUserClaim(decoded['superUser'])
+    req.user = { uid: decoded.uid, role, email: decoded.email ?? '', ...(superUser ? { superUser: true } : {}) }
     next()
   } catch (err: unknown) {
     const code = (err as { code?: string } | undefined)?.code
@@ -69,7 +73,12 @@ export async function verifyAuth(req: Request, res: Response, next: NextFunction
 
 export function requireRole(allowed: UserRole[]) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user || !allowed.includes(req.user.role)) {
+    if (!req.user) {
+      return res.status(403).json({ error: 'Access denied for your role' })
+    }
+    // alpha_admin passes every role gate, whatever the allowed list says.
+    if (req.user.superUser === true) return next()
+    if (!allowed.includes(req.user.role)) {
       return res.status(403).json({ error: 'Access denied for your role' })
     }
     next()

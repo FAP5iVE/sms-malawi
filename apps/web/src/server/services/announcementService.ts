@@ -905,7 +905,7 @@ function mapViewer(id: string, data: DocumentData): ViewerAnnouncement {
  * own composite index — the same reason the old client listener filtered
  * client-side, but now done on the trusted server.
  */
-export async function listForViewer(viewer: { uid: string; role: string }): Promise<ViewerAnnouncement[]> {
+export async function listForViewer(viewer: { uid: string; role: string; superUser?: boolean }): Promise<ViewerAnnouncement[]> {
   const snap = await getFirestore(getAdminApp())
     .collection(COLLECTIONS.ANNOUNCEMENTS)
     .where('status', '==', 'PUBLISHED')
@@ -922,7 +922,9 @@ export async function listForViewer(viewer: { uid: string; role: string }): Prom
         // a user's internal /announcements tab, no matter what
         // targetAll/targetRoles happen to be on the doc.
         !PUBLIC_ONLY_POST_TYPES.includes(a.postType) &&
-        (a.targetAll ||
+        // alpha_admin sees every published announcement, whoever it targeted.
+        (viewer.superUser === true ||
+          a.targetAll ||
           a.targetRoles.includes(viewer.role) ||
           a.createdByUid === viewer.uid),
     )

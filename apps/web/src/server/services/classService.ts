@@ -162,8 +162,8 @@ async function assertNotAlreadyClassTeacher(
  *  than the class.create/class.edit permission the route itself checks.
  *  See this file's header note for why this must live here rather than
  *  at the route's middleware layer. */
-function assertCanAssignClassTeacher(actorRole: UserRole): void {
-  if (!hasPermission(actorRole, 'class.assignTeacher')) {
+function assertCanAssignClassTeacher(actorRole: UserRole, superUser = false): void {
+  if (!hasPermission(actorRole, 'class.assignTeacher', superUser)) {
     throw Object.assign(new Error('Only a high-ranking staff member may assign a class teacher.'), {
       status: 403,
     })
@@ -223,9 +223,9 @@ export async function getClass(id: string) {
 //  CREATE / UPDATE / ARCHIVE
 // ─────────────────────────────────────────────────────────
 
-export async function createClass(data: CreateClassInput, actorUid: string, actorRole: UserRole) {
+export async function createClass(data: CreateClassInput, actorUid: string, actorRole: UserRole, superUser = false) {
   if (data.teacherId) {
-    assertCanAssignClassTeacher(actorRole)
+    assertCanAssignClassTeacher(actorRole, superUser)
     await assertIsTeacherStaff(data.teacherId)
     await assertNotAlreadyClassTeacher(data.teacherId, data.academicYear)
   }
@@ -257,7 +257,8 @@ export async function updateClass(
   id: string,
   data: UpdateClassInput,
   actorUid: string,
-  actorRole: UserRole
+  actorRole: UserRole,
+  superUser = false
 ) {
   const before = await prisma.class.findUniqueOrThrow({
     where: { id },
@@ -273,7 +274,7 @@ export async function updateClass(
   })
 
   if (data.teacherId) {
-    assertCanAssignClassTeacher(actorRole)
+    assertCanAssignClassTeacher(actorRole, superUser)
     await assertIsTeacherStaff(data.teacherId)
     await assertNotAlreadyClassTeacher(data.teacherId, data.academicYear ?? before.academicYear, id)
   }

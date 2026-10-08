@@ -20,7 +20,10 @@
  * [DEPENDS ON]: W/components/dashboards/* (this phase's rewrites)
  */
 
+import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
+import { SuperUserRoleSwitcher } from '@/components/shared/SuperUserRoleSwitcher'
+import type { UserRole } from '@shared/types/roles'
 import { WelcomeHeader } from '@/components/shared/WelcomeHeader'
 import { AdminDashboard } from '@/components/dashboards/AdminDashboard'
 import { HighRankDashboard } from '@/components/dashboards/HighRankDashboard'
@@ -40,7 +43,10 @@ function greetingForHour(hour: number): string {
 }
 
 export default function DashboardPage() {
-  const { role, user, subtitle, initialized } = useAuthStore()
+  const { role: authRole, user, subtitle, initialized, superUser } = useAuthStore()
+  // alpha_admin can open any staff role's dashboard; everyone else sees their own.
+  const [viewAs, setViewAs] = useState<UserRole>('admin')
+  const role = superUser ? viewAs : authRole
 
   // Show skeleton while auth initialises
   if (!initialized) {
@@ -71,6 +77,12 @@ export default function DashboardPage() {
         name={displayName}
         detail={subtitle ? <>{subtitle} · {role?.replace('_', ' ')}</> : role?.replace('_', ' ')}
       />
+
+      {superUser && (
+        <div className="flex justify-end">
+          <SuperUserRoleSwitcher value={viewAs} onChange={setViewAs} />
+        </div>
+      )}
 
       {role === 'admin' && <AdminDashboard />}
       {role === 'high_rank' && <HighRankDashboard />}

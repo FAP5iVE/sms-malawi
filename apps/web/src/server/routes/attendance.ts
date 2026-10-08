@@ -115,12 +115,12 @@ attendanceRouter.get(
     const { studentId } = req.params as { studentId: string }
     const user = req.user!
 
-    const staffHasAccess = hasAnyPermission(user.role, ['class.markAttendance', 'class.viewAnalytics'])
+    const staffHasAccess = hasAnyPermission(user.role, ['class.markAttendance', 'class.viewAnalytics'], user.superUser === true)
 
     if (!staffHasAccess) {
       // Not a staff oversight role — only allowed to view their own record,
       // and only if they hold report.viewOwnAttendance (the student role).
-      if (!hasAnyPermission(user.role, ['report.viewOwnAttendance'])) {
+      if (!hasAnyPermission(user.role, ['report.viewOwnAttendance'], user.superUser === true)) {
         res.status(403).json({ error: 'You do not have access to this attendance record.' })
         return
       }

@@ -37,7 +37,7 @@ approvalsRouter.use(verifyAuth)
 function actorOf(req: Request) {
   const { user } = req
   if (!user) return null
-  return { uid: user.uid, role: user.role }
+  return { uid: user.uid, role: user.role, superUser: user.superUser === true }
 }
 
 approvalsRouter.get('/', async (req: Request, res: Response) => {

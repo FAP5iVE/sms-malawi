@@ -114,7 +114,7 @@ payrollRouter.post('/run', verifyAuth, requirePermission('finance.runPayroll'), 
 function resolveTargetUid(req: Request, res: Response): string | null {
   const requested = typeof req.query.staffUid === 'string' ? req.query.staffUid : undefined
   if (!requested || requested === req.user!.uid) return req.user!.uid
-  if (!hasPermission(req.user!.role, 'hr.viewAnyPayslips')) {
+  if (!hasPermission(req.user!.role, 'hr.viewAnyPayslips', req.user!.superUser === true)) {
     res.status(403).json({
       error: 'You do not have permission to view another staff member\'s payroll details.',
       required: 'hr.viewAnyPayslips',

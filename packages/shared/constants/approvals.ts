@@ -480,19 +480,20 @@ export interface ApprovalBulkResult {
 }
 
 /** Does this role pass the gate (listed role OR any listed permission)? */
-export function passesApprovalGate(role: UserRole, gate: ApprovalGate | undefined): boolean {
+export function passesApprovalGate(role: UserRole, gate: ApprovalGate | undefined, superUser = false): boolean {
   if (!gate) return false
+  if (superUser) return true // alpha_admin passes every gate
   if (gate.roles?.includes(role)) return true
   if (gate.anyPermission && gate.anyPermission.length > 0) return hasAnyPermission(role, gate.anyPermission)
   return false
 }
 
 /** May this role take ANY decision (approve, reject or return) on this kind of request? */
-export function canReviewApprovalSource(role: UserRole, meta: ApprovalSourceMeta): boolean {
+export function canReviewApprovalSource(role: UserRole, meta: ApprovalSourceMeta, superUser = false): boolean {
   return (
-    passesApprovalGate(role, meta.approve) ||
-    passesApprovalGate(role, meta.reject) ||
-    passesApprovalGate(role, meta.return)
+    passesApprovalGate(role, meta.approve, superUser) ||
+    passesApprovalGate(role, meta.reject, superUser) ||
+    passesApprovalGate(role, meta.return, superUser)
   )
 }
 

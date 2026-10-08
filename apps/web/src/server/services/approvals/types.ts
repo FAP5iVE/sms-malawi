@@ -21,6 +21,8 @@ export type AdapterItem = Omit<ApprovalItem, 'capabilities' | 'isMine'>
 export interface ApprovalActor {
   uid: string
   role: UserRole
+  /** alpha_admin: passes every approval gate (self-review blocking still applies). */
+  superUser?: boolean
 }
 
 export interface AdapterQuery {

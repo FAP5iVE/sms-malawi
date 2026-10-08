@@ -19,7 +19,11 @@ async function deleteAllUsersExceptOne() {
       const listUsersResult = await admin.auth().listUsers(1000, nextPageToken);
       
       // 2. Filter out the specific user UID you want to preserve
+      // The alpha_admin super user (custom claim superUser === true) is
+      // also always preserved — deleting it would silently remove the
+      // maintenance/demo account. Re-create it with `pnpm seed:superadmin`.
       const uidsToDelete = listUsersResult.users
+        .filter((user) => user.customClaims?.superUser !== true)
         .map((user) => user.uid)
         .filter((uid) => uid !== USER_UID_TO_KEEP);
 

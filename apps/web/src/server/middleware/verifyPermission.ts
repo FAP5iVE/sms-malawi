@@ -29,7 +29,7 @@ export function requirePermission(permission: Permission) {
       return
     }
 
-    if (!hasPermission(req.user.role, permission)) {
+    if (!hasPermission(req.user.role, permission, req.user.superUser === true)) {
       res.status(403).json({
         error: 'You do not have permission to perform this action.',
         required: permission,
@@ -63,7 +63,7 @@ export function requireAnyPermission(permissions: readonly Permission[]) {
       return
     }
 
-    if (!hasAnyPermission(req.user.role, permissions)) {
+    if (!hasAnyPermission(req.user.role, permissions, req.user.superUser === true)) {
       res.status(403).json({
         error: 'You do not have permission to perform this action.',
         requiredAny: permissions,
@@ -97,7 +97,7 @@ export function requireAllPermissions(permissions: readonly Permission[]) {
       return
     }
 
-    if (!hasAllPermissions(req.user.role, permissions)) {
+    if (!hasAllPermissions(req.user.role, permissions, req.user.superUser === true)) {
       res.status(403).json({
         error: 'You do not have permission to perform this action.',
         requiredAll: permissions,
@@ -140,7 +140,7 @@ export function attachPermissions(permissions: readonly Permission[]) {
 
     const can: Record<string, boolean> = {}
     for (const permission of permissions) {
-      can[permission] = hasPermission(req.user.role, permission)
+      can[permission] = hasPermission(req.user.role, permission, req.user.superUser === true)
     }
 
     // Attach to request — downstream handlers access via req.can

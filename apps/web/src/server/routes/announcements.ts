@@ -72,7 +72,7 @@ announcementsRouter.get(
     const { user } = req
     if (!user) return res.status(401).json({ error: 'Not authenticated.' })
     try {
-      const announcements = await announcementService.listForViewer({ uid: user.uid, role: user.role })
+      const announcements = await announcementService.listForViewer({ uid: user.uid, role: user.role, superUser: user.superUser === true })
       return res.json({ announcements })
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'announcements' } })
@@ -182,8 +182,8 @@ announcementsRouter.patch(
     const { user } = req
     if (!user) return res.status(401).json({ error: 'Not authenticated.' })
 
-    const directPublish = hasPermission(user.role, 'announcement.publishDirect')
-    const scheduledFor = hasPermission(user.role, 'announcement.schedule')
+    const directPublish = hasPermission(user.role, 'announcement.publishDirect', user.superUser === true)
+    const scheduledFor = hasPermission(user.role, 'announcement.schedule', user.superUser === true)
       ? parsed.data.scheduledFor
       : undefined
 
@@ -257,12 +257,12 @@ announcementsRouter.post(
     const { user } = req
     if (!user) return res.status(401).json({ error: 'Not authenticated.' })
 
-    const directPublish = hasPermission(user.role, 'announcement.publishDirect')
+    const directPublish = hasPermission(user.role, 'announcement.publishDirect', user.superUser === true)
 
     // announcement.schedule is high_rank-only — silently drop scheduledFor
     // for any other role rather than erroring, since the schema itself
     // doesn't know the actor's role.
-    const scheduledFor = hasPermission(user.role, 'announcement.schedule')
+    const scheduledFor = hasPermission(user.role, 'announcement.schedule', user.superUser === true)
       ? parsed.data.scheduledFor
       : undefined
 
@@ -382,7 +382,7 @@ announcementsRouter.delete(
     if (!snap.exists) return res.status(404).json({ error: 'Announcement not found.' })
 
     // deleteAny may delete anything; otherwise the caller must be the author.
-    const canDeleteAny = hasPermission(user.role, 'announcement.deleteAny')
+    const canDeleteAny = hasPermission(user.role, 'announcement.deleteAny', user.superUser === true)
     if (!canDeleteAny && snap.data()?.createdByUid !== user.uid) {
       return res.status(403).json({ error: 'You can only delete your own announcements.' })
     }

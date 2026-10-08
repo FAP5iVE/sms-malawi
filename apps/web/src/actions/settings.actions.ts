@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import * as admin from 'firebase-admin'
 import * as settingsService from '@/server/services/settingsService'
 import { hasPermission } from '@shared/types/permissions'
+import { isSuperUserClaim } from '@shared/constants/superUser'
 import { SETTING_KEYS } from '@shared/types/settings'
 import type { UserRole } from '@shared/types/roles'
 import {
@@ -33,7 +34,7 @@ interface ActionResult<T = undefined> {
  * Verify the caller from the session cookie.
  * Returns the uid and role, or throws with an error ActionResult.
  */
-async function getCallerFromCookie(): Promise<{ uid: string; role: UserRole }> {
+async function getCallerFromCookie(): Promise<{ uid: string; role: UserRole; superUser: boolean }> {
   const cookieStore = await cookies()
   const uid = cookieStore.get('sms_session')?.value
   const role = cookieStore.get('sms_role')?.value as UserRole | undefined
@@ -44,6 +45,7 @@ async function getCallerFromCookie(): Promise<{ uid: string; role: UserRole }> {
 
   // Double-verify the UID against Firebase Admin to prevent
   // cookie forgery — Server Actions can be called directly.
+  let superUser = false
   try {
     const user = await admin.auth().getUser(uid)
     const claims = user.customClaims
@@ -51,12 +53,14 @@ async function getCallerFromCookie(): Promise<{ uid: string; role: UserRole }> {
     if (!verifiedRole || verifiedRole !== role) {
       throw new Error('Session is invalid or role has changed. Please sign in again.')
     }
+    // alpha_admin: read from the VERIFIED claims, never from a cookie.
+    superUser = isSuperUserClaim(claims?.['superUser'])
   } catch (err) {
     if (err instanceof Error && err.message.includes('Session is invalid')) throw err
     throw new Error('Could not verify your session. Please sign in again.')
   }
 
-  return { uid, role }
+  return { uid, role, superUser }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -71,14 +75,14 @@ export async function updateAcademicSettings(
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed.' }
   }
 
-  let caller: { uid: string; role: UserRole }
+  let caller: { uid: string; role: UserRole; superUser: boolean }
   try {
     caller = await getCallerFromCookie()
   } catch (err) {
     return { success: false, error: (err as Error).message }
   }
 
-  if (!hasPermission(caller.role, 'settings.manageAcademicPolicy')) {
+  if (!hasPermission(caller.role, 'settings.manageAcademicPolicy', caller.superUser)) {
     return { success: false, error: 'You do not have permission to update academic settings.' }
   }
 
@@ -114,14 +118,14 @@ export async function updateSchoolIdentity(
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed.' }
   }
 
-  let caller: { uid: string; role: UserRole }
+  let caller: { uid: string; role: UserRole; superUser: boolean }
   try {
     caller = await getCallerFromCookie()
   } catch (err) {
     return { success: false, error: (err as Error).message }
   }
 
-  if (!hasPermission(caller.role, 'settings.manageAcademicPolicy')) {
+  if (!hasPermission(caller.role, 'settings.manageAcademicPolicy', caller.superUser)) {
     return { success: false, error: 'You do not have permission to update school identity settings.' }
   }
 
@@ -158,14 +162,14 @@ export async function updateExamSettings(
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed.' }
   }
 
-  let caller: { uid: string; role: UserRole }
+  let caller: { uid: string; role: UserRole; superUser: boolean }
   try {
     caller = await getCallerFromCookie()
   } catch (err) {
     return { success: false, error: (err as Error).message }
   }
 
-  if (!hasPermission(caller.role, 'settings.manageExamConfig')) {
+  if (!hasPermission(caller.role, 'settings.manageExamConfig', caller.superUser)) {
     return { success: false, error: 'You do not have permission to update exam settings.' }
   }
 
@@ -198,14 +202,14 @@ export async function updateFinanceSettings(
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed.' }
   }
 
-  let caller: { uid: string; role: UserRole }
+  let caller: { uid: string; role: UserRole; superUser: boolean }
   try {
     caller = await getCallerFromCookie()
   } catch (err) {
     return { success: false, error: (err as Error).message }
   }
 
-  if (!hasPermission(caller.role, 'settings.manageFinanceConfig')) {
+  if (!hasPermission(caller.role, 'settings.manageFinanceConfig', caller.superUser)) {
     return { success: false, error: 'You do not have permission to update finance settings.' }
   }
 
@@ -238,14 +242,14 @@ export async function updateLibrarySettings(
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed.' }
   }
 
-  let caller: { uid: string; role: UserRole }
+  let caller: { uid: string; role: UserRole; superUser: boolean }
   try {
     caller = await getCallerFromCookie()
   } catch (err) {
     return { success: false, error: (err as Error).message }
   }
 
-  if (!hasPermission(caller.role, 'settings.manageLibraryConfig')) {
+  if (!hasPermission(caller.role, 'settings.manageLibraryConfig', caller.superUser)) {
     return { success: false, error: 'You do not have permission to update library settings.' }
   }
 
@@ -279,14 +283,14 @@ export async function updateHRSettings(
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Validation failed.' }
   }
 
-  let caller: { uid: string; role: UserRole }
+  let caller: { uid: string; role: UserRole; superUser: boolean }
   try {
     caller = await getCallerFromCookie()
   } catch (err) {
     return { success: false, error: (err as Error).message }
   }
 
-  if (!hasPermission(caller.role, 'settings.manageHRConfig')) {
+  if (!hasPermission(caller.role, 'settings.manageHRConfig', caller.superUser)) {
     return { success: false, error: 'You do not have permission to update HR settings.' }
   }
 
@@ -319,14 +323,14 @@ export async function updateHRSettings(
 export async function setMaintenanceMode(
   enabled: boolean
 ): Promise<ActionResult> {
-  let caller: { uid: string; role: UserRole }
+  let caller: { uid: string; role: UserRole; superUser: boolean }
   try {
     caller = await getCallerFromCookie()
   } catch (err) {
     return { success: false, error: (err as Error).message }
   }
 
-  if (caller.role !== 'admin') {
+  if (caller.role !== 'admin' && !caller.superUser) {
     return { success: false, error: 'Only administrators may toggle maintenance mode.' }
   }
 

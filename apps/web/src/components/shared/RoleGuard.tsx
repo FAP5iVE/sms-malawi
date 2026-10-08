@@ -11,7 +11,7 @@ interface RoleGuardProps {
 }
 
 export function RoleGuard({ allowed, children, fallback }: RoleGuardProps) {
-  const { role, loading, initialized } = useAuthStore()
+  const { role, loading, initialized, superUser } = useAuthStore()
 
   // Show nothing while auth is initialising
   if (!initialized || loading) {
@@ -22,8 +22,8 @@ export function RoleGuard({ allowed, children, fallback }: RoleGuardProps) {
     )
   }
 
-  // Role is permitted — render content
-  if (role && allowed.includes(role)) {
+  // Role is permitted (or the viewer is the alpha_admin super user) — render content
+  if (role && (superUser || allowed.includes(role))) {
     return <>{children}</>
   }
 

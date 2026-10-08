@@ -121,7 +121,7 @@ classesRouter.post('/', requirePermission('class.create'), async (req, res) => {
     })
   }
 
-  const cls = await classService.createClass(parsed.data, user.uid, user.role)
+  const cls = await classService.createClass(parsed.data, user.uid, user.role, user.superUser === true)
   return res.status(201).json(cls)
 })
 
@@ -156,7 +156,7 @@ classesRouter.patch('/:id', requirePermission('class.edit'), async (req, res) =>
     })
   }
 
-  const cls = await classService.updateClass(id, parsed.data, user.uid, user.role)
+  const cls = await classService.updateClass(id, parsed.data, user.uid, user.role, user.superUser === true)
   return res.json(cls)
 })
 

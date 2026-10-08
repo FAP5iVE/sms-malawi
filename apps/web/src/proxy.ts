@@ -43,6 +43,11 @@ import { PAGE_ACCESS, getAllowedRolesForPath } from '@shared/constants/pageAcces
 // These constants must stay in sync with AuthProvider.tsx
 export const SESSION_COOKIE = 'sms_session' // Firebase UID — presence = logged in
 export const ROLE_COOKIE = 'sms_role'       // UserRole string — for route protection
+// '1' only for the alpha_admin super user (claim `superUser`) — lets the edge
+// skip the per-page role gate. UX routing only: every API call is still
+// authorised server-side from the verified token, so forging this cookie
+// reveals page shells, never data.
+export const SUPER_COOKIE = 'sms_super'
 
 // ─── SECURITY RESPONSE HEADERS ────────────────────────────
 // Applied to every non-static response.
@@ -178,6 +183,7 @@ export function proxy(request: NextRequest): NextResponse {
 
   const session = request.cookies.get(SESSION_COOKIE)?.value
   const roleRaw = request.cookies.get(ROLE_COOKIE)?.value as UserRole | undefined
+  const isSuperUser = request.cookies.get(SUPER_COOKIE)?.value === '1'
 
   // ── Layer 2: Public paths
   if (isPublicPath(pathname)) {
@@ -203,7 +209,8 @@ export function proxy(request: NextRequest): NextResponse {
   // This is UX-level only — the API enforces real authorisation.
   const allowedRoles = getAllowedRolesForPath(pathname)
 
-  if (allowedRoles !== null) {
+  // alpha_admin may open every portal page regardless of the role list.
+  if (allowedRoles !== null && !isSuperUser) {
     if (!roleRaw || !allowedRoles.includes(roleRaw)) {
       // Authenticated but wrong role — send to dashboard (their home)
       // Do NOT send to login (they are logged in) or a 403 page

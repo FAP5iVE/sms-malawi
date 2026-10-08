@@ -232,7 +232,7 @@ pendingActionsRouter.post('/', async (req: Request, res: Response) => {
     res.status(400).json({ error: `"${action}" requests cannot be submitted through this endpoint.` })
     return
   }
-  if (!hasPermission(user.role, requiredPermission)) {
+  if (!hasPermission(user.role, requiredPermission, user.superUser === true)) {
     res.status(403).json({ error: 'You do not have permission to request this change.', required: requiredPermission })
     return
   }
