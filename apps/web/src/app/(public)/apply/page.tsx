@@ -112,8 +112,6 @@ import {
   Loader2,
   User,
   Phone,
-  Mail,
-  MapPin,
   BookOpen,
   Users,
   FileText,

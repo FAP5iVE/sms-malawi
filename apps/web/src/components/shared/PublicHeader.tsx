@@ -94,12 +94,12 @@ export function PublicHeader({ title }: PublicHeaderProps) {
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2 sm:gap-4 sm:px-6">
         <Link
           href="/"
-          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 text-sm text-muted transition-colors hover:text-body"
+          className="inline-flex min-h-12 shrink-0 items-center gap-2 rounded-xl px-2 -ml-2 text-base text-muted transition-colors hover:bg-black/5 hover:text-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/50 dark:hover:bg-white/10"
         >
-          <ArrowLeft className="h-4 w-4" aria-hidden /> Home
+          <ArrowLeft className="h-5 w-5" aria-hidden /> Home
         </Link>
 
-        <div className="h-4 w-px shrink-0 bg-border" aria-hidden />
+        <div className="h-6 w-px shrink-0 bg-border" aria-hidden />
 
         <div className="flex min-w-0 items-center gap-2.5">
           <div

@@ -18,31 +18,59 @@
  * because storage can be blocked (private windows, strict browser settings).
  */
 
-import { useState } from 'react'
+import { useSyncExternalStore } from 'react'
 import Link from 'next/link'
 
 const STORAGE_KEY = 'sms_cookie_notice_dismissed'
 
+// [HYDRATION FIX 2026-10-08]: This used to read localStorage inside a useState
+// initializer, so the server rendered nothing while the browser's first render
+// (on a first visit) rendered the notice, React flagged a hydration mismatch
+// on every first visit to every public page and threw away the server HTML.
+// useSyncExternalStore is React's tool for exactly this: during hydration it
+// uses getServerSnapshot (treated as "already dismissed", so nothing renders,
+// matching the server), then immediately re-renders with the real stored
+// value. No mismatch, no setState-in-an-effect.
+//
+// `dismissedInMemory` covers blocked storage: setItem throws, so the choice is
+// kept for this page session only and the notice returns next visit, as before.
+let dismissedInMemory = false
+const listeners = new Set<() => void>()
+
+function subscribe(onChange: () => void): () => void {
+  listeners.add(onChange)
+  window.addEventListener('storage', onChange)
+  return () => {
+    listeners.delete(onChange)
+    window.removeEventListener('storage', onChange)
+  }
+}
+
+function getDismissed(): boolean {
+  if (dismissedInMemory) return true
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+// Server render + hydration: pretend it's dismissed so both sides render null.
+const getServerDismissed = () => true
+
 export function CookieNotice() {
-  const [visible, setVisible] = useState(() => {
-    if (typeof window === 'undefined') return false
+  const dismissed = useSyncExternalStore(subscribe, getDismissed, getServerDismissed)
 
-    try {
-      return window.localStorage.getItem(STORAGE_KEY) !== '1'
-    } catch {
-      return true
-    }
-  })
-
-  if (!visible) return null
+  if (dismissed) return null
 
   function dismiss() {
+    dismissedInMemory = true
     try {
       window.localStorage.setItem(STORAGE_KEY, '1')
     } catch {
       /* storage blocked: the notice simply returns next visit */
     }
-    setVisible(false)
+    listeners.forEach((notify) => notify())
   }
 
   return (

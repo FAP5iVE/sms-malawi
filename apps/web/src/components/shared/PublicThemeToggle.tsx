@@ -22,8 +22,10 @@
  *
  * [CHANGE]: Rendered by <PublicHeader /> (components/shared/PublicHeader.tsx),
  *   which every public page now gets from (public)/layout.tsx, pages no longer
- *   place their own toggle. Chip enlarged from 36px to the project's 44px
- *   minimum touch target (sms-erp-ux, "Touch targets").
+ *   place their own toggle. It now sits on the header bar, so the solid dark
+ *   chip + shadow behind it is gone: it is a plain icon button (transparent,
+ *   subtle hover/open tint) with a larger 24px icon in a 48px hit area, above
+ *   the project's 44px minimum touch target (sms-erp-ux, "Touch targets").
  *
  * [USAGE]: <PublicThemeToggle /> inside a page's header/back-link row.
  *   Pass a `className` to override sizing/position (e.g. `ml-auto` to push
@@ -68,9 +70,9 @@ export function PublicThemeToggle({ className = '' }: PublicThemeToggleProps) {
         <button
           type="button"
           aria-label={mounted ? `Theme: ${theme}. Click to change.` : 'Toggle theme'}
-          className={`w-11 h-11 rounded-lg bg-brand-deep hover:brightness-125 text-white shadow-md flex items-center justify-center transition-colors shrink-0 cursor-pointer ${className}`}
+          className={`w-12 h-12 rounded-xl text-body hover:bg-black/5 dark:hover:bg-white/10 data-[state=open]:bg-black/5 dark:data-[state=open]:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/50 flex items-center justify-center transition-colors shrink-0 cursor-pointer ${className}`}
         >
-          <ActiveIcon className="w-4 h-4" aria-hidden />
+          <ActiveIcon className="w-6 h-6" aria-hidden />
         </button>
       </DropdownMenuTrigger>
 

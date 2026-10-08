@@ -32,8 +32,14 @@
  *   unreadable. The card is still translucent and blurred, so the artwork
  *   still shows through, just dimmed to a level text can sit on.
  *
- * [VERTICAL POSITION]: Top-aligned, as login's revision 3 requested (card
- *   close to the header rather than floating in a large empty gap above).
+ * [VERTICAL SIZE]: The frame and card stretch to fill the whole area under the
+ *   header (2026-10-08), the previous top-aligned, content-height card only
+ *   used the top half of a tall window and left a large empty band below it.
+ *   The card still starts right under the header (no gap above, as login's
+ *   revision 3 wanted); on desktop the brand sits centred in its pane with the
+ *   notice pinned to the bottom, and the form is centred in its pane. On
+ *   phones the content is centred in the card. A very short window simply
+ *   scrolls, `flex-1` only ever grows the card, it never squeezes content.
  *
  * [DEPENDS ON]: PublicAmbientBackground (`vivid`), next-themes (logo variant).
  *   The header bar itself comes from (public)/layout.tsx via <PublicHeader />.
@@ -88,16 +94,16 @@ export function AuthShell({ children, footer }: AuthShellProps) {
     <div className="relative flex flex-1 flex-col font-sans">
       <PublicAmbientBackground vivid />
 
-      <main className="relative z-10 flex flex-1 items-start justify-center px-3 pb-6 pt-4 sm:px-6 sm:pb-10 sm:pt-6">
+      <main className="relative z-10 flex flex-1 items-stretch justify-center px-3 pb-6 pt-4 sm:px-6 sm:pb-10 sm:pt-6">
         {/* Wide frosted plate */}
-        <div className="w-full max-w-md rounded-[28px] border border-black/5 bg-black/[0.02] p-2.5 shadow-xl backdrop-blur-md dark:border-white/10 dark:bg-white/[0.03] sm:max-w-2xl sm:rounded-[36px] sm:p-4 lg:max-w-5xl">
+        <div className="flex w-full max-w-md flex-col rounded-[28px] border border-black/5 bg-black/[0.02] p-2.5 shadow-xl backdrop-blur-md dark:border-white/10 dark:bg-white/[0.03] sm:max-w-2xl sm:rounded-[36px] sm:p-4 lg:max-w-5xl">
           {/* Glass card, translucent + blurred in BOTH themes. Single column
               by default; from lg it is a 2-column grid whose left column is
               brand (row 1) + footer (row 2) and whose right column spans both
               rows for the form. Source order is brand, form, footer so the
               mobile stack reads in the right order without duplicating any
               markup. */}
-          <div className="relative grid gap-y-5 overflow-hidden rounded-[24px] border border-black/5 bg-white/80 p-6 shadow-2xl backdrop-blur-2xl dark:border-white/15 dark:bg-[hsl(var(--background)/0.55)] sm:rounded-[30px] sm:p-8 lg:grid-cols-2 lg:grid-rows-[1fr_auto] lg:gap-y-0 lg:p-0">
+          <div className="relative grid flex-1 content-center gap-y-5 overflow-hidden rounded-[24px] border border-black/5 bg-white/80 p-6 shadow-2xl backdrop-blur-2xl dark:border-white/15 dark:bg-[hsl(var(--background)/0.55)] sm:rounded-[30px] sm:p-8 lg:grid-cols-2 lg:grid-rows-[1fr_auto] lg:content-normal lg:gap-y-0 lg:p-0">
             {/* Tinted backing for the desktop brand pane */}
             <div
               className="pointer-events-none absolute inset-y-0 left-0 hidden w-1/2 border-r border-black/5 bg-black/[0.03] dark:border-white/10 dark:bg-black/25 lg:block"
