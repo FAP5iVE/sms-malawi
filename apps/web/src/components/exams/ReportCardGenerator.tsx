@@ -31,18 +31,24 @@
  *   • Class + term + academic year selector
  *   • "Generate All" button → calls GET /exams/report-cards/:classId/:term
  *   • Per-student status table: Queued → Generating → Done | Failed
- *   • Individual PDF download/view link (signed Appwrite URL)
+ *   • Individual PDF view action — opens the report card in the browser's
+ *     own PDF viewer (new tab); download/print from the viewer's controls
  *   • Retry failed students individually
  *   • Progress bar showing batch completion
  *
- * The student-facing download is in the student's results page, which
- * calls GET /exams/report-card/:studentId (singular — the only
- * authenticated, access-controlled path) directly.
+ * The student-facing view is in the student's results page
+ * (StudentResultsView.tsx), which uses the same shared openPdfPreview().
+ *
+ * [PDF PREVIEW] The per-row Download button (an <a download> click that
+ * forced a file download) was removed. Viewing a report card now goes
+ * through lib/pdfPreview.ts; the browser's PDF viewer already provides
+ * Download and Print, so users review first and save only if they choose to.
  */
 
 import { useState, useCallback }       from 'react'
 import { motion, AnimatePresence }     from 'framer-motion'
 import { getAuth }                      from 'firebase/auth'
+import { toast }                        from 'sonner'
 import {
   FileText,
   Download,
@@ -64,6 +70,7 @@ import {
   EASE,
 }                                       from '@/lib/motion'
 import { apiFetch }                     from '@/lib/api-client'
+import { openPdfPreview }               from '@/lib/pdfPreview'
 import type { BatchGenerationResult }   from '@/server/services/reportCardService'
 import { useClasses }                   from '@/hooks/useClasses'
 import { usePublicSchoolInfo }          from '@/hooks/usePublic'
@@ -125,32 +132,20 @@ function StudentResultRow({
   row:     StudentRow
   onRetry: (studentId: string) => void
 }) {
-  // [PRODUCTION FIX] These used to be plain <a href={row.url}> links.
-  // /api/files/[fileId] requires a live auth token, and a direct browser
-  // navigation can never attach one — every click returned {"error":
-  // "Unauthorised"}. Fetching a fresh ID token at click time and appending
-  // it as the ?token= param (now accepted by getIdTokenFromRequest, see
-  // verifyAuth.ts) makes these work without weakening the access check —
-  // it's still the same decoded uid/role being verified, just read from
-  // the query string instead of a header this navigation could never send.
-  const openWithToken = useCallback(async (mode: 'view' | 'download') => {
+  // [PDF PREVIEW] /api/files/[fileId] requires a live auth token, and a plain
+  // browser navigation can never attach an Authorization header (an earlier
+  // <a href> version returned {"error":"Unauthorised"} on every click).
+  // openPdfPreview() fetches a fresh ID token at click time, appends it as
+  // ?token= (accepted by getIdTokenFromRequest, see verifyAuth.ts) and opens
+  // the file in a new tab. The server still runs the same token + canReadFile
+  // checks and answers Content-Disposition: inline, so the browser's PDF
+  // viewer shows it. The tab is opened synchronously inside the click.
+  const openPreview = useCallback(() => {
     if (!row.url) return
-    const user = getAuth().currentUser
-    if (!user) return
-    const token = await user.getIdToken()
-    const separator = row.url.includes('?') ? '&' : '?'
-    const authedUrl = `${row.url}${separator}token=${encodeURIComponent(token)}`
-    if (mode === 'view') {
-      window.open(authedUrl, '_blank', 'noopener,noreferrer')
-    } else {
-      const a = document.createElement('a')
-      a.href = authedUrl
-      a.download = `report-card-${row.registrationNo}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-    }
-  }, [row.url, row.registrationNo])
+    openPdfPreview(row.url).catch((err: unknown) => {
+      toast.error(err instanceof Error ? err.message : 'Could not open this report card.')
+    })
+  }, [row.url])
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 bg-surface border-b border-base last:border-0">
@@ -174,24 +169,15 @@ function StudentResultRow({
       {/* Actions */}
       <div className="flex items-center gap-2 shrink-0">
         {row.rowStatus === 'done' && row.url && (
-          <>
-            <button
-              type="button"
-              onClick={() => void openWithToken('view')}
-              className="p-1.5 rounded-lg text-brand-teal hover:bg-brand-teal/10 transition-colors"
-              aria-label={`View report card for ${row.fullName}`}
-            >
-              <ExternalLink className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => void openWithToken('download')}
-              className="p-1.5 rounded-lg text-brand-navy hover:bg-brand-navy/10 transition-colors"
-              aria-label={`Download report card for ${row.fullName}`}
-            >
-              <Download className="w-4 h-4" />
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={openPreview}
+            className="p-1.5 rounded-lg text-brand-teal hover:bg-brand-teal/10 transition-colors"
+            aria-label={`View report card for ${row.fullName}`}
+            title="View report card (opens in a new tab)"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </button>
         )}
         {row.rowStatus === 'failed' && (
           <button

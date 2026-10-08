@@ -890,11 +890,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                     <button
                       type="button"
                       disabled={fetchReceipt.isPending}
-                      onClick={() =>
-                        fetchReceipt.mutate(p.id, {
-                          onSuccess: (r) => window.open(r.url, '_blank', 'noopener'),
-                        })
-                      }
+                      onClick={() => fetchReceipt.mutate(p.id)}
                       className="inline-flex items-center gap-1 text-xs font-medium text-brand-teal hover:underline disabled:opacity-50"
                     >
                       <ReceiptIcon className="w-3.5 h-3.5" /> View Receipt{' '}

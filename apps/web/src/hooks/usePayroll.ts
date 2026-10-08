@@ -26,6 +26,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { openPdfPreview, PdfPreviewError } from '@/lib/pdfPreview'
 import type {
   ApiPayslip,
   ApiSalaryStructure,
@@ -76,10 +77,16 @@ export function useMySalaryStructure(staffUid?: string) {
  * keeps this simple for a one-shot button click.
  */
 /**
- * Fetches a signed download URL for a payslip and opens it in a new tab.
+ * Fetches the view URL for a payslip and opens it in the browser's own PDF
+ * viewer (new tab), where the user can review it and download or print it.
  * Not a mutation — GET /payroll/payslips/:id/download has no side effect,
- * it just mints a signed URL, so a plain async function (not useMutation)
- * keeps this simple for a one-shot button click.
+ * it just returns the file's proxy URL, so a plain async function (not
+ * useMutation) keeps this simple for a one-shot button click.
+ * [PDF PREVIEW] The opening is done by the shared openPdfPreview(): a bare
+ * window.open(url) could not work here because /api/files/[fileId] needs the
+ * caller's ID token (a plain navigation cannot send an Authorization header),
+ * so the proxy answered 401. The tab is opened inside the click, the URL is
+ * resolved, then the token is attached. Server-side checks are unchanged.
  * [PRODUCTION FIX, user-requested] Every call site fired this with no
  * .catch() — a 403 (not yours to view) or 404 (PDF not generated, e.g. a
  * seeded/demo payslip with no real file behind it) rejected silently.
@@ -89,10 +96,14 @@ export function useMySalaryStructure(staffUid?: string) {
  */
 export async function downloadPayslip(payslipId: string): Promise<void> {
   try {
-    const { url } = await apiFetch<{ url: string }>(`/payroll/payslips/${payslipId}/download`)
-    window.open(url, '_blank', 'noopener,noreferrer')
+    await openPdfPreview(async () => {
+      const { url } = await apiFetch<{ url: string }>(`/payroll/payslips/${payslipId}/download`)
+      return url
+    })
   } catch (err) {
-    toast.error(err instanceof ApiError ? err.message : 'Could not open this payslip.')
+    toast.error(
+      err instanceof ApiError || err instanceof PdfPreviewError ? err.message : 'Could not open this payslip.',
+    )
   }
 }
 

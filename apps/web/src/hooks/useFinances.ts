@@ -25,7 +25,9 @@ import type {
   AddInvoiceLineItemInput, CreateStudentFeeCommitmentInput,
   UpdateStudentFeeCommitmentInput, BulkGenerateInvoicesInput,
 } from '@shared/schemas/finance'
-import { apiFetch, queryKeys } from '@/lib/api-client'
+import { toast } from 'sonner'
+import { apiFetch, ApiError, queryKeys } from '@/lib/api-client'
+import { openPdfPreview, PdfPreviewError } from '@/lib/pdfPreview'
 
 export function useFinanceSummary(academicYear: string, term: number) {
   return useQuery({
@@ -196,13 +198,26 @@ export function useUploadExpenseReceipt() {
   })
 }
 
+// [PDF PREVIEW] Receipt openers. The API returns the file's /api/files/<id>
+// proxy URL; openPdfPreview() opens it in the browser's own PDF viewer (new
+// tab) with the caller's ID token attached — a bare window.open(url) could not
+// authenticate, so the proxy answered 401. The tab has to be opened inside the
+// click, so the opening lives in the mutationFn (not onSuccess, which runs
+// after the round-trip). Failures are toasted: before, they were silent.
+function openReceiptPreview(path: string): Promise<void> {
+  return openPdfPreview(async () => (await apiFetch<{ url: string }>(path)).url)
+}
+
+function receiptErrorMessage(err: unknown): string {
+  return err instanceof ApiError || err instanceof PdfPreviewError
+    ? err.message
+    : 'Could not open this receipt.'
+}
+
 export function useViewExpenseReceipt() {
   return useMutation({
-    mutationFn: (expenseId: string) =>
-      apiFetch<{ url: string }>(`/finances/expenses/${expenseId}/receipt`),
-    onSuccess: (data) => {
-      window.open(data.url, '_blank', 'noopener,noreferrer')
-    },
+    mutationFn: (expenseId: string) => openReceiptPreview(`/finances/expenses/${expenseId}/receipt`),
+    onError: (err) => toast.error(receiptErrorMessage(err)),
   })
 }
 
@@ -354,12 +369,15 @@ export function useScholarships() {
 // [NEW] "Generate Receipt" / "View Receipt" — FinanceDashboard's own
 // quick action linked here already but nothing in this tab ever called
 // GET /finances/payments/:id/receipt; this closes that gap. Returns a
-// signed, short-lived view URL for the receipt generated at payment time
-// (see receiptService.generateReceipt()) — the caller opens it directly
-// rather than this hook caching a URL that would go stale.
+// view URL for the receipt generated at payment time (see
+// receiptService.generateReceipt()). [PDF PREVIEW] The hook now also opens it:
+// the receipt PDF opens in the browser's own viewer (new tab) so the user can
+// review it, then download or print from there. Callers just call
+// .mutate(paymentId) from a click; nothing is cached, so no URL goes stale.
 export function useFetchReceipt() {
   return useMutation({
-    mutationFn: (paymentId: string) => apiFetch<{ url: string }>(`/finances/payments/${paymentId}/receipt`),
+    mutationFn: (paymentId: string) => openReceiptPreview(`/finances/payments/${paymentId}/receipt`),
+    onError: (err) => toast.error(receiptErrorMessage(err)),
   })
 }
 
