@@ -49,7 +49,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useClass, useClassTimetable } from '@/hooks/useClasses'
 import { useAuthStore } from '@/store/authStore'
-import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import type { ApiTimetableSlot } from '@shared/types/api'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
@@ -96,10 +96,8 @@ function ClassDetailContent() {
   const { id } = useParams<{ id: string }>()
   const { data: cls, isLoading } = useClass(id)
   const { role, user } = useAuthStore()
-  // Follows the school's stored current term until the user picks another.
-  const { term: currentTerm } = useEffectiveAcademicPeriod()
-  const [pickedTerm, setTerm] = useState<number | null>(null)
-  const term = pickedTerm ?? currentTerm
+  // Follows the universal header filter; the term select below writes through to it.
+  const { term, setTerm } = useEffectiveViewingPeriod()
   const { data: slots = [] } = useClassTimetable(id, term)
   const [activeTab, setActiveTab] = useState<Tab>('roster')
   const [showAssignmentForm, setShowAssignmentForm] = useState(false)

@@ -41,7 +41,7 @@ import Link from 'next/link'
 import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { useExams } from '@/hooks/useExams'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import {
   examsInNextSevenDays,
   examsAwaitingMarks,
@@ -94,7 +94,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 ]
 
 export function ExamOfficerDashboard() {
-  const { academicYear, term, isLoading: periodLoading } = useCurrentAcademicPeriod()
+  const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
   const { data: examsData, isLoading: examsLoading } = useExams(
     undefined,
     academicYear ?? '',

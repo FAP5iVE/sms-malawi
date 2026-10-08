@@ -35,6 +35,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sidebar } from '@/components/shared/Sidebar'
 import { PageHeader } from '@/components/shared/PageHeader'
+import { PeriodBanner } from '@/components/shared/PeriodSwitcher'
 import { MobileBottomNav } from '@/components/shared/MobileBottomNav'
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
@@ -212,6 +213,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             For C1 the existing PageHeader renders across all breakpoints.
           */}
           <PageHeader />
+
+          {/* Shown on every page whenever the viewing period is not the live one */}
+          <PeriodBanner />
 
           {/*
             Scrollable page content area.

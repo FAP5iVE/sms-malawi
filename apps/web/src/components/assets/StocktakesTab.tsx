@@ -4,14 +4,14 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { Loader2, Plus, Play, ClipboardCheck } from 'lucide-react'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import { useStocktakes, useCreateStocktake, useStartStocktake, useCompleteStocktake, useStocktake, useRecordStocktakeLine, useResolveInventoryVariance, type Stocktake, type StocktakeLine } from '@/hooks/useAssetsInventory'
 
 function humanize(value: string) { return value.replace(/_/g, ' ').toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()) }
 function num(v: number | string | undefined) { return Number(v ?? 0) }
 
 export function StocktakesTab() {
-  const { academicYear, term } = useCurrentAcademicPeriod()
+  const { academicYear, term } = useViewingPeriod()
   const [showForm, setShowForm] = useState(false); const [roomId, setRoomId] = useState(''); const [selectedId, setSelectedId] = useState<string | null>(null)
   const { data: rows = [], isLoading } = useStocktakes({ academicYear, term })
   const create = useCreateStocktake()

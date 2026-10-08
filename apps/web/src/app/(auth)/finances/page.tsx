@@ -14,7 +14,26 @@
  *   page in the app (PageHeader, every dashboard) since R15 -- fixed to
  *   match that established pattern; a genuine year/term rollover would
  *   otherwise have silently kept every finance tab pinned to 2025/2026.
- * [DEPENDS ON]: @/hooks/useSettings (useCurrentAcademicPeriod)
+ *
+ * [CHANGE TYPE]: REWORK -- 14 flat tabs -> 7 grouped tabs with sub-tabs, and
+ *   the period now comes from the universal viewing-period filter.
+ * [PURPOSE]:
+ *   1. YEAR/TERM now come from useViewingPeriod() (the header's period
+ *      switcher), not the school's current setting directly, so Finance can
+ *      finally be pointed at last term / last year. Every tab is passed it.
+ *   2. The horizontal tab strip was 14 wide. Related screens are grouped:
+ *        Billing      Invoices / Bulk Generator / Scholarships / Library Fines
+ *        Fee Setup    Fee Catalog / Student Fee Structure
+ *        Spending     Expenses / Debts & Loans
+ *        Budget       Allocations / Windows / Forecast
+ *        Procurement  (its own workspace)
+ *        Payroll      (its own workspace)
+ *        Accounting   Ledger / Reports
+ *      Components are untouched; only navigation moved. Every pre-existing
+ *      ?tab= value (invoices, expenses, budget, feeStructure, ...) still
+ *      deep-links to the same screen: it resolves to its leaf, and the
+ *      leaf's group highlights automatically. ?tab=windows is new.
+ * [DEPENDS ON]: @/hooks/useViewingPeriod
  */
 
 import { useState, Suspense }    from 'react'
@@ -22,11 +41,12 @@ import { useSearchParams }       from 'next/navigation'
 import { RoleGuard }             from '@/components/shared/RoleGuard'
 import { ModuleSurface }         from '@/components/shared/ModuleSurface'
 import { useAuthStore }          from '@/store/authStore'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useViewingPeriod }      from '@/hooks/useViewingPeriod'
 import { InvoicesTab }           from '@/components/finances/InvoicesTab'
 import { ExpensesTab }           from '@/components/finances/ExpensesTab'
 import { PayrollTab }            from '@/components/finances/PayrollTab'
 import { BudgetTab }             from '@/components/finances/BudgetTab'
+import { BudgetWindowsPanel }    from '@/components/finances/BudgetWindowsPanel'
 import { FeeStructureTab }       from '@/components/finances/FeeStructureTab'
 import { FinanceFeeStructureTab } from '@/components/finances/FinanceFeeStructureTab'
 import { BulkInvoiceGenerator }   from '@/components/finances/BulkInvoiceGenerator'
@@ -60,6 +80,14 @@ type Tab =
   // goods-receipt workflow. A distinct tab from 'budget' (which stays the
   // existing Budget/Expense screen, untouched) since this is new territory.
   | 'procurement'
+  // Moved here from Procurement's sub-tabs: the calendar half of the budget.
+  | 'windows'
+
+type GroupId =
+  | 'billing' | 'feeSetup' | 'spending' | 'budget' | 'procurement' | 'payroll' | 'accounting'
+
+interface LeafDef  { id: Tab; label: string; show: boolean }
+interface GroupDef { id: GroupId; label: string; leaves: LeafDef[] }
 
 export default function FinancesPage() {
   return (
@@ -95,9 +123,11 @@ function FinancesLoadingSkeleton() {
 
 function FinancesContent() {
   const { role }   = useAuthStore()
-  const { academicYear, term: currentTerm, isLoading: periodLoading } = useCurrentAcademicPeriod()
+  // [UNIVERSAL PERIOD FILTER] The viewing period (header switcher), not the
+  // school's current setting: this is what makes past terms reachable here.
+  const { academicYear, term: viewingTerm, isLoading: periodLoading } = useViewingPeriod()
   const YEAR = academicYear ?? ''
-  const TERM = currentTerm ?? 0
+  const TERM = viewingTerm ?? 0
 
   const isStudent = role === 'student'
   const isFinance = role === 'finance' || role === 'admin'
@@ -128,48 +158,65 @@ function FinancesContent() {
     isHRPayrollViewer ? 0 : TERM,
   )
 
-  // Build visible tab list — filtered by role, then mapped to clean TabItem shape
-  // (strips the `show` field before passing to ModuleTabs for type safety)
-  const TABS = [
-    { id: 'invoices'     as Tab, label: isStudent ? 'My Fees' : 'Invoices', show: !isHRPayrollViewer            },
-    // [PRODUCTION FIX] high_rank holds finance.approveExpense/rejectExpense
-    // — added so they can actually reach the tab whose "Approve"/"Reject"
-    // buttons ExpensesTab.tsx already correctly gates on that permission.
-    { id: 'expenses'     as Tab, label: 'Expenses',                          show: isFinance || isHighRank       },
-    // [PRODUCTION FIX] high_rank holds finance.approvePayroll — same reason
-    // as Expenses above. PayrollApprovalPanel (now rendered below) already
-    // correctly gates its Approve button on this permission.
-    { id: 'payroll'      as Tab, label: 'Payroll',                           show: isFinance || isHRPayrollViewer || isHighRank },
-    { id: 'budget'       as Tab, label: 'Budget',                            show: !isStudent && !isHRPayrollViewer },
-    // R22 — visible to finance/high_rank (full review + approve authority,
-    // same as Expenses above) and to academic/hr (procurement.createRequisition
-    // only — they can raise and track their own requisitions; ProcurementWorkspace
-    // gates every review/approve/PO/receipt action internally via PermissionGuard,
-    // same pattern this page already uses for Payroll's mixed-role visibility).
-    { id: 'procurement'  as Tab, label: 'Procurement',                       show: isFinance || isHighRank || role === 'academic' || role === 'hr' },
-    // [2026-09-05] Relabeled to match the rebuilt component -- this is
-    // now the fee catalog *definition* screen (Settings & Fee Catalog);
-    // financeFeeStructure below is the new per-student *application* of
-    // that catalog (the bursar workstation).
-    { id: 'feeStructure' as Tab, label: 'Settings & Fee Catalog',           show: isFinance                     },
-    { id: 'financeFeeStructure' as Tab, label: 'Finance Fee Structure',     show: isFinance                     },
-    // [2026-09-05] Promoted out of the ?action=bulk modal InvoicesTab.tsx
-    // used to open -- now a real top-level tab like every other screen here.
-    { id: 'bulkInvoiceGenerator' as Tab, label: 'Bulk Invoice Generator',   show: isFinance                     },
-    { id: 'scholarships' as Tab, label: 'Scholarships',                      show: isFinance                     },
-    { id: 'fines'        as Tab, label: 'Library Fines',                     show: isFinance                     },
-    // [PRODUCTION FIX 2026-07-27] Forecast and Ledger were fully-built,
-    // orphaned components (ForecastPanel.tsx / AccountingLedgerTab.tsx) —
-    // real backend routes, zero UI wiring. Debts & Loans is new. All three
-    // gated the same as Expenses/Scholarships/Fines — finance-management
-    // only, not students, not the HR read-only payroll viewer.
-    { id: 'forecast'     as Tab, label: 'Forecast',                          show: isFinance                     },
-    { id: 'debts'        as Tab, label: 'Debts & Loans',                     show: isFinance                     },
-    { id: 'ledger'       as Tab, label: 'Ledger',                            show: isFinance                     },
-    { id: 'reports'      as Tab, label: 'Reports',                           show: isFinance                     },
-  ]
-    .filter((t) => t.show)
-    .map(({ id, label }) => ({ id, label }))
+  // Visibility is decided per LEAF (exactly as it was per flat tab before);
+  // a group shows only if at least one of its leaves does, so students and
+  // the HR payroll viewer still see just their own screens.
+  const GROUPS: GroupDef[] = ([
+    {
+      id: 'billing', label: isStudent ? 'My Fees' : 'Billing', leaves: [
+        { id: 'invoices',             label: 'Invoices',        show: !isHRPayrollViewer },
+        { id: 'bulkInvoiceGenerator', label: 'Bulk Generator',  show: isFinance },
+        { id: 'scholarships',         label: 'Scholarships',    show: isFinance },
+        { id: 'fines',                label: 'Library Fines',   show: isFinance },
+      ],
+    },
+    {
+      // feeStructure is the fee catalog *definition*; financeFeeStructure is its
+      // per-student *application* (the bursar workstation). Natural pair.
+      id: 'feeSetup', label: 'Fee Setup', leaves: [
+        { id: 'feeStructure',        label: 'Fee Catalog',           show: isFinance },
+        { id: 'financeFeeStructure', label: 'Student Fee Structure', show: isFinance },
+      ],
+    },
+    {
+      // high_rank holds finance.approveExpense/rejectExpense, so it reaches Expenses.
+      id: 'spending', label: 'Spending', leaves: [
+        { id: 'expenses', label: 'Expenses',       show: isFinance || isHighRank },
+        { id: 'debts',    label: 'Debts & Loans',  show: isFinance },
+      ],
+    },
+    {
+      id: 'budget', label: 'Budget', leaves: [
+        { id: 'budget',   label: 'Allocations', show: !isStudent && !isHRPayrollViewer },
+        { id: 'windows',  label: 'Windows',     show: !isStudent && !isHRPayrollViewer },
+        { id: 'forecast', label: 'Forecast',    show: isFinance },
+      ],
+    },
+    {
+      // Requisition-through-goods-receipt workflow. Review/approve/PO/receipt
+      // actions are gated inside ProcurementWorkspace via PermissionGuard.
+      id: 'procurement', label: 'Procurement', leaves: [
+        { id: 'procurement', label: 'Procurement', show: isFinance || isHighRank || role === 'academic' || role === 'hr' },
+      ],
+    },
+    {
+      // high_rank holds finance.approvePayroll; HR gets read-only run history.
+      id: 'payroll', label: 'Payroll', leaves: [
+        { id: 'payroll', label: 'Payroll', show: isFinance || isHRPayrollViewer || isHighRank },
+      ],
+    },
+    {
+      id: 'accounting', label: 'Accounting', leaves: [
+        { id: 'ledger',  label: 'Ledger',  show: isFinance },
+        { id: 'reports', label: 'Reports', show: isFinance },
+      ],
+    },
+  ] as GroupDef[])
+    .map((g) => ({ ...g, leaves: g.leaves.filter((l) => l.show) }))
+    .filter((g) => g.leaves.length > 0)
+
+  const isVisibleLeaf = (id: string | null): id is Tab =>
+    !!id && GROUPS.some((g) => g.leaves.some((l) => l.id === id))
 
   // R19 — the active tab is derived from ?tab= during render via Next's
   // useSearchParams() (the codebase's established pattern — see
@@ -184,7 +231,7 @@ function FinancesContent() {
   // HR can only see the payroll tab, so its default (and any invalid ?tab=)
   // resolves to 'payroll' rather than the invoices tab it can't open.
   const fallbackTab: Tab = isHRPayrollViewer ? 'payroll' : 'invoices'
-  const initialTab: Tab = tabParam && TABS.some((tab) => tab.id === tabParam) ? (tabParam as Tab) : fallbackTab
+  const initialTab: Tab = isVisibleLeaf(tabParam) ? tabParam : fallbackTab
 
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)
 
@@ -203,9 +250,21 @@ function FinancesContent() {
   const [prevTabParam, setPrevTabParam] = useState(tabParam)
   if (tabParam !== prevTabParam) {
     setPrevTabParam(tabParam)
-    if (tabParam && TABS.some((t) => t.id === tabParam)) {
-      setActiveTab(tabParam as Tab)
+    if (isVisibleLeaf(tabParam)) {
+      setActiveTab(tabParam)
     }
+  }
+
+  // The active GROUP is derived from the active leaf, so a legacy
+  // ?tab=expenses highlights "Spending" with no extra state to keep in sync.
+  const activeGroup = GROUPS.find((g) => g.leaves.some((l) => l.id === activeTab)) ?? GROUPS[0]
+  const currentLeaf: Tab | undefined =
+    activeGroup?.leaves.find((l) => l.id === activeTab)?.id ?? activeGroup?.leaves[0]?.id
+  function selectGroup(id: GroupId) {
+    // `leaves[0]` is `T | undefined` under noUncheckedIndexedAccess; a group
+    // is only ever built with >= 1 leaf, but say so in the types, not a cast.
+    const first = GROUPS.find((x) => x.id === id)?.leaves[0]
+    if (first) setActiveTab(first.id)
   }
 
   // Same skeleton the Suspense boundary above already uses -- avoids
@@ -259,18 +318,29 @@ function FinancesContent() {
         </div>
       )}
 
-      {/* Mobile-scrollable tab navigation — C7 */}
-      <ModuleTabs<Tab>
-        tabs={TABS}
-        active={activeTab}
-        onChange={setActiveTab}
+      {/* Level 1: the 7 grouped tabs */}
+      <ModuleTabs<GroupId>
+        tabs={GROUPS.map(({ id, label }) => ({ id, label }))}
+        active={activeGroup?.id ?? 'billing'}
+        onChange={selectGroup}
         variant="underline"
         id="finance-tabs"
       />
 
+      {/* Level 2: sub-tabs, only when the group actually has more than one screen */}
+      {activeGroup && activeGroup.leaves.length > 1 && (
+        <ModuleTabs<Tab>
+          tabs={activeGroup.leaves.map(({ id, label }) => ({ id, label }))}
+          active={currentLeaf ?? activeGroup.leaves[0]?.id ?? activeTab}
+          onChange={setActiveTab}
+          variant="underline"
+          id={`finance-subtabs-${activeGroup.id}`}
+        />
+      )}
+
       {/* Tab content */}
-      {activeTab === 'invoices'     && <InvoicesTab      academicYear={YEAR} term={TERM} />}
-      {activeTab === 'expenses'     && <ExpensesTab      academicYear={YEAR} term={TERM} />}
+      {currentLeaf === 'invoices'     && <InvoicesTab      academicYear={YEAR} term={TERM} />}
+      {currentLeaf === 'expenses'     && <ExpensesTab      academicYear={YEAR} term={TERM} />}
       {/* [PRODUCTION FIX] PayrollTab now mounts the full Payroll workspace
          (Runs & Approvals / Salary Structure & Allowances / My Pay /
          Financial Insights & Trends / PAYE & Pension Settings — see
@@ -280,18 +350,19 @@ function FinancesContent() {
          Approvals tab and deleted; importing it here separately (as an
          earlier revision of this file did) breaks the build, since the
          file no longer exists. */}
-      {activeTab === 'payroll'      && <PayrollTab />}
-      {activeTab === 'budget'       && <BudgetTab        academicYear={YEAR} />}
-      {activeTab === 'procurement'  && <ProcurementWorkspace />}
-      {activeTab === 'feeStructure'        && <FeeStructureTab        academicYear={YEAR} />}
-      {activeTab === 'financeFeeStructure' && <FinanceFeeStructureTab academicYear={YEAR} term={TERM} />}
-      {activeTab === 'bulkInvoiceGenerator' && <BulkInvoiceGenerator />}
-      {activeTab === 'scholarships' && <ScholarshipTab   academicYear={YEAR} />}
-      {activeTab === 'fines'        && <LibraryFinesTab />}
-      {activeTab === 'forecast'     && <ForecastPanel />}
-      {activeTab === 'debts'        && <DebtsLoansTab />}
-      {activeTab === 'ledger'       && <AccountingLedgerTab />}
-      {activeTab === 'reports'      && <ReportsExportPanel academicYear={YEAR} term={TERM} />}
+      {currentLeaf === 'payroll'      && <PayrollTab />}
+      {currentLeaf === 'budget'       && <BudgetTab        academicYear={YEAR} term={TERM} />}
+      {currentLeaf === 'windows'      && <BudgetWindowsPanel academicYear={YEAR} term={TERM} />}
+      {currentLeaf === 'procurement'  && <ProcurementWorkspace />}
+      {currentLeaf === 'feeStructure'        && <FeeStructureTab        academicYear={YEAR} />}
+      {currentLeaf === 'financeFeeStructure' && <FinanceFeeStructureTab academicYear={YEAR} term={TERM} />}
+      {currentLeaf === 'bulkInvoiceGenerator' && <BulkInvoiceGenerator key={`${YEAR}-${TERM}`} />}
+      {currentLeaf === 'scholarships' && <ScholarshipTab   academicYear={YEAR} />}
+      {currentLeaf === 'fines'        && <LibraryFinesTab />}
+      {currentLeaf === 'forecast'     && <ForecastPanel key={`${YEAR}-${TERM}`} />}
+      {currentLeaf === 'debts'        && <DebtsLoansTab />}
+      {currentLeaf === 'ledger'       && <AccountingLedgerTab key={`${YEAR}-${TERM}`} />}
+      {currentLeaf === 'reports'      && <ReportsExportPanel academicYear={YEAR} term={TERM} />}
       </ModuleSurface>
     </div>
   )

@@ -50,7 +50,7 @@ import { TodaysTimetableList } from '@/components/shared/TodaysTimetableList'
 import { useStudents, useHighRiskStudents } from '@/hooks/useStudents'
 import { useClasses, useMyTimetableToday } from '@/hooks/useClasses'
 import { useExams } from '@/hooks/useExams'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
 import Link from 'next/link'
 import type { QuickAction } from '@/components/shared/QuickActions'
@@ -90,7 +90,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 ]
 
 export function AcademicDashboard() {
-  const { academicYear, term, isLoading: periodLoading } = useCurrentAcademicPeriod()
+  const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
 
   const { data: studentsData, isLoading: studentsLoading } =
     useStudents({ status: 'ACTIVE' })

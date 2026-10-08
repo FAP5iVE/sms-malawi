@@ -52,6 +52,7 @@ import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { Field, inputCls } from '@/components/students/StudentFormSections'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { TeacherSelect } from '@/components/shared/TeacherSelect'
 import { ClassSubjectsField } from '@/components/classes/ClassSubjectsField'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -83,7 +84,6 @@ export default function ClassesPage() {
 
 function ClassesContent() {
   const [showArchived, setShowArchived] = useState(false)
-  const [selectedYear, setSelectedYear] = useState<string | null>(null)
   // [R15 fix] Archiving a class has no confirmation step at all — unlike
   // students' bulk-archive path, which routes through ConfirmDialog. A class
   // affects every enrolled student's roster/timetable/attendance history, so
@@ -99,13 +99,11 @@ function ClassesContent() {
   const archive = useArchiveClass()
   const { can } = usePermissions()
 
-  // ── Derive available academic years and forms from live data — no
-  // hardcoded literal for either. ──────────────────────────────────────────
-  const availableYears = useMemo(
-    () => Array.from(new Set((classes ?? []).map((c) => c.academicYear))).sort().reverse(),
-    [classes]
-  )
-  const activeYear = selectedYear ?? availableYears[0] ?? null
+  // [UNIVERSAL PERIOD FILTER] The year this list shows is the app-wide
+  // header filter, not a page-local select (which defaulted to "newest year
+  // that has classes" and so disagreed with every other page). Forms are
+  // still derived from live data below.
+  const { academicYear: activeYear } = useEffectiveViewingPeriod()
 
   const yearClasses = useMemo(
     () => (classes ?? []).filter((c) => {
@@ -139,19 +137,6 @@ function ClassesContent() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          {availableYears.length > 0 && (
-            <select
-              value={activeYear ?? ''}
-              onChange={(e) => setSelectedYear(e.target.value)}
-              className={`${inputCls} w-auto min-w-[140px]`}
-              aria-label="Academic year"
-            >
-              {availableYears.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-          )}
-
           <label className="flex items-center gap-2 text-sm text-muted min-h-[44px]">
             <input
               type="checkbox"

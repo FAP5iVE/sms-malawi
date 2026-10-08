@@ -51,7 +51,7 @@ import {
 import { TrendingUp, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 import { apiFetch }             from '@/lib/api-client'
 import { formatMWK }            from '@shared/constants/malawi'
-import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { AcademicYearSelect }   from '@/components/shared/AcademicYearSelect'
 import type { ForecastReport, MonthlyDataPoint } from '@/server/services/forecastService'
 
@@ -154,7 +154,7 @@ function buildForecastUrl(academicYear: string, forwardMonths: number): string {
 export function ForecastPanel() {
   // Seeded from the school's stored current year (SystemSettings) — the
   // finances page header has already loaded it by the time this tab mounts.
-  const { academicYear: currentYear } = useEffectiveAcademicPeriod()
+  const { academicYear: currentYear } = useEffectiveViewingPeriod()
   const [academicYear, setAcademicYear] = useState(currentYear)
   const [forwardMonths, setForwardMonths] = useState(3)
   const [report,   setReport]   = useState<ForecastReport | null>(null)

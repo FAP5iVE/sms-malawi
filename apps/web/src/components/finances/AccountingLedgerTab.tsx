@@ -28,6 +28,7 @@
  */
 
 import { useState, useEffect }         from 'react'
+import { useViewingTermRange }          from '@/hooks/useViewingPeriod'
 import { toast }                       from 'sonner'
 import { TrendingUp, TrendingDown, Scale, BookOpen } from 'lucide-react'
 import { ModuleTabs }                  from '@/components/shared/ModuleTabs'
@@ -52,8 +53,12 @@ const TABS = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 function IncomeStatementPanel() {
-  const [from,   setFrom]   = useState(() => `${new Date().getFullYear()}-01-01`)
-  const [to,     setTo]     = useState(() => new Date().toISOString().slice(0, 10))
+  // [UNIVERSAL PERIOD FILTER] Default range = the viewing term's dates (the
+  // old default was "Jan 1 of this calendar year -> today", unrelated to the
+  // school term). The page re-keys this tab when the period changes.
+  const termRange = useViewingTermRange()
+  const [from,   setFrom]   = useState(() => termRange?.start ?? `${new Date().getFullYear()}-01-01`)
+  const [to,     setTo]     = useState(() => termRange?.end ?? new Date().toISOString().slice(0, 10))
   const [data,   setData]   = useState<IncomeStatement | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -206,8 +211,9 @@ function TrialBalancePanel() {
 
 function AccountLedgerPanel() {
   const [code,  setCode]  = useState('1000')
-  const [from,  setFrom]  = useState(() => `${new Date().getFullYear()}-01-01`)
-  const [to,    setTo]    = useState(() => new Date().toISOString().slice(0, 10))
+  const termRange = useViewingTermRange()
+  const [from,  setFrom]  = useState(() => termRange?.start ?? `${new Date().getFullYear()}-01-01`)
+  const [to,    setTo]    = useState(() => termRange?.end ?? new Date().toISOString().slice(0, 10))
   const [lines, setLines] = useState<LedgerLine[]>([])
   const [loading, setLoading] = useState(false)
 

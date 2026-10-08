@@ -17,7 +17,7 @@
 
 import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
-import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { usePlacementRegistry, usePlacementCatalogue } from '@/hooks/usePlacements'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { DataTable, type DataColumn } from '@/components/shared/DataTable'
@@ -37,10 +37,10 @@ const ENTRY_SOURCE_LABEL: Record<string, string> = {
 
 export function PlacementRegistryPanel() {
   // The school's stored current year (SystemSettings), never a literal.
-  const { academicYear: currentYear } = useEffectiveAcademicPeriod()
+  // [UNIVERSAL PERIOD FILTER] The year follows the app-wide header filter; this
+  // panel's own year select writes through to it.
+  const { academicYear: effectiveYear, setAcademicYear } = useEffectiveViewingPeriod()
   const { data: catalogue = [] } = usePlacementCatalogue()
-  const [academicYear, setAcademicYear] = useState<string>('')
-  const effectiveYear = academicYear || currentYear
 
   const { data: placements = [], isLoading, isError, error } = usePlacementRegistry(effectiveYear)
 

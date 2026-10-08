@@ -42,8 +42,6 @@
 'use client'
 import { useState, useEffect, useRef, useMemo, useCallback, useContext, createContext } from 'react'
 import { RoleGuard } from '@/components/shared/RoleGuard'
-import type { UserRole } from '@shared/types/roles'
-import { SuperUserRoleSwitcher } from '@/components/shared/SuperUserRoleSwitcher'
 import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
 import { AdminSessionsPanel } from '@/components/reports/AdminSessionsPanel'
@@ -3861,10 +3859,7 @@ function ExportProvider({ children }: { children: React.ReactNode }) {
 }
 
 function ReportsContent() {
-  const { role: authRole, user, superUser } = useAuthStore()
-  // alpha_admin can open every staff role's report tabs; everyone else sees their own.
-  const [viewAs, setViewAs] = useState<UserRole>('admin')
-  const role = superUser ? viewAs : authRole
+  const { role, user } = useAuthStore()
 
   // [UNIVERSAL PERIOD FILTER] Year and term come from the app-wide header
   // filter (useViewingPeriod): the person's pick if they made one, otherwise
@@ -3900,15 +3895,6 @@ function ReportsContent() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {superUser && (
-            <SuperUserRoleSwitcher
-              value={viewAs}
-              onChange={(r) => {
-                setViewAs(r)
-                setActiveTab(ROLE_TABS[r]?.[0]?.id ?? 'overview')
-              }}
-            />
-          )}
           <select
             value={term ?? ''}
             onChange={(e) => setTerm(Number(e.target.value))}

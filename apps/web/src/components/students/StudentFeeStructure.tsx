@@ -19,7 +19,7 @@
 
 import { useFeeStructures, useInvoices, useStudentCredits } from '@/hooks/useFinances'
 import { formatMWK } from '@shared/constants/malawi'
-import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { Wallet, CheckCircle2 } from 'lucide-react'
 
 export function StudentFeeStructure({ studentId }: { studentId: string }) {
@@ -27,7 +27,7 @@ export function StudentFeeStructure({ studentId }: { studentId: string }) {
   // used to be a pair of module-level literals ('2025/2026', 1), which is
   // why a student's fee panel could show nothing while their invoices sat
   // under the term the school was really in.
-  const { academicYear: CURRENT_YEAR, term: CURRENT_TERM } = useEffectiveAcademicPeriod()
+  const { academicYear: CURRENT_YEAR, term: CURRENT_TERM } = useEffectiveViewingPeriod()
   const { data: feeStructures = [], isLoading: feesLoading } = useFeeStructures(
     CURRENT_YEAR, studentId, CURRENT_TERM,
   )

@@ -265,6 +265,8 @@ export const CreateBudgetSchema = z.object({
   category: ExpenseCategorySchema,
   allocated: z.number().positive(),
   description: z.string().optional(),
+  /** Optional: the budget window this allocation was raised under (same academic year). */
+  budgetWindowId: z.string().optional(),
 })
 
 // ─── LIBRARY FINE ────────────────────────────────────────

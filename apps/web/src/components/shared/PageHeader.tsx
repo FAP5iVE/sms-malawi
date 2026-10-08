@@ -82,7 +82,7 @@ import { useNavigation }         from '@/hooks/useNavigation'
 import { useMotionEnabled }      from '@/store/motionStore'
 import { useNotificationFeed }   from '@/hooks/useNotificationFeed'
 import type { FeedNotification } from '@/hooks/useNotificationFeed'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { PeriodSwitcher }       from '@/components/shared/PeriodSwitcher'
 import { ModeToggle }            from '@/components/shared/ModeToggle'
 import {
   FADE_DOWN_VARIANTS,
@@ -447,10 +447,6 @@ export function PageHeader() {
     isLoading: notifLoading,
   } = useNotificationFeed()
 
-  // Real academic-term badge source (R15 — replaces the hardcoded
-  // 'Term 1 — 2025/2026' literal)
-  const { academicYear, term, isLoading: periodLoading } = useCurrentAcademicPeriod()
-
   const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'User'
   const initials    = displayName.slice(0, 2).toUpperCase()
 
@@ -570,8 +566,10 @@ export function PageHeader() {
             <PageTitle title={pageTitle} motionEnabled={motionEnabled} />
           </div>
 
-          {/* Right: Search + Bell */}
+          {/* Right: Period + Search + Bell */}
           <div className="flex items-center gap-0.5 shrink-0">
+            <PeriodSwitcher variant="compact" />
+
             <button
               type="button"
               onClick={() => {
@@ -613,26 +611,14 @@ export function PageHeader() {
 
         {/* ════════════════════════════════════════════════════════════════════
             DESKTOP LAYOUT (md+, h-16)
-            Two-zone: [Term badge left] [Actions right]
+            Two-zone: [Period switcher left] [Actions right]
             ════════════════════════════════════════════════════════════════════ */}
         <div className="hidden md:flex items-center justify-between h-16 px-6">
 
-          {/* Left: Academic term badge — real SETTING_KEYS values (R15).
-              A quiet skeleton pill while the two settings resolve; nothing
-              is shown at all if they fail, rather than a fake year. */}
-          {periodLoading ? (
-            <span
-              className="h-4 w-32 rounded bg-page animate-pulse"
-              role="status"
-              aria-label="Loading academic term"
-            />
-          ) : academicYear && term ? (
-            <span className="text-sm font-semibold font-heading text-body">
-              Term {term} — {academicYear}
-            </span>
-          ) : (
-            <span aria-hidden />
-          )}
+          {/* Left: universal academic year + term filter. Replaces the old
+              read-only badge: picking a period here drives every
+              period-scoped tab in the app (see hooks/useViewingPeriod). */}
+          <PeriodSwitcher variant="desktop" />
 
           {/* Right: Search + Bell + ModeToggle + User */}
           <div className="flex items-center gap-1.5">

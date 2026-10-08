@@ -27,7 +27,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import {
   useEligibleCohort,
   useRecordStaffPlacement,
@@ -52,10 +52,10 @@ function nextIntakeYear(academicYear: string): string {
 
 export function StaffPlacementEntryPanel() {
   // The school's stored current year (SystemSettings), never a literal.
-  const { academicYear: currentYear } = useEffectiveAcademicPeriod()
+  // [UNIVERSAL PERIOD FILTER] The year follows the app-wide header filter; this
+  // panel's own year select writes through to it.
+  const { academicYear: effectiveYear, setAcademicYear } = useEffectiveViewingPeriod()
   const { data: catalogue = [] } = usePlacementCatalogue()
-  const [academicYear, setAcademicYear] = useState<string>('')
-  const effectiveYear = academicYear || currentYear
 
   const { data: cohort = [], isLoading, isError, error } = useEligibleCohort(effectiveYear)
   const recordEntry = useRecordStaffPlacement(effectiveYear)

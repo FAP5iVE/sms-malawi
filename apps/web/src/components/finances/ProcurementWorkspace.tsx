@@ -4,14 +4,16 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { formatMWK } from '@shared/constants/malawi'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
+import { usePermissions } from '@/hooks/usePermissions'
+import { useBudgetVsActual } from '@/hooks/useFinances'
 import { useDepartments } from '@/hooks/useLocations'
 import {
   useRequisitions, useRFQs, useQuotations, usePurchaseOrders, useGoodsReceipts, useBudgetWindows, useSuppliers,
   useCreateRequisition, useSubmitRequisition, useApproveRequisition, useReturnRequisition, useRejectRequisition, useCancelRequisition,
   useCreateRFQ, useCloseRFQ, useCreateQuotation, useSelectQuotation, useRejectQuotation,
   useCreatePurchaseOrder, useApprovePurchaseOrder, useSendPurchaseOrder, useCancelPurchaseOrder,
-  useCreateGoodsReceipt, useCompleteGoodsReceipt, useCreateBudgetWindow, useOpenBudgetWindow, useCloseBudgetWindow, useCreateSupplier,
+  useCreateGoodsReceipt, useCompleteGoodsReceipt, useCreateSupplier,
   type PurchaseRequisition, type RFQRow, type QuotationRow, type PurchaseOrderRow, type Supplier,
 } from '@/hooks/useProcurement'
 import { Loader2, Plus, Send, Check, X, RotateCcw, Ban, Truck } from 'lucide-react'
@@ -26,10 +28,10 @@ import { Loader2, Plus, Send, Check, X, RotateCcw, Ban, Truck } from 'lucide-rea
 // values (PENDING_APPROVAL/COMPLETED, which aren't real ProcurementStatus/
 // PurchaseOrderStatus values) are also corrected throughout.
 
-type Tab = 'requisitions' | 'rfqs' | 'quotations' | 'orders' | 'receipts' | 'windows' | 'suppliers'
+type Tab = 'requisitions' | 'rfqs' | 'quotations' | 'orders' | 'receipts' | 'suppliers'
 const tabs: Array<{ id: Tab; label: string }> = [
   { id: 'requisitions', label: 'Requisitions' }, { id: 'rfqs', label: 'RFQs' }, { id: 'quotations', label: 'Quotations' },
-  { id: 'orders', label: 'Purchase Orders' }, { id: 'receipts', label: 'Goods Receipts' }, { id: 'windows', label: 'Budget Windows' },
+  { id: 'orders', label: 'Purchase Orders' }, { id: 'receipts', label: 'Goods Receipts' },
   { id: 'suppliers', label: 'Suppliers' },
 ]
 function humanize(s: string) { return s.replace(/_/g, ' ').toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()) }
@@ -38,7 +40,9 @@ function errorMessage(err: unknown, fallback: string) { return err instanceof Er
 
 export function ProcurementWorkspace() {
   const [tab, setTab] = useState<Tab>('requisitions')
-  const { academicYear } = useCurrentAcademicPeriod()
+  // Budget Windows now live with Budget allocations (Finance → Budget → Windows).
+  // The viewing period is passed down so budget pickers offer THIS period's budgets.
+  const { academicYear, term } = useViewingPeriod()
   return <div className="space-y-5">
     <div className="flex gap-1 border-b border-base overflow-x-auto">
       {tabs.map(t => <button key={t.id} type="button" onClick={() => setTab(t.id)}
@@ -46,35 +50,49 @@ export function ProcurementWorkspace() {
         {t.label}
       </button>)}
     </div>
-    {tab === 'requisitions' && <Requisitions />}
+    {tab === 'requisitions' && <Requisitions academicYear={academicYear ?? ''} term={term ?? 1} />}
     {tab === 'rfqs' && <RFQs />}
     {tab === 'quotations' && <Quotations />}
     {tab === 'orders' && <PurchaseOrders />}
     {tab === 'receipts' && <GoodsReceipts />}
-    {tab === 'windows' && <BudgetWindows academicYear={academicYear ?? ''} />}
     {tab === 'suppliers' && <Suppliers />}
   </div>
 }
 
 // ── REQUISITIONS ──
 
-function Requisitions() {
+function Requisitions({ academicYear, term }: { academicYear: string; term: number }) {
   const { data = [], isLoading } = useRequisitions(); const [show, setShow] = useState(false)
   return <section className="space-y-4">
     <Header title="Purchase requisitions"
       action={<PermissionGuard permission="procurement.createRequisition"><button type="button" onClick={() => setShow(true)} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold inline-flex items-center gap-2"><Plus className="w-4 h-4" /> New requisition</button></PermissionGuard>} />
-    {show && <RequisitionForm onClose={() => setShow(false)} />}
-    {isLoading ? <Loading /> : <DataTable headers={['Requisition', 'Department', 'Purpose', 'Status', 'Amount', 'Actions']}>{data.map((r) => <RequisitionRow key={r.id} row={r} />)}</DataTable>}
+    {show && <RequisitionForm academicYear={academicYear} term={term} onClose={() => setShow(false)} />}
+    {isLoading ? <Loading /> : <DataTable headers={['Requisition', 'Department', 'Purpose', 'Status', 'Amount', 'Actions']}>{data.map((r) => <RequisitionRow key={r.id} row={r} academicYear={academicYear} term={term} />)}</DataTable>}
   </section>
 }
 
-function RequisitionRow({ row }: { row: PurchaseRequisition }) {
+function RequisitionRow({ row, academicYear, term }: { row: PurchaseRequisition; academicYear: string; term: number }) {
   const submit = useSubmitRequisition(); const approve = useApproveRequisition(); const ret = useReturnRequisition(); const reject = useRejectRequisition(); const cancel = useCancelRequisition()
   const amount = (row.lines ?? []).reduce((sum, l) => sum + Number(l.quantity) * Number(l.estimatedUnitCost), 0)
   const err = submit.error || approve.error || ret.error || reject.error || cancel.error
   // A submitted requisition can also sit at UNDER_REVIEW; both are the reviewable window.
   const reviewable = row.status === 'SUBMITTED' || row.status === 'UNDER_REVIEW'
   const closed = ['CLOSED', 'CANCELLED', 'REJECTED'].includes(row.status)
+  // Approval reserves money, so it needs a budget. Requesters usually can't see
+  // budgets, so when none was attached the APPROVER picks one here.
+  const { can } = usePermissions()
+  const [choosing, setChoosing] = useState(false)
+  const [pickedBudget, setPickedBudget] = useState('')
+  const needsBudget = !row.budgetId
+  const { data: budgets = [] } = useBudgetVsActual(academicYear, term, reviewable && needsBudget && choosing && can('finance.viewBudget'))
+  function startApprove() {
+    if (needsBudget) setChoosing(true)
+    else approve.mutate({ id: row.id, data: {} })
+  }
+  function confirmApprove() {
+    if (!pickedBudget) return
+    approve.mutate({ id: row.id, data: { budgetId: pickedBudget } }, { onSuccess: () => setChoosing(false) })
+  }
   function returnWithNote() { const note = window.prompt('What needs to change before this can be resubmitted?'); if (note?.trim()) ret.mutate({ id: row.id, data: { reviewNote: note.trim() } }) }
   function rejectWithNote() { const note = window.prompt('Reason for rejecting this requisition:'); if (note?.trim()) reject.mutate({ id: row.id, data: { reviewNote: note.trim() } }) }
   return <tr className="border-b border-base last:border-0">
@@ -87,12 +105,30 @@ function RequisitionRow({ row }: { row: PurchaseRequisition }) {
       <div className="flex justify-end gap-1">
         {row.status === 'DRAFT' && <Action onClick={() => submit.mutate({ id: row.id })} label="Submit"><Send className="w-4 h-4" /></Action>}
         {reviewable && <>
-          <Action onClick={() => approve.mutate({ id: row.id, data: {} })} label="Approve"><Check className="w-4 h-4" /></Action>
+          <Action onClick={startApprove} label="Approve"><Check className="w-4 h-4" /></Action>
           <Action onClick={returnWithNote} label="Return"><RotateCcw className="w-4 h-4" /></Action>
           <Action onClick={rejectWithNote} label="Reject"><X className="w-4 h-4" /></Action>
         </>}
         {!closed && <Action onClick={() => cancel.mutate({ id: row.id })} label="Cancel"><Ban className="w-4 h-4" /></Action>}
       </div>
+      {choosing && reviewable && (
+        <div className="mt-2 flex flex-col gap-2 items-end">
+          <label className="text-xs text-muted self-start">Charge to budget ({academicYear} · Term {term})</label>
+          <select value={pickedBudget} onChange={(e) => setPickedBudget(e.target.value)} className="input w-full min-w-56">
+            <option value="">Select a budget…</option>
+            {budgets.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.department} · {humanize(b.category)} · {b.term ? `T${b.term}` : 'Full year'} — {money(b.available)} available
+              </option>
+            ))}
+          </select>
+          {budgets.length === 0 && <p className="text-xs text-muted self-start">No budgets exist for this period yet — add one under Budget → Allocations.</p>}
+          <div className="flex gap-1">
+            <Action onClick={() => setChoosing(false)} label="Cancel">Cancel</Action>
+            <Action onClick={confirmApprove} label="Approve with this budget">{approve.isPending ? 'Approving…' : 'Approve'}</Action>
+          </div>
+        </div>
+      )}
       {err && <p className="text-xs text-brand-coral mt-1">{errorMessage(err, 'Action failed.')}</p>}
     </td>
   </tr>
@@ -101,9 +137,17 @@ function RequisitionRow({ row }: { row: PurchaseRequisition }) {
 const ASSET_CATEGORIES = ['FURNITURE', 'IT_EQUIPMENT', 'LAB_EQUIPMENT', 'SPORTS_EQUIPMENT', 'KITCHEN_EQUIPMENT', 'VEHICLE', 'MAINTENANCE_TOOL', 'OTHER']
 const LINE_CLASSIFICATIONS = ['FIXED_ASSET', 'INVENTORY', 'CONSUMABLE', 'SERVICE', 'DIRECT_EXPENSE']
 
-function RequisitionForm({ onClose }: { onClose: () => void }) {
+function RequisitionForm({ onClose, academicYear, term }: { onClose: () => void; academicYear: string; term: number }) {
   const create = useCreateRequisition()
   const { data: departments = [] } = useDepartments()
+  // Real pickers instead of "paste an ID you can't see". Budgets are only
+  // fetched for roles allowed to view them; everyone else leaves it blank and
+  // the approver chooses the budget at approval time.
+  const { can } = usePermissions()
+  const canPickBudget = can('finance.viewBudget')
+  const { data: budgets = [] } = useBudgetVsActual(academicYear, term, canPickBudget)
+  const { data: windows = [] } = useBudgetWindows(academicYear)
+  const openWindows = windows.filter((w) => w.status === 'OPEN')
   const [departmentId, setDepartmentId] = useState(''); const [budgetId, setBudgetId] = useState(''); const [budgetWindowId, setBudgetWindowId] = useState('')
   const [purpose, setPurpose] = useState(''); const [justification, setJustification] = useState(''); const [emergency, setEmergency] = useState(false)
   const [description, setDescription] = useState(''); const [qty, setQty] = useState('1'); const [unit, setUnit] = useState('each'); const [cost, setCost] = useState('0')
@@ -125,8 +169,22 @@ function RequisitionForm({ onClose }: { onClose: () => void }) {
     <div className="flex justify-between"><h4 className="font-semibold text-brand-navy">New purchase requisition</h4><button type="button" onClick={onClose} className="text-muted">Close</button></div>
     <div className="grid sm:grid-cols-2 gap-3">
       <Field label="Department"><select value={departmentId} onChange={e => setDepartmentId(e.target.value)} className="input"><option value="">Select a department…</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
-      <Field label="Budget ID"><input value={budgetId} onChange={e => setBudgetId(e.target.value)} className="input" placeholder="Required before this can be approved" /></Field>
-      <Field label="Budget Window ID"><input value={budgetWindowId} onChange={e => setBudgetWindowId(e.target.value)} className="input" placeholder="Optional" /></Field>
+      {canPickBudget ? (
+        <Field label={`Budget (${academicYear} · Term ${term})`}>
+          <select value={budgetId} onChange={e => setBudgetId(e.target.value)} className="input">
+            <option value="">Not decided — the approver will choose</option>
+            {budgets.map(b => <option key={b.id} value={b.id}>{b.department} · {humanize(b.category)} · {b.term ? `T${b.term}` : 'Full year'} — {money(b.available)} available</option>)}
+          </select>
+        </Field>
+      ) : (
+        <p className="text-xs text-muted self-end pb-2">The budget is assigned by the finance approver.</p>
+      )}
+      <Field label="Budget window">
+        <select value={budgetWindowId} onChange={e => setBudgetWindowId(e.target.value)} className="input">
+          <option value="">{openWindows.length ? 'Not under a window' : 'No window is open'}</option>
+          {openWindows.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+        </select>
+      </Field>
       <Field label="Purpose"><input value={purpose} onChange={e => setPurpose(e.target.value)} className="input" /></Field>
       <Field label="Item / service"><input value={description} onChange={e => setDescription(e.target.value)} className="input" /></Field>
       <Field label="Classification"><select value={classification} onChange={e => setClassification(e.target.value)} className="input">{LINE_CLASSIFICATIONS.map(c => <option key={c} value={c}>{humanize(c)}</option>)}</select></Field>
@@ -391,35 +449,6 @@ function GoodsReceiptForm({ onClose }: { onClose: () => void }) {
     <button type="button" onClick={submit} disabled={create.isPending || !poId} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Saving…' : 'Record receipt'}</button>
     {create.error && <p className="text-sm text-brand-coral">{errorMessage(create.error, 'Could not record goods receipt.')}</p>}
   </div>
-}
-
-// ── BUDGET WINDOWS ──
-
-function BudgetWindows({ academicYear }: { academicYear: string }) {
-  const { data = [], isLoading } = useBudgetWindows(); const create = useCreateBudgetWindow(); const open = useOpenBudgetWindow(); const close = useCloseBudgetWindow()
-  const [name, setName] = useState(''); const [type, setType] = useState('TERM'); const [term, setTerm] = useState('1'); const [start, setStart] = useState(''); const [end, setEnd] = useState('')
-  function make() { if (!name || !start || !end || !academicYear) return; create.mutate({ academicYear, term: Number(term), type, name, submissionStart: start, submissionEnd: end }, { onSuccess: () => setName('') }) }
-  return <section className="space-y-4">
-    <Header title="Budget windows" action={<PermissionGuard permission="finance.manageBudgetWindows"><div className="flex gap-2 flex-wrap">
-      <input value={name} onChange={e => setName(e.target.value)} placeholder="Window name" className="input w-40" />
-      <select value={type} onChange={e => setType(e.target.value)} className="input w-32"><option>ANNUAL</option><option>TERM</option><option>QUARTERLY</option><option>MONTHLY</option><option>CUSTOM</option></select>
-      <input type="date" value={start} onChange={e => setStart(e.target.value)} className="input" />
-      <input type="date" value={end} onChange={e => setEnd(e.target.value)} className="input" />
-      <button type="button" onClick={make} disabled={create.isPending} className="button-primary"><Plus className="w-4 h-4" /> Add</button>
-    </div></PermissionGuard>} />
-    <DataTable headers={['Window', 'Period', 'Dates', 'Status', 'Actions']}>
-      {isLoading ? <tr><td colSpan={5}><Loading /></td></tr> : data.map(w => <tr key={w.id} className="border-b border-base">
-        <td className="px-4 py-3 font-medium">{w.name}</td>
-        <td className="px-4 py-3">{w.academicYear} · {w.term ? `Term ${w.term}` : 'Annual'}</td>
-        <td className="px-4 py-3 text-xs">{new Date(w.submissionStart).toLocaleDateString()} – {new Date(w.submissionEnd).toLocaleDateString()}</td>
-        <td className="px-4 py-3">{humanize(w.status)}</td>
-        <td className="px-4 py-3 text-right">
-          {w.status === 'DRAFT' && <Action onClick={() => open.mutate({ id: w.id })} label="Open">Open</Action>}
-          {w.status === 'OPEN' && <Action onClick={() => close.mutate({ id: w.id })} label="Close">Close</Action>}
-        </td>
-      </tr>)}
-    </DataTable>
-  </section>
 }
 
 // ── SUPPLIERS ── (useCreateSupplier existed with no button calling it — the Quotation form could select a supplier but never create one)

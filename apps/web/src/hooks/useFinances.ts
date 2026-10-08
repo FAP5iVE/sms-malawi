@@ -253,18 +253,32 @@ export function useRejectExpense() {
   })
 }
 
-// Budget vs Actual — returns array of {department, category, allocated, spent, remaining}
-export function useBudgetVsActual(academicYear: string) {
+export interface BudgetLine {
+  id: string
+  department: string
+  category: string
+  /** null = a full-year budget, which applies to every term. */
+  term: number | null
+  budgetWindowId: string | null
+  description: string | null
+  allocated: number
+  spent: number
+  /** Promised to open requisitions/POs but not yet spent. */
+  committed: number
+  remaining: number
+  /** allocated − committed − spent: what a new requisition can still draw on. */
+  available: number
+}
+
+// Budget vs Actual for the viewing year/term. A term includes the full-year budgets too.
+export function useBudgetVsActual(academicYear: string, term?: number, enabled = true) {
   return useQuery({
-    queryKey: queryKeys.finances.budget(academicYear, undefined),
+    queryKey: queryKeys.finances.budget(academicYear, term),
     queryFn: () =>
-      apiFetch<Array<{
-        department: string
-        category: string
-        allocated: number
-        spent: number
-        remaining: number
-      }>>(`/finances/budget?academicYear=${academicYear}`),
+      apiFetch<BudgetLine[]>(
+        `/finances/budget?academicYear=${encodeURIComponent(academicYear)}${term ? `&term=${term}` : ''}`,
+      ),
+    enabled: enabled && !!academicYear,
   })
 }
 

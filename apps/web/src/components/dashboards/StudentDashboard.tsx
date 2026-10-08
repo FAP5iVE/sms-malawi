@@ -65,7 +65,7 @@ import { useStudentMe } from '@/hooks/useStudents'
 import { useStudentPerformanceTrend, useOwnAttendance } from '@/hooks/useAnalytics'
 import { useExams } from '@/hooks/useExams'
 import { useMyTimetableToday } from '@/hooks/useClasses'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import { examsInNextSevenDays } from '@/lib/examFilters'
 import { formatMWK } from '@shared/constants/malawi'
 
@@ -96,7 +96,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 ]
 
 export function StudentDashboard() {
-  const { academicYear, term, isLoading: periodLoading } = useCurrentAcademicPeriod()
+  const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
   const { data: me, isLoading: meLoading } = useStudentMe()
   const { data: examsData, isLoading: examsLoading } = useExams(
     me?.classId ?? undefined,

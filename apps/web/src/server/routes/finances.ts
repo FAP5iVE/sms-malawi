@@ -69,7 +69,7 @@ import 'server-only'
 import { Router } from 'express'
 import multer from 'multer'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
-import { requirePermission } from '@/server/middleware/verifyPermission'
+import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import {
   RecordPaymentSchema,
   GenerateInvoiceSchema,
@@ -110,7 +110,7 @@ import { bulkGenerateInvoices } from '@/server/services/bulkInvoiceService'
 import * as Sentry from '@sentry/nextjs'
 import { logger } from '@/lib/logger'
 import * as budgetWindowService from '@/server/services/budgetWindowService'
-import { CreateBudgetWindowSchema } from '@shared/schemas/assetsInventoryProcurement'
+import { CreateBudgetWindowSchema, SetBudgetWindowStatusSchema } from '@shared/schemas/assetsInventoryProcurement'
 import { sendError } from '@/server/lib/sendError'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
@@ -1142,7 +1142,9 @@ financesRouter.get(
 // than a new router since it's a Finance-owned concept the UI already expects at
 // /finances/budget-windows.
 
-financesRouter.get('/budget-windows', verifyAuth, requirePermission('finance.viewBudget'),
+// Readable by anyone who can view budgets OR raise a requisition: requesters
+// (academic/hr) need to see which windows are open to raise one under.
+financesRouter.get('/budget-windows', verifyAuth, requireAnyPermission(['finance.viewBudget', 'procurement.createRequisition']),
   async (req, res) => {
     const { academicYear, status } = req.query as { academicYear?: string; status?: string }
     return res.json(await budgetWindowService.listBudgetWindows({ academicYear, status }))
@@ -1154,6 +1156,17 @@ financesRouter.post('/budget-windows', verifyAuth, requirePermission('finance.ma
     const parsed = CreateBudgetWindowSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     return res.status(201).json(await budgetWindowService.createBudgetWindow(parsed.data, req.user.uid, req.user.role))
+  })
+
+// Generic transition (DRAFT/OPEN/REVIEW/CLOSED/ARCHIVED). /open and /close stay for compatibility.
+financesRouter.post('/budget-windows/:id/status', verifyAuth, requirePermission('finance.manageBudgetWindows'),
+  async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: 'Not authenticated.' })
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+    if (!id) return res.status(400).json({ error: 'Budget window id is required.' })
+    const parsed = SetBudgetWindowStatusSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    return res.json(await budgetWindowService.setBudgetWindowStatus(id, parsed.data.status, req.user.uid, req.user.role))
   })
 
 financesRouter.post('/budget-windows/:id/open', verifyAuth, requirePermission('finance.manageBudgetWindows'),

@@ -27,7 +27,7 @@ import { useMemo, useState } from 'react'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { useStudentMe } from '@/hooks/useStudents'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { useOwnAttendance } from '@/hooks/useAnalytics'
 import { useStudentAttendance } from '@/hooks/useAttendance'
 import {
@@ -54,9 +54,9 @@ const STATUS_STYLE: Record<Status, { dot: string; bg: string; text: string }> = 
 
 function AttendanceContent() {
   const { data: me } = useStudentMe()
-  const { academicYear: defaultYear, term: defaultTerm } = useCurrentAcademicPeriod()
-  const [term, setTerm] = useState<number | null>(null)
-  const activeTerm = term ?? defaultTerm ?? 1
+  // Year/term follow the universal header filter; this page's own term
+  // select writes THROUGH to it (one source of truth, two access points).
+  const { academicYear: defaultYear, term: activeTerm, setTerm } = useEffectiveViewingPeriod()
 
   const { data: summary, isLoading: summaryLoading } = useOwnAttendance(
     me?.id ?? '', defaultYear ?? '', activeTerm,

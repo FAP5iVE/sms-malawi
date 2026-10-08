@@ -80,7 +80,7 @@ import { PromotionEngine } from '@/components/exams/PromotionEngine'
 import { ResultsReleaseWorkflow } from '@/components/exams/ResultsReleaseWorkflow'
 import { useExams, useApproveResults, useReleaseResults } from '@/hooks/useExams'
 import { useClasses } from '@/hooks/useClasses'
-import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { usePermissions } from '@/hooks/usePermissions'
 import { apiFetch } from '@/lib/api-client'
 import { EXAM_MARKS_ENTERABLE_STATUSES } from '@shared/schemas/exam'
@@ -147,10 +147,11 @@ function ExamsPageInner() {
   const [tab, setTab] = useState<Tab>(initialTab)
   // Term (like the year, below) follows the school's stored current period
   // until the user explicitly picks a different one.
-  const { academicYear: currentYear, term: currentTerm } = useEffectiveAcademicPeriod()
-  const [pickedTerm, setTerm] = useState<number | null>(null)
-  const term = pickedTerm ?? currentTerm
-  const [selectedClassId, setSelectedClassId] = useState('')
+  // [UNIVERSAL PERIOD FILTER] Year AND term now come from the app-wide
+  // header filter (useViewingPeriod). This page's own year/term selects
+  // write THROUGH to it, so there is exactly one source of truth.
+  const { academicYear, term, setTerm, setAcademicYear } = useEffectiveViewingPeriod()
+  const [pickedClassId, setSelectedClassId] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [marksExamId, setMarksExamId] = useState<string | null>(null)
   // [PRODUCTION FIX 2026-07-28] Separate from marksExamId (teacher entry)
@@ -172,8 +173,6 @@ function ExamsPageInner() {
   // <AcademicYearSelect> for exactly this reason. Same controlled pattern
   // as ClaimsVerificationPanel.tsx: empty state = "follow the school's
   // current year"; once the user picks one, it sticks.
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState('')
-  const academicYear = selectedAcademicYear || currentYear
 
   useEffect(() => {
     setTitle('Exams & Results')
@@ -186,6 +185,9 @@ function ExamsPageInner() {
 
   const { data: classesData } = useClasses(academicYear)
   const classes = (classesData ?? []) as ApiClass[]
+  // A class picked under another year is not in this year's list — treat it
+  // as "no class selected" rather than querying with a stale id.
+  const selectedClassId = classes.some((c) => c.id === pickedClassId) ? pickedClassId : ''
 
   const { data: examsData, isLoading: examsLoading } = useExams(
     selectedClassId || undefined,
@@ -333,7 +335,7 @@ function ExamsPageInner() {
                they all read the same page-level academicYear. */}
             <AcademicYearSelect
               value={academicYear}
-              onChange={(e) => setSelectedAcademicYear(e.target.value)}
+              onChange={(e) => setAcademicYear(e.target.value)}
               aria-label="Select academic year"
               className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none"
             />

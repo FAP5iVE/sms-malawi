@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useBudgetVsActual, useCreateBudget } from '@/hooks/useFinances'
+import { useBudgetWindows } from '@/hooks/useProcurement'
 import { useDepartmentTitles } from '@/hooks/useSettings'
 import { formatMWK } from '@shared/constants/malawi'
 import { MOBILE_BREAKPOINT } from '@shared/constants/breakpoints'
@@ -14,8 +15,12 @@ const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })
 
 const EXPENSE_CATEGORIES = ['SALARIES', 'UTILITIES', 'MAINTENANCE', 'PROCUREMENT', 'LIBRARY', 'TRANSPORT', 'MISCELLANEOUS']
 
-export function BudgetTab({ academicYear }: { academicYear: string }) {
-  const { data: budget = [], isLoading } = useBudgetVsActual(academicYear)
+export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: string; term: number }) {
+  // [UNIVERSAL PERIOD FILTER] Scoped to the viewing year AND term. A term view
+  // includes the full-year (term = null) budgets, which apply to every term.
+  const { data: budget = [], isLoading } = useBudgetVsActual(academicYear, viewingTerm)
+  // Windows for this year, so a new allocation can be filed under one.
+  const { data: windows = [] } = useBudgetWindows(academicYear)
   const createBudget = useCreateBudget()
   // [PRODUCTION FIX 2026-07-28] Budget.department was free-text with no
   // create UI at all (confirmed: CreateBudgetSchema/createBudget had zero
@@ -42,6 +47,7 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
   const [category, setCategory] = useState('')
   const [allocatedAmount, setAllocatedAmount] = useState('')
   const [description, setDescription] = useState('')
+  const [budgetWindowId, setBudgetWindowId] = useState('')
 
   function submitBudget() {
     if (!department || !category || !allocatedAmount || Number(allocatedAmount) <= 0) return
@@ -53,17 +59,21 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
         category: category as never,
         allocated: Number(allocatedAmount),
         description: description.trim() || undefined,
+        budgetWindowId: budgetWindowId || undefined,
       },
       {
         onSuccess: () => {
           setShowForm(false)
-          setTerm(''); setDepartment(''); setCategory(''); setAllocatedAmount(''); setDescription('')
+          setTerm(''); setDepartment(''); setCategory(''); setAllocatedAmount(''); setDescription(''); setBudgetWindowId('')
         },
       },
     )
   }
 
-  const categories = budget.map((b) => b.category)
+  // One bar pair per budget LINE (department × category). The old code used
+  // the bare category, so two departments with the same category were
+  // indistinguishable.
+  const categories = budget.map((b) => `${b.department} · ${b.category}`)
   const allocated = budget.map((b) => b.allocated)
   const spent = budget.map((b) => b.spent)
 
@@ -120,7 +130,10 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="font-heading font-semibold text-body">Budget vs Actual — {academicYear}</h2>
+        <div>
+          <h2 className="font-heading font-semibold text-body">Budget vs Actual — {academicYear} · Term {viewingTerm}</h2>
+          <p className="text-xs text-muted mt-0.5">Includes full-year budgets, which apply to every term.</p>
+        </div>
         <button
           type="button"
           onClick={() => setShowForm((v) => !v)}
@@ -189,6 +202,20 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
             </div>
           </div>
           <div>
+            <label htmlFor="budget-window" className="text-xs text-muted mb-1 block">Budget window <span className="text-muted/70">(optional)</span></label>
+            <select
+              id="budget-window"
+              value={budgetWindowId}
+              onChange={(e) => setBudgetWindowId(e.target.value)}
+              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+            >
+              <option value="">Not linked to a window</option>
+              {windows.map((w) => (
+                <option key={w.id} value={w.id}>{w.name} ({w.status.toLowerCase()})</option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label htmlFor="budget-description" className="text-xs text-muted mb-1 block">Description <span className="text-muted/70">(optional)</span></label>
             <textarea
               id="budget-description"
@@ -219,7 +246,7 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
         <div className="skeleton h-64 rounded-xl" />
       ) : budget.length === 0 ? (
         <div className="py-12 text-center text-muted text-sm">
-          No budget data for {academicYear}
+          No budget data for {academicYear} · Term {viewingTerm}
         </div>
       ) : (
         <>
@@ -231,40 +258,36 @@ export function BudgetTab({ academicYear }: { academicYear: string }) {
             <Chart type="bar" options={chartOptions} series={series} />
           </div>
 
-          {/* Table */}
+          {/* Table — one row per budget line (department × category) */}
           <div className="table-scroll">
-            <table className="w-full text-sm min-w-140">
+            <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="border-b border-base bg-page">
-                  <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                    Category
-                  </th>
-                  <th className="text-right px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                    Allocated
-                  </th>
-                  <th className="text-right px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                    Spent
-                  </th>
-                  <th className="text-right px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                    Remaining
-                  </th>
-                  <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                    %
-                  </th>
+                  {[
+                    ['Department', 'left'], ['Category', 'left'], ['Applies to', 'left'],
+                    ['Allocated', 'right'], ['Committed', 'right'], ['Spent', 'right'], ['Available', 'right'], ['Used', 'left'],
+                  ].map(([h, align]) => (
+                    <th key={h} className={`${align === 'right' ? 'text-right' : 'text-left'} px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold`}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {budget.map((b) => {
-                  const pct = b.allocated > 0 ? Math.round((b.spent / b.allocated) * 100) : 0
+                  const pct = b.allocated > 0 ? Math.round(((b.spent + b.committed) / b.allocated) * 100) : 0
                   return (
-                    <tr key={b.category} className="border-b border-base hover:bg-page">
-                      <td className="px-4 py-3 font-medium">{b.category}</td>
+                    <tr key={b.id} className="border-b border-base hover:bg-page">
+                      <td className="px-4 py-3 font-medium">{b.department}</td>
+                      <td className="px-4 py-3">{b.category.charAt(0) + b.category.slice(1).toLowerCase()}</td>
+                      <td className="px-4 py-3 text-muted">{b.term ? `Term ${b.term}` : 'Full year'}</td>
                       <td className="px-4 py-3 text-right tabular">{formatMWK(b.allocated)}</td>
+                      <td className="px-4 py-3 text-right tabular text-muted">{formatMWK(b.committed)}</td>
                       <td className="px-4 py-3 text-right tabular">{formatMWK(b.spent)}</td>
                       <td
-                        className={`px-4 py-3 text-right tabular font-semibold ${b.remaining < 0 ? 'text-brand-coral' : 'text-emerald-600'}`}
+                        className={`px-4 py-3 text-right tabular font-semibold ${b.available < 0 ? 'text-brand-coral' : 'text-emerald-600'}`}
                       >
-                        {formatMWK(b.remaining)}
+                        {formatMWK(b.available)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">

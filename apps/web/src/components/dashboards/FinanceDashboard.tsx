@@ -41,7 +41,7 @@ import { QuickActions } from '@/components/shared/QuickActions'
 import { FeeCollectionRadial } from '@/components/finances/FeeCollectionRadial'
 import { IncomeExpenseChart } from '@/components/finances/IncomeExpenseChart'
 import { useFinanceSummary } from '@/hooks/useFinances'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import { formatMWK } from '@shared/constants/malawi'
 import type { QuickAction } from '@/components/shared/QuickActions'
 
@@ -95,7 +95,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 ]
 
 export function FinanceDashboard() {
-  const { academicYear, term, isLoading: periodLoading } = useCurrentAcademicPeriod()
+  const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
   const { data: summary, isLoading: summaryLoading } = useFinanceSummary(
     academicYear ?? '',
     term ?? 0,

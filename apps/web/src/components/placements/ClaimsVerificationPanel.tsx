@@ -17,7 +17,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { usePlacementsQueue, useApprovePlacementClaim, useRejectPlacementClaim } from '@/hooks/usePlacements'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { MotionBottomSheet } from '@/components/shared/MotionBottomSheet'
@@ -100,9 +100,9 @@ function ClaimCard({
 
 export function ClaimsVerificationPanel() {
   // The school's stored current year (SystemSettings), never a literal.
-  const { academicYear: currentYear } = useEffectiveAcademicPeriod()
-  const [academicYear, setAcademicYear] = useState<string>('')
-  const effectiveYear = academicYear || currentYear
+  // [UNIVERSAL PERIOD FILTER] The year follows the app-wide header filter; this
+  // panel's own year select writes through to it.
+  const { academicYear: effectiveYear, setAcademicYear } = useEffectiveViewingPeriod()
 
   const { data: queue = [], isLoading, isError, error } = usePlacementsQueue(effectiveYear)
   const approve = useApprovePlacementClaim()

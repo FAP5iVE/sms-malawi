@@ -34,7 +34,7 @@ import { useRef } from 'react'
 import { useReactToPrint } from 'react-to-print'
 import { useStudent } from '@/hooks/useStudents'
 import { useReportCardData } from '@/hooks/useExams'
-import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { StudentForm } from '@/components/students/StudentForm'
@@ -72,12 +72,11 @@ function ProfileContent() {
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({ contentRef: printRef })
 
-  // Year and default report-card term both come from the school's stored
-  // current period; the term selector below overrides only once used.
-  const { academicYear, term: currentTerm } = useEffectiveAcademicPeriod()
+  // Year and report-card term both follow the universal header filter; the
+  // term selector below writes through to it.
+  const { academicYear, term: viewingTerm, setTerm: setReportCardTerm } = useEffectiveViewingPeriod()
   const [showReportCard, setShowReportCard] = useState(false)
-  const [pickedReportCardTerm, setReportCardTerm] = useState<1 | 2 | 3 | null>(null)
-  const reportCardTerm = (pickedReportCardTerm ?? currentTerm) as 1 | 2 | 3
+  const reportCardTerm = viewingTerm as 1 | 2 | 3
   const {
     data:      reportCardData,
     isLoading: reportCardLoading,
@@ -127,7 +126,7 @@ function ProfileContent() {
         <div className="flex items-center gap-1.5">
           <select
             value={reportCardTerm}
-            onChange={(e) => setReportCardTerm(Number(e.target.value) as 1 | 2 | 3)}
+            onChange={(e) => setReportCardTerm(Number(e.target.value))}
             aria-label="Report card term"
             className="border border-base rounded-lg text-sm px-2 py-1.5 bg-surface min-h-[36px]"
           >

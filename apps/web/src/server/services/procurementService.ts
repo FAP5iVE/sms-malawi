@@ -114,6 +114,19 @@ export async function createPurchaseRequisition(
 ) {
   if (!input.lines.length)
     throw Object.assign(new Error('A requisition needs at least one line.'), { status: 400 })
+  // A requisition raised "under" a budget window is only valid while that
+  // window is open — otherwise the window's open/close dates govern nothing.
+  // Emergency requisitions bypass this by design.
+  if (input.budgetWindowId && !input.isEmergency) {
+    const window = await prisma.budgetWindow.findUnique({ where: { id: input.budgetWindowId } })
+    if (!window) throw Object.assign(new Error('Budget window not found.'), { status: 400 })
+    if (window.status !== 'OPEN') {
+      throw Object.assign(
+        new Error(`The budget window "${window.name}" is ${window.status.toLowerCase()} — requisitions can only be raised under an open window (or marked as an emergency).`),
+        { status: 409 },
+      )
+    }
+  }
   for (const l of input.lines) {
     if (l.classification === 'FIXED_ASSET' && !l.assetCategory) {
       throw Object.assign(
@@ -208,7 +221,7 @@ export async function submitRequisition(id: string, actorUid: string, actorRole:
 
 export async function approveRequisition(
   id: string,
-  input: { reviewNote?: string },
+  input: { reviewNote?: string; budgetId?: string },
   actorUid: string,
   actorRole: UserRole
 ) {
@@ -224,9 +237,11 @@ export async function approveRequisition(
   if (requisition.requestedByUid === actorUid) {
     throw Object.assign(new Error('You cannot approve your own requisition.'), { status: 403 })
   }
-  if (!requisition.budgetId) {
+  // The reviewer's choice wins over whatever the requester entered (if anything).
+  const budgetId = input.budgetId ?? requisition.budgetId
+  if (!budgetId) {
     throw Object.assign(
-      new Error('This requisition has no budget attached — assign one before approving.'),
+      new Error('This requisition has no budget attached — choose a budget to charge it to before approving.'),
       { status: 400 }
     )
   }
@@ -237,7 +252,7 @@ export async function approveRequisition(
     await budgetWindowService.reserveCommitment(
       tx,
       {
-        budgetId: requisition.budgetId!,
+        budgetId,
         budgetWindowId: requisition.budgetWindowId,
         purchaseRequisitionId: id,
         amount: estimatedTotal,
@@ -249,6 +264,7 @@ export async function approveRequisition(
       where: { id },
       data: {
         status: 'APPROVED',
+        budgetId,
         reviewedByUid: actorUid,
         reviewedAt: new Date(),
         approvedByUid: actorUid,

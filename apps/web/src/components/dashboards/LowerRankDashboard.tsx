@@ -43,7 +43,7 @@ import { ListCard } from '@/components/shared/ListCard'
 import { useStudents } from '@/hooks/useStudents'
 import { useApplications } from '@/hooks/useApplications'
 import { useExams } from '@/hooks/useExams'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import { examsInNextSevenDays } from '@/lib/examFilters'
 import type { QuickAction } from '@/components/shared/QuickActions'
 
@@ -81,7 +81,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 ]
 
 export function LowerRankDashboard() {
-  const { academicYear, term, isLoading: periodLoading } = useCurrentAcademicPeriod()
+  const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
 
   const { data: studentsData, isLoading: studentsLoading } =
     useStudents({ status: 'ACTIVE' })

@@ -68,7 +68,7 @@ import {
   useHRStaffByDepartment,
   useLibraryBorrowingTrend,
 } from '@/hooks/useAnalytics'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import type { ApiStaffProfile } from '@shared/types/api'
 
 const QUICK_ACTIONS: QuickAction[] = [
@@ -140,7 +140,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 ]
 
 export function HighRankDashboard() {
-  const { academicYear, term, isLoading: periodLoading } = useCurrentAcademicPeriod()
+  const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
 
   const { data: studentsData, isLoading: studentsLoading } =
     useStudents({ status: 'ACTIVE' })

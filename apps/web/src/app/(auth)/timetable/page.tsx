@@ -38,7 +38,7 @@ import { apiFetch, queryKeys } from '@/lib/api-client'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { useClasses } from '@/hooks/useClasses'
-import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import type { ApiTimetableSlot, ApiClass } from '@shared/types/api'
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'] as const
@@ -61,13 +61,14 @@ export default function TimetablePage() {
 }
 
 function TimetableContent() {
-  // Year AND term follow the school's stored current period (SystemSettings)
-  // until the user picks a different term from the selector.
-  const { academicYear: currentYear, term: currentTerm } = useEffectiveAcademicPeriod()
+  // Year AND term follow the universal header filter; the term select below
+  // writes through to it rather than keeping a competing local copy.
+  const { academicYear: currentYear, term, setTerm } = useEffectiveViewingPeriod()
   const { data: classes = [] } = useClasses(currentYear)
-  const [selectedClassId, setSelectedClassId] = useState('')
-  const [pickedTerm, setTerm] = useState<number | null>(null)
-  const term = pickedTerm ?? currentTerm
+  const [pickedClassId, setSelectedClassId] = useState('')
+  // A class picked under another year is not in this year's list — fall back
+  // to "nothing selected" instead of querying a stale class id.
+  const selectedClassId = (classes as ApiClass[]).some((c: ApiClass) => c.id === pickedClassId) ? pickedClassId : ''
 
   const { data: slots = [], isLoading } = useQuery<ApiTimetableSlot[]>({
     queryKey: queryKeys.classes.timetable(selectedClassId, undefined, term),

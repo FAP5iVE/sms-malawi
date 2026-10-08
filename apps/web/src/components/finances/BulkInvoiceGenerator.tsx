@@ -70,7 +70,7 @@ import {
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { useClasses } from '@/hooks/useClasses'
-import { useCurrentAcademicPeriod } from '@/hooks/useSettings'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import { useBulkGenerateInvoices } from '@/hooks/useFinances'
 import { formatMWK } from '@shared/constants/malawi'
 import type { ApiBulkInvoiceResult, ApiBulkInvoiceStudentResult } from '@shared/types/api'
@@ -285,7 +285,7 @@ function ImpactProjection({
 export function BulkInvoiceGenerator() {
   const motionEnabled = useMotionEnabled()
   const { data: classes = [] } = useClasses()
-  const { academicYear: currentYear, term: currentTerm } = useCurrentAcademicPeriod()
+  const { academicYear: currentYear, term: currentTerm } = useViewingPeriod()
 
   const [classId, setClassId] = useState('ALL')
   const [academicYear, setAcademicYear] = useState(currentYear ?? '')

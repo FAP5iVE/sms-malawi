@@ -82,7 +82,10 @@ export const CreatePurchaseRequisitionSchema = z.object({
   lines: z.array(RequisitionLineSchema).min(1),
 })
 
-export const ReviewRequisitionSchema = z.object({ reviewNote: z.string().optional() })
+// budgetId: the reviewer may attach (or change) the budget the requisition is
+// charged to at approval time. Requesters usually cannot see budgets, so
+// requiring them to supply one at creation made approval a dead end.
+export const ReviewRequisitionSchema = z.object({ reviewNote: z.string().optional(), budgetId: z.string().optional() })
 export const RejectRequisitionSchema = z.object({ reviewNote: z.string().min(1) })
 
 export const CreateSupplierSchema = z.object({

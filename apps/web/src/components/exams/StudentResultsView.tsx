@@ -41,7 +41,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useStudentResults, useReportCardData } from '@/hooks/useExams'
-import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { PrintableReportCard } from '@/components/shared/PrintableReportCard'
 import { AlertTriangle, FileText, TrendingUp, Loader2 } from 'lucide-react'
 import type { ApiTermResult } from '@shared/types/api'
@@ -70,10 +70,8 @@ function pct(value: number | string | null | undefined): string {
 }
 
 export function StudentResultsView({ studentId, bordered = true }: Props) {
-  const { academicYear, term: currentTerm, isLoading: periodLoading } = useEffectiveAcademicPeriod()
-  // Follows the school's stored current term until the student picks another.
-  const [pickedTerm, setTerm] = useState<number | null>(null)
-  const term = pickedTerm ?? currentTerm
+  // Follows the universal header filter; the term buttons below write through to it.
+  const { academicYear, term, setTerm, isLoading: periodLoading } = useEffectiveViewingPeriod()
   const [showReportCard, setShowReportCard] = useState(false)
   const { data: result, isLoading, error } = useStudentResults(studentId, academicYear ?? '', term)
 

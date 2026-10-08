@@ -147,8 +147,12 @@ export const useGoodsReceipts = (purchaseOrderId?: string) =>
     `/procurement/goods-receipts${purchaseOrderId ? `?purchaseOrderId=${encodeURIComponent(purchaseOrderId)}` : ''}`,
     [...keys.receipts(), purchaseOrderId]
   )
-export const useBudgetWindows = () =>
-  useList<BudgetWindow>('/finances/budget-windows', keys.windows())
+/** Optionally scoped to one academic year (the universal viewing period). */
+export const useBudgetWindows = (academicYear?: string) =>
+  useList<BudgetWindow>(
+    `/finances/budget-windows${academicYear ? `?academicYear=${encodeURIComponent(academicYear)}` : ''}`,
+    [...keys.windows(), academicYear ?? null],
+  )
 
 function useMutationHelper(path: string, method: string, key: readonly unknown[]) {
   const qc = useQueryClient()
@@ -244,4 +248,8 @@ export function useOpenBudgetWindow() {
 }
 export function useCloseBudgetWindow() {
   return useActionMutation('/finances/budget-windows', 'close', keys.windows())
+}
+/** Any transition: send { id, data: { status: 'REVIEW' | 'ARCHIVED' | ... } }. */
+export function useSetBudgetWindowStatus() {
+  return useActionMutation('/finances/budget-windows', 'status', keys.windows())
 }
