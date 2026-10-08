@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
-import type { Request, Response } from 'express'
+import type { Request as ExpressRequest, Response as ExpressResponse, NextFunction } from 'express'
 import { isSuperUserClaim } from '@shared/constants/superUser'
 import {
   ALL_GRANTED_PERMISSIONS,
@@ -55,11 +55,11 @@ describe('permission helpers', () => {
   })
 })
 
-function run(mw: (req: Request, res: Response, next: () => void) => void, user: Request['user']) {
+function run(mw: (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => unknown, user: ExpressRequest['user']) {
   const next = vi.fn()
   const json = vi.fn()
-  const res = { status: vi.fn(() => ({ json })), json } as unknown as Response
-  mw({ user } as Request, res, next)
+  const res = { status: vi.fn(() => ({ json })), json } as unknown as ExpressResponse
+  mw({ user } as ExpressRequest, res, next as unknown as NextFunction)
   return { allowed: next.mock.calls.length === 1 }
 }
 
