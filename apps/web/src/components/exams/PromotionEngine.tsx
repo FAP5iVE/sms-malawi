@@ -59,6 +59,7 @@ import {
   EASE,
 }                                      from '@/lib/motion'
 import type { PromotionPreview, StudentPromotionResult, PromotionOutcome, PromotionEligibility } from '@/server/services/promotionService'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -99,67 +100,56 @@ interface ConfirmDialogProps {
 
 function ConfirmDialog({ preview, onConfirm, onCancel, committing }: ConfirmDialogProps) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      role="alertdialog"
-      aria-modal="true"
-      aria-labelledby="promo-confirm-title"
+    <Modal
+      title="Confirm Promotion"
+      description={`Academic year ${preview.academicYear}`}
+      onClose={onCancel}
+      size="md"
+      busy={committing}
+      bodyClassName="space-y-5"
+      footer={
+        <>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={committing}
+          className={MODAL_BTN_SECONDARY}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={committing}
+          className={MODAL_BTN_PRIMARY}
+        >
+          {committing && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
+          {committing ? 'Committing…' : 'Yes, Commit'}
+        </button>
+        </>
+      }
     >
-      <div className="w-full max-w-md bg-surface rounded-3xl shadow-2xl border border-base p-7 space-y-5">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-brand-amber/15 flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-5 h-5 text-brand-amber" aria-hidden />
-          </div>
-          <div>
-            <h2 id="promo-confirm-title" className="font-heading font-bold text-body text-base">
-              Confirm Promotion
-            </h2>
-            <p className="text-xs text-muted mt-0.5">Academic year {preview.academicYear}</p>
-          </div>
+    <p className="text-sm text-body leading-relaxed">
+      This will permanently update student records. Specifically:
+    </p>
+
+    <div className="grid grid-cols-3 gap-3 text-center">
+      {[
+        { label: 'Promoted',      value: preview.promoted,      color: 'text-emerald-600' },
+        { label: 'Repeating',     value: preview.repeated,      color: 'text-brand-coral' },
+        { label: 'Await MANEB',   value: preview.awaitingManeb, color: 'text-brand-amber' },
+      ].map(({ label, value, color }) => (
+        <div key={label} className="bg-page rounded-xl p-3 border border-base">
+          <p className={`text-xl font-bold font-heading ${color}`}>{value}</p>
+          <p className="text-[10px] text-muted mt-0.5">{label}</p>
         </div>
-
-        <p className="text-sm text-body leading-relaxed">
-          This will permanently update student records. Specifically:
-        </p>
-
-        <div className="grid grid-cols-3 gap-3 text-center">
-          {[
-            { label: 'Promoted',      value: preview.promoted,      color: 'text-emerald-600' },
-            { label: 'Repeating',     value: preview.repeated,      color: 'text-brand-coral' },
-            { label: 'Await MANEB',   value: preview.awaitingManeb, color: 'text-brand-amber' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="bg-page rounded-xl p-3 border border-base">
-              <p className={`text-xl font-bold font-heading ${color}`}>{value}</p>
-              <p className="text-[10px] text-muted mt-0.5">{label}</p>
-            </div>
-          ))}
-        </div>
-
-        <p className="text-xs text-muted bg-brand-amber/8 border border-brand-amber/20 rounded-xl px-3 py-2">
-          This action cannot be undone. Ensure all Term 3 results are released before committing.
-        </p>
-
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={committing}
-            className="flex-1 min-h-[44px] rounded-xl text-sm font-heading font-semibold border border-base text-muted hover:bg-page transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={committing}
-            className="flex-1 min-h-[44px] rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
-          >
-            {committing && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
-            {committing ? 'Committing…' : 'Yes, Commit'}
-          </button>
-        </div>
-      </div>
+      ))}
     </div>
+
+    <p className="text-xs text-muted bg-brand-amber/8 border border-brand-amber/20 rounded-xl px-3 py-2">
+      This action cannot be undone. Ensure all Term 3 results are released before committing.
+    </p>
+    </Modal>
   )
 }
 

@@ -31,7 +31,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import { z } from 'zod'
 import { useForm, useWatch } from 'react-hook-form'
 import type { Resolver } from 'react-hook-form'
@@ -44,8 +43,8 @@ import { USER_ROLES, ROLE_LABELS } from '@shared/types/roles'
 import { useCreateStaff, useUpdateStaff, useStaffProfile, useSalary, useUpdateSalary, useAllowances, useAddAllowance, useDeleteAllowance } from '@/hooks/useHR'
 import { useDepartmentTitles } from '@/hooks/useSettings'
 import { usePermissions } from '@/hooks/usePermissions'
-import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, AlertTriangle, CheckCircle2, Copy, Wallet } from 'lucide-react'
+import { Loader2, AlertTriangle, CheckCircle2, Copy, Wallet } from 'lucide-react'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 interface Props {
   onClose: () => void
@@ -180,237 +179,209 @@ export function StaffForm({ onClose, staffId }: Props) {
   // wrapper never re-introducing a transform.
   if (typeof document === 'undefined') return null
 
-  return createPortal(
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        <div className="absolute inset-0" onClick={onClose} />
-        {/* [PRODUCTION FIX] Was max-w-lg (512px) — this form's fields run in
-           a 2-column grid (see below) that left each field only ~230px
-           wide at that size. Widened to max-w-2xl, matching StudentForm's
-           equivalent "add user" dialog, for consistency between the two
-           add-a-person flows. */}
-        <motion.div
-          className="relative z-10 w-full max-w-2xl bg-surface rounded-2xl shadow-xl overflow-hidden"
-          initial={{ scale: 0.96, y: 12 }}
-          animate={{ scale: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-        >
-          <div className="flex items-center justify-between px-6 py-4 border-b border-base">
-            <h2 className="font-heading font-bold text-brand-navy">
-              {created ? 'Staff Account Created' : isEdit ? 'Edit Staff Member' : 'Add Staff Member'}
-            </h2>
+  return (
+    <Modal
+      title={created ? 'Staff Account Created' : isEdit ? 'Edit Staff Member' : 'Add Staff Member'}
+      onClose={onClose}
+      size="xl"
+      onSubmit={created ? undefined : handleSubmit(onSubmit)}
+      busy={createStaff.isPending || updateStaff.isPending}
+      footer={
+        created ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className={MODAL_BTN_PRIMARY}
+          >
+            Done
+          </button>
+        ) : (
+          <>
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
-              className="p-2 hover:bg-page rounded-xl min-h-11 min-w-11 flex items-center justify-center"
+              className={MODAL_BTN_SECONDARY}
             >
-              <X className="w-4 h-4 text-muted" />
+              Cancel
             </button>
+            <button
+              type="submit"
+              disabled={createStaff.isPending || updateStaff.isPending}
+              className={MODAL_BTN_PRIMARY}
+            >
+              {(createStaff.isPending || updateStaff.isPending) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {isEdit ? 'Save Changes' : 'Create Staff & Send Login'}
+            </button>
+          </>
+        )
+      }
+    >
+      {/* Success view — show the temp password as a manual-relay fallback. */}
+      {created ? (
+        <div className="space-y-4">
+          <div className="flex items-start gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+            <span>
+              {created.name}&apos;s account was created. A welcome email with these login
+              details has been sent to <strong>{created.email}</strong>. If it doesn&apos;t
+              arrive, share the temporary password below directly.
+            </span>
           </div>
-
-          {/* Success view — show the temp password as a manual-relay fallback. */}
-          {created ? (
-            <div className="p-6 space-y-4">
-              <div className="flex items-start gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
-                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
-                <span>
-                  {created.name}&apos;s account was created. A welcome email with these login
-                  details has been sent to <strong>{created.email}</strong>. If it doesn&apos;t
-                  arrive, share the temporary password below directly.
-                </span>
-              </div>
-              <div>
-                <span className={lbl}>Temporary password</span>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 bg-page border border-base rounded-xl px-4 py-3 text-sm break-all">
-                    {created.tempPassword}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={copyPassword}
-                    className="shrink-0 border border-base rounded-xl px-3 py-3 text-xs hover:bg-page min-h-11 flex items-center gap-1.5"
-                  >
-                    <Copy className="w-3.5 h-3.5" aria-hidden />
-                    {copied ? 'Copied' : 'Copy'}
-                  </button>
-                </div>
-                <p className="text-xs text-muted mt-1.5">
-                  The staff member will be asked to change this on first login.
-                </p>
-              </div>
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-5 py-2.5 text-sm bg-brand-teal text-white rounded-xl font-semibold hover:bg-brand-teal-light min-h-11"
-                >
-                  Done
-                </button>
-              </div>
+          <div>
+            <span className={lbl}>Temporary password</span>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-page border border-base rounded-xl px-4 py-3 text-sm break-all">
+                {created.tempPassword}
+              </code>
+              <button
+                type="button"
+                onClick={copyPassword}
+                className="shrink-0 border border-base rounded-xl px-3 py-3 text-xs hover:bg-page min-h-11 flex items-center gap-1.5"
+              >
+                <Copy className="w-3.5 h-3.5" aria-hidden />
+                {copied ? 'Copied' : 'Copy'}
+              </button>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit(onSubmit)} className="overflow-y-auto max-h-[80vh]">
-              <div className="p-6 grid grid-cols-2 gap-4">
-                <div>
-                  <label className={lbl} htmlFor="sf-firstName">First name</label>
-                  <input id="sf-firstName" {...register('firstName')} className={ic} placeholder="e.g. Grace" />
-                  {errors.firstName && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.firstName.message}</p>}
-                </div>
-                <div>
-                  <label className={lbl} htmlFor="sf-lastName">Last name</label>
-                  <input id="sf-lastName" {...register('lastName')} className={ic} placeholder="e.g. Banda" />
-                  {errors.lastName && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.lastName.message}</p>}
-                </div>
-                <div>
-                  <label className={lbl} htmlFor="sf-sex">Sex</label>
-                  {/* Optional. Used to pick the staff member's dashboard profile
-                      picture; they see initials until this is set. An empty
-                      choice is sent as "not provided" rather than as "". */}
-                  <select
-                    id="sf-sex"
-                    {...register('sex', { setValueAs: (v: string) => (v === '' ? undefined : v) })}
-                    className={ic}
-                    defaultValue=""
-                  >
-                    <option value="">Not specified</option>
-                    <option value="MALE">Male</option>
-                    <option value="FEMALE">Female</option>
-                  </select>
-                  {errors.sex && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.sex.message}</p>}
-                </div>
-                <div className="col-span-full">
-                  <label className={lbl} htmlFor="sf-email">Email (login)</label>
-                  <input id="sf-email" type="email" {...register('email')} className={ic} placeholder="name@school.mw" />
-                  {errors.email && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.email.message}</p>}
-                </div>
-                {!isEdit && (
-                  <div>
-                    <label className={lbl} htmlFor="sf-employeeNo">Employee no.</label>
-                    <input id="sf-employeeNo" {...register('employeeNo')} className={ic} placeholder="e.g. EMP-014" />
-                    {errors.employeeNo && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.employeeNo.message}</p>}
-                  </div>
-                )}
-                <div>
-                  <label className={lbl} htmlFor="sf-phone">Phone (optional)</label>
-                  <input id="sf-phone" {...register('phone')} className={ic} placeholder="+265…" />
-                  {errors.phone && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.phone.message}</p>}
-                </div>
-                {!isEdit && (
-                  <div>
-                    <label className={lbl} htmlFor="sf-role">Role</label>
-                    <select id="sf-role" {...register('role')} className={ic} defaultValue="">
-                      <option value="" disabled>Select role…</option>
-                      {STAFF_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                    </select>
-                    {errors.role && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.role.message}</p>}
-                  </div>
-                )}
-                <div>
-                  <label className={lbl} htmlFor="sf-employmentType">Employment type</label>
-                  <select id="sf-employmentType" {...register('employmentType')} className={ic}>
-                    {EMPLOYMENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={lbl} htmlFor="sf-department">Department</label>
-                  <select
-                    id="sf-department"
-                    {...register('department', { onChange: handleDepartmentChange })}
-                    className={ic}
-                    disabled={deptLoading}
-                    defaultValue=""
-                  >
-                    <option value="" disabled>{deptLoading ? 'Loading…' : 'Select department…'}</option>
-                    {departments.map((d) => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                  {errors.department && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.department.message}</p>}
-                  {!deptLoading && departments.length === 0 && (
-                    <p className="text-xs text-muted mt-1">
-                      No departments defined yet — set them up under Settings → Departments &amp; Titles.
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className={lbl} htmlFor="sf-jobTitle">Job title</label>
-                  <select
-                    id="sf-jobTitle"
-                    {...register('jobTitle')}
-                    className={ic}
-                    disabled={!selectedDept || titlesForDept.length === 0}
-                    defaultValue=""
-                  >
-                    <option value="" disabled>
-                      {!selectedDept ? 'Select a department first…' : titlesForDept.length === 0 ? 'No titles for this department' : 'Select job title…'}
-                    </option>
-                    {titlesForDept.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  {errors.jobTitle && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.jobTitle.message}</p>}
-                </div>
-                {!isEdit && (
-                  <div>
-                    <label className={lbl} htmlFor="sf-dateJoined">Date joined</label>
-                    <input id="sf-dateJoined" type="date" {...register('dateJoined')} className={ic} />
-                    {errors.dateJoined && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.dateJoined.message}</p>}
-                  </div>
-                )}
-                <div>
-                  <label className={lbl} htmlFor="sf-contractExpiry">Contract expiry (optional)</label>
-                  <input id="sf-contractExpiry" type="date" {...register('contractExpiry')} className={ic} />
-                  {errors.contractExpiry && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.contractExpiry.message}</p>}
-                </div>
+            <p className="text-xs text-muted mt-1.5">
+              The staff member will be asked to change this on first login.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={lbl} htmlFor="sf-firstName">First name</label>
+              <input id="sf-firstName" {...register('firstName')} className={ic} placeholder="e.g. Grace" />
+              {errors.firstName && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.firstName.message}</p>}
+            </div>
+            <div>
+              <label className={lbl} htmlFor="sf-lastName">Last name</label>
+              <input id="sf-lastName" {...register('lastName')} className={ic} placeholder="e.g. Banda" />
+              {errors.lastName && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.lastName.message}</p>}
+            </div>
+            <div>
+              <label className={lbl} htmlFor="sf-sex">Sex</label>
+              {/* Optional. Used to pick the staff member's dashboard profile
+                  picture; they see initials until this is set. An empty
+                  choice is sent as "not provided" rather than as "". */}
+              <select
+                id="sf-sex"
+                {...register('sex', { setValueAs: (v: string) => (v === '' ? undefined : v) })}
+                className={ic}
+                defaultValue=""
+              >
+                <option value="">Not specified</option>
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
+              </select>
+              {errors.sex && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.sex.message}</p>}
+            </div>
+            <div className="col-span-full">
+              <label className={lbl} htmlFor="sf-email">Email (login)</label>
+              <input id="sf-email" type="email" {...register('email')} className={ic} placeholder="name@school.mw" />
+              {errors.email && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.email.message}</p>}
+            </div>
+            {!isEdit && (
+              <div>
+                <label className={lbl} htmlFor="sf-employeeNo">Employee no.</label>
+                <input id="sf-employeeNo" {...register('employeeNo')} className={ic} placeholder="e.g. EMP-014" />
+                {errors.employeeNo && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.employeeNo.message}</p>}
               </div>
-
-              {/* [PRODUCTION FIX] Salary was never settable anywhere in the
-                  app — see hrService.ts's getSalaryStructure/
-                  upsertSalaryStructure. Only shown once a staff record
-                  exists (a brand-new hire has no SalaryStructure row to
-                  create yet without an id to key it against) and only to
-                  roles the permission matrix already grants
-                  hr.manageSalaryStructure/finance.manageSalaryStructure to
-                  — everyone else simply doesn't see this section, same as
-                  every other PermissionGuard-gated panel in this app. */}
-              {isEdit && staffId && (can('hr.manageSalaryStructure') || can('finance.manageSalaryStructure')) && (
-                <div className="px-6 pb-2">
-                  <SalarySection staffId={staffId} />
-                </div>
-              )}
-
-              {submitError && (
-                <p role="alert" className="mx-6 mb-4 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
-                  {submitError}
+            )}
+            <div>
+              <label className={lbl} htmlFor="sf-phone">Phone (optional)</label>
+              <input id="sf-phone" {...register('phone')} className={ic} placeholder="+265…" />
+              {errors.phone && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.phone.message}</p>}
+            </div>
+            {!isEdit && (
+              <div>
+                <label className={lbl} htmlFor="sf-role">Role</label>
+                <select id="sf-role" {...register('role')} className={ic} defaultValue="">
+                  <option value="" disabled>Select role…</option>
+                  {STAFF_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                </select>
+                {errors.role && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.role.message}</p>}
+              </div>
+            )}
+            <div>
+              <label className={lbl} htmlFor="sf-employmentType">Employment type</label>
+              <select id="sf-employmentType" {...register('employmentType')} className={ic}>
+                {EMPLOYMENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={lbl} htmlFor="sf-department">Department</label>
+              <select
+                id="sf-department"
+                {...register('department', { onChange: handleDepartmentChange })}
+                className={ic}
+                disabled={deptLoading}
+                defaultValue=""
+              >
+                <option value="" disabled>{deptLoading ? 'Loading…' : 'Select department…'}</option>
+                {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+              {errors.department && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.department.message}</p>}
+              {!deptLoading && departments.length === 0 && (
+                <p className="text-xs text-muted mt-1">
+                  No departments defined yet — set them up under Settings → Departments &amp; Titles.
                 </p>
               )}
-
-              <div className="px-6 py-4 border-t border-base flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-5 py-2.5 text-sm border border-base rounded-xl hover:bg-page min-h-11"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createStaff.isPending || updateStaff.isPending}
-                  className="px-5 py-2.5 text-sm bg-brand-teal text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 hover:bg-brand-teal-light min-h-11"
-                >
-                  {(createStaff.isPending || updateStaff.isPending) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  {isEdit ? 'Save Changes' : 'Create Staff & Send Login'}
-                </button>
+            </div>
+            <div>
+              <label className={lbl} htmlFor="sf-jobTitle">Job title</label>
+              <select
+                id="sf-jobTitle"
+                {...register('jobTitle')}
+                className={ic}
+                disabled={!selectedDept || titlesForDept.length === 0}
+                defaultValue=""
+              >
+                <option value="" disabled>
+                  {!selectedDept ? 'Select a department first…' : titlesForDept.length === 0 ? 'No titles for this department' : 'Select job title…'}
+                </option>
+                {titlesForDept.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+              {errors.jobTitle && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.jobTitle.message}</p>}
+            </div>
+            {!isEdit && (
+              <div>
+                <label className={lbl} htmlFor="sf-dateJoined">Date joined</label>
+                <input id="sf-dateJoined" type="date" {...register('dateJoined')} className={ic} />
+                {errors.dateJoined && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.dateJoined.message}</p>}
               </div>
-            </form>
+            )}
+            <div>
+              <label className={lbl} htmlFor="sf-contractExpiry">Contract expiry (optional)</label>
+              <input id="sf-contractExpiry" type="date" {...register('contractExpiry')} className={ic} />
+              {errors.contractExpiry && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.contractExpiry.message}</p>}
+            </div>
+          </div>
+          {/* [PRODUCTION FIX] Salary was never settable anywhere in the
+              app — see hrService.ts's getSalaryStructure/
+              upsertSalaryStructure. Only shown once a staff record
+              exists (a brand-new hire has no SalaryStructure row to
+              create yet without an id to key it against) and only to
+              roles the permission matrix already grants
+              hr.manageSalaryStructure/finance.manageSalaryStructure to
+              — everyone else simply doesn't see this section, same as
+              every other PermissionGuard-gated panel in this app. */}
+          {isEdit && staffId && (can('hr.manageSalaryStructure') || can('finance.manageSalaryStructure')) && (
+            <div className="px-6 pb-2">
+              <SalarySection staffId={staffId} />
+            </div>
           )}
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>,
-    document.body,
+
+          {submitError && (
+            <p role="alert" className="mt-4 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
+              {submitError}
+            </p>
+          )}
+        </>
+      )}
+    </Modal>
   )
 }
 

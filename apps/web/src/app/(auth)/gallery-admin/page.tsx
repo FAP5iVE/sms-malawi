@@ -29,6 +29,7 @@ import { Images, ImagePlus, Loader2, Trash2, X } from 'lucide-react'
 // [NEW] Click-a-photo-to-view-full-size — grid itself is unchanged (kept
 // exactly as it was), this only adds the viewer.
 import { PhotoLightbox } from '@/components/shared/PhotoLightbox'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 interface GalleryPhoto {
   id: string
@@ -99,85 +100,84 @@ function UploadForm({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-surface rounded-2xl w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Add Photo</h2>
-          <button onClick={onDone} className="p-1.5 hover:bg-page rounded-lg" aria-label="Close">
-            <X className="w-4 h-4 text-muted" />
+    <Modal
+      title="Add Photo"
+      onClose={onDone}
+      size="md"
+      onSubmit={handleSubmit}
+      busy={loading}
+      bodyClassName="space-y-4"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onDone}
+            className={MODAL_BTN_SECONDARY}
+          >
+            Cancel
           </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-body mb-1.5">Photo</label>
-            {preview ? (
-              <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview */}
-                <img src={preview} alt="Selected" className="w-full h-40 object-cover rounded-xl border border-base" />
-                <button
-                  type="button"
-                  onClick={() => { setFile(null); setPreview(null) }}
-                  className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
-                  aria-label="Remove photo"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-base rounded-xl h-32 cursor-pointer hover:border-brand-teal transition-colors text-muted">
-                <ImagePlus className="w-6 h-6" aria-hidden />
-                <span className="text-xs">Choose a photo</span>
-                <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-              </label>
-            )}
-          </div>
-          <div>
-            <label htmlFor="gallery-caption" className="block text-sm font-medium text-body mb-1.5">Description</label>
-            <textarea
-              id="gallery-caption"
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              required
-              rows={2}
-              placeholder="e.g. Form 3 students at Sports Day, August 2026"
-              className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page resize-none focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-            />
-          </div>
-          <div>
-            <label htmlFor="gallery-category" className="block text-sm font-medium text-body mb-1.5">
-              Category <span className="text-muted font-normal">(optional)</span>
-            </label>
-            <input
-              id="gallery-category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="e.g. Sports Day, Assembly, Graduation"
-              className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-            />
-          </div>
-          {error && (
-            <p role="alert" className="text-xs text-brand-coral">{error}</p>
-          )}
-          <div className="flex justify-end gap-3 pt-2">
+          <button
+            type="submit"
+            disabled={loading}
+            className={MODAL_BTN_PRIMARY}
+          >
+            {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Add to Gallery
+          </button>
+        </>
+      }
+    >
+      <div>
+        <label className="block text-sm font-medium text-body mb-1.5">Photo</label>
+        {preview ? (
+          <div className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element -- local blob: preview */}
+            <img src={preview} alt="Selected" className="w-full h-40 object-cover rounded-xl border border-base" />
             <button
               type="button"
-              onClick={onDone}
-              className="px-5 py-2 text-sm border border-base rounded-xl hover:bg-page min-h-[44px]"
+              onClick={() => { setFile(null); setPreview(null) }}
+              className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
+              aria-label="Remove photo"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-5 py-2 text-sm bg-brand-teal text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 min-h-[44px]"
-            >
-              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              Add to Gallery
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
-        </form>
+        ) : (
+          <label className="flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-base rounded-xl h-32 cursor-pointer hover:border-brand-teal transition-colors text-muted">
+            <ImagePlus className="w-6 h-6" aria-hidden />
+            <span className="text-xs">Choose a photo</span>
+            <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+          </label>
+        )}
       </div>
-    </div>
+      <div>
+        <label htmlFor="gallery-caption" className="block text-sm font-medium text-body mb-1.5">Description</label>
+        <textarea
+          id="gallery-caption"
+          value={caption}
+          onChange={(e) => setCaption(e.target.value)}
+          required
+          rows={2}
+          placeholder="e.g. Form 3 students at Sports Day, August 2026"
+          className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page resize-none focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+        />
+      </div>
+      <div>
+        <label htmlFor="gallery-category" className="block text-sm font-medium text-body mb-1.5">
+          Category <span className="text-muted font-normal">(optional)</span>
+        </label>
+        <input
+          id="gallery-category"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          placeholder="e.g. Sports Day, Assembly, Graduation"
+          className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+        />
+      </div>
+      {error && (
+        <p role="alert" className="text-xs text-brand-coral">{error}</p>
+      )}
+    </Modal>
   )
 }
 

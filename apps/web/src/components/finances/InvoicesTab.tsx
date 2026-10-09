@@ -87,11 +87,12 @@ import {
   AlertTriangle,
   CheckCircle2,
   Receipt as ReceiptIcon,
-  X,
+  
   ExternalLink,
   Boxes,
-  ArrowRight,
+  ArrowRight
 } from 'lucide-react'
+import { Modal, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 const STATUS_COLORS: Record<string, string> = {
   PAID: 'text-status-success',
@@ -890,7 +891,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                     <button
                       type="button"
                       disabled={fetchReceipt.isPending}
-                      onClick={() => fetchReceipt.mutate(p.id)}
+                     onClick={() => fetchReceipt.mutate(p.id)}
                       className="inline-flex items-center gap-1 text-xs font-medium text-brand-teal hover:underline disabled:opacity-50"
                     >
                       <ReceiptIcon className="w-3.5 h-3.5" /> View Receipt{' '}
@@ -967,67 +968,54 @@ function OverpaymentConfirmModal({
 }) {
   const totalCredit = items.reduce((sum, i) => sum + i.excess, 0)
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      role="dialog"
-      aria-modal="true"
+    <Modal
+      title={<span className="flex items-center gap-2"><AlertTriangle className="w-4.5 h-4.5 text-amber-500" /> Confirm Overpayment</span>}
+      onClose={onCancel}
+      size="sm"
+      busy={isPending}
+      bodyClassName="space-y-3"
+      footer={
+        <>
+        <button
+          type="button"
+          onClick={onCancel}
+          className={MODAL_BTN_SECONDARY}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={isPending}
+          className="inline-flex items-center gap-2 bg-amber-500 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-amber-600 disabled:opacity-60 min-h-11"
+        >
+          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          Confirm &amp; Save as Credit
+        </button>
+        </>
+      }
     >
-      <div className="bg-surface rounded-xl shadow-xl max-w-sm modal-panel w-full">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-base">
-          <h3 className="font-heading font-semibold text-body flex items-center gap-2">
-            <AlertTriangle className="w-4.5 h-4.5 text-amber-500" /> Confirm Overpayment
-          </h3>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="p-1 rounded-lg hover:bg-page text-muted"
-            aria-label="Cancel"
+      <p className="text-sm text-muted">
+        This payment exceeds the balance owed on the fee(s) below. The excess will be saved as
+        an advance credit and applied automatically to this student&rsquo;s next invoice.
+      </p>
+      <ul className="space-y-1.5">
+        {items.map((item, i) => (
+          <li
+            key={item.lineItemId || i}
+            className="flex items-center justify-between text-sm bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg px-3 py-2"
           >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="p-5 space-y-3">
-          <p className="text-sm text-muted">
-            This payment exceeds the balance owed on the fee(s) below. The excess will be saved as
-            an advance credit and applied automatically to this student&rsquo;s next invoice.
-          </p>
-          <ul className="space-y-1.5">
-            {items.map((item, i) => (
-              <li
-                key={item.lineItemId || i}
-                className="flex items-center justify-between text-sm bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-lg px-3 py-2"
-              >
-                <span className="text-body">{item.feeName || 'Unallocated'}</span>
-                <span className="tabular font-semibold text-amber-700 dark:text-amber-400">
-                  +{formatMWK(item.excess)}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <div className="flex items-center justify-between text-sm font-semibold pt-1 border-t border-base">
-            <span className="text-body">Total advance credit</span>
-            <span className="tabular text-body">{formatMWK(totalCredit)}</span>
-          </div>
-        </div>
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-base">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-muted hover:text-body min-h-11"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={isPending}
-            className="inline-flex items-center gap-2 bg-amber-500 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-amber-600 disabled:opacity-60 min-h-11"
-          >
-            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            Confirm &amp; Save as Credit
-          </button>
-        </div>
+            <span className="text-body">{item.feeName || 'Unallocated'}</span>
+            <span className="tabular font-semibold text-amber-700 dark:text-amber-400">
+              +{formatMWK(item.excess)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-center justify-between text-sm font-semibold pt-1 border-t border-base">
+        <span className="text-body">Total advance credit</span>
+        <span className="tabular text-body">{formatMWK(totalCredit)}</span>
       </div>
-    </div>
+    </Modal>
   )
 }

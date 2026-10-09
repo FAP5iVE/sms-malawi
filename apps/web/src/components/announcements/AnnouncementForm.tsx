@@ -39,7 +39,6 @@
  */
 'use client'
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
 import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
 import { AnnouncementSchema, AnnouncementDraftSchema } from '@shared/schemas/announcement'
@@ -50,6 +49,7 @@ import { USER_ROLES } from '@shared/types/roles'
 import type { Announcement } from '@/hooks/useAnnouncements'
 import { RichTextEditor } from '@/components/shared/RichTextEditor'
 import { stripHtml } from '@/components/shared/PublicArchive'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 type FormMode = 'announcement' | 'event' | 'news' | 'ads'
 
@@ -301,267 +301,250 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
   // might add) the same way ConfirmDialog.tsx already does.
   if (typeof document === 'undefined') return null
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      {/* [PRODUCTION FIX 2026-07-28] Had no height cap and no scroll — once
-          the image preview pushed content taller than the viewport, the
-          submit button (and even the close button, since both live inside
-          this same unconstrained container) went off-screen with no way to
-          reach them. Capped height + scrollable body; header is sticky so
-          the close button stays reachable no matter how far you've scrolled. */}
-      {/* [PRODUCTION FIX] Was max-w-lg (512px) — cramped for the richtext
-         editor (News/Announcements body), which is the content type this
-         form spends the most space on. Widened to max-w-3xl so there's
-         comfortable room to type and format, for every content type this
-         shared form handles (News, Academic Ads, Announcements, Events). */}
-      <div className="bg-surface rounded-2xl w-full max-w-3xl shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">{HEADING[mode]}</h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 hover:bg-page rounded-lg"
-            aria-label={`Close ${noun} form`}
-          >
-            <X className="w-4 h-4 text-muted" />
-          </button>
+  return (
+    <Modal
+      title={HEADING[mode]}
+      onClose={onClose}
+      size="2xl"
+      onSubmit={handleSubmit}
+      busy={loading || savingDraft}
+      bodyClassName="space-y-4"
+      footer={
+        <>
+        <button
+          type="button"
+          onClick={onClose}
+          className={MODAL_BTN_SECONDARY}
+        >
+          Cancel
+        </button>
+        {/* [NEW] Save as draft — lenient validation, doesn't require the
+            item to be complete. Lets an author keep several drafts of
+            any of the four types going before committing to Publish. */}
+        <button
+          type="button"
+          onClick={handleSaveDraft}
+          disabled={savingDraft || loading}
+          className={MODAL_BTN_PRIMARY}
+        >
+          {savingDraft ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" aria-hidden />}
+          {draft ? 'Save Draft' : 'Save as Draft'}
+        </button>
+        <button
+          type="submit"
+          disabled={loading || savingDraft}
+          className={MODAL_BTN_PRIMARY}
+        >
+          {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          {canPublishDirectly
+            ? (isEvent ? 'Publish Event' : isNews ? 'Publish Article' : isAds ? 'Publish Advertisement' : 'Publish')
+            : (isEvent ? 'Submit Event for Approval' : isNews ? 'Submit Article for Approval' : isAds ? 'Submit Advertisement for Approval' : 'Submit for Approval')}
+        </button>
+        </>
+      }
+    >
+      <div>
+        <label htmlFor="announcement-title" className="block text-sm font-medium text-body mb-1.5">
+          {isNews ? 'Headline' : isAds ? 'Advertisement title' : 'Title'}
+        </label>
+        <input
+          id="announcement-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+          placeholder={
+            isEvent ? 'Event title'
+            : isNews ? 'Article headline'
+            : isAds ? 'e.g. Call for Applications — 2027 Intake'
+            : 'Announcement title'
+          }
+          maxLength={200}
+          className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+        />
+      </div>
+      {/* [NEW] Author byline — News only, matching the request this was
+          built for. Free text (not tied to a staff record), optional.
+          Shown bold on the same line as the publish date on the public
+          detail page. */}
+      {isNews && (
+        <div>
+          <label htmlFor="announcement-author" className="block text-sm font-medium text-body mb-1.5">
+            Author <span className="text-muted font-normal">(optional)</span>
+          </label>
+          <input
+            id="announcement-author"
+            value={authorName}
+            onChange={(e) => setAuthorName(e.target.value)}
+            placeholder="e.g. Jane Banda, School Administration"
+            maxLength={120}
+            className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+          />
+          <p className="text-xs text-muted mt-1">Shown as &quot;Written by: {authorName || '…'}&quot; next to the date.</p>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label htmlFor="announcement-title" className="block text-sm font-medium text-body mb-1.5">
-              {isNews ? 'Headline' : isAds ? 'Advertisement title' : 'Title'}
-            </label>
+      )}
+      {isEvent && (
+        <div>
+          <label htmlFor="event-date" className="block text-sm font-medium text-body mb-1.5">Event date</label>
+          <input
+            id="event-date"
+            type="date"
+            value={eventDate}
+            onChange={(e) => setEventDate(e.target.value)}
+            required
+            className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+          />
+        </div>
+      )}
+      <div>
+        <label htmlFor="announcement-body" className="block text-sm font-medium text-body mb-1.5">
+          {isEvent ? 'Details' : isNews ? 'Article' : isAds ? 'Notice details' : 'Message'}
+        </label>
+        {isNews ? (
+          // [NEW] Formatting toolbar — bold, italic, alignment,
+          // bullet/numbered list, highlight. See RichTextEditor.tsx.
+          // Body is sanitized server-side on every write path
+          // (server/lib/sanitizeRichText.ts) before it's stored.
+          <RichTextEditor
+            value={body}
+            onChange={setBody}
+            placeholder="Write the full article…"
+            minHeightClassName="min-h-[260px]"
+          />
+        ) : (
+          <textarea
+            id="announcement-body"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            required
+            rows={isAds ? 8 : 4}
+            placeholder={
+              isEvent ? 'Describe the event…'
+              : isAds ? 'Intake dates, eligibility, how and where to apply…'
+              : 'Write your announcement here…'
+            }
+            className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page resize-none focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+          />
+        )}
+      </div>
+      {/* [PRODUCTION FIX] News and Academic Advertisements are
+          public-site-only content by design — see the postType comment
+          on the Props interface above. There is no internal targeting
+          to configure and nothing to opt into, so this whole block (and
+          the publicWebsite toggle right after it) is skipped entirely
+          for both. */}
+      {!isPublicOnly && (
+        <div>
+          <label className="flex items-center gap-2 text-sm mb-2">
             <input
-              id="announcement-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              placeholder={
-                isEvent ? 'Event title'
-                : isNews ? 'Article headline'
-                : isAds ? 'e.g. Call for Applications — 2027 Intake'
-                : 'Announcement title'
-              }
-              maxLength={200}
-              className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+              type="checkbox"
+              checked={targetAll}
+              onChange={(e) => setTargetAll(e.target.checked)}
+              className="accent-brand-teal"
             />
-          </div>
-          {/* [NEW] Author byline — News only, matching the request this was
-              built for. Free text (not tied to a staff record), optional.
-              Shown bold on the same line as the publish date on the public
-              detail page. */}
-          {isNews && (
-            <div>
-              <label htmlFor="announcement-author" className="block text-sm font-medium text-body mb-1.5">
-                Author <span className="text-muted font-normal">(optional)</span>
-              </label>
-              <input
-                id="announcement-author"
-                value={authorName}
-                onChange={(e) => setAuthorName(e.target.value)}
-                placeholder="e.g. Jane Banda, School Administration"
-                maxLength={120}
-                className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-              />
-              <p className="text-xs text-muted mt-1">Shown as &quot;Written by: {authorName || '…'}&quot; next to the date.</p>
-            </div>
-          )}
-          {isEvent && (
-            <div>
-              <label htmlFor="event-date" className="block text-sm font-medium text-body mb-1.5">Event date</label>
-              <input
-                id="event-date"
-                type="date"
-                value={eventDate}
-                onChange={(e) => setEventDate(e.target.value)}
-                required
-                className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-              />
-            </div>
-          )}
-          <div>
-            <label htmlFor="announcement-body" className="block text-sm font-medium text-body mb-1.5">
-              {isEvent ? 'Details' : isNews ? 'Article' : isAds ? 'Notice details' : 'Message'}
-            </label>
-            {isNews ? (
-              // [NEW] Formatting toolbar — bold, italic, alignment,
-              // bullet/numbered list, highlight. See RichTextEditor.tsx.
-              // Body is sanitized server-side on every write path
-              // (server/lib/sanitizeRichText.ts) before it's stored.
-              <RichTextEditor
-                value={body}
-                onChange={setBody}
-                placeholder="Write the full article…"
-                minHeightClassName="min-h-[260px]"
-              />
-            ) : (
-              <textarea
-                id="announcement-body"
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                required
-                rows={isAds ? 8 : 4}
-                placeholder={
-                  isEvent ? 'Describe the event…'
-                  : isAds ? 'Intake dates, eligibility, how and where to apply…'
-                  : 'Write your announcement here…'
-                }
-                className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page resize-none focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-              />
-            )}
-          </div>
-          {/* [PRODUCTION FIX] News and Academic Advertisements are
-              public-site-only content by design — see the postType comment
-              on the Props interface above. There is no internal targeting
-              to configure and nothing to opt into, so this whole block (and
-              the publicWebsite toggle right after it) is skipped entirely
-              for both. */}
-          {!isPublicOnly && (
-            <div>
-              <label className="flex items-center gap-2 text-sm mb-2">
-                <input
-                  type="checkbox"
-                  checked={targetAll}
-                  onChange={(e) => setTargetAll(e.target.checked)}
-                  className="accent-brand-teal"
-                />
-                Send to everyone
-              </label>
-              {!targetAll && (
-                <div className="flex flex-wrap gap-2">
-                  {USER_ROLES.map((r) => (
-                    <label
-                      key={r}
-                      className="flex items-center gap-1.5 text-xs border border-base rounded-lg px-3 py-1.5 cursor-pointer hover:bg-page"
-                    >
-                      <input
-                        type="checkbox"
-                        value={r}
-                        checked={targetRoles.includes(r)}
-                        onChange={(e) =>
-                          setTargetRoles((prev) =>
-                            e.target.checked ? [...prev, r] : prev.filter((x) => x !== r)
-                          )
-                        }
-                        className="accent-brand-teal"
-                      />
-                      {r.replace('_', ' ')}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          {/* [PRODUCTION FIX 2026-07-28] Public website opt-in — independent
-              of "Send to everyone" above, which only controls internal
-              visibility. News and Ads are always public, so the toggle
-              itself is hidden for both (nothing to opt into), but the
-              cover-image picker below still applies. */}
-          <div className="border-t border-base pt-4">
-            {!isPublicOnly && (
-              <>
-                <label className="flex items-center gap-2 text-sm mb-1">
+            Send to everyone
+          </label>
+          {!targetAll && (
+            <div className="flex flex-wrap gap-2">
+              {USER_ROLES.map((r) => (
+                <label
+                  key={r}
+                  className="flex items-center gap-1.5 text-xs border border-base rounded-lg px-3 py-1.5 cursor-pointer hover:bg-page"
+                >
                   <input
                     type="checkbox"
-                    checked={publicWebsite}
-                    onChange={(e) => setPublicWebsite(e.target.checked)}
+                    value={r}
+                    checked={targetRoles.includes(r)}
+                    onChange={(e) =>
+                      setTargetRoles((prev) =>
+                        e.target.checked ? [...prev, r] : prev.filter((x) => x !== r)
+                      )
+                    }
                     className="accent-brand-teal"
                   />
-                  Publish to public website
+                  {r.replace('_', ' ')}
                 </label>
-                <p className="text-xs text-muted mb-3">
-                  Shows on the public landing page, in its own section — never mixed with News,
-                  Academic Advertisements, or each other. Separate from &quot;Send to everyone&quot;
-                  above — that only controls who inside the school sees it.
-                  {isEvent && ' Events are typically public — leave this checked unless this is an internal-only event.'}
-                </p>
-              </>
-            )}
-            {isPublicOnly && (
-              <p className="text-xs text-muted mb-3">
-                {isNews
-                  ? 'News articles are public-website content only — this never appears in anyone\u2019s internal Announcements tab.'
-                  : 'Academic Advertisements are a standalone, public-website-only section — this never appears in anyone\u2019s internal Announcements tab, and never as a News article or Event.'}
-              </p>
-            )}
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {/* [PRODUCTION FIX 2026-07-28] Public website opt-in — independent
+          of "Send to everyone" above, which only controls internal
+          visibility. News and Ads are always public, so the toggle
+          itself is hidden for both (nothing to opt into), but the
+          cover-image picker below still applies. */}
+      <div className="border-t border-base pt-4">
+        {!isPublicOnly && (
+          <>
+            <label className="flex items-center gap-2 text-sm mb-1">
+              <input
+                type="checkbox"
+                checked={publicWebsite}
+                onChange={(e) => setPublicWebsite(e.target.checked)}
+                className="accent-brand-teal"
+              />
+              Publish to public website
+            </label>
+            <p className="text-xs text-muted mb-3">
+              Shows on the public landing page, in its own section — never mixed with News,
+              Academic Advertisements, or each other. Separate from &quot;Send to everyone&quot;
+              above — that only controls who inside the school sees it.
+              {isEvent && ' Events are typically public — leave this checked unless this is an internal-only event.'}
+            </p>
+          </>
+        )}
+        {isPublicOnly && (
+          <p className="text-xs text-muted mb-3">
+            {isNews
+              ? 'News articles are public-website content only — this never appears in anyone\u2019s internal Announcements tab.'
+              : 'Academic Advertisements are a standalone, public-website-only section — this never appears in anyone\u2019s internal Announcements tab, and never as a News article or Event.'}
+          </p>
+        )}
 
-            {publicWebsite && (
-              <div>
-                <label className="block text-sm font-medium text-body mb-1.5">
-                  {isNews ? 'Photo' : 'Cover image'} <span className="text-muted font-normal">(optional)</span>
-                </label>
-                {imagePreview || persistedImageKey ? (
-                  <div className="relative">
-                    {imagePreview ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- local blob: preview, not a remote asset
-                      <img src={imagePreview} alt="Selected cover" className="w-full h-32 object-cover rounded-xl border border-base" />
-                    ) : (
-                      <div className="w-full h-32 rounded-xl border border-base bg-page flex items-center justify-center text-xs text-muted">
-                        Image attached from your draft
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={removeImage}
-                      className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
-                      aria-label="Remove image"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+        {publicWebsite && (
+          <div>
+            <label className="block text-sm font-medium text-body mb-1.5">
+              {isNews ? 'Photo' : 'Cover image'} <span className="text-muted font-normal">(optional)</span>
+            </label>
+            {imagePreview || persistedImageKey ? (
+              <div className="relative">
+                {imagePreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- local blob: preview, not a remote asset
+                  <img src={imagePreview} alt="Selected cover" className="w-full h-32 object-cover rounded-xl border border-base" />
                 ) : (
-                  <label className="flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-base rounded-xl h-24 cursor-pointer hover:border-brand-teal transition-colors text-muted">
-                    <ImagePlus className="w-5 h-5" aria-hidden />
-                    <span className="text-xs">{isNews ? 'Add a photo' : 'Add a cover image'}</span>
-                    <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-                  </label>
+                  <div className="w-full h-32 rounded-xl border border-base bg-page flex items-center justify-center text-xs text-muted">
+                    Image attached from your draft
+                  </div>
                 )}
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center"
+                  aria-label="Remove image"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-base rounded-xl h-24 cursor-pointer hover:border-brand-teal transition-colors text-muted">
+                <ImagePlus className="w-5 h-5" aria-hidden />
+                <span className="text-xs">{isNews ? 'Add a photo' : 'Add a cover image'}</span>
+                <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+              </label>
             )}
           </div>
-          {!canPublishDirectly && (
-            <p className="text-xs text-muted bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              Your {noun} will be submitted for approval before publishing.
-            </p>
-          )}
-          {error && (
-            <p role="alert" className="text-xs text-brand-coral">
-              {error}
-            </p>
-          )}
-          <div className="flex flex-wrap justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2 text-sm border border-base rounded-xl hover:bg-page min-h-11"
-            >
-              Cancel
-            </button>
-            {/* [NEW] Save as draft — lenient validation, doesn't require the
-                item to be complete. Lets an author keep several drafts of
-                any of the four types going before committing to Publish. */}
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              disabled={savingDraft || loading}
-              className="px-5 py-2 text-sm border border-brand-teal text-brand-teal rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 min-h-11 hover:bg-brand-teal/5"
-            >
-              {savingDraft ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" aria-hidden />}
-              {draft ? 'Save Draft' : 'Save as Draft'}
-            </button>
-            <button
-              type="submit"
-              disabled={loading || savingDraft}
-              className="px-5 py-2 text-sm bg-brand-deep text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 min-h-11"
-            >
-              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {canPublishDirectly
-                ? (isEvent ? 'Publish Event' : isNews ? 'Publish Article' : isAds ? 'Publish Advertisement' : 'Publish')
-                : (isEvent ? 'Submit Event for Approval' : isNews ? 'Submit Article for Approval' : isAds ? 'Submit Advertisement for Approval' : 'Submit for Approval')}
-            </button>
-          </div>
-        </form>
+        )}
       </div>
-    </div>,
-    document.body,
+      {!canPublishDirectly && (
+        <p className="text-xs text-muted bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          Your {noun} will be submitted for approval before publishing.
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="text-xs text-brand-coral">
+          {error}
+        </p>
+      )}
+    </Modal>
   )
 }

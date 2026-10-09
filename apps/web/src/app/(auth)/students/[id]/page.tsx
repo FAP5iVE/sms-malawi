@@ -34,7 +34,7 @@ import { useRef } from 'react'
 import { useReactToPrint } from 'react-to-print'
 import { useStudent } from '@/hooks/useStudents'
 import { useReportCardData } from '@/hooks/useExams'
-import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
+import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { StudentForm } from '@/components/students/StudentForm'
@@ -44,6 +44,7 @@ import { formatMWK } from '@shared/constants/malawi'
 import { usePermissions } from '@/hooks/usePermissions'
 import { ArrowLeft, Pencil, Printer, FileText, Loader2, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
+import { Modal } from '@/components/shared/Modal'
 
 export default function StudentProfilePage() {
   return (
@@ -72,11 +73,12 @@ function ProfileContent() {
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({ contentRef: printRef })
 
-  // Year and report-card term both follow the universal header filter; the
-  // term selector below writes through to it.
-  const { academicYear, term: viewingTerm, setTerm: setReportCardTerm } = useEffectiveViewingPeriod()
+  // Year and default report-card term both come from the school's stored
+  // current period; the term selector below overrides only once used.
+  const { academicYear, term: currentTerm } = useEffectiveAcademicPeriod()
   const [showReportCard, setShowReportCard] = useState(false)
-  const reportCardTerm = viewingTerm as 1 | 2 | 3
+  const [pickedReportCardTerm, setReportCardTerm] = useState<1 | 2 | 3 | null>(null)
+  const reportCardTerm = (pickedReportCardTerm ?? currentTerm) as 1 | 2 | 3
   const {
     data:      reportCardData,
     isLoading: reportCardLoading,
@@ -126,7 +128,7 @@ function ProfileContent() {
         <div className="flex items-center gap-1.5">
           <select
             value={reportCardTerm}
-            onChange={(e) => setReportCardTerm(Number(e.target.value))}
+            onChange={(e) => setReportCardTerm(Number(e.target.value) as 1 | 2 | 3)}
             aria-label="Report card term"
             className="border border-base rounded-lg text-sm px-2 py-1.5 bg-surface min-h-[36px]"
           >
@@ -229,33 +231,34 @@ function ProfileContent() {
       {editing && <StudentForm studentId={id} onClose={() => setEditing(false)} />}
 
       {showReportCard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="absolute inset-0" onClick={() => setShowReportCard(false)} />
-          <div className="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl p-4">
-            {reportCardLoading && (
-              <div className="flex items-center justify-center gap-2 py-16 text-muted text-sm">
-                <Loader2 className="w-4 h-4 animate-spin" /> Loading report card…
-              </div>
-            )}
-            {reportCardError && (
-              <div className="flex flex-col items-center gap-2 py-16 text-center">
-                <AlertTriangle className="w-6 h-6 text-brand-coral" />
-                <p className="text-sm text-brand-coral font-medium">
-                  {reportCardError instanceof Error ? reportCardError.message : 'Failed to load report card.'}
-                </p>
-                <button
-                  onClick={() => setShowReportCard(false)}
-                  className="mt-2 text-sm text-muted hover:text-body underline"
-                >
-                  Close
-                </button>
-              </div>
-            )}
-            {reportCardData && (
-              <PrintableReportCard data={reportCardData} onClose={() => setShowReportCard(false)} />
-            )}
-          </div>
-        </div>
+        <Modal
+          ariaLabel="Student report card"
+          onClose={() => setShowReportCard(false)}
+          size="2xl"
+        >
+          {reportCardLoading && (
+            <div className="flex items-center justify-center gap-2 py-16 text-muted text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading report card…
+            </div>
+          )}
+          {reportCardError && (
+            <div className="flex flex-col items-center gap-2 py-16 text-center">
+              <AlertTriangle className="w-6 h-6 text-brand-coral" />
+              <p className="text-sm text-brand-coral font-medium">
+                {reportCardError instanceof Error ? reportCardError.message : 'Failed to load report card.'}
+              </p>
+              <button
+                onClick={() => setShowReportCard(false)}
+                className="mt-2 text-sm text-muted hover:text-body underline"
+              >
+                Close
+              </button>
+            </div>
+          )}
+          {reportCardData && (
+            <PrintableReportCard data={reportCardData} onClose={() => setShowReportCard(false)} />
+          )}
+        </Modal>
       )}
     </div>
   )

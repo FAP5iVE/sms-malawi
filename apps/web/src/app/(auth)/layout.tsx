@@ -127,6 +127,7 @@ function PageTransitionWrapper({ children }: { children: React.ReactNode }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
   // [R15 fix] The sidebar wrapper's reserved width below is a hardcoded
   // Tailwind arbitrary-value class (`md:w-[60px]`) — Tailwind classes must
   // be static strings, so it can't be generated directly from
@@ -264,7 +265,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               the whole page pan sideways; wide data scrolls inside its own
               `.table-scroll` region instead. */}
           <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-3 px-4 main-scroll-pad md:p-6 relative">
-            <ErrorBoundary>
+            <ErrorBoundary resetKey={pathname}>
               <PageTransitionWrapper>{children}</PageTransitionWrapper>
             </ErrorBoundary>
           </main>

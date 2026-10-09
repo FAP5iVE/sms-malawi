@@ -743,6 +743,21 @@ export interface ApiManebRecord {
   registrationNo: string | null
   status: 'REGISTERED' | 'SITTING' | 'RESULTS_RECEIVED' | 'CERTIFIED'
 }
+/**
+ * Minimal staff option for "pick a staff member" controls (GET /hr/staff-picker).
+ * Deliberately NOT ApiStaffProfile: roles that merely need to choose a person
+ * (e.g. Finance allocating an asset) get a name, employee number, department
+ * and job title — never contract, employment or HR-record fields.
+ */
+export interface ApiStaffPickerOption {
+  id: string
+  employeeNo: string
+  firstName: string
+  lastName: string
+  department: string
+  jobTitle: string
+}
+
 export interface ApiStaffProfile {
   id: string
   uid: string

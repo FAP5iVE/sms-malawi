@@ -51,10 +51,10 @@
 import { useState, useMemo } from 'react'
 import { useStudents } from '@/hooks/useStudents'
 import { useEnterMarks, useFinalizeMarks, useExamMarks, useCorrectMarks } from '@/hooks/useExams'
-import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Lock, Save, AlertTriangle } from 'lucide-react'
+import { Loader2, Lock, Save, AlertTriangle } from 'lucide-react'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import type { ApiStudent } from '@shared/types/api'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 interface Props {
   examId: string
@@ -187,117 +187,104 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
   const loading = studentsLoading || marksLoading
 
   return (
-    <AnimatePresence>
-      <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-        <div className="absolute inset-0" onClick={onClose} />
-        <motion.div className="relative z-10 w-full max-w-2xl bg-surface rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
-          initial={{ scale: 0.96, y: 12 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 30 }}>
-          <div className="flex items-center justify-between px-6 py-4 border-b border-base shrink-0">
-            <div>
-              <h2 className="font-heading font-bold text-brand-navy">{correctionMode ? 'Correct Marks (Review)' : 'Enter Marks'}</h2>
-              <p className="text-xs text-muted mt-0.5">
-                {loading ? 'Loading…' : `${students.length} students · out of ${maxMark}`}
-              </p>
-            </div>
-            <button onClick={onClose} aria-label="Close" className="p-2 hover:bg-page rounded-xl">
-              <X className="w-4 h-4 text-muted" />
-            </button>
-          </div>
-          <div className="overflow-y-auto flex-1">
-            {loading ? (
-              <div className="px-6 py-12 text-center text-sm text-muted animate-pulse">
-                Loading students and saved marks…
-              </div>
-            ) : (
-              <div className="table-scroll">
-              <table className="w-full text-sm border-collapse min-w-75">
-                <thead>
-                  <tr className="border-b border-base bg-page">
-                    <th className="px-5 py-3 text-left font-heading text-xs uppercase tracking-wide text-muted">Student</th>
-                    <th className="px-5 py-3 text-left font-heading text-xs uppercase tracking-wide text-muted w-36">Mark (/{maxMark})</th>
-                    <th className="px-5 py-3 text-center font-heading text-xs uppercase tracking-wide text-muted w-24">Absent</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-base">
-                  {students.map((student) => (
-                    <tr key={student.id} className={marks[student.id]?.absent ? 'text-muted italic' : ''}>
-                      <td className="px-5 py-3">
-                        <p className="font-medium text-body">{student.firstName} {student.lastName}</p>
-                        <p className="text-xs text-muted">{student.registrationNo}</p>
-                      </td>
-                      <td className="px-5 py-2">
-                        <input
-                          type="number" min={0} max={maxMark}
-                          value={marks[student.id]?.mark ?? ''}
-                          disabled={marks[student.id]?.absent || !editable}
-                          onChange={(e) => setMark(student.id, e.target.value)}
-                          aria-label={`Mark for ${student.firstName} ${student.lastName}`}
-                          className={`w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/25 ${
-                            errors[student.id] ? 'border-brand-coral bg-brand-coral/5' : 'border-base bg-page'
-                          } disabled:opacity-40`}
-                        />
-                        {errors[student.id] && (
-                          <p className="text-xs text-brand-coral mt-1 flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" /> {errors[student.id]}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-5 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          className="accent-brand-amber w-4 h-4"
-                          checked={marks[student.id]?.absent ?? false}
-                          onChange={() => toggleAbsent(student.id)}
-                          disabled={!editable}
-                          aria-label={`Mark ${student.firstName} ${student.lastName} as absent`}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              </div>
-            )}
-          </div>
-          <div className="px-6 py-4 border-t border-base flex items-center justify-between gap-3 shrink-0">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-base rounded-xl hover:bg-page">
+    <>
+      <Modal
+        title={correctionMode ? 'Correct Marks (Review)' : 'Enter Marks'}
+        description={loading ? 'Loading…' : `${students.length} students · out of ${maxMark}`}
+        onClose={onClose}
+        size="xl"
+        flush
+        footer={
+          <>
+            <button type="button" onClick={onClose} className={`${MODAL_BTN_SECONDARY} sm:mr-auto`}>
               {readOnly && !correctionMode ? 'Close' : 'Cancel'}
             </button>
             {correctionMode ? (
-              <button type="button" onClick={saveCorrections} disabled={correctMarks.isPending || !hydrated}
-                className="flex items-center gap-2 px-5 py-2 text-sm bg-brand-teal text-white rounded-xl font-semibold disabled:opacity-60 hover:bg-brand-teal/90">
+              <button type="button" onClick={saveCorrections} disabled={correctMarks.isPending || !hydrated} className={MODAL_BTN_PRIMARY}>
                 {correctMarks.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 Save Corrections
               </button>
             ) : !readOnly ? (
-            <div className="flex gap-3">
-              <button onClick={saveDraft} disabled={enterMarks.isPending || !hydrated}
-                className="flex items-center gap-2 px-4 py-2 text-sm border border-base rounded-xl hover:bg-page disabled:opacity-60">
-                {enterMarks.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                Save Draft
-              </button>
-              <button type="button" onClick={requestFinalize} disabled={finalizeMarks.isPending || !hydrated}
-                className="flex items-center gap-2 px-5 py-2 text-sm bg-brand-deep text-white rounded-xl font-semibold disabled:opacity-60 hover:brightness-125">
-                {finalizeMarks.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
-                Finalize Marks
-              </button>
-            </div>
+              <>
+                <button type="button" onClick={saveDraft} disabled={enterMarks.isPending || !hydrated} className={MODAL_BTN_SECONDARY}>
+                  {enterMarks.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  Save Draft
+                </button>
+                <button type="button" onClick={requestFinalize} disabled={finalizeMarks.isPending || !hydrated} className={MODAL_BTN_PRIMARY}>
+                  {finalizeMarks.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+                  Finalize Marks
+                </button>
+              </>
             ) : null}
-          </div>
+          </>
+        }
+      >
+          {loading ? (
+            <div className="px-6 py-12 text-center text-sm text-muted animate-pulse">
+              Loading students and saved marks…
+            </div>
+          ) : (
+            <div className="table-scroll">
+            <table className="w-full text-sm border-collapse min-w-75">
+              <thead>
+                <tr className="border-b border-base bg-page">
+                  <th className="px-5 py-3 text-left font-heading text-xs uppercase tracking-wide text-muted">Student</th>
+                  <th className="px-5 py-3 text-left font-heading text-xs uppercase tracking-wide text-muted w-36">Mark (/{maxMark})</th>
+                  <th className="px-5 py-3 text-center font-heading text-xs uppercase tracking-wide text-muted w-24">Absent</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-base">
+                {students.map((student) => (
+                  <tr key={student.id} className={marks[student.id]?.absent ? 'text-muted italic' : ''}>
+                    <td className="px-5 py-3">
+                      <p className="font-medium text-body">{student.firstName} {student.lastName}</p>
+                      <p className="text-xs text-muted">{student.registrationNo}</p>
+                    </td>
+                    <td className="px-5 py-2">
+                      <input
+                        type="number" min={0} max={maxMark}
+                        value={marks[student.id]?.mark ?? ''}
+                        disabled={marks[student.id]?.absent || !editable}
+                        onChange={(e) => setMark(student.id, e.target.value)}
+                        aria-label={`Mark for ${student.firstName} ${student.lastName}`}
+                        className={`w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/25 ${
+                          errors[student.id] ? 'border-brand-coral bg-brand-coral/5' : 'border-base bg-page'
+                        } disabled:opacity-40`}
+                      />
+                      {errors[student.id] && (
+                        <p className="text-xs text-brand-coral mt-1 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> {errors[student.id]}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-5 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        className="accent-brand-amber w-4 h-4"
+                        checked={marks[student.id]?.absent ?? false}
+                        onChange={() => toggleAbsent(student.id)}
+                        disabled={!editable}
+                        aria-label={`Mark ${student.firstName} ${student.lastName} as absent`}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+          )}
+      </Modal>
 
-          {/* R15 — confirmation before the irreversible finalize */}
-          <ConfirmDialog
-            open={confirmFinalizeOpen}
-            title="Finalize these marks?"
-            description={`Marks for all ${students.length} students will be submitted and the sheet locked against further entry. Corrections after this point require an administrator.`}
-            confirmLabel="Finalize Marks"
-            destructive
-            onConfirm={doFinalize}
-            onCancel={() => setConfirmFinalizeOpen(false)}
-          />
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+      {/* R15 — confirmation before the irreversible finalize */}
+        <ConfirmDialog
+          open={confirmFinalizeOpen}
+          title="Finalize these marks?"
+          description={`Marks for all ${students.length} students will be submitted and the sheet locked against further entry. Corrections after this point require an administrator.`}
+          confirmLabel="Finalize Marks"
+          destructive
+          onConfirm={doFinalize}
+          onCancel={() => setConfirmFinalizeOpen(false)}
+        />
+    </>
   )
 }

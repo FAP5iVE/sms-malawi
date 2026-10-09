@@ -25,7 +25,7 @@ import { RoleGuard } from '@/components/shared/RoleGuard'
 import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { StatCard, StatCardGrid } from '@/components/shared/StatCard'
-import { useStaffDirectory } from '@/hooks/useHR'
+import { StaffSelect } from '@/components/shared/StaffSelect'
 import {
   useAssets,
   useAsset,
@@ -55,7 +55,6 @@ import { formatMWK } from '@shared/constants/malawi'
 import {
   Boxes,
   Plus,
-  X as XIcon,
   Search,
   Wrench,
   Trash2,
@@ -75,6 +74,7 @@ import {
 import { InventoryOperationsTab } from '@/components/assets/InventoryOperationsTab'
 import { StocktakesTab } from '@/components/assets/StocktakesTab'
 import { LocationsTab } from '@/components/assets/LocationsTab'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 const CATEGORIES = [
   'FURNITURE',
@@ -445,161 +445,159 @@ function AssetFormModal({ asset, onClose }: { asset: ApiAsset | null; onClose: (
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">
-            {asset ? 'Edit Asset' : 'Add Asset'}
-          </h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title={asset ? 'Edit Asset' : 'Add Asset'}
+      onClose={onClose}
+      size="lg"
+      bodyClassName="space-y-3"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-3">
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="sm:col-span-2">
-              <label htmlFor="asset-name" className="text-xs text-muted mb-1 block">
-                Name
-              </label>
-              <input
-                id="asset-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div>
-              <label htmlFor="asset-category" className="text-xs text-muted mb-1 block">
-                Category
-              </label>
-              <select
-                id="asset-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as never)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {humanize(c)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="asset-condition" className="text-xs text-muted mb-1 block">
-                Condition
-              </label>
-              <select
-                id="asset-condition"
-                value={condition}
-                onChange={(e) => setCondition(e.target.value as never)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                {CONDITIONS.map((c) => (
-                  <option key={c} value={c}>
-                    {humanize(c)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="asset-serial" className="text-xs text-muted mb-1 block">
-                Serial Number{' '}
-                <span className="text-muted/70">(individually-tracked items only)</span>
-              </label>
-              <input
-                id="asset-serial"
-                value={serialNumber}
-                onChange={(e) => setSerialNumber(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div>
-              <label htmlFor="asset-qty" className="text-xs text-muted mb-1 block">
-                Quantity
-              </label>
-              <input
-                id="asset-qty"
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="asset-location" className="text-xs text-muted mb-1 block">
-                Location <span className="text-muted/70">(while in store)</span>
-              </label>
-              <input
-                id="asset-location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. Science Lab storeroom"
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div>
-              <label htmlFor="asset-cost" className="text-xs text-muted mb-1 block">
-                Acquisition Cost (MWK)
-              </label>
-              <input
-                id="asset-cost"
-                type="number"
-                min="0"
-                value={acquisitionCost}
-                onChange={(e) => setAcquisitionCost(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div>
-              <label htmlFor="asset-supplier" className="text-xs text-muted mb-1 block">
-                Supplier
-              </label>
-              <input
-                id="asset-supplier"
-                value={supplier}
-                onChange={(e) => setSupplier(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="asset-notes" className="text-xs text-muted mb-1 block">
-                Notes
-              </label>
-              <textarea
-                id="asset-notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={2}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
-              />
-            </div>
-          </div>
-
           <button
             type="button"
             onClick={handleSave}
             disabled={pending || !name.trim()}
-            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {pending ? 'Saving…' : asset ? 'Save Changes' : 'Add to Register'}
           </button>
-          {error && (
-            <p className="text-sm text-brand-coral">
-              {error instanceof Error ? error.message : 'Something went wrong.'}
-            </p>
-          )}
+        </>
+      }
+    >
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="sm:col-span-2">
+          <label htmlFor="asset-name" className="text-xs text-muted mb-1 block">
+            Name
+          </label>
+          <input
+            id="asset-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div>
+          <label htmlFor="asset-category" className="text-xs text-muted mb-1 block">
+            Category
+          </label>
+          <select
+            id="asset-category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value as never)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {humanize(c)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="asset-condition" className="text-xs text-muted mb-1 block">
+            Condition
+          </label>
+          <select
+            id="asset-condition"
+            value={condition}
+            onChange={(e) => setCondition(e.target.value as never)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          >
+            {CONDITIONS.map((c) => (
+              <option key={c} value={c}>
+                {humanize(c)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="asset-serial" className="text-xs text-muted mb-1 block">
+            Serial Number{' '}
+            <span className="text-muted/70">(individually-tracked items only)</span>
+          </label>
+          <input
+            id="asset-serial"
+            value={serialNumber}
+            onChange={(e) => setSerialNumber(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div>
+          <label htmlFor="asset-qty" className="text-xs text-muted mb-1 block">
+            Quantity
+          </label>
+          <input
+            id="asset-qty"
+            type="number"
+            min="1"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="asset-location" className="text-xs text-muted mb-1 block">
+            Location <span className="text-muted/70">(while in store)</span>
+          </label>
+          <input
+            id="asset-location"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="e.g. Science Lab storeroom"
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div>
+          <label htmlFor="asset-cost" className="text-xs text-muted mb-1 block">
+            Acquisition Cost (MWK)
+          </label>
+          <input
+            id="asset-cost"
+            type="number"
+            min="0"
+            value={acquisitionCost}
+            onChange={(e) => setAcquisitionCost(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div>
+          <label htmlFor="asset-supplier" className="text-xs text-muted mb-1 block">
+            Supplier
+          </label>
+          <input
+            id="asset-supplier"
+            value={supplier}
+            onChange={(e) => setSupplier(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="asset-notes" className="text-xs text-muted mb-1 block">
+            Notes
+          </label>
+          <textarea
+            id="asset-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+          />
         </div>
       </div>
-    </div>
+
+      {error && (
+        <p className="text-sm text-brand-coral">
+          {error instanceof Error ? error.message : 'Something went wrong.'}
+        </p>
+      )}
+    </Modal>
   )
 }
 
 function AllocateModal({ asset, onClose }: { asset: ApiAsset; onClose: () => void }) {
   const allocate = useAllocateAsset()
-  const { data: staff } = useStaffDirectory()
   const [assignedToType, setAssignedToType] = useState<'STAFF' | 'DEPARTMENT' | 'ROOM'>('STAFF')
   const [staffId, setStaffId] = useState('')
   const [departmentOrRoom, setDepartmentOrRoom] = useState('')
@@ -625,95 +623,80 @@ function AllocateModal({ asset, onClose }: { asset: ApiAsset; onClose: () => voi
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Allocate — {asset.name}</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title={<>Allocate — {asset.name}</>}
+      onClose={onClose}
+      size="md"
+      bodyClassName="space-y-3"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-3">
-          <div>
-            <label htmlFor="allocate-type" className="text-xs text-muted mb-1 block">
-              Assign to
-            </label>
-            <select
-              id="allocate-type"
-              value={assignedToType}
-              onChange={(e) => setAssignedToType(e.target.value as never)}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-            >
-              <option value="STAFF">A staff member</option>
-              <option value="DEPARTMENT">A department</option>
-              <option value="ROOM">A room</option>
-            </select>
-          </div>
-          {assignedToType === 'STAFF' ? (
-            <div>
-              <label htmlFor="allocate-staff" className="text-xs text-muted mb-1 block">
-                Staff member
-              </label>
-              <select
-                id="allocate-staff"
-                value={staffId}
-                onChange={(e) => setStaffId(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                <option value="">Select…</option>
-                {(
-                  staff as
-                    | { id: string; firstName: string; lastName: string; department: string }[]
-                    | undefined
-                )?.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.firstName} {s.lastName} — {s.department}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div>
-              <label htmlFor="allocate-doR" className="text-xs text-muted mb-1 block">
-                {assignedToType === 'DEPARTMENT' ? 'Department' : 'Room'} name
-              </label>
-              <input
-                id="allocate-doR"
-                value={departmentOrRoom}
-                onChange={(e) => setDepartmentOrRoom(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-          )}
-          <div>
-            <label htmlFor="allocate-notes" className="text-xs text-muted mb-1 block">
-              Notes
-            </label>
-            <textarea
-              id="allocate-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
-            />
-          </div>
           <button
             type="button"
             onClick={handleAllocate}
             disabled={allocate.isPending || !valid}
-            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {allocate.isPending ? 'Allocating…' : 'Allocate'}
           </button>
-          {allocate.error && (
-            <p className="text-sm text-brand-coral">
-              {allocate.error instanceof Error ? allocate.error.message : 'Something went wrong.'}
-            </p>
-          )}
-        </div>
+        </>
+      }
+    >
+      <div>
+        <label htmlFor="allocate-type" className="text-xs text-muted mb-1 block">
+          Assign to
+        </label>
+        <select
+          id="allocate-type"
+          value={assignedToType}
+          onChange={(e) => setAssignedToType(e.target.value as never)}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        >
+          <option value="STAFF">A staff member</option>
+          <option value="DEPARTMENT">A department</option>
+          <option value="ROOM">A room</option>
+        </select>
       </div>
-    </div>
+      {assignedToType === 'STAFF' ? (
+        <div>
+          <label htmlFor="allocate-staff" className="text-xs text-muted mb-1 block">
+            Staff member
+          </label>
+          <StaffSelect id="allocate-staff" value={staffId} onChange={setStaffId} />
+        </div>
+      ) : (
+        <div>
+          <label htmlFor="allocate-doR" className="text-xs text-muted mb-1 block">
+            {assignedToType === 'DEPARTMENT' ? 'Department' : 'Room'} name
+          </label>
+          <input
+            id="allocate-doR"
+            value={departmentOrRoom}
+            onChange={(e) => setDepartmentOrRoom(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+      )}
+      <div>
+        <label htmlFor="allocate-notes" className="text-xs text-muted mb-1 block">
+          Notes
+        </label>
+        <textarea
+          id="allocate-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+        />
+      </div>
+      {allocate.error && (
+        <p className="text-sm text-brand-coral">
+          {allocate.error instanceof Error ? allocate.error.message : 'Something went wrong.'}
+        </p>
+      )}
+    </Modal>
   )
 }
 
@@ -725,45 +708,16 @@ function ConditionModal({ asset, onClose }: { asset: ApiAsset; onClose: () => vo
   const [confirmDispose, setConfirmDispose] = useState(false)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Condition — {asset.name}</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title={<>Condition — {asset.name}</>}
+      onClose={onClose}
+      size="md"
+      bodyClassName="space-y-3"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-3">
-          <div>
-            <label htmlFor="condition-select" className="text-xs text-muted mb-1 block">
-              Condition
-            </label>
-            <select
-              id="condition-select"
-              value={condition}
-              onChange={(e) => setCondition(e.target.value as never)}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-            >
-              {CONDITIONS.map((c) => (
-                <option key={c} value={c}>
-                  {humanize(c)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="condition-notes" className="text-xs text-muted mb-1 block">
-              Notes
-            </label>
-            <textarea
-              id="condition-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
-            />
-          </div>
           <button
             type="button"
             onClick={() =>
@@ -776,68 +730,98 @@ function ConditionModal({ asset, onClose }: { asset: ApiAsset; onClose: () => vo
               )
             }
             disabled={markCondition.isPending}
-            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {markCondition.isPending ? 'Saving…' : 'Update Condition'}
           </button>
-          {markCondition.error && (
-            <p className="text-sm text-brand-coral">
-              {markCondition.error instanceof Error
-                ? markCondition.error.message
+        </>
+      }
+    >
+      <div>
+        <label htmlFor="condition-select" className="text-xs text-muted mb-1 block">
+          Condition
+        </label>
+        <select
+          id="condition-select"
+          value={condition}
+          onChange={(e) => setCondition(e.target.value as never)}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        >
+          {CONDITIONS.map((c) => (
+            <option key={c} value={c}>
+              {humanize(c)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor="condition-notes" className="text-xs text-muted mb-1 block">
+          Notes
+        </label>
+        <textarea
+          id="condition-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+        />
+      </div>
+      {markCondition.error && (
+        <p className="text-sm text-brand-coral">
+          {markCondition.error instanceof Error
+            ? markCondition.error.message
+            : 'Something went wrong.'}
+        </p>
+      )}
+
+      <PermissionGuard permission="assets.dispose">
+        <div className="pt-4 mt-2 border-t border-base">
+          {confirmDispose ? (
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-muted flex-1">
+                Mark this asset disposed? It leaves the active register (must not be currently
+                allocated).
+              </p>
+              <button
+                type="button"
+                disabled={disposeAsset.isPending}
+                onClick={() =>
+                  disposeAsset.mutate(
+                    { id: asset.id, data: { notes: notes.trim() || undefined } },
+                    { onSuccess: onClose }
+                  )
+                }
+                className="text-xs font-semibold text-brand-coral hover:underline shrink-0"
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDispose(false)}
+                className="text-xs text-muted hover:underline shrink-0"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmDispose(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-coral hover:underline"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Mark disposed
+            </button>
+          )}
+          {disposeAsset.error && (
+            <p className="text-sm text-brand-coral mt-2">
+              {disposeAsset.error instanceof Error
+                ? disposeAsset.error.message
                 : 'Something went wrong.'}
             </p>
           )}
-
-          <PermissionGuard permission="assets.dispose">
-            <div className="pt-4 mt-2 border-t border-base">
-              {confirmDispose ? (
-                <div className="flex items-center gap-3">
-                  <p className="text-xs text-muted flex-1">
-                    Mark this asset disposed? It leaves the active register (must not be currently
-                    allocated).
-                  </p>
-                  <button
-                    type="button"
-                    disabled={disposeAsset.isPending}
-                    onClick={() =>
-                      disposeAsset.mutate(
-                        { id: asset.id, data: { notes: notes.trim() || undefined } },
-                        { onSuccess: onClose }
-                      )
-                    }
-                    className="text-xs font-semibold text-brand-coral hover:underline shrink-0"
-                  >
-                    Confirm
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDispose(false)}
-                    className="text-xs text-muted hover:underline shrink-0"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDispose(true)}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-coral hover:underline"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Mark disposed
-                </button>
-              )}
-              {disposeAsset.error && (
-                <p className="text-sm text-brand-coral mt-2">
-                  {disposeAsset.error instanceof Error
-                    ? disposeAsset.error.message
-                    : 'Something went wrong.'}
-                </p>
-              )}
-            </div>
-          </PermissionGuard>
         </div>
-      </div>
-    </div>
+      </PermissionGuard>
+    </Modal>
   )
 }
 
@@ -847,89 +831,83 @@ function AssetDetailModal({ assetId, onClose }: { assetId: string; onClose: () =
   const returnAsset = useReturnAsset()
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">{asset?.name ?? 'Asset'}</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
-          </button>
-        </div>
-        <div className="p-6 space-y-4">
-          {asset && (
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-xs text-muted">Category</p>
-                <p>{humanize(asset.category)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted">Status</p>
-                <p>{humanize(asset.status)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted">Condition</p>
-                <p>{humanize(asset.condition)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted">Quantity</p>
-                <p>{asset.quantity}</p>
-              </div>
-              {asset.acquisitionCost !== undefined && (
-                <div>
-                  <p className="text-xs text-muted">Acquisition cost</p>
-                  <p>{formatMWK(asset.acquisitionCost)}</p>
-                </div>
-              )}
-              {asset.supplier && (
-                <div>
-                  <p className="text-xs text-muted">Supplier</p>
-                  <p>{asset.supplier}</p>
-                </div>
-              )}
+    <Modal
+      title={asset?.name ?? 'Asset'}
+      onClose={onClose}
+      size="lg"
+      bodyClassName="space-y-4"
+    >
+      {asset && (
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-xs text-muted">Category</p>
+            <p>{humanize(asset.category)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted">Status</p>
+            <p>{humanize(asset.status)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted">Condition</p>
+            <p>{humanize(asset.condition)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted">Quantity</p>
+            <p>{asset.quantity}</p>
+          </div>
+          {asset.acquisitionCost !== undefined && (
+            <div>
+              <p className="text-xs text-muted">Acquisition cost</p>
+              <p>{formatMWK(asset.acquisitionCost)}</p>
             </div>
           )}
-          <div>
-            <h3 className="text-xs font-semibold text-muted mb-2">Custody history</h3>
-            <div className="space-y-2">
-              {assignments?.length === 0 && <p className="text-xs text-muted">Never allocated.</p>}
-              {assignments?.map((a) => (
-                <div
-                  key={a.id}
-                  className="flex items-center justify-between bg-page rounded-lg px-3 py-2 text-xs"
-                >
-                  <div>
-                    <p className="font-medium">
-                      {a.assignedToType === 'STAFF'
-                        ? 'Staff member'
-                        : (a.departmentOrRoom ?? a.assignedToType)}
-                    </p>
-                    <p className="text-muted">
-                      {new Date(a.assignedAt).toLocaleDateString()}{' '}
-                      {a.returnedAt
-                        ? `→ ${new Date(a.returnedAt).toLocaleDateString()}`
-                        : '(active)'}
-                    </p>
-                  </div>
-                  <PermissionGuard permission="assets.allocateItem">
-                    {a.status === 'ACTIVE' && (
-                      <button
-                        type="button"
-                        disabled={returnAsset.isPending}
-                        onClick={() => returnAsset.mutate({ assignmentId: a.id, data: {} })}
-                        className="inline-flex items-center gap-1 text-brand-teal font-semibold min-h-11 px-2"
-                      >
-                        <Undo2 className="w-3.5 h-3.5" /> Return
-                      </button>
-                    )}
-                  </PermissionGuard>
-                </div>
-              ))}
+          {asset.supplier && (
+            <div>
+              <p className="text-xs text-muted">Supplier</p>
+              <p>{asset.supplier}</p>
             </div>
-          </div>
+          )}
+        </div>
+      )}
+      <div>
+        <h3 className="text-xs font-semibold text-muted mb-2">Custody history</h3>
+        <div className="space-y-2">
+          {assignments?.length === 0 && <p className="text-xs text-muted">Never allocated.</p>}
+          {assignments?.map((a) => (
+            <div
+              key={a.id}
+              className="flex items-center justify-between bg-page rounded-lg px-3 py-2 text-xs"
+            >
+              <div>
+                <p className="font-medium">
+                  {a.assignedToType === 'STAFF'
+                    ? 'Staff member'
+                    : (a.departmentOrRoom ?? a.assignedToType)}
+                </p>
+                <p className="text-muted">
+                  {new Date(a.assignedAt).toLocaleDateString()}{' '}
+                  {a.returnedAt
+                    ? `→ ${new Date(a.returnedAt).toLocaleDateString()}`
+                    : '(active)'}
+                </p>
+              </div>
+              <PermissionGuard permission="assets.allocateItem">
+                {a.status === 'ACTIVE' && (
+                  <button
+                    type="button"
+                    disabled={returnAsset.isPending}
+                    onClick={() => returnAsset.mutate({ assignmentId: a.id, data: {} })}
+                    className="inline-flex items-center gap-1 text-brand-teal font-semibold min-h-11 px-2"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" /> Return
+                  </button>
+                )}
+              </PermissionGuard>
+            </div>
+          ))}
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -1261,52 +1239,16 @@ function RecordAdvanceModal({ requestId, onClose }: { requestId: string; onClose
   const [notes, setNotes] = useState('')
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-sm bg-surface rounded-2xl shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Record Advance</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title="Record Advance"
+      onClose={onClose}
+      size="sm"
+      bodyClassName="space-y-3"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-3">
-          <div>
-            <label htmlFor="adv-supplier" className="text-xs text-muted mb-1 block">
-              Supplier
-            </label>
-            <input
-              id="adv-supplier"
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-            />
-          </div>
-          <div>
-            <label htmlFor="adv-amount" className="text-xs text-muted mb-1 block">
-              Amount (MWK)
-            </label>
-            <input
-              id="adv-amount"
-              type="number"
-              min="0"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-            />
-          </div>
-          <div>
-            <label htmlFor="adv-notes" className="text-xs text-muted mb-1 block">
-              Notes
-            </label>
-            <textarea
-              id="adv-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
-            />
-          </div>
           <button
             type="button"
             disabled={recordAdvance.isPending || !supplier.trim() || !amount}
@@ -1323,20 +1265,57 @@ function RecordAdvanceModal({ requestId, onClose }: { requestId: string; onClose
                 { onSuccess: onClose }
               )
             }
-            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {recordAdvance.isPending ? 'Recording…' : 'Record Advance'}
           </button>
-          {recordAdvance.error && (
-            <p className="text-sm text-brand-coral">
-              {recordAdvance.error instanceof Error
-                ? recordAdvance.error.message
-                : 'Something went wrong.'}
-            </p>
-          )}
-        </div>
+        </>
+      }
+    >
+      <div>
+        <label htmlFor="adv-supplier" className="text-xs text-muted mb-1 block">
+          Supplier
+        </label>
+        <input
+          id="adv-supplier"
+          value={supplier}
+          onChange={(e) => setSupplier(e.target.value)}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        />
       </div>
-    </div>
+      <div>
+        <label htmlFor="adv-amount" className="text-xs text-muted mb-1 block">
+          Amount (MWK)
+        </label>
+        <input
+          id="adv-amount"
+          type="number"
+          min="0"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        />
+      </div>
+      <div>
+        <label htmlFor="adv-notes" className="text-xs text-muted mb-1 block">
+          Notes
+        </label>
+        <textarea
+          id="adv-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+        />
+      </div>
+      {recordAdvance.error && (
+        <p className="text-sm text-brand-coral">
+          {recordAdvance.error instanceof Error
+            ? recordAdvance.error.message
+            : 'Something went wrong.'}
+        </p>
+      )}
+    </Modal>
   )
 }
 
@@ -1416,84 +1395,16 @@ function RequestFormModal({ onClose }: { onClose: () => void }) {
   const [justification, setJustification] = useState('')
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Request Equipment</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title="Request Equipment"
+      onClose={onClose}
+      size="md"
+      bodyClassName="space-y-3"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-3">
-          <div>
-            <label htmlFor="req-title" className="text-xs text-muted mb-1 block">
-              What do you need?
-            </label>
-            <input
-              id="req-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. 10 microscopes for Form 3 Biology"
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="req-category" className="text-xs text-muted mb-1 block">
-                Category
-              </label>
-              <select
-                id="req-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {humanize(c)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="req-qty" className="text-xs text-muted mb-1 block">
-                Quantity
-              </label>
-              <input
-                id="req-qty"
-                type="number"
-                min="1"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-          </div>
-          <div>
-            <label htmlFor="req-dept" className="text-xs text-muted mb-1 block">
-              Department
-            </label>
-            <input
-              id="req-dept"
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              placeholder="e.g. Biology Department"
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-            />
-          </div>
-          <div>
-            <label htmlFor="req-justification" className="text-xs text-muted mb-1 block">
-              Why is this needed?
-            </label>
-            <textarea
-              id="req-justification"
-              value={justification}
-              onChange={(e) => setJustification(e.target.value)}
-              rows={2}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
-            />
-          </div>
           <button
             type="button"
             disabled={createRequest.isPending || !title.trim()}
@@ -1509,19 +1420,88 @@ function RequestFormModal({ onClose }: { onClose: () => void }) {
                 { onSuccess: onClose }
               )
             }
-            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {createRequest.isPending ? 'Submitting…' : 'Submit Request'}
           </button>
-          {createRequest.error && (
-            <p className="text-sm text-brand-coral">
-              {createRequest.error instanceof Error
-                ? createRequest.error.message
-                : 'Something went wrong.'}
-            </p>
-          )}
+        </>
+      }
+    >
+      <div>
+        <label htmlFor="req-title" className="text-xs text-muted mb-1 block">
+          What do you need?
+        </label>
+        <input
+          id="req-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="e.g. 10 microscopes for Form 3 Biology"
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="req-category" className="text-xs text-muted mb-1 block">
+            Category
+          </label>
+          <select
+            id="req-category"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {humanize(c)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="req-qty" className="text-xs text-muted mb-1 block">
+            Quantity
+          </label>
+          <input
+            id="req-qty"
+            type="number"
+            min="1"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
         </div>
       </div>
-    </div>
+      <div>
+        <label htmlFor="req-dept" className="text-xs text-muted mb-1 block">
+          Department
+        </label>
+        <input
+          id="req-dept"
+          value={department}
+          onChange={(e) => setDepartment(e.target.value)}
+          placeholder="e.g. Biology Department"
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        />
+      </div>
+      <div>
+        <label htmlFor="req-justification" className="text-xs text-muted mb-1 block">
+          Why is this needed?
+        </label>
+        <textarea
+          id="req-justification"
+          value={justification}
+          onChange={(e) => setJustification(e.target.value)}
+          rows={2}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+        />
+      </div>
+      {createRequest.error && (
+        <p className="text-sm text-brand-coral">
+          {createRequest.error instanceof Error
+            ? createRequest.error.message
+            : 'Something went wrong.'}
+        </p>
+      )}
+    </Modal>
   )
 }

@@ -5,13 +5,15 @@
  * [PURPOSE]: Express router for the Postgres-backed attendance rebuild,
  *   matching students.ts's router convention exactly (Router(), verifyAuth
  *   first, thin handlers delegating to * as attendanceService).
- *     - GET /class/:classId  — a day's attendance for a class. Gated by
- *       class.markAttendance (academic/teacher role), with an ownership
- *       check (the requester must actually teach this class) mirroring
- *       assignments.ts's established academic-role ownership pattern —
- *       admin/high_rank bypass the ownership check.
+ *     - GET /class/:classId  — a day's attendance for a class. READ-ONLY
+ *       and deliberately NOT ownership-scoped: gated only by
+ *       class.viewAttendance (admin, high_rank, lower_rank, academic,
+ *       exam_officer), so oversight staff and teachers who are not this
+ *       class's teacher can all open and read any class's register.
  *     - POST /class/:classId — mark attendance (one or many students).
- *       Same gate and ownership check as GET.
+ *       Gated by class.markAttendance (academic) AND an ownership check —
+ *       only the class's own assigned teacher may write. This is the only
+ *       place ownership is enforced; viewing never requires it.
  *     - GET /student/:studentId — a student's own attendance history.
  *       Self-scoped (report.viewOwnAttendance + Student.firebaseUid match)
  *       or staff-scoped (class.markAttendance or class.viewAnalytics —
@@ -35,11 +37,11 @@ attendanceRouter.use(verifyAuth)
 
 // ─────────────────────────────────────────────────────────
 //  OWNERSHIP GUARD — mirrors assignments.ts's established pattern.
-//  An 'academic' (teacher) requester must actually teach the target class;
-//  admin/high_rank bypass this (school-wide oversight, not a per-class
-//  teaching relationship). Must run after requirePermission('class.
-//  markAttendance'), which already excludes every role other than
-//  academic/admin/high_rank from reaching this point.
+//  An 'academic' (teacher) requester must actually teach the target class.
+//  Applied to WRITES only (POST). Reading a register is governed solely by
+//  class.viewAttendance — see the GET handler below.
+//  Must run after requirePermission('class.markAttendance'), which already
+//  excludes every role other than academic from reaching this point.
 // ─────────────────────────────────────────────────────────
 
 async function requireClassOwnership(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -67,10 +69,12 @@ async function requireClassOwnership(req: Request, res: Response, next: NextFunc
 }
 
 // GET /attendance/class/:classId?date=YYYY-MM-DD
+// Read-only. No ownership check — any role holding class.viewAttendance may
+// read any class's register; only POST (below) is restricted to the class's
+// own assigned teacher.
 attendanceRouter.get(
   '/class/:classId',
-  requirePermission('class.markAttendance'),
-  requireClassOwnership,
+  requirePermission('class.viewAttendance'),
   async (req: Request, res: Response) => {
     const { classId } = req.params as { classId: string }
     const { date } = req.query as { date?: string }
@@ -115,12 +119,12 @@ attendanceRouter.get(
     const { studentId } = req.params as { studentId: string }
     const user = req.user!
 
-    const staffHasAccess = hasAnyPermission(user.role, ['class.markAttendance', 'class.viewAnalytics'], user.superUser === true)
+    const staffHasAccess = hasAnyPermission(user.role, ['class.markAttendance', 'class.viewAttendance', 'class.viewAnalytics'])
 
     if (!staffHasAccess) {
       // Not a staff oversight role — only allowed to view their own record,
       // and only if they hold report.viewOwnAttendance (the student role).
-      if (!hasAnyPermission(user.role, ['report.viewOwnAttendance'], user.superUser === true)) {
+      if (!hasAnyPermission(user.role, ['report.viewOwnAttendance'])) {
         res.status(403).json({ error: 'You do not have access to this attendance record.' })
         return
       }

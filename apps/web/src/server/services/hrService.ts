@@ -113,6 +113,23 @@ export async function listStaff(filters: {
   })
 }
 
+/**
+ * Minimal, non-sensitive staff list for "pick a person" controls — see
+ * GET /hr/staff-picker in hr.ts. Includes ACTIVE and ON_LEAVE staff (a person
+ * on leave can still be custodian of equipment); excludes SUSPENDED and
+ * TERMINATED. Returns only what a picker displays and searches on.
+ */
+export async function listStaffForPicker() {
+  return prisma.staffProfile.findMany({
+    where: { status: { in: ['ACTIVE', 'ON_LEAVE'] } },
+    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    select: {
+      id: true, employeeNo: true, firstName: true, lastName: true,
+      department: true, jobTitle: true,
+    },
+  })
+}
+
 export async function getStaffProfile(id: string) {
   return prisma.staffProfile.findUniqueOrThrow({
     where: { id },

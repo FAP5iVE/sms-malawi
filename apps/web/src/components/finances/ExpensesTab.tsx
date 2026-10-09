@@ -38,6 +38,7 @@ import { format } from 'date-fns'
 import { ExpenseCategorySchema, type CreateExpenseInput } from '@shared/schemas/finance'
 import { z } from 'zod'
 import { Plus, Check, X, Paperclip, FileText, Loader2 } from 'lucide-react'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 type ExpenseCategoryType = z.infer<typeof ExpenseCategorySchema>
 
@@ -288,72 +289,23 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
 
       {/* Log Expense Modal */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-surface rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h3 className="font-heading font-bold text-lg text-brand-navy">Log Expense</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Category</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as ExpenseCategoryType)}
-                  className="input w-full"
-                  aria-label="Expense category"
-                >
-                  {CATEGORY_OPTIONS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Description</label>
-                <input
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="input w-full"
-                  placeholder="What was this expense for?"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Amount (MWK)</label>
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="input w-full"
-                  placeholder="Enter amount"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Date incurred</label>
-                <input
-                  type="date"
-                  value={incurredAt}
-                  onChange={(e) => setIncurredAt(e.target.value)}
-                  className="input w-full"
-                  aria-label="Date incurred"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Receipt (optional)</label>
-                <input
-                  type="file"
-                  accept="application/pdf,image/*"
-                  onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
-                  className="input w-full"
-                  aria-label="Receipt file"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3">
+        <Modal
+          title="Log Expense"
+          onClose={() => {
+            setShowCreate(false)
+            resetCreateForm()
+          }}
+          size="sm"
+          busy={isCreating}
+          bodyClassName="space-y-3"
+          footer={
+            <>
               <button
                 onClick={() => {
                   setShowCreate(false)
                   resetCreateForm()
                 }}
-                className="flex-1 border border-base px-4 py-2 rounded-lg text-sm hover:bg-page min-h-[44px]"
+                className={MODAL_BTN_SECONDARY}
                 type="button"
               >
                 Cancel
@@ -361,15 +313,70 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
               <button
                 onClick={submitCreate}
                 disabled={isCreating || !description.trim() || !amount}
-                className="flex-1 bg-brand-teal text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60 min-h-[44px]"
+                className={MODAL_BTN_PRIMARY}
                 type="button"
               >
                 {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Log Expense
               </button>
-            </div>
+            </>
+          }
+        >
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Category</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as ExpenseCategoryType)}
+              className="input w-full"
+              aria-label="Expense category"
+            >
+              {CATEGORY_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Description</label>
+            <input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="input w-full"
+              placeholder="What was this expense for?"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Amount (MWK)</label>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="input w-full"
+              placeholder="Enter amount"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Date incurred</label>
+            <input
+              type="date"
+              value={incurredAt}
+              onChange={(e) => setIncurredAt(e.target.value)}
+              className="input w-full"
+              aria-label="Date incurred"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Receipt (optional)</label>
+            <input
+              type="file"
+              accept="application/pdf,image/*"
+              onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+              className="input w-full"
+              aria-label="Receipt file"
+            />
+          </div>
+        </Modal>
       )}
     </div>
   )

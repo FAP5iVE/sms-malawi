@@ -995,3 +995,66 @@
   min-width: var(--touch-min);
   min-height: var(--touch-min);
 }
+
+/* ─────────────────────────────────────────────────────────
+   SHARED MODAL  (components/shared/Modal.tsx)
+   Panel height is capped to the VISIBLE viewport (dvh follows collapsing
+   mobile browser bars). Phones: bottom sheet, keeps clear of the status-bar
+   safe area at the top. sm+: centred dialog with 1.5rem breathing room top
+   and bottom. Only .app-modal-body scrolls; header and footer stay pinned.
+   Unlayered on purpose — see the note on .main-scroll-pad above.
+   ───────────────────────────────────────────────────────── */
+.app-modal-panel {
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 0.75rem);
+}
+
+@media (min-width: 640px) {
+  .app-modal-panel {
+    max-height: calc(100dvh - 3rem);
+  }
+}
+
+/* Full-screen variant (size="screen"), e.g. the digital-resource reader. */
+.app-modal-panel.app-modal-panel--screen {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  border-radius: 0;
+}
+
+/* Footer clears the iOS home indicator on phones. */
+.app-modal-footer {
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 640px) {
+  .app-modal-footer {
+    padding-bottom: 0.75rem;
+  }
+}
+
+/* Printing from inside a dialog (e.g. the student report card): un-clip the
+   panel, drop the backdrop and action footer so the content flows onto paper. */
+@media print {
+  .app-modal-root {
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+  }
+  .app-modal-backdrop,
+  .app-modal-footer {
+    display: none !important;
+  }
+  .app-modal-panel {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  .app-modal-body {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+}

@@ -21,6 +21,7 @@ import {
   RotateCw,
   X,
 } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getAuth } from 'firebase/auth'
 import { useMotionEnabled } from '@/store/motionStore'
@@ -399,7 +400,13 @@ export function DigitalResourceViewer({
     exit: { opacity: 0, scale: 0.98, y: 8 },
   })
 
-  return (
+  // Portaled to <body>: rendered inline it was a `fixed inset-0` child of the
+  // page, so the app header (z-30) could paint over this reader's own toolbar
+  // and the mobile bottom nav over its page controls. Same root cause as every
+  // other dialog — see components/shared/Modal.tsx.
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <AnimatePresence onExitComplete={onClose}>
       {visible && (
         <motion.div
@@ -551,6 +558,7 @@ export function DigitalResourceViewer({
           </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }

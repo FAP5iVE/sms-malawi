@@ -32,8 +32,10 @@ import {
 import { formatMWK, FEE_CATEGORY_LABELS, formatFeeScheduleBadge } from '@shared/constants/malawi'
 import type { ApiStudent, ApiFeeStructure } from '@shared/types/api'
 import {
-  Search, Loader2, X, Pencil, Phone, Receipt, GraduationCap, PiggyBank, Wallet2,
+  Search, Loader2, Pencil, Phone, Receipt, GraduationCap, PiggyBank, Wallet2
 } from 'lucide-react'
+import { Modal, MODAL_BTN_PRIMARY
+} from '@/components/shared/Modal'
 
 // ─────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
@@ -359,69 +361,61 @@ function AddOnCommitmentsModal({
   const isLoading = feesLoading || commitmentsLoading
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
-      <div className="bg-surface rounded-xl shadow-xl max-w-md w-full max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-base">
-          <div>
-            <h3 className="font-heading font-semibold text-body">Edit Add-on Commitments</h3>
-            <p className="text-xs text-muted">{student.firstName} {student.lastName}</p>
-          </div>
-          <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-page text-muted" aria-label="Close">
-            <X className="w-5 h-5" />
-          </button>
+    <Modal
+      title="Edit Add-on Commitments"
+      description={`${student.firstName} ${student.lastName}`}
+      onClose={onClose}
+      size="md"
+      footer={
+        <>
+        <button
+          type="button" onClick={onClose}
+          className={MODAL_BTN_PRIMARY}
+        >
+          Done
+        </button>
+        </>
+      }
+    >
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => <div key={i} className="h-12 rounded-lg bg-page animate-pulse" />)}
         </div>
-
-        <div className="p-5">
-          {isLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => <div key={i} className="h-12 rounded-lg bg-page animate-pulse" />)}
-            </div>
-          ) : optionalFees.length === 0 ? (
-            <p className="text-sm text-muted text-center py-6">
-              No optional add-on services are defined for this student&rsquo;s class yet.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {optionalFees.map((fee) => {
-                const existing = commitmentFor(fee.id)
-                const isCommitted = existing?.status === 'COMMITTED'
-                const isPending =
-                  (upsert.isPending && upsert.variables?.feeStructureId === fee.id) ||
-                  (updateStatus.isPending && updateStatus.variables?.id === existing?.id)
-                return (
-                  <li key={fee.id} className="flex items-center justify-between gap-3 border border-base rounded-lg px-3 py-2.5">
-                    <label className="flex items-center gap-2.5 cursor-pointer min-w-0">
-                      <input
-                        type="checkbox"
-                        checked={isCommitted}
-                        disabled={isPending}
-                        onChange={() => toggle(fee)}
-                        className="w-4 h-4 rounded border-base shrink-0"
-                      />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium text-body truncate">{fee.name}</span>
-                        <span className="block text-xs text-muted">
-                          {FEE_CATEGORY_LABELS[fee.category as keyof typeof FEE_CATEGORY_LABELS] ?? fee.category} &middot; {formatMWK(fee.amount)}
-                        </span>
-                      </span>
-                    </label>
-                    {isPending && <Loader2 className="w-4 h-4 animate-spin text-muted shrink-0" />}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </div>
-
-        <div className="flex items-center justify-end px-5 py-4 border-t border-base">
-          <button
-            type="button" onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold bg-brand-deep text-white rounded-lg min-h-11"
-          >
-            Done
-          </button>
-        </div>
-      </div>
-    </div>
+      ) : optionalFees.length === 0 ? (
+        <p className="text-sm text-muted text-center py-6">
+          No optional add-on services are defined for this student&rsquo;s class yet.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {optionalFees.map((fee) => {
+            const existing = commitmentFor(fee.id)
+            const isCommitted = existing?.status === 'COMMITTED'
+            const isPending =
+              (upsert.isPending && upsert.variables?.feeStructureId === fee.id) ||
+              (updateStatus.isPending && updateStatus.variables?.id === existing?.id)
+            return (
+              <li key={fee.id} className="flex items-center justify-between gap-3 border border-base rounded-lg px-3 py-2.5">
+                <label className="flex items-center gap-2.5 cursor-pointer min-w-0">
+                  <input
+                    type="checkbox"
+                    checked={isCommitted}
+                    disabled={isPending}
+                    onChange={() => toggle(fee)}
+                    className="w-4 h-4 rounded border-base shrink-0"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-body truncate">{fee.name}</span>
+                    <span className="block text-xs text-muted">
+                      {FEE_CATEGORY_LABELS[fee.category as keyof typeof FEE_CATEGORY_LABELS] ?? fee.category} &middot; {formatMWK(fee.amount)}
+                    </span>
+                  </span>
+                </label>
+                {isPending && <Loader2 className="w-4 h-4 animate-spin text-muted shrink-0" />}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </Modal>
   )
 }

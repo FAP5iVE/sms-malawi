@@ -91,16 +91,17 @@ import {
   Loader2,
   UserPlus,
   Wallet,
-  X,
+  
   ChevronRight,
   LayoutGrid,
-  List,
+  List
 }                           from 'lucide-react'
 import Link                 from 'next/link'
 import { ModuleTabs }       from '@/components/shared/ModuleTabs'
 import { formatMWK }        from '@shared/constants/malawi'
 import { PayrollWorkspace } from '@/components/finances/payroll/PayrollWorkspace'
 import type { ApiStaffProfile, ApiLeaveRequest, ApiContractAlert, ApiStaffLoan } from '@shared/types/api'
+import { Modal } from '@/components/shared/Modal'
 
 /*
  * [CHANGE TYPE]: TARGETED EDIT
@@ -614,24 +615,13 @@ function HRContent() {
 
           {/* [R11] Conflict analysis shown after an approval that surfaced one */}
           {conflictPanel && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-              <div className="w-full max-w-lg bg-page rounded-2xl shadow-xl p-5 space-y-3 max-h-[85vh] overflow-y-auto">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-heading font-semibold text-body">
-                    Conflict Analysis — {conflictPanel.staffName}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setConflictPanel(null)}
-                    aria-label="Close"
-                    className="p-1.5 rounded-lg hover:bg-surface min-h-11 min-w-11 flex items-center justify-center"
-                  >
-                    <X className="w-4 h-4 text-muted" />
-                  </button>
-                </div>
-                <LeaveConflictWarning result={conflictPanel.result} />
-              </div>
-            </div>
+            <Modal
+              title={<>Conflict Analysis — {conflictPanel.staffName}</>}
+              onClose={() => setConflictPanel(null)}
+              size="lg"
+            >
+              <LeaveConflictWarning result={conflictPanel.result} />
+            </Modal>
           )}
         </div>
           )}

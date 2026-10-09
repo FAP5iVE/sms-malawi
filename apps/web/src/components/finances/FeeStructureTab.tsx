@@ -37,7 +37,8 @@ import {
 } from '@shared/constants/malawi'
 import type { ApiFeeStructure } from '@shared/types/api'
 import type { CreateFeeStructureInput } from '@shared/schemas/finance'
-import { Plus, Loader2, Globe, Pencil, Archive, ArchiveRestore, X, Wallet } from 'lucide-react'
+import { Plus, Loader2, Globe, Pencil, Archive, ArchiveRestore, Wallet } from 'lucide-react'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 // ─────────────────────────────────────────────────────────────────────────
 // BADGE HELPERS — literal-palette + explicit dark: variants, following
@@ -381,138 +382,134 @@ function FeeFormModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
-      <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-base">
-          <h3 className="font-heading font-semibold text-body">{isEditing ? 'Edit Fee Category' : 'Add Fee Category'}</h3>
-          <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-page text-muted" aria-label="Close">
-            <X className="w-5 h-5" />
-          </button>
+    <Modal
+      title={isEditing ? 'Edit Fee Category' : 'Add Fee Category'}
+      onClose={onClose}
+      size="lg"
+      busy={isPending}
+      bodyClassName="space-y-3"
+      footer={
+        <>
+        <button
+          type="button" onClick={onClose}
+          className={MODAL_BTN_SECONDARY}
+        >
+          Cancel
+        </button>
+        <button
+          type="button" onClick={handleSubmit} disabled={isPending || !canSubmit}
+          className={MODAL_BTN_PRIMARY}
+        >
+          {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          {isPending ? 'Saving…' : isEditing ? 'Save Changes' : 'Save Fee Category'}
+        </button>
+        </>
+      }
+    >
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="sm:col-span-2">
+          <label htmlFor="fee-name" className="text-xs text-muted mb-1 block">Fee name</label>
+          <input
+            id="fee-name" value={name} onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. School Fee (Tuition)"
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
         </div>
-
-        <div className="p-5 space-y-3">
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="sm:col-span-2">
-              <label htmlFor="fee-name" className="text-xs text-muted mb-1 block">Fee name</label>
-              <input
-                id="fee-name" value={name} onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. School Fee (Tuition)"
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div>
-              <label htmlFor="fee-code" className="text-xs text-muted mb-1 block">Code</label>
-              <input
-                id="fee-code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="e.g. TUI-01"
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 font-mono"
-              />
-            </div>
-            <div>
-              <label htmlFor="fee-category" className="text-xs text-muted mb-1 block">Category</label>
-              <select
-                id="fee-category" value={category} onChange={(e) => setCategory(e.target.value as typeof category)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                {FEE_CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="fee-amount" className="text-xs text-muted mb-1 block">Standard rate (MWK)</label>
-              <input
-                id="fee-amount" type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              />
-            </div>
-            <div>
-              <label htmlFor="fee-schedule" className="text-xs text-muted mb-1 block">Billing schedule</label>
-              <select
-                id="fee-schedule" value={schedule} onChange={(e) => setSchedule(e.target.value as typeof schedule)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                {FEE_SCHEDULE_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <label className="flex items-start gap-2.5 cursor-pointer">
-            <input
-              type="checkbox" checked={mandatory} onChange={(e) => setMandatory(e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded border-base"
-            />
-            <span className="text-sm text-body">
-              <span className="font-medium">Mandatory</span>
-              <span className="block text-xs text-muted">
-                {mandatory
-                  ? 'Applies automatically to every student in scope — no per-student opt-in needed.'
-                  : 'Optional add-on — students are billed only after being enrolled via Finance Fee Structure.'}
-              </span>
-            </span>
-          </label>
-
-          <div>
-            <label htmlFor="fee-description" className="text-xs text-muted mb-1 block">
-              Description <span className="text-muted/70">(optional)</span>
-            </label>
-            <textarea
-              id="fee-description" value={description} onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page resize-none"
-            />
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="fee-class" className="text-xs text-muted mb-1 block">
-                Class <span className="text-muted/70">(optional — blank = all classes)</span>
-              </label>
-              <select
-                id="fee-class" value={classId} onChange={(e) => setClassId(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                <option value="">All classes</option>
-                {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="fee-term" className="text-xs text-muted mb-1 block">
-                Term <span className="text-muted/70">(optional — blank = all terms)</span>
-              </label>
-              <select
-                id="fee-term" value={term} onChange={(e) => setTerm(e.target.value)}
-                className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-              >
-                <option value="">All terms</option>
-                <option value="1">Term 1</option>
-                <option value="2">Term 2</option>
-                <option value="3">Term 3</option>
-              </select>
-            </div>
-          </div>
-
-          {error && (
-            <p className="text-sm text-brand-coral">
-              {error instanceof Error ? error.message : 'Failed to save fee category.'}
-            </p>
-          )}
+        <div>
+          <label htmlFor="fee-code" className="text-xs text-muted mb-1 block">Code</label>
+          <input
+            id="fee-code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="e.g. TUI-01"
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 font-mono"
+          />
         </div>
-
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-base">
-          <button
-            type="button" onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-muted hover:text-body min-h-11"
+        <div>
+          <label htmlFor="fee-category" className="text-xs text-muted mb-1 block">Category</label>
+          <select
+            id="fee-category" value={category} onChange={(e) => setCategory(e.target.value as typeof category)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
           >
-            Cancel
-          </button>
-          <button
-            type="button" onClick={handleSubmit} disabled={isPending || !canSubmit}
-            className="inline-flex items-center gap-2 bg-brand-deep text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
+            {FEE_CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="fee-amount" className="text-xs text-muted mb-1 block">Standard rate (MWK)</label>
+          <input
+            id="fee-amount" type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          />
+        </div>
+        <div>
+          <label htmlFor="fee-schedule" className="text-xs text-muted mb-1 block">Billing schedule</label>
+          <select
+            id="fee-schedule" value={schedule} onChange={(e) => setSchedule(e.target.value as typeof schedule)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
           >
-            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {isPending ? 'Saving…' : isEditing ? 'Save Changes' : 'Save Fee Category'}
-          </button>
+            {FEE_SCHEDULE_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
         </div>
       </div>
-    </div>
+
+      <label className="flex items-start gap-2.5 cursor-pointer">
+        <input
+          type="checkbox" checked={mandatory} onChange={(e) => setMandatory(e.target.checked)}
+          className="mt-0.5 w-4 h-4 rounded border-base"
+        />
+        <span className="text-sm text-body">
+          <span className="font-medium">Mandatory</span>
+          <span className="block text-xs text-muted">
+            {mandatory
+              ? 'Applies automatically to every student in scope — no per-student opt-in needed.'
+              : 'Optional add-on — students are billed only after being enrolled via Finance Fee Structure.'}
+          </span>
+        </span>
+      </label>
+
+      <div>
+        <label htmlFor="fee-description" className="text-xs text-muted mb-1 block">
+          Description <span className="text-muted/70">(optional)</span>
+        </label>
+        <textarea
+          id="fee-description" value={description} onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page resize-none"
+        />
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="fee-class" className="text-xs text-muted mb-1 block">
+            Class <span className="text-muted/70">(optional — blank = all classes)</span>
+          </label>
+          <select
+            id="fee-class" value={classId} onChange={(e) => setClassId(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          >
+            <option value="">All classes</option>
+            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="fee-term" className="text-xs text-muted mb-1 block">
+            Term <span className="text-muted/70">(optional — blank = all terms)</span>
+          </label>
+          <select
+            id="fee-term" value={term} onChange={(e) => setTerm(e.target.value)}
+            className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+          >
+            <option value="">All terms</option>
+            <option value="1">Term 1</option>
+            <option value="2">Term 2</option>
+            <option value="3">Term 3</option>
+          </select>
+        </div>
+      </div>
+
+      {error && (
+        <p className="text-sm text-brand-coral">
+          {error instanceof Error ? error.message : 'Failed to save fee category.'}
+        </p>
+      )}
+    </Modal>
   )
 }

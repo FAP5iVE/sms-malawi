@@ -102,6 +102,7 @@ import {
   Send,
 } from 'lucide-react'
 import type { ApiExam, ApiClass } from '@shared/types/api'
+import { Modal } from '@/components/shared/Modal'
 
 const ALLOWED_ROLES = [
   'admin',
@@ -672,39 +673,32 @@ function ExamsPageInner() {
 
         {/* ET-1: exam detail */}
         {detailExamId && detailExam && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="Exam details">
-            <div className="absolute inset-0" onClick={() => setDetailExamId(null)} />
-      <div className="relative z-10 w-full max-w-lg modal-panel bg-surface rounded-2xl shadow-xl ">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-base">
-                <div>
-                  <h2 className="font-heading font-bold text-brand-navy">{detailExam.title}</h2>
-                  <p className="text-xs text-muted mt-0.5">{detailExam.type.replace(/_/g, ' ')} · {detailExam.status.replace(/_/g, ' ')}</p>
+          <Modal
+            title={detailExam.title}
+            description={`${detailExam.type.replace(/_/g, ' ')} · ${detailExam.status.replace(/_/g, ' ')}`}
+            onClose={() => setDetailExamId(null)}
+            size="lg"
+          >
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              {[
+                ['Subject', detailExam.subject],
+                ['Class', detailExam.className ?? detailExam.classId],
+                ['Date', new Date(detailExam.date).toLocaleDateString('en-MW', { day: '2-digit', month: 'short', year: 'numeric' })],
+                ['Time', `${detailExam.timeStart} – ${detailExam.timeEnd}`],
+                ['Venue', detailExam.venue],
+                ['Max mark', String(detailExam.maxMark)],
+                ['Weight', `${detailExam.weightPercent}%`],
+                ['Term', `Term ${detailExam.term} · ${detailExam.academicYear}`],
+                ['Students', detailExam.totalStudents != null ? String(detailExam.totalStudents) : '—'],
+                ['Marks entered', detailExam.marksEntered != null ? String(detailExam.marksEntered) : '—'],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-[11px] uppercase tracking-wide text-muted">{label}</dt>
+                  <dd className="text-body font-medium">{value}</dd>
                 </div>
-                <button type="button" onClick={() => setDetailExamId(null)} aria-label="Close" className="p-2 hover:bg-page rounded-xl">
-                  <ChevronRight className="w-4 h-4 text-muted rotate-90" />
-                </button>
-              </div>
-              <dl className="px-6 py-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                {[
-                  ['Subject', detailExam.subject],
-                  ['Class', detailExam.className ?? detailExam.classId],
-                  ['Date', new Date(detailExam.date).toLocaleDateString('en-MW', { day: '2-digit', month: 'short', year: 'numeric' })],
-                  ['Time', `${detailExam.timeStart} – ${detailExam.timeEnd}`],
-                  ['Venue', detailExam.venue],
-                  ['Max mark', String(detailExam.maxMark)],
-                  ['Weight', `${detailExam.weightPercent}%`],
-                  ['Term', `Term ${detailExam.term} · ${detailExam.academicYear}`],
-                  ['Students', detailExam.totalStudents != null ? String(detailExam.totalStudents) : '—'],
-                  ['Marks entered', detailExam.marksEntered != null ? String(detailExam.marksEntered) : '—'],
-                ].map(([label, value]) => (
-                  <div key={label}>
-                    <dt className="text-[11px] uppercase tracking-wide text-muted">{label}</dt>
-                    <dd className="text-body font-medium">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          </div>
+              ))}
+            </dl>
+          </Modal>
         )}
     </RoleGuard>
   )

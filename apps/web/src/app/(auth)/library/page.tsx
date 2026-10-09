@@ -95,7 +95,7 @@ import { DigitalResourceViewer } from '@/components/library/DigitalResourceViewe
 import {
   BookOpen, Scan, FileText, AlertTriangle, Eye, Check, X as XIcon, Undo2, Pencil, Archive,
   ArrowUpDown, Users2, Upload, Loader2, Repeat, Shield, Plus, Sparkles, LayoutGrid,
-  List, Download, Printer, Search, ArrowUpRight, ShieldCheck, ClipboardList, BookMarked,
+  List, Download, Printer, Search, ArrowUpRight, ShieldCheck, ClipboardList, BookMarked
 }                            from 'lucide-react'
 import { ModuleTabs }        from '@/components/shared/ModuleTabs'
 import { MALAWI_SUBJECTS, formatMWK } from '@shared/constants/malawi'
@@ -106,6 +106,7 @@ import type {
   ApiLibraryStats,
   ApiLibraryConditionEntry,
 }                            from '@shared/types/api'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 /*
  * [CHANGE TYPE]: TARGETED EDIT
@@ -304,87 +305,88 @@ function BookFormModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">{book ? 'Edit Book' : 'Add Book'}</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title={book ? 'Edit Book' : 'Add Book'}
+      onClose={onClose}
+      size="lg"
+      bodyClassName="space-y-3"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-3">
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="book-title" className="text-xs text-muted mb-1 block">Title</label>
-              <input id="book-title" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
-            </div>
-            <div>
-              <label htmlFor="book-author" className="text-xs text-muted mb-1 block">Author</label>
-              <input id="book-author" value={author} onChange={(e) => setAuthor(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
-            </div>
-            <div>
-              <label htmlFor="book-isbn" className="text-xs text-muted mb-1 block">ISBN <span className="text-muted/70">(unique — best identifier for issue/return)</span></label>
-              <input id="book-isbn" value={isbn} onChange={(e) => setIsbn(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
-            </div>
-            <div>
-              <label htmlFor="book-category" className="text-xs text-muted mb-1 block">Category</label>
-              <select id="book-category" value={category} onChange={(e) => setCategory(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11">
-                {['TEXTBOOK', 'REFERENCE', 'FICTION', 'NONFICTION', 'SCIENCE', 'MATHEMATICS', 'HUMANITIES', 'PAST_PAPER', 'OTHER'].map((c) => (
-                  <option key={c} value={c}>{c.charAt(0) + c.slice(1).toLowerCase().replace('_', ' ')}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="book-publisher" className="text-xs text-muted mb-1 block">Publisher</label>
-              <input id="book-publisher" value={publisher} onChange={(e) => setPublisher(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
-            </div>
-            <div>
-              <label htmlFor="book-year" className="text-xs text-muted mb-1 block">Published Year</label>
-              <input id="book-year" type="number" value={publishedYear} onChange={(e) => setPublishedYear(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
-            </div>
-            <div>
-              <label htmlFor="book-copies" className="text-xs text-muted mb-1 block">Total Copies</label>
-              <input id="book-copies" type="number" min="1" value={totalCopies} onChange={(e) => setTotalCopies(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
-            </div>
-            <div>
-              <label htmlFor="book-barcode" className="text-xs text-muted mb-1 block">Barcode <span className="text-muted/70">(optional)</span></label>
-              <input id="book-barcode" value={barcode} onChange={(e) => setBarcode(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
-            </div>
-            <div>
-              <label htmlFor="book-shelf" className="text-xs text-muted mb-1 block">Shelf <span className="text-muted/70">(e.g. M-02)</span></label>
-              <input id="book-shelf" value={shelf} onChange={(e) => setShelf(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
-            </div>
-          </div>
-
           <button
             type="button"
             onClick={handleSave}
             disabled={pending || !title.trim() || !author.trim()}
-            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {pending ? 'Saving…' : book ? 'Save Changes' : 'Add to Catalog'}
           </button>
-          {error && <p className="text-sm text-brand-coral">{error instanceof Error ? error.message : 'Something went wrong.'}</p>}
-
-          {book && (
-            <div className="pt-4 mt-2 border-t border-base">
-              {confirmArchive ? (
-                <div className="flex items-center gap-3">
-                  <p className="text-xs text-muted flex-1">Archive this book? It will be removed from the searchable catalog (copies set to 0).</p>
-                  <button type="button" onClick={handleArchive} disabled={pending} className="text-xs font-semibold text-brand-coral hover:underline shrink-0">Confirm</button>
-                  <button type="button" onClick={() => setConfirmArchive(false)} className="text-xs text-muted hover:underline shrink-0">Cancel</button>
-                </div>
-              ) : (
-                <button type="button" onClick={() => setConfirmArchive(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-coral hover:underline">
-                  <Archive className="w-3.5 h-3.5" /> Archive this book
-                </button>
-              )}
-            </div>
-          )}
+        </>
+      }
+    >
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="book-title" className="text-xs text-muted mb-1 block">Title</label>
+          <input id="book-title" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+        </div>
+        <div>
+          <label htmlFor="book-author" className="text-xs text-muted mb-1 block">Author</label>
+          <input id="book-author" value={author} onChange={(e) => setAuthor(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+        </div>
+        <div>
+          <label htmlFor="book-isbn" className="text-xs text-muted mb-1 block">ISBN <span className="text-muted/70">(unique — best identifier for issue/return)</span></label>
+          <input id="book-isbn" value={isbn} onChange={(e) => setIsbn(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+        </div>
+        <div>
+          <label htmlFor="book-category" className="text-xs text-muted mb-1 block">Category</label>
+          <select id="book-category" value={category} onChange={(e) => setCategory(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11">
+            {['TEXTBOOK', 'REFERENCE', 'FICTION', 'NONFICTION', 'SCIENCE', 'MATHEMATICS', 'HUMANITIES', 'PAST_PAPER', 'OTHER'].map((c) => (
+              <option key={c} value={c}>{c.charAt(0) + c.slice(1).toLowerCase().replace('_', ' ')}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="book-publisher" className="text-xs text-muted mb-1 block">Publisher</label>
+          <input id="book-publisher" value={publisher} onChange={(e) => setPublisher(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+        </div>
+        <div>
+          <label htmlFor="book-year" className="text-xs text-muted mb-1 block">Published Year</label>
+          <input id="book-year" type="number" value={publishedYear} onChange={(e) => setPublishedYear(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+        </div>
+        <div>
+          <label htmlFor="book-copies" className="text-xs text-muted mb-1 block">Total Copies</label>
+          <input id="book-copies" type="number" min="1" value={totalCopies} onChange={(e) => setTotalCopies(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+        </div>
+        <div>
+          <label htmlFor="book-barcode" className="text-xs text-muted mb-1 block">Barcode <span className="text-muted/70">(optional)</span></label>
+          <input id="book-barcode" value={barcode} onChange={(e) => setBarcode(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+        </div>
+        <div>
+          <label htmlFor="book-shelf" className="text-xs text-muted mb-1 block">Shelf <span className="text-muted/70">(e.g. M-02)</span></label>
+          <input id="book-shelf" value={shelf} onChange={(e) => setShelf(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
         </div>
       </div>
-    </div>
+
+      {error && <p className="text-sm text-brand-coral">{error instanceof Error ? error.message : 'Something went wrong.'}</p>}
+
+      {book && (
+        <div className="pt-4 mt-2 border-t border-base">
+          {confirmArchive ? (
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-muted flex-1">Archive this book? It will be removed from the searchable catalog (copies set to 0).</p>
+              <button type="button" onClick={handleArchive} disabled={pending} className="text-xs font-semibold text-brand-coral hover:underline shrink-0">Confirm</button>
+              <button type="button" onClick={() => setConfirmArchive(false)} className="text-xs text-muted hover:underline shrink-0">Cancel</button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setConfirmArchive(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-coral hover:underline">
+              <Archive className="w-3.5 h-3.5" /> Archive this book
+            </button>
+          )}
+        </div>
+      )}
+    </Modal>
   )
 }
 
@@ -412,72 +414,73 @@ function UploadDigitalResourceModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Add Digital Resource</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title="Add Digital Resource"
+      onClose={onClose}
+      size="lg"
+      bodyClassName="space-y-3"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-3">
-          <div>
-            <label htmlFor="dr-title" className="text-xs text-muted mb-1 block">Title</label>
-            <input id="dr-title" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="dr-type" className="text-xs text-muted mb-1 block">Type</label>
-              <select id="dr-type" value={type} onChange={(e) => setType(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11">
-                <option value="EBOOK">eBook</option>
-                <option value="PAST_PAPER">Past Paper</option>
-                <option value="REFERENCE">Reference</option>
-                <option value="STUDY_GUIDE">Study Guide</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="dr-form" className="text-xs text-muted mb-1 block">Form <span className="text-muted/70">(optional)</span></label>
-              <select id="dr-form" value={form} onChange={(e) => setForm(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11">
-                <option value="">All forms</option>
-                {[1, 2, 3, 4].map((f) => <option key={f} value={f}>Form {f}</option>)}
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="dr-subject" className="text-xs text-muted mb-1 block">Subject <span className="text-muted/70">(optional)</span></label>
-              <select id="dr-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11">
-                <option value="">All subjects</option>
-                {MALAWI_SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label htmlFor="dr-file" className="text-xs text-muted mb-1 block">File</label>
-            <input
-              id="dr-file"
-              type="file"
-              accept="application/pdf,image/*"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-teal/10 file:text-brand-teal file:text-xs file:font-semibold"
-            />
-          </div>
-
           <button
             type="button"
             onClick={handleSubmit}
             disabled={upload.isPending || !title.trim() || !file}
-            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {upload.isPending ? 'Uploading…' : 'Upload'}
           </button>
-          {upload.error && (
-            <p className="text-sm text-brand-coral">
-              {upload.error instanceof Error ? upload.error.message : 'Something went wrong.'}
-            </p>
-          )}
+        </>
+      }
+    >
+      <div>
+        <label htmlFor="dr-title" className="text-xs text-muted mb-1 block">Title</label>
+        <input id="dr-title" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="dr-type" className="text-xs text-muted mb-1 block">Type</label>
+          <select id="dr-type" value={type} onChange={(e) => setType(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11">
+            <option value="EBOOK">eBook</option>
+            <option value="PAST_PAPER">Past Paper</option>
+            <option value="REFERENCE">Reference</option>
+            <option value="STUDY_GUIDE">Study Guide</option>
+          </select>
+        </div>
+        <div>
+          <label htmlFor="dr-form" className="text-xs text-muted mb-1 block">Form <span className="text-muted/70">(optional)</span></label>
+          <select id="dr-form" value={form} onChange={(e) => setForm(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11">
+            <option value="">All forms</option>
+            {[1, 2, 3, 4].map((f) => <option key={f} value={f}>Form {f}</option>)}
+          </select>
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="dr-subject" className="text-xs text-muted mb-1 block">Subject <span className="text-muted/70">(optional)</span></label>
+          <select id="dr-subject" value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11">
+            <option value="">All subjects</option>
+            {MALAWI_SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
         </div>
       </div>
-    </div>
+      <div>
+        <label htmlFor="dr-file" className="text-xs text-muted mb-1 block">File</label>
+        <input
+          id="dr-file"
+          type="file"
+          accept="application/pdf,image/*"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-teal/10 file:text-brand-teal file:text-xs file:font-semibold"
+        />
+      </div>
+
+      {upload.error && (
+        <p className="text-sm text-brand-coral">
+          {upload.error instanceof Error ? upload.error.message : 'Something went wrong.'}
+        </p>
+      )}
+    </Modal>
   )
 }
 
@@ -690,73 +693,74 @@ function IssueBookModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Issue Book</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title="Issue Book"
+      onClose={onClose}
+      size="md"
+      bodyClassName="space-y-4"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-4">
-          {!bookId && (
-            <div>
-              <label className="text-xs text-muted mb-1 block">Book</label>
-              <BookPicker value={pickedBook} onChange={setPickedBook} />
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => { setBorrowerType('student'); setBorrower(null) }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${borrowerType === 'student' ? 'bg-brand-deep text-white border-brand-navy' : 'border-base text-body'}`}
-            >
-              Student
-            </button>
-            <button
-              type="button"
-              onClick={() => { setBorrowerType('staff'); setBorrower(null) }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${borrowerType === 'staff' ? 'bg-brand-deep text-white border-brand-navy' : 'border-base text-body'}`}
-            >
-              Staff
-            </button>
-          </div>
-
-          <div>
-            <label className="text-xs text-muted mb-1 block">
-              {borrowerType === 'student' ? 'Student' : 'Staff member'}
-            </label>
-            <BorrowerPicker type={borrowerType} value={borrower} onChange={setBorrower} />
-          </div>
-
-          <div>
-            <label htmlFor="issue-due-date" className="text-xs text-muted mb-1 block">Due date</label>
-            <input
-              id="issue-due-date"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-            />
-          </div>
-
           <button
             type="button"
             onClick={handleSubmit}
             disabled={issueBorrowing.isPending || !effectiveBookId || !borrower || !dueDate}
-            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {issueBorrowing.isPending ? 'Issuing…' : 'Issue Book'}
           </button>
-          {issueBorrowing.error && (
-            <p className="text-sm text-brand-coral">
-              {issueBorrowing.error instanceof Error ? issueBorrowing.error.message : 'Something went wrong.'}
-            </p>
-          )}
+        </>
+      }
+    >
+      {!bookId && (
+        <div>
+          <label className="text-xs text-muted mb-1 block">Book</label>
+          <BookPicker value={pickedBook} onChange={setPickedBook} />
         </div>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => { setBorrowerType('student'); setBorrower(null) }}
+          className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${borrowerType === 'student' ? 'bg-brand-deep text-white border-brand-navy' : 'border-base text-body'}`}
+        >
+          Student
+        </button>
+        <button
+          type="button"
+          onClick={() => { setBorrowerType('staff'); setBorrower(null) }}
+          className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${borrowerType === 'staff' ? 'bg-brand-deep text-white border-brand-navy' : 'border-base text-body'}`}
+        >
+          Staff
+        </button>
       </div>
-    </div>
+
+      <div>
+        <label className="text-xs text-muted mb-1 block">
+          {borrowerType === 'student' ? 'Student' : 'Staff member'}
+        </label>
+        <BorrowerPicker type={borrowerType} value={borrower} onChange={setBorrower} />
+      </div>
+
+      <div>
+        <label htmlFor="issue-due-date" className="text-xs text-muted mb-1 block">Due date</label>
+        <input
+          id="issue-due-date"
+          type="date"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        />
+      </div>
+
+      {issueBorrowing.error && (
+        <p className="text-sm text-brand-coral">
+          {issueBorrowing.error instanceof Error ? issueBorrowing.error.message : 'Something went wrong.'}
+        </p>
+      )}
+    </Modal>
   )
 }
 
@@ -806,83 +810,84 @@ function ReturnBookModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Return Book</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title="Return Book"
+      onClose={onClose}
+      size="md"
+      bodyClassName="space-y-4"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-4">
-          <p className="text-sm text-body"><strong>{bookTitle}</strong> — {borrowerName}</p>
-
-          <div>
-            <label className="text-xs text-muted mb-1.5 block">Condition on return</label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['GOOD', 'DAMAGED', 'LOST'] as const).map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setCondition(c)}
-                  className={`py-2 rounded-lg text-sm font-semibold border ${
-                    condition === c
-                      ? c === 'GOOD' ? 'bg-brand-teal text-white border-brand-teal' : 'bg-brand-coral text-white border-brand-coral'
-                      : 'border-base text-body'
-                  }`}
-                >
-                  {c.charAt(0) + c.slice(1).toLowerCase()}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {needsFee && (
-            <>
-              <div>
-                <label htmlFor="return-notes" className="text-xs text-muted mb-1 block">
-                  Describe the {condition === 'LOST' ? 'loss' : 'damage'}
-                </label>
-                <textarea
-                  id="return-notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  placeholder={condition === 'LOST' ? 'e.g. Never returned; reported lost by borrower.' : 'e.g. Torn binding and water spill on chapters 3-4.'}
-                  className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
-                />
-              </div>
-              <div>
-                <label htmlFor="return-fee" className="text-xs text-muted mb-1 block">Fine amount (MK) <span className="text-muted/70">(optional — leave blank to skip)</span></label>
-                <input
-                  id="return-fee"
-                  type="number"
-                  min="0"
-                  value={feeAmount}
-                  onChange={(e) => setFeeAmount(e.target.value)}
-                  className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
-                />
-              </div>
-            </>
-          )}
-
           <button
             type="button"
             onClick={handleSubmit}
             disabled={returnBook.isPending || assessFine.isPending}
-            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {returnBook.isPending || assessFine.isPending ? 'Processing…' : 'Confirm Return'}
           </button>
-          {returnBook.error && (
-            <p className="text-sm text-brand-coral">
-              {returnBook.error instanceof Error ? returnBook.error.message : 'Something went wrong.'}
-            </p>
-          )}
+        </>
+      }
+    >
+      <p className="text-sm text-body"><strong>{bookTitle}</strong> — {borrowerName}</p>
+
+      <div>
+        <label className="text-xs text-muted mb-1.5 block">Condition on return</label>
+        <div className="grid grid-cols-3 gap-2">
+          {(['GOOD', 'DAMAGED', 'LOST'] as const).map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCondition(c)}
+              className={`py-2 rounded-lg text-sm font-semibold border ${
+                condition === c
+                  ? c === 'GOOD' ? 'bg-brand-teal text-white border-brand-teal' : 'bg-brand-coral text-white border-brand-coral'
+                  : 'border-base text-body'
+              }`}
+            >
+              {c.charAt(0) + c.slice(1).toLowerCase()}
+            </button>
+          ))}
         </div>
       </div>
-    </div>
+
+      {needsFee && (
+        <>
+          <div>
+            <label htmlFor="return-notes" className="text-xs text-muted mb-1 block">
+              Describe the {condition === 'LOST' ? 'loss' : 'damage'}
+            </label>
+            <textarea
+              id="return-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              placeholder={condition === 'LOST' ? 'e.g. Never returned; reported lost by borrower.' : 'e.g. Torn binding and water spill on chapters 3-4.'}
+              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
+            />
+          </div>
+          <div>
+            <label htmlFor="return-fee" className="text-xs text-muted mb-1 block">Fine amount (MK) <span className="text-muted/70">(optional — leave blank to skip)</span></label>
+            <input
+              id="return-fee"
+              type="number"
+              min="0"
+              value={feeAmount}
+              onChange={(e) => setFeeAmount(e.target.value)}
+              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+            />
+          </div>
+        </>
+      )}
+
+      {returnBook.error && (
+        <p className="text-sm text-brand-coral">
+          {returnBook.error instanceof Error ? returnBook.error.message : 'Something went wrong.'}
+        </p>
+      )}
+    </Modal>
   )
 }
 
@@ -893,66 +898,60 @@ function BookDetailModal({ bookId, onClose }: { bookId: string; onClose: () => v
   const { data: book, isLoading } = useBook(bookId)
   const b = book as ApiBook | undefined
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Book Details</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
-          </button>
-        </div>
-        <div className="p-6 space-y-4">
-          {isLoading || !b ? (
-            <div className="text-center py-10 text-muted text-sm animate-pulse">Loading…</div>
-          ) : (
-            <>
-              <div>
-                <p className="font-heading font-bold text-lg text-brand-navy">{b.title}</p>
-                <p className="text-sm text-muted">{b.author}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><p className="text-xs text-muted">Category</p><p className="font-medium">{b.category}</p></div>
-                <div><p className="text-xs text-muted">Publisher</p><p className="font-medium">{b.publisher ?? '—'}</p></div>
-                <div><p className="text-xs text-muted">Year</p><p className="font-medium">{b.publishedYear ?? '—'}</p></div>
-                <div><p className="text-xs text-muted">ISBN</p><p className="font-medium">{b.isbn ?? '—'}</p></div>
-                <div><p className="text-xs text-muted">Barcode</p><p className="font-medium">{b.barcode ?? '—'}</p></div>
-                <div><p className="text-xs text-muted">Shelf</p><p className="font-medium">{b.shelf ?? '—'}</p></div>
-                <div><p className="text-xs text-muted">Copies</p><p className="font-medium">{b.totalCopies}</p></div>
-                <div><p className="text-xs text-muted">Available</p><p className={`font-semibold ${b.availableCopies === 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>{b.availableCopies}</p></div>
-              </div>
-              <div>
-                <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">Currently on loan</p>
-                {!b.borrowings || b.borrowings.length === 0 ? (
-                  <p className="text-sm text-muted">No copies currently checked out.</p>
-                ) : (
-                  <ul className="divide-y divide-base border border-base rounded-lg">
-                    {b.borrowings.map((loan) => {
-                      const { name } = borrowerLabel(loan)
-                      return (
-                        <li key={loan.id} className="px-3 py-2 text-sm flex items-center justify-between">
-                          <span>{name}</span>
-                          <span className="text-xs text-muted">Due {new Date(loan.dueDate).toLocaleDateString()}</span>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </div>
+    <Modal
+      title="Book Details"
+      onClose={onClose}
+      size="lg"
+      bodyClassName="space-y-4"
+    >
+      {isLoading || !b ? (
+        <div className="text-center py-10 text-muted text-sm animate-pulse">Loading…</div>
+      ) : (
+        <>
+          <div>
+            <p className="font-heading font-bold text-lg text-brand-navy">{b.title}</p>
+            <p className="text-sm text-muted">{b.author}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div><p className="text-xs text-muted">Category</p><p className="font-medium">{b.category}</p></div>
+            <div><p className="text-xs text-muted">Publisher</p><p className="font-medium">{b.publisher ?? '—'}</p></div>
+            <div><p className="text-xs text-muted">Year</p><p className="font-medium">{b.publishedYear ?? '—'}</p></div>
+            <div><p className="text-xs text-muted">ISBN</p><p className="font-medium">{b.isbn ?? '—'}</p></div>
+            <div><p className="text-xs text-muted">Barcode</p><p className="font-medium">{b.barcode ?? '—'}</p></div>
+            <div><p className="text-xs text-muted">Shelf</p><p className="font-medium">{b.shelf ?? '—'}</p></div>
+            <div><p className="text-xs text-muted">Copies</p><p className="font-medium">{b.totalCopies}</p></div>
+            <div><p className="text-xs text-muted">Available</p><p className={`font-semibold ${b.availableCopies === 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>{b.availableCopies}</p></div>
+          </div>
+          <div>
+            <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">Currently on loan</p>
+            {!b.borrowings || b.borrowings.length === 0 ? (
+              <p className="text-sm text-muted">No copies currently checked out.</p>
+            ) : (
+              <ul className="divide-y divide-base border border-base rounded-lg">
+                {b.borrowings.map((loan) => {
+                  const { name } = borrowerLabel(loan)
+                  return (
+                    <li key={loan.id} className="px-3 py-2 text-sm flex items-center justify-between">
+                      <span>{name}</span>
+                      <span className="text-xs text-muted">Due {new Date(loan.dueDate).toLocaleDateString()}</span>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
 
-              {/* [R21.2] "no where to change [a book's] status" outside of
-                  the return flow — marks a shelf copy damaged/lost right
-                  from here, independent of any loan. Copies out on loan
-                  are still marked via the Return flow (they have a real
-                  borrower to attribute the condition to). */}
-              <PermissionGuard any={['library.markDamaged', 'library.markLost']}>
-                <MarkConditionSection book={b} onClose={onClose} />
-              </PermissionGuard>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+          {/* [R21.2] "no where to change [a book's] status" outside of
+              the return flow — marks a shelf copy damaged/lost right
+              from here, independent of any loan. Copies out on loan
+              are still marked via the Return flow (they have a real
+              borrower to attribute the condition to). */}
+          <PermissionGuard any={['library.markDamaged', 'library.markLost']}>
+            <MarkConditionSection book={b} onClose={onClose} />
+          </PermissionGuard>
+        </>
+      )}
+    </Modal>
   )
 }
 
@@ -1094,60 +1093,61 @@ function AssessFineModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Assess Fine</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
+    <Modal
+      title="Assess Fine"
+      onClose={onClose}
+      size="md"
+      bodyClassName="space-y-4"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-4">
-          <div className="flex gap-2">
-            <button type="button" onClick={() => { setBorrowerType('student'); setBorrower(null) }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${borrowerType === 'student' ? 'bg-brand-deep text-white border-brand-navy' : 'border-base text-body'}`}>
-              Student
-            </button>
-            <button type="button" onClick={() => { setBorrowerType('staff'); setBorrower(null) }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${borrowerType === 'staff' ? 'bg-brand-deep text-white border-brand-navy' : 'border-base text-body'}`}>
-              Staff
-            </button>
-          </div>
-          <div>
-            <label className="text-xs text-muted mb-1 block">{borrowerType === 'student' ? 'Student' : 'Staff member'}</label>
-            <BorrowerPicker type={borrowerType} value={borrower} onChange={setBorrower} />
-          </div>
-          <div>
-            <label htmlFor="fine-book-title" className="text-xs text-muted mb-1 block">Book title</label>
-            <input id="fine-book-title" value={bookTitle} onChange={(e) => setBookTitle(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
-          </div>
-          <div>
-            <label htmlFor="fine-amount" className="text-xs text-muted mb-1 block">Amount (MK)</label>
-            <input id="fine-amount" type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
-          </div>
-          <div>
-            <label htmlFor="fine-reason" className="text-xs text-muted mb-1 block">Reason</label>
-            <textarea id="fine-reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={2}
-              placeholder="e.g. Book returned damaged. Torn binding and water spill on chapters 3-4."
-              className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page" />
-          </div>
           <button
             type="button"
             onClick={handleSubmit}
             disabled={assessFine.isPending || !borrower || !bookTitle.trim() || !reason.trim() || !(Number(amount) > 0)}
-            className="w-full bg-brand-deep text-white rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60 min-h-11"
+            className={MODAL_BTN_PRIMARY}
           >
             {assessFine.isPending ? 'Assessing…' : 'Assess Fine'}
           </button>
-          {assessFine.error && (
-            <p className="text-sm text-brand-coral">
-              {assessFine.error instanceof Error ? assessFine.error.message : 'Something went wrong.'}
-            </p>
-          )}
-        </div>
+        </>
+      }
+    >
+      <div className="flex gap-2">
+        <button type="button" onClick={() => { setBorrowerType('student'); setBorrower(null) }}
+          className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${borrowerType === 'student' ? 'bg-brand-deep text-white border-brand-navy' : 'border-base text-body'}`}>
+          Student
+        </button>
+        <button type="button" onClick={() => { setBorrowerType('staff'); setBorrower(null) }}
+          className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${borrowerType === 'staff' ? 'bg-brand-deep text-white border-brand-navy' : 'border-base text-body'}`}>
+          Staff
+        </button>
       </div>
-    </div>
+      <div>
+        <label className="text-xs text-muted mb-1 block">{borrowerType === 'student' ? 'Student' : 'Staff member'}</label>
+        <BorrowerPicker type={borrowerType} value={borrower} onChange={setBorrower} />
+      </div>
+      <div>
+        <label htmlFor="fine-book-title" className="text-xs text-muted mb-1 block">Book title</label>
+        <input id="fine-book-title" value={bookTitle} onChange={(e) => setBookTitle(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+      </div>
+      <div>
+        <label htmlFor="fine-amount" className="text-xs text-muted mb-1 block">Amount (MK)</label>
+        <input id="fine-amount" type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
+      </div>
+      <div>
+        <label htmlFor="fine-reason" className="text-xs text-muted mb-1 block">Reason</label>
+        <textarea id="fine-reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={2}
+          placeholder="e.g. Book returned damaged. Torn binding and water spill on chapters 3-4."
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page" />
+      </div>
+      {assessFine.error && (
+        <p className="text-sm text-brand-coral">
+          {assessFine.error instanceof Error ? assessFine.error.message : 'Something went wrong.'}
+        </p>
+      )}
+    </Modal>
   )
 }
 
@@ -1167,45 +1167,39 @@ function ClearanceCheckerModal({ allFines, onClose }: {
   const isClear = !!borrower && outstandingLoans.length === 0 && pendingFines.length === 0
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg min-h-[440px] max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl">
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy">Student Library Clearance Audit</h2>
-          <button onClick={onClose} aria-label="Close" className="p-1.5 hover:bg-page rounded-lg">
-            <XIcon className="w-4 h-4 text-muted" />
-          </button>
-        </div>
-        <div className="p-6 space-y-4">
-          <div>
-            <label className="text-xs text-muted mb-1 block">Student</label>
-            <BorrowerPicker type="student" value={borrower} onChange={setBorrower} />
-          </div>
+    <Modal
+      title="Student Library Clearance Audit"
+      onClose={onClose}
+      size="lg"
+      bodyClassName="space-y-4"
+    >
+      <div>
+        <label className="text-xs text-muted mb-1 block">Student</label>
+        <BorrowerPicker type="student" value={borrower} onChange={setBorrower} />
+      </div>
 
-          {borrower && (
-            <div className={`rounded-xl p-4 border ${isClear ? 'bg-brand-teal/8 border-brand-teal/25' : 'bg-brand-coral/8 border-brand-coral/25'}`}>
-              <p className={`font-heading font-semibold text-sm ${isClear ? 'text-brand-teal' : 'text-brand-coral'}`}>
-                {isClear ? 'Cleared — no outstanding books or fines' : 'Not cleared'}
-              </p>
-              {!isClear && (
-                <div className="mt-3 space-y-2">
-                  {outstandingLoans.map((loan) => (
-                    <p key={loan.id} className="text-sm text-body">
-                      📕 {loan.book?.title ?? 'Untitled'} — {borrowingDisplayStatus(loan) === 'OVERDUE' ? borrowingCountdownLabel(loan) : `due ${new Date(loan.dueDate).toLocaleDateString()}`}
-                    </p>
-                  ))}
-                  {pendingFines.map((f) => (
-                    <p key={f.id} className="text-sm text-body">
-                      💰 {f.bookTitle} — {formatMWK(f.amount)} pending
-                    </p>
-                  ))}
-                </div>
-              )}
+      {borrower && (
+        <div className={`rounded-xl p-4 border ${isClear ? 'bg-brand-teal/8 border-brand-teal/25' : 'bg-brand-coral/8 border-brand-coral/25'}`}>
+          <p className={`font-heading font-semibold text-sm ${isClear ? 'text-brand-teal' : 'text-brand-coral'}`}>
+            {isClear ? 'Cleared — no outstanding books or fines' : 'Not cleared'}
+          </p>
+          {!isClear && (
+            <div className="mt-3 space-y-2">
+              {outstandingLoans.map((loan) => (
+                <p key={loan.id} className="text-sm text-body">
+                  📕 {loan.book?.title ?? 'Untitled'} — {borrowingDisplayStatus(loan) === 'OVERDUE' ? borrowingCountdownLabel(loan) : `due ${new Date(loan.dueDate).toLocaleDateString()}`}
+                </p>
+              ))}
+              {pendingFines.map((f) => (
+                <p key={f.id} className="text-sm text-body">
+                  💰 {f.bookTitle} — {formatMWK(f.amount)} pending
+                </p>
+              ))}
             </div>
           )}
         </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   )
 }
 

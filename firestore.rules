@@ -54,20 +54,30 @@ service cloud.firestore {
       return request.auth.uid;
     }
 
+    /**
+     * The alpha_admin super user: carries the `superUser: true` custom claim
+     * (set only by the Admin SDK — see packages/shared/constants/superUser.ts).
+     * Passes every role helper below. `.get(key, default)` keeps this safe
+     * for the vast majority of tokens that have no such claim at all.
+     */
+    function isSuper() {
+      return isAuth() && request.auth.token.get('superUser', false) == true;
+    }
+
     function isAdmin() {
-      return isAuth() && role() == 'admin';
+      return isSuper() || (isAuth() && role() == 'admin');
     }
 
     function isHighRankOrAdmin() {
-      return isAuth() && role() in ['admin', 'high_rank'];
+      return isSuper() || (isAuth() && role() in ['admin', 'high_rank']);
     }
 
     /** All staff roles — everyone except students. */
     function isStaff() {
-      return isAuth() && role() in [
+      return isSuper() || (isAuth() && role() in [
         'admin', 'high_rank', 'finance', 'library',
         'lower_rank', 'academic', 'hr', 'exam_officer',
-      ];
+      ]);
     }
 
     /**
@@ -76,11 +86,11 @@ service cloud.firestore {
      * have supervisory write access.
      */
     function canWriteAttendance() {
-      return isAuth() && role() in ['admin', 'high_rank', 'academic', 'exam_officer', 'lower_rank'];
+      return isSuper() || (isAuth() && role() in ['admin', 'high_rank', 'academic', 'exam_officer', 'lower_rank']);
     }
 
     function isStudent() {
-      return isAuth() && role() == 'student';
+      return isSuper() || (isAuth() && role() == 'student');
     }
 
     // ── ATTENDANCE ────────────────────────────────────────

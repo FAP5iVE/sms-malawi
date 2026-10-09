@@ -22,7 +22,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput, CreateAllowanceInput } from '@shared/schemas/hr'
-import type { ApiStaffLoan, ApiLeaveRequest, ApiContractAlert, ApiStaffProfile } from '@shared/types/api'
+import type { ApiStaffLoan, ApiLeaveRequest, ApiContractAlert, ApiStaffProfile, ApiStaffPickerOption } from '@shared/types/api'
 import type { ConflictCheckResult } from '@/server/services/leaveConflictService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { STALE } from '@/components/providers/QueryProvider'
@@ -46,6 +46,17 @@ export function useTeacherRoster() {
   return useQuery({
     queryKey: queryKeys.hr.teacherRoster(),
     queryFn: () => apiFetch<ApiStaffProfile[]>('/hr/teacher-roster'),
+  })
+}
+
+// [FIX 2026-10] Staff options for "choose a person" controls (asset allocation).
+// Backed by GET /hr/staff-picker — usable by roles that are NOT in the real
+// staff directory's role list (finance), unlike useStaffDirectory().
+export function useStaffPicker() {
+  return useQuery({
+    queryKey: queryKeys.hr.staffPicker(),
+    queryFn: () => apiFetch<ApiStaffPickerOption[]>('/hr/staff-picker'),
+    staleTime: STALE.MEDIUM,
   })
 }
 

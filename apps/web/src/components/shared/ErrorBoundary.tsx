@@ -21,6 +21,11 @@ import { AlertTriangle } from 'lucide-react'
 
 interface ErrorBoundaryProps {
   children: ReactNode
+  /** When this value changes (e.g. the pathname), a previously caught error is
+   *  cleared so the new page gets a fresh attempt. Without it, the boundary
+   *  living in the persistent app shell would keep showing the error screen
+   *  after navigating away from the page that crashed, until a full reload. */
+  resetKey?: string
 }
 
 interface ErrorBoundaryState {
@@ -37,6 +42,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   componentDidCatch(error: Error, info: { componentStack?: string | null }) {
     // eslint-disable-next-line no-console
     console.error('[ErrorBoundary] Caught render error:', error, info.componentStack)
+  }
+
+  componentDidUpdate(prev: ErrorBoundaryProps) {
+    if (this.state.error && prev.resetKey !== this.props.resetKey) {
+      this.setState({ error: null })
+    }
+  }
+
+  handleRetry = () => {
+    this.setState({ error: null })
   }
 
   handleReload = () => {
@@ -57,13 +72,22 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               Please try reloading. If the problem continues, contact your system administrator.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={this.handleReload}
-            className="min-h-[44px] px-5 rounded-xl bg-brand-teal text-white text-sm font-semibold hover:opacity-90 transition-opacity"
-          >
-            Reload page
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={this.handleRetry}
+              className="min-h-[44px] px-5 rounded-xl border border-base text-body text-sm font-semibold hover:bg-page transition-colors"
+            >
+              Try again
+            </button>
+            <button
+              type="button"
+              onClick={this.handleReload}
+              className="min-h-[44px] px-5 rounded-xl bg-brand-teal text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              Reload page
+            </button>
+          </div>
         </div>
       )
     }

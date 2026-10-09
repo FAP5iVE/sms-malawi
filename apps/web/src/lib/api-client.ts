@@ -343,6 +343,8 @@ export const queryKeys = {
     /** GET /hr/teacher-roster — academic staff picker (see hr.ts's own
      *  header comment for the full rationale and permission gate). */
     teacherRoster: () => ['hr', 'teacher-roster'] as const,
+    /** GET /hr/staff-picker — minimal staff options for any "choose a person" control. */
+    staffPicker: () => ['hr', 'staff-picker'] as const,
     contractAlerts: (days?: number) => ['hr', 'contract-alerts', days ?? 60] as const,
     contractAlertsUpcoming: (days?: number) => ['hr', 'contract-alerts-upcoming', days ?? 60] as const,
   },

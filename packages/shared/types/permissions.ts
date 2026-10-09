@@ -55,6 +55,15 @@
  *   those routes on it explicitly. finance receives it because its own
  *   fee-statement lookup by studentId is the same capability applied to the
  *   finance domain; no other role does.
+ *
+ *   [2026-10 — Attendance visibility] adds 'class.viewAttendance' (read-only
+ *   view of a class's attendance register) and grants it to every role
+ *   that already holds class.viewAnalytics: admin, high_rank, lower_rank,
+ *   academic, exam_officer. Previously GET /attendance/class/:id was gated
+ *   by class.markAttendance (academic only) PLUS a teacher-ownership check,
+ *   so even *viewing* a register 403'd for everyone except that class's own
+ *   teacher. Viewing is now separated from marking: class.markAttendance
+ *   (and the ownership check on POST) is unchanged.
  * [DEPENDS ON]: none
  */
 import type { UserRole } from './roles'
@@ -112,7 +121,8 @@ export type Permission =
   | 'class.viewAssignments'          // View class assignments
   | 'class.submitAssignment'         // Submit an assignment (student)
   | 'class.viewAnalytics'            // View class analytics panel
-  | 'class.markAttendance'           // Mark and view attendance for a class (R6)
+  | 'class.markAttendance'           // Mark attendance for a class — the class's own assigned teacher only (per-class ownership is enforced in attendance.ts)
+  | 'class.viewAttendance'           // View a class's attendance register, READ-ONLY (no marking) — oversight roles and non-owning teachers
 
   // ── APPLICATION ──────────────────────────────────────
   | 'application.view'               // View admission applications
@@ -438,6 +448,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'class.assignSubject',   // manage subject-teacher assignments (class structure, not results)
     'class.manageSubjectPresets', // set a class's preset subject list (with high_rank/lower_rank)
     'class.viewAnalytics',
+    'class.viewAttendance',
 
     // Applications — oversight
     'application.view',
@@ -603,6 +614,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'class.manageSubjectPresets',
     'class.assignRoom',
     'class.viewAnalytics',
+    'class.viewAttendance',
 
     // Applications — full access
     'application.view',
@@ -1033,6 +1045,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'class.softDelete',
     'class.manageSubjectPresets', // set a class's preset subject list (with admin/high_rank)
     'class.viewAnalytics',
+    'class.viewAttendance',
 
     // Applications — partial access with approval limits
     'application.view',
@@ -1116,6 +1129,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'class.giveAssignment',
     'class.viewAssignments',
     'class.viewAnalytics',
+    'class.viewAttendance',
     'class.markAttendance',
 
     // Applications — no access (§3.8.1.6)
@@ -1310,6 +1324,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Classes — view and analytics
     'class.view',
     'class.viewAnalytics',
+    'class.viewAttendance',
     'class.assignSubject',
 
     // Announcements — own only, pending approval

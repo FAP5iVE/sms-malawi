@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import type { ReactNode } from 'react'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { Loader2, Plus, Play, ClipboardCheck } from 'lucide-react'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import { useStocktakes, useCreateStocktake, useStartStocktake, useCompleteStocktake, useStocktake, useRecordStocktakeLine, useResolveInventoryVariance, type Stocktake, type StocktakeLine } from '@/hooks/useAssetsInventory'
+import { Modal } from '@/components/shared/Modal'
 
 function humanize(value: string) { return value.replace(/_/g, ' ').toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()) }
 function num(v: number | string | undefined) { return Number(v ?? 0) }
@@ -31,14 +31,14 @@ function StocktakeRow({ row, onOpen }: { row: Stocktake; onOpen: () => void }) {
 function StocktakeDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const { data, isLoading } = useStocktake(id)
   const complete = useCompleteStocktake()
-  if (isLoading || !data) return <Modal title="Stocktake" onClose={onClose}><div className="py-8 text-center"><Loader2 className="inline w-5 h-5 animate-spin" /></div></Modal>
+  if (isLoading || !data) return <Modal size="xl" title="Stocktake" onClose={onClose}><div className="py-8 text-center"><Loader2 className="inline w-5 h-5 animate-spin" /></div></Modal>
   // Only IN_PROGRESS is countable/completable — DRAFT hasn't been started yet,
   // REVIEWED/COMPLETED/CANCELLED are already closed out.
   const canComplete = data.status === 'IN_PROGRESS'
   // No filtering needed here: variances only get created once completeStocktake()
   // runs, so every line is still open for counting while IN_PROGRESS.
   const lines = data.lines ?? []
-  return <Modal title={`Stocktake · ${data.stocktakeNumber}`} onClose={onClose}>
+  return <Modal size="xl" title={`Stocktake · ${data.stocktakeNumber}`} onClose={onClose}>
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3"><Mini label="Status" value={humanize(data.status)} /><Mini label="Lines" value={String(data.lines?.length ?? 0)} /><Mini label="Open variances" value={String((data.variances ?? []).filter(v => v.status === 'OPEN' || v.status === 'INVESTIGATING').length)} /></div>
 
@@ -107,4 +107,3 @@ function VarianceRow({ stocktakeId, varianceId, varianceQuantity, varianceType, 
 }
 
 function Mini({ label, value }: { label: string; value: string }) { return <div className="bg-page border border-base rounded-lg p-3"><p className="text-xs text-muted">{label}</p><p className="font-semibold mt-1">{value}</p></div> }
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) { return <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"><div className="absolute inset-0" onClick={onClose} /><div className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl p-6"><div className="flex justify-between items-center mb-5"><h2 className="font-heading font-bold text-brand-navy">{title}</h2><button type="button" onClick={onClose} className="text-muted">Close</button></div>{children}</div></div> }

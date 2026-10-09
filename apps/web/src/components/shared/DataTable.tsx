@@ -64,6 +64,7 @@
  */
 
 import { useState, useMemo, useRef, useEffect }  from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ChevronDown,
@@ -369,7 +370,12 @@ function MobileActionsSheet<T>({
 
   if (!row) return null
 
-  return (
+  // Portaled to <body>: rendered inline this sheet lived inside the page's
+  // z-10 stacking context (ModuleSurface), so the fixed mobile bottom nav
+  // painted over its lower actions. See components/shared/Modal.tsx.
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <AnimatePresence>
       {row && (
         <>
@@ -434,7 +440,8 @@ function MobileActionsSheet<T>({
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
 

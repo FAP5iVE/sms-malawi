@@ -37,7 +37,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
 import { z } from 'zod'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -46,8 +45,8 @@ import type { CreateTimetableSlotInput } from '@shared/schemas/student'
 import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
 import { useCreateTimetableSlot, useClassSubjects } from '@/hooks/useClasses'
 import { TeacherSelect } from '@/components/shared/TeacherSelect'
-import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, AlertTriangle } from 'lucide-react'
+import { Loader2, AlertTriangle } from 'lucide-react'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 // CreateTimetableSlotSchema has a defaulted field (type), so its INPUT type
 // differs from its OUTPUT type (CreateTimetableSlotInput). Parameterise useForm
@@ -125,183 +124,159 @@ export function TimetableSlotForm({ classId, academicYear, term, onClose }: Prop
   // AnnouncementForm.tsx/StaffForm.tsx/StudentForm.tsx/ExamForm.tsx.
   if (typeof document === 'undefined') return null
 
-  return createPortal(
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        <div className="absolute inset-0" onClick={onClose} />
-        <motion.div
-     className="relative z-10 w-full max-w-md modal-panel bg-surface rounded-2xl shadow-xl "
-          initial={{ scale: 0.96, y: 12 }}
-          animate={{ scale: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+  return (
+    <Modal
+      title="Add Timetable Slot"
+      onClose={onClose}
+      size="md"
+      onSubmit={handleSubmit(onSubmit)}
+      busy={createSlot.isPending}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className={MODAL_BTN_SECONDARY}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={createSlot.isPending}
+            className={MODAL_BTN_PRIMARY}
+          >
+            {createSlot.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Add Slot
+          </button>
+        </>
+      }
+    >
+      <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-full text-xs text-muted -mb-1">
+          Term {term} · {academicYear}
+        </div>
+
+        <div>
+          <label className={lbl} htmlFor="ts-day">
+            Day
+          </label>
+          <select id="ts-day" {...register('day')} className={ic} defaultValue="">
+            <option value="" disabled>
+              Select day…
+            </option>
+            {DAYS.map((d) => (
+              <option key={d} value={d}>
+                {d.charAt(0) + d.slice(1).toLowerCase()}
+              </option>
+            ))}
+          </select>
+          {errors.day && (
+            <p className="text-xs text-brand-coral mt-1" role="alert">
+              {errors.day.message}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className={lbl} htmlFor="ts-type">
+            Type
+          </label>
+          <select id="ts-type" {...register('type')} className={ic}>
+            {TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className={lbl} htmlFor="ts-start">
+            Start time
+          </label>
+          <input id="ts-start" type="time" {...register('periodStart')} className={ic} />
+          {errors.periodStart && (
+            <p className="text-xs text-brand-coral mt-1" role="alert">
+              {errors.periodStart.message}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className={lbl} htmlFor="ts-end">
+            End time
+          </label>
+          <input id="ts-end" type="time" {...register('periodEnd')} className={ic} />
+          {errors.periodEnd && (
+            <p className="text-xs text-brand-coral mt-1" role="alert">
+              {errors.periodEnd.message}
+            </p>
+          )}
+        </div>
+
+        <div className="col-span-full">
+          <label className={lbl} htmlFor="ts-subject">
+            Subject
+          </label>
+          <select id="ts-subject" {...register('subject')} className={ic} defaultValue="">
+            <option value="" disabled>
+              Select subject…
+            </option>
+            {MALAWI_SUBJECTS.map((s) => (
+              <option key={s} value={s} disabled={hasPresets && !presetSubjects.includes(s)}>
+                {s}
+                {hasPresets && !presetSubjects.includes(s)
+                  ? ' (not offered by this class)'
+                  : ''}
+              </option>
+            ))}
+          </select>
+          {errors.subject && (
+            <p className="text-xs text-brand-coral mt-1" role="alert">
+              {errors.subject.message}
+            </p>
+          )}
+          {!hasPresets && (
+            <p className="text-xs text-muted mt-1">
+              This class has no preset subjects yet — every subject is selectable until they
+              are set.
+            </p>
+          )}
+        </div>
+
+        <div className="col-span-full">
+          <label className={lbl} htmlFor="ts-teacher">
+            Teacher
+          </label>
+          <TeacherSelect
+            id="ts-teacher"
+            value={teacherUid}
+            onChange={(uid) => setValue('teacherUid', uid, { shouldValidate: true })}
+            placeholder="Search teacher…"
+          />
+          {errors.teacherUid && (
+            <p className="text-xs text-brand-coral mt-1" role="alert">
+              {errors.teacherUid.message}
+            </p>
+          )}
+        </div>
+
+        <div className="col-span-full">
+          <label className={lbl} htmlFor="ts-room">
+            Room (optional)
+          </label>
+          <input id="ts-room" {...register('room')} className={ic} placeholder="e.g. Lab 2" />
+        </div>
+      </div>
+      {submitError && (
+        <p
+          role="alert"
+          className="mt-4 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
         >
-          <div className="flex items-center justify-between px-6 py-4 border-b border-base">
-            <h2 className="font-heading font-bold text-brand-navy">Add Timetable Slot</h2>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="p-2 hover:bg-page rounded-xl min-h-11 min-w-11 flex items-center justify-center"
-            >
-              <X className="w-4 h-4 text-muted" />
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="overflow-y-auto max-h-[80vh]">
-            <div className="p-6 grid grid-cols-2 gap-4">
-              <div className="col-span-full text-xs text-muted -mb-1">
-                Term {term} · {academicYear}
-              </div>
-
-              <div>
-                <label className={lbl} htmlFor="ts-day">
-                  Day
-                </label>
-                <select id="ts-day" {...register('day')} className={ic} defaultValue="">
-                  <option value="" disabled>
-                    Select day…
-                  </option>
-                  {DAYS.map((d) => (
-                    <option key={d} value={d}>
-                      {d.charAt(0) + d.slice(1).toLowerCase()}
-                    </option>
-                  ))}
-                </select>
-                {errors.day && (
-                  <p className="text-xs text-brand-coral mt-1" role="alert">
-                    {errors.day.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className={lbl} htmlFor="ts-type">
-                  Type
-                </label>
-                <select id="ts-type" {...register('type')} className={ic}>
-                  {TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className={lbl} htmlFor="ts-start">
-                  Start time
-                </label>
-                <input id="ts-start" type="time" {...register('periodStart')} className={ic} />
-                {errors.periodStart && (
-                  <p className="text-xs text-brand-coral mt-1" role="alert">
-                    {errors.periodStart.message}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className={lbl} htmlFor="ts-end">
-                  End time
-                </label>
-                <input id="ts-end" type="time" {...register('periodEnd')} className={ic} />
-                {errors.periodEnd && (
-                  <p className="text-xs text-brand-coral mt-1" role="alert">
-                    {errors.periodEnd.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="col-span-full">
-                <label className={lbl} htmlFor="ts-subject">
-                  Subject
-                </label>
-                <select id="ts-subject" {...register('subject')} className={ic} defaultValue="">
-                  <option value="" disabled>
-                    Select subject…
-                  </option>
-                  {MALAWI_SUBJECTS.map((s) => (
-                    <option key={s} value={s} disabled={hasPresets && !presetSubjects.includes(s)}>
-                      {s}
-                      {hasPresets && !presetSubjects.includes(s)
-                        ? ' (not offered by this class)'
-                        : ''}
-                    </option>
-                  ))}
-                </select>
-                {errors.subject && (
-                  <p className="text-xs text-brand-coral mt-1" role="alert">
-                    {errors.subject.message}
-                  </p>
-                )}
-                {!hasPresets && (
-                  <p className="text-xs text-muted mt-1">
-                    This class has no preset subjects yet — every subject is selectable until they
-                    are set.
-                  </p>
-                )}
-              </div>
-
-              <div className="col-span-full">
-                <label className={lbl} htmlFor="ts-teacher">
-                  Teacher
-                </label>
-                <TeacherSelect
-                  id="ts-teacher"
-                  value={teacherUid}
-                  onChange={(uid) => setValue('teacherUid', uid, { shouldValidate: true })}
-                  placeholder="Search teacher…"
-                />
-                {errors.teacherUid && (
-                  <p className="text-xs text-brand-coral mt-1" role="alert">
-                    {errors.teacherUid.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="col-span-full">
-                <label className={lbl} htmlFor="ts-room">
-                  Room (optional)
-                </label>
-                <input id="ts-room" {...register('room')} className={ic} placeholder="e.g. Lab 2" />
-              </div>
-            </div>
-
-            {submitError && (
-              <p
-                role="alert"
-                className="mx-6 mb-4 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
-              >
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
-                {submitError}
-              </p>
-            )}
-
-            <div className="px-6 py-4 border-t border-base flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-5 py-2.5 text-sm border border-base rounded-xl hover:bg-page min-h-11"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={createSlot.isPending}
-                className="px-5 py-2.5 text-sm bg-brand-teal text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 hover:bg-brand-teal-light min-h-11"
-              >
-                {createSlot.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Add Slot
-              </button>
-            </div>
-          </form>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>,
-    document.body,
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
+          {submitError}
+        </p>
+      )}
+    </Modal>
   )
 }

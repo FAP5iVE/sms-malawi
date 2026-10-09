@@ -36,6 +36,17 @@
  *      high_rank/exam_officer open a UI that would then 403 on every
  *      interaction, exactly the class of front-end/back-end mismatch this
  *      audit repeatedly flags.
+ *   6. [2026-10 — Attendance visibility] VIEWING and MARKING are now two
+ *      separate capabilities, both decided from the permission matrix (not
+ *      hardcoded role lists):
+ *        • class.viewAttendance — admin, high_rank, lower_rank, academic,
+ *          exam_officer: sees the Attendance tab and the full register,
+ *          read-only, for ANY class.
+ *        • class.markAttendance + being this class's assigned teacher —
+ *          the only way to get the editable register.
+ *      Roles with neither (students) don't get the tab at all. If a viewer
+ *      is somehow refused by the API, AttendanceSheet shows an inline
+ *      "restricted" panel instead of crashing the page.
  * [DEPENDS ON]: apps/web/src/hooks/useClasses.ts, @shared/types/api,
  *   apps/web/src/components/classes/AssignmentForm.tsx,
  *   apps/web/src/components/classes/AttendanceSheet.tsx (rewritten in the
@@ -49,6 +60,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useClass, useClassTimetable } from '@/hooks/useClasses'
 import { useAuthStore } from '@/store/authStore'
+import { usePermissions } from '@/hooks/usePermissions'
 import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import type { ApiTimetableSlot } from '@shared/types/api'
 import { RoleGuard } from '@/components/shared/RoleGuard'
@@ -83,6 +95,10 @@ export default function ClassDetailPage() {
   )
 }
 
+// Stable fallback — an inline `?? []` yields a new array identity every render,
+// which AttendanceSheet's reference-based state re-seeding treats as a change.
+const NO_STUDENTS: RosterStudent[] = []
+
 interface RosterStudent {
   id: string
   firstName: string
@@ -96,6 +112,7 @@ function ClassDetailContent() {
   const { id } = useParams<{ id: string }>()
   const { data: cls, isLoading } = useClass(id)
   const { role, user } = useAuthStore()
+   const { can } = usePermissions()
   // Follows the universal header filter; the term select below writes through to it.
   const { term, setTerm } = useEffectiveViewingPeriod()
   const { data: slots = [] } = useClassTimetable(id, term)
@@ -120,12 +137,14 @@ function ClassDetailContent() {
   // render, then hit an unhandled backend error the moment it tried to
   // load. Checking ownership here means the UI can react appropriately
   // instead of surfacing that as a raw error.
-  const isAssignedTeacher = role === 'academic' && cls?.teacherId === user?.uid
-  // Other staff who hold class.viewAnalytics (school-wide oversight, not a
-  // per-class teaching relationship) — see attendance for the day,
-  // read-only, rather than either an error or a wall.
-  const canViewAttendanceReadOnly =
-    !isAssignedTeacher && (['admin', 'high_rank', 'exam_officer', 'lower_rank'].includes(role ?? '') || role === 'academic')
+  // [2026-10] Marking = holds class.markAttendance AND is this class's
+  // assigned teacher (the API enforces the same pair on POST).
+  const canMarkAttendance =
+    can('class.markAttendance') && !!cls?.teacherId && cls.teacherId === user?.uid
+  // Viewing = holds class.viewAttendance. Everyone who can see the tab but
+  // can't mark gets the same register in read-only mode — no restrictions
+  // on WHICH class they may look at.
+  const canViewAttendance = can('class.viewAttendance')
 
   if (isLoading) {
     return (
@@ -142,7 +161,9 @@ function ClassDetailContent() {
 
   const TABS: TabItem<Tab>[] = [
     { id: 'roster', label: 'Students', icon: Users },
-    ...(role !== 'student' ? [{ id: 'attendance' as Tab, label: 'Attendance', icon: ClipboardCheck }] : []),
+    // Hidden entirely for roles with no business here (e.g. students) rather
+    // than offering a tab that can only dead-end.
+    ...(canViewAttendance ? [{ id: 'attendance' as Tab, label: 'Attendance', icon: ClipboardCheck }] : []),
     { id: 'timetable', label: 'Timetable', icon: Clock },
     { id: 'assignments', label: 'Assignments', icon: BookOpen, badge: assignments.length },
   ]
@@ -242,7 +263,7 @@ function ClassDetailContent() {
 
       {activeTab === 'roster' && (
         <DataTable<RosterStudent>
-          data={cls.students ?? []}
+          data={cls.students ?? NO_STUDENTS}
           isLoading={false}
           columns={rosterColumns}
           rowKey="id"
@@ -252,13 +273,20 @@ function ClassDetailContent() {
 
       {activeTab === 'attendance' && (
         <div className="space-y-3">
-          {isAssignedTeacher ? (
-            <AttendanceSheet classId={id} students={cls.students ?? []} />
-          ) : canViewAttendanceReadOnly ? (
-            <AttendanceSheet classId={id} students={cls.students ?? []} readOnly />
+          {canMarkAttendance ? (
+            <AttendanceSheet classId={id} students={cls.students ?? NO_STUDENTS} />
+          ) : canViewAttendance ? (
+            <AttendanceSheet
+              classId={id}
+              students={cls.students ?? NO_STUDENTS}
+              readOnly
+              classTeacherName={cls.teacherName}
+            />
           ) : (
+            // Defensive: the tab is hidden for these roles, so this is only
+            // reachable if permissions change while the page is open.
             <div className="bg-surface rounded-xl p-6 text-center text-sm text-muted">
-              Only this class&apos;s assigned teacher can mark attendance.
+              You don&apos;t have permission to view this class&apos;s attendance.
             </div>
           )}
         </div>

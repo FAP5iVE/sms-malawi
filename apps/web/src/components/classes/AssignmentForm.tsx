@@ -16,25 +16,16 @@
 'use client'
 
 import { useState } from 'react'
-import { useIsMobileSync } from '@/hooks/use-mobile'
-import { createPortal } from 'react-dom'
 import { useForm } from 'react-hook-form'
 import type { Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AnimatePresence, motion } from 'framer-motion'
-import { AlertCircle, X } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { CreateAssignmentSchema } from '@shared/schemas/student'
 import type { CreateAssignmentInput } from '@shared/schemas/student'
 import { useCreateAssignment } from '@/hooks/useClasses'
-import { useMotionEnabled } from '@/store/motionStore'
 import { Field, inputCls } from '@/components/students/StudentFormSections'
-import {
-  SHEET_UP_VARIANTS,
-  OVERLAY_VARIANTS,
-  reducedMotionVariants,
-  reducedMotionTransition,
-  DURATION,
-} from '@/lib/motion'
+import { Modal, MODAL_BTN_PRIMARY
+} from '@/components/shared/Modal'
 
 interface AssignmentFormProps {
   classId: string
@@ -43,13 +34,8 @@ interface AssignmentFormProps {
 
 export default function AssignmentForm({ classId, onClose }: AssignmentFormProps) {
   const { mutate: createAssignment, isPending } = useCreateAssignment()
-  const motionEnabled = useMotionEnabled()
 
-  const [visible, setVisible] = useState(true)
   const [submitError, setSubmitError] = useState<string | null>(null)
-
-  // Live breakpoint — see useIsMobileSync() (was a one-shot read at mount).
-  const isMobile = useIsMobileSync()
 
   const {
     register,
@@ -60,8 +46,7 @@ export default function AssignmentForm({ classId, onClose }: AssignmentFormProps
   })
 
   function handleClose() {
-    setVisible(false)
-    // onClose() is called by AnimatePresence onExitComplete
+    onClose()
   }
 
   function onSubmit(data: CreateAssignmentInput) {
@@ -76,20 +61,6 @@ export default function AssignmentForm({ classId, onClose }: AssignmentFormProps
       }
     )
   }
-
-  const backdropVariants   = reducedMotionVariants(motionEnabled, OVERLAY_VARIANTS)
-  const backdropTransition = reducedMotionTransition(motionEnabled, { duration: DURATION.fast })
-  const sheetVariants      = reducedMotionVariants(motionEnabled, SHEET_UP_VARIANTS)
-  const dialogVariants = reducedMotionVariants(motionEnabled, {
-    hidden:  { opacity: 0, scale: 0.96, y: 12 },
-    visible: { opacity: 1, scale: 1,    y: 0  },
-    exit:    { opacity: 0, scale: 0.96, y: 12 },
-  })
-  const dialogTransition = reducedMotionTransition(motionEnabled, {
-    type: 'spring',
-    stiffness: 400,
-    damping: 30,
-  })
 
   const formBody = (
     <>
@@ -136,157 +107,34 @@ export default function AssignmentForm({ classId, onClose }: AssignmentFormProps
     </>
   )
 
-  // [PRODUCTION FIX] Both render paths below now portal directly under
-  // <body> — same reasoning as StudentForm.tsx (this file has the same
-  // mobile/desktop dual-render structure).
-  if (typeof document === 'undefined') return null
-
-  if (isMobile) {
-    return createPortal(
-      <AnimatePresence onExitComplete={onClose}>
-        {visible && (
-          <>
-            <motion.div
-              key="assignment-form-backdrop"
-              variants={backdropVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              transition={backdropTransition}
-              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px]"
-              onClick={handleClose}
-              aria-hidden
-            />
-            <motion.div
-              key="assignment-form-sheet"
-              variants={sheetVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="fixed inset-x-0 bottom-0 z-50 flex flex-col bg-surface rounded-t-2xl shadow-2xl max-h-[92dvh] overflow-hidden"
-              style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-              role="dialog"
-              aria-label="New assignment"
-              aria-modal="true"
-            >
-              <div className="flex justify-center pt-3 pb-1 shrink-0" aria-hidden>
-                <span className="w-10 h-1 rounded-full bg-muted/25" />
-              </div>
-
-              <div className="flex items-center justify-between px-5 py-3 border-b border-base shrink-0">
-                <h2 className="font-heading font-bold text-base text-body">New Assignment</h2>
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-muted hover:bg-page hover:text-body transition-colors"
-                  aria-label="Close form"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form
-                onSubmit={handleSubmit(onSubmit)}
-                className="flex-1 overflow-y-auto flex flex-col"
-              >
-                <div className="flex flex-col gap-4 px-5 py-4">
-                  {formBody}
-                </div>
-
-                <div className="shrink-0 px-5 py-4 border-t border-base bg-surface mt-auto">
-                  <button
-                    type="submit"
-                    disabled={isPending}
-                    className="w-full min-h-[44px] rounded-xl bg-brand-teal text-white font-heading font-semibold text-sm hover:bg-brand-teal-light transition-colors disabled:opacity-60"
-                  >
-                    {isPending ? 'Creating…' : 'Create Assignment'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>,
-      document.body,
-    )
-  }
-
-  return createPortal(
-    <AnimatePresence onExitComplete={onClose}>
-      {visible && (
-        <motion.div
-          key="assignment-form-overlay"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
-          variants={backdropVariants}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
-          transition={backdropTransition}
-        >
-          <div
-            className="absolute inset-0 bg-brand-navy/50 backdrop-blur-sm"
+  return (
+    <Modal
+      title="New Assignment"
+      onClose={handleClose}
+      size="md"
+      onSubmit={handleSubmit(onSubmit)}
+      busy={isPending}
+      bodyClassName="flex flex-col gap-4"
+      footer={
+        <>
+          <button
+            type="button"
             onClick={handleClose}
-            aria-hidden
-          />
-
-          <motion.div
-            key="assignment-form-dialog"
-            variants={dialogVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            transition={dialogTransition}
-            className="relative z-10 w-full max-w-md bg-surface rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh]"
-            role="dialog"
-            aria-label="New assignment"
-            aria-modal="true"
+            className="min-h-[44px] px-4 rounded-xl text-sm font-heading font-semibold text-muted hover:bg-page transition-colors"
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-base shrink-0">
-              <div>
-                <h2 className="font-heading font-bold text-lg text-brand-navy">New Assignment</h2>
-                <p className="text-xs text-muted font-sans mt-0.5">
-                  Create an assignment for this class.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleClose}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-page text-muted hover:text-body transition-colors"
-                aria-label="Close dialog"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form
-              onSubmit={handleSubmit(onSubmit)}
-              className="flex-1 overflow-y-auto flex flex-col"
-            >
-              <div className="flex flex-col gap-4 px-6 py-5">
-                {formBody}
-              </div>
-
-              <div className="shrink-0 px-6 py-4 border-t border-base bg-surface flex justify-end gap-3 mt-auto">
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="min-h-[44px] px-4 rounded-xl text-sm font-heading font-semibold text-muted hover:bg-page transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="min-h-[44px] px-5 rounded-xl bg-brand-teal text-white font-heading font-semibold text-sm hover:bg-brand-teal-light transition-colors disabled:opacity-60"
-                >
-                  {isPending ? 'Creating…' : 'Create Assignment'}
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body,
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isPending}
+            className={MODAL_BTN_PRIMARY}
+          >
+            {isPending ? 'Creating…' : 'Create Assignment'}
+          </button>
+        </>
+      }
+    >
+      {formBody}
+    </Modal>
   )
 }

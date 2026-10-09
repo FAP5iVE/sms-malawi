@@ -27,15 +27,15 @@
  */
 'use client'
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { format, parseISO } from 'date-fns'
-import { Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Loader2, X } from 'lucide-react'
+import { Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Loader2 } from 'lucide-react'
 import { MotionBottomSheet } from '@/components/shared/MotionBottomSheet'
 import { useCreateCalendarEvent, useUpdateCalendarEvent } from '@/hooks/useCalendarEvents'
 import { CreateCalendarEventSchema } from '@shared/schemas/calendarEvent'
 import { CALENDAR_COLORS } from '@shared/types/calendar'
 import type { CalendarEvent, CalendarEventCategory } from '@shared/types/calendar'
 import { CATEGORY_LEGEND, DEFAULT_EVENT_CATEGORY, manualEventDbId } from './calendarConfig'
+import { Modal } from '@/components/shared/Modal'
 
 interface CalendarEventFormDialogProps {
   open: boolean
@@ -389,32 +389,18 @@ export function CalendarEventFormDialog({
   // <body> now, for the same reason.
   if (typeof document === 'undefined') return null
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
-      onClick={onClose}
+  return (
+    <Modal
+      title={
+        <span className="flex items-center gap-2">
+          <CalendarIcon className="w-4 h-4 text-brand-teal" aria-hidden="true" />
+          {isEditing ? 'Edit Event' : 'New Calendar Event'}
+        </span>
+      }
+      onClose={onClose}
+      size="lg"
     >
-      <div
-        className="bg-surface rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sticky top-0 z-10 bg-surface flex items-center justify-between px-6 py-4 border-b border-base">
-          <h2 className="font-heading font-bold text-brand-navy flex items-center gap-2">
-            <CalendarIcon className="w-4 h-4 text-brand-teal" aria-hidden="true" />
-            {isEditing ? 'Edit Event' : 'New Calendar Event'}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close event form"
-            className="p-1.5 hover:bg-page rounded-lg"
-          >
-            <X className="w-4 h-4 text-muted" aria-hidden="true" />
-          </button>
-        </div>
-        <div className="p-6">{formBody}</div>
-      </div>
-    </div>,
-    document.body,
+      {formBody}
+    </Modal>
   )
 }

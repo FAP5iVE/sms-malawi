@@ -57,7 +57,9 @@ import { TeacherSelect } from '@/components/shared/TeacherSelect'
 import { ClassSubjectsField } from '@/components/classes/ClassSubjectsField'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import type { ApiClass } from '@shared/types/api'
-import { Users, ChevronRight, UserPlus, Pencil, Archive, X, Inbox, ArchiveRestore, GraduationCap } from 'lucide-react'
+import { Users, ChevronRight, UserPlus, Pencil, Archive, Inbox, ArchiveRestore, GraduationCap } from 'lucide-react'
+import { Modal, MODAL_BTN_PRIMARY
+} from '@/components/shared/Modal'
 
 // [BUGFIX 2026-09-16] These were bg-*-50/border-*-200 — at that lightness
 // the tint reads as barely-there/washed-out against the page background
@@ -381,114 +383,96 @@ function ClassFormDialog({ onClose, classToEdit, classes, activeYear, onCreated 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      <div className="absolute inset-0 bg-brand-navy/50 backdrop-blur-sm" onClick={onClose} aria-hidden />
-      <div
-        className="relative z-10 w-full max-w-md bg-surface rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh]"
-        role="dialog"
-        aria-label={isEdit ? 'Edit class' : 'Add new class'}
-        aria-modal="true"
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-base shrink-0">
-          <h2 className="font-heading font-bold text-lg text-brand-navy">
-            {isEdit ? 'Edit Class' : 'Add New Class'}
-          </h2>
+    <Modal
+      title={isEdit ? 'Edit Class' : 'Add New Class'}
+      onClose={onClose}
+      size="md"
+      onSubmit={handleSubmit(onSubmit)}
+      busy={isPending}
+      bodyClassName="flex flex-col gap-4"
+      footer={
+        <>
           <button
             type="button"
             onClick={onClose}
-            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl hover:bg-page text-muted hover:text-body transition-colors"
-            aria-label="Close dialog"
+            className="min-h-[44px] px-4 rounded-xl text-sm font-heading font-semibold text-muted hover:bg-page transition-colors"
           >
-            <X className="w-5 h-5" />
+            Cancel
           </button>
+          <button
+            type="submit"
+            disabled={isPending}
+            className={MODAL_BTN_PRIMARY}
+          >
+            {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Class'}
+          </button>
+        </>
+      }
+    >
+      <Field label="Class Name" error={errors.name?.message} required>
+        <input type="text" {...register('name')} placeholder="e.g. Form 1A" className={inputCls} />
+      </Field>
+      <Field label="Form" error={errors.form?.message} required>
+        <select {...register('form', { valueAsNumber: true })} className={inputCls}>
+          {[1, 2, 3, 4].map((f) => (
+            <option key={f} value={f}>Form {f}</option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Stream" error={errors.stream?.message}>
+        <input type="text" {...register('stream')} placeholder="e.g. Science (optional)" className={inputCls} />
+      </Field>
+      <Field label="Room" error={errors.room?.message}>
+        <input type="text" {...register('room')} placeholder="e.g. Room 12 (optional)" className={inputCls} />
+      </Field>
+      {/* [BUGFIX 2026-09-16] Was a free-text "Teacher Firebase UID"
+          input — replaced with a searchable, name-based staff picker
+          (GET /hr/teacher-roster, academic staff only). Only shown to
+          roles that actually hold class.assignTeacher (high_rank) —
+          classService enforces the same boundary server-side, so
+          showing this to lower_rank would only produce a confusing
+          403 on save. */}
+      {canAssignTeacher ? (
+        <Field label="Class Teacher" error={errors.teacherId?.message}>
+          <TeacherSelect
+            value={watch('teacherId')}
+            onChange={(uid) => setValue('teacherId', uid, { shouldValidate: true, shouldDirty: true })}
+            disabledUids={disabledTeacherUids}
+            disabledReason={(t) => `${t.firstName} ${t.lastName} is already the class teacher of another class for ${formYear}.`}
+            placeholder="Optional — search teacher…"
+          />
+        </Field>
+      ) : (
+        <p className="text-xs text-muted -mt-1">
+          Only a high-ranking staff member can assign a class teacher.
+        </p>
+      )}
+      <Field label="Academic Year" error={errors.academicYear?.message} required>
+        <AcademicYearSelect
+          value={watch('academicYear')}
+          {...register('academicYear')}
+          className={inputCls}
+        />
+      </Field>
+
+      {submitError && (
+        <p role="alert" className="text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
+          {submitError}
+        </p>
+      )}
+
+      {/* Subjects can only be set once the class has an id — new
+          classes are routed straight into edit mode after creation
+          (see onCreated above) specifically so this section is
+          reachable in the same flow. */}
+      {isEdit && (
+        <div className="pt-2 border-t border-base">
+          <p className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
+            Subjects Taken by This Class
+          </p>
+          <ClassSubjectsField classId={classToEdit!.id} readOnly={!canManageSubjects} />
         </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto flex flex-col">
-          <div className="flex flex-col gap-4 px-6 py-5">
-            <Field label="Class Name" error={errors.name?.message} required>
-              <input type="text" {...register('name')} placeholder="e.g. Form 1A" className={inputCls} />
-            </Field>
-            <Field label="Form" error={errors.form?.message} required>
-              <select {...register('form', { valueAsNumber: true })} className={inputCls}>
-                {[1, 2, 3, 4].map((f) => (
-                  <option key={f} value={f}>Form {f}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Stream" error={errors.stream?.message}>
-              <input type="text" {...register('stream')} placeholder="e.g. Science (optional)" className={inputCls} />
-            </Field>
-            <Field label="Room" error={errors.room?.message}>
-              <input type="text" {...register('room')} placeholder="e.g. Room 12 (optional)" className={inputCls} />
-            </Field>
-            {/* [BUGFIX 2026-09-16] Was a free-text "Teacher Firebase UID"
-                input — replaced with a searchable, name-based staff picker
-                (GET /hr/teacher-roster, academic staff only). Only shown to
-                roles that actually hold class.assignTeacher (high_rank) —
-                classService enforces the same boundary server-side, so
-                showing this to lower_rank would only produce a confusing
-                403 on save. */}
-            {canAssignTeacher ? (
-              <Field label="Class Teacher" error={errors.teacherId?.message}>
-                <TeacherSelect
-                  value={watch('teacherId')}
-                  onChange={(uid) => setValue('teacherId', uid, { shouldValidate: true, shouldDirty: true })}
-                  disabledUids={disabledTeacherUids}
-                  disabledReason={(t) => `${t.firstName} ${t.lastName} is already the class teacher of another class for ${formYear}.`}
-                  placeholder="Optional — search teacher…"
-                />
-              </Field>
-            ) : (
-              <p className="text-xs text-muted -mt-1">
-                Only a high-ranking staff member can assign a class teacher.
-              </p>
-            )}
-            <Field label="Academic Year" error={errors.academicYear?.message} required>
-              <AcademicYearSelect
-                value={watch('academicYear')}
-                {...register('academicYear')}
-                className={inputCls}
-              />
-            </Field>
-
-            {submitError && (
-              <p role="alert" className="text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
-                {submitError}
-              </p>
-            )}
-
-            {/* Subjects can only be set once the class has an id — new
-                classes are routed straight into edit mode after creation
-                (see onCreated above) specifically so this section is
-                reachable in the same flow. */}
-            {isEdit && (
-              <div className="pt-2 border-t border-base">
-                <p className="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">
-                  Subjects Taken by This Class
-                </p>
-                <ClassSubjectsField classId={classToEdit!.id} readOnly={!canManageSubjects} />
-              </div>
-            )}
-          </div>
-
-          <div className="shrink-0 px-6 py-4 border-t border-base bg-surface flex justify-end gap-3 mt-auto">
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-[44px] px-4 rounded-xl text-sm font-heading font-semibold text-muted hover:bg-page transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isPending}
-              className="min-h-[44px] px-5 rounded-xl bg-brand-teal text-white font-heading font-semibold text-sm hover:bg-brand-teal-light transition-colors disabled:opacity-60"
-            >
-              {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Class'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      )}
+    </Modal>
   )
 }

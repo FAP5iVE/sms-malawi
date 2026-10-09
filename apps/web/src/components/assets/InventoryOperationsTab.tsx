@@ -14,6 +14,7 @@ import {
   useAdjustInventory,
   type InventoryItem,
 } from '@/hooks/useAssetsInventory'
+import { Modal } from '@/components/shared/Modal'
 
 function n(value: number | string | null | undefined) { return Number(value ?? 0) }
 function humanize(value: string) { return value.replace(/_/g, ' ').toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()) }
@@ -101,7 +102,7 @@ function InventoryItemForm({ item, onClose }: { item?: InventoryItem; onClose: (
     if (item) update.mutate({ id: item.id, ...common }, { onSuccess: onClose })
     else { if (!itemCode.trim() || !name.trim() || !unitOfMeasure.trim()) return; create.mutate({ itemCode: itemCode.trim(), unitOfMeasure: unitOfMeasure.trim(), ...common }, { onSuccess: onClose }) }
   }
-  return <Modal title={item ? `Edit ${item.name}` : 'New inventory item'} onClose={onClose}>
+  return <Modal size="lg" title={item ? `Edit ${item.name}` : 'New inventory item'} onClose={onClose}>
     <div className="space-y-3">
       {!item && <Field label="Item code"><input value={itemCode} onChange={(e) => setItemCode(e.target.value)} className="input" placeholder="INV-001" /></Field>}
       <Field label="Name"><input value={name} onChange={(e) => setName(e.target.value)} className="input" /></Field>
@@ -130,7 +131,7 @@ function InventoryOperationModal({ item, operation, onClose }: { item: Inventory
     if (operation === 'transfer') { if (!from || !to) return; transfer.mutate({ inventoryItemId: item.id, quantity: qty, sourceRoomId: from, destinationRoomId: to, reason: reason.trim() || undefined }, { onSuccess: onClose }) }
     if (operation === 'adjust') { if (!reason.trim()) return; adjust.mutate({ inventoryItemId: item.id, quantity: qty, direction, reason: reason.trim() }, { onSuccess: onClose }) }
   }
-  return <Modal title={`${humanize(operation)} stock`} onClose={onClose}>
+  return <Modal size="lg" title={`${humanize(operation)} stock`} onClose={onClose}>
     <p className="text-sm text-muted mb-4">{item.name} · {item.itemCode}</p>
     <div className="space-y-3">
       {operation === 'adjust' && <Field label="Direction">
@@ -151,10 +152,9 @@ function InventoryOperationModal({ item, operation, onClose }: { item: Inventory
 
 function InventoryHistoryModal({ item, onClose }: { item: InventoryItem; onClose: () => void }) {
   const { data = [], isLoading } = useInventoryTransactions(item.id)
-  return <Modal title={`Movement · ${item.name}`} onClose={onClose}>
+  return <Modal size="lg" title={`Movement · ${item.name}`} onClose={onClose}>
     {isLoading ? <div className="py-8 text-center"><Loader2 className="inline w-5 h-5 animate-spin" /></div> : data.length === 0 ? <p className="py-8 text-center text-sm text-muted">No movement recorded.</p> : <div className="space-y-2 max-h-96 overflow-y-auto">{data.map((row) => <div key={row.id} className="border border-base rounded-lg p-3"><div className="flex justify-between gap-3"><span className="font-medium">{humanize(row.transactionType)}</span><span className="tabular">{n(row.quantity)} {item.unitOfMeasure}</span></div><p className="text-xs text-muted mt-1">{new Date(row.createdAt).toLocaleString()} · {row.reason || 'No reason supplied'}</p></div>)}</div>}
   </Modal>
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="text-xs text-muted block mb-1">{label}</span>{children}</label> }
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) { return <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"><div className="absolute inset-0" onClick={onClose} /><div className="relative z-10 w-full max-w-lg bg-surface rounded-2xl shadow-xl p-6"><div className="flex justify-between items-center mb-5"><h2 className="font-heading font-bold text-brand-navy">{title}</h2><button type="button" onClick={onClose} className="text-muted">Close</button></div>{children}</div></div> }

@@ -125,6 +125,21 @@ hrRouter.get('/teacher-roster', verifyAuth,
     return res.json(staff)
   })
 
+// [FIX 2026-10 — Assets "Allocate" dropdown was empty for Finance Staff]
+// The Allocate dialog filled its staff <select> from GET / (the real directory),
+// which is role-gated to admin/hr/high_rank. finance — the only role holding
+// assets.allocateItem — got a 403, the hook swallowed it, and the dropdown
+// rendered with just "Select…". Same remedy as /salary-roster and
+// /teacher-roster above: a purpose-scoped picker route rather than widening
+// the directory. Unlike those two it returns a MINIMAL projection (id, name,
+// employee no., department, job title) via hrService.listStaffForPicker().
+// Registered before GET /:id so the literal path isn't shadowed.
+hrRouter.get('/staff-picker', verifyAuth,
+  requireAnyPermission(['assets.allocateItem', 'hr.viewAnyProfile']),
+  async (_req, res) => {
+    return res.json(await hrService.listStaffForPicker())
+  })
+
 hrRouter.get('/:id', verifyAuth, requireRole([...REVIEWERS]),
   async (req, res) => {return res.json(await hrService.getStaffProfile(String(req.params.id)))})
 

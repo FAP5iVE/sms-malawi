@@ -33,30 +33,18 @@
  *   5. Colour-block status highlights replaced with font colour only — the
  *      brand tokens are theme-aware, so they read correctly in light AND
  *      dark mode, which `bg-green-100 text-green-700` did not.
- *   6. [PDF PREVIEW] "View Report Card" now opens the report card PDF in the
- *      browser's own PDF viewer (new tab) via the shared openPdfPreview(),
- *      so the student can review it and download/print with the browser's
- *      controls. It reuses the student's existing generated PDF
- *      (GET /exams/report-card/:id, same ownership + fee-gate checks) and
- *      only generates one (POST /exams/report-card/mine) if none exists yet.
- *      If the PDF cannot be opened for any reason, it falls back to the
- *      on-screen PrintableReportCard modal from SR-3, so this is never
- *      worse than before.
- * [DEPENDS ON]: @/hooks/useExams (useStudentResults, useReportCardData,
- *   useGenerateMyReportCard), @/hooks/useSettings (useCurrentAcademicPeriod),
- *   @/components/shared/PrintableReportCard, @/lib/pdfPreview
+ * [DEPENDS ON]: @/hooks/useExams (useStudentResults, useReportCardData),
+ *   @/hooks/useSettings (useCurrentAcademicPeriod),
+ *   @/components/shared/PrintableReportCard
  */
 
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
-import { toast } from 'sonner'
-import { useStudentResults, useReportCardData, useGenerateMyReportCard } from '@/hooks/useExams'
-import { apiFetch, ApiError } from '@/lib/api-client'
-import { openPdfPreview } from '@/lib/pdfPreview'
+import { useStudentResults, useReportCardData } from '@/hooks/useExams'
 import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { PrintableReportCard } from '@/components/shared/PrintableReportCard'
 import { AlertTriangle, FileText, TrendingUp, Loader2 } from 'lucide-react'
 import type { ApiTermResult } from '@shared/types/api'
+import { Modal } from '@/components/shared/Modal'
 
 interface Props {
   studentId: string
@@ -92,41 +80,6 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
     isLoading: reportCardLoading,
     error:     reportCardError,
   } = useReportCardData(showReportCard ? studentId : '', academicYear ?? '', term)
-
-  const generateMyReportCard = useGenerateMyReportCard()
-  const [openingPdf, setOpeningPdf] = useState(false)
-
-  // [PDF PREVIEW] Opens the report card PDF in the browser's PDF viewer.
-  // The new tab is opened synchronously inside the click (inside
-  // openPdfPreview), then the URL is resolved: an existing generated PDF if
-  // there is one, otherwise generate it for this student. Both routes enforce
-  // the student's own-record check and the fee gate server-side.
-  async function handleViewReportCard() {
-    if (!academicYear || openingPdf) return
-    setOpeningPdf(true)
-    try {
-      await openPdfPreview(async () => {
-        try {
-          const existing = await apiFetch<{ url: string }>(
-            `/exams/report-card/${studentId}?academicYear=${encodeURIComponent(academicYear)}&term=${term}`,
-          )
-          return existing.url
-        } catch (err) {
-          if (!(err instanceof ApiError && err.status === 404)) throw err
-          const generated = await generateMyReportCard.mutateAsync({ academicYear, term })
-          if (!generated.url) throw new Error(generated.error ?? 'The report card could not be generated.')
-          return generated.url
-        }
-      })
-    } catch (err) {
-      toast.error(
-        `${err instanceof Error ? err.message : 'The PDF could not be opened.'} Showing the on-screen report card instead.`,
-      )
-      setShowReportCard(true)
-    } finally {
-      setOpeningPdf(false)
-    }
-  }
 
   if (isLoading || periodLoading) return <div className="animate-pulse h-40 rounded-xl bg-surface" />
 
@@ -195,17 +148,15 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
             </button>
           ))}
         </div>
-        {/* Opens the PDF in the browser's viewer (download/print from there).
-            Falls back to the SR-3 on-screen PrintableReportCard modal if the
-            PDF cannot be opened — see handleViewReportCard(). */}
+        {/* SR-3: opens the same in-browser PrintableReportCard staff use,
+            which has its own Print button. Replaces the server-PDF download
+            that was erroring for students. */}
         <button
-          type="button"
-          onClick={() => void handleViewReportCard()}
-          disabled={openingPdf}
-          className="flex items-center gap-1.5 text-sm border border-base px-3 py-1.5 rounded-xl hover:bg-page transition-colors disabled:opacity-60"
+          onClick={() => setShowReportCard(true)}
+          className="flex items-center gap-1.5 text-sm border border-base px-3 py-1.5 rounded-xl hover:bg-page transition-colors"
         >
-          {openingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-          View Report Card
+          <FileText className="w-4 h-4" />
+          View / Print Report Card
         </button>
       </div>
 
@@ -318,32 +269,32 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
          alongside this one. Only this conditional block portals (not the
          whole component's return), since the results table above needs to
          stay in normal page flow. */}
-      {showReportCard && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="absolute inset-0" onClick={() => setShowReportCard(false)} />
-          <div className="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-surface rounded-2xl shadow-xl p-4">
-            {reportCardLoading && (
-              <div className="flex items-center justify-center gap-2 py-16 text-muted text-sm">
-                <Loader2 className="w-4 h-4 animate-spin" /> Loading report card…
-              </div>
-            )}
-            {reportCardError && (
-              <div className="flex flex-col items-center gap-2 py-16 text-center">
-                <AlertTriangle className="w-6 h-6 text-brand-coral" />
-                <p className="text-sm text-brand-coral font-medium">
-                  {reportCardError instanceof Error ? reportCardError.message : 'Failed to load report card.'}
-                </p>
-                <button onClick={() => setShowReportCard(false)} className="mt-2 text-sm text-muted hover:text-body underline">
-                  Close
-                </button>
-              </div>
-            )}
-            {reportCardData && (
-              <PrintableReportCard data={reportCardData} onClose={() => setShowReportCard(false)} />
-            )}
-          </div>
-        </div>,
-        document.body,
+      {showReportCard && (
+        <Modal
+          ariaLabel="Student report card"
+          onClose={() => setShowReportCard(false)}
+          size="2xl"
+        >
+          {reportCardLoading && (
+            <div className="flex items-center justify-center gap-2 py-16 text-muted text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading report card…
+            </div>
+          )}
+          {reportCardError && (
+            <div className="flex flex-col items-center gap-2 py-16 text-center">
+              <AlertTriangle className="w-6 h-6 text-brand-coral" />
+              <p className="text-sm text-brand-coral font-medium">
+                {reportCardError instanceof Error ? reportCardError.message : 'Failed to load report card.'}
+              </p>
+              <button onClick={() => setShowReportCard(false)} className="mt-2 text-sm text-muted hover:text-body underline">
+                Close
+              </button>
+            </div>
+          )}
+          {reportCardData && (
+            <PrintableReportCard data={reportCardData} onClose={() => setShowReportCard(false)} />
+          )}
+        </Modal>
       )}
     </div>
   )

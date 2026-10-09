@@ -56,8 +56,7 @@ import {
   ChevronRight,
   AlertTriangle,
   Users,
-  Trophy,
-  X,
+  Trophy
 }                                         from 'lucide-react'
 import { useMotionEnabled }               from '@/store/motionStore'
 import { usePermissions }                 from '@/hooks/usePermissions'
@@ -70,6 +69,7 @@ import {
   EASE,
 }                                         from '@/lib/motion'
 import { apiFetch }                       from '@/lib/api-client'
+import { Modal } from '@/components/shared/Modal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -529,42 +529,36 @@ export function ResultsReleaseWorkflow({
       {/* RW-2: fee-blocked students modal */}
       <AnimatePresence>
         {feeBlocked !== null && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            role="dialog" aria-modal="true" aria-label="Fee-blocked students"
+          <Modal
+            title={
+              <span className="flex items-center gap-2">
+                <Users className="w-4 h-4" /> Fee-blocked students
+              </span>
+            }
+            onClose={() => setFeeBlocked(null)}
+            size="md"
+            flush
           >
-            <div className="absolute inset-0" onClick={() => setFeeBlocked(null)} />
-      <div className="relative z-10 w-full max-w-md modal-panel bg-surface rounded-2xl shadow-xl ">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-base">
-                <h3 className="font-heading font-bold text-brand-navy flex items-center gap-2">
-                  <Users className="w-4 h-4" /> Fee-blocked students
-                </h3>
-                <button type="button" onClick={() => setFeeBlocked(null)} aria-label="Close" className="p-2 hover:bg-page rounded-xl">
-                  <X className="w-4 h-4 text-muted" />
-                </button>
-              </div>
-              <div className="max-h-[60vh] overflow-y-auto p-2">
-                {feeLoading ? (
-                  <div className="py-10 text-center text-sm text-muted">Loading…</div>
-                ) : feeBlocked.length === 0 ? (
-                  <div className="py-10 text-center text-sm text-muted">No fee-blocked students for this class and term.</div>
-                ) : (
-                  <ul className="divide-y divide-base">
-                    {feeBlocked.map((st) => (
-                      <li key={st.studentId} className="flex items-center justify-between gap-3 px-3 py-3">
-                        <div>
-                          <p className="text-sm font-medium text-body">{st.name}</p>
-                          <p className="text-xs text-muted font-mono">{st.registrationNo}</p>
-                        </div>
-                        <span className="text-sm font-semibold text-brand-coral tabular">MWK {st.balance.toLocaleString()}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+            <div className="p-2">
+              {feeLoading ? (
+                <div className="py-10 text-center text-sm text-muted">Loading…</div>
+              ) : feeBlocked.length === 0 ? (
+                <div className="py-10 text-center text-sm text-muted">No fee-blocked students for this class and term.</div>
+              ) : (
+                <ul className="divide-y divide-base">
+                  {feeBlocked.map((st) => (
+                    <li key={st.studentId} className="flex items-center justify-between gap-3 px-3 py-3">
+                      <div>
+                        <p className="text-sm font-medium text-body">{st.name}</p>
+                        <p className="text-xs text-muted font-mono">{st.registrationNo}</p>
+                      </div>
+                      <span className="text-sm font-semibold text-brand-coral tabular">MWK {st.balance.toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-          </motion.div>
+          </Modal>
         )}
       </AnimatePresence>
     </div>

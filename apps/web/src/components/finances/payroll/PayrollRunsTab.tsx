@@ -61,7 +61,7 @@
 import { useMemo, useState } from 'react'
 import {
   Search, ClipboardCheck, Lock, Undo2, Send, CheckCircle2,
-  Loader2, AlertTriangle, X, Download, ShieldCheck, RotateCcw,
+  Loader2, AlertTriangle, Download, ShieldCheck, RotateCcw,
 } from 'lucide-react'
 import { formatMWK } from '@shared/constants/malawi'
 import type { ApiPayrollRun, ApiPayslip } from '@shared/types/api'
@@ -77,6 +77,7 @@ import {
   WORKFLOW_STEPS, getStatusMeta, formatRunPeriod, formatRunPeriodShort,
   formatWindowDate,
 } from './payrollDisplay'
+import { Modal, MODAL_BTN_SECONDARY, MODAL_BTN_DANGER } from '@/components/shared/Modal'
 
 const NOW = new Date()
 const CURRENT_MONTH = NOW.getMonth() + 1
@@ -172,49 +173,37 @@ function RollbackDialog({
   const [reason, setReason] = useState('')
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]" onClick={onCancel}>
-      <div
-        className="w-full max-w-sm modal-panel bg-surface border border-base rounded-2xl shadow-xl p-5"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-      >
-        <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-brand-coral/10 flex items-center justify-center shrink-0">
-            <Undo2 className="w-5 h-5 text-brand-coral" aria-hidden />
-          </div>
-          <div>
-            <h2 className="font-heading font-bold text-base text-body">Rollback Locked Payroll</h2>
-            <p className="text-sm text-muted mt-1 leading-relaxed">
-              This voids the posted journal entry and returns the run to Pending Approval. A reason is
-              required for the audit trail.
-            </p>
-          </div>
-        </div>
-        <textarea
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="Why is this being rolled back?"
-          rows={3}
-          className="w-full border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-coral/25 resize-none"
-        />
-        <div className="flex items-center justify-end gap-2.5 mt-4">
-          <button type="button" onClick={onCancel}
-            className="min-h-[44px] px-4 rounded-xl text-sm font-heading font-semibold border border-base text-muted hover:bg-page transition-colors">
+    <Modal
+      title="Rollback Locked Payroll"
+      description="This voids the posted journal entry and returns the run to Pending Approval. A reason is required for the audit trail."
+      onClose={onCancel}
+      size="sm"
+      busy={isPending}
+      footer={
+        <>
+          <button type="button" onClick={onCancel} className={MODAL_BTN_SECONDARY}>
             Cancel
           </button>
           <button
             type="button"
             disabled={!reason.trim() || isPending}
             onClick={() => onConfirm(reason.trim())}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-coral hover:bg-brand-coral/90 disabled:opacity-50 transition-colors flex items-center gap-2"
+            className={MODAL_BTN_DANGER}
           >
             {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
             Rollback Run
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+    <textarea
+      value={reason}
+      onChange={(e) => setReason(e.target.value)}
+      placeholder="Why is this being rolled back?"
+      rows={3}
+      className="w-full border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-coral/25 resize-none"
+    />
+    </Modal>
   )
 }
 
@@ -402,50 +391,35 @@ function RunDetailModal({ runId, onClose }: { runId: string; onClose: () => void
   ]
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
-      <div
-        className="w-full max-w-4xl max-h-[85vh] overflow-y-auto bg-surface border border-base rounded-2xl shadow-xl p-5 sm:p-6"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-      >
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div>
-            <h2 className="font-heading font-bold text-lg text-body">
-              {run ? formatRunPeriod(run.month, run.year) : 'Payroll Run'} — Deep Inspection
-            </h2>
-            {run && (
-              <p className="text-sm text-muted mt-1">
-                {run._count?.payslips ?? run.payslips?.length ?? 0} staff •
-                {' '}Gross {formatMWK(run.totalGross)} • Net {formatMWK(run.totalNet)}
-              </p>
-            )}
+    <Modal
+      title={<>{run ? formatRunPeriod(run.month, run.year) : 'Payroll Run'} — Deep Inspection</>}
+      description={
+        run
+          ? `${run._count?.payslips ?? run.payslips?.length ?? 0} staff • Gross ${formatMWK(run.totalGross)} • Net ${formatMWK(run.totalNet)}`
+          : undefined
+      }
+      onClose={onClose}
+      size="2xl"
+    >
+      {run && (
+        <div className="bg-page rounded-xl p-4 mb-5">
+          <p className="text-sm font-heading font-semibold text-body mb-3">Workflow Status</p>
+          <WorkflowStepper run={run} />
+          <div className="mt-3">
+            <RunActions run={run} />
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="p-2 rounded-lg hover:bg-page text-muted shrink-0">
-            <X className="w-5 h-5" />
-          </button>
         </div>
+      )}
 
-        {run && (
-          <div className="bg-page rounded-xl p-4 mb-5">
-            <p className="text-sm font-heading font-semibold text-body mb-3">Workflow Status</p>
-            <WorkflowStepper run={run} />
-            <div className="mt-3">
-              <RunActions run={run} />
-            </div>
-          </div>
-        )}
-
-        <DataTable
-          data={run?.payslips ?? []}
-          isLoading={isLoading}
-          columns={columns}
-          rowKey="id"
-          emptyMessage="No payslip lines on this run."
-          bordered={false}
-        />
-      </div>
-    </div>
+      <DataTable
+        data={run?.payslips ?? []}
+        isLoading={isLoading}
+        columns={columns}
+        rowKey="id"
+        emptyMessage="No payslip lines on this run."
+        bordered={false}
+      />
+    </Modal>
   )
 }
 

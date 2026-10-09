@@ -33,7 +33,6 @@
  */
 'use client'
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -42,11 +41,11 @@ import type { CreateExamInput } from '@shared/schemas/exam'
 import { useCreateExam } from '@/hooks/useExams'
 import { useClasses, useMySubjectAssignments, useClassSubjects } from '@/hooks/useClasses'
 import { useAuthStore } from '@/store/authStore'
-import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, AlertTriangle } from 'lucide-react'
+import { Loader2, AlertTriangle } from 'lucide-react'
 import type { ApiClass } from '@shared/types/api'
 import { MALAWI_SUBJECTS, isManebNationalTerm } from '@shared/constants/malawi'
 import { EXAM_TYPES } from '@shared/constants/exams'
+import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 // CreateExamSchema has defaulted fields (maxMark, weightPercent), so its INPUT
 // type (form values — those fields optional) differs from its OUTPUT type
@@ -122,106 +121,98 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
   // AnnouncementForm.tsx/StaffForm.tsx/StudentForm.tsx.
   if (typeof document === 'undefined') return null
 
-  return createPortal(
-    <AnimatePresence>
-      <motion.div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40"
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-        <div className="absolute inset-0" onClick={onClose} />
-    <motion.div className="relative z-10 w-full max-w-lg modal-panel bg-surface rounded-2xl shadow-xl "
-          initial={{ scale: 0.96, y: 12 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 30 }}>
-          <div className="flex items-center justify-between px-6 py-4 border-b border-base">
-            <h2 className="font-heading font-bold text-brand-navy">Schedule Exam</h2>
-            <button type="button" onClick={onClose} aria-label="Close" className="p-2 hover:bg-page rounded-xl">
-              <X className="w-4 h-4 text-muted" />
-            </button>
-          </div>
-          <form onSubmit={handleSubmit(onSubmit)} className="overflow-y-auto max-h-[80vh]">
-            <div className="p-6 grid grid-cols-2 gap-4">
-              <div className="col-span-full">
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Title</label>
-                <input {...register('title')} className={ic} placeholder="e.g. Week 3 Biology Test" />
-                {errors.title && <p className="text-xs text-brand-coral mt-1">{errors.title.message}</p>}
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Type</label>
-                <select {...register('type')} className={ic} aria-label="Exam type">
-                  {availableTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Class</label>
-                <select {...register('classId')} className={ic} aria-label="Class">
-                  <option value="">Select class\u2026</option>
-                  {availableClasses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                {errors.classId && <p className="text-xs text-brand-coral mt-1">{errors.classId.message}</p>}
-                {isTeacher && availableClasses.length === 0 && (
-                  <p className="text-xs text-muted mt-1">You have no subject assignments for {academicYear}.</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Subject</label>
-                <select {...register('subject')} className={ic} aria-label="Subject" disabled={isTeacher && !selectedClassId}>
-                  <option value="">{isTeacher && !selectedClassId ? 'Select a class first\u2026' : 'Select subject\u2026'}</option>
-                  {availableSubjects.map((s) => {
-                    const notOffered = hasPresets && !presetSubjects.includes(s)
-                    return (
-                      <option key={s} value={s} disabled={notOffered}>
-                        {s}{notOffered ? ' (not offered by this class)' : ''}
-                      </option>
-                    )
-                  })}
-                </select>
-                {errors.subject && <p className="text-xs text-brand-coral mt-1">{errors.subject.message}</p>}
-                {selectedClassId && !hasPresets && (
-                  <p className="text-xs text-muted mt-1">
-                    This class has no preset subjects yet — every subject is selectable until they are set.
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Date</label>
-                <input type="date" {...register('date')} className={ic} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Start Time</label>
-                <input type="time" {...register('timeStart')} className={ic} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">End Time</label>
-                <input type="time" {...register('timeEnd')} className={ic} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Venue</label>
-                <input {...register('venue')} className={ic} placeholder="e.g. Room 12" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Max Mark</label>
-                <input type="number" {...register('maxMark', { valueAsNumber: true })} className={ic} min={1} max={1000} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Weight (% of term)</label>
-                <input type="number" {...register('weightPercent', { valueAsNumber: true })} className={ic} min={1} max={100} />
-              </div>
-            </div>
-            {submitError && (
-              <p role="alert" className="mx-6 mb-4 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
-                {submitError}
-              </p>
-            )}
-            <div className="px-6 py-4 border-t border-base flex justify-end gap-3">
-              <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm border border-base rounded-xl hover:bg-page">Cancel</button>
-              <button type="submit" disabled={createExam.isPending}
-                className="px-5 py-2.5 text-sm bg-brand-teal text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60 hover:bg-brand-teal-light">
-                {createExam.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Schedule Exam
-              </button>
-            </div>
-          </form>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>,
-    document.body,
+  return (
+    <Modal
+      title="Schedule Exam"
+      onClose={onClose}
+      size="lg"
+      onSubmit={handleSubmit(onSubmit)}
+      busy={createExam.isPending}
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>Cancel</button>
+          <button type="submit" disabled={createExam.isPending}
+            className={MODAL_BTN_PRIMARY}>
+            {createExam.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Schedule Exam
+          </button>
+        </>
+      }
+    >
+      <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-full">
+          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Title</label>
+          <input {...register('title')} className={ic} placeholder="e.g. Week 3 Biology Test" />
+          {errors.title && <p className="text-xs text-brand-coral mt-1">{errors.title.message}</p>}
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Type</label>
+          <select {...register('type')} className={ic} aria-label="Exam type">
+            {availableTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Class</label>
+          <select {...register('classId')} className={ic} aria-label="Class">
+            <option value="">Select class\u2026</option>
+            {availableClasses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {errors.classId && <p className="text-xs text-brand-coral mt-1">{errors.classId.message}</p>}
+          {isTeacher && availableClasses.length === 0 && (
+            <p className="text-xs text-muted mt-1">You have no subject assignments for {academicYear}.</p>
+          )}
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Subject</label>
+          <select {...register('subject')} className={ic} aria-label="Subject" disabled={isTeacher && !selectedClassId}>
+            <option value="">{isTeacher && !selectedClassId ? 'Select a class first\u2026' : 'Select subject\u2026'}</option>
+            {availableSubjects.map((s) => {
+              const notOffered = hasPresets && !presetSubjects.includes(s)
+              return (
+                <option key={s} value={s} disabled={notOffered}>
+                  {s}{notOffered ? ' (not offered by this class)' : ''}
+                </option>
+              )
+            })}
+          </select>
+          {errors.subject && <p className="text-xs text-brand-coral mt-1">{errors.subject.message}</p>}
+          {selectedClassId && !hasPresets && (
+            <p className="text-xs text-muted mt-1">
+              This class has no preset subjects yet — every subject is selectable until they are set.
+            </p>
+          )}
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Date</label>
+          <input type="date" {...register('date')} className={ic} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Start Time</label>
+          <input type="time" {...register('timeStart')} className={ic} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">End Time</label>
+          <input type="time" {...register('timeEnd')} className={ic} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Venue</label>
+          <input {...register('venue')} className={ic} placeholder="e.g. Room 12" />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Max Mark</label>
+          <input type="number" {...register('maxMark', { valueAsNumber: true })} className={ic} min={1} max={1000} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Weight (% of term)</label>
+          <input type="number" {...register('weightPercent', { valueAsNumber: true })} className={ic} min={1} max={100} />
+        </div>
+      </div>
+      {submitError && (
+        <p role="alert" className="mt-4 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
+          {submitError}
+        </p>
+      )}
+    </Modal>
   )
 }
