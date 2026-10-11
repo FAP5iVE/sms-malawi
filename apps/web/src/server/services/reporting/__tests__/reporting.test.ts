@@ -115,6 +115,6 @@ describe('insights', () => {
   it('compact drops falsy entries and sorts by severity', () => {
     const out = compact([null, collectionInsight(90, 0), overdueInsight(12, 'book'), false])
     expect(out.map((i) => i.severity)).toEqual(['critical', 'positive'])
-    expect(sortInsights([{ severity: 'info' as const }, { severity: 'critical' as const }])[0].severity).toBe('critical')
+    expect(sortInsights([{ severity: 'info' as const }, { severity: 'critical' as const }])[0]?.severity).toBe('critical')
   })
 })
