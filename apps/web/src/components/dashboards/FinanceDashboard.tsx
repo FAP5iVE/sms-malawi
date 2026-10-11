@@ -27,22 +27,17 @@
  */
 
 import {
-  Banknote,
-  TrendingUp,
-  TrendingDown,
-  Clock,
   PlusCircle,
   FileText,
   Users,
   Receipt,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { FeeCollectionRadial } from '@/components/finances/FeeCollectionRadial'
 import { IncomeExpenseChart } from '@/components/finances/IncomeExpenseChart'
-import { useFinanceSummary } from '@/hooks/useFinances'
+import { useFinanceOverview, useFinanceAttention } from '@/hooks/reporting/useFinanceReporting'
+import { DashboardAttention, DashboardKpis } from './DashboardReport'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
-import { formatMWK } from '@shared/constants/malawi'
 import type { QuickAction } from '@/components/shared/QuickActions'
 
 const QUICK_ACTIONS: QuickAction[] = [
@@ -96,61 +91,22 @@ const QUICK_ACTIONS: QuickAction[] = [
 
 export function FinanceDashboard() {
   const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
-  const { data: summary, isLoading: summaryLoading } = useFinanceSummary(
-    academicYear ?? '',
-    term ?? 0,
-  )
-
-  const isLoading = periodLoading || summaryLoading
-  const mwk = (v: number | undefined): string | undefined =>
-    v === undefined ? undefined : formatMWK(v)
+  const period = { academicYear: academicYear ?? '', term: term ?? undefined }
+  const overview = useFinanceOverview(period)
+  const attention = useFinanceAttention(period)
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard
-          label="Total Collected"
-          value={statValue(isLoading, mwk(summary?.totalCollected))}
-          icon={TrendingUp}
-          trend="neutral"
-          trendLabel={term ? `Term ${term}` : 'this term'}
-          iconColor="bg-emerald-50"
-          iconText="text-emerald-600"
-          href="/finances?tab=invoices"
-        />
-        <StatCard
-          label="Outstanding Fees"
-          value={statValue(isLoading, mwk(summary?.totalOutstanding))}
-          icon={TrendingDown}
-          trend="neutral"
-          trendLabel="unpaid"
-          iconColor="bg-brand-coral/10"
-          iconText="text-brand-coral"
-          href="/finances?tab=invoices"
-        />
-        <StatCard
-          label="Total Expenses"
-          value={statValue(isLoading, mwk(summary?.totalExpenses))}
-          icon={Banknote}
-          trend="neutral"
-          trendLabel="approved"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-          href="/finances?tab=expenses"
-        />
-        <StatCard
-          label="Collection Rate"
-          value={statValue(
-            isLoading,
-            summary ? `${summary.collectionPercent}%` : undefined,
-          )}
-          icon={Clock}
-          trend="neutral"
-          trendLabel="of target"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-        />
-      </StatCardGrid>
+      <DashboardKpis
+        title="Finance overview"
+        summary="Collection, receivables, spending and the obligations that need a decision. Each figure opens the report behind it."
+        academicYear={academicYear}
+        term={term}
+        overview={overview}
+        reportsHref="/reports?tab=overview"
+        showInsights
+        placeholders={8}
+      />
       <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <FeeCollectionRadial
@@ -163,6 +119,7 @@ export function FinanceDashboard() {
           periodLoading={periodLoading}
         />
       </div>
+      <DashboardAttention query={attention} title="Finance exceptions" />
     </div>
   )
 }

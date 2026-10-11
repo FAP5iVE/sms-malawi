@@ -489,26 +489,16 @@ export const queryKeys = {
 
     admissions: () => ['analytics', 'admissions'] as const,
     applicationsFunnel: () => ['analytics', 'admissions', 'applications-funnel'] as const,
-    applicationTrend: (months: number) =>
-      ['analytics', 'admissions', 'application-trend', months] as const,
-    enrollmentByForm: (year: string) =>
-      ['analytics', 'admissions', 'enrollment-by-form', year] as const,
 
     academic: () => ['analytics', 'academic'] as const,
     academicSubjectPerformance: (year: string, term: number) =>
       ['analytics', 'academic', 'subject-performance', year, term] as const,
-    academicAssignmentCompletion: (year: string) =>
-      ['analytics', 'academic', 'assignment-completion', year] as const,
     academicMarksDistribution: (examId: string) =>
       ['analytics', 'academic', 'marks-distribution', examId] as const,
 
     student: () => ['analytics', 'student'] as const,
     studentPerformanceTrend: (studentId: string) =>
       ['analytics', 'student', 'performance-trend', studentId] as const,
-    studentSubjectBreakdown: (studentId: string, year: string, term: number) =>
-      ['analytics', 'student', 'subject-breakdown', studentId, year, term] as const,
-    studentFeeStatement: (studentId: string) =>
-      ['analytics', 'student', 'fee-statement', studentId] as const,
     studentAttendance: (studentId: string, year?: string, term?: number) =>
       ['analytics', 'student', 'attendance', studentId, year ?? null, term ?? null] as const,
 
@@ -519,8 +509,6 @@ export const queryKeys = {
 
     hr: () => ['analytics', 'hr'] as const,
     hrStaffByDepartment: () => ['analytics', 'hr', 'staff-by-department'] as const,
-    hrLeaveByType: (year: number) => ['analytics', 'hr', 'leave-by-type', year] as const,
-    hrLeaveTrend: (months: number) => ['analytics', 'hr', 'leave-trend', months] as const,
 
     capabilities: () => ['analytics', 'capabilities'] as const,
   },
@@ -535,16 +523,20 @@ export const queryKeys = {
       ['reports', 'finance', filters] as const,
     academic: (filters: Record<string, unknown>) =>
       ['reports', 'academic', filters] as const,
-    library: (filters?: Record<string, unknown>) =>
-      ['reports', 'library', filters ?? {}] as const,
-    hr: (filters?: Record<string, unknown>) =>
-      ['reports', 'hr', filters ?? {}] as const,
-    examOfficer: (filters?: Record<string, unknown>) =>
-      ['reports', 'exam-officer', filters ?? {}] as const,
     student: (id: string) => ['reports', 'student', id] as const,
     system: () => ['reports', 'system'] as const,
     auditLogs: (filters: Record<string, unknown>) =>
       ['reports', 'audit-logs', filters] as const,
+  },
+
+  // ── Domain reporting (/reporting/<domain>/<endpoint>) — one generic factory so
+  // every domain's report hooks share one cache namespace and a whole domain
+  // can be invalidated at once: queryKeys.reporting.domain('finance').
+  reporting: {
+    all: () => ['reporting'] as const,
+    domain: (domain: string) => ['reporting', domain] as const,
+    endpoint: (domain: string, endpoint: string, params?: Record<string, unknown>) =>
+      ['reporting', domain, endpoint, params ?? {}] as const,
   },
 
   // ── User Management / Admin

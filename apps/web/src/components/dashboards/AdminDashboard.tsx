@@ -34,27 +34,22 @@
  */
 
 import {
-  Users,
-  ShieldCheck,
   Activity,
-  ClipboardList,
   UserPlus,
   FileSearch,
   Settings,
   Bell,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions }           from '@/components/shared/QuickActions'
 import type { QuickAction }       from '@/components/shared/QuickActions'
 import { ChartCard }              from '@/components/shared/ChartCard'
 import { ListCard }               from '@/components/shared/ListCard'
 import { Chart }                  from '@/components/shared/chart'
 import type { ChartDataPoint }    from '@/components/shared/chart'
-import { useUsers }               from '@/hooks/useAdmin'
 import { useAdminLoginTrend }     from '@/hooks/useAnalytics'
-import { useSystemHealth }        from '@/hooks/useReports'
+import { useAdminOverview, useAdminAttention } from '@/hooks/reporting/useAdminReporting'
+import { DashboardAttention, DashboardKpis } from './DashboardReport'
 import { useAnnouncements }       from '@/hooks/useAnnouncements'
-import type { ApiUserListResponse, ApiSystemHealth } from '@shared/types/api'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
@@ -98,15 +93,8 @@ const QUICK_ACTIONS: QuickAction[] = [
 ]
 
 export function AdminDashboard() {
-  const { data: usersData, isLoading: usersLoading }   = useUsers()
-  const { data: healthData, isLoading: healthLoading } = useSystemHealth()
-
-  const users  = usersData  as ApiUserListResponse | undefined
-  const health = healthData as ApiSystemHealth | undefined
-
-  const serviceAlerts = health
-    ? health.services.filter((s) => s.status !== 'ok').length
-    : undefined
+  const overview = useAdminOverview()
+  const attention = useAdminAttention()
 
   const { data: loginTrend = [], isLoading: loginLoading } = useAdminLoginTrend(30)
   const loginData: ChartDataPoint[] = loginTrend.map((p) => ({
@@ -121,45 +109,14 @@ export function AdminDashboard() {
   return (
     <div className="space-y-4 md:space-y-6">
 
-      {/* Stat row — StatCardGrid orchestrates stagger animation (B8 + C6) */}
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard
-          label="Total Users"
-          value={statValue(usersLoading, users?.users.length)}
-          icon={Users}
-          trend="neutral"
-          trendLabel="accounts"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-        />
-        <StatCard
-          label="Active Users"
-          value={statValue(healthLoading, health?.activeUsersLastHr)}
-          icon={Activity}
-          trend="neutral"
-          trendLabel="last hour"
-          iconColor="bg-blue-50"
-          iconText="text-blue-600"
-        />
-        <StatCard
-          label="Service Alerts"
-          value={statValue(healthLoading, serviceAlerts)}
-          icon={ShieldCheck}
-          trend={serviceAlerts === 0 ? 'up' : serviceAlerts !== undefined ? 'down' : 'neutral'}
-          trendLabel={serviceAlerts === 0 ? 'all healthy' : 'degraded'}
-          iconColor={serviceAlerts ? 'bg-brand-coral/10' : 'bg-emerald-50'}
-          iconText={serviceAlerts ? 'text-brand-coral' : 'text-emerald-600'}
-        />
-        <StatCard
-          label="Actions (24h)"
-          value={statValue(healthLoading, health?.actionsLast24h)}
-          icon={ClipboardList}
-          trend="neutral"
-          trendLabel="audit events"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-        />
-      </StatCardGrid>
+      <DashboardKpis
+        title="Administration overview"
+        summary="Accounts, sign-in security, sessions, platform health and audited activity. Each figure opens the report behind it."
+        overview={overview}
+        reportsHref="/reports?tab=overview"
+        showInsights
+        placeholders={8}
+      />
 
       <QuickActions actions={QUICK_ACTIONS} />
 
@@ -213,6 +170,7 @@ export function AdminDashboard() {
           </ul>
         </ListCard>
       </div>
+      <DashboardAttention query={attention} title="Administrator attention queue" />
     </div>
   )
 }

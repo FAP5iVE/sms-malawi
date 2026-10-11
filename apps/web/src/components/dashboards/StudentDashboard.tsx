@@ -43,16 +43,12 @@
  */
 
 import {
-  BookOpen,
-  Banknote,
-  GraduationCap,
   Library,
   Clock,
   Bell,
   BarChart3,
   AlertCircle,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { ListCard } from '@/components/shared/ListCard'
 import { TodaysTimetableList } from '@/components/shared/TodaysTimetableList'
@@ -63,10 +59,10 @@ import type { QuickAction } from '@/components/shared/QuickActions'
 import { StudentResultsView } from '@/components/exams/StudentResultsView'
 import { useStudentMe } from '@/hooks/useStudents'
 import { useStudentPerformanceTrend, useOwnAttendance } from '@/hooks/useAnalytics'
-import { useExams } from '@/hooks/useExams'
+import { useMyOverview, useMyAttention } from '@/hooks/reporting/useStudentReporting'
+import { DashboardAttention, DashboardKpis } from './DashboardReport'
 import { useMyTimetableToday } from '@/hooks/useClasses'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
-import { examsInNextSevenDays } from '@/lib/examFilters'
 import { formatMWK } from '@shared/constants/malawi'
 
 const QUICK_ACTIONS: QuickAction[] = [
@@ -98,14 +94,9 @@ const QUICK_ACTIONS: QuickAction[] = [
 export function StudentDashboard() {
   const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
   const { data: me, isLoading: meLoading } = useStudentMe()
-  const { data: examsData, isLoading: examsLoading } = useExams(
-    me?.classId ?? undefined,
-    academicYear ?? '',
-    term ?? 0,
-  )
-
-  const upcomingExams = examsInNextSevenDays(examsData ?? []).length
-  const examsLoadingAll = periodLoading || meLoading || examsLoading
+  const period = { academicYear: academicYear ?? '', term: term ?? undefined }
+  const overview = useMyOverview(period)
+  const attention = useMyAttention(period)
 
   // Student performance trend (average % per term) — grade data sourced from
   // gradeService.ts via the R14 analytics endpoint. Unblocked by R7/R8's
@@ -137,48 +128,15 @@ export function StudentDashboard() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard
-          label="My Class"
-          value={statValue(meLoading, me?.className)}
-          icon={BookOpen}
-          trend="neutral"
-          trendLabel={me?.classForm ? `Form ${me.classForm}` : 'current form'}
-          iconColor="bg-brand-navy/8"
-          iconText="text-brand-navy"
-        />
-        <StatCard
-          label="Books Borrowed"
-          value={statValue(meLoading, me?.currentBorrowings)}
-          icon={Library}
-          trend="neutral"
-          trendLabel="from library"
-          iconColor="bg-blue-50"
-          iconText="text-blue-600"
-        />
-        <StatCard
-          label="Fees Balance"
-          value={statValue(
-            meLoading,
-            me ? formatMWK(me.feeBalance) : undefined,
-          )}
-          icon={Banknote}
-          trend="neutral"
-          trendLabel="outstanding"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-          href="/finances?tab=invoices"
-        />
-        <StatCard
-          label="Upcoming Exams"
-          value={statValue(examsLoadingAll, upcomingExams)}
-          icon={GraduationCap}
-          trend="neutral"
-          trendLabel="this week"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-        />
-      </StatCardGrid>
+      <DashboardKpis
+        title="My school life"
+        summary="Your results, attendance, assignments and fees in one place. Results appear once your term fees are cleared."
+        academicYear={academicYear}
+        term={term}
+        overview={overview}
+        reportsHref="/reports?tab=progress"
+        placeholders={6}
+      />
 
       {/* Fee-gated exam results notice — R15: shown only when the student's
           real balance (R9's feeBalance from /students/me) is outstanding,
@@ -258,6 +216,7 @@ export function StudentDashboard() {
             </p>
           )}
       </div>
+      <DashboardAttention query={attention} title="For you to look at" />
     </div>
   )
 }

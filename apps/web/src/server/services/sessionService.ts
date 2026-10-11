@@ -42,7 +42,7 @@ function getAuth() { return admin.auth(getAdminApp()) }
 // Comfortably wider than the ~60s heartbeat interval so one missed beat
 // (a backgrounded tab, a flaky connection) doesn't flip someone to
 // "offline" and back every other poll.
-const ACTIVE_GRACE_MS = 3 * 60 * 1000 // 3 minutes
+export const ACTIVE_GRACE_MS = 3 * 60 * 1000 // 3 minutes
 
 export type SessionWindow = '10m' | '30m' | '1h' | 'all'
 

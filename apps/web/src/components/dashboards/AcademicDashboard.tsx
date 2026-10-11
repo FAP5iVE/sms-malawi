@@ -34,28 +34,22 @@
  */
 
 import {
-  Users,
-  BookOpen,
-  GraduationCap,
-  CheckSquare,
   ClipboardCheck,
   PenLine,
   Clock,
   Bell,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { ListCard } from '@/components/shared/ListCard'
 import { TodaysTimetableList } from '@/components/shared/TodaysTimetableList'
-import { useStudents, useHighRiskStudents } from '@/hooks/useStudents'
-import { useClasses, useMyTimetableToday } from '@/hooks/useClasses'
-import { useExams } from '@/hooks/useExams'
+import { useHighRiskStudents } from '@/hooks/useStudents'
+import { useMyTimetableToday } from '@/hooks/useClasses'
+import { useAcademicOverview, useAcademicAttention } from '@/hooks/reporting/useAcademicReporting'
+import { DashboardAttention, DashboardKpis } from './DashboardReport'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
 import Link from 'next/link'
 import type { QuickAction } from '@/components/shared/QuickActions'
-import type { ApiClass } from '@shared/types/api'
-import { examsInNextSevenDays, examsAwaitingMarks } from '@/lib/examFilters'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
@@ -90,69 +84,28 @@ const QUICK_ACTIONS: QuickAction[] = [
 ]
 
 export function AcademicDashboard() {
-  const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
+  const { academicYear, term } = useViewingPeriod()
 
-  const { data: studentsData, isLoading: studentsLoading } =
-    useStudents({ status: 'ACTIVE' })
-  const { data: classesData, isLoading: classesLoading } =
-    useClasses(academicYear)
-  const { data: examsData, isLoading: examsLoading } = useExams(
-    undefined,
-    academicYear ?? '',
-    term ?? 0,
-  )
-
-  const classes = classesData as ApiClass[] | undefined
-  const exams   = examsData ?? []
+  const period = { academicYear: academicYear ?? '', term: term ?? undefined }
+  const overview = useAcademicOverview(period)
+  const attention = useAcademicAttention(period)
 
   const { data: timetableToday, isLoading: timetableLoading } = useMyTimetableToday()
   const { data: riskData, isLoading: riskLoading } = useHighRiskStudents(6)
   const highRiskStudents = riskData?.students ?? []
 
-  const examsThisWeek = examsInNextSevenDays(exams).length
-  const marksPending  = examsAwaitingMarks(exams).length
-  const examsLoadingAll = periodLoading || examsLoading
-
   return (
     <div className="space-y-4 md:space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard
-          label="Active Classes"
-          value={statValue(periodLoading || classesLoading, classes?.length)}
-          icon={BookOpen}
-          trend="neutral"
-          trendLabel="this year"
-          iconColor="bg-brand-navy/8"
-          iconText="text-brand-navy"
-        />
-        <StatCard
-          label="Total Students"
-          value={statValue(studentsLoading, studentsData?.total)}
-          icon={Users}
-          trend="neutral"
-          trendLabel="enrolled"
-          iconColor="bg-blue-50"
-          iconText="text-blue-600"
-        />
-        <StatCard
-          label="Exams This Week"
-          value={statValue(examsLoadingAll, examsThisWeek)}
-          icon={GraduationCap}
-          trend="neutral"
-          trendLabel="scheduled"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-        />
-        <StatCard
-          label="Marks Pending"
-          value={statValue(examsLoadingAll, marksPending)}
-          icon={CheckSquare}
-          trend="neutral"
-          trendLabel="to enter"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-        />
-      </StatCardGrid>
+      <DashboardKpis
+        title="Teaching overview"
+        summary="Results, attendance, assessments and the students who need support across the classes you teach. Each figure opens the report behind it."
+        academicYear={academicYear}
+        term={term}
+        overview={overview}
+        reportsHref="/reports?tab=teaching"
+        showInsights
+        placeholders={7}
+      />
       <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
@@ -189,6 +142,7 @@ export function AcademicDashboard() {
           </ul>
         </ListCard>
       </div>
+      <DashboardAttention query={attention} title="Your intervention queue" />
     </div>
   )
 }

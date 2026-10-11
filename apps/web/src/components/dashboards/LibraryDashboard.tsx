@@ -26,21 +26,18 @@
  */
 
 import {
-  BookOpen,
-  BookX,
-  Library,
   PlusCircle,
   RotateCcw,
   Search,
   FileText,
-  AlertTriangle,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { ChartCard } from '@/components/shared/ChartCard'
 import { Chart } from '@/components/shared/chart'
 import type { ChartDataPoint } from '@/components/shared/chart'
-import { useLibraryStats, useOverdueByClass } from '@/hooks/useLibrary'
+import { useOverdueByClass } from '@/hooks/useLibrary'
+import { useLibraryOverview, useLibraryAttention } from '@/hooks/reporting/useLibraryReporting'
+import { DashboardAttention, DashboardKpis } from './DashboardReport'
 import { useLibraryBorrowingTrend } from '@/hooks/useAnalytics'
 import type { QuickAction } from '@/components/shared/QuickActions'
 
@@ -79,7 +76,8 @@ const QUICK_ACTIONS: QuickAction[] = [
 ]
 
 export function LibraryDashboard() {
-  const { data: stats, isLoading } = useLibraryStats()
+  const overview = useLibraryOverview()
+  const attention = useLibraryAttention()
   const { data: borrowTrend = [], isLoading: trendLoading } = useLibraryBorrowingTrend(12)
   const { data: overdueByClass = [], isLoading: overdueLoading } = useOverdueByClass()
 
@@ -90,48 +88,14 @@ export function LibraryDashboard() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard
-          label="Total Books"
-          value={statValue(isLoading, stats?.totalBooks)}
-          icon={Library}
-          trend="neutral"
-          trendLabel="in catalog"
-          iconColor="bg-brand-navy/8"
-          iconText="text-brand-navy"
-          href="/library"
-        />
-        <StatCard
-          label="Currently Borrowed"
-          value={statValue(isLoading, stats?.activeBorrowings)}
-          icon={BookOpen}
-          trend="neutral"
-          trendLabel="checked out"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-          href="/library?tab=borrowings"
-        />
-        <StatCard
-          label="Overdue Books"
-          value={statValue(isLoading, stats?.overdueBorrowings)}
-          icon={BookX}
-          trend="neutral"
-          trendLabel="past due"
-          iconColor="bg-brand-coral/10"
-          iconText="text-brand-coral"
-          href="/library?tab=borrowings"
-        />
-        <StatCard
-          label="Pending Fines"
-          value={statValue(isLoading, stats?.pendingFines)}
-          icon={AlertTriangle}
-          trend="neutral"
-          trendLabel="unpaid"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-          href="/library?tab=reports"
-        />
-      </StatCardGrid>
+      <DashboardKpis
+        title="Library overview"
+        summary="Stock, circulation, overdue exposure and fines. Each figure opens the report behind it."
+        overview={overview}
+        reportsHref="/reports?tab=overview"
+        showInsights
+        placeholders={8}
+      />
       <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ChartCard
@@ -176,6 +140,7 @@ export function LibraryDashboard() {
           )}
         </div>
       </div>
+      <DashboardAttention query={attention} title="Library attention queue" />
     </div>
   )
 }

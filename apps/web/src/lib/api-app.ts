@@ -112,6 +112,7 @@ import { createRateLimiter }   from '@/lib/ratelimit'
 import { logger }              from '@/lib/logger'
 import { globalErrorHandler }  from '@/server/middleware/inputSanitise'
 import { analyticsRouter }     from '@/server/routes/analytics'
+import { reportingRouter }     from '@/server/routes/reporting'
 import { searchRouter }        from '@/server/routes/search'
 import { calendarRouter }      from '@/server/routes/calendar'
 import { algoliaAdminRouter }  from '@/server/routes/algoliaAdmin'
@@ -242,6 +243,7 @@ export function createApiApp() {
   app.use('/gallery',         galleryRouter)
   app.use('/auth',            authRouter)
   app.use('/analytics',       analyticsRouter)
+  app.use('/reporting',       reportingRouter)
   app.use('/search',          searchRouter)
   app.use('/calendar',        calendarRouter)
   app.use('/algolia-admin',   algoliaAdminRouter)

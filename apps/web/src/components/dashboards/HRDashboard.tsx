@@ -35,31 +35,19 @@
 
 import { useState } from 'react'
 import {
-  Users,
-  Clock,
-  AlertTriangle,
-  Banknote,
   UserPlus,
   CheckCircle,
   CalendarDays,
   FileText,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { ListCard } from '@/components/shared/ListCard'
-import {
-  useStaffDirectory,
-  useLeaveRequests,
-  useUpcomingContractExpiries,
-  useLoans,
-} from '@/hooks/useHR'
+import { useLeaveRequests, useUpcomingContractExpiries } from '@/hooks/useHR'
+import { useHrOverview, useHrAttention } from '@/hooks/reporting/useHrReporting'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
+import { DashboardAttention, DashboardKpis } from './DashboardReport'
 import type { QuickAction } from '@/components/shared/QuickActions'
-import type {
-  ApiStaffProfile,
-  ApiLeaveRequest,
-  ApiContractAlert,
-  ApiStaffLoan,
-} from '@shared/types/api'
+import type { ApiLeaveRequest, ApiContractAlert } from '@shared/types/api'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
@@ -101,22 +89,19 @@ const CONTRACT_ALERT_DAYS = 60
 const DAY_MS = 24 * 60 * 60 * 1000
 
 export function HRDashboard() {
-  const { data: staffData, isLoading: staffLoading }       = useStaffDirectory()
-  const { data: leaveData, isLoading: leaveLoading }       = useLeaveRequests({ status: 'PENDING' })
+  const { academicYear } = useViewingPeriod()
+  const overview = useHrOverview(academicYear ?? '')
+  const attention = useHrAttention(academicYear ?? '')
   // [PRODUCTION FIX] was useContractAlerts() — an exact-day match (see
   // hrService.getUpcomingContractExpiries()'s header comment) that could
   // only ever show a contract expiring exactly 60 days from today. Both
   // this stat card and the widget below need a genuine "next 60 days" range.
   const { data: contractData, isLoading: contractLoading } = useUpcomingContractExpiries(CONTRACT_ALERT_DAYS)
-  const { data: loansData, isLoading: loansLoading }       = useLoans('PENDING')
   // "Who is off this week" — every APPROVED leave request, filtered to
   // whichever ones overlap the current week.
   const { data: approvedLeaveData, isLoading: approvedLeaveLoading } = useLeaveRequests({ status: 'APPROVED' })
 
-  const staff     = staffData    as ApiStaffProfile[]  | undefined
-  const leave     = leaveData    as ApiLeaveRequest[]  | undefined
   const contracts = contractData as ApiContractAlert[] | undefined
-  const loans     = loansData    as ApiStaffLoan[]     | undefined
   const approvedLeave = approvedLeaveData as ApiLeaveRequest[] | undefined
 
   // [PRODUCTION FIX] react-hooks/purity — Date.now() called directly in the
@@ -137,44 +122,15 @@ export function HRDashboard() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard
-          label="Total Staff"
-          value={statValue(staffLoading, staff?.length)}
-          icon={Users}
-          trend="neutral"
-          trendLabel="on record"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-        />
-        <StatCard
-          label="Leave Requests"
-          value={statValue(leaveLoading, leave?.length)}
-          icon={Clock}
-          trend="neutral"
-          trendLabel="pending review"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-        />
-        <StatCard
-          label="Contract Expiries"
-          value={statValue(contractLoading, contracts?.length)}
-          icon={AlertTriangle}
-          trend="neutral"
-          trendLabel={`within ${CONTRACT_ALERT_DAYS} days`}
-          iconColor="bg-brand-coral/10"
-          iconText="text-brand-coral"
-        />
-        <StatCard
-          label="Pending Loan Approvals"
-          value={statValue(loansLoading, loans?.length)}
-          icon={Banknote}
-          trend="neutral"
-          trendLabel="awaiting"
-          iconColor="bg-blue-50"
-          iconText="text-blue-600"
-        />
-      </StatCardGrid>
+      <DashboardKpis
+        title="Workforce overview"
+        summary="Headcount, leave, contracts, staff loans and performance reviews. Each figure opens the report behind it."
+        academicYear={academicYear}
+        overview={overview}
+        reportsHref="/reports?tab=overview"
+        showInsights
+        placeholders={8}
+      />
       <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
@@ -224,6 +180,7 @@ export function HRDashboard() {
           </ul>
         </ListCard>
       </div>
+      <DashboardAttention query={attention} title="HR attention queue" />
     </div>
   )
 }

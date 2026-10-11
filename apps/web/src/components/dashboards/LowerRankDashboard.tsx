@@ -29,18 +29,16 @@
  */
 
 import {
-  Users,
   ClipboardList,
   CalendarDays,
-  GraduationCap,
   UserPlus,
-  UserCheck,
   Bell,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { ListCard } from '@/components/shared/ListCard'
-import { useStudents } from '@/hooks/useStudents'
+import { useAdmissionsOverview, useAdmissionsAttention } from '@/hooks/reporting/useAdmissionsReporting'
+import { useAttendanceAttention } from '@/hooks/reporting/useAttendanceReporting'
+import { DashboardAttention, DashboardKpis } from './DashboardReport'
 import { useApplications } from '@/hooks/useApplications'
 import { useExams } from '@/hooks/useExams'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
@@ -83,12 +81,12 @@ const QUICK_ACTIONS: QuickAction[] = [
 export function LowerRankDashboard() {
   const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
 
-  const { data: studentsData, isLoading: studentsLoading } =
-    useStudents({ status: 'ACTIVE' })
+  const period = { academicYear: academicYear ?? '', term: term ?? undefined }
+  const overview = useAdmissionsOverview(period)
+  const admissionsAttention = useAdmissionsAttention()
+  const attendanceAttention = useAttendanceAttention(period)
   const { data: pendingApps, isLoading: pendingLoading } =
     useApplications('PENDING')
-  const { data: awaitingApps, isLoading: awaitingLoading } =
-    useApplications('AWAITING_ADMISSION')
   const { data: examsData, isLoading: examsLoading } = useExams(
     undefined,
     academicYear ?? '',
@@ -100,44 +98,16 @@ export function LowerRankDashboard() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard
-          label="Total Students"
-          value={statValue(studentsLoading, studentsData?.total)}
-          icon={Users}
-          trend="neutral"
-          trendLabel="enrolled"
-          iconColor="bg-blue-50"
-          iconText="text-blue-600"
-        />
-        <StatCard
-          label="Pending Applications"
-          value={statValue(pendingLoading, pendingApps?.total)}
-          icon={ClipboardList}
-          trend="neutral"
-          trendLabel="awaiting review"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-        />
-        <StatCard
-          label="Awaiting Admission"
-          value={statValue(awaitingLoading, awaitingApps?.total)}
-          icon={UserCheck}
-          trend="neutral"
-          trendLabel="approved, to admit"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-        />
-        <StatCard
-          label="Exams This Week"
-          value={statValue(periodLoading || examsLoading, examsThisWeekList.length)}
-          icon={GraduationCap}
-          trend="neutral"
-          trendLabel="scheduled"
-          iconColor="bg-purple-50"
-          iconText="text-purple-600"
-        />
-      </StatCardGrid>
+      <DashboardKpis
+        title="Registry overview"
+        summary="Students on the roll, the admissions queue and attendance exceptions. Each figure opens the report behind it."
+        academicYear={academicYear}
+        term={term}
+        overview={overview}
+        reportsHref="/reports?tab=admissions"
+        showInsights
+        placeholders={6}
+      />
       <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
@@ -186,6 +156,10 @@ export function LowerRankDashboard() {
             ))}
           </ul>
         </ListCard>
+      </div>
+      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
+        <DashboardAttention query={admissionsAttention} title="Admissions queue" />
+        <DashboardAttention query={attendanceAttention} title="Attendance exceptions" />
       </div>
     </div>
   )

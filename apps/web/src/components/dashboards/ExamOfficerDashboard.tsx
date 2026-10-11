@@ -29,24 +29,23 @@
  */
 
 import {
-  GraduationCap,
   PenLine,
   CheckCircle,
-  Send,
   ClipboardList,
   Settings,
   BarChart3,
 } from 'lucide-react'
 import Link from 'next/link'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { useExams } from '@/hooks/useExams'
+import { useExamOverview, useExamAttention, useExamPipeline } from '@/hooks/reporting/useExamsReporting'
+import { ChartCard } from '@/components/shared/ChartCard'
+import { Chart } from '@/components/shared/chart'
+import { DashboardAttention, DashboardKpis } from './DashboardReport'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import {
   examsInNextSevenDays,
-  examsAwaitingMarks,
   examsAwaitingRelease,
-  examsReleased,
 } from '@/lib/examFilters'
 import type { QuickAction } from '@/components/shared/QuickActions'
 
@@ -104,50 +103,23 @@ export function ExamOfficerDashboard() {
   const exams     = examsData ?? []
   const isLoading = periodLoading || examsLoading
 
+  const period = { academicYear: academicYear ?? '', term: term ?? undefined }
+  const overview = useExamOverview(period)
+  const attention = useExamAttention(period)
+  const pipeline = useExamPipeline(period)
+
   return (
     <div className="space-y-4 md:space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard
-          label="Exams This Week"
-          value={statValue(isLoading, examsInNextSevenDays(exams).length)}
-          icon={GraduationCap}
-          trend="neutral"
-          trendLabel="scheduled"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-          href="/exams?tab=exams"
-        />
-        <StatCard
-          label="Marks Pending Entry"
-          value={statValue(isLoading, examsAwaitingMarks(exams).length)}
-          icon={PenLine}
-          trend="neutral"
-          trendLabel="to enter"
-          iconColor="bg-brand-amber/10"
-          iconText="text-brand-amber"
-          href="/exams?tab=exams"
-        />
-        <StatCard
-          label="Results to Release"
-          value={statValue(isLoading, examsAwaitingRelease(exams).length)}
-          icon={CheckCircle}
-          trend="neutral"
-          trendLabel="approved, awaiting"
-          iconColor="bg-blue-50"
-          iconText="text-blue-600"
-          href="/exams?tab=release"
-        />
-        <StatCard
-          label="Results Released"
-          value={statValue(isLoading, examsReleased(exams).length)}
-          icon={Send}
-          trend="neutral"
-          trendLabel={term ? `Term ${term}` : 'this term'}
-          iconColor="bg-emerald-50"
-          iconText="text-emerald-600"
-          href="/exams?tab=release"
-        />
-      </StatCardGrid>
+      <DashboardKpis
+        title="Examination overview"
+        summary="Where each exam is in its lifecycle — marking, approval and release — and what is holding results back. Each figure opens the report behind it."
+        academicYear={academicYear}
+        term={term}
+        overview={overview}
+        reportsHref="/reports?tab=completion"
+        showInsights
+        placeholders={8}
+      />
       <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         {/* [PRODUCTION FIX 2026-07-28] Was a permanent PlaceholderWidget
@@ -209,6 +181,22 @@ export function ExamOfficerDashboard() {
           )}
         </div>
       </div>
+      <ChartCard
+        title="Results pipeline"
+        sub="Exams at each stage this term"
+        isLoading={pipeline.isLoading}
+        height={200}
+      >
+        <Chart
+          type="bar"
+          data={(pipeline.data?.stages ?? []).map((st) => ({ x: st.label, count: st.count }))}
+          series={[{ key: 'count', label: 'Exams' }]}
+          height={200}
+          emptyStateMessage="No exams this term."
+          ariaLabel="Number of exams at each stage of the results pipeline"
+        />
+      </ChartCard>
+      <DashboardAttention query={attention} title="Examination exceptions" />
     </div>
   )
 }

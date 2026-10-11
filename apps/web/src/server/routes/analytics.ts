@@ -57,57 +57,16 @@ import {
   requireAnyPermission,
 } from '@/server/middleware/verifyPermission'
 import { hasPermission } from '@shared/types/permissions'
-import { SETTING_KEYS } from '@shared/types/settings'
 import * as analytics from '@/server/services/analyticsService'
-import * as settingsService from '@/server/services/settingsService'
 import { resolveStudentFromUid } from '@/server/services/studentService'
+import { checkBalanceGate } from '@/server/services/feeService'
+import { resolvePeriod, optionalTerm, positiveInt } from './reporting/_shared'
 
 export const analyticsRouter = Router()
 
 // ─── SHARED QUERY-PARAM RESOLUTION ───────────────────────────────────────────
-
-/**
- * Resolves the academicYear/term a request is asking about.
- *
- * When the caller supplies neither, the answer is whatever the school's
- * SystemSettings say the CURRENT period is — never a hardcoded '2025/2026'
- * literal, which is what every route in this file previously defaulted to and
- * which would silently keep reporting a stale year forever once the school
- * rolled over.
- */
-async function resolvePeriod(req: Request): Promise<{ academicYear: string; term: number }> {
-  const settings = await settingsService.getMany([
-    SETTING_KEYS.CURRENT_ACADEMIC_YEAR,
-    SETTING_KEYS.CURRENT_TERM,
-  ])
-
-  const queryYear = typeof req.query.academicYear === 'string' ? req.query.academicYear : undefined
-  const queryTerm = typeof req.query.term === 'string' ? Number(req.query.term) : undefined
-
-  return {
-    academicYear: queryYear ?? settings[SETTING_KEYS.CURRENT_ACADEMIC_YEAR],
-    term:
-      queryTerm !== undefined && Number.isInteger(queryTerm) && queryTerm >= 1 && queryTerm <= 3
-        ? queryTerm
-        : settings[SETTING_KEYS.CURRENT_TERM],
-  }
-}
-
-/** Optional term filter — distinct from resolvePeriod(): omitting `term`
- *  here means "all terms", not "the current term". */
-function optionalTerm(req: Request): number | undefined {
-  const raw = req.query.term
-  if (typeof raw !== 'string') return undefined
-  const n = Number(raw)
-  return Number.isInteger(n) && n >= 1 && n <= 3 ? n : undefined
-}
-
-/** A positive-integer window parameter (days / months / weeks / limit). */
-function positiveInt(raw: unknown, fallback: number): number {
-  if (typeof raw !== 'string') return fallback
-  const n = Number(raw)
-  return Number.isInteger(n) && n > 0 ? n : fallback
-}
+// resolvePeriod / optionalTerm / positiveInt live in ./reporting/_shared so the
+// domain reporting routers resolve the period identically.
 
 /**
  * Resolves which student a /student/* route is about.
@@ -413,7 +372,15 @@ analyticsRouter.get('/student/performance-trend',
   async (req, res) => {
     const studentId = await resolveStudentId(req, res)
     if (studentId === null) return
-    res.json(await analytics.getStudentPerformanceTrend(studentId))
+    const trend = await analytics.getStudentPerformanceTrend(studentId)
+    // A student reads results only for terms whose fee gate is open — the same
+    // rule examService.getStudentResults enforces. Staff lookups are not gated.
+    if (req.user!.role === 'student') {
+      const open = await Promise.all(trend.map((p) => checkBalanceGate(studentId, p.term, p.academicYear)))
+      res.json(trend.filter((_, i) => open[i]))
+      return
+    }
+    res.json(trend)
   })
 
 analyticsRouter.get('/student/subject-breakdown',
@@ -422,6 +389,10 @@ analyticsRouter.get('/student/subject-breakdown',
     const studentId = await resolveStudentId(req, res)
     if (studentId === null) return
     const { academicYear, term } = await resolvePeriod(req)
+    if (req.user!.role === 'student' && !(await checkBalanceGate(studentId, term, academicYear))) {
+      res.status(403).json({ error: 'Outstanding fee balance. Pay fees to view results.' })
+      return
+    }
     res.json(await analytics.getStudentSubjectBreakdown(studentId, academicYear, term))
   })
 

@@ -38,17 +38,14 @@
 
 import {
   Users,
-  Briefcase,
   Banknote,
   GraduationCap,
-  TrendingUp,
   BarChart3,
   ClipboardList,
   ClipboardCheck,
   Settings,
   Megaphone,
 } from 'lucide-react'
-import { StatCard, StatCardGrid, statValue } from '@/components/shared/StatCard'
 import { QuickActions } from '@/components/shared/QuickActions'
 import type { QuickAction } from '@/components/shared/QuickActions'
 import { PendingActionsPanel } from '@/components/shared/PendingActionsPanel'
@@ -56,11 +53,9 @@ import { ChartCard } from '@/components/shared/ChartCard'
 import { Chart } from '@/components/shared/chart'
 import type { ChartDataPoint } from '@/components/shared/chart'
 import { FeeCollectionRadial } from '@/components/finances/FeeCollectionRadial'
-import { useStudents } from '@/hooks/useStudents'
-import { useStaffDirectory } from '@/hooks/useHR'
-import { useFinanceSummary } from '@/hooks/useFinances'
+import { useExecutiveOverview, useExecutiveAttention } from '@/hooks/reporting/useExecutiveReporting'
+import { DashboardAttention, ExecutiveKpiGroups } from './DashboardReport'
 import {
-  useSchoolPerformanceTrend,
   useEnrollmentTrend,
   useClassComparison,
   useAttendanceSummary,
@@ -69,7 +64,6 @@ import {
   useLibraryBorrowingTrend,
 } from '@/hooks/useAnalytics'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
-import type { ApiStaffProfile } from '@shared/types/api'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
@@ -142,27 +136,8 @@ const QUICK_ACTIONS: QuickAction[] = [
 export function HighRankDashboard() {
   const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
 
-  const { data: studentsData, isLoading: studentsLoading } =
-    useStudents({ status: 'ACTIVE' })
-  const { data: staffData, isLoading: staffLoading } = useStaffDirectory()
-  const { data: finance, isLoading: financeLoading } = useFinanceSummary(
-    academicYear ?? '',
-    term ?? 0,
-  )
-  const { data: perfTrend, isLoading: perfLoading } = useSchoolPerformanceTrend(
-    academicYear ? [academicYear] : [],
-  )
-
-  const staff = staffData as ApiStaffProfile[] | undefined
-
-  // Latest trend point for the current year — the trend endpoint returns
-  // one point per (year, term); take the highest term present.
-  const latestPerf = perfTrend && perfTrend.length > 0
-    ? perfTrend[perfTrend.length - 1]
-    : undefined
-
-  const financeLoadingAll = periodLoading || financeLoading
-  const perfLoadingAll    = periodLoading || perfLoading
+  const executive = useExecutiveOverview({ academicYear: academicYear ?? '', term: term ?? undefined })
+  const attention = useExecutiveAttention({ academicYear: academicYear ?? '', term: term ?? undefined })
 
   const { data: enrollment = [], isLoading: enrollmentLoading } = useEnrollmentTrend(12)
   const enrollmentData: ChartDataPoint[] = enrollment.map((e) => ({
@@ -218,51 +193,7 @@ export function HighRankDashboard() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <StatCardGrid className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard
-          label="Total Students"
-          value={statValue(studentsLoading, studentsData?.total)}
-          icon={Users}
-          trend="neutral"
-          trendLabel="active"
-          iconColor="bg-blue-50"
-          iconText="text-blue-600"
-        />
-        {/* R15: distinct icon from the adjacent Total Students card */}
-        <StatCard
-          label="Total Staff"
-          value={statValue(staffLoading, staff?.length)}
-          icon={Briefcase}
-          trend="neutral"
-          trendLabel="on record"
-          iconColor="bg-brand-teal/10"
-          iconText="text-brand-teal"
-        />
-        <StatCard
-          label="Fee Collection"
-          value={statValue(
-            financeLoadingAll,
-            finance ? `${finance.collectionPercent}%` : undefined,
-          )}
-          icon={Banknote}
-          trend="neutral"
-          trendLabel="of target"
-          iconColor="bg-emerald-50"
-          iconText="text-emerald-600"
-        />
-        <StatCard
-          label="School Pass Rate"
-          value={statValue(
-            perfLoadingAll,
-            latestPerf ? `${latestPerf.passRate}%` : undefined,
-          )}
-          icon={TrendingUp}
-          trend="neutral"
-          trendLabel={latestPerf ? `Term ${latestPerf.term}` : 'this year'}
-          iconColor="bg-purple-50"
-          iconText="text-purple-600"
-        />
-      </StatCardGrid>
+      <ExecutiveKpiGroups academicYear={academicYear} term={term} overview={executive} />
       <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ChartCard
@@ -410,6 +341,7 @@ export function HighRankDashboard() {
           />
         </ChartCard>
       </div>
+      <DashboardAttention query={attention} title="Needs leadership attention" />
     </div>
   )
 }

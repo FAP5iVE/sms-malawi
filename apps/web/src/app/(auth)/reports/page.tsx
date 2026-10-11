@@ -1,61 +1,84 @@
 /**
  * apps/web/src/app/(auth)/reports/page.tsx
  *
- * [CHANGE TYPE]: MAJOR REWRITE (tab wiring + export affordance)
- * [R-PHASE]: R14 — Analytics & Reports Domain
- * [PURPOSE]: The page's chart panels are sound and are left alone. Four
- *   things were not:
+ * Reports for every role. The page owns the role → tab map and the viewing
+ * period; the tabs themselves live in two places:
  *
- *   1. Seven report hooks (useSchoolReport, useFinanceReport,
- *      useLibraryReport, useHRReport, useAcademicReport, useExamOfficerReport,
- *      useStudentReport) were fully built, backed by real routes, and had NO
- *      consumer anywhere in the app — only useAdminReport and useAuditLog were
- *      ever called. Each is now wired into a real Summary tab for the role
- *      whose route it serves, so every role's report actually reaches a screen.
+ *   - components/reports/panels/*  — the role reports backed by the
+ *     /reporting/<domain> endpoints (KPI strip, findings, attention queue,
+ *     charts and tables). Their numbers come from the same server services the
+ *     dashboards use, so a dashboard KPI and the report it links to agree.
+ *   - the panels below — the long-standing chart panels, kept where they still
+ *     show something the newer tabs do not.
  *
- *   2. `report.export` is the one permission granted to all nine roles, and it
- *      had no implementation at any layer — the page imported a `Download`
- *      icon and never rendered it. Every panel with tabular data now registers
- *      that data with an export context, and the header renders a real,
- *      permission-gated Download button that produces a genuine CSV via
- *      W/lib/csv.ts. Whether the button appears is decided by
- *      GET /analytics/capabilities — i.e. by ROLE_PERMISSIONS itself — not by
- *      a client-side role list that can drift from it.
- *
- *   3. analyticsService.getAcademicMarksDistribution() and
- *      getManebCandidateList() were likewise fully built, role-gated, and
- *      unreachable. Both are now wired into the academic and exam_officer tabs.
- *
- *   4. `const CURRENT_YEAR = '2025/2026'` was a hardcoded literal. It is now
- *      read from SystemSettings (current_academic_year / current_term, both
- *      isPublic) — the same source R14's routes default from, so the page and
- *      the API agree on what "now" is and the school does not silently keep
- *      reporting 2025/2026 forever after it rolls over.
- *
- *   Also corrects the budget-vs-actual chart's `dataKey="department"` to
- *   `"category"`: ApiBudgetVsActualRow's key field is the ExpenseCategory join
- *   key, not the free-text department that never matched an expense (R14,
- *   analyticsService.ts + schema.prisma).
- * [DEPENDS ON]: W/hooks/useAnalytics.ts, W/hooks/useReports.ts, W/lib/csv.ts,
- *   W/hooks/useSettings.ts
+ * The active tab is the `?tab=` URL parameter, which is what dashboard KPIs
+ * link to (see reportLink). Export (CSV / Excel / PDF report pack) is
+ * registered per panel through useExportable and offered by ExportToolbar,
+ * which is shown only to roles holding `report.export`. Year and term come from
+ * the app-wide viewing period (SystemSettings), never from literals.
  */
 'use client'
-import { useState, useEffect, useRef, useMemo, useCallback, useContext, createContext } from 'react'
+import { Suspense, useState, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import type { UserRole } from '@shared/types/roles'
 import { SuperUserRoleSwitcher } from '@/components/shared/SuperUserRoleSwitcher'
 import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
 import { AdminSessionsPanel } from '@/components/reports/AdminSessionsPanel'
+import { ExecutiveOverviewTab } from '@/components/reports/panels/ExecutivePanels'
+import {
+  FinanceOverviewTab,
+  FinanceAgingTab,
+  FinancePaymentsTab,
+  ProcurementTab,
+  StocktakeTab,
+} from '@/components/reports/panels/FinancePanels'
+import {
+  HrOverviewTab,
+  HrWorkforceTab,
+  HrLeaveTab,
+  HrContractsTab,
+  HrLoansTab,
+  HrReviewsTab,
+} from '@/components/reports/panels/HrPanels'
+import { MarkCompletionTab, ExamPipelineTab } from '@/components/reports/panels/ExamPanels'
+import {
+  LibraryOverviewSection,
+  LibraryCirculationTab,
+  LibraryFinesTab,
+} from '@/components/reports/panels/LibraryPanels'
+import { AttendanceReportTab } from '@/components/reports/panels/AttendancePanels'
+import { AdmissionsTab, EnrollmentTab } from '@/components/reports/panels/AdmissionsPanels'
+import {
+  AcademicTeachingTab,
+  AcademicAssignmentsTab,
+  AcademicStudentsTab,
+  AcademicReadinessTab,
+} from '@/components/reports/panels/AcademicPanels'
+import {
+  AdminOverviewSection,
+  AdminSecurityTab,
+  AdminSessionsReportTab,
+  AdminGovernanceTab,
+  AdminAdoptionTab,
+} from '@/components/reports/panels/AdminPanels'
+import {
+  StudentOverviewTab,
+  StudentProgressTab,
+  StudentAssignmentsTab,
+  StudentLibraryTab,
+  StudentAttendanceTab,
+  StudentFeesTab,
+} from '@/components/reports/panels/StudentPanels'
 import { useResizableColumns } from '@/hooks/useResizableColumns'
 import { CopyableId } from '@/components/shared/CopyableId'
 import { chartColorAt } from '@/lib/chartPalette'
 import { useAuthStore } from '@/store/authStore'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
-import { downloadCsv, csvFilename } from '@/lib/csv'
-import type { CsvColumn } from '@/lib/csv'
+import { ReportExportProvider, ExportToolbar, useExportable } from '@/components/reports/ui/ReportExport'
+import { useReportParam } from '@/components/reports/ui/useReportParams'
 import {
-  useAdminLoginTrend,
   useAdminActivityHeatmap,
   useAdminEntityActivity,
   useAdminActionBreakdown,
@@ -86,34 +109,16 @@ import {
   useLibraryTopBorrowed,
   useLibraryDigitalStats,
 } from '@/hooks/useAnalytics'
-import {
-  useApplicationsFunnel,
-  useApplicationTrend,
-  useEnrollmentByForm,
-} from '@/hooks/useAnalytics'
-import {
-  useAcademicSubjectPerformance,
-  useAcademicAssignmentCompletion,
-  useAcademicMarksDistribution,
-} from '@/hooks/useAnalytics'
-import {
-  useStudentPerformanceTrend,
-  useStudentSubjectBreakdown,
-  useStudentFeeStatement,
-  useOwnAttendance,
-} from '@/hooks/useAnalytics'
+import { useApplicationsFunnel } from '@/hooks/useAnalytics'
+import { useAcademicSubjectPerformance, useAcademicMarksDistribution } from '@/hooks/useAnalytics'
 import { useManebSchoolStats, useManebCandidates } from '@/hooks/useAnalytics'
-import { useHRStaffByDepartment, useHRLeaveByType, useHRLeaveTrend } from '@/hooks/useAnalytics'
-import { useReportCapabilities } from '@/hooks/useAnalytics'
+import { useHRStaffByDepartment } from '@/hooks/useAnalytics'
 import {
   useAdminReport,
   useAuditLog,
   useSchoolReport,
   useFinanceReport,
-  useLibraryReport,
-  useHRReport,
   useAcademicReport,
-  useExamOfficerReport,
   useStudentReport,
 } from '@/hooks/useReports'
 import {
@@ -133,7 +138,6 @@ import {
   Cell,
   Legend,
   ComposedChart,
-  ReferenceLine,
 } from 'recharts'
 import type { PieLabelRenderProps } from 'recharts'
 import {
@@ -149,29 +153,20 @@ import {
   AlertTriangle,
   ArrowUpRight,
   ArrowDownRight,
-  Download,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Wifi,
 } from 'lucide-react'
 import type {
-  ApiLoginTrendPoint,
   ApiCategoryBreakdown,
   ApiClassPerformanceStat,
   ApiTeacherEffectivenessRow,
   ApiEnrollmentTrendPoint,
-  ApiApplicationFunnelStage,
   ApiTopBorrowedBook,
-  ApiStudentPerformancePoint,
-  ApiStudentSubjectScore,
-  ApiStudentFeeStatement,
   ApiManebSchoolStat,
   ApiCashFlowRow,
   ApiBudgetVsActualRow,
-  ApiAssignmentCompletionRow,
   ApiTimeSeriesPoint,
-  ApiAttendanceSummaryRow,
   ApiScholarshipSummaryRow,
   ApiMarksDistributionBucket,
   ApiAcademicSubjectPerformanceRow,
@@ -221,258 +216,133 @@ function recentAcademicYears(currentYear: string, yearsBack: number): string[] {
   return years
 }
 
-// ─── EXPORT CONTEXT (R14 — report.export) ────────────────────────────────────
+const I = {
+  trend: <TrendingUp className="w-4 h-4" />,
+  chart: <BarChart2 className="w-4 h-4" />,
+  users: <Users className="w-4 h-4" />,
+  grad: <GraduationCap className="w-4 h-4" />,
+  activity: <Activity className="w-4 h-4" />,
+  money: <DollarSign className="w-4 h-4" />,
+  doc: <FileText className="w-4 h-4" />,
+  alert: <AlertTriangle className="w-4 h-4" />,
+  book: <BookOpen className="w-4 h-4" />,
+  shield: <ShieldCheck className="w-4 h-4" />,
+  wifi: <Wifi className="w-4 h-4" />,
+}
 
 /**
- * What the currently-visible panel(s) offer for export.
- *
- * The Download button lives in the page header, but only the active panel
- * knows what rows it is actually showing — so panels register their table
- * here and the header renders a button that exports precisely what the user
- * is looking at, rather than some fixed guess at what the tab "probably"
- * holds.
- *
- * [PRODUCTION FIX] This used to hold a single `registration | null` slot —
- * correct as long as exactly one useExportable-calling panel was ever
- * mounted per tab, which was true everywhere until High Rank's
- * Performance/Classes/Finance tabs started stacking multiple existing
- * sub-panels (each already calling useExportable on its own) into one tab.
- * With a single slot, the last panel to mount silently overwrote every
- * registration before it — clicking Export would download only the bottom
- * -most section's data with no indication the others were never
- * exportable. Keyed by `label` (a Map) so each panel owns its own entry:
- * unrelated panels can never evict each other, and a panel re-registering
- * on every render (its normal behavior) updates its own entry in place
- * rather than appending duplicates.
- *
- * `download` is a closure rather than raw rows + columns so each panel keeps
- * its own row type: type erasure happens at the boundary, not inside the panel.
+ * Tab ids double as deep-link targets: dashboards link to `/reports?tab=<id>`
+ * (see reportLink), so renaming an id here means updating the dashboards.
  */
-interface ExportRegistration {
-  label: string
-  hasRows: boolean
-  download: () => boolean
-}
-
-interface ExportContextValue {
-  registrations: Map<string, ExportRegistration>
-  register: (registration: ExportRegistration) => void
-  unregister: (label: string) => void
-}
-
-const ExportContext = createContext<ExportContextValue>({
-  registrations: new Map(),
-  register: () => undefined,
-  unregister: () => undefined,
-})
-
-/**
- * Registers the calling panel's table as one of the page's current export
- * targets (see the [PRODUCTION FIX] note on ExportContext above for why this
- * is keyed by label rather than a single overwritable slot).
- *
- * `columns` are held in a ref rather than an effect dependency on purpose:
- * panels declare them inline, so a fresh array identity arrives on every
- * render and depending on it would re-register (and therefore setState) every
- * render — an infinite loop. `rows` comes from TanStack Query and IS reference
- * -stable between renders, so it is a real dependency.
- */
-function useExportable<T>(
-  label: string,
-  rows: readonly T[] | undefined,
-  columns: readonly CsvColumn<T>[]
-): void {
-  const { register, unregister } = useContext(ExportContext)
-
-  const columnsRef = useRef(columns)
-  const rowsRef = useRef(rows)
-
-  // Refs are mirrors of the latest `columns`/`rows`, kept fresh for the
-  // `download` closure below without making either a dependency of the
-  // registration effect (see the two comments above for why: unstable
-  // `columns` identity and — deliberately, for symmetry — `rows` too).
-  // Mutating a ref must happen outside render, so this assignment lives in
-  // its own effect (no dependency array — it intentionally runs after every
-  // render) rather than directly in the function body.
-  useEffect(() => {
-    columnsRef.current = columns
-    rowsRef.current = rows
-  })
-
-  const hasRows = (rows?.length ?? 0) > 0
-
-  useEffect(() => {
-    register({
-      label,
-      hasRows,
-      download: () => downloadCsv(csvFilename(label), rowsRef.current ?? [], columnsRef.current),
-    })
-    // Unregister only this panel's own entry — never the whole map, so
-    // sibling panels registered under other labels are untouched.
-    return () => unregister(label)
-  }, [register, unregister, label, hasRows])
-}
-
-/** The header's Download control — rendered only when the caller actually
- *  holds report.export, as reported by the permission matrix itself.
- *  [PRODUCTION FIX] Single-registration tabs (still the overwhelming
- *  majority) get the exact same one-click button as before. A tab with more
- *  than one registration (High Rank's stacked panels) gets a small dropdown
- *  instead of silently picking one — nothing is dropped without the user
- *  choosing that. */
-function ExportButton() {
-  const { registrations } = useContext(ExportContext)
-  const { data: capabilities } = useReportCapabilities()
-  const [message, setMessage] = useState<string | null>(null)
-  const [menuOpen, setMenuOpen] = useState(false)
-
-  if (!capabilities?.canExport) return null
-
-  const list = Array.from(registrations.values())
-
-  if (list.length <= 1) {
-    const registration = list[0] as ExportRegistration | undefined
-    const disabled = !registration?.hasRows
-    return (
-      <div className="flex flex-col items-end gap-1">
-        <button
-          type="button"
-          onClick={() => {
-            if (!registration) return
-            setMessage(registration.download() ? null : 'Nothing to export on this tab.')
-          }}
-          disabled={disabled}
-          title={
-            disabled
-              ? 'This tab has no exportable data yet'
-              : `Export ${registration?.label} as CSV`
-          }
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border border-base bg-surface text-brand-navy transition-colors hover:bg-base disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
-        >
-          <Download className="w-4 h-4" />
-          Export CSV
-        </button>
-        {message && (
-          <p role="alert" className="text-xs text-brand-coral">
-            {message}
-          </p>
-        )}
-      </div>
-    )
-  }
-
-  const anyExportable = list.some((r) => r.hasRows)
-
-  return (
-    <div className="relative flex flex-col items-end gap-1">
-      <button
-        type="button"
-        onClick={() => setMenuOpen((o) => !o)}
-        disabled={!anyExportable}
-        title={anyExportable ? 'Choose a table to export' : 'This tab has no exportable data yet'}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border border-base bg-surface text-brand-navy transition-colors hover:bg-base disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-      >
-        <Download className="w-4 h-4" />
-        Export CSV
-        <ChevronDown className="w-3.5 h-3.5" />
-      </button>
-      {menuOpen && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full mt-1 min-w-55 bg-surface border border-base rounded-xl shadow-lg py-1 z-20"
-        >
-          {list.map((r) => (
-            <button
-              key={r.label}
-              role="menuitem"
-              type="button"
-              disabled={!r.hasRows}
-              onClick={() => {
-                setMessage(r.download() ? null : 'Nothing to export on this tab.')
-                setMenuOpen(false)
-              }}
-              className="w-full text-left px-3 py-2 text-sm text-brand-navy hover:bg-page disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-      )}
-      {message && (
-        <p role="alert" className="text-xs text-brand-coral">
-          {message}
-        </p>
-      )}
-    </div>
-  )
-}
-
 const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNode }[]> = {
   admin: [
-    { id: 'overview', label: 'Overview', icon: <Activity className="w-4 h-4" /> },
-    { id: 'security', label: 'Security', icon: <ShieldCheck className="w-4 h-4" /> },
-    { id: 'sessions', label: 'Sessions', icon: <Wifi className="w-4 h-4" /> },
-    { id: 'audit', label: 'Audit Log', icon: <FileText className="w-4 h-4" /> },
+    { id: 'overview', label: 'Overview', icon: I.activity },
+    { id: 'security', label: 'Security', icon: I.shield },
+    { id: 'sessions', label: 'Sessions', icon: I.wifi },
+    { id: 'governance', label: 'Governance', icon: I.doc },
+    { id: 'adoption', label: 'Adoption', icon: I.users },
+    { id: 'audit', label: 'Audit Log', icon: I.doc },
   ],
   high_rank: [
-    { id: 'performance', label: 'Performance', icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'classes', label: 'Classes', icon: <BarChart2 className="w-4 h-4" /> },
-    { id: 'teachers', label: 'Teachers', icon: <Users className="w-4 h-4" /> },
-    { id: 'enrollment', label: 'Enrollment', icon: <GraduationCap className="w-4 h-4" /> },
-    { id: 'attendance', label: 'Attendance', icon: <Activity className="w-4 h-4" /> },
-    { id: 'finance', label: 'Finance', icon: <DollarSign className="w-4 h-4" /> },
-    { id: 'placements', label: 'Placements', icon: <GraduationCap className="w-4 h-4" /> },
-    { id: 'summary', label: 'Summary', icon: <FileText className="w-4 h-4" /> },
+    { id: 'overview', label: 'Overview', icon: I.activity },
+    { id: 'performance', label: 'Performance', icon: I.trend },
+    { id: 'classes', label: 'Classes', icon: I.chart },
+    { id: 'teachers', label: 'Teachers', icon: I.users },
+    { id: 'enrollment', label: 'Enrollment', icon: I.grad },
+    { id: 'admissions', label: 'Admissions', icon: I.doc },
+    { id: 'attendance', label: 'Attendance', icon: I.activity },
+    { id: 'completion', label: 'Exams', icon: I.doc },
+    { id: 'finance', label: 'Finance', icon: I.money },
+    { id: 'aging', label: 'Receivables', icon: I.alert },
+    { id: 'procurement', label: 'Procurement', icon: I.doc },
+    { id: 'stocktake', label: 'Stock', icon: I.chart },
+    { id: 'workforce', label: 'HR', icon: I.users },
+    { id: 'leave', label: 'Leave', icon: I.activity },
+    { id: 'contracts', label: 'Contracts', icon: I.alert },
+    { id: 'circulation', label: 'Library', icon: I.book },
+    { id: 'placements', label: 'Placements', icon: I.grad },
+    { id: 'governance', label: 'Governance', icon: I.shield },
+    { id: 'summary', label: 'Summary', icon: I.doc },
   ],
   finance: [
-    { id: 'collection', label: 'Fee Collection', icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'outstanding', label: 'Outstanding', icon: <AlertTriangle className="w-4 h-4" /> },
-    { id: 'expenses', label: 'Expenses', icon: <BarChart2 className="w-4 h-4" /> },
-    { id: 'cashflow', label: 'Cash Flow', icon: <Activity className="w-4 h-4" /> },
-    { id: 'payroll', label: 'Payroll', icon: <DollarSign className="w-4 h-4" /> },
-    { id: 'scholarships', label: 'Scholarships', icon: <GraduationCap className="w-4 h-4" /> },
-    { id: 'summary', label: 'Summary', icon: <FileText className="w-4 h-4" /> },
+    { id: 'overview', label: 'Overview', icon: I.activity },
+    { id: 'collection', label: 'Fee Collection', icon: I.trend },
+    { id: 'outstanding', label: 'Outstanding', icon: I.alert },
+    { id: 'aging', label: 'Aging', icon: I.alert },
+    { id: 'payments', label: 'Payments', icon: I.money },
+    { id: 'expenses', label: 'Expenses', icon: I.chart },
+    { id: 'cashflow', label: 'Cash Flow', icon: I.activity },
+    { id: 'payroll', label: 'Payroll', icon: I.money },
+    { id: 'scholarships', label: 'Scholarships', icon: I.grad },
+    { id: 'procurement', label: 'Procurement', icon: I.doc },
+    { id: 'stocktake', label: 'Stocktake', icon: I.chart },
+    { id: 'summary', label: 'Summary', icon: I.doc },
   ],
   library: [
-    { id: 'overview', label: 'Overview', icon: <BookOpen className="w-4 h-4" /> },
-    { id: 'borrowing', label: 'Borrowing', icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'digital', label: 'Digital', icon: <FileText className="w-4 h-4" /> },
-    { id: 'summary', label: 'Summary', icon: <Activity className="w-4 h-4" /> },
+    { id: 'overview', label: 'Overview', icon: I.book },
+    { id: 'circulation', label: 'Circulation', icon: I.activity },
+    { id: 'borrowing', label: 'Borrowing', icon: I.trend },
+    { id: 'fines', label: 'Fines', icon: I.money },
+    { id: 'digital', label: 'Digital', icon: I.doc },
   ],
   lower_rank: [
-    { id: 'applications', label: 'Applications', icon: <FileText className="w-4 h-4" /> },
-    { id: 'enrollment', label: 'Enrollment', icon: <Users className="w-4 h-4" /> },
-    { id: 'attendance', label: 'Attendance', icon: <Activity className="w-4 h-4" /> },
+    { id: 'admissions', label: 'Admissions', icon: I.doc },
+    { id: 'enrollment', label: 'Enrollment', icon: I.users },
+    { id: 'attendance', label: 'Attendance', icon: I.activity },
   ],
   academic: [
-    { id: 'subjects', label: 'Subjects', icon: <BarChart2 className="w-4 h-4" /> },
-    { id: 'assignments', label: 'Assignments', icon: <FileText className="w-4 h-4" /> },
-    { id: 'marks', label: 'Marks', icon: <Activity className="w-4 h-4" /> },
-    { id: 'attendance', label: 'Attendance', icon: <Users className="w-4 h-4" /> },
-    { id: 'summary', label: 'My Classes', icon: <GraduationCap className="w-4 h-4" /> },
+    { id: 'teaching', label: 'Teaching', icon: I.chart },
+    { id: 'assignments', label: 'Assignments', icon: I.doc },
+    { id: 'marks', label: 'Marks', icon: I.activity },
+    { id: 'students', label: 'Students', icon: I.alert },
+    { id: 'readiness', label: 'Exam Readiness', icon: I.grad },
+    { id: 'attendance', label: 'Attendance', icon: I.users },
+    { id: 'summary', label: 'My Classes', icon: I.grad },
   ],
   exam_officer: [
-    { id: 'maneb', label: 'MANEB', icon: <GraduationCap className="w-4 h-4" /> },
-    { id: 'candidates', label: 'Candidates', icon: <Users className="w-4 h-4" /> },
-    { id: 'subjects', label: 'Subjects', icon: <BarChart2 className="w-4 h-4" /> },
-    { id: 'marks', label: 'Marks', icon: <Activity className="w-4 h-4" /> },
-    { id: 'placements', label: 'Placements', icon: <GraduationCap className="w-4 h-4" /> },
-    { id: 'summary', label: 'Summary', icon: <FileText className="w-4 h-4" /> },
+    { id: 'completion', label: 'Mark Completion', icon: I.activity },
+    { id: 'pipeline', label: 'Results Pipeline', icon: I.trend },
+    { id: 'maneb', label: 'MANEB', icon: I.grad },
+    { id: 'candidates', label: 'Candidates', icon: I.users },
+    { id: 'subjects', label: 'Subjects', icon: I.chart },
+    { id: 'marks', label: 'Marks', icon: I.activity },
+    { id: 'placements', label: 'Placements', icon: I.grad },
   ],
   hr: [
-    { id: 'staffing', label: 'Staffing', icon: <Users className="w-4 h-4" /> },
-    { id: 'leave', label: 'Leave', icon: <Activity className="w-4 h-4" /> },
-    { id: 'summary', label: 'Summary', icon: <FileText className="w-4 h-4" /> },
+    { id: 'overview', label: 'Overview', icon: I.activity },
+    { id: 'workforce', label: 'Workforce', icon: I.users },
+    { id: 'leave', label: 'Leave', icon: I.activity },
+    { id: 'contracts', label: 'Contracts', icon: I.alert },
+    { id: 'loans', label: 'Staff Loans', icon: I.money },
+    { id: 'reviews', label: 'Reviews', icon: I.doc },
   ],
   student: [
-    { id: 'performance', label: 'Performance', icon: <TrendingUp className="w-4 h-4" /> },
-    { id: 'subjects', label: 'Subjects', icon: <BarChart2 className="w-4 h-4" /> },
-    { id: 'attendance', label: 'Attendance', icon: <Activity className="w-4 h-4" /> },
-    { id: 'fees', label: 'Fees', icon: <DollarSign className="w-4 h-4" /> },
-    { id: 'summary', label: 'Results', icon: <FileText className="w-4 h-4" /> },
+    { id: 'overview', label: 'Overview', icon: I.activity },
+    { id: 'progress', label: 'Progress', icon: I.trend },
+    { id: 'assignments', label: 'Assignments', icon: I.doc },
+    { id: 'attendance', label: 'Attendance', icon: I.activity },
+    { id: 'library', label: 'Library', icon: I.book },
+    { id: 'fees', label: 'Fees', icon: I.money },
+    { id: 'summary', label: 'Results', icon: I.doc },
   ],
+}
+
+/**
+ * Deep links written for a role's own report (e.g. the finance reports' `outstanding`
+ * or the HR reports' `loans`) that leadership sees inside a wider tab.
+ */
+const TAB_ALIASES: Record<string, Record<string, string>> = {
+  high_rank: {
+    collection: 'finance',
+    outstanding: 'aging',
+    expenses: 'finance',
+    payments: 'finance',
+    loans: 'workforce',
+    reviews: 'workforce',
+    fines: 'circulation',
+    library: 'circulation',
+    pipeline: 'completion',
+  },
 }
 
 // ─── SHARED UI COMPONENTS ────────────────────────────────────────────────────
@@ -705,64 +575,6 @@ function AdminActionBreakdownChart() {
     </ResponsiveContainer>
   )
 }
-
-function AdminSecurityPanel() {
-  const { data: raw, isLoading } = useAdminLoginTrend(30)
-  const data = raw as ApiLoginTrendPoint[] | undefined
-  const successful = data?.reduce((s, d) => s + d.successful, 0) ?? 0
-  const failed = data?.reduce((s, d) => s + d.failed, 0) ?? 0
-  const failRate = successful + failed > 0 ? Math.round((failed / (successful + failed)) * 100) : 0
-
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard label="Successful Logins" value={successful} trend="up" />
-        <KpiCard label="Failed Logins" value={failed} warn={failed > 10} />
-        <KpiCard label="Failure Rate" value={`${failRate}%`} warn={failRate > 5} />
-        <KpiCard label="Period" value="30 days" />
-      </div>
-      {isLoading ? (
-        <SkeletonChart />
-      ) : (
-        <ChartCard title="Login Success vs Failure — Last 30 Days">
-          {data && data.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-                />
-                <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
-                <Tooltip contentStyle={{ fontSize: 12 }} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar
-                  dataKey="successful"
-                  fill={chartColorAt(1)}
-                  radius={[4, 4, 0, 0]}
-                  name="Successful"
-                  stackId="a"
-                />
-                <Bar
-                  dataKey="failed"
-                  fill={chartColorAt(3)}
-                  radius={[4, 4, 0, 0]}
-                  name="Failed"
-                  stackId="a"
-                />
-                <ReferenceLine y={0} stroke="var(--color-border)" />
-              </ComposedChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState message="No login activity in this period" />
-          )}
-        </ChartCard>
-      )}
-      <AdminHeatmapPanel />
-    </div>
-  )
-}
-
 function AdminHeatmapPanel() {
   const { data: raw } = useAdminActivityHeatmap()
   const cells = raw as { hour: number; dayOfWeek: number; count: number }[] | undefined
@@ -2146,132 +1958,6 @@ function LibraryDigitalPanel() {
   )
 }
 
-// ─── LOWER RANK PANELS ───────────────────────────────────────────────────────
-
-function LowerRankApplicationsPanel() {
-  const { data: funnel, isLoading: fl } = useApplicationsFunnel()
-  const { data: trend, isLoading: tl } = useApplicationTrend(12)
-
-  useExportable<ApiApplicationFunnelStage>('Applications Funnel', funnel, [
-    { label: 'Stage', value: (f) => f.stage },
-    { label: 'Count', value: (f) => f.count },
-  ])
-
-  return (
-    <div className="space-y-5">
-      {funnel && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {funnel.map((s) => (
-            <KpiCard
-              key={s.stage}
-              label={s.stage}
-              value={s.count}
-              sub={`${s.pct}%`}
-              warn={s.stage === 'Denied'}
-            />
-          ))}
-        </div>
-      )}
-      {fl ? (
-        <SkeletonChart />
-      ) : (
-        <ChartCard title="Application Funnel">
-          {funnel && funnel.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={funnel.filter((s) => s.stage !== 'Denied')}>
-                <XAxis
-                  dataKey="stage"
-                  tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-                />
-                <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
-                <Tooltip contentStyle={{ fontSize: 12 }} />
-                <Bar dataKey="count" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState />
-          )}
-        </ChartCard>
-      )}
-      {tl ? (
-        <SkeletonChart />
-      ) : (
-        <ChartCard title="Monthly Application Submissions — Last 12 Months">
-          {trend && trend.length > 0 ? (
-            <ResponsiveContainer width="100%" height={160}>
-              <AreaChart data={trend}>
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-                />
-                <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
-                <Tooltip contentStyle={{ fontSize: 12 }} />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke={chartColorAt(1)}
-                  fill={chartColorAt(1)}
-                  fillOpacity={0.08}
-                  strokeWidth={2}
-                  name="Applications"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState />
-          )}
-        </ChartCard>
-      )}
-    </div>
-  )
-}
-
-function LowerRankEnrollmentPanel({ academicYear }: { academicYear: string }) {
-  const { data: raw, isLoading } = useEnrollmentByForm(academicYear)
-  const rows = raw as { form: number; className: string; studentCount: number }[] | undefined
-
-  return (
-    <div className="space-y-5">
-      {isLoading ? (
-        <SkeletonChart />
-      ) : (
-        <ChartCard title={`Enrollment by Class — ${academicYear}`}>
-          {rows && rows.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={rows}>
-                  <XAxis
-                    dataKey="className"
-                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-                  />
-                  <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Bar
-                    dataKey="studentCount"
-                    fill={chartColorAt(1)}
-                    radius={[4, 4, 0, 0]}
-                    name="Students"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
-                {[1, 2, 3, 4].map((form) => {
-                  const total = rows
-                    .filter((r) => r.form === form)
-                    .reduce((s, r) => s + r.studentCount, 0)
-                  return <KpiCard key={form} label={`Form ${form}`} value={total} />
-                })}
-              </div>
-            </>
-          ) : (
-            <EmptyState />
-          )}
-        </ChartCard>
-      )}
-    </div>
-  )
-}
-
 // ─── ACADEMIC STAFF PANELS ───────────────────────────────────────────────────
 
 function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; term: number }) {
@@ -2364,306 +2050,6 @@ function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; t
             </div>
           )}
         </>
-      )}
-    </div>
-  )
-}
-
-function AcademicAssignmentsPanel({ academicYear }: { academicYear: string }) {
-  const { data: rows, isLoading } = useAcademicAssignmentCompletion(academicYear)
-
-  useExportable<ApiAssignmentCompletionRow>(`Assignment Completion ${academicYear}`, rows, [
-    { label: 'Assignment', value: (a) => a.title },
-    { label: 'Subject', value: (a) => a.subject },
-    { label: 'Due', value: (a) => a.dueDate },
-    { label: 'Submitted', value: (a) => a.submitted },
-    { label: 'Total', value: (a) => a.total },
-    { label: 'Completion (%)', value: (a) => a.completionRate },
-  ])
-
-  return (
-    <div className="space-y-5">
-      {isLoading ? (
-        <SkeletonChart />
-      ) : (
-        <ChartCard title="Assignment Completion Rates">
-          {rows && rows.length > 0 ? (
-            <div className="space-y-2">
-              {rows.map((r) => (
-                <div key={r.assignmentId} className="flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <p className="text-sm font-medium text-brand-navy truncate">{r.title}</p>
-                      <span className="text-xs text-muted ml-2 whitespace-nowrap">
-                        {r.submitted}/{r.total}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted mb-1">
-                      {r.subject} · Due {r.dueDate}
-                    </p>
-                    <div className="h-2 bg-base rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${r.completionRate >= 80 ? 'bg-brand-teal' : r.completionRate >= 50 ? 'bg-brand-amber' : 'bg-brand-coral'}`}
-                        style={{ width: `${r.completionRate}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span
-                    className={`text-sm font-bold w-12 text-right ${r.completionRate >= 80 ? 'text-brand-teal' : r.completionRate >= 50 ? 'text-brand-amber' : 'text-brand-coral'}`}
-                  >
-                    {r.completionRate}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState message="No assignments found for this year" />
-          )}
-        </ChartCard>
-      )}
-    </div>
-  )
-}
-
-// ─── STUDENT PANELS ──────────────────────────────────────────────────────────
-
-function StudentPerformancePanel({
-  studentId,
-  academicYear,
-  term,
-}: {
-  studentId: string
-  academicYear: string
-  term: number
-}) {
-  const { data: trend, isLoading: tl } = useStudentPerformanceTrend(studentId)
-  const { data: subjects, isLoading: sl } = useStudentSubjectBreakdown(
-    studentId,
-    academicYear,
-    term
-  )
-
-  useExportable<ApiStudentPerformancePoint>('Performance Trend', trend, [
-    { label: 'Academic Year', value: (p) => p.academicYear },
-    { label: 'Term', value: (p) => p.term },
-    { label: 'Average', value: (p) => p.average },
-    { label: 'Grade', value: (p) => p.grade },
-    { label: 'Position', value: (p) => p.position },
-    { label: 'Class Total', value: (p) => p.classTotal },
-    { label: 'Attendance (%)', value: (p) => p.attendancePct },
-  ])
-
-  const latest = trend?.[trend.length - 1]
-
-  return (
-    <div className="space-y-5">
-      {latest && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard
-            label="Latest Average"
-            value={`${latest.average}%`}
-            trend={latest.passStatus ? 'up' : 'down'}
-          />
-          <KpiCard label="Grade" value={latest.grade} />
-          <KpiCard
-            label="Class Position"
-            value={latest.position !== null ? `#${latest.position} of ${latest.classTotal}` : '—'}
-          />
-          <KpiCard
-            label="Attendance"
-            value={`${latest.attendancePct}%`}
-            warn={latest.attendancePct < 80}
-          />
-        </div>
-      )}
-      {tl ? (
-        <SkeletonChart />
-      ) : (
-        <ChartCard title="My Performance Trend">
-          {trend && trend.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={trend.map((t) => ({ ...t, label: `${t.academicYear} T${t.term}` }))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
-                />
-                <YAxis
-                  domain={[0, 100]}
-                  tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-                />
-                <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, '']} />
-                <Line
-                  type="monotone"
-                  dataKey="average"
-                  stroke={chartColorAt(1)}
-                  strokeWidth={2}
-                  dot
-                  name="Average %"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <EmptyState />
-          )}
-        </ChartCard>
-      )}
-      {sl ? (
-        <SkeletonChart />
-      ) : (
-        <ChartCard title={`Subject Breakdown — ${academicYear} Term ${term}`}>
-          {subjects && subjects.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={subjects}>
-                  <XAxis
-                    dataKey="subject"
-                    tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
-                  />
-                  <YAxis
-                    domain={[0, 100]}
-                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-                  />
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="score" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Score">
-                    {subjects.map((s, i) => (
-                      <Cell
-                        key={i}
-                        fill={
-                          (Number(s.score) / s.maxMark) * 100 >= 50
-                            ? chartColorAt(1)
-                            : chartColorAt(3)
-                        }
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
-                {subjects.map((s) => (
-                  <div key={s.subject} className="bg-page border border-base rounded-xl p-3">
-                    <p className="text-xs text-muted truncate">{s.subject}</p>
-                    <p className="font-bold text-brand-navy">
-                      {s.score}/{s.maxMark}
-                    </p>
-                    <p
-                      className={`text-xs font-semibold ${s.grade === 'F' ? 'text-brand-coral' : 'text-brand-teal'}`}
-                    >
-                      {s.grade}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <EmptyState message="No results released for this term" />
-          )}
-        </ChartCard>
-      )}
-    </div>
-  )
-}
-
-function StudentFeesPanel({ studentId }: { studentId: string }) {
-  const { data: invoices, isLoading } = useStudentFeeStatement(studentId)
-
-  const totalOwed = invoices?.reduce((s, i) => s + i.balance, 0) ?? 0
-
-  useExportable<ApiStudentFeeStatement>('Fee Statement', invoices, [
-    { label: 'Academic Year', value: (i) => i.academicYear },
-    { label: 'Term', value: (i) => i.term },
-    { label: 'Total (MWK)', value: (i) => i.totalAmount },
-    { label: 'Paid (MWK)', value: (i) => i.paidAmount },
-    { label: 'Balance (MWK)', value: (i) => i.balance },
-    { label: 'Status', value: (i) => i.status },
-    { label: 'Due Date', value: (i) => i.dueDate },
-  ])
-
-  return (
-    <div className="space-y-5">
-      {invoices && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard
-            label="Total Outstanding"
-            value={`MWK ${totalOwed.toLocaleString()}`}
-            warn={totalOwed > 0}
-          />
-          <KpiCard label="Invoices" value={invoices.length} />
-          <KpiCard
-            label="Fully Paid"
-            value={invoices.filter((i) => i.status === 'PAID').length}
-            trend="up"
-          />
-          <KpiCard
-            label="Overdue"
-            value={invoices.filter((i) => i.status === 'OVERDUE').length}
-            warn
-          />
-        </div>
-      )}
-      {isLoading ? (
-        <SkeletonChart />
-      ) : (
-        <div className="space-y-3">
-          {invoices?.map((inv) => (
-            <div key={inv.invoiceId} className="pb-4 border-b border-base last:border-b-0">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <p className="font-semibold text-brand-navy">
-                    {inv.academicYear} — Term {inv.term}
-                  </p>
-                  <p className="text-xs text-muted">Due {inv.dueDate}</p>
-                </div>
-                <span
-                  className={`text-xs font-semibold ${
-                    inv.status === 'PAID'
-                      ? 'text-status-success'
-                      : inv.status === 'OVERDUE'
-                        ? 'text-status-danger'
-                        : inv.status === 'PARTIAL'
-                          ? 'text-status-warning'
-                          : 'text-muted'
-                  }`}
-                >
-                  {inv.status}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-sm mb-3">
-                <div>
-                  <p className="text-xs text-muted">Total</p>
-                  <p className="font-bold">MWK {inv.totalAmount.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted">Paid</p>
-                  <p className="font-bold text-brand-teal">MWK {inv.paidAmount.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted">Balance</p>
-                  <p
-                    className={`font-bold ${inv.balance > 0 ? 'text-brand-coral' : 'text-brand-teal'}`}
-                  >
-                    MWK {inv.balance.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-              {inv.payments.length > 0 && (
-                <div className="border-t border-base pt-2 space-y-1">
-                  {inv.payments.map((p, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs text-muted">
-                      <span>
-                        {p.method} · {p.paidAt}
-                      </span>
-                      <span className="font-medium text-brand-navy">
-                        MWK {p.amount.toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-          {(!invoices || invoices.length === 0) && <EmptyState message="No invoices found" />}
-        </div>
       )}
     </div>
   )
@@ -2769,151 +2155,6 @@ function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
   )
 }
 
-// ─── HR PANELS ───────────────────────────────────────────────────────────────
-
-function HRStaffingPanel() {
-  const { data: depts, isLoading: dl } = useHRStaffByDepartment()
-
-  useExportable<ApiCategoryBreakdown>('Staff by Department', depts, [
-    { label: 'Department', value: (d) => d.category },
-    { label: 'Staff', value: (d) => d.value },
-  ])
-
-  return (
-    <div className="space-y-5">
-      {depts && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="Active Staff" value={depts.reduce((s, d) => s + d.value, 0)} />
-          <KpiCard label="Departments" value={depts.length} />
-          <KpiCard label="Largest Dept." value={depts[0]?.category ?? '—'} />
-          <KpiCard label="Smallest Dept." value={depts[depts.length - 1]?.category ?? '—'} />
-        </div>
-      )}
-      {dl ? (
-        <SkeletonChart />
-      ) : (
-        <ChartCard title="Staff Headcount by Department">
-          {depts && depts.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={depts}
-                    dataKey="value"
-                    nameKey="category"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                  >
-                    {depts.map((_, i) => (
-                      <Cell key={i} fill={chartColorAt(i)} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={depts} layout="vertical">
-                  <XAxis
-                    type="number"
-                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="category"
-                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-                    width={100}
-                  />
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="value" fill={chartColorAt(0)} radius={[0, 4, 4, 0]} name="Staff" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <EmptyState />
-          )}
-        </ChartCard>
-      )}
-    </div>
-  )
-}
-
-function HRLeavePanel() {
-  const { data: typeRaw, isLoading: tl } = useHRLeaveByType()
-  const { data: trendRaw, isLoading: trl } = useHRLeaveTrend(12)
-  const types = typeRaw as ApiCategoryBreakdown[] | undefined
-  const trend = trendRaw as { label: string; value: number; value2: number }[] | undefined
-
-  return (
-    <div className="space-y-5">
-      {tl ? (
-        <SkeletonChart />
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartCard title="Leave Days by Type — Current Year">
-            {types && types.length > 0 ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie
-                    data={types}
-                    dataKey="value"
-                    nameKey="category"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={70}
-                  >
-                    {types.map((_, i) => (
-                      <Cell key={i} fill={chartColorAt(i)} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState />
-            )}
-          </ChartCard>
-          {trl ? (
-            <SkeletonChart />
-          ) : (
-            <ChartCard title="Leave Requests Trend — Last 12 Months">
-              {trend && trend.length > 0 ? (
-                <ResponsiveContainer width="100%" height={180}>
-                  <ComposedChart data={trend}>
-                    <XAxis
-                      dataKey="label"
-                      tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-                    />
-                    <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
-                    <Tooltip contentStyle={{ fontSize: 12 }} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar
-                      dataKey="value"
-                      fill={chartColorAt(1)}
-                      radius={[4, 4, 0, 0]}
-                      name="Approved"
-                    />
-                    <Bar
-                      dataKey="value2"
-                      fill={chartColorAt(3)}
-                      radius={[4, 4, 0, 0]}
-                      name="Rejected"
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              ) : (
-                <EmptyState />
-              )}
-            </ChartCard>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ─── ROOT PAGE ────────────────────────────────────────────────────────────────
 
 // ─── R14 — NEW PANELS ────────────────────────────────────────────────────────
@@ -2922,204 +2163,6 @@ function HRLeavePanel() {
 // own attendance, scholarship summary), the two zero-consumer analytics
 // endpoints (marks distribution, MANEB candidate list), and the seven
 // zero-consumer report hooks (one Summary tab per role).
-
-/** report.viewAttendanceSummary — high_rank, lower_rank, academic, hr, exam_officer. */
-function AttendanceSummaryPanel({ academicYear, term }: { academicYear: string; term: number }) {
-  const { data, isLoading } = useAttendanceSummary(academicYear, term)
-
-  useExportable<ApiAttendanceSummaryRow>(`Attendance ${academicYear} Term ${term}`, data?.byClass, [
-    { label: 'Class', value: (r) => r.className },
-    { label: 'Form', value: (r) => r.form },
-    { label: 'Students', value: (r) => r.studentCount },
-    { label: 'Present', value: (r) => r.daysPresent },
-    { label: 'Absent', value: (r) => r.daysAbsent },
-    { label: 'Late', value: (r) => r.daysLate },
-    { label: 'Attendance (%)', value: (r) => r.attendanceRate },
-  ])
-
-  if (isLoading) return <SkeletonChart />
-  if (!data || data.byClass.length === 0)
-    return <EmptyState message="No attendance recorded for this term" />
-
-  return (
-    <div className="space-y-5">
-      <SectionHeader
-        title={`Attendance — ${academicYear} Term ${term}`}
-        icon={<Activity className="w-4 h-4" />}
-      />
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard
-          label="Attendance Rate"
-          value={`${data.attendanceRate}%`}
-          warn={data.attendanceRate < 85}
-        />
-        <KpiCard label="Days Present" value={data.daysPresent.toLocaleString()} />
-        <KpiCard
-          label="Days Absent"
-          value={data.daysAbsent.toLocaleString()}
-          warn={data.daysAbsent > 0}
-        />
-        <KpiCard label="Days Late" value={data.daysLate.toLocaleString()} />
-      </div>
-      <ChartCard title="Attendance Rate by Class">
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={data.byClass}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-            <XAxis
-              dataKey="className"
-              tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-            />
-            <YAxis
-              domain={[0, 100]}
-              tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-            />
-            <Tooltip
-              contentStyle={{ fontSize: 12 }}
-              formatter={(v) => [`${num(v)}%`, 'Attendance']}
-            />
-            <ReferenceLine y={85} stroke={chartColorAt(3)} strokeDasharray="4 4" />
-            <Bar dataKey="attendanceRate" radius={[4, 4, 0, 0]} name="Attendance %">
-              {data.byClass.map((c) => (
-                <Cell
-                  key={c.classId}
-                  fill={c.attendanceRate >= 85 ? chartColorAt(1) : chartColorAt(2)}
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </ChartCard>
-      {/* [PRODUCTION FIX] The full per-class breakdown was fetched and
-         registered for CSV export but never rendered on screen — only the
-         chart's rounded bars were visible, with no way to see exact
-         present/absent/late counts per class without downloading a file. */}
-      <div className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-page border-b border-base">
-                {['Class', 'Form', 'Students', 'Present', 'Absent', 'Late', 'Rate'].map((h) => (
-                  <th
-                    key={h}
-                    className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-base">
-              {data.byClass.map((r) => (
-                <tr key={r.classId} className="hover:bg-page">
-                  <td className="px-4 py-3 font-medium text-brand-navy">{r.className}</td>
-                  <td className="px-4 py-3 text-muted">{r.form}</td>
-                  <td className="px-4 py-3">{r.studentCount}</td>
-                  <td className="px-4 py-3">{r.daysPresent.toLocaleString()}</td>
-                  <td className="px-4 py-3">{r.daysAbsent.toLocaleString()}</td>
-                  <td className="px-4 py-3">{r.daysLate.toLocaleString()}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`font-bold ${r.attendanceRate >= 85 ? 'text-brand-teal' : 'text-brand-coral'}`}
-                    >
-                      {r.attendanceRate}%
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/** report.viewOwnAttendance — the student's own record. */
-function StudentAttendancePanel({
-  studentId,
-  academicYear,
-  term,
-}: {
-  studentId: string
-  academicYear: string
-  term: number
-}) {
-  const { data, isLoading } = useOwnAttendance(studentId, academicYear, term)
-
-  useExportable('My Attendance', data ? [data] : undefined, [
-    { label: 'Academic Year', value: (r: typeof data & object) => r.academicYear },
-    { label: 'Term', value: (r: typeof data & object) => r.term },
-    { label: 'Days Present', value: (r: typeof data & object) => r.daysPresent },
-    { label: 'Days Absent', value: (r: typeof data & object) => r.daysAbsent },
-    { label: 'Days Late', value: (r: typeof data & object) => r.daysLate },
-    { label: 'Total Days', value: (r: typeof data & object) => r.totalDays },
-    { label: 'Attendance (%)', value: (r: typeof data & object) => r.attendanceRate },
-  ])
-
-  if (isLoading) return <SkeletonChart />
-  if (!data || data.totalDays === 0)
-    return <EmptyState message="No attendance recorded for this term" />
-
-  const breakdown = [
-    { category: 'Present', value: data.daysPresent, pct: 0 },
-    { category: 'Late', value: data.daysLate, pct: 0 },
-    { category: 'Absent', value: data.daysAbsent, pct: 0 },
-  ].filter((b) => b.value > 0)
-
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard
-          label="Attendance Rate"
-          value={`${data.attendanceRate}%`}
-          warn={data.attendanceRate < 85}
-        />
-        <KpiCard label="Present" value={data.daysPresent} />
-        <KpiCard label="Late" value={data.daysLate} />
-        <KpiCard label="Absent" value={data.daysAbsent} warn={data.daysAbsent > 0} />
-      </div>
-      <ChartCard title={`My Attendance — ${academicYear} Term ${term}`}>
-        <ResponsiveContainer width="100%" height={220}>
-          <PieChart>
-            <Pie
-              data={breakdown}
-              dataKey="value"
-              nameKey="category"
-              cx="50%"
-              cy="50%"
-              outerRadius={80}
-              label={(p: PieLabelRenderProps) => `${p.name ?? ''} ${num(p.value)}`}
-              fontSize={11}
-            >
-              {/* [PRODUCTION FIX] Colours were picked by array position
-                 ([green, amber, red][i % 3]) against `breakdown`, which
-                 has already been through .filter((b) => b.value > 0) —
-                 so whenever a category had zero days (commonly "Late"),
-                 the remaining categories shifted left and inherited the
-                 wrong colour (e.g. "Absent" landing on amber instead of
-                 red). Mapped by category identity instead of position,
-                 so Present/Late/Absent keep the same colour regardless of
-                 which categories are present in a given student's data. */}
-              {breakdown.map((b) => (
-                <Cell
-                  key={b.category}
-                  fill={
-                    b.category === 'Present'
-                      ? chartColorAt(1)
-                      : b.category === 'Late'
-                        ? chartColorAt(2)
-                        : chartColorAt(3)
-                  }
-                />
-              ))}
-            </Pie>
-            <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)} days`, '']} />
-          </PieChart>
-        </ResponsiveContainer>
-      </ChartCard>
-    </div>
-  )
-}
 
 /** report.viewScholarshipSummary — high_rank, finance. */
 function FinanceScholarshipsPanel({ academicYear }: { academicYear: string }) {
@@ -3579,91 +2622,6 @@ function FinanceSummaryPanel({ academicYear, term }: { academicYear: string; ter
     </div>
   )
 }
-
-function LibrarySummaryPanel() {
-  const { data, isLoading } = useLibraryReport()
-
-  if (isLoading) return <SkeletonChart />
-  if (!data) return <EmptyState />
-
-  return (
-    <div className="space-y-5">
-      <SectionHeader title="Library Summary" icon={<Activity className="w-4 h-4" />} />
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <SummaryStat
-          label="Total Copies"
-          value={(data.stats?._sum?.totalCopies ?? 0).toLocaleString()}
-        />
-        <SummaryStat
-          label="Available"
-          value={(data.stats?._sum?.availableCopies ?? 0).toLocaleString()}
-        />
-        <KpiCard
-          label="Overdue"
-          value={data.overdueBorrowings?.length ?? 0}
-          warn={(data.overdueBorrowings?.length ?? 0) > 0}
-        />
-        <KpiCard
-          label="Pending Approvals"
-          value={data.pendingApprovals ?? 0}
-          warn={(data.pendingApprovals ?? 0) > 0}
-        />
-      </div>
-    </div>
-  )
-}
-
-function HRSummaryPanel() {
-  const { data, isLoading } = useHRReport()
-
-  useExportable('Staff by Department', data?.staffByDept, [
-    { label: 'Department', value: (d: { department: string }) => d.department },
-    { label: 'Staff', value: (d: { _count: number }) => d._count },
-  ])
-
-  if (isLoading) return <SkeletonChart />
-  if (!data) return <EmptyState />
-
-  return (
-    <div className="space-y-5">
-      <SectionHeader title="HR Summary" icon={<FileText className="w-4 h-4" />} />
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <SummaryStat label="Active Loans" value={data.activeLoans} />
-        <SummaryStat label="Loan Balance" value={`MWK ${data.totalLoanBalance.toLocaleString()}`} />
-        <KpiCard
-          label="Expiring Contracts"
-          value={data.expiringContracts}
-          sub={`Within ${data.lookaheadDays} days`}
-          warn={data.expiringContracts > 0}
-        />
-      </div>
-      {data.staffByDept.length > 0 ? (
-        <ChartCard title="Staff by Department">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={data.staffByDept} layout="vertical">
-              <XAxis
-                type="number"
-                allowDecimals={false}
-                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-              />
-              <YAxis
-                type="category"
-                dataKey="department"
-                tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-                width={120}
-              />
-              <Tooltip contentStyle={{ fontSize: 12 }} />
-              <Bar dataKey="_count" fill={chartColorAt(1)} radius={[0, 4, 4, 0]} name="Staff" />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      ) : (
-        <EmptyState message="No active staff on record" />
-      )}
-    </div>
-  )
-}
-
 function AcademicSummaryPanel({ academicYear }: { academicYear: string }) {
   const { data, isLoading } = useAcademicReport(academicYear)
 
@@ -3722,32 +2680,6 @@ function AcademicSummaryPanel({ academicYear }: { academicYear: string }) {
     </div>
   )
 }
-
-function ExamOfficerSummaryPanel({ academicYear, term }: { academicYear: string; term: number }) {
-  const { data, isLoading } = useExamOfficerReport(academicYear, term)
-
-  if (isLoading) return <SkeletonChart />
-  if (!data) return <EmptyState />
-
-  return (
-    <div className="space-y-5">
-      <SectionHeader
-        title={`Exam Summary — ${academicYear} Term ${term}`}
-        icon={<FileText className="w-4 h-4" />}
-      />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <KpiCard
-          label="Pending Marks"
-          value={data.pendingMarks ?? 0}
-          warn={(data.pendingMarks ?? 0) > 0}
-        />
-        <SummaryStat label="Approved Results" value={data.approvedResults ?? 0} />
-        <SummaryStat label="MANEB Records" value={data.manebRecords?.length ?? 0} />
-      </div>
-    </div>
-  )
-}
-
 function StudentSummaryPanel({ studentId }: { studentId: string }) {
   const { data, isLoading } = useStudentReport(studentId)
 
@@ -3819,44 +2751,12 @@ export default function ReportsPage() {
         'lower_rank',
       ]}
     >
-      <ExportProvider>
-        <ReportsContent />
-      </ExportProvider>
+      <ReportExportProvider>
+        <Suspense fallback={<SkeletonChart />}>
+          <ReportsContent />
+        </Suspense>
+      </ReportExportProvider>
     </RoleGuard>
-  )
-}
-
-/**
- * [R14] Holds whichever panel is currently on screen, so the header's Export
- * button downloads exactly what the user is looking at. `register` and `clear`
- * are stable identities — useExportable depends on them, and a fresh identity
- * each render would re-register forever.
- */
-function ExportProvider({ children }: { children: React.ReactNode }) {
-  const [registrations, setRegistrations] = useState<Map<string, ExportRegistration>>(new Map())
-
-  // [PRODUCTION FIX] register/unregister now key by label instead of
-  // replacing a single slot — see the ExportContext comment above.
-  const register = useCallback((next: ExportRegistration) => {
-    setRegistrations((prev) => {
-      const copy = new Map(prev)
-      copy.set(next.label, next)
-      return copy
-    })
-  }, [])
-  const unregister = useCallback((label: string) => {
-    setRegistrations((prev) => {
-      if (!prev.has(label)) return prev
-      const copy = new Map(prev)
-      copy.delete(label)
-      return copy
-    })
-  }, [])
-
-  return (
-    <ExportContext.Provider value={{ registrations, register, unregister }}>
-      {children}
-    </ExportContext.Provider>
   )
 }
 
@@ -3875,12 +2775,18 @@ function ReportsContent() {
   const { academicYear: year, term: viewingTerm, isLoading: settingsLoading, setTerm } = useViewingPeriod()
   const term = viewingTerm ?? null
 
-  const [activeTab, setActiveTab] = useState(() => {
-    const tabs = ROLE_TABS[role ?? 'student'] ?? []
-    return tabs[0]?.id ?? 'overview'
-  })
-
-  const studentId = user?.uid ?? ''
+  // The active tab lives in the URL (?tab=) so dashboard KPIs can deep-link to a
+  // report, a drilled view survives refresh, and Back works. An id the role does
+  // not have falls back to its first tab.
+  const router = useRouter()
+  const [tabParam] = useReportParam('tab')
+  const tabs = ROLE_TABS[role ?? 'student'] ?? []
+  const requested = tabParam ? (TAB_ALIASES[role ?? '']?.[tabParam] ?? tabParam) : undefined
+  const activeTab = tabs.find((t) => t.id === requested)?.id ?? tabs[0]?.id ?? 'overview'
+  const setActiveTab = useCallback(
+    (id: string) => router.replace(`/reports?tab=${encodeURIComponent(id)}`, { scroll: false }),
+    [router],
+  )
 
   // Admin's panels are period-independent, so they render without waiting.
   const periodReady = year !== undefined && term !== null
@@ -3922,7 +2828,10 @@ function ReportsContent() {
               </option>
             ))}
           </select>
-          <ExportButton />
+          <ExportToolbar
+            title={`Reports — ${(role ?? '').replace(/_/g, ' ')}`}
+            filters={year ? [`Academic year: ${year}`, ...(term ? [`Term: ${term}`] : [])] : []}
+          />
         </div>
       </div>
 
@@ -3933,9 +2842,26 @@ function ReportsContent() {
         )}
 
         {/* ── Admin Panels (period-independent) ── */}
-        {role === 'admin' && activeTab === 'overview' && <AdminOverviewPanel />}
-        {role === 'admin' && activeTab === 'security' && <AdminSecurityPanel />}
-        {role === 'admin' && activeTab === 'sessions' && <AdminSessionsPanel />}
+        {role === 'admin' && activeTab === 'overview' && (
+          <div className="space-y-5">
+            <AdminOverviewSection />
+            <AdminOverviewPanel />
+          </div>
+        )}
+        {role === 'admin' && activeTab === 'security' && <AdminSecurityTab />}
+        {role === 'admin' && activeTab === 'sessions' && (
+          <div className="space-y-5">
+            <AdminSessionsReportTab />
+            <AdminSessionsPanel />
+          </div>
+        )}
+        {role === 'admin' && activeTab === 'governance' && (
+          <div className="space-y-5">
+            <AdminGovernanceTab />
+            <AdminHeatmapPanel />
+          </div>
+        )}
+        {role === 'admin' && activeTab === 'adoption' && <AdminAdoptionTab />}
         {role === 'admin' && activeTab === 'audit' && <AdminAuditPanel />}
 
         {/* Every other role's panels are scoped to an academic year and term. */}
@@ -3950,6 +2876,9 @@ function ReportsContent() {
         {role !== 'admin' && periodReady && (
           <>
             {/* ── High Rank Panels ── */}
+            {role === 'high_rank' && activeTab === 'overview' && (
+              <ExecutiveOverviewTab academicYear={year} term={term} />
+            )}
             {role === 'high_rank' && activeTab === 'performance' && (
               <HighRankPerformancePanel academicYear={year} term={term} />
             )}
@@ -3959,13 +2888,47 @@ function ReportsContent() {
             {role === 'high_rank' && activeTab === 'teachers' && (
               <HighRankTeachersPanel academicYear={year} term={term} />
             )}
-            {role === 'high_rank' && activeTab === 'enrollment' && <HighRankEnrollmentPanel />}
+            {role === 'high_rank' && activeTab === 'enrollment' && (
+              <div className="space-y-5">
+                <EnrollmentTab academicYear={year} />
+                <HighRankEnrollmentPanel />
+              </div>
+            )}
+            {role === 'high_rank' && activeTab === 'admissions' && (
+              <AdmissionsTab academicYear={year} term={term} />
+            )}
             {role === 'high_rank' && activeTab === 'attendance' && (
-              <AttendanceSummaryPanel academicYear={year} term={term} />
+              <AttendanceReportTab academicYear={year} term={term} />
+            )}
+            {role === 'high_rank' && activeTab === 'completion' && (
+              <div className="space-y-5">
+                <MarkCompletionTab academicYear={year} term={term} />
+                <ExamPipelineTab academicYear={year} term={term} />
+              </div>
             )}
             {role === 'high_rank' && activeTab === 'finance' && (
               <HighRankFinancePanel academicYear={year} term={term} />
             )}
+            {role === 'high_rank' && activeTab === 'aging' && (
+              <FinanceAgingTab academicYear={year} term={term} />
+            )}
+            {role === 'high_rank' && activeTab === 'procurement' && <ProcurementTab />}
+            {role === 'high_rank' && activeTab === 'stocktake' && <StocktakeTab academicYear={year} />}
+            {role === 'high_rank' && activeTab === 'workforce' && (
+              <div className="space-y-5">
+                <HrOverviewTab academicYear={year} />
+                <HrWorkforceTab />
+              </div>
+            )}
+            {role === 'high_rank' && activeTab === 'leave' && <HrLeaveTab />}
+            {role === 'high_rank' && activeTab === 'contracts' && <HrContractsTab />}
+            {role === 'high_rank' && activeTab === 'circulation' && (
+              <div className="space-y-5">
+                <LibraryOverviewSection />
+                <LibraryCirculationTab />
+              </div>
+            )}
+            {role === 'high_rank' && activeTab === 'governance' && <AdminGovernanceTab />}
             {role === 'high_rank' && activeTab === 'placements' && (
               <PlacementAnalyticsPanel academicYear={year} />
             )}
@@ -3974,9 +2937,18 @@ function ReportsContent() {
             )}
 
             {/* ── Finance Panels ── */}
+            {role === 'finance' && activeTab === 'overview' && (
+              <FinanceOverviewTab academicYear={year} term={term} />
+            )}
             {role === 'finance' && activeTab === 'collection' && <FinanceCollectionPanel />}
             {role === 'finance' && activeTab === 'outstanding' && (
               <FinanceOutstandingPanel academicYear={year} term={term} />
+            )}
+            {role === 'finance' && activeTab === 'aging' && (
+              <FinanceAgingTab academicYear={year} term={term} />
+            )}
+            {role === 'finance' && activeTab === 'payments' && (
+              <FinancePaymentsTab academicYear={year} term={term} />
             )}
             {role === 'finance' && activeTab === 'expenses' && (
               <FinanceExpensesPanel academicYear={year} term={term} />
@@ -3988,43 +2960,68 @@ function ReportsContent() {
             {role === 'finance' && activeTab === 'scholarships' && (
               <FinanceScholarshipsPanel academicYear={year} />
             )}
+            {role === 'finance' && activeTab === 'procurement' && <ProcurementTab />}
+            {role === 'finance' && activeTab === 'stocktake' && <StocktakeTab academicYear={year} />}
             {role === 'finance' && activeTab === 'summary' && (
               <FinanceSummaryPanel academicYear={year} term={term} />
             )}
 
             {/* ── Library Panels ── */}
-            {role === 'library' && activeTab === 'overview' && <LibraryOverviewPanel />}
+            {role === 'library' && activeTab === 'overview' && (
+              <div className="space-y-5">
+                <LibraryOverviewSection />
+                <LibraryOverviewPanel />
+              </div>
+            )}
+            {role === 'library' && activeTab === 'circulation' && <LibraryCirculationTab />}
             {role === 'library' && activeTab === 'borrowing' && <LibraryBorrowingPanel />}
+            {role === 'library' && activeTab === 'fines' && <LibraryFinesTab />}
             {role === 'library' && activeTab === 'digital' && <LibraryDigitalPanel />}
-            {role === 'library' && activeTab === 'summary' && <LibrarySummaryPanel />}
 
             {/* ── Lower Rank Panels ── */}
-            {role === 'lower_rank' && activeTab === 'applications' && (
-              <LowerRankApplicationsPanel />
+            {role === 'lower_rank' && activeTab === 'admissions' && (
+              <AdmissionsTab academicYear={year} term={term} />
             )}
             {role === 'lower_rank' && activeTab === 'enrollment' && (
-              <LowerRankEnrollmentPanel academicYear={year} />
+              <EnrollmentTab academicYear={year} />
             )}
             {role === 'lower_rank' && activeTab === 'attendance' && (
-              <AttendanceSummaryPanel academicYear={year} term={term} />
+              <AttendanceReportTab academicYear={year} term={term} />
             )}
 
             {/* ── Academic Staff Panels ── */}
-            {role === 'academic' && activeTab === 'subjects' && (
-              <AcademicSubjectsPanel academicYear={year} term={term} />
+            {role === 'academic' && activeTab === 'teaching' && (
+              <AcademicTeachingTab academicYear={year} term={term} />
             )}
             {role === 'academic' && activeTab === 'assignments' && (
-              <AcademicAssignmentsPanel academicYear={year} />
+              <AcademicAssignmentsTab academicYear={year} term={term} />
             )}
-            {role === 'academic' && activeTab === 'marks' && <MarksDistributionPanel />}
+            {role === 'academic' && activeTab === 'marks' && (
+              <div className="space-y-5">
+                <MarkCompletionTab academicYear={year} term={term} showTeachers={false} />
+                <MarksDistributionPanel />
+              </div>
+            )}
+            {role === 'academic' && activeTab === 'students' && (
+              <AcademicStudentsTab academicYear={year} term={term} />
+            )}
+            {role === 'academic' && activeTab === 'readiness' && (
+              <AcademicReadinessTab academicYear={year} term={term} />
+            )}
             {role === 'academic' && activeTab === 'attendance' && (
-              <AttendanceSummaryPanel academicYear={year} term={term} />
+              <AttendanceReportTab academicYear={year} term={term} />
             )}
             {role === 'academic' && activeTab === 'summary' && (
               <AcademicSummaryPanel academicYear={year} />
             )}
 
             {/* ── Exam Officer Panels ── */}
+            {role === 'exam_officer' && activeTab === 'completion' && (
+              <MarkCompletionTab academicYear={year} term={term} />
+            )}
+            {role === 'exam_officer' && activeTab === 'pipeline' && (
+              <ExamPipelineTab academicYear={year} term={term} />
+            )}
             {role === 'exam_officer' && activeTab === 'maneb' && (
               <ManebAnalyticsPanel academicYear={year} />
             )}
@@ -4038,30 +3035,36 @@ function ReportsContent() {
             {role === 'exam_officer' && activeTab === 'placements' && (
               <PlacementAnalyticsPanel academicYear={year} />
             )}
-            {role === 'exam_officer' && activeTab === 'summary' && (
-              <ExamOfficerSummaryPanel academicYear={year} term={term} />
-            )}
 
             {/* ── HR Panels ── */}
-            {role === 'hr' && activeTab === 'staffing' && <HRStaffingPanel />}
-            {role === 'hr' && activeTab === 'leave' && <HRLeavePanel />}
-            {role === 'hr' && activeTab === 'summary' && <HRSummaryPanel />}
+            {role === 'hr' && activeTab === 'overview' && <HrOverviewTab academicYear={year} />}
+            {role === 'hr' && activeTab === 'workforce' && <HrWorkforceTab />}
+            {role === 'hr' && activeTab === 'leave' && <HrLeaveTab />}
+            {role === 'hr' && activeTab === 'contracts' && <HrContractsTab />}
+            {role === 'hr' && activeTab === 'loans' && <HrLoansTab />}
+            {role === 'hr' && activeTab === 'reviews' && <HrReviewsTab academicYear={year} />}
 
-            {/* ── Student Panels ── */}
-            {role === 'student' && activeTab === 'performance' && (
-              <StudentPerformancePanel studentId={studentId} academicYear={year} term={term} />
+            {/* ── Student Panels (self-only; fee-gated results) ── */}
+            {role === 'student' && activeTab === 'overview' && (
+              <StudentOverviewTab academicYear={year} term={term} />
             )}
-            {role === 'student' && activeTab === 'subjects' && (
-              <StudentSubjectPanel studentId={studentId} academicYear={year} term={term} />
+            {role === 'student' && activeTab === 'progress' && (
+              <StudentProgressTab academicYear={year} term={term} />
+            )}
+            {role === 'student' && activeTab === 'assignments' && (
+              <StudentAssignmentsTab academicYear={year} term={term} />
             )}
             {role === 'student' && activeTab === 'attendance' && (
-              <StudentAttendancePanel studentId={studentId} academicYear={year} term={term} />
+              <StudentAttendanceTab academicYear={year} term={term} />
+            )}
+            {role === 'student' && activeTab === 'library' && (
+              <StudentLibraryTab academicYear={year} term={term} />
             )}
             {role === 'student' && activeTab === 'fees' && (
-              <StudentFeesPanel studentId={studentId} />
+              <StudentFeesTab academicYear={year} term={term} />
             )}
             {role === 'student' && activeTab === 'summary' && (
-              <StudentSummaryPanel studentId={studentId} />
+              <StudentSummaryPanel studentId={user?.uid ?? ''} />
             )}
           </>
         )}
@@ -4070,70 +3073,3 @@ function ReportsContent() {
   )
 }
 
-// Standalone wrapper for student subject tab (reuses StudentPerformancePanel's sub-component)
-function StudentSubjectPanel({
-  studentId,
-  academicYear,
-  term,
-}: {
-  studentId: string
-  academicYear: string
-  term: number
-}) {
-  const { data: subjectRaw, isLoading } = useStudentSubjectBreakdown(studentId, academicYear, term)
-  const subjects = subjectRaw as ApiStudentSubjectScore[] | undefined
-
-  return (
-    <div className="space-y-5">
-      {isLoading ? (
-        <SkeletonChart />
-      ) : (
-        <ChartCard title={`Subject Breakdown — ${academicYear} Term ${term}`}>
-          {subjects && subjects.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={subjects}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis
-                    dataKey="subject"
-                    tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
-                  />
-                  <YAxis
-                    domain={[0, 100]}
-                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-                  />
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="score" radius={[4, 4, 0, 0]} name="Score">
-                    {subjects.map((s, i) => (
-                      <Cell
-                        key={i}
-                        fill={(s.score / s.maxMark) * 100 >= 50 ? chartColorAt(1) : chartColorAt(3)}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4">
-                {subjects.map((s) => (
-                  <div key={s.subject} className="bg-page border border-base rounded-xl p-3">
-                    <p className="text-xs text-muted truncate">{s.subject}</p>
-                    <p className="font-bold text-lg text-brand-navy">
-                      {s.score}/{s.maxMark}
-                    </p>
-                    <p
-                      className={`text-xs font-bold ${s.grade === 'F' ? 'text-brand-coral' : 'text-brand-teal'}`}
-                    >
-                      {s.grade}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <EmptyState message="No released results for this term" />
-          )}
-        </ChartCard>
-      )}
-    </div>
-  )
-}

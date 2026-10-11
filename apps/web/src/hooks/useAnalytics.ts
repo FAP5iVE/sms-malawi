@@ -49,7 +49,6 @@ import type {
   ApiActivityHeatmapCell,
   ApiCategoryBreakdown,
   ApiTimeSeriesPoint,
-  ApiDualSeriesPoint,
   ApiSchoolPerformanceTrendPoint,
   ApiClassPerformanceStat,
   ApiSubjectAverageStat,
@@ -67,11 +66,8 @@ import type {
   ApiTopBorrowedBook,
   ApiLibraryDigitalStats,
   ApiApplicationFunnelStage,
-  ApiAssignmentCompletionRow,
   ApiMarksDistributionBucket,
   ApiStudentPerformancePoint,
-  ApiStudentSubjectScore,
-  ApiStudentFeeStatement,
   ApiManebSchoolStat,
   ApiManebResultSummary,
 } from '@shared/types/api'
@@ -357,26 +353,6 @@ export function useApplicationsFunnel() {
   })
 }
 
-export function useApplicationTrend(months = 12) {
-  return useQuery({
-    queryKey: queryKeys.analytics.applicationTrend(months),
-    queryFn: () =>
-      apiFetch<ApiTimeSeriesPoint[]>(`/analytics/lower-rank/application-trend${qs({ months })}`),
-    staleTime: STALE.MEDIUM,
-  })
-}
-
-export function useEnrollmentByForm(academicYear: string) {
-  return useQuery({
-    queryKey: queryKeys.analytics.enrollmentByForm(academicYear),
-    queryFn: () =>
-      apiFetch<ApiCategoryBreakdown[]>(
-        `/analytics/lower-rank/enrollment-by-form${qs({ academicYear })}`,
-      ),
-    staleTime: STALE.SLOW,
-  })
-}
-
 // ─── ACADEMIC STAFF ──────────────────────────────────────────────────────────
 
 export function useAcademicSubjectPerformance(academicYear: string, term: number) {
@@ -385,17 +361,6 @@ export function useAcademicSubjectPerformance(academicYear: string, term: number
     queryFn: () =>
       apiFetch<ApiAcademicSubjectPerformanceRow[]>(
         `/analytics/academic/subject-performance${qs({ academicYear, term })}`,
-      ),
-    staleTime: STALE.MEDIUM,
-  })
-}
-
-export function useAcademicAssignmentCompletion(academicYear: string) {
-  return useQuery({
-    queryKey: queryKeys.analytics.academicAssignmentCompletion(academicYear),
-    queryFn: () =>
-      apiFetch<ApiAssignmentCompletionRow[]>(
-        `/analytics/academic/assignment-completion${qs({ academicYear })}`,
       ),
     staleTime: STALE.MEDIUM,
   })
@@ -432,36 +397,6 @@ export function useStudentPerformanceTrend(studentId: string) {
         `/analytics/student/performance-trend${qs({ studentId: studentId || undefined })}`,
       ),
     staleTime: STALE.MEDIUM,
-  })
-}
-
-export function useStudentSubjectBreakdown(
-  studentId: string,
-  academicYear: string,
-  term: number,
-) {
-  return useQuery({
-    queryKey: queryKeys.analytics.studentSubjectBreakdown(studentId, academicYear, term),
-    queryFn: () =>
-      apiFetch<ApiStudentSubjectScore[]>(
-        `/analytics/student/subject-breakdown${qs({
-          studentId: studentId || undefined,
-          academicYear,
-          term,
-        })}`,
-      ),
-    staleTime: STALE.MEDIUM,
-  })
-}
-
-export function useStudentFeeStatement(studentId: string) {
-  return useQuery({
-    queryKey: queryKeys.analytics.studentFeeStatement(studentId),
-    queryFn: () =>
-      apiFetch<ApiStudentFeeStatement[]>(
-        `/analytics/student/fee-statement${qs({ studentId: studentId || undefined })}`,
-      ),
-    staleTime: STALE.FAST,
   })
 }
 
@@ -516,22 +451,6 @@ export function useHRStaffByDepartment() {
   return useQuery({
     queryKey: queryKeys.analytics.hrStaffByDepartment(),
     queryFn: () => apiFetch<ApiCategoryBreakdown[]>('/analytics/hr/staff-by-department'),
-    staleTime: STALE.SLOW,
-  })
-}
-
-export function useHRLeaveByType(year: number = new Date().getFullYear()) {
-  return useQuery({
-    queryKey: queryKeys.analytics.hrLeaveByType(year),
-    queryFn: () => apiFetch<ApiCategoryBreakdown[]>(`/analytics/hr/leave-by-type${qs({ year })}`),
-    staleTime: STALE.SLOW,
-  })
-}
-
-export function useHRLeaveTrend(months = 12) {
-  return useQuery({
-    queryKey: queryKeys.analytics.hrLeaveTrend(months),
-    queryFn: () => apiFetch<ApiDualSeriesPoint[]>(`/analytics/hr/leave-trend${qs({ months })}`),
     staleTime: STALE.SLOW,
   })
 }
