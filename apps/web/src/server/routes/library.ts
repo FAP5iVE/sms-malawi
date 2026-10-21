@@ -241,7 +241,7 @@ libraryRouter.post('/digital/upload', verifyAuth, requirePermission('library.upl
 libraryRouter.get('/digital/:id/view', verifyAuth, requirePermission('library.viewDigitalResources'),
   async (req, res) => {
     try {
-      const url = await libService.getDigitalResourceViewUrl(String(req.params.id), req.user!.role)
+      const url = await libService.getDigitalResourceViewUrl(String(req.params.id), req.user!.role, req.user!.uid)
       return res.json({ url })
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'library' } })

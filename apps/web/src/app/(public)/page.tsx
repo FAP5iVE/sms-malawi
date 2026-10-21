@@ -424,7 +424,8 @@ export default function LandingPage() {
 
       <div className="bg-page text-body font-sans">
         <ScribbleDefs />
-        {/* ══════════════════════════════════════════════════════════════
+        {/*
+        ══════════════════════════════════════════════════════════════
             HEADER, fixed, transparent over hero, solid once scrolled
         ══════════════════════════════════════════════════════════════ */}
         <header

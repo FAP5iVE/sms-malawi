@@ -59,6 +59,7 @@ import { logger }   from '@/lib/logger'
 import { getSignedViewUrl } from '@/lib/storage'
 import { differenceInDays }   from 'date-fns'
 import type { CreateBookInput, IssueBorrowingInput, ReturnBorrowingInput, CreateDigitalResourceInput } from '@shared/schemas/library'
+import { recordDigitalResourceView } from './digitalViewRecorder'
 import * as algolia from '@/server/services/algoliaService'
 import * as settingsService from '@/server/services/settingsService'
 import { SETTING_KEYS } from '@shared/types/settings'
@@ -564,11 +565,14 @@ export async function approveDigitalResource(resourceId: string, actorUid: strin
   })
 }
 
-export async function getDigitalResourceViewUrl(resourceId: string, actorRole: string): Promise<string> {
+export async function getDigitalResourceViewUrl(resourceId: string, actorRole: string, viewerUid?: string): Promise<string> {
   const resource = await prisma.digitalResource.findUniqueOrThrow({ where: { id: resourceId } })
   if (!resource.approved && actorRole === 'student')
     throw Object.assign(new Error('Resource not yet approved.'), { status: 403 })
-  return getSignedViewUrl(resource.fileKey)
+  const url = await getSignedViewUrl(resource.fileKey)
+  // A librarian previewing a resource that is still awaiting approval is review work, not use.
+  if (viewerUid && resource.approved) await recordDigitalResourceView(resource.id, viewerUid)
+  return url
 }
 
 // ─── LIBRARY REPORTS ─────────────────────────────────────
@@ -675,4 +679,4 @@ export async function getCatalogReportStats() {
       availableCount: c._sum.availableCopies ?? 0,
     })),
   }
-}
+}

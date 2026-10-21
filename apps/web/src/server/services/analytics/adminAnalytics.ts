@@ -11,17 +11,22 @@ import 'server-only'
 import { prisma } from '@/lib/prisma'
 import type { AttentionItem, ReportInsight, ReportSectionData } from '@shared/types/reporting'
 import type {
-  ApiAdoptionReport, ApiAdoptionRole, ApiGovernanceReport, ApiSecurityReport, ApiSessionsReport,
+  ApiAdoptionReport, ApiAdoptionRole, ApiGovernanceReport, ApiOperationsReport, ApiSecurityReport, ApiSessionsReport,
 } from '@shared/types/reporting-admin'
 import { ACTIVE_GRACE_MS, getSessionSummary } from '@/server/services/sessionService'
 import { getSystemHealth } from '@/server/services/systemHealthService'
 import * as monitoring from '@/server/services/monitoringService'
+import { isVercelMonitoringConfigured } from '@/server/services/vercelMonitoringService'
 import {
   AUDIT_CATEGORIES, DURATION_BANDS, MULTI_IP_THRESHOLD, REPEATED_FAILURE_THRESHOLD, abnormalVolume, categoriesOf,
   dayKey, dayLabel, detectBursts, domainOf, durationBand, durationStats, lastDays, mondayOf, repeatedFailures,
 } from './adminLogic'
+import {
+  NOT_RECORDED, errorsByHour, summariseBacklog, summariseDeployments, summariseIssues, syncFreshness, topErrorPaths, truncate,
+} from './platformLogic'
 import { kpi, ratioPct, thresholdKpi } from '@/server/services/reporting/kpi'
 import { compact, sortInsights } from '@/server/services/reporting/insights'
+import { enrichAttention, rankAttention } from './executiveLogic'
 
 const DAY_MS = 86_400_000
 const SESSION_ROW_CAP = 50_000
@@ -367,6 +372,147 @@ export async function getAdminAttention(opts: AdminOverviewOptions): Promise<Att
     { key: 'audit-volume', severity: 'watch', label: 'Audit volume today is unusually high', count: abnormal ? todayAudit : 0, href: '/reports?tab=governance' },
     { key: 'inactive-accounts', severity: 'info', label: 'Accounts with no sign-in in 30 days', count: Math.max(0, adoption.accounts - adoption.active30), href: '/reports?tab=adoption' },
   ]
-  const order = { critical: 0, watch: 1, info: 2, positive: 3 } as const
-  return items.filter((i) => (i.count ?? 0) > 0).sort((a, b) => order[a.severity] - order[b.severity])
+  return enrichAttention(rankAttention(items))
+}
+
+
+// ─── Platform operations ─────────────────────────────────────────────────────
+
+export interface OperationsAccess {
+  /** report.viewSystemHealth — live service probes. */
+  health: boolean
+  /** monitoring.view — error-monitoring and deployment caches. */
+  monitoring: boolean
+  /** report.viewDatabaseMetrics — storage sizes in probe details. */
+  database: boolean
+}
+
+/** Probe details that expose storage sizes or raw provider errors. */
+const SIZE_BEARING_SERVICES = new Set(['Neon PostgreSQL', 'Appwrite Storage'])
+
+/**
+ * Platform health from persisted operational data and live probes only.
+ * Reads the monitoring caches directly and never triggers a sync, so opening a
+ * report cannot change what it reports. Sections the caller may not see are
+ * null, and what the system does not record is listed in `notRecorded`.
+ */
+export async function getOperationsReport(access: OperationsAccess): Promise<ApiOperationsReport> {
+  const now = new Date()
+  const d1 = new Date(now.getTime() - DAY_MS)
+  const d7 = new Date(now.getTime() - 7 * DAY_MS)
+  const vercelConfigured = isVercelMonitoringConfigured()
+
+  const [health, syncRows, pending, audit24, audit7] = await Promise.all([
+    access.health ? safe(getSystemHealth) : Promise.resolve(null),
+    access.monitoring ? prisma.monitoringSyncState.findMany() : Promise.resolve(null),
+    prisma.pendingAction.findMany({ where: { status: 'PENDING' }, select: { entityType: true, createdAt: true, expiresAt: true } }),
+    prisma.auditLog.count({ where: { createdAt: { gte: d1 } } }),
+    prisma.auditLog.count({ where: { createdAt: { gte: d7 } } }),
+  ])
+
+  const sync = syncRows ? syncFreshness(syncRows, now) : null
+  const sentrySynced = sync ? sync.find((r) => r.key === 'issues')?.status !== 'never' : false
+
+  const useVercel = access.monitoring && vercelConfigured
+  const useSentry = access.monitoring && sentrySynced
+  const errorWhere = (since: Date) => ({ level: { in: ['error', 'fatal'] }, timestamp: { gte: since } })
+  const [deployRows, errorRows, errors24h, errors7d, alertRows, unacked, oldestLog, issueRows, topIssues] = await Promise.all([
+    useVercel ? prisma.vercelDeploymentCache.findMany({ orderBy: { createdAtVercel: 'desc' }, take: 50 }) : Promise.resolve([]),
+    // Rows feed the hourly chart and top routes; the headline counts below are exact counts.
+    useVercel
+      ? prisma.vercelRuntimeLogCache.findMany({
+          where: errorWhere(d7),
+          select: { level: true, timestamp: true, requestPath: true, responseStatusCode: true },
+          orderBy: { timestamp: 'desc' },
+          take: 5000,
+        })
+      : Promise.resolve([]),
+    useVercel ? prisma.vercelRuntimeLogCache.count({ where: errorWhere(d1) }) : Promise.resolve(0),
+    useVercel ? prisma.vercelRuntimeLogCache.count({ where: errorWhere(d7) }) : Promise.resolve(0),
+    useVercel ? prisma.vercelAlertEvent.findMany({ where: { acknowledged: false }, orderBy: { occurredAt: 'desc' }, take: 10 }) : Promise.resolve([]),
+    useVercel ? prisma.vercelAlertEvent.count({ where: { acknowledged: false } }) : Promise.resolve(0),
+    useVercel ? prisma.vercelRuntimeLogCache.findFirst({ orderBy: { timestamp: 'asc' }, select: { timestamp: true } }) : Promise.resolve(null),
+    useSentry
+      ? prisma.sentryIssueCache.findMany({ where: { status: 'unresolved' }, select: { status: true, isUptimeIssue: true, level: true, firstSeenAt: true } })
+      : Promise.resolve([]),
+    useSentry
+      ? prisma.sentryIssueCache.findMany({
+          where: { status: 'unresolved', isUptimeIssue: false },
+          orderBy: [{ eventCount: 'desc' }],
+          take: 5,
+          select: { sentryIssueId: true, title: true, level: true, eventCount: true, userCount: true, lastSeenAt: true },
+        })
+      : Promise.resolve([]),
+  ])
+
+  const dep = summariseDeployments(deployRows)
+  const iso = (d: Date | null) => (d ? d.toISOString() : null)
+  const backlog = summariseBacklog(pending, now)
+  const issues = summariseIssues(issueRows, now)
+  const overall = health ? (health.overall as 'healthy' | 'warning' | 'degraded') : null
+
+  return {
+    generatedAt: now.toISOString(),
+    access,
+    overall,
+    services: health
+      ? health.services.map((svc) => ({
+          name: svc.name,
+          status: svc.status,
+          latencyMs: svc.latencyMs ?? null,
+          details: svc.details && (access.database || !SIZE_BEARING_SERVICES.has(svc.name)) ? truncate(svc.details, 200) : null,
+        }))
+      : null,
+    sync,
+    deployments: access.monitoring
+      ? {
+          configured: vercelConfigured,
+          recorded: dep.recorded,
+          failed: dep.failed,
+          failureRate: dep.failureRate,
+          latestProduction: dep.latestProduction ? { state: dep.latestProduction.state, at: dep.latestProduction.at.toISOString() } : null,
+          lastSuccessfulProductionAt: iso(dep.lastSuccessfulProductionAt),
+          recent: deployRows.slice(0, 8).map((d) => ({
+            id: d.deploymentId,
+            state: d.state,
+            target: d.target,
+            at: d.createdAtVercel.toISOString(),
+            error: d.errorMessage ? truncate(d.errorMessage, 200) : null,
+          })),
+        }
+      : null,
+    errors: access.monitoring
+      ? {
+          configured: vercelConfigured,
+          last24h: errors24h,
+          last7d: errors7d,
+          byHour: errorsByHour(errorRows, now),
+          topPaths: topErrorPaths(errorRows),
+          unacknowledgedAlerts: unacked,
+          alerts: alertRows.map((a) => ({ id: a.id, kind: a.kind, severity: a.severity, message: truncate(a.message, 200), at: a.occurredAt.toISOString() })),
+          oldestRecordedAt: iso(oldestLog?.timestamp ?? null),
+        }
+      : null,
+    issues: access.monitoring
+      ? {
+          configured: sentrySynced,
+          unresolved: issues.unresolved,
+          activeOutages: issues.activeOutages,
+          newLast7d: issues.newLast7d,
+          oldestUnresolvedDays: issues.oldestUnresolvedDays,
+          byLevel: issues.byLevel,
+          top: topIssues.map((i) => ({
+            id: i.sentryIssueId,
+            title: truncate(i.title, 160),
+            level: i.level,
+            events: i.eventCount,
+            users: i.userCount,
+            lastSeenAt: iso(i.lastSeenAt),
+          })),
+        }
+      : null,
+    backlog,
+    audit: { last24h: audit24, last7d: audit7 },
+    notRecorded: NOT_RECORDED.map((n) => ({ ...n })),
+  }
 }

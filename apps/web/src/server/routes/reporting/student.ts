@@ -14,6 +14,7 @@ import { verifyAuth } from '@/lib/verifyAuth'
 import { requirePermission } from '@/server/middleware/verifyPermission'
 import { resolveStudentFromUid } from '@/server/services/studentService'
 import * as student from '@/server/services/analytics/studentAnalytics'
+import { getStudentPlacement } from '@/server/services/analytics/studentPlacementReport'
 import { resolvePeriod } from './_shared'
 
 export const studentReportingRouter = Router()
@@ -30,6 +31,7 @@ async function ownStudentId(req: Request, res: Response): Promise<string | null>
 const performance = [verifyAuth, requirePermission('report.viewOwnPerformance')] as const
 const attendance = [verifyAuth, requirePermission('report.viewOwnAttendance')] as const
 const fees = [verifyAuth, requirePermission('report.viewOwnFeeStatement')] as const
+const placement = [verifyAuth, requirePermission('placement.viewOwn')] as const
 
 studentReportingRouter.get('/overview', ...performance, async (req, res) => {
   const id = await ownStudentId(req, res)
@@ -78,4 +80,12 @@ studentReportingRouter.get('/fees', ...fees, async (req, res) => {
   if (!id) return
   const { academicYear } = await resolvePeriod(req)
   res.json(await student.getStudentFees(id, academicYear))
+})
+
+// The student's own placement — published information only (see studentPlacementLogic).
+// Takes no student id and no period: it is always the caller's own record.
+studentReportingRouter.get('/placement', ...placement, async (req, res) => {
+  const id = await ownStudentId(req, res)
+  if (!id) return
+  res.json(await getStudentPlacement(id))
 })

@@ -1,7 +1,7 @@
 'use client'
 
 import type {
-  ApiStudentAssignments, ApiStudentAttendance, ApiStudentFees, ApiStudentLibrary, ApiStudentProgress,
+  ApiStudentAssignments, ApiStudentAttendance, ApiStudentFees, ApiStudentLibrary, ApiStudentPlacement, ApiStudentProgress,
 } from '@shared/types/reporting-student'
 import { useReportingQuery } from '@/hooks/useReporting'
 import type { AttentionItem, HookOptions, PeriodParams, ReportSectionData } from './shared'
@@ -24,3 +24,5 @@ export const useMyLibrary = (p: PeriodParams, o?: HookOptions) =>
   useReportingQuery<ApiStudentLibrary>(D, 'library', { academicYear: p.academicYear }, { enabled: on(p, o) })
 export const useMyFees = (p: PeriodParams, o?: HookOptions) =>
   useReportingQuery<ApiStudentFees>(D, 'fees', { academicYear: p.academicYear }, { enabled: on(p, o) })
+export const useMyPlacementReport = (o?: HookOptions) =>
+  useReportingQuery<ApiStudentPlacement>(D, 'placement', {}, { enabled: o?.enabled ?? true })

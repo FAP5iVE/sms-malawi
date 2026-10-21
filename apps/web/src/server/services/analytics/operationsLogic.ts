@@ -21,6 +21,8 @@ export interface PipelineRequisition {
     total: number
     orderDate: Date | null
     receipts: Date[]
+    /** Value of goods accepted so far; when absent the whole order total is assumed received. */
+    receivedValue?: number
   }[]
 }
 
@@ -48,7 +50,7 @@ export function buildPipelineStages(reqs: readonly PipelineRequisition[]): ApiPr
     { key: 'rfq', label: 'RFQ issued', count: withRfq.length, value: withRfq.length ? sumEst(withRfq) : null },
     { key: 'quotations', label: 'Quotations received', count: withQuote.length, value: selectedQuoteValue > 0 ? round(selectedQuoteValue, 2) : null },
     { key: 'purchaseOrders', label: 'Purchase orders raised', count: pos.length, value: pos.length ? round(pos.reduce((s, p) => s + p.total, 0), 2) : null },
-    { key: 'received', label: 'Goods received', count: received.length, value: received.length ? round(received.reduce((s, p) => s + p.total, 0), 2) : null },
+    { key: 'received', label: 'Goods received', count: received.length, value: received.length ? round(received.reduce((s, p) => s + (p.receivedValue ?? p.total), 0), 2) : null },
   ]
 }
 

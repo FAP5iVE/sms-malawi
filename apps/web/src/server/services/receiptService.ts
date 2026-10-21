@@ -37,6 +37,10 @@ import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 import { uploadFile, FILE_PREFIX } from '@/lib/storage'
 import { formatMWK } from '@shared/constants/malawi'
+import { escapeHtml } from '@/lib/escapeHtml'
+import { getSchoolLogo } from '@/server/services/schoolLogoService'
+import { getIdentitySettings } from '@/server/services/settingsService'
+import { LETTERHEAD_CSS, letterheadHtml } from '@/server/templates/documents/letterhead'
 
 async function launchBrowser() {
   const isLocal = process.env.NODE_ENV !== 'production'
@@ -78,13 +82,21 @@ export async function generateReceipt(
   branding: { schoolName: string; schoolAddress: string; schoolPhone: string; schoolEmail: string },
   receiptPrefix: string,
 ): Promise<string> {
+  const logo = await getSchoolLogo()
   const browser = await launchBrowser()
-  const page = await browser.newPage()
-  await page.setContent(buildReceiptHtml({ paymentId, invoice, payment, student, branding, receiptPrefix }), {
-    waitUntil: 'load',   // 'networkidle0' removed in puppeteer-core v24
-  })
-  const pdfBuffer = Buffer.from(await page.pdf({ format: 'A4', printBackground: true }))
-  await browser.close()
+  let pdfBuffer: Buffer
+  try {
+    const page = await browser.newPage()
+    await page.setContent(
+      buildReceiptHtml({ paymentId, invoice, payment, student, branding, receiptPrefix, logoDataUri: logo.dataUri }),
+      { waitUntil: 'load' },   // 'networkidle0' removed in puppeteer-core v24
+    )
+    pdfBuffer = Buffer.from(await page.pdf({ format: 'A4', printBackground: true }))
+  } finally {
+    // Previously a render error leaked the Chromium process (browser.close()
+    // was skipped) — on a warm serverless instance that compounds failures.
+    await browser.close()
+  }
   const filename = `receipt_${paymentId}.pdf`
   const uploaded = await uploadFile(FILE_PREFIX.RECEIPT, pdfBuffer, filename, 'application/pdf')
   return uploaded.fileId
@@ -109,11 +121,28 @@ export async function generatePayslipPdf(
   year: number
 ): Promise<string> {
   const monthName = new Date(year, month - 1).toLocaleString('en-MW', { month: 'long' })
+  const [logo, identity] = await Promise.all([getSchoolLogo(), getIdentitySettings()])
   const browser = await launchBrowser()
-  const page = await browser.newPage()
-  await page.setContent(buildPayslipHtml({ ...data, monthName, year }), { waitUntil: 'load' })
-  const pdfBuffer = Buffer.from(await page.pdf({ format: 'A4', printBackground: true }))
-  await browser.close()
+  let pdfBuffer: Buffer
+  try {
+    const page = await browser.newPage()
+    await page.setContent(
+      buildPayslipHtml({
+        ...data, monthName, year,
+        logoDataUri: logo.dataUri,
+        branding: {
+          schoolName: identity.schoolName,
+          schoolAddress: identity.schoolAddress,
+          schoolPhone: identity.schoolPhone,
+          schoolEmail: identity.schoolEmail,
+        },
+      }),
+      { waitUntil: 'load' },
+    )
+    pdfBuffer = Buffer.from(await page.pdf({ format: 'A4', printBackground: true }))
+  } finally {
+    await browser.close()
+  }
   const filename = `payslip_${data.staffUid}_${year}-${String(month).padStart(2, '0')}.pdf`
   const uploaded = await uploadFile(FILE_PREFIX.PAYSLIP, pdfBuffer, filename, 'application/pdf')
   return uploaded.fileId
@@ -127,14 +156,14 @@ function buildReceiptHtml(d: {
   student: { firstName: string; lastName: string; registrationNo: string }
   branding: { schoolName: string; schoolAddress: string; schoolPhone: string; schoolEmail: string }
   receiptPrefix: string
+  logoDataUri: string
 }): string {
   const receiptNo = `${d.receiptPrefix}-${d.paymentId.slice(0, 8).toUpperCase()}`
+  const e = escapeHtml
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
   <style>
     body{font-family:Arial,sans-serif;color:#1A2535;padding:40px;}
-    .header{background:#0F2744;color:white;padding:20px;border-radius:8px 8px 0 0;text-align:center;}
-    .header h2{margin:0 0 4px 0;}
-    .header .school-info{font-size:12px;color:#B7C4D6;}
+    ${LETTERHEAD_CSS}
     .body{padding:24px;border:1px solid #DDE4EC;border-top:none;border-radius:0 0 8px 8px;}
     table{width:100%;border-collapse:collapse;margin-top:16px;}
     td{padding:8px;border-bottom:1px solid #EEE;font-size:13px;}
@@ -142,22 +171,23 @@ function buildReceiptHtml(d: {
     .amount{font-size:24px;font-weight:700;color:#0E8A6A;margin:16px 0;}
   </style></head>
   <body>
-    <div class="header">
-      <h2>${d.branding.schoolName}</h2>
-      <div class="school-info">${d.branding.schoolAddress} · ${d.branding.schoolPhone} · ${d.branding.schoolEmail}</div>
-      <div class="school-info" style="margin-top:8px;font-size:14px;color:white;">Payment Receipt</div>
-    </div>
+    ${letterheadHtml({
+      logoDataUri: d.logoDataUri,
+      schoolName: d.branding.schoolName,
+      contactLines: [d.branding.schoolAddress, d.branding.schoolPhone, d.branding.schoolEmail],
+      documentTitle: 'Payment Receipt',
+    })}
     <div class="body">
-      <p class="amount">${formatMWK(d.payment.amount)}</p>
+      <p class="amount">${e(formatMWK(d.payment.amount))}</p>
       <table>
-        <tr><td>Receipt No</td><td>${receiptNo}</td></tr>
-        <tr><td>Student</td><td>${d.student.firstName} ${d.student.lastName}</td></tr>
-        <tr><td>Reg No</td><td>${d.student.registrationNo}</td></tr>
-        <tr><td>Academic Year</td><td>${d.invoice.academicYear}</td></tr>
-        <tr><td>Term</td><td>${d.invoice.term}</td></tr>
-        <tr><td>Method</td><td>${d.payment.method}</td></tr>
-        ${d.payment.reference ? `<tr><td>Reference</td><td>${d.payment.reference}</td></tr>` : ''}
-        <tr><td>Date</td><td>${d.payment.recordedAt.toLocaleDateString('en-MW')}</td></tr>
+        <tr><td>Receipt No</td><td>${e(receiptNo)}</td></tr>
+        <tr><td>Student</td><td>${e(d.student.firstName)} ${e(d.student.lastName)}</td></tr>
+        <tr><td>Reg No</td><td>${e(d.student.registrationNo)}</td></tr>
+        <tr><td>Academic Year</td><td>${e(d.invoice.academicYear)}</td></tr>
+        <tr><td>Term</td><td>${e(d.invoice.term)}</td></tr>
+        <tr><td>Method</td><td>${e(d.payment.method)}</td></tr>
+        ${d.payment.reference ? `<tr><td>Reference</td><td>${e(d.payment.reference)}</td></tr>` : ''}
+        <tr><td>Date</td><td>${e(d.payment.recordedAt.toLocaleDateString('en-MW'))}</td></tr>
       </table>
     </div>
   </body></html>`
@@ -167,11 +197,14 @@ function buildPayslipHtml(data: {
   staffUid: string; staffName: string; grossSalary: number
   paye: number; pension: number; pensionPercent: number; loanDeduction: number; netSalary: number
   monthName: string; year: number
+  logoDataUri: string
+  branding: { schoolName: string; schoolAddress: string; schoolPhone: string; schoolEmail: string }
 }): string {
+  const e = escapeHtml
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
   <style>
     body{font-family:Arial,sans-serif;color:#1A2535;padding:40px;}
-    .header{background:#0F2744;color:white;padding:20px;border-radius:8px 8px 0 0;}
+    ${LETTERHEAD_CSS}
     .body{padding:24px;border:1px solid #DDE4EC;border-top:none;border-radius:0 0 8px 8px;}
     table{width:100%;border-collapse:collapse;margin-top:16px;}
     td{padding:8px;border-bottom:1px solid #EEE;font-size:13px;}
@@ -179,15 +212,20 @@ function buildPayslipHtml(data: {
     .net{font-size:20px;font-weight:700;color:#0E8A6A;}
   </style></head>
   <body>
-    <div class="header"><h2 style="margin:0">Payslip — ${data.monthName} ${data.year}</h2></div>
+    ${letterheadHtml({
+      logoDataUri: data.logoDataUri,
+      schoolName: data.branding.schoolName,
+      contactLines: [data.branding.schoolAddress, data.branding.schoolPhone, data.branding.schoolEmail],
+      documentTitle: `Payslip — ${data.monthName} ${data.year}`,
+    })}
     <div class="body">
-      <p><strong>${data.staffName}</strong> | UID: ${data.staffUid}</p>
+      <p><strong>${e(data.staffName)}</strong> | UID: ${e(data.staffUid)}</p>
       <table>
-        <tr><td>Gross Salary</td><td>${formatMWK(data.grossSalary)}</td></tr>
-        <tr><td>PAYE Tax</td><td>- ${formatMWK(data.paye)}</td></tr>
-        <tr><td>Pension (${data.pensionPercent}%)</td><td>- ${formatMWK(data.pension)}</td></tr>
-        ${data.loanDeduction > 0 ? `<tr><td>Loan Deduction</td><td>- ${formatMWK(data.loanDeduction)}</td></tr>` : ''}
-        <tr><td class="net">Net Pay</td><td class="net">${formatMWK(data.netSalary)}</td></tr>
+        <tr><td>Gross Salary</td><td>${e(formatMWK(data.grossSalary))}</td></tr>
+        <tr><td>PAYE Tax</td><td>- ${e(formatMWK(data.paye))}</td></tr>
+        <tr><td>Pension (${e(data.pensionPercent)}%)</td><td>- ${e(formatMWK(data.pension))}</td></tr>
+        ${data.loanDeduction > 0 ? `<tr><td>Loan Deduction</td><td>- ${e(formatMWK(data.loanDeduction))}</td></tr>` : ''}
+        <tr><td class="net">Net Pay</td><td class="net">${e(formatMWK(data.netSalary))}</td></tr>
       </table>
     </div>
   </body></html>`

@@ -193,6 +193,12 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
     nonNegativeIntSchema('High subject-fails threshold').max(20),
   [SETTING_KEYS.RISK_SUBJECT_FAILS_MEDIUM]:
     nonNegativeIntSchema('Medium subject-fails threshold').max(20),
+  [SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_HIGH]:
+    positiveIntSchema('High library-overdue threshold').max(365),
+  [SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_MEDIUM]:
+    positiveIntSchema('Medium library-overdue threshold').max(365),
+  [SETTING_KEYS.RISK_LIBRARY_FINES_MEDIUM]:
+    mwkAmountSchema('Library-fines threshold'),
 
   // ── Finance — fees
   [SETTING_KEYS.FINANCE_LATE_PENALTY_PER_DAY]:

@@ -10,12 +10,16 @@ import 'server-only'
 import { subDays } from 'date-fns'
 import { prisma } from '@/lib/prisma'
 import type { AttentionItem, ReportInsight, ReportSectionData } from '@shared/types/reporting'
-import type { ApiLibraryCirculation, ApiLibraryFines, ApiOverdueRow } from '@shared/types/reporting-library'
+import type {
+  ApiLibraryCirculation, ApiLibraryDigital, ApiLibraryFines, ApiLibraryStock, ApiNotRecorded, ApiOverdueRow,
+} from '@shared/types/reporting-library'
 import {
   OVERDUE_BUCKETS, averageLoanDays, lastMonths, monthKey, onTimeRate, overdueBucket,
 } from './libraryLogic'
+import { summariseDigitalUsage, summariseStock } from './digitalUsageLogic'
 import { kpi, thresholdKpi, ratioPct, compare, round, daysBetween } from '@/server/services/reporting/kpi'
 import { compact, overdueInsight, sortInsights } from '@/server/services/reporting/insights'
+import { enrichAttention, rankAttention } from './executiveLogic'
 
 const num = (v: unknown): number => {
   const n = Number(v)
@@ -174,20 +178,150 @@ export async function getLibraryOverview(): Promise<ReportSectionData> {
 
 export async function getLibraryAttention(): Promise<AttentionItem[]> {
   const now = new Date()
-  const [overdueSevere, overdueAny, pendingApprovals, lost, lowStock] = await Promise.all([
+  const [overdueSevere, overdueAny, pendingApprovals, lost, lowStock, oldestOverdue] = await Promise.all([
     prisma.borrowing.count({ where: { returnedAt: null, status: { not: 'LOST' }, dueDate: { lt: subDays(now, 30) } } }),
     prisma.borrowing.count({ where: { returnedAt: null, status: { not: 'LOST' }, dueDate: { lt: now } } }),
     prisma.digitalResource.count({ where: { approved: false } }),
     prisma.borrowing.count({ where: { status: 'LOST' } }),
     prisma.book.count({ where: { availableCopies: 0 } }),
+    prisma.borrowing.findFirst({
+      where: { returnedAt: null, status: { not: 'LOST' }, dueDate: { lt: now } },
+      orderBy: { dueDate: 'asc' },
+      select: { dueDate: true },
+    }),
   ])
+  const oldestDays = oldestOverdue ? daysBetween(oldestOverdue.dueDate, now) : null
   const items: AttentionItem[] = [
-    { key: 'overdue-severe', severity: 'critical', label: 'Loans more than 30 days overdue', count: overdueSevere, href: '/reports?tab=circulation' },
+    { key: 'overdue-severe', severity: 'critical', label: 'Loans more than 30 days overdue', count: overdueSevere, ageDays: oldestDays, href: '/reports?tab=circulation' },
     { key: 'overdue', severity: 'watch', label: 'Loans overdue', count: overdueAny - overdueSevere, href: '/reports?tab=circulation' },
-    { key: 'unapproved-digital', severity: 'info', label: 'Digital resources awaiting approval', count: pendingApprovals, href: '/library' },
-    { key: 'no-copies', severity: 'info', label: 'Titles with no copy available', count: lowStock, href: '/library' },
-    { key: 'lost', severity: 'info', label: 'Copies recorded as lost', count: lost, href: '/library' },
+    { key: 'unapproved-digital', severity: 'info', label: 'Digital resources awaiting approval', count: pendingApprovals, href: '/library?tab=digital&status=pending' },
+    { key: 'no-copies', severity: 'info', label: 'Titles with no copy available', count: lowStock, href: '/reports?tab=stock' },
+    { key: 'lost', severity: 'info', label: 'Copies recorded as lost', count: lost, href: '/reports?tab=stock' },
   ]
-  const order = { critical: 0, watch: 1, info: 2, positive: 3 } as const
-  return items.filter((i) => (i.count ?? 0) > 0).sort((a, b) => order[a.severity] - order[b.severity])
+  return enrichAttention(rankAttention(items))
+}
+
+
+// ─── Digital library ─────────────────────────────────────────────────────────
+
+/** Measures the application has no event for. The report names them instead of showing a zero. */
+export const DIGITAL_NOT_RECORDED: readonly ApiNotRecorded[] = [
+  { key: 'downloads', label: 'Downloads', reason: 'Resources are opened in the in-app viewer through a signed link. No download event is stored, so downloads cannot be counted.' },
+  { key: 'searches', label: 'Searches and unsuccessful searches', reason: 'Searches are not logged, so search demand and searches that found nothing are unknown.' },
+  { key: 'rejections', label: 'Rejected resources', reason: 'A resource is either approved or waiting. There is no rejected state, so rejections are not counted.' },
+  { key: 'reading', label: 'Reading time and completion', reason: 'Only the moment a resource is opened is recorded.' },
+]
+
+export const STOCK_NOT_RECORDED: readonly ApiNotRecorded[] = [
+  { key: 'renewals', label: 'Renewals', reason: 'Renewing a loan moves its due date and is written only to the server log. No renewal count is stored, so renewals cannot be reported.' },
+  { key: 'repairs', label: 'Repaired copies', reason: 'Damaged copies are not marked as repaired later, so the damaged total is a running figure.' },
+]
+
+/** Most view rows one report reads; beyond this the figures cover only the latest events. */
+const VIEW_ROW_CAP = 100_000
+
+export interface DigitalFilters {
+  days?: number
+  /** Inclusive calendar dates; override `days` when set. */
+  from?: Date
+  to?: Date
+  type?: string
+  subject?: string
+  form?: number
+  status?: 'approved' | 'pending'
+}
+
+export async function getLibraryDigital(f: DigitalFilters = {}, now: Date = new Date()): Promise<ApiLibraryDigital> {
+  const to = f.to ? new Date(Date.UTC(f.to.getUTCFullYear(), f.to.getUTCMonth(), f.to.getUTCDate(), 23, 59, 59, 999)) : now
+  const from = f.from
+    ? new Date(Date.UTC(f.from.getUTCFullYear(), f.from.getUTCMonth(), f.from.getUTCDate()))
+    : subDays(to, f.days ?? 90)
+
+  const resourceWhere = {
+    ...(f.type ? { type: f.type } : {}),
+    ...(f.subject ? { subject: f.subject } : {}),
+    ...(f.form !== undefined ? { form: f.form } : {}),
+    ...(f.status ? { approved: f.status === 'approved' } : {}),
+  }
+  const hasResourceFilter = Object.keys(resourceWhere).length > 0
+
+  const [resources, views, first] = await Promise.all([
+    prisma.digitalResource.findMany({
+      where: resourceWhere as never,
+      select: { id: true, title: true, type: true, subject: true, form: true, approved: true, createdAt: true, approvedAt: true },
+    }),
+    prisma.digitalResourceView.findMany({
+      where: { viewedAt: { gte: from, lte: to }, ...(hasResourceFilter ? { resource: resourceWhere } : {}) } as never,
+      select: { resourceId: true, viewerUid: true, viewedAt: true },
+      orderBy: { viewedAt: 'desc' },
+      take: VIEW_ROW_CAP,
+    }),
+    prisma.digitalResourceView.findFirst({ orderBy: { viewedAt: 'asc' }, select: { viewedAt: true } }),
+  ])
+
+  const summary = summariseDigitalUsage(
+    resources.map((r) => ({ ...r, type: String(r.type) })),
+    views,
+    { from, to },
+    now,
+  )
+
+  return {
+    generatedAt: now.toISOString(),
+    from: from.toISOString(),
+    to: to.toISOString(),
+    filters: { type: f.type ?? null, subject: f.subject ?? null, form: f.form ?? null, status: f.status ?? null },
+    trackingSince: first ? first.viewedAt.toISOString() : null,
+    ...summary,
+    viewsCapped: views.length >= VIEW_ROW_CAP,
+    notRecorded: [...DIGITAL_NOT_RECORDED],
+  }
+}
+
+// ─── Physical stock ──────────────────────────────────────────────────────────
+
+export async function getLibraryStock(f: { category?: string; days?: number } = {}, now: Date = new Date()): Promise<ApiLibraryStock> {
+  const days = f.days ?? 90
+  const since = subDays(now, days)
+  const bookFilter = f.category ? { category: f.category } : {}
+  const onBook = f.category ? { book: bookFilter } : {}
+
+  const [books, open, logs, loansLost, returnedDamaged] = await Promise.all([
+    prisma.book.findMany({
+      where: bookFilter as never,
+      select: { id: true, title: true, author: true, category: true, totalCopies: true, availableCopies: true },
+    }),
+    prisma.borrowing.findMany({
+      where: { returnedAt: null, status: { not: 'LOST' }, ...onBook } as never,
+      select: { bookId: true, dueDate: true },
+    }),
+    prisma.bookConditionLog.findMany({ where: onBook as never, select: { condition: true, copies: true } }),
+    prisma.borrowing.count({ where: { status: 'LOST', ...onBook } as never }),
+    prisma.borrowing.count({ where: { condition: 'DAMAGED', returnedAt: { gte: since }, ...onBook } as never }),
+  ])
+
+  const stock = summariseStock(books.map((b) => ({ ...b, category: String(b.category) })), open, now)
+  const copiesFor = (c: string) => logs.filter((l) => l.condition === c).reduce((s, l) => s + num(l.copies), 0)
+
+  return {
+    generatedAt: now.toISOString(),
+    windowDays: days,
+    category: f.category ?? null,
+    titles: stock.titles,
+    copies: stock.copies,
+    available: stock.available,
+    onLoan: stock.onLoan,
+    offShelf: stock.offShelf,
+    availabilityRate: stock.availabilityRate,
+    overdueLoans: open.filter((l) => l.dueDate.getTime() < now.getTime()).length,
+    byCategory: stock.byCategory,
+    unavailable: stock.unavailable.slice(0, 50),
+    condition: {
+      shelfDamagedCopies: copiesFor('DAMAGED'),
+      shelfLostCopies: copiesFor('LOST'),
+      loansLost,
+      returnedDamaged,
+    },
+    notRecorded: [...STOCK_NOT_RECORDED],
+  }
 }

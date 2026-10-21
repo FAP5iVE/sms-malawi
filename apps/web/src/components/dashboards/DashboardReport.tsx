@@ -12,7 +12,6 @@
  * rest of the dashboard keeps working.
  */
 import type { AttentionItem, ReportSectionData } from '@shared/types/reporting'
-import type { ApiExecutiveOverview } from '@shared/types/reporting-executive'
 import { QueryState } from '@/components/reports/ui/ReportStates'
 import { ReportKpiStrip } from '@/components/reports/ui/ReportKpiStrip'
 import { AttentionList, InsightList } from '@/components/reports/ui/InsightList'
@@ -76,64 +75,19 @@ export function DashboardAttention({
   query,
   title = 'Needs attention',
   emptyMessage,
+  limit,
 }: {
   query: QueryLike<AttentionItem[]>
   title?: string
   emptyMessage?: string
+  /** Show only the first N (they arrive ranked most urgent first) with a button for the rest. */
+  limit?: number
 }) {
   return (
     <ReportCard title={title}>
       <QueryState isLoading={query.isLoading} isError={query.isError} onRetry={() => void query.refetch()} loadingHeight={90}>
-        <AttentionList items={query.data} emptyMessage={emptyMessage} />
+        <AttentionList items={query.data} emptyMessage={emptyMessage} limit={limit} />
       </QueryState>
     </ReportCard>
-  )
-}
-
-/**
- * The school-wide executive KPIs (academics, students, finance, operations),
- * grouped under headings. Only the groups the viewer may see are returned by
- * the server, so nothing here needs a client-side permission check.
- */
-export function ExecutiveKpiGroups({
-  academicYear,
-  term,
-  overview,
-}: {
-  academicYear?: string
-  term?: number | null
-  overview: QueryLike<ApiExecutiveOverview>
-}) {
-  const { data, isLoading, isError, refetch } = overview
-  return (
-    <section aria-label="School overview" className="space-y-3">
-      <DashboardIntro
-        title="School overview"
-        summary="Headline numbers across academics, students, finance and operations. Each figure opens the report behind it."
-        academicYear={academicYear}
-        term={term}
-        reportsHref="/reports?tab=overview"
-        generatedAt={data?.generatedAt}
-      />
-      {isError ? (
-        <QueryState isLoading={false} isError onRetry={() => void refetch()}>
-          {null}
-        </QueryState>
-      ) : isLoading || !data ? (
-        <ReportKpiStrip kpis={undefined} isLoading placeholders={8} />
-      ) : (
-        data.groups.map((g) => (
-          <div key={g.key} className="space-y-2">
-            <h3 className="font-heading text-xs font-semibold uppercase tracking-wide text-muted">{g.title}</h3>
-            <ReportKpiStrip kpis={g.kpis} isLoading={false} />
-          </div>
-        ))
-      )}
-      {data?.warnings.map((w) => (
-        <p key={w.key} role="note" className="rounded-lg border border-base bg-page px-3 py-2 text-xs text-muted">
-          {w.message}
-        </p>
-      ))}
-    </section>
   )
 }

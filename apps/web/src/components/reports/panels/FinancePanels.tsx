@@ -2,8 +2,7 @@
 
 /**
  * Finance report tabs added by the reports overhaul: overview, receivables
- * aging, payment mix, and (shared with high_rank) procurement and stocktake
- * variance. The long-standing collection / outstanding / expenses / cash-flow /
+ * aging and payment mix. The long-standing collection / outstanding / expenses / cash-flow /
  * payroll / scholarship panels stay in the page file untouched.
  */
 import { Chart } from '@/components/shared/chart'
@@ -11,9 +10,7 @@ import { ChartCard } from '@/components/shared/ChartCard'
 import {
   useFinanceAging, useFinanceAttention, useFinanceOverview, usePaymentMix,
 } from '@/hooks/reporting/useFinanceReporting'
-import { useProcurementPipeline, useStocktakeVariance } from '@/hooks/reporting/useOperationsReporting'
 import type { ApiAgingBucket, ApiAgingDebtorRow } from '@shared/types/reporting-finance'
-import type { ApiVarianceItemRow, ApiVarianceRoomRow } from '@shared/types/reporting-operations'
 import { formatDate, formatDays, formatMwk, formatMwkCompact, formatPercent } from '@/lib/reportFormat'
 import { ReportCard } from '../ui/ReportCard'
 import { ReportTable } from '../ui/ReportTable'
@@ -103,7 +100,7 @@ export function FinanceAgingTab({ academicYear, term }: PeriodProps) {
       </TwoUp>
       <ReportCard
         title="Debtors"
-        sub={data?.debtorsTruncated ? 'Largest balances first (list is capped — export for the largest rows)' : 'Largest balances first'}
+        sub={data?.debtorsTruncated ? 'Largest balances first. The list is capped, and the export has the same rows' : 'Largest balances first'}
         actions={
           <FilterBar ariaLabel="Aging filter">
             <FilterSelect label="Bucket" value={bucket ?? ''} options={BUCKET_OPTIONS} allLabel="All buckets" onChange={(v) => setBucket(v || undefined)} />
@@ -115,6 +112,7 @@ export function FinanceAgingTab({ academicYear, term }: PeriodProps) {
             rows={debtors}
             rowKey={(r) => r.invoiceId}
             exportLabel="Debtors"
+            exportNote={data?.debtorsTruncated ? `Largest ${data?.debtors.length ?? 0} balances only` : undefined}
             emptyMessage="No invoices in this bucket."
             defaultSort={{ key: 'balance', direction: 'desc' }}
             columns={[
@@ -143,25 +141,27 @@ export function FinancePaymentsTab({ academicYear, term }: PeriodProps) {
         kpis={
           data
             ? [
-                kpiTile('collected', 'Collected', data.totalCollected, 'mwk', 'Total of payments recorded for the selected period.'),
+                kpiTile('received', 'Cash received', data.totalCollected, 'mwk', 'Total of payments recorded against the selected term’s invoices, whenever they were paid. Equals fees applied to invoices plus any overpayment held as credit.'),
+                kpiTile('applied', 'Applied to invoices', data.appliedToInvoices, 'mwk', 'The part of the cash received that reduced the term’s invoice balances (the figure behind the collection rate).'),
+                kpiTile('credit', 'Held as credit', data.heldAsCredit, 'mwk', 'Overpayments not applied to an invoice; they are carried to the student’s next invoice.', data.heldAsCredit > 0 ? 'watch' : 'neutral'),
                 kpiTile('count', 'Payments', data.paymentCount, 'count', 'Number of payments recorded.'),
-                kpiTile('average', 'Average payment', data.averagePayment, 'mwk', 'Total collected ÷ number of payments.'),
+                kpiTile('average', 'Average payment', data.averagePayment, 'mwk', 'Cash received ÷ number of payments.'),
               ]
             : undefined
         }
       />
       <TwoUp>
-        <ChartCard title="Payment methods" sub="Share of money collected" isLoading={q.isLoading} height={240}>
+        <ChartCard title="Payment methods" sub="Share of cash received" isLoading={q.isLoading} height={240}>
           <Chart
             type="donut"
             data={(data?.byMethod ?? []).map((m) => ({ x: m.label, amount: m.amount }))}
-            series={[{ key: 'amount', label: 'Collected (MWK)' }]}
+            series={[{ key: 'amount', label: 'Received (MWK)' }]}
             height={240}
             emptyStateMessage="No payments recorded."
             ariaLabel="Fee payments by method"
           />
         </ChartCard>
-        <ChartCard title="Payments by weekday" sub="Money collected on each day of the week" isLoading={q.isLoading} height={240}>
+        <ChartCard title="Payments by weekday" sub="Cash received on each day of the week" isLoading={q.isLoading} height={240}>
           <Chart
             type="bar"
             data={(data?.byWeekday ?? []).map((d) => ({ x: d.label, amount: d.amount }))}
@@ -181,136 +181,11 @@ export function FinancePaymentsTab({ academicYear, term }: PeriodProps) {
             columns={[
               { key: 'method', label: 'Method', sortValue: (r) => r.label },
               { key: 'count', label: 'Payments', align: 'right', sortValue: (r) => r.count },
-              { key: 'amount', label: 'Collected', align: 'right', sortValue: (r) => r.amount, cell: (r) => formatMwk(r.amount), exportValue: (r) => r.amount },
+              { key: 'amount', label: 'Received', align: 'right', sortValue: (r) => r.amount, cell: (r) => formatMwk(r.amount), exportValue: (r) => r.amount },
               { key: 'share', label: 'Share', align: 'right', sortValue: (r) => r.share, cell: (r) => formatPercent(r.share), exportValue: (r) => r.share },
             ]}
           />
         </QueryState>
-      </ReportCard>
-    </PanelStack>
-  )
-}
-
-export function ProcurementTab() {
-  const q = useProcurementPipeline(365)
-  const data = q.data
-  return (
-    <PanelStack>
-      <ReportKpiStrip
-        isLoading={q.isLoading}
-        kpis={
-          data
-            ? [
-                kpiTile('requisitions', 'Requisitions (12 months)', data.stages.find((s) => s.key === 'requisitions')?.count ?? null, 'count', 'Purchase requisitions raised in the last 12 months.'),
-                kpiTile('approvalDays', 'Time to approve', data.avgApprovalDays, 'days', 'Average days from submission to approval.'),
-                kpiTile('deliveryDays', 'Time to deliver', data.avgDeliveryDays, 'days', 'Average days from purchase order date to first goods receipt.'),
-              ]
-            : undefined
-        }
-      />
-      <TwoUp>
-        <ChartCard title="Procurement pipeline" sub="Requisitions that reached each stage (last 12 months)" isLoading={q.isLoading} height={260}>
-          <Chart
-            type="bar"
-            data={(data?.stages ?? []).map((s) => ({ x: s.label, count: s.count }))}
-            series={[{ key: 'count', label: 'Requisitions' }]}
-            height={260}
-            emptyStateMessage="No procurement activity in this window."
-            ariaLabel="Procurement pipeline stages"
-          />
-        </ChartCard>
-        <ReportCard title="Stage values">
-          <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()} isEmpty={!data || data.stages.length === 0}>
-            <ReportTable
-              rows={data?.stages}
-              rowKey={(r) => r.key}
-              exportLabel="Procurement stages"
-              columns={[
-                { key: 'stage', label: 'Stage', sortValue: (r) => r.label },
-                { key: 'count', label: 'Count', align: 'right', sortValue: (r) => r.count },
-                { key: 'value', label: 'Value', align: 'right', sortValue: (r) => r.value, cell: (r) => formatMwkCompact(r.value), exportValue: (r) => r.value },
-              ]}
-            />
-          </QueryState>
-        </ReportCard>
-      </TwoUp>
-      <TwoUp>
-        <ReportCard title="Requisitions by status" sub="Where work is sitting now">
-          <ReportTable
-            rows={data?.requisitionsByStatus}
-            rowKey={(r) => r.status}
-            exportLabel="Requisitions by status"
-            columns={[
-              { key: 'status', label: 'Status', sortValue: (r) => r.status },
-              { key: 'count', label: 'Requisitions', align: 'right', sortValue: (r) => r.count },
-            ]}
-          />
-        </ReportCard>
-        <ReportCard title="Purchase orders by status">
-          <ReportTable
-            rows={data?.purchaseOrdersByStatus}
-            rowKey={(r) => r.status}
-            exportLabel="Purchase orders by status"
-            columns={[
-              { key: 'status', label: 'Status', sortValue: (r) => r.status },
-              { key: 'count', label: 'Orders', align: 'right', sortValue: (r) => r.count },
-              { key: 'value', label: 'Value', align: 'right', sortValue: (r) => r.value, cell: (r) => formatMwkCompact(r.value), exportValue: (r) => r.value },
-            ]}
-          />
-        </ReportCard>
-      </TwoUp>
-    </PanelStack>
-  )
-}
-
-export function StocktakeTab({ academicYear }: { academicYear: string }) {
-  const q = useStocktakeVariance(academicYear)
-  const data = q.data
-  return (
-    <PanelStack>
-      <ReportKpiStrip
-        isLoading={q.isLoading}
-        kpis={
-          data
-            ? [
-                kpiTile('stocktakes', 'Stocktakes', data.stocktakes, 'count', 'Stocktakes recorded this academic year.'),
-                kpiTile('variances', 'Variances', data.totalVariances, 'count', 'Lines where the counted quantity differed from the book quantity.'),
-                kpiTile('unresolved', 'Unresolved', data.unresolved, 'count', 'Variances still open or under investigation.', data.unresolved > 0 ? 'watch' : 'healthy'),
-                kpiTile('rate', 'Variance rate', data.varianceRate, 'percent', 'Variances ÷ lines counted.'),
-              ]
-            : undefined
-        }
-      />
-      <ReportCard title="Variances by room" sub="Shortages and surpluses (units)">
-        <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()} isEmpty={!data || data.byRoom.length === 0} emptyMessage="No stocktake variances recorded.">
-          <ReportTable<ApiVarianceRoomRow>
-            rows={data?.byRoom}
-            rowKey={(r) => `${r.building}|${r.room}`}
-            exportLabel="Variances by room"
-            columns={[
-              { key: 'room', label: 'Room', sortValue: (r) => `${r.building} · ${r.room}` },
-              { key: 'open', label: 'Open', align: 'right', sortValue: (r) => r.open },
-              { key: 'resolved', label: 'Resolved', align: 'right', sortValue: (r) => r.resolved },
-              { key: 'short', label: 'Short (units)', align: 'right', sortValue: (r) => r.shortageQty },
-              { key: 'surplus', label: 'Surplus (units)', align: 'right', sortValue: (r) => r.surplusQty },
-            ]}
-          />
-        </QueryState>
-      </ReportCard>
-      <ReportCard title="Variance items" sub="Unresolved first">
-        <ReportTable<ApiVarianceItemRow>
-          rows={data?.items}
-          rowKey={(r) => r.varianceId}
-          exportLabel="Variance items"
-          columns={[
-            { key: 'item', label: 'Item', sortValue: (r) => r.itemName },
-            { key: 'room', label: 'Room', hideOnMobile: true, sortValue: (r) => `${r.building} · ${r.room}` },
-            { key: 'type', label: 'Type', sortValue: (r) => r.varianceType },
-            { key: 'qty', label: 'Qty', align: 'right', sortValue: (r) => r.quantity },
-            { key: 'status', label: 'Status', sortValue: (r) => r.status },
-            { key: 'stocktake', label: 'Stocktake', hideOnMobile: true, sortValue: (r) => r.stocktakeNumber },
-          ]}
-        />
       </ReportCard>
     </PanelStack>
   )

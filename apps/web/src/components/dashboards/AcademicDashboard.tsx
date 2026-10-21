@@ -45,7 +45,9 @@ import { TodaysTimetableList } from '@/components/shared/TodaysTimetableList'
 import { useHighRiskStudents } from '@/hooks/useStudents'
 import { useMyTimetableToday } from '@/hooks/useClasses'
 import { useAcademicOverview, useAcademicAttention } from '@/hooks/reporting/useAcademicReporting'
-import { DashboardAttention, DashboardKpis } from './DashboardReport'
+import { DashboardAttention } from './DashboardReport'
+import { PrimaryOverviewKpis, ReportLinks, SecondaryKpis } from './DashboardSections'
+import type { ReportLink } from './DashboardSections'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
 import Link from 'next/link'
@@ -83,6 +85,17 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
 ]
 
+/** Lead with how the classes are doing; the rest sit in "More figures". */
+const PREFERRED = ['average', 'passRate', 'attendance', 'marks']
+
+const REPORT_LINKS: ReportLink[] = [
+  { label: 'Teaching overview', href: '/reports?tab=teaching', description: 'Results and attendance for your classes' },
+  { label: 'Students needing support', href: '/reports?tab=students', description: 'Low average, absence, decline' },
+  { label: 'Assignments', href: '/reports?tab=assignments', description: 'Completion and overdue work' },
+  { label: 'Marks', href: '/reports?tab=marks', description: 'Entered and missing marks' },
+  { label: 'Exam readiness', href: '/reports?tab=readiness', description: 'Upcoming exams and preparation' },
+]
+
 export function AcademicDashboard() {
   const { academicYear, term } = useViewingPeriod()
 
@@ -90,29 +103,29 @@ export function AcademicDashboard() {
   const overview = useAcademicOverview(period)
   const attention = useAcademicAttention(period)
 
-  const { data: timetableToday, isLoading: timetableLoading } = useMyTimetableToday()
-  const { data: riskData, isLoading: riskLoading } = useHighRiskStudents(6)
+  const { data: timetableToday, isLoading: timetableLoading, isError: timetableError, refetch: refetchTimetable } = useMyTimetableToday()
+  const { data: riskData, isLoading: riskLoading, isError: riskError, refetch: refetchRisk } = useHighRiskStudents(6)
   const highRiskStudents = riskData?.students ?? []
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <DashboardKpis
-        title="Teaching overview"
-        summary="Results, attendance, assessments and the students who need support across the classes you teach. Each figure opens the report behind it."
+      <PrimaryOverviewKpis
+        title="Teaching at a glance"
+        summary="Results, attendance and marks across the classes you teach. Tap a figure to open its report."
         academicYear={academicYear}
         term={term}
         overview={overview}
+        preferred={PREFERRED}
         reportsHref="/reports?tab=teaching"
-        showInsights
-        placeholders={7}
       />
-      <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
           title="Today's Timetable"
           sub="Your classes today"
           isLoading={timetableLoading}
           isEmpty={(timetableToday ?? []).length === 0}
+          isError={timetableError}
+          onRetry={() => void refetchTimetable()}
           emptyMessage="No classes on your timetable today."
         >
           <TodaysTimetableList slots={timetableToday ?? []} />
@@ -122,6 +135,8 @@ export function AcademicDashboard() {
           sub="High-risk active students"
           isLoading={riskLoading}
           isEmpty={highRiskStudents.length === 0}
+          isError={riskError}
+          onRetry={() => void refetchRisk()}
           emptyMessage="No high-risk students right now."
         >
           <ul className="space-y-2">
@@ -135,14 +150,17 @@ export function AcademicDashboard() {
                     {s.firstName} {s.lastName}
                     {s.className ? <span className="text-muted"> · {s.className}</span> : null}
                   </span>
-                  <StudentRiskBadge riskLevel="HIGH" variant="dot" />
+                  <StudentRiskBadge riskLevel={s.riskLevel} variant="dot" hint={s.topFactor ?? undefined} />
                 </Link>
               </li>
             ))}
           </ul>
         </ListCard>
       </div>
-      <DashboardAttention query={attention} title="Your intervention queue" />
+      <DashboardAttention query={attention} title="Your intervention queue" limit={5} />
+      <SecondaryKpis title="More figures and findings" overview={overview} preferred={PREFERRED} showInsights />
+      <QuickActions actions={QUICK_ACTIONS} compact />
+      <ReportLinks links={REPORT_LINKS} />
     </div>
   )
 }

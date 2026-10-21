@@ -119,6 +119,7 @@ export function useApproveDigitalResource() {
 export function useIssueBorrowing() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: IssueBorrowingInput) => apiFetch('/library/borrowings/issue', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
   })
@@ -127,6 +128,7 @@ export function useIssueBorrowing() {
 export function useReturnBook() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: ({ borrowingId, data }: { borrowingId: string; data: ReturnBorrowingInput }) =>
       apiFetch(`/library/borrowings/${borrowingId}/return`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
@@ -141,6 +143,7 @@ export function useReturnBook() {
 export function useMarkBookCondition() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: ({ bookId, data }: { bookId: string; data: MarkBookConditionInput }) =>
       apiFetch(`/library/${bookId}/condition`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
@@ -171,6 +174,7 @@ export function useBorrowings(filters: {
 export function useRenewBorrowing() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (borrowingId: string) => apiFetch(`/library/borrowings/${borrowingId}/renew`, { method: 'PATCH', body: JSON.stringify({}) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
     onError: (err) => { console.error('[useRenewBorrowing] failed', err) },
@@ -202,11 +206,14 @@ export function useScanBarcode() {
 }
 
 // ─── RESOURCE RECOMMENDATIONS ─────────────────────────────
-export function useRecommendations(status?: string) {
+export function useRecommendations(status?: string, enabled = true) {
   const params = status ? `?status=${encodeURIComponent(status)}` : ''
   return useQuery({
     queryKey: queryKeys.library.recommendations(status),
     queryFn: () => apiFetch<ApiResourceRecommendation[]>(`/library/recommendations${params}`),
+    // Students hold no library.recommendResource, so the endpoint 403s for them;
+    // callers pass enabled=false rather than firing a request that cannot succeed.
+    enabled,
   })
 }
 
@@ -262,6 +269,7 @@ export function useCreateFineWaiver() {
 export function useApproveFineWaiver() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (id: string) => apiFetch(`/library/fine-waivers/${id}/approve`, { method: 'PATCH', body: JSON.stringify({}) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.fineWaivers() }),
     onError: (err) => { console.error('[useApproveFineWaiver] failed', err) },
@@ -348,6 +356,7 @@ export function useFines(status?: string) {
 export function useClearFine() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (id: string) => apiFetch(`/library/fines/${id}/clear`, { method: 'PATCH', body: JSON.stringify({}) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['library', 'fines'] }),
   })
@@ -364,6 +373,7 @@ export function useClearFine() {
 export function useAssessFine() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: CreateLibraryFineInput) => apiFetch<ApiLibraryFine>('/finances/library-fines', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['library', 'fines'] })
@@ -377,6 +387,7 @@ export function useAssessFine() {
 export function useWaiveFineDirect() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (id: string) => apiFetch<ApiLibraryFine>(`/finances/library-fines/${id}/waive`, { method: 'PATCH', body: JSON.stringify({}) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['library', 'fines'] })

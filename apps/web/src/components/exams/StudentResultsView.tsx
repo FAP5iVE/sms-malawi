@@ -70,8 +70,10 @@ function pct(value: number | string | null | undefined): string {
 }
 
 export function StudentResultsView({ studentId, bordered = true }: Props) {
-  // Follows the universal header filter; the term buttons below write through to it.
-  const { academicYear, term, setTerm, isLoading: periodLoading } = useEffectiveViewingPeriod()
+  // Follows the universal header filter. The term pills that used to sit below
+  // wrote THROUGH to it (a second control for the same value) and are replaced
+  // by a read-only label; switch term from the header.
+  const { academicYear, term, isLoading: periodLoading } = useEffectiveViewingPeriod()
   const [showReportCard, setShowReportCard] = useState(false)
   const { data: result, isLoading, error } = useStudentResults(studentId, academicYear ?? '', term)
 
@@ -138,16 +140,11 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex gap-2">
-          {[1,2,3].map((t) => (
-            <button key={t} onClick={() => setTerm(t)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                term === t ? 'bg-brand-deep text-white border-brand-navy' : 'border-base text-muted'
-              }`}>
-              Term {t}
-            </button>
-          ))}
-        </div>
+        <p className="text-sm text-muted" aria-label="Period shown">
+          <span className="font-semibold text-body">Term {term}</span>
+          {academicYear ? ` · ${academicYear}` : ''}
+          <span className="hidden sm:inline"> — change the period from the header</span>
+        </p>
         {/* SR-3: opens the same in-browser PrintableReportCard staff use,
             which has its own Print button. Replaces the server-PDF download
             that was erroring for students. */}

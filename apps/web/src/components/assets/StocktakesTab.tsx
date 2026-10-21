@@ -10,9 +10,9 @@ import { Modal } from '@/components/shared/Modal'
 function humanize(value: string) { return value.replace(/_/g, ' ').toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()) }
 function num(v: number | string | undefined) { return Number(v ?? 0) }
 
-export function StocktakesTab() {
+export function StocktakesTab({ initialSelectedId = null }: { initialSelectedId?: string | null } = {}) {
   const { academicYear, term } = useViewingPeriod()
-  const [showForm, setShowForm] = useState(false); const [roomId, setRoomId] = useState(''); const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false); const [roomId, setRoomId] = useState(''); const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId)
   const { data: rows = [], isLoading } = useStocktakes({ academicYear, term })
   const create = useCreateStocktake()
   function createStocktake() { if (!academicYear || !term || !roomId.trim()) return; create.mutate({ academicYear, term, roomId: roomId.trim() }, { onSuccess: () => { setShowForm(false); setRoomId('') } }) }

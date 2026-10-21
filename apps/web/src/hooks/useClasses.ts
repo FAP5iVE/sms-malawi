@@ -25,8 +25,9 @@ import type { CreateClassInput, UpdateClassInput, CreateAssignmentInput, CreateT
 import type { ApiClass, ApiTimetableSlot, ApiAssignment, ApiSubjectAssignment, ApiClassSubjectsMeta } from '@shared/types/api'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { uploadFileDirectly } from '@/lib/directUpload'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 
-export function useClasses(academicYear?: string, includeArchived?: boolean) {
+export function useClasses(academicYear?: string, includeArchived?: boolean, enabled = true) {
   const params = new URLSearchParams()
   if (academicYear) params.set('academicYear', academicYear)
   if (includeArchived) params.set('includeArchived', 'true')
@@ -35,13 +36,21 @@ export function useClasses(academicYear?: string, includeArchived?: boolean) {
   return useQuery({
     queryKey: queryKeys.classes.list(academicYear ? { academicYear, includeArchived } : { includeArchived }),
     queryFn: () => apiFetch<ApiClass[]>(query ? `/classes?${query}` : '/classes'),
+    enabled,
   })
 }
 
 export function useClass(id: string) {
+  // The roster's risk dots are assessed for the global viewing period.
+  const { academicYear, term } = useViewingPeriod()
   return useQuery({
-    queryKey: queryKeys.classes.detail(id),
-    queryFn: () => apiFetch<ApiClass>(`/classes/${id}`),
+    queryKey: queryKeys.classes.detail(id, { academicYear, term }),
+    queryFn: () => {
+      const p = new URLSearchParams()
+      if (academicYear) p.set('academicYear', academicYear)
+      if (term) p.set('term', String(term))
+      return apiFetch<ApiClass>(`/classes/${id}?${p}`)
+    },
     enabled: !!id,
   })
 }

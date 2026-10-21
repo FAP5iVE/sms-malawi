@@ -33,10 +33,11 @@ import {
   Receipt,
 } from 'lucide-react'
 import { QuickActions } from '@/components/shared/QuickActions'
-import { FeeCollectionRadial } from '@/components/finances/FeeCollectionRadial'
 import { IncomeExpenseChart } from '@/components/finances/IncomeExpenseChart'
 import { useFinanceOverview, useFinanceAttention } from '@/hooks/reporting/useFinanceReporting'
-import { DashboardAttention, DashboardKpis } from './DashboardReport'
+import { DashboardAttention } from './DashboardReport'
+import { PrimaryOverviewKpis, ReportLinks, SecondaryKpis } from './DashboardSections'
+import type { ReportLink } from './DashboardSections'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import type { QuickAction } from '@/components/shared/QuickActions'
 
@@ -89,6 +90,18 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
 ]
 
+/** Lead with collection and what is owed; the rest sit in "More figures". */
+const PREFERRED = ['collectionRate', 'outstanding', 'overdue', 'budgetUtilisation']
+
+const REPORT_LINKS: ReportLink[] = [
+  { label: 'Fee collection', href: '/reports?tab=collection', description: 'Billed, collected and rate by term' },
+  { label: 'Receivables ageing', href: '/reports?tab=aging', description: 'Overdue invoices by age' },
+  { label: 'Outstanding by class', href: '/reports?tab=outstanding', description: 'Who owes what, by class' },
+  { label: 'Expenses and budget', href: '/reports?tab=expenses', description: 'Spend against budget' },
+  { label: 'Cash flow', href: '/reports?tab=cashflow', description: 'Money in and out' },
+  { label: 'Payments', href: '/reports?tab=payments', description: 'Receipts and methods' },
+]
+
 export function FinanceDashboard() {
   const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
   const period = { academicYear: academicYear ?? '', term: term ?? undefined }
@@ -97,29 +110,20 @@ export function FinanceDashboard() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <DashboardKpis
-        title="Finance overview"
-        summary="Collection, receivables, spending and the obligations that need a decision. Each figure opens the report behind it."
+      <PrimaryOverviewKpis
+        title="Finance at a glance"
+        summary="Collection, what is owed and how much of the budget is spent. Tap a figure to open its report."
         academicYear={academicYear}
         term={term}
         overview={overview}
+        preferred={PREFERRED}
         reportsHref="/reports?tab=overview"
-        showInsights
-        placeholders={8}
       />
-      <QuickActions actions={QUICK_ACTIONS} />
-      <div className="grid md:grid-cols-2 gap-3 md:gap-4">
-        <FeeCollectionRadial
-          academicYear={academicYear ?? ''}
-          term={term ?? 0}
-          periodLoading={periodLoading}
-        />
-        <IncomeExpenseChart
-          academicYear={academicYear ?? ''}
-          periodLoading={periodLoading}
-        />
-      </div>
-      <DashboardAttention query={attention} title="Finance exceptions" />
+      <IncomeExpenseChart academicYear={academicYear ?? ''} periodLoading={periodLoading} />
+      <DashboardAttention query={attention} title="Finance exceptions" limit={5} />
+      <SecondaryKpis title="More figures and findings" overview={overview} preferred={PREFERRED} showInsights />
+      <QuickActions actions={QUICK_ACTIONS} compact />
+      <ReportLinks links={REPORT_LINKS} />
     </div>
   )
 }

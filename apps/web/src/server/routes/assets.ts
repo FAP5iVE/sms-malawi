@@ -149,9 +149,11 @@ assetsRouter.patch('/advances/:id/write-off', verifyAuth, requirePermission('ass
 // ── REGISTER ──
 assetsRouter.get('/', verifyAuth, requirePermission('assets.viewRegister'),
   async (req, res) => {
-    const { category, status, search, sortBy, sortDir } = req.query as Record<string, string>
+    const { category, status, condition, search, sortBy, sortDir } = req.query as Record<string, string>
+    // An unknown condition would be rejected by the database with a 500; ignore it like an empty filter.
+    const knownCondition = ['NEW', 'GOOD', 'FAIR', 'POOR', 'DAMAGED'].includes(condition ?? '') ? condition : undefined
     return res.json(await assetService.listAssets({
-      category, status, search,
+      category, status, condition: knownCondition, search,
       sortBy: sortBy as never, sortDir: sortDir as never,
     }))
   })
@@ -229,4 +231,4 @@ assetsRouter.post('/assignments/:assignmentId/return', verifyAuth, requirePermis
     const parsed = ReturnAssetSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     return res.json(await assetService.returnAsset(assignmentId, parsed.data, req.user.uid, req.user.role))
-  })
+  })

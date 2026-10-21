@@ -30,6 +30,8 @@ import ExcelJS from 'exceljs'
 import { prisma } from '@/lib/prisma'
 import { uploadFile, getDownloadUrl, FILE_PREFIX } from '@/lib/storage'
 import { formatMWK } from '@shared/constants/malawi'
+import { getRasterSchoolLogo } from '@/server/services/schoolLogoService'
+import { getIdentitySettings } from '@/server/services/settingsService'
 
 type ReportType =
   | 'fee_collection'
@@ -46,18 +48,25 @@ export async function generateFinancialReport(
   wb.creator = 'SMS Malawi Finance System'
   wb.created = new Date()
 
+  // Resolve the school identity + logo once; every sheet gets the same banner.
+  const [identity, logo] = await Promise.all([getIdentitySettings(), getRasterSchoolLogo()])
+  const brand: SheetBrand = {
+    schoolName: identity.schoolName,
+    logoImageId: wb.addImage({ base64: logo.base64, extension: logo.rasterFormat }),
+  }
+
   switch (type) {
     case 'fee_collection':
-      await buildFeeCollectionSheet(wb, academicYear, term)
+      await buildFeeCollectionSheet(wb, academicYear, term, brand)
       break
     case 'outstanding_balances':
-      await buildOutstandingSheet(wb, academicYear, term)
+      await buildOutstandingSheet(wb, academicYear, term, brand)
       break
     case 'expense_breakdown':
-      await buildExpenseSheet(wb, academicYear, term)
+      await buildExpenseSheet(wb, academicYear, term, brand)
       break
     case 'payroll_summary':
-      await buildPayrollSheet(wb, new Date().getFullYear())
+      await buildPayrollSheet(wb, new Date().getFullYear(), brand)
       break
   }
 
@@ -76,8 +85,50 @@ export async function generateFinancialReport(
 }
 
 // --- SHEET BUILDERS --------------------------------------
-function styleHeader(ws: ExcelJS.Worksheet, cols: string[]) {
-  const headerRow = ws.getRow(1)
+interface SheetBrand {
+  schoolName: string
+  /** Id returned by wb.addImage() for the school logo. */
+  logoImageId: number
+}
+
+/**
+ * Letterhead banner (logo + school name + report title + period) occupying
+ * rows 1-4; the table header is row 5 and data follows. Returns the header
+ * row number. Replaces the old behaviour of a bare header on row 1 — a report
+ * handed to the board or the auditors now identifies the school.
+ */
+function addBanner(ws: ExcelJS.Worksheet, brand: SheetBrand, title: string, subtitle: string, colCount: number): number {
+  ws.getRow(1).height = 24
+  ws.getRow(2).height = 20
+  ws.getRow(3).height = 20
+  ws.getRow(4).height = 8
+
+  ws.addImage(brand.logoImageId, { tl: { col: 0, row: 0 }, ext: { width: 64, height: 64 } })
+
+  const last = Math.max(colCount, 3)
+  const name = ws.getCell('B1')
+  name.value = brand.schoolName
+  name.font = { bold: true, size: 15, color: { argb: 'FF0F2744' } }
+  name.alignment = { vertical: 'middle' }
+  ws.mergeCells(1, 2, 1, last)
+
+  const t = ws.getCell('B2')
+  t.value = title
+  t.font = { bold: true, size: 12, color: { argb: 'FF1A2535' } }
+  t.alignment = { vertical: 'middle' }
+  ws.mergeCells(2, 2, 2, last)
+
+  const s = ws.getCell('B3')
+  s.value = `${subtitle}  ·  Generated ${new Date().toLocaleDateString('en-MW')}`
+  s.font = { size: 10, color: { argb: 'FF64748B' } }
+  s.alignment = { vertical: 'middle' }
+  ws.mergeCells(3, 2, 3, last)
+
+  return 5
+}
+
+function styleHeader(ws: ExcelJS.Worksheet, cols: string[], rowNumber = 1) {
+  const headerRow = ws.getRow(rowNumber)
   cols.forEach((col, i) => {
     const cell = headerRow.getCell(i + 1)
     cell.value = col
@@ -88,7 +139,7 @@ function styleHeader(ws: ExcelJS.Worksheet, cols: string[]) {
   headerRow.commit()
 }
 
-async function buildFeeCollectionSheet(wb: ExcelJS.Workbook, academicYear: string, term: number) {
+async function buildFeeCollectionSheet(wb: ExcelJS.Workbook, academicYear: string, term: number, brand: SheetBrand) {
   const ws = wb.addWorksheet('Fee Collection')
   const cols = [
     'Student',
@@ -105,7 +156,7 @@ async function buildFeeCollectionSheet(wb: ExcelJS.Workbook, academicYear: strin
     key: String(i),
     width: i > 3 && i < 7 ? 18 : 15,
   }))
-  styleHeader(ws, cols)
+  styleHeader(ws, cols, addBanner(ws, brand, 'Fee Collection Report', `Academic Year ${academicYear} · Term ${term}`, cols.length))
 
   const invoices = await prisma.invoice.findMany({
     where: { academicYear, term },
@@ -140,11 +191,11 @@ async function buildFeeCollectionSheet(wb: ExcelJS.Workbook, academicYear: strin
   ]).font = { bold: true }
 }
 
-async function buildOutstandingSheet(wb: ExcelJS.Workbook, academicYear: string, term: number) {
+async function buildOutstandingSheet(wb: ExcelJS.Workbook, academicYear: string, term: number, brand: SheetBrand) {
   const ws = wb.addWorksheet('Outstanding Balances')
   const cols = ['Student', 'Student Reg No', 'Term', 'Balance (MWK)', 'Status', 'Due Date']
   ws.columns = cols.map(() => ({ width: 18 }))
-  styleHeader(ws, cols)
+  styleHeader(ws, cols, addBanner(ws, brand, 'Outstanding Balances', `Academic Year ${academicYear} · Term ${term}`, cols.length))
 
   const overdue = await prisma.invoice.findMany({
     where: { academicYear, term, status: { in: ['UNPAID', 'PARTIAL', 'OVERDUE'] } },
@@ -164,11 +215,11 @@ async function buildOutstandingSheet(wb: ExcelJS.Workbook, academicYear: string,
   })
 }
 
-async function buildExpenseSheet(wb: ExcelJS.Workbook, academicYear: string, term: number) {
+async function buildExpenseSheet(wb: ExcelJS.Workbook, academicYear: string, term: number, brand: SheetBrand) {
   const ws = wb.addWorksheet('Expense Breakdown')
   const cols = ['Category', 'Description', 'Amount (MWK)', 'Date', 'Status']
   ws.columns = cols.map((_, i) => ({ width: i === 1 ? 30 : 18 }))
-  styleHeader(ws, cols)
+  styleHeader(ws, cols, addBanner(ws, brand, 'Expense Breakdown', `Academic Year ${academicYear} · Term ${term}`, cols.length))
 
   const expenses = await prisma.expense.findMany({
     where: { academicYear, term },
@@ -186,11 +237,11 @@ async function buildExpenseSheet(wb: ExcelJS.Workbook, academicYear: string, ter
   })
 }
 
-async function buildPayrollSheet(wb: ExcelJS.Workbook, year: number) {
+async function buildPayrollSheet(wb: ExcelJS.Workbook, year: number, brand: SheetBrand) {
   const ws = wb.addWorksheet('Payroll Summary')
   const cols = ['Month', 'Total Gross (MWK)', 'Total Net (MWK)', 'Status', 'Run Date']
   ws.columns = cols.map(() => ({ width: 20 }))
-  styleHeader(ws, cols)
+  styleHeader(ws, cols, addBanner(ws, brand, 'Payroll Summary', `Payroll Year ${year}`, cols.length))
 
   const runs = await prisma.payrollRun.findMany({
     where: { year },

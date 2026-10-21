@@ -52,7 +52,6 @@ import { TrendingUp, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 import { apiFetch }             from '@/lib/api-client'
 import { formatMWK }            from '@shared/constants/malawi'
 import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
-import { AcademicYearSelect }   from '@/components/shared/AcademicYearSelect'
 import type { ForecastReport, MonthlyDataPoint } from '@/server/services/forecastService'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -152,10 +151,11 @@ function buildForecastUrl(academicYear: string, forwardMonths: number): string {
 }
 
 export function ForecastPanel() {
-  // Seeded from the school's stored current year (SystemSettings) — the
-  // finances page header has already loaded it by the time this tab mounts.
-  const { academicYear: currentYear } = useEffectiveViewingPeriod()
-  const [academicYear, setAcademicYear] = useState(currentYear)
+  // The year is the GLOBAL viewing year. This panel used to hold its own year
+  // select; it duplicated the header filter, and the finances page already
+  // re-mounts this panel (key=YEAR-TERM) whenever the period changes, so the
+  // mount-only fetch below always runs for the right year.
+  const { academicYear } = useEffectiveViewingPeriod()
   const [forwardMonths, setForwardMonths] = useState(3)
   const [report,   setReport]   = useState<ForecastReport | null>(null)
   // R19 — starts `true`, not `false`: the mount effect below always kicks
@@ -220,14 +220,10 @@ export function ForecastPanel() {
 
         <div className="flex items-end gap-3 flex-wrap">
           <div>
-            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+            <p className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
               Academic Year
-            </label>
-            <AcademicYearSelect
-              value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body w-32 focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-            />
+            </p>
+            <p className="min-h-11 flex items-center text-sm text-body">{academicYear}</p>
           </div>
           <div>
             <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">

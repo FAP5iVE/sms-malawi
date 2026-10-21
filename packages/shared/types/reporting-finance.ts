@@ -71,7 +71,12 @@ export interface ApiPaymentWeekdayRow {
 export interface ApiPaymentMix {
   academicYear: string
   term: number | null
+  /** Cash RECEIVED: Σ payments recorded against the scope's invoices (a flow, by payment). */
   totalCollected: number
+  /** Part of the cash received that was applied to those invoices (Σ invoice.paidAmount). */
+  appliedToInvoices: number
+  /** Cash received but not applied — overpayments held as student credit. received = applied + credit. */
+  heldAsCredit: number
   paymentCount: number
   averagePayment: number | null
   byMethod: ApiPaymentMethodRow[]

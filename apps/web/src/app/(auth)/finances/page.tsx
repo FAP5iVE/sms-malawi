@@ -57,7 +57,7 @@ import { LibraryFinesTab }       from '@/components/finances/LibraryFinesTab'
 import { ForecastPanel }         from '@/components/finances/ForecastPanel'
 import { AccountingLedgerTab }   from '@/components/finances/AccountingLedgerTab'
 import { DebtsLoansTab }         from '@/components/finances/DebtsLoansTab'
-import { ProcurementWorkspace }  from '@/components/finances/ProcurementWorkspace'
+import { ProcurementWorkspace, PROCUREMENT_TABS } from '@/components/finances/ProcurementWorkspace'
 import { formatMWK }             from '@shared/constants/malawi'
 import { Banknote, TrendingDown, TrendingUp, PieChart } from 'lucide-react'
 import { ModuleTabs }            from '@/components/shared/ModuleTabs'
@@ -232,6 +232,8 @@ function FinancesContent() {
   // resolves to 'payroll' rather than the invoices tab it can't open.
   const fallbackTab: Tab = isHRPayrollViewer ? 'payroll' : 'invoices'
   const initialTab: Tab = isVisibleLeaf(tabParam) ? tabParam : fallbackTab
+  const ptabParam = searchParams.get('ptab')
+  const procurementTab = PROCUREMENT_TABS.find((t) => t === ptabParam)
 
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)
 
@@ -353,7 +355,14 @@ function FinancesContent() {
       {currentLeaf === 'payroll'      && <PayrollTab />}
       {currentLeaf === 'budget'       && <BudgetTab        academicYear={YEAR} term={TERM} />}
       {currentLeaf === 'windows'      && <BudgetWindowsPanel academicYear={YEAR} term={TERM} />}
-      {currentLeaf === 'procurement'  && <ProcurementWorkspace />}
+      {currentLeaf === 'procurement'  && (
+        // ?ptab= lets a report link straight to the matching procurement list; keyed so a
+        // changed link re-opens on that list instead of keeping the previous one.
+        <ProcurementWorkspace
+          key={procurementTab ?? 'default'}
+          {...(procurementTab ? { initialTab: procurementTab } : {})}
+        />
+      )}
       {currentLeaf === 'feeStructure'        && <FeeStructureTab        academicYear={YEAR} />}
       {currentLeaf === 'financeFeeStructure' && <FinanceFeeStructureTab academicYear={YEAR} term={TERM} />}
       {currentLeaf === 'bulkInvoiceGenerator' && <BulkInvoiceGenerator key={`${YEAR}-${TERM}`} />}
@@ -396,4 +405,4 @@ function SummaryCard({
       </div>
     </div>
   )
-}
+}

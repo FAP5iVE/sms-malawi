@@ -33,7 +33,6 @@ import {
   useRecordStaffPlacement,
   usePlacementCatalogue,
 } from '@/hooks/usePlacements'
-import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { PlacementStatusBadge } from '@/components/placements/PlacementStatusBadge'
 import { groupProgramsByFaculty, formatPrerequisites } from '@/lib/placementCatalogueHelpers'
 import type { ApiPlacementEligibleStudent } from '@shared/types/api'
@@ -52,9 +51,11 @@ function nextIntakeYear(academicYear: string): string {
 
 export function StaffPlacementEntryPanel() {
   // The school's stored current year (SystemSettings), never a literal.
-  // [UNIVERSAL PERIOD FILTER] The year follows the app-wide header filter; this
-  // panel's own year select writes through to it.
-  const { academicYear: effectiveYear, setAcademicYear } = useEffectiveViewingPeriod()
+  // [UNIVERSAL PERIOD FILTER] The year comes ONLY from the app-wide header
+  // filter. The year select this panel used to carry wrote through to it (picking
+  // a year here already moved the whole app), so it was a second control for one
+  // value; it is now a read-only label.
+  const { academicYear: effectiveYear } = useEffectiveViewingPeriod()
   const { data: catalogue = [] } = usePlacementCatalogue()
 
   const { data: cohort = [], isLoading, isError, error } = useEligibleCohort(effectiveYear)
@@ -153,11 +154,9 @@ export function StaffPlacementEntryPanel() {
             <h3 className="font-heading font-semibold text-base">
               Staff Official Placement Entry (NCHE Harmonized Gazette)
             </h3>
-            <AcademicYearSelect
-              value={effectiveYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              className="border border-base rounded-xl px-3 py-1.5 text-sm bg-page"
-            />
+            <span className="text-xs text-muted" aria-label="Academic year shown">
+              Intake {effectiveYear}
+            </span>
           </div>
           <p className="text-xs text-muted mt-0.5">
             Cross-reference the published NCHE Selection List with our school cohort and register

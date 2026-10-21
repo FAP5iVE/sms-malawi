@@ -19,9 +19,9 @@ import { Modal } from '@/components/shared/Modal'
 function n(value: number | string | null | undefined) { return Number(value ?? 0) }
 function humanize(value: string) { return value.replace(/_/g, ' ').toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()) }
 
-export function InventoryOperationsTab() {
-  const [search, setSearch] = useState('')
-  const [lowStock, setLowStock] = useState(false)
+export function InventoryOperationsTab({ initialSearch = '', initialLowStock = false }: { initialSearch?: string; initialLowStock?: boolean } = {}) {
+  const [search, setSearch] = useState(initialSearch)
+  const [lowStock, setLowStock] = useState(initialLowStock)
   const [selected, setSelected] = useState<InventoryItem | null>(null)
   const [operation, setOperation] = useState<'receive' | 'issue' | 'transfer' | 'adjust' | null>(null)
   const [editing, setEditing] = useState<InventoryItem | null>(null)

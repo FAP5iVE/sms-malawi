@@ -45,7 +45,9 @@ import { ListCard } from '@/components/shared/ListCard'
 import { useLeaveRequests, useUpcomingContractExpiries } from '@/hooks/useHR'
 import { useHrOverview, useHrAttention } from '@/hooks/reporting/useHrReporting'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
-import { DashboardAttention, DashboardKpis } from './DashboardReport'
+import { DashboardAttention } from './DashboardReport'
+import { PrimaryOverviewKpis, ReportLinks, SecondaryKpis } from './DashboardSections'
+import type { ReportLink } from './DashboardSections'
 import type { QuickAction } from '@/components/shared/QuickActions'
 import type { ApiLeaveRequest, ApiContractAlert } from '@shared/types/api'
 
@@ -88,6 +90,18 @@ const CONTRACT_ALERT_DAYS = 60
 /** Msec in a day — for the "who is off this week" leave-window check. */
 const DAY_MS = 24 * 60 * 60 * 1000
 
+/** Lead with headcount, absence and the two decisions HR is waiting on; the rest sit in "More figures". */
+const PREFERRED = ['headcount', 'onLeaveToday', 'pendingLeave', 'expiringContracts']
+
+const REPORT_LINKS: ReportLink[] = [
+  { label: 'Overview', href: '/reports?tab=overview', description: 'Every workforce figure with its definition' },
+  { label: 'Workforce', href: '/reports?tab=workforce', description: 'Headcount by department and role' },
+  { label: 'Leave', href: '/reports?tab=leave', description: 'Requests, balances, days taken' },
+  { label: 'Contracts', href: '/reports?tab=contracts', description: 'Expiring and expired contracts' },
+  { label: 'Staff loans', href: '/reports?tab=loans', description: 'Balances and approvals' },
+  { label: 'Reviews', href: '/reports?tab=reviews', description: 'Performance review completion' },
+]
+
 export function HRDashboard() {
   const { academicYear } = useViewingPeriod()
   const overview = useHrOverview(academicYear ?? '')
@@ -96,10 +110,10 @@ export function HRDashboard() {
   // hrService.getUpcomingContractExpiries()'s header comment) that could
   // only ever show a contract expiring exactly 60 days from today. Both
   // this stat card and the widget below need a genuine "next 60 days" range.
-  const { data: contractData, isLoading: contractLoading } = useUpcomingContractExpiries(CONTRACT_ALERT_DAYS)
+  const { data: contractData, isLoading: contractLoading, isError: contractError, refetch: refetchContracts } = useUpcomingContractExpiries(CONTRACT_ALERT_DAYS)
   // "Who is off this week" — every APPROVED leave request, filtered to
   // whichever ones overlap the current week.
-  const { data: approvedLeaveData, isLoading: approvedLeaveLoading } = useLeaveRequests({ status: 'APPROVED' })
+  const { data: approvedLeaveData, isLoading: approvedLeaveLoading, isError: leaveError, refetch: refetchLeave } = useLeaveRequests({ status: 'APPROVED' })
 
   const contracts = contractData as ApiContractAlert[] | undefined
   const approvedLeave = approvedLeaveData as ApiLeaveRequest[] | undefined
@@ -122,22 +136,22 @@ export function HRDashboard() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <DashboardKpis
-        title="Workforce overview"
-        summary="Headcount, leave, contracts, staff loans and performance reviews. Each figure opens the report behind it."
+      <PrimaryOverviewKpis
+        title="Workforce at a glance"
+        summary="Headcount, who is away and the decisions waiting on you. Tap a figure to open its report."
         academicYear={academicYear}
         overview={overview}
+        preferred={PREFERRED}
         reportsHref="/reports?tab=overview"
-        showInsights
-        placeholders={8}
       />
-      <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
           title="Contract Expiry Alerts"
           sub={`Expiring in the next ${CONTRACT_ALERT_DAYS} days`}
           isLoading={contractLoading}
           isEmpty={(contracts ?? []).length === 0}
+          isError={contractError}
+          onRetry={() => void refetchContracts()}
           emptyMessage={`No contracts expiring in the next ${CONTRACT_ALERT_DAYS} days.`}
         >
           <ul className="divide-y divide-base">
@@ -161,6 +175,8 @@ export function HRDashboard() {
           sub="Who is off this week"
           isLoading={approvedLeaveLoading}
           isEmpty={offThisWeek.length === 0}
+          isError={leaveError}
+          onRetry={() => void refetchLeave()}
           emptyMessage="No staff are on approved leave this week."
         >
           <ul className="divide-y divide-base">
@@ -180,7 +196,10 @@ export function HRDashboard() {
           </ul>
         </ListCard>
       </div>
-      <DashboardAttention query={attention} title="HR attention queue" />
+      <DashboardAttention query={attention} title="HR attention queue" limit={5} />
+      <SecondaryKpis title="More figures and findings" overview={overview} preferred={PREFERRED} showInsights />
+      <QuickActions actions={QUICK_ACTIONS} compact />
+      <ReportLinks links={REPORT_LINKS} />
     </div>
   )
 }

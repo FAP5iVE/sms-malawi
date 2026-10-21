@@ -34,6 +34,7 @@ import {
 } from './hrLogic'
 import { kpi, mean, ratioPct, round, daysBetween } from '@/server/services/reporting/kpi'
 import { compact, expiryInsight, sortInsights } from '@/server/services/reporting/insights'
+import { enrichAttention, rankAttention } from './executiveLogic'
 
 const num = (v: unknown): number => {
   const n = Number(v)
@@ -438,7 +439,6 @@ export async function getHrAttention(academicYear: string): Promise<AttentionIte
     { key: 'promotions-pending', severity: 'info', label: 'Promotions awaiting approval', count: promotions.pending, href: '/hr' },
     { key: 'reviews-outstanding', severity: 'info', label: `Staff without a completed ${academicYear} review`, count: overdueReviews, href: '/reports?tab=reviews' },
   ]
-  const order = { critical: 0, watch: 1, info: 2, positive: 3 } as const
-  return items.filter((i) => (i.count ?? 0) > 0).sort((a, b) => order[a.severity] - order[b.severity])
+  return enrichAttention(rankAttention(items))
 }
 

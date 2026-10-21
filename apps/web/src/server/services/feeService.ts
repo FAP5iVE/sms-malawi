@@ -72,6 +72,7 @@ import { getSchoolBranding } from '@/server/services/notificationService'
 import * as settingsService from '@/server/services/settingsService'
 import { SETTING_KEYS } from '@shared/types/settings'
 import { withInvoiceNumber } from '@/server/services/invoiceNumberService'
+import { summariseInvoices } from '@/server/services/analytics/financeLogic'
 
 export async function checkBalanceGate(
   studentId: string,
@@ -473,33 +474,12 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
     logger.error({ event: 'accounting.payment_posting_failed', paymentId: payment.id, invoiceId: data.invoiceId, err })
   }
 
+  // Receipt generation must never roll back a committed payment — a failure is
+  // logged and the receipt is regenerated on demand the first time someone
+  // asks to preview it (see ensurePaymentReceipt / GET /payments/:id/receipt).
   let receiptKey: string | undefined
   try {
-    if (student) {
-      const [branding, receiptPrefix] = await Promise.all([
-        getSchoolBranding(),
-        settingsService.get(SETTING_KEYS.RECEIPT_PREFIX),
-      ])
-      receiptKey = await generateReceipt(
-        payment.id,
-        { id: invoice.id, studentId: invoice.studentId, academicYear: invoice.academicYear, term: invoice.term },
-        {
-          amount: Number(payment.amount),
-          method: String(payment.method),
-          reference: payment.reference ?? null,
-          recordedAt: payment.paidAt,    // Prisma field is paidAt, not recordedAt
-        },
-        { firstName: student.firstName, lastName: student.lastName, registrationNo: student.registrationNo },
-        {
-          schoolName: branding.schoolName,
-          schoolAddress: branding.schoolAddress,
-          schoolPhone: branding.schoolPhone,
-          schoolEmail: branding.schoolEmail,
-        },
-        receiptPrefix,
-      )
-      await prisma.payment.update({ where: { id: payment.id }, data: { receiptKey } })
-    }
+    receiptKey = (await ensurePaymentReceipt(payment.id)) ?? undefined
   } catch (err) {
     logger.error({ event: 'receipt.generation_failed', paymentId: payment.id, err })
   }
@@ -511,6 +491,60 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
     balance:  Number(updatedInvoice.balance),
   })
   return { payment: { ...payment, receiptKey }, invoice: updatedInvoice }
+}
+
+/**
+ * Returns the payment's receipt file id, generating (and persisting) the PDF if
+ * it doesn't exist yet. Idempotent: an existing receiptKey is returned as-is.
+ *
+ * Why this exists: receipts are rendered by headless Chromium right after the
+ * payment commits, inside a try/catch that deliberately never fails the
+ * payment. When that render failed (cold-start timeout, Chromium unavailable),
+ * Payment.receiptKey stayed null and GET /payments/:id/receipt answered
+ * "Receipt not yet generated" FOREVER — the student and finance staff could
+ * never preview it. Calling this from the route self-heals those rows.
+ *
+ * Returns null only when the payment's student can no longer be resolved.
+ */
+export async function ensurePaymentReceipt(paymentId: string): Promise<string | null> {
+  const payment = await prisma.payment.findUniqueOrThrow({
+    where: { id: paymentId },
+    include: {
+      invoice: { select: { id: true, studentId: true, academicYear: true, term: true } },
+    },
+  })
+  if (payment.receiptKey) return payment.receiptKey
+
+  const student = await prisma.student.findUnique({
+    where: { id: payment.invoice.studentId },
+    select: { firstName: true, lastName: true, registrationNo: true },
+  })
+  if (!student) return null
+
+  const [branding, receiptPrefix] = await Promise.all([
+    getSchoolBranding(),
+    settingsService.get(SETTING_KEYS.RECEIPT_PREFIX),
+  ])
+  const receiptKey = await generateReceipt(
+    payment.id,
+    payment.invoice,
+    {
+      amount: Number(payment.amount),
+      method: String(payment.method),
+      reference: payment.reference ?? null,
+      recordedAt: payment.paidAt,    // Prisma field is paidAt, not recordedAt
+    },
+    student,
+    {
+      schoolName: branding.schoolName,
+      schoolAddress: branding.schoolAddress,
+      schoolPhone: branding.schoolPhone,
+      schoolEmail: branding.schoolEmail,
+    },
+    receiptPrefix,
+  )
+  await prisma.payment.update({ where: { id: payment.id }, data: { receiptKey } })
+  return receiptKey
 }
 
 // R19: the late-payment penalty rate is an admin-configurable percentage
@@ -651,15 +685,23 @@ export async function getFinanceSummary(academicYear: string, term: number) {
     where: { academicYear, term },
     select: { totalAmount: true, paidAmount: true, balance: true },
   })
-  const totalCollected = invoices.reduce((s: number, i: { paidAmount: unknown }) => s + Number(i.paidAmount), 0)
-  const totalOutstanding = invoices.reduce((s: number, i: { balance: unknown }) => s + Number(i.balance), 0)
-  const collectionTarget = invoices.reduce((s: number, i: { totalAmount: unknown }) => s + Number(i.totalAmount), 0)
-  const collectionPercent = collectionTarget > 0 ? Math.round((totalCollected / collectionTarget) * 100) : 0
+  // Same maths as the reports overview (financeLogic.summariseInvoices), so the
+  // dashboard gauge and the report show the identical figure.
+  const s = summariseInvoices(
+    invoices.map((i) => ({ totalAmount: Number(i.totalAmount), paidAmount: Number(i.paidAmount), balance: Number(i.balance) })),
+  )
   const expenses = await prisma.expense.aggregate({
     where: { academicYear, term, status: 'APPROVED' },
     _sum: { amount: true },
   })
-  return { totalCollected, totalOutstanding, totalExpenses: Number(expenses._sum.amount ?? 0), collectionTarget, collectionPercent }
+  return {
+    totalCollected: s.collected,
+    totalOutstanding: s.outstanding,
+    totalExpenses: Number(expenses._sum.amount ?? 0),
+    collectionTarget: s.billed,
+    // null — not 0 — when nothing has been billed for the term.
+    collectionPercent: s.collectionRate,
+  }
 }
 // ─── ADD LINE TO EXISTING INVOICE ────────────────────────
 // [NEW] Append one more fee type to an EXISTING invoice -- the Invoice

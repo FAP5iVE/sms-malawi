@@ -52,6 +52,17 @@ export function PendingActionsPanel({ title = 'Pending Approvals', compactLimit 
         <div className="space-y-2" role="status" aria-label="Loading approvals">
           {[0, 1, 2].map((i) => <div key={i} className="skeleton h-12 w-full rounded-xl" />)}
         </div>
+      ) : list.isError ? (
+        <div role="alert" className="flex flex-col items-center gap-2 py-6 text-center">
+          <p className="text-sm text-muted">Pending approvals could not be loaded.</p>
+          <button
+            type="button"
+            onClick={() => void list.refetch()}
+            className="min-h-11 rounded-lg border border-base px-3 py-1.5 text-xs font-medium text-brand-navy hover:bg-page focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+          >
+            Retry
+          </button>
+        </div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-6 text-center">
           <CheckCircle2 className="h-8 w-8 text-emerald-500" aria-hidden="true" />

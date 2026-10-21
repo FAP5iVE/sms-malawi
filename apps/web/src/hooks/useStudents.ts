@@ -33,6 +33,15 @@ import type { ApiStudent, ApiStudentListResponse, ApiHighRiskStudentsResponse } 
 import type { ApiStudentDetail } from '@/server/services/studentService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { useAuthStore } from '@/store/authStore'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
+
+/** `?academicYear=&term=` for the global viewing period (risk is assessed for it). */
+function periodParams(academicYear?: string, term?: number): URLSearchParams {
+  const p = new URLSearchParams()
+  if (academicYear) p.set('academicYear', academicYear)
+  if (term) p.set('term', String(term))
+  return p
+}
 
 export function useStudents(
   filters: {
@@ -49,7 +58,10 @@ export function useStudents(
     sortDir?: 'asc' | 'desc'
   } = {}
 ) {
-  const params = new URLSearchParams()
+  // Risk badges are assessed for the GLOBAL viewing period, so the list
+  // refetches when the person switches term/year in the header.
+  const { academicYear, term } = useViewingPeriod()
+  const params = periodParams(academicYear, term)
   if (filters.status) params.set('status', filters.status)
   if (filters.classId) params.set('classId', filters.classId)
   if (filters.sex) params.set('sex', filters.sex)
@@ -61,7 +73,7 @@ export function useStudents(
     params.set('sortDir', filters.sortDir)
   }
   return useQuery({
-    queryKey: queryKeys.students.list(filters),
+    queryKey: queryKeys.students.list({ ...filters, academicYear, term }),
     queryFn: () => apiFetch<ApiStudentListResponse>(`/students?${params}`),
     enabled: filters.search === undefined || filters.search.length >= 2,
   })
@@ -76,9 +88,10 @@ export function useStudents(
  */
 export function useStudentMe() {
   const { role } = useAuthStore()
+  const { academicYear, term } = useViewingPeriod()
   return useQuery({
-    queryKey: queryKeys.students.me(),
-    queryFn:  () => apiFetch<ApiStudentDetail>('/students/me'),
+    queryKey: queryKeys.students.me({ academicYear, term }),
+    queryFn:  () => apiFetch<ApiStudentDetail>(`/students/me?${periodParams(academicYear, term)}`),
     enabled:  role === 'student',
   })
 }
@@ -92,16 +105,22 @@ export function useStudentMe() {
  * unreachable without a term average).
  */
 export function useHighRiskStudents(limit = 6) {
+  const { academicYear, term } = useViewingPeriod()
   return useQuery({
-    queryKey: queryKeys.students.atRisk(limit),
-    queryFn: () => apiFetch<ApiHighRiskStudentsResponse>(`/students/at-risk?limit=${limit}`),
+    queryKey: queryKeys.students.atRisk(limit, { academicYear, term }),
+    queryFn: () => {
+      const params = periodParams(academicYear, term)
+      params.set('limit', String(limit))
+      return apiFetch<ApiHighRiskStudentsResponse>(`/students/at-risk?${params}`)
+    },
   })
 }
 
 export function useStudent(id: string) {
+  const { academicYear, term } = useViewingPeriod()
   return useQuery({
-    queryKey: queryKeys.students.detail(id),
-    queryFn: () => apiFetch<ApiStudent>(`/students/${id}`),
+    queryKey: queryKeys.students.detail(id, { academicYear, term }),
+    queryFn: () => apiFetch<ApiStudent>(`/students/${id}?${periodParams(academicYear, term)}`),
     enabled: !!id,
   })
 }

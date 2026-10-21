@@ -3,15 +3,19 @@
 /**
  * Admin report tabs: overview, security (sign-in outcomes and anomalies),
  * sessions (usage and how sessions end), governance (audit activity by actor,
- * area and sensitivity) and adoption (who actually uses the system). Only
- * facts the platform records are reported — nothing is inferred or estimated.
+ * area and sensitivity), adoption (who actually uses the system) and
+ * operations (service health, deployments, errors, sync freshness). Only facts
+ * the platform records or can probe live are reported — nothing is inferred or
+ * estimated, and gaps in what is recorded are stated outright.
  */
 import { Chart } from '@/components/shared/chart'
 import { ChartCard } from '@/components/shared/ChartCard'
 import {
-  useAdminAttention, useAdminOverview, useAdoptionReport, useGovernanceReport, useSecurityReport, useSessionsReport,
+  useAdminAttention, useAdminOverview, useAdoptionReport, useGovernanceReport, useOperationsReport, useSecurityReport, useSessionsReport,
 } from '@/hooks/reporting/useAdminReporting'
-import type { ApiAdoptionRole, ApiGovernanceCategory } from '@shared/types/reporting-admin'
+import type {
+  ApiAdoptionRole, ApiGovernanceCategory, ApiOperationsService, ApiOperationsSync,
+} from '@shared/types/reporting-admin'
 import { formatCount, formatDate, formatPercent } from '@/lib/reportFormat'
 import { FilterBar, FilterSelect } from '../ui/ReportFilters'
 import { useReportParam } from '../ui/useReportParams'
@@ -283,6 +287,170 @@ export function AdminAdoptionTab() {
               { key: 'rate', label: 'Adoption', align: 'right', sortValue: (r) => r.activeRate, cell: (r) => formatPercent(r.activeRate), exportValue: (r) => r.activeRate },
             ]}
           />
+        </QueryState>
+      </ReportCard>
+    </PanelStack>
+  )
+}
+
+const formatDateTime = (iso: string | null | undefined): string => {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC'
+}
+
+const formatAge = (minutes: number | null): string => {
+  if (minutes === null) return '—'
+  if (minutes < 60) return `${minutes} min ago`
+  if (minutes < 48 * 60) return `${Math.round(minutes / 60)} h ago`
+  return `${Math.round(minutes / 1440)} days ago`
+}
+
+const SERVICE_TEXT: Record<ApiOperationsService['status'], string> = { ok: 'OK', degraded: 'Degraded', down: 'Down' }
+const SYNC_TEXT: Record<ApiOperationsSync['status'], string> = {
+  ok: 'Up to date', stale: 'Out of date', failing: 'Last refresh failed', never: 'Never refreshed',
+}
+
+/** Shown in place of a section the signed-in role is not permitted to see. */
+function RestrictedNote({ what }: { what: string }) {
+  return (
+    <p className="text-sm text-muted">
+      {what} is not shown because your role does not include that permission.
+    </p>
+  )
+}
+
+export function AdminOperationsTab() {
+  const q = useOperationsReport()
+  const d = q.data
+  const services = d?.services ?? null
+  const degraded = services ? services.filter((s) => s.status !== 'ok').length : null
+  const dep = d?.deployments ?? null
+  const err = d?.errors ?? null
+  const iss = d?.issues ?? null
+  return (
+    <PanelStack>
+      <ReportKpiStrip
+        isLoading={q.isLoading}
+        kpis={d ? [
+          kpiTile('services', 'Services needing attention', degraded, 'count', 'Services not reporting OK in the live probe made when this page loaded.', degraded === null ? 'neutral' : degraded > 0 ? 'critical' : 'healthy', services ? `${services.length} checked` : undefined),
+          kpiTile('deploy', 'Failed deployments', dep && dep.configured ? dep.failureRate : null, 'percent', 'Failed ÷ finished (ready + failed) among the deployments the platform has recorded. N/A when none have finished.', dep?.failureRate != null && dep.failureRate >= 25 ? 'watch' : 'neutral', dep && dep.configured ? `${dep.failed} of ${dep.recorded} recorded` : undefined),
+          kpiTile('errors', 'Runtime errors (24 h)', err && err.configured ? err.last24h : null, 'count', 'Error and fatal runtime log entries recorded in the last 24 hours. Only entries the platform has synced are counted.', err && err.last24h > 0 ? 'watch' : 'neutral'),
+          kpiTile('issues', 'Unresolved error issues', iss && iss.configured ? iss.unresolved : null, 'count', 'Unresolved issues in error monitoring, excluding uptime incidents.', iss && iss.activeOutages > 0 ? 'critical' : iss && iss.unresolved > 0 ? 'watch' : 'neutral', iss && iss.activeOutages > 0 ? `${iss.activeOutages} active outage${iss.activeOutages === 1 ? '' : 's'}` : undefined),
+          kpiTile('backlog', 'Pending approvals', d.backlog.pending, 'count', 'Approval requests still waiting for a decision.', d.backlog.pastExpiry > 0 ? 'watch' : 'neutral', d.backlog.oldestPendingDays === null ? undefined : `Oldest ${d.backlog.oldestPendingDays} day${d.backlog.oldestPendingDays === 1 ? '' : 's'}`),
+        ] : undefined}
+      />
+
+      <ReportCard title="Service health" sub="Live check made when this page loaded">
+        <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
+          {services ? (
+            <ReportTable<ApiOperationsService>
+              rows={services}
+              rowKey={(r) => r.name}
+              exportLabel="Service health"
+              emptyMessage="No services were checked."
+              columns={[
+                { key: 'name', label: 'Service', sortValue: (r) => r.name },
+                { key: 'status', label: 'Status', sortValue: (r) => r.status, cell: (r) => SERVICE_TEXT[r.status], exportValue: (r) => SERVICE_TEXT[r.status] },
+                { key: 'latency', label: 'Response', align: 'right', sortValue: (r) => r.latencyMs ?? -1, cell: (r) => (r.latencyMs === null ? '—' : `${r.latencyMs} ms`), exportValue: (r) => r.latencyMs ?? '' },
+                { key: 'details', label: 'Details', hideOnMobile: true, sortValue: (r) => r.details ?? '', cell: (r) => r.details ?? '—', exportValue: (r) => r.details ?? '' },
+              ]}
+            />
+          ) : (
+            <RestrictedNote what="Live service health" />
+          )}
+        </QueryState>
+      </ReportCard>
+
+      <ChartCard title="Runtime errors by hour" sub="Last 24 hours, from synced runtime logs" isLoading={q.isLoading} height={240}>
+        {err && err.configured ? (
+          <Chart type="bar" data={err.byHour.map((h) => ({ x: h.label, count: h.count }))} series={[{ key: 'count', label: 'Errors' }]} height={240} emptyStateMessage="No runtime errors recorded." ariaLabel="Runtime errors per hour over the last 24 hours" />
+        ) : (
+          <p className="text-sm text-muted">{err ? 'Deployment monitoring is not configured, so runtime errors are not recorded.' : 'Runtime errors are not shown because your role does not include monitoring access.'}</p>
+        )}
+      </ChartCard>
+
+      <TwoUp>
+        <ReportCard title="Deployments" sub="Most recent recorded">
+          <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
+            {dep && dep.configured ? (
+              <ReportTable
+                rows={dep.recent}
+                rowKey={(r) => r.id}
+                exportLabel="Deployments"
+                emptyMessage="No deployments recorded yet."
+                columns={[
+                  { key: 'at', label: 'Started', sortValue: (r) => r.at, cell: (r) => formatDateTime(r.at), exportValue: (r) => r.at },
+                  { key: 'target', label: 'Target', hideOnMobile: true, sortValue: (r) => r.target ?? '', cell: (r) => r.target ?? 'preview', exportValue: (r) => r.target ?? 'preview' },
+                  { key: 'state', label: 'State', sortValue: (r) => r.state, cell: (r) => r.state.toLowerCase().replace(/_/g, ' ') + (r.error ? ` — ${r.error}` : ''), exportValue: (r) => r.state },
+                ]}
+              />
+            ) : (
+              <p className="text-sm text-muted">{dep ? 'Deployment monitoring is not configured.' : 'Deployments are not shown because your role does not include monitoring access.'}</p>
+            )}
+            {dep && dep.configured && (
+              <p className="mt-2 text-xs text-muted">
+                Last successful production deployment: {formatDateTime(dep.lastSuccessfulProductionAt)}
+              </p>
+            )}
+          </QueryState>
+        </ReportCard>
+        <ReportCard title="Routes with the most errors" sub="Last 7 days, ids grouped">
+          <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
+            {err && err.configured ? (
+              <ReportTable
+                rows={err.topPaths}
+                rowKey={(r) => r.path}
+                exportLabel="Routes with errors"
+                emptyMessage="No runtime errors recorded in this window."
+                columns={[
+                  { key: 'path', label: 'Route', sortValue: (r) => r.path },
+                  { key: 'n', label: 'Errors', align: 'right', sortValue: (r) => r.count, cell: (r) => formatCount(r.count) },
+                ]}
+              />
+            ) : (
+              <p className="text-sm text-muted">Not available.</p>
+            )}
+            {err && err.configured && (
+              <p className="mt-2 text-xs text-muted">
+                {err.last7d.toLocaleString('en-US')} errors in 7 days. Logs are only kept once synced — earliest recorded: {formatDateTime(err.oldestRecordedAt)}.
+              </p>
+            )}
+          </QueryState>
+        </ReportCard>
+      </TwoUp>
+
+      <ReportCard title="Is this data current?" sub="When each monitoring source last refreshed">
+        <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
+          {d?.sync ? (
+            <ReportTable<ApiOperationsSync>
+              rows={d.sync}
+              rowKey={(r) => r.key}
+              exportLabel="Monitoring data freshness"
+              emptyMessage="No monitoring sources."
+              columns={[
+                { key: 'label', label: 'Source', sortValue: (r) => r.label },
+                { key: 'status', label: 'Status', sortValue: (r) => r.status, cell: (r) => SYNC_TEXT[r.status] + (r.lastError ? ` — ${r.lastError}` : ''), exportValue: (r) => SYNC_TEXT[r.status] },
+                { key: 'age', label: 'Last refresh', align: 'right', sortValue: (r) => r.ageMinutes ?? Number.MAX_SAFE_INTEGER, cell: (r) => formatAge(r.ageMinutes), exportValue: (r) => r.lastAttemptAt ?? '' },
+                { key: 'mode', label: 'Refreshes', hideOnMobile: true, sortValue: (r) => r.mode, cell: (r) => (r.mode === 'scheduled' ? 'On a schedule' : 'When monitoring is opened'), exportValue: (r) => r.mode },
+              ]}
+            />
+          ) : (
+            <RestrictedNote what="Monitoring data freshness" />
+          )}
+        </QueryState>
+      </ReportCard>
+
+      <ReportCard title="What this report cannot show" sub="Not recorded by the system, so nothing is estimated">
+        <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
+          <ul className="space-y-2 text-sm">
+            {(d?.notRecorded ?? []).map((n) => (
+              <li key={n.key}>
+                <span className="font-medium text-brand-navy">{n.label}.</span> <span className="text-muted">{n.reason}</span>
+              </li>
+            ))}
+          </ul>
         </QueryState>
       </ReportCard>
     </PanelStack>

@@ -59,7 +59,7 @@ function Comparison({ c, unit }: { c: ReportKpiComparison; unit: ReportKpi['unit
   )
 }
 
-export function KpiTile({ kpi }: { kpi: ReportKpi }) {
+export function KpiTile({ kpi, showDescription = false }: { kpi: ReportKpi; showDescription?: boolean }) {
   const body = (
     <div
       className={cn(
@@ -81,6 +81,7 @@ export function KpiTile({ kpi }: { kpi: ReportKpi }) {
       </p>
       {kpi.subLabel ? <p className="text-xs text-muted">{kpi.subLabel}</p> : null}
       {kpi.comparison ? <Comparison c={kpi.comparison} unit={kpi.unit} /> : null}
+      {showDescription ? <p className="mt-auto line-clamp-3 pt-1 text-[11px] leading-snug text-muted">{kpi.description}</p> : null}
     </div>
   )
   return kpi.href ? (
@@ -97,11 +98,14 @@ export function ReportKpiStrip({
   isLoading = false,
   placeholders = 6,
   className,
+  showDescription = false,
 }: {
   kpis: readonly ReportKpi[] | undefined
   isLoading?: boolean
   placeholders?: number
   className?: string
+  /** Print each KPI's definition under its value (otherwise it is a tooltip / screen-reader label only). */
+  showDescription?: boolean
 }) {
   const grid = 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6'
   if (isLoading) {
@@ -121,7 +125,7 @@ export function ReportKpiStrip({
   return (
     <div className={cn(cols, className)}>
       {kpis.map((k) => (
-        <KpiTile key={k.key} kpi={k} />
+        <KpiTile key={k.key} kpi={k} showDescription={showDescription} />
       ))}
     </div>
   )

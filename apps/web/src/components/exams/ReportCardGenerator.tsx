@@ -73,7 +73,7 @@ import { apiFetch }                     from '@/lib/api-client'
 import { openPdfPreview }               from '@/lib/pdfPreview'
 import type { BatchGenerationResult }   from '@/server/services/reportCardService'
 import { useClasses }                   from '@/hooks/useClasses'
-import { usePublicSchoolInfo }          from '@/hooks/usePublic'
+import { useEffectiveViewingPeriod }     from '@/hooks/useViewingPeriod'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROGRESS BAR
@@ -203,17 +203,20 @@ export function ReportCardGenerator() {
   const motionEnabled = useMotionEnabled()
 
   const { data: classes = [] } = useClasses()
-  const { data: schoolInfo }   = usePublicSchoolInfo()
+  // Year AND term come from the GLOBAL viewing period. This generator used to
+  // keep its own term select (defaulting to Term 1 no matter which term the
+  // page was showing) and a free-text year box — so "Generate All" could quietly
+  // build the wrong term's cards. The Exams page subtitle and the header
+  // switcher now decide which period is generated; the panel states it below.
+  const { academicYear: effectiveAcademicYear, term: viewingTerm } = useEffectiveViewingPeriod()
+  const term = viewingTerm as 1 | 2 | 3
 
   const [classId,      setClassId]      = useState('')
-  const [term,         setTerm]         = useState<1 | 2 | 3>(1)
-  const [academicYear, setAcademicYear] = useState('')
   const [rows,         setRows]         = useState<StudentRow[]>([])
   const [generating,   setGenerating]   = useState(false)
   const [error,        setError]        = useState<string | null>(null)
   const [done,         setDone]         = useState(false)
 
-  const effectiveAcademicYear = academicYear || schoolInfo?.currentYear || ''
 
   const doneCount   = rows.filter((r) => r.rowStatus === 'done').length
   const failedCount = rows.filter((r) => r.rowStatus === 'failed').length
@@ -329,30 +332,12 @@ export function ReportCardGenerator() {
         </div>
 
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-            Term
-          </label>
-          <select
-            value={term}
-            onChange={(e) => setTerm(parseInt(e.target.value) as 1 | 2 | 3)}
-            className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-          >
-            <option value={1}>Term 1</option>
-            <option value={2}>Term 2</option>
-            <option value={3}>Term 3</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-            Academic Year
-          </label>
-          <input
-            value={effectiveAcademicYear}
-            onChange={(e) => setAcademicYear(e.target.value)}
-            placeholder="e.g. 2025/2026"
-            className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
-          />
+          <p className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+            Period
+          </p>
+          <p className="min-h-[44px] flex items-center text-sm text-body">
+            Term {term} · {effectiveAcademicYear}
+          </p>
         </div>
 
         {canGenerate && (
@@ -420,7 +405,7 @@ export function ReportCardGenerator() {
 
       {rows.length === 0 && !generating && (
         <div className="text-center py-16 text-muted text-sm border border-dashed border-base rounded-xl">
-          Select a class and term, then click Generate All to create report cards.
+          Select a class, then click Generate All to create report cards for the period shown above.
         </div>
       )}
     </div>

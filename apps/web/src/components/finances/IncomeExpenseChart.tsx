@@ -38,6 +38,7 @@ import { Chart } from '@/components/shared/chart'
 import type { ChartDataPoint } from '@/components/shared/chart'
 import { ChartCard } from '@/components/shared/ChartCard'
 import { useFinanceCashFlow } from '@/hooks/useAnalytics'
+import { ReportError } from '@/components/reports/ui/ReportStates'
 
 interface IncomeExpenseChartProps {
   academicYear: string
@@ -48,7 +49,7 @@ export function IncomeExpenseChart({
   academicYear,
   periodLoading = false,
 }: IncomeExpenseChartProps) {
-  const { data: rows = [], isLoading } = useFinanceCashFlow(academicYear)
+  const { data: rows = [], isLoading, isError, refetch } = useFinanceCashFlow(academicYear)
   const loading = periodLoading || isLoading
 
   const data: ChartDataPoint[] = rows.map((r) => ({
@@ -65,6 +66,9 @@ export function IncomeExpenseChart({
       isLoading={loading}
       height={260}
     >
+      {isError ? (
+        <ReportError message="Income and expenses could not be loaded." onRetry={() => void refetch()} />
+      ) : (
       <Chart
         type="combo"
         data={data}
@@ -78,6 +82,7 @@ export function IncomeExpenseChart({
         emptyStateMessage="No income or expense data for this year yet."
         ariaLabel={`Income versus expenses by term for ${academicYear}, showing revenue, expenses and net`}
       />
+      )}
     </ChartCard>
   )
 }

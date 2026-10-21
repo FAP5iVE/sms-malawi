@@ -6,13 +6,14 @@
  *  - Columns declare how to render (`cell`), sort (`sortValue`) and export
  *    (`exportValue`, defaulting to sortValue) a value.
  *  - Passing `exportLabel` registers the table with the report export toolbar
- *    so what the user sees is what they can download.
+ *    so what the user sees is what they can download: every row (not just the
+ *    visible page), in the on-screen sort order.
  *  - Rows may be clickable (`rowHref`) so a table row drills into the entity.
  *  - Long tables show `pageSize` rows with a "Show more" control; sorting
  *    applies to the whole data set, not just the visible page.
  */
 import Link from 'next/link'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import type { CsvCell } from '@/lib/csv'
 import { cn } from '@/lib/utils'
@@ -48,6 +49,7 @@ export function ReportTable<T>({
   rowKey,
   rowHref,
   exportLabel,
+  exportNote,
   caption,
   emptyMessage = 'No records for this selection.',
   pageSize = 15,
@@ -59,6 +61,8 @@ export function ReportTable<T>({
   rowKey: (row: T, index: number) => string
   rowHref?: (row: T) => string | undefined
   exportLabel?: string
+  /** Set when `rows` is not the whole result (the server capped it): stated in the export menu, workbook and PDF. */
+  exportNote?: string
   caption?: string
   emptyMessage?: string
   pageSize?: number
@@ -68,10 +72,18 @@ export function ReportTable<T>({
   const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(defaultSort ?? null)
   const [visible, setVisible] = useState(pageSize)
 
+  // Panels declare `columns` inline, so their identity changes every render; the sort
+  // reads them through a ref so `sorted` (which the export registry depends on) only
+  // changes when the rows or the sort do.
+  const columnsRef = useRef(columns)
+  useEffect(() => {
+    columnsRef.current = columns
+  })
+
   const sorted = useMemo(() => {
     const data = rows ?? []
     if (!sort) return data
-    const col = columns.find((c) => c.key === sort.key)
+    const col = columnsRef.current.find((c) => c.key === sort.key)
     if (!col?.sortValue) return data
     const dir = sort.direction === 'asc' ? 1 : -1
     const get = col.sortValue
@@ -82,16 +94,18 @@ export function ReportTable<T>({
       if (a === null || a === undefined || b === null || b === undefined) return compareValues(a, b)
       return compareValues(a, b) * dir
     })
-  }, [rows, columns, sort])
+  }, [rows, sort])
 
+  // Exports every row, in the order the user sees them (sorted), not just the rows on screen.
   useExportable(
     exportLabel ?? null,
-    exportLabel ? rows : undefined,
+    exportLabel ? sorted : undefined,
     columns.map((c) => ({
       label: c.label,
       value: (row: T): CsvCell =>
         c.exportValue ? c.exportValue(row) : (c.sortValue?.(row) as CsvCell) ?? '',
     })),
+    exportNote,
   )
 
   if (!rows || rows.length === 0) return <ReportEmpty message={emptyMessage} />

@@ -55,6 +55,13 @@ import { getAttendanceSummaryForTerm, getTermDateRange } from '@/server/services
 import { getPassingGrades, isPassingClassification, isDistinctionGrade, type ExamTypeKey } from '@/server/services/gradeService'
 import { findUniversity } from '@shared/constants/universities'
 import type { ApiPayrollBreakdownPoint } from '@shared/types/api'
+import { loadBudgetPosition } from '@/server/services/analytics/financeAnalytics'
+import {
+  PAYROLL_COUNTED_STATUSES,
+  groupOutstandingByClass,
+  payrollForTerm,
+  type PayrollRunPeriod,
+} from '@/server/services/analytics/financeLogic'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -80,9 +87,14 @@ export interface CategoryBreakdown {
 export interface ClassPerformanceStat {
   className: string
   form: number
+  /** Students on the class roster. */
   studentCount: number
-  passRate: number
-  average: number
+  /** Students with a computed term result (0 → nothing to measure yet). */
+  assessed: number
+  /** Null — never 0 — when the class has no computed results. A real 0 means nobody passed. */
+  passRate: number | null
+  /** Null — never 0 — when the class has no computed results. */
+  average: number | null
   term: number
 }
 
@@ -218,8 +230,12 @@ export interface BudgetVsActualRow {
   /** ExpenseCategory enum member — the real Budget-to-Expense join key. */
   category: ExpenseCategory
   allocated: number
+  /** Live APPROVED expenses. */
   spent: number
-  utilisation: number
+  /** spent ÷ allocated (percent); null when nothing is allocated. */
+  utilisation: number | null
+  /** Spend in a category that has no budget in scope. */
+  unbudgeted: boolean
 }
 
 export interface ScholarshipSummaryRow {
@@ -301,55 +317,17 @@ function monthLabel(d: Date): string {
 }
 
 /**
- * [R14] The calendar months each Malawian school term spans. A Malawi
- * academic year runs September–July, so Term 1 falls in the FIRST calendar
- * year named in an academicYear string ("2025/2026" → 2025) while Terms 2
- * and 3 fall in the second (→ 2026).
- */
-const TERM_MONTHS: Readonly<Record<number, readonly number[]>> = {
-  1: [9, 10, 11, 12],
-  2: [1, 2, 3, 4],
-  3: [5, 6, 7],
-}
-
-interface PayrollRunPeriod {
-  month: number
-  year: number
-  totalNet: unknown
-}
-
-/**
- * [R14] Total completed payroll (PayrollRun.totalNet) falling inside a given
- * academic-year term.
+ * Every payroll run that is real payroll — the one source both cash-flow and
+ * financial-summary payroll figures are derived from.
  *
- * Extracted as a single shared helper because getFinanceCashFlow() and
- * getHighRankFinancialSummary() answer the SAME business question ("what did
- * we spend on payroll this term?") for two different roles — and before R14
- * only the first of them computed it at all, while the second returned a
- * hardcoded 0. Two independent copies of this arithmetic is exactly how the
- * two roles' answers drifted apart in the first place, so there is now one.
+ * Was `status: 'COMPLETED'` only. A run is COMPLETED just transiently, on its
+ * way COMPLETED → PENDING_APPROVAL → APPROVED → LOCKED, so that filter dropped
+ * every approved month and overstated net cash flow. It now uses the same
+ * statuses as the payroll trend (see PAYROLL_COUNTED_STATUSES).
  */
-function payrollForTerm(
-  runs: readonly PayrollRunPeriod[],
-  academicYear: string,
-  term: number,
-): number {
-  const firstYear = Number.parseInt(academicYear.split('/')[0] ?? '', 10)
-  if (Number.isNaN(firstYear)) return 0
-
-  const months = TERM_MONTHS[term] ?? []
-  const calendarYear = term === 1 ? firstYear : firstYear + 1
-
-  return runs
-    .filter((r) => r.year === calendarYear && months.includes(r.month))
-    .reduce((sum, r) => sum + Number(r.totalNet), 0)
-}
-
-/** [R14] Every COMPLETED payroll run — the one source both cash-flow and
- *  financial-summary payroll figures are derived from. */
 async function completedPayrollRuns(): Promise<PayrollRunPeriod[]> {
   return prisma.payrollRun.findMany({
-    where: { status: 'COMPLETED' },
+    where: { status: { in: [...PAYROLL_COUNTED_STATUSES] } },
     select: { month: true, year: true, totalNet: true },
   })
 }
@@ -542,18 +520,23 @@ export async function getHighRankClassComparison(
   ])
 
   return classes
-    .map((cls) => {
+    .map((cls): ClassPerformanceStat => {
       const clsResults = termResults.filter((r) => r.classId === cls.id)
+      const assessed = clsResults.length
+      // A class with no computed results has no pass rate or average — report
+      // null so "not computed yet" is never mistaken for a measured 0%.
       return {
         className: cls.name,
         form: cls.form,
         studentCount: cls._count.students,
-        passRate: pct(clsResults.filter((r) => r.passStatus).length, clsResults.length),
-        average: avg(clsResults.map((r) => Number(r.average))),
+        assessed,
+        passRate: assessed > 0 ? pct(clsResults.filter((r) => r.passStatus).length, assessed) : null,
+        average: assessed > 0 ? avg(clsResults.map((r) => Number(r.average))) : null,
         term,
       }
     })
-    .sort((a, b) => b.average - a.average)
+    // Highest average first; classes with nothing computed sink to the bottom.
+    .sort((a, b) => (b.average ?? -1) - (a.average ?? -1))
 }
 
 /**
@@ -733,34 +716,8 @@ export async function getHighRankEnrollmentTrend(months = 12): Promise<Enrollmen
 export async function getHighRankFinancialSummary(
   academicYear: string,
 ): Promise<CashFlowRow[]> {
-  const payrollRuns = await completedPayrollRuns()
-
-  return Promise.all(
-    [1, 2, 3].map(async (term) => {
-      const [invoices, expenses] = await Promise.all([
-        prisma.invoice.aggregate({
-          _sum: { paidAmount: true },
-          where: { academicYear, term },
-        }),
-        prisma.expense.aggregate({
-          _sum: { amount: true },
-          where: { academicYear, term, status: 'APPROVED' },
-        }),
-      ])
-      const revenue = Number(invoices._sum.paidAmount ?? 0)
-      const expenseTotal = Number(expenses._sum.amount ?? 0)
-      const payroll = payrollForTerm(payrollRuns, academicYear, term)
-
-      return {
-        academicYear,
-        term,
-        revenue: Math.round(revenue),
-        expenses: Math.round(expenseTotal),
-        payroll: Math.round(payroll),
-        net: Math.round(revenue - expenseTotal - payroll),
-      }
-    }),
-  )
+  // One implementation: the two roles can never see different answers again.
+  return getFinanceCashFlow(academicYear)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -840,7 +797,6 @@ export async function getFinanceOutstandingByClass(
       where: {
         academicYear,
         ...(term !== undefined ? { term } : {}),
-        status: { in: ['UNPAID', 'PARTIAL', 'OVERDUE'] },
         balance: { gt: 0 },
       },
       select: {
@@ -851,25 +807,13 @@ export async function getFinanceOutstandingByClass(
     }),
   ])
 
-  const classMap = new Map(classes.map((c) => [c.id, c.name]))
-  const breakdown: Record<string, { outstanding: number; students: Set<string> }> = {}
-
-  for (const inv of invoices) {
-    const classId = inv.student.classId
-    if (!classId) continue
-    const bucket = breakdown[classId] ?? (breakdown[classId] = { outstanding: 0, students: new Set() })
-    bucket.outstanding += Number(inv.balance)
-    bucket.students.add(inv.studentId)
-  }
-
-  return Object.entries(breakdown)
-    .map(([classId, b]) => ({
-      classId,
-      className: classMap.get(classId) ?? classId,
-      outstanding: Math.round(b.outstanding),
-      studentCount: b.students.size,
-    }))
-    .sort((a, b) => b.outstanding - a.outstanding)
+  // Students without a class (or in a class outside this year) are kept in an
+  // explicit "No class" row so this report's total always equals the finance
+  // overview's outstanding balance — never silently dropped.
+  return groupOutstandingByClass(
+    invoices.map((i) => ({ studentId: i.studentId, balance: Number(i.balance), classId: i.student.classId })),
+    new Map(classes.map((c) => [c.id, c.name])),
+  )
 }
 
 /**
@@ -922,38 +866,16 @@ export async function getFinanceBudgetVsActual(
   academicYear: string,
   term?: number,
 ): Promise<BudgetVsActualRow[]> {
-  const [budgets, expenses] = await Promise.all([
-    prisma.budget.groupBy({
-      by: ['category'],
-      _sum: { allocated: true },
-      where: { academicYear, ...(term !== undefined ? { term } : {}) },
-      orderBy: { category: 'asc' },
-    }),
-    prisma.expense.groupBy({
-      by: ['category'],
-      _sum: { amount: true },
-      where: {
-        academicYear,
-        ...(term !== undefined ? { term } : {}),
-        status: 'APPROVED',
-      },
-    }),
-  ])
-
-  const spentByCategory = new Map<ExpenseCategory, number>(
-    expenses.map((e) => [e.category, Number(e._sum.amount ?? 0)]),
-  )
-
-  return budgets.map((b) => {
-    const allocated = Number(b._sum.allocated ?? 0)
-    const spent = spentByCategory.get(b.category) ?? 0
-    return {
-      category: b.category,
-      allocated: Math.round(allocated),
-      spent: Math.round(spent),
-      utilisation: pct(spent, allocated),
-    }
-  })
+  // Same live, category-level position the finance overview's "Budget used"
+  // KPI and the attention queue use (see financeLogic.budgetPosition).
+  const position = await loadBudgetPosition(academicYear, term ?? null)
+  return position.rows.map((r) => ({
+    category: r.category as ExpenseCategory,
+    allocated: Math.round(r.allocated),
+    spent: Math.round(r.spent),
+    utilisation: r.utilisation,
+    unbudgeted: r.unbudgeted,
+  }))
 }
 
 /**
@@ -1005,7 +927,7 @@ export async function getFinanceCashFlow(academicYear: string): Promise<CashFlow
 // COMPLETED alone silently excludes almost every real month from both
 // functions below the moment it's approved. PROCESSING (mid-generation)
 // and FAILED are the only statuses genuinely worth excluding.
-const PAYROLL_TREND_STATUSES = ['COMPLETED', 'PENDING_APPROVAL', 'APPROVED', 'LOCKED'] as const
+const PAYROLL_TREND_STATUSES = PAYROLL_COUNTED_STATUSES
 
 /**
  * Payroll trend — monthly totalNet for the last N months.
@@ -2059,4 +1981,4 @@ export async function getPlacementAnalytics(academicYear: string): Promise<Place
     genderBreakdown: { male, female },
     topUniversities,
   }
-}
+}

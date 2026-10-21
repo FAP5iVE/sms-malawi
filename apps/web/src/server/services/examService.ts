@@ -194,9 +194,18 @@ export async function listExams(classId: string | undefined, academicYear: strin
   const where: Prisma.ExamWhereInput = { academicYear, term, ...(classId ? { classId } : {}) }
 
   // AC-3: a student sees only their OWN class's RESULTS_RELEASED exams.
+  // The Exams page enforces the same rule in the UI (no class picker for
+  // students; the tab is hidden for a non-active student with no class) but
+  // THIS is the guard that matters: it holds for any direct API call too.
+  //   • no class assigned            -> nothing
+  //   • asks for a DIFFERENT class   -> nothing (previously the param was
+  //                                     silently overwritten, which hid the
+  //                                     mistake and made the endpoint look
+  //                                     like it honoured the filter)
   if (actor.role === 'student') {
     const me = await prisma.student.findFirst({ where: { firebaseUid: actor.uid }, select: { classId: true } })
     if (!me?.classId) return []
+    if (classId && classId !== me.classId) return []
     where.classId = me.classId
     where.status = 'RESULTS_RELEASED'
   }

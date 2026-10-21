@@ -64,6 +64,7 @@ import { useReactToPrint }   from 'react-to-print'
 import { Printer, X }        from 'lucide-react'
 import { useGradingScales }  from '@/hooks/useSettings'
 import type { GradingScaleRow } from '@/hooks/useSettings'
+import { DEFAULT_SCHOOL_LOGO_DATA_URI } from '@/lib/schoolLogoData'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -200,15 +201,6 @@ function gradeColor(row: GradingScaleRow | undefined): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SCHOOL INITIALS — fallback when no logo has been uploaded yet.
-// ─────────────────────────────────────────────────────────────────────────────
-
-function schoolInitials(schoolName: string): string {
-  const words = schoolName.trim().split(/\s+/).filter(Boolean)
-  return words.slice(0, 3).map((w) => w[0]!.toUpperCase()).join('')
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -271,45 +263,29 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
           textAlign: 'center',
         }}
       >
-        {/* School crest/logo — real image when uploaded (settingsService.
-            getIdentitySettings().schoolLogoUrl), initials fallback otherwise */}
-        {data.schoolLogoUrl ? (
-          // next/image is wrong here, not just unoptimized: (1) this is a
-          // print-only crest captured by react-to-print, and next/image's
-          // lazy-loading can leave the image unloaded when the DOM is
-          // captured for PDF generation; (2) schoolLogoUrl is a dynamic,
-          // per-school Appwrite signed URL, and no images.remotePatterns is
-          // configured in next.config.ts, so next/image would throw at
-          // runtime for an unconfigured host; (3) the whole document is
-          // sized in `pt` (print points) throughout, not px, which
-          // next/image's width/height props don't accommodate.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={data.schoolLogoUrl}
-            alt={`${data.schoolName} crest`}
-            style={{
-              width: '48pt', height: '48pt',
-              margin: '0 auto 6pt',
-              borderRadius: '50%',
-              objectFit: 'cover',
-              display: 'block',
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              width: '48pt', height: '48pt',
-              border: '1pt solid #d1d5db',
-              borderRadius: '50%',
-              margin: '0 auto 6pt',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: '#f3f4f6',
-              fontSize: '13pt', fontWeight: 700, color: '#1e3a5f',
-            }}
-          >
-            {schoolInitials(data.schoolName)}
-          </div>
-        )}
+        {/* School crest/logo — ALWAYS the real mark. reportCardService supplies
+            the admin-uploaded logo or the built-in school mark; if a stale/cached
+            payload predates that, fall back to the same embedded mark here so the
+            card can never print an initials placeholder. */}
+        {/* next/image is wrong here, not just unoptimized: (1) this is a
+            print-only crest captured by react-to-print, and next/image's
+            lazy-loading can leave the image unloaded when the DOM is captured
+            for PDF generation; (2) the source is an inline data URI or a
+            per-school signed URL, and no images.remotePatterns is configured;
+            (3) the whole document is sized in `pt`, which next/image's
+            width/height props don't accommodate. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={data.schoolLogoUrl || DEFAULT_SCHOOL_LOGO_DATA_URI}
+          alt={`${data.schoolName} logo`}
+          style={{
+            width: '52pt', height: '52pt',
+            margin: '0 auto 6pt',
+            // contain, not cover/circle: cropping a logo to a circle clips the mark
+            objectFit: 'contain',
+            display: 'block',
+          }}
+        />
 
         <div
           style={{

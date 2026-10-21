@@ -169,7 +169,13 @@ const COLUMNS: DataColumn<Student>[] = [
     // Optional: only visible on desktop (lg+) — a compact severity signal,
     // not the primary reason someone opens this list.
     priority: 'optional',
-    render: (s: Student) => <StudentRiskBadge riskLevel={s.riskLevel ?? 'NONE'} variant="badge" />,
+    render: (s: Student) => (
+      <StudentRiskBadge
+        riskLevel={s.riskLevel ?? 'NONE'}
+        variant="badge"
+        hint={s.riskFactors?.[0]?.detail}
+      />
+    ),
   },
 ]
 

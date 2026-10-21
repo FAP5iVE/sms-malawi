@@ -379,9 +379,30 @@ function httpError(message: string, status: number): Error & { status: number } 
   return Object.assign(new Error(message), { status })
 }
 
+/**
+ * Where a requester should land when they tap a decision notification.
+ * Students have no Approvals page (they never review anything), so the few
+ * request types a student can originate link back to the page where they
+ * track them. Everyone else keeps the unified hub.
+ */
+const STUDENT_ORIGIN_LANDING: Partial<Record<ApprovalSource, string>> = {
+  placement_claim:     '/placements',
+  book_recommendation: '/library',
+  fine_waiver:         '/library',
+}
+
+function requesterLandingUrl(item: AdapterItem): string {
+  const studentLanding = STUDENT_ORIGIN_LANDING[item.source]
+  if (studentLanding && (item.requester.role === 'student' || item.requester.role == null)) {
+    return studentLanding
+  }
+  return '/approvals'
+}
+
 async function notifyRequester(item: AdapterItem, action: ApprovalAction, actor: ApprovalActor, notes?: string) {
   const uid = item.requester.uid
   if (!uid || uid === actor.uid || action === 'cancel') return
+  const landing = requesterLandingUrl(item)
 
   const verb =
     action === 'approve'
@@ -395,13 +416,13 @@ async function notifyRequester(item: AdapterItem, action: ApprovalAction, actor:
   const body = `“${item.title}” was ${verb}.${notes ? ` Note: ${notes}` : ''}`.slice(0, 240)
 
   await Promise.allSettled([
-    sendToUser(uid, { title, body, clickAction: '/approvals', tag: `approval_${item.key}` }),
+    sendToUser(uid, { title, body, clickAction: landing, tag: `approval_${item.key}` }),
     notificationFeedService.pushToFeed(uid, {
       title,
       body,
       type: action === 'approve' ? 'SUCCESS' : 'WARNING',
       category: 'approvals',
-      actionUrl: '/approvals',
+      actionUrl: landing,
     }),
   ])
 }

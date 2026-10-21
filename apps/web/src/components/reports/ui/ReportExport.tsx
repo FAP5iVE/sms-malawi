@@ -20,6 +20,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { ChevronDown, Download, FileSpreadsheet, FileText, Printer } from 'lucide-react'
 import type { ReportInsight, ReportKpi } from '@shared/types/reporting'
 import { downloadCsv, csvFilename } from '@/lib/csv'
@@ -31,6 +32,7 @@ import {
   type PackInsight,
   type PackKpi,
 } from '@/lib/reportExport'
+import { filterLinesFromParams } from '@/lib/exportFilters'
 import { formatKpiValue } from '@/lib/reportFormat'
 import { useReportCapabilities } from '@/hooks/useAnalytics'
 import { useSchoolIdentity } from '@/hooks/useSettings'
@@ -38,6 +40,8 @@ import { useSchoolIdentity } from '@/hooks/useSettings'
 interface TableRegistration {
   label: string
   hasRows: boolean
+  /** Set when the table is not the whole result; shown in the menu, the workbook and the PDF. */
+  note?: string
   table: () => ExportTable
 }
 
@@ -118,6 +122,7 @@ export function useExportable<T>(
   label: string | null,
   rows: readonly T[] | undefined,
   columns: readonly CsvColumn<T>[],
+  note?: string,
 ): void {
   const { registerTable, unregisterTable } = useContext(ExportActionsContext)
   const rowsRef = useRef(rows)
@@ -132,14 +137,16 @@ export function useExportable<T>(
     registerTable({
       label,
       hasRows,
+      ...(note ? { note } : {}),
       table: () => ({
         name: label,
         columns: columnsRef.current as unknown as ExportTable['columns'],
         rows: rowsRef.current ?? [],
+        ...(note ? { note } : {}),
       }),
     })
     return () => unregisterTable(label)
-  }, [registerTable, unregisterTable, label, hasRows, rows])
+  }, [registerTable, unregisterTable, label, hasRows, rows, note])
 }
 
 /** Registers KPIs + findings so the PDF report pack can include them. */
@@ -165,9 +172,10 @@ export function ExportToolbar({
 }: {
   /** Report title used for the PDF and file names. */
   title: string
-  /** Human-readable filter lines shown on the PDF, e.g. "Term: 2". */
+  /** Human-readable filter lines shown on the PDF, e.g. "Term: 2". Filters in the address bar are added automatically. */
   filters: string[]
 }) {
+  const searchParams = useSearchParams()
   const { tables, summaries } = useContext(ExportActionsContext)
   useContext(ExportVersionContext) // re-render when registrations change
   const { data: capabilities } = useReportCapabilities()
@@ -214,6 +222,9 @@ export function ExportToolbar({
   }
 
   const packTables = (): ExportTable[] => exportable.map((t) => t.table())
+  // What the file says about itself: the period plus every filter in the URL, so a
+  // printout or workbook can be traced back to the screen that produced it.
+  const allFilters = [...filters, ...filterLinesFromParams(searchParams.entries())]
 
   const openPdf = () =>
     run(async () => {
@@ -228,7 +239,7 @@ export function ExportToolbar({
       await openReportPdfPreview({
         title,
         schoolName: identity?.schoolName ?? 'School Management System',
-        filters,
+        filters: allFilters,
         generatedAt: new Date(),
         kpis,
         insights,
@@ -264,7 +275,16 @@ export function ExportToolbar({
             type="button"
             disabled={exportable.length === 0}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-brand-navy hover:bg-page disabled:opacity-40"
-            onClick={() => run(() => downloadXlsx(title, packTables()))}
+            onClick={() =>
+              run(() =>
+                downloadXlsx(title, packTables(), {
+                  title,
+                  schoolName: identity?.schoolName ?? 'School Management System',
+                  filters: allFilters,
+                  generatedAt: new Date(),
+                }),
+              )
+            }
           >
             <FileSpreadsheet className="h-4 w-4 text-muted" aria-hidden /> Excel workbook ({exportable.length}{' '}
             {exportable.length === 1 ? 'sheet' : 'sheets'})
@@ -279,15 +299,22 @@ export function ExportToolbar({
               onClick={() =>
                 run(async () => {
                   const tbl = t.table()
-                  return downloadCsv(
+                  const done = downloadCsv(
                     csvFilename(tbl.name),
                     tbl.rows,
                     tbl.columns as unknown as CsvColumn<unknown>[],
                   )
+                  // Say so when the file is not the whole result, instead of letting it pass as complete.
+                  if (done && tbl.note) setMessage(`${tbl.name}: ${tbl.note}.`)
+                  return done
                 })
               }
             >
-              <FileText className="h-4 w-4 text-muted" aria-hidden /> CSV — {t.label}
+              <FileText className="h-4 w-4 shrink-0 text-muted" aria-hidden />
+              <span>
+                CSV — {t.label}
+                {t.note ? <span className="block text-xs text-muted">{t.note}</span> : null}
+              </span>
             </button>
           ))}
         </div>

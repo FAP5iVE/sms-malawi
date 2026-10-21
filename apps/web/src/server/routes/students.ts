@@ -23,6 +23,8 @@ import {
   attachPermissions,
 } from '@/server/middleware/verifyPermission'
 import * as studentService             from '@/server/services/studentService'
+import * as riskService                from '@/server/services/riskService'
+import * as classService               from '@/server/services/classService'
 import * as pendingActionService       from '@/server/services/pendingActionService'
 import { StudentStatusSchema }         from '@shared/schemas/student'
 import type { StudentStatus, Sex }     from '@prisma/client'
@@ -37,6 +39,24 @@ studentsRouter.use(verifyAuth)
 // ─────────────────────────────────────────────────────────
 //  HELPERS
 // ─────────────────────────────────────────────────────────
+
+/**
+ * The global viewing period travels as ?academicYear=&term= — the same params
+ * every other period-aware endpoint takes. Missing/invalid values fall back to
+ * the school's current period inside riskService.resolveRiskPeriod().
+ */
+function periodFromQuery(req: Request): { academicYear?: string; term?: number } {
+  const year = typeof req.query['academicYear'] === 'string' && /^\d{4}\/\d{4}$/.test(req.query['academicYear'])
+    ? req.query['academicYear']
+    : undefined
+  const t = Number(req.query['term'])
+  return { academicYear: year, term: t === 1 || t === 2 || t === 3 ? t : undefined }
+}
+
+/** What this caller may see of the risk engine's output (see riskService.riskViewerFor). */
+function riskViewerOf(req: Request): riskService.RiskViewer {
+  return riskService.riskViewerFor(req.user?.role, req.user?.superUser === true)
+}
 
 /**
  * Resolve the authenticated student's database ID from their Firebase UID.
@@ -96,9 +116,59 @@ studentsRouter.get(
       // falls back to the default ordering for anything unrecognised.
       sortBy:   sortBy   ? String(sortBy)                : undefined,
       sortDir:  sortDir === 'desc' ? 'desc' : sortDir === 'asc' ? 'asc' : undefined,
-    })
+      ...periodFromQuery(req),
+    }, riskViewerOf(req))
 
     res.json({ ...result, capabilities: req.can })
+  }
+)
+
+// ─────────────────────────────────────────────────────────
+//  GET /students/at-risk?limit=&academicYear=&term=
+//  HIGH-risk active students for the "Students Needing Attention" widget.
+//  This route did not exist before (the hook called it, it fell through to
+//  /:id and failed), so the widget could never populate. Registered BEFORE
+//  /:id on purpose.
+//  Oversight roles see the whole school; a teacher only sees students in
+//  classes they teach — same scoping rule as exam analytics.
+// ─────────────────────────────────────────────────────────
+
+studentsRouter.get(
+  '/at-risk',
+  requirePermission('student.viewRiskStatus'),
+  async (req: Request, res: Response) => {
+    const { user } = req
+    const limit = Math.min(Math.max(parseInt(String(req.query['limit'] ?? '6'), 10) || 6, 1), 50)
+    const period = await riskService.resolveRiskPeriod(periodFromQuery(req))
+
+    let classIds: string[] | undefined
+    if (user && user.superUser !== true && user.role !== 'admin' && user.role !== 'high_rank') {
+      classIds = await classService.listClassIdsTaughtBy(user.uid, period.academicYear)
+    }
+
+    const students = await riskService.getHighRiskStudents(period.term, period.academicYear, limit, classIds)
+    res.json({
+      students: students.map((s) => ({
+        id: s.id, firstName: s.firstName, lastName: s.lastName, className: s.className,
+        riskLevel: s.riskLevel, riskScore: s.riskScore, topFactor: s.topFactor, domains: s.domains,
+      })),
+    })
+  }
+)
+
+// ─────────────────────────────────────────────────────────
+//  GET /students/risk-summary?academicYear=&term=
+//  School-wide counts per risk level and per module (fees / academics /
+//  attendance / library). Oversight only — it is a whole-school figure.
+// ─────────────────────────────────────────────────────────
+
+studentsRouter.get(
+  '/risk-summary',
+  requirePermission('student.viewRiskStatus'),
+  requireRole(['admin', 'high_rank']),
+  async (req: Request, res: Response) => {
+    const period = await riskService.resolveRiskPeriod(periodFromQuery(req))
+    res.json(await riskService.getSchoolRiskSummary(period.term, period.academicYear))
   }
 )
 
@@ -127,7 +197,7 @@ studentsRouter.get(
       return
     }
 
-    const detail = await studentService.getById(student.id)
+    const detail = await studentService.getById(student.id, periodFromQuery(req), riskViewerOf(req))
     if (!detail) {
       res.status(404).json({ error: 'Student record not found.' })
       return
@@ -164,7 +234,7 @@ studentsRouter.get(
       }
     }
 
-    const detail = await studentService.getById(id)
+    const detail = await studentService.getById(id, periodFromQuery(req), riskViewerOf(req))
     if (!detail) {
       res.status(404).json({ error: 'Student not found.' })
       return

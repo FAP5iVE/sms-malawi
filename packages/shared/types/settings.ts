@@ -177,6 +177,10 @@ export const SETTING_KEYS = {
   RISK_ABSENCE_MEDIUM:            'risk_absence_medium',
   RISK_SUBJECT_FAILS_HIGH:        'risk_subject_fails_high',
   RISK_SUBJECT_FAILS_MEDIUM:      'risk_subject_fails_medium',
+  // Library factor of the unified risk engine (riskService)
+  RISK_LIBRARY_OVERDUE_DAYS_HIGH:   'risk_library_overdue_days_high',
+  RISK_LIBRARY_OVERDUE_DAYS_MEDIUM: 'risk_library_overdue_days_medium',
+  RISK_LIBRARY_FINES_MEDIUM:        'risk_library_fines_medium',
 
   // ── Finance — fee and penalty
   FINANCE_LATE_PENALTY_PER_DAY:   'finance_late_penalty_per_day',
@@ -315,6 +319,9 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.RISK_ABSENCE_MEDIUM]:       number  // % absent, default 15
   readonly [SETTING_KEYS.RISK_SUBJECT_FAILS_HIGH]:   number  // subject count, default 4
   readonly [SETTING_KEYS.RISK_SUBJECT_FAILS_MEDIUM]: number  // subject count, default 2
+  readonly [SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_HIGH]:   number  // days a book is overdue, default 30
+  readonly [SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_MEDIUM]: number  // days a book is overdue, default 14
+  readonly [SETTING_KEYS.RISK_LIBRARY_FINES_MEDIUM]:        number  // MWK of unpaid library fines, default 5000
 
   // ── Finance — fees
   readonly [SETTING_KEYS.FINANCE_LATE_PENALTY_PER_DAY]:    number  // MWK
@@ -666,6 +673,27 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     isPublic: false,
     description: 'Number of failed subjects at or above which a student is flagged MEDIUM risk.',
     defaultValue: 2,
+  },
+  [SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_HIGH]: {
+    key: SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_HIGH,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Days a library book may be overdue (or any lost book) before the library factor of a student\'s risk is HIGH severity.',
+    defaultValue: 30,
+  },
+  [SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_MEDIUM]: {
+    key: SETTING_KEYS.RISK_LIBRARY_OVERDUE_DAYS_MEDIUM,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Days a library book may be overdue before the library factor of a student\'s risk is MEDIUM severity.',
+    defaultValue: 14,
+  },
+  [SETTING_KEYS.RISK_LIBRARY_FINES_MEDIUM]: {
+    key: SETTING_KEYS.RISK_LIBRARY_FINES_MEDIUM,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Unpaid library fines (MWK) at or above which the library factor of a student\'s risk is MEDIUM severity.',
+    defaultValue: 5000,
   },
 
   // ── Finance — fees and penalties

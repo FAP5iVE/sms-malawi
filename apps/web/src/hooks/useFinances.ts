@@ -126,6 +126,7 @@ export function useStudentBalance(studentId: string, academicYear: string, enabl
 export function useRecordPayment() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: RecordPaymentInput) =>
       apiFetch<{ payment: unknown; invoice: ApiInvoice }>('/finances/payments', {
         method: 'POST',
@@ -144,6 +145,7 @@ export function useRecordPayment() {
 export function useGenerateInvoice() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: GenerateInvoiceInput) =>
       apiFetch<ApiInvoice>('/finances/invoices/generate', {
         method: 'POST',
@@ -447,6 +449,7 @@ export function useUpdateFeeCommitmentStatus() {
 export function useAddInvoiceLineItem() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: ({ invoiceId, feeStructureId }: AddInvoiceLineItemInput) =>
       apiFetch<ApiInvoice>(`/finances/invoices/${invoiceId}/line-items`, {
         method: 'POST',
@@ -470,6 +473,7 @@ export function useAddInvoiceLineItem() {
 export function useBulkGenerateInvoices() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: BulkGenerateInvoicesInput) =>
       apiFetch<ApiBulkInvoiceResult>('/finances/invoices/bulk-generate', {
         method: 'POST',

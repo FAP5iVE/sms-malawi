@@ -2,9 +2,8 @@
  * [CHANGE TYPE]: TARGETED EDIT (OVERHAUL — added search/filter, richer columns)
  * [FILE]: apps/web/src/components/placements/PlacementRegistryPanel.tsx
  * [PURPOSE]: The "Placement Registry & Analytics" tab from the reference
- *   module — open to EVERY role (placement.view / placement.viewAnalytics
- *   are universal; placement outcomes are culturally public at Malawian
- *   schools). Shows the cohort-wide analytics cards, then the list of
+ *   module — open to every STAFF role (placement.viewAnalytics) but never the
+ *   student role — it lists other students' names, candidate numbers and points. Shows the cohort-wide analytics cards, then the list of
  *   CONFIRMED placements only, with the reference module's search-by-name/
  *   MSCE-number/course + University + Gender filters (all client-side over
  *   the already-fetched confirmed list — the dataset is small by nature,
@@ -19,7 +18,6 @@ import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { usePlacementRegistry, usePlacementCatalogue } from '@/hooks/usePlacements'
-import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { DataTable, type DataColumn } from '@/components/shared/DataTable'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
 import { PlacementStatusBadge } from '@/components/placements/PlacementStatusBadge'
@@ -37,9 +35,11 @@ const ENTRY_SOURCE_LABEL: Record<string, string> = {
 
 export function PlacementRegistryPanel() {
   // The school's stored current year (SystemSettings), never a literal.
-  // [UNIVERSAL PERIOD FILTER] The year follows the app-wide header filter; this
-  // panel's own year select writes through to it.
-  const { academicYear: effectiveYear, setAcademicYear } = useEffectiveViewingPeriod()
+  // [UNIVERSAL PERIOD FILTER] The year comes ONLY from the app-wide header
+  // filter. The year select this panel used to carry wrote through to it (picking
+  // a year here already moved the whole app), so it was a second control for one
+  // value; it is now a read-only label.
+  const { academicYear: effectiveYear } = useEffectiveViewingPeriod()
   const { data: catalogue = [] } = usePlacementCatalogue()
 
   const { data: placements = [], isLoading, isError, error } = usePlacementRegistry(effectiveYear)
@@ -114,11 +114,9 @@ export function PlacementRegistryPanel() {
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h3 className="font-heading font-semibold text-base">Cohort placement outcomes</h3>
-        <AcademicYearSelect
-          value={effectiveYear}
-          onChange={(e) => setAcademicYear(e.target.value)}
-          className="border border-base rounded-xl px-3 py-2 text-sm bg-surface"
-        />
+        <span className="text-sm text-muted" aria-label="Academic year shown">
+              Intake {effectiveYear}
+            </span>
       </div>
 
       <PlacementAnalyticsPanel academicYear={effectiveYear} />

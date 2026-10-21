@@ -52,3 +52,18 @@ export function positiveInt(raw: unknown, fallback: number): number {
 export function optionalString(raw: unknown): string | undefined {
   return typeof raw === 'string' && raw.trim() !== '' ? raw.trim() : undefined
 }
+
+/** An optional calendar date (YYYY-MM-DD). Returns null when present but invalid. */
+export function optionalDate(raw: unknown): string | undefined | null {
+  if (typeof raw !== 'string' || raw.trim() === '') return undefined
+  const v = raw.trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null
+  return Number.isNaN(new Date(`${v}T00:00:00Z`).getTime()) ? null : v
+}
+
+/** An optional enum-like parameter. Returns null when present but not one of `allowed`. */
+export function optionalEnum(raw: unknown, allowed: readonly string[]): string | undefined | null {
+  const v = optionalString(raw)
+  if (v === undefined) return undefined
+  return allowed.includes(v) ? v : null
+}

@@ -38,7 +38,9 @@ import { QuickActions } from '@/components/shared/QuickActions'
 import { ListCard } from '@/components/shared/ListCard'
 import { useAdmissionsOverview, useAdmissionsAttention } from '@/hooks/reporting/useAdmissionsReporting'
 import { useAttendanceAttention } from '@/hooks/reporting/useAttendanceReporting'
-import { DashboardAttention, DashboardKpis } from './DashboardReport'
+import { DashboardAttention } from './DashboardReport'
+import { PrimaryOverviewKpis, ReportLinks, SecondaryKpis } from './DashboardSections'
+import type { ReportLink } from './DashboardSections'
 import { useApplications } from '@/hooks/useApplications'
 import { useExams } from '@/hooks/useExams'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
@@ -78,6 +80,15 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
 ]
 
+/** Lead with the roll and the admissions queue; the rest sit in "More figures". */
+const PREFERRED = ['active', 'pending', 'awaiting', 'attendanceExceptions']
+
+const REPORT_LINKS: ReportLink[] = [
+  { label: 'Admissions', href: '/reports?tab=admissions', description: 'Applications by stage, conversion' },
+  { label: 'Enrollment', href: '/reports?tab=enrollment', description: 'Students on the roll' },
+  { label: 'Attendance', href: '/reports?tab=attendance', description: 'By class and week' },
+]
+
 export function LowerRankDashboard() {
   const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
 
@@ -85,9 +96,9 @@ export function LowerRankDashboard() {
   const overview = useAdmissionsOverview(period)
   const admissionsAttention = useAdmissionsAttention()
   const attendanceAttention = useAttendanceAttention(period)
-  const { data: pendingApps, isLoading: pendingLoading } =
+  const { data: pendingApps, isLoading: pendingLoading, isError: pendingError, refetch: refetchPending } =
     useApplications('PENDING')
-  const { data: examsData, isLoading: examsLoading } = useExams(
+  const { data: examsData, isLoading: examsLoading, isError: examsError, refetch: refetchExams } = useExams(
     undefined,
     academicYear ?? '',
     term ?? 0,
@@ -98,23 +109,23 @@ export function LowerRankDashboard() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <DashboardKpis
-        title="Registry overview"
-        summary="Students on the roll, the admissions queue and attendance exceptions. Each figure opens the report behind it."
+      <PrimaryOverviewKpis
+        title="Registry at a glance"
+        summary="Students on the roll, the admissions queue and attendance exceptions. Tap a figure to open its report."
         academicYear={academicYear}
         term={term}
         overview={overview}
+        preferred={PREFERRED}
         reportsHref="/reports?tab=admissions"
-        showInsights
-        placeholders={6}
       />
-      <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
           title="Exam Schedule This Week"
           sub="Next 7 days"
           isLoading={periodLoading || examsLoading}
           isEmpty={examsThisWeekList.length === 0}
+          isError={examsError}
+          onRetry={() => void refetchExams()}
           emptyMessage="No exams scheduled in the next 7 days."
         >
           <ul className="divide-y divide-base">
@@ -138,6 +149,8 @@ export function LowerRankDashboard() {
           sub="Pending review"
           isLoading={pendingLoading}
           isEmpty={recentApplications.length === 0}
+          isError={pendingError}
+          onRetry={() => void refetchPending()}
           emptyMessage="No pending applications right now."
         >
           <ul className="divide-y divide-base">
@@ -158,9 +171,12 @@ export function LowerRankDashboard() {
         </ListCard>
       </div>
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
-        <DashboardAttention query={admissionsAttention} title="Admissions queue" />
-        <DashboardAttention query={attendanceAttention} title="Attendance exceptions" />
+        <DashboardAttention query={admissionsAttention} title="Admissions queue" limit={5} />
+        <DashboardAttention query={attendanceAttention} title="Attendance exceptions" limit={5} />
       </div>
+      <SecondaryKpis title="More figures and findings" overview={overview} preferred={PREFERRED} showInsights />
+      <QuickActions actions={QUICK_ACTIONS} compact />
+      <ReportLinks links={REPORT_LINKS} />
     </div>
   )
 }

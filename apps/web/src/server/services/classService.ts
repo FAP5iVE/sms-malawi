@@ -97,6 +97,7 @@ import type { CreateClassInput, UpdateClassInput } from '@shared/schemas/student
 import type { UserRole } from '@shared/types/roles'
 import { getManebExamType, MALAWI_SUBJECTS } from '@shared/constants/malawi'
 import { hasPermission } from '@shared/types/permissions'
+import * as riskService from '@/server/services/riskService'
 
 // Number of days, from the first time a class's subject presets are set,
 // during which they may still be changed. After this window closes the
@@ -206,7 +207,11 @@ export async function listClasses(academicYear?: string, includeArchived = false
   return attachTeacherNames(classes)
 }
 
-export async function getClass(id: string) {
+export async function getClass(
+  id: string,
+  /** Risk context for the roster badges. Omitted viewer = no risk fields at all. */
+  risk?: { period?: { academicYear?: string; term?: number }; viewer: riskService.RiskViewer },
+) {
   const cls = await prisma.class.findUniqueOrThrow({
     where: { id },
     include: {
@@ -216,7 +221,41 @@ export async function getClass(id: string) {
     },
   })
   const [withTeacherName] = await attachTeacherNames([cls])
-  return withTeacherName
+
+  // The roster used to return raw student rows with no riskLevel, so every dot
+  // in the class roster rendered "NONE". Attach the same engine output the
+  // Students list and profile use.
+  if (!risk || !risk.viewer.canViewRisk) return withTeacherName
+  const period   = await riskService.resolveRiskPeriod(risk.period)
+  const assessed = await riskService.assessStudents(withTeacherName.students.map((s) => s.id), period)
+  return {
+    ...withTeacherName,
+    students: withTeacherName.students.map((s) => {
+      const a = assessed.get(s.id)
+      if (!a) return s
+      const r = riskService.redactAssessment(a, risk.viewer.visibility)
+      return { ...s, riskLevel: r.riskLevel, riskScore: r.riskScore, riskFactors: r.factors }
+    }),
+  }
+}
+
+/**
+ * Classes a staff member teaches in a year: ones they are class teacher of plus
+ * ones they hold a subject assignment in. Used to scope teacher-facing views
+ * (e.g. the at-risk widget) to "my students" the same way exam analytics is.
+ */
+export async function listClassIdsTaughtBy(teacherUid: string, academicYear: string): Promise<string[]> {
+  const [own, assigned] = await Promise.all([
+    prisma.class.findMany({ where: { teacherId: teacherUid, academicYear }, select: { id: true } }),
+    getTeacherSubjectAssignments(teacherUid, academicYear),
+  ])
+  const ids = new Set<string>()
+  own.forEach((c: { id: string }) => ids.add(c.id))
+  assigned.forEach((key: string) => {
+    const classId = key.split('|')[0]
+    if (classId) ids.add(classId)
+  })
+  return Array.from(ids)
 }
 
 // ─────────────────────────────────────────────────────────

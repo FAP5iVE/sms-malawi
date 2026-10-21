@@ -38,18 +38,36 @@ export interface CsvColumn<T> {
   value: (row: T) => CsvCell
 }
 
+/** A plain number written as text ("12", "-5.5", "+265999123456"). Spreadsheets read these as numbers, not formulas. */
+const PLAIN_NUMBER = /^[+-]?\d+(\.\d+)?$/
+
+/**
+ * Stops a spreadsheet from running text as a formula (CSV injection). A text
+ * value that starts with = + - @ or a tab / carriage return can be read as a
+ * formula by Excel, Sheets and LibreOffice, so a student name or note typed as
+ * `=HYPERLINK(...)` would execute when a staff member opens the export. Such
+ * values get a leading apostrophe, which spreadsheets show as plain text.
+ * Real numbers (typeof number) and plain numeric text such as "-5" or a phone
+ * number "+265999123456" are left as they are.
+ */
+export function neutraliseFormula(text: string): string {
+  if (!/^[=+\-@\t\r]/.test(text)) return text
+  return PLAIN_NUMBER.test(text) ? text : `'${text}`
+}
+
 /**
  * Renders one cell as an RFC 4180-conformant CSV field.
  *
- * A field is quoted when — and only when — it contains a comma, a double
- * quote, or a line break; inside a quoted field, each embedded double quote is
- * doubled. Anything else is emitted bare, which keeps the common case
- * (numbers, plain names) readable.
+ * Text that a spreadsheet could read as a formula is neutralised first (see
+ * neutraliseFormula). A field is then quoted when — and only when — it contains
+ * a comma, a double quote, or a line break; inside a quoted field, each embedded
+ * double quote is doubled. Anything else is emitted bare, which keeps the common
+ * case (numbers, plain names) readable.
  */
-function escapeCell(cell: CsvCell): string {
+export function escapeCell(cell: CsvCell): string {
   if (cell === null || cell === undefined) return ''
 
-  const text = String(cell)
+  const text = typeof cell === 'string' ? neutraliseFormula(cell) : String(cell)
   if (!/[",\r\n]/.test(text)) return text
 
   return `"${text.replace(/"/g, '""')}"`

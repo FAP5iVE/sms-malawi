@@ -24,6 +24,7 @@ import { RoleGuard } from '@/components/shared/RoleGuard'
 import type { UserRole } from '@shared/types/roles'
 import { SuperUserRoleSwitcher } from '@/components/shared/SuperUserRoleSwitcher'
 import { ModuleSurface } from '@/components/shared/ModuleSurface'
+import { recentAcademicYears } from '@/lib/academicYears'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
 import { AdminSessionsPanel } from '@/components/reports/AdminSessionsPanel'
 import { ExecutiveOverviewTab } from '@/components/reports/panels/ExecutivePanels'
@@ -31,9 +32,8 @@ import {
   FinanceOverviewTab,
   FinanceAgingTab,
   FinancePaymentsTab,
-  ProcurementTab,
-  StocktakeTab,
 } from '@/components/reports/panels/FinancePanels'
+import { AssetsTab, InventoryTab, ProcurementTab, StocktakeTab } from '@/components/reports/panels/OperationsPanels'
 import {
   HrOverviewTab,
   HrWorkforceTab,
@@ -42,11 +42,13 @@ import {
   HrLoansTab,
   HrReviewsTab,
 } from '@/components/reports/panels/HrPanels'
-import { MarkCompletionTab, ExamPipelineTab } from '@/components/reports/panels/ExamPanels'
+import { ExamWorkflowTab, ManebStatusCard, MarkCompletionTab } from '@/components/reports/panels/ExamPanels'
 import {
   LibraryOverviewSection,
   LibraryCirculationTab,
   LibraryFinesTab,
+  LibraryDigitalTab,
+  LibraryStockTab,
 } from '@/components/reports/panels/LibraryPanels'
 import { AttendanceReportTab } from '@/components/reports/panels/AttendancePanels'
 import { AdmissionsTab, EnrollmentTab } from '@/components/reports/panels/AdmissionsPanels'
@@ -62,6 +64,7 @@ import {
   AdminSessionsReportTab,
   AdminGovernanceTab,
   AdminAdoptionTab,
+  AdminOperationsTab,
 } from '@/components/reports/panels/AdminPanels'
 import {
   StudentOverviewTab,
@@ -70,6 +73,7 @@ import {
   StudentLibraryTab,
   StudentAttendanceTab,
   StudentFeesTab,
+  StudentPlacementTab,
 } from '@/components/reports/panels/StudentPanels'
 import { useResizableColumns } from '@/hooks/useResizableColumns'
 import { CopyableId } from '@/components/shared/CopyableId'
@@ -107,7 +111,6 @@ import {
   useLibraryBorrowingTrend,
   useLibraryInventoryHealth,
   useLibraryTopBorrowed,
-  useLibraryDigitalStats,
 } from '@/hooks/useAnalytics'
 import { useApplicationsFunnel } from '@/hooks/useAnalytics'
 import { useAcademicSubjectPerformance, useAcademicMarksDistribution } from '@/hooks/useAnalytics'
@@ -241,6 +244,9 @@ const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNo
     { id: 'sessions', label: 'Sessions', icon: I.wifi },
     { id: 'governance', label: 'Governance', icon: I.doc },
     { id: 'adoption', label: 'Adoption', icon: I.users },
+    { id: 'operations', label: 'Operations', icon: I.alert },
+    { id: 'assets', label: 'Assets', icon: I.chart },
+    { id: 'inventory', label: 'Inventory', icon: I.chart },
     { id: 'audit', label: 'Audit Log', icon: I.doc },
   ],
   high_rank: [
@@ -255,7 +261,9 @@ const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNo
     { id: 'finance', label: 'Finance', icon: I.money },
     { id: 'aging', label: 'Receivables', icon: I.alert },
     { id: 'procurement', label: 'Procurement', icon: I.doc },
-    { id: 'stocktake', label: 'Stock', icon: I.chart },
+    { id: 'stocktake', label: 'Stocktakes', icon: I.chart },
+    { id: 'assets', label: 'Assets', icon: I.chart },
+    { id: 'inventory', label: 'Inventory', icon: I.chart },
     { id: 'workforce', label: 'HR', icon: I.users },
     { id: 'leave', label: 'Leave', icon: I.activity },
     { id: 'contracts', label: 'Contracts', icon: I.alert },
@@ -275,7 +283,9 @@ const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNo
     { id: 'payroll', label: 'Payroll', icon: I.money },
     { id: 'scholarships', label: 'Scholarships', icon: I.grad },
     { id: 'procurement', label: 'Procurement', icon: I.doc },
-    { id: 'stocktake', label: 'Stocktake', icon: I.chart },
+    { id: 'stocktake', label: 'Stocktakes', icon: I.chart },
+    { id: 'assets', label: 'Assets', icon: I.chart },
+    { id: 'inventory', label: 'Inventory', icon: I.chart },
     { id: 'summary', label: 'Summary', icon: I.doc },
   ],
   library: [
@@ -284,6 +294,7 @@ const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNo
     { id: 'borrowing', label: 'Borrowing', icon: I.trend },
     { id: 'fines', label: 'Fines', icon: I.money },
     { id: 'digital', label: 'Digital', icon: I.doc },
+    { id: 'stock', label: 'Physical stock', icon: I.book },
   ],
   lower_rank: [
     { id: 'admissions', label: 'Admissions', icon: I.doc },
@@ -301,7 +312,7 @@ const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNo
   ],
   exam_officer: [
     { id: 'completion', label: 'Mark Completion', icon: I.activity },
-    { id: 'pipeline', label: 'Results Pipeline', icon: I.trend },
+    { id: 'pipeline', label: 'Workflow', icon: I.trend },
     { id: 'maneb', label: 'MANEB', icon: I.grad },
     { id: 'candidates', label: 'Candidates', icon: I.users },
     { id: 'subjects', label: 'Subjects', icon: I.chart },
@@ -324,6 +335,7 @@ const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNo
     { id: 'library', label: 'Library', icon: I.book },
     { id: 'fees', label: 'Fees', icon: I.money },
     { id: 'summary', label: 'Results', icon: I.doc },
+    { id: 'placement', label: 'Placement', icon: I.grad },
   ],
 }
 
@@ -341,6 +353,8 @@ const TAB_ALIASES: Record<string, Record<string, string>> = {
     reviews: 'workforce',
     fines: 'circulation',
     library: 'circulation',
+    stock: 'circulation',
+    digital: 'circulation',
     pipeline: 'completion',
   },
 }
@@ -682,7 +696,12 @@ function AdminAuditPanel() {
   const totalEntries = audit?.total ?? 0
   const firstShown = totalEntries === 0 ? 0 : (safePage - 1) * AUDIT_PAGE_SIZE + 1
   const lastShown = Math.min(safePage * AUDIT_PAGE_SIZE, totalEntries)
-  // ...useExportable(...) and the rest unchanged
+  // The audit log is paged on the server, so an export holds the page on screen, not the whole log.
+  // Say so in the menu, the workbook and the PDF rather than letting it pass as complete.
+  const auditExportNote =
+    totalPages > 1
+      ? `Page ${safePage} of ${totalPages} only (${totalEntries} entries in total); use the page controls to export other pages`
+      : undefined
 
   useExportable<ApiAuditLogEntry>('Audit Log', audit?.logs, [
     { label: 'Action', value: (l) => l.action },
@@ -694,7 +713,7 @@ function AdminAuditPanel() {
     { label: 'Actor', value: (l) => l.actorUid },
     { label: 'Role', value: (l) => l.actorRole },
     { label: 'Time', value: (l) => l.createdAt },
-  ])
+  ], auditExportNote)
 
   // [PRODUCTION FIX] Column widths are now admin-adjustable (drag the
   // handle at each header's right edge) rather than a fixed best-guess
@@ -946,6 +965,7 @@ function HighRankPerformancePanel({ academicYear, term }: { academicYear: string
           title="MANEB National Exam Results"
           icon={<GraduationCap className="w-4 h-4" />}
         />
+        <ManebStatusCard academicYear={academicYear} />
         <ManebAnalyticsPanel academicYear={academicYear} />
       </div>
     </div>
@@ -959,9 +979,12 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
   useExportable<ApiClassPerformanceStat>(`Class Comparison ${academicYear} Term ${term}`, classes, [
     { label: 'Class', value: (c) => c.className },
     { label: 'Students', value: (c) => c.studentCount },
+    { label: 'Assessed', value: (c) => c.assessed },
+    // Blank, never 0, when the class has no computed results.
     { label: 'Average', value: (c) => c.average },
     { label: 'Pass Rate (%)', value: (c) => c.passRate },
   ])
+  const notComputed = (classes ?? []).filter((c) => c.studentCount > 0 && c.assessed === 0)
 
   return (
     <div className="space-y-5">
@@ -998,6 +1021,12 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
             </ResponsiveContainer>
           ) : (
             <EmptyState />
+          )}
+          {notComputed.length > 0 && (
+            <p role="note" className="mt-3 text-xs text-muted">
+              No computed results yet for {notComputed.map((c) => c.className).join(', ')} — shown
+              without a bar, not as 0%.
+            </p>
           )}
         </ChartCard>
       )}
@@ -1249,7 +1278,7 @@ function HighRankFinancePanel({ academicYear, term }: { academicYear: string; te
         {isLoading ? (
           <SkeletonChart />
         ) : (
-          <ChartCard title="Revenue vs Expenses by Term">
+          <ChartCard title="Fees Collected vs Expenses & Payroll by Term">
             {cashFlow && cashFlow.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={cashFlow.map((r) => ({ ...r, label: `Term ${r.term}` }))}>
@@ -1268,7 +1297,7 @@ function HighRankFinancePanel({ academicYear, term }: { academicYear: string; te
                     dataKey="revenue"
                     fill={chartColorAt(1)}
                     radius={[4, 4, 0, 0]}
-                    name="Revenue"
+                    name="Fees collected"
                   />
                   <Bar
                     dataKey="expenses"
@@ -1339,15 +1368,19 @@ function FinanceCollectionPanel() {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard label="Last 30 Days" value={`MWK ${totalDay.toLocaleString()}`} trend="up" />
-        <KpiCard label="Last 12 Months" value={`MWK ${totalMonth.toLocaleString()}`} />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <KpiCard label="Received, last 30 days" value={`MWK ${totalDay.toLocaleString()}`} />
+        <KpiCard label="Received, last 12 months" value={`MWK ${totalMonth.toLocaleString()}`} />
         <KpiCard
-          label="Daily Average"
+          label="Daily average (30 days)"
           value={`MWK ${Math.round(totalDay / 30).toLocaleString()}`}
         />
-        <KpiCard label="Currency" value="MWK" />
       </div>
+      <p role="note" className="text-xs text-muted">
+        Cash received by the date each payment was recorded, across all terms. This is a flow and
+        will not match the term collection rate, which compares fees applied to a term&apos;s
+        invoices with fees billed for that term.
+      </p>
       {dl ? (
         <SkeletonChart />
       ) : (
@@ -1510,11 +1543,18 @@ function FinanceExpensesPanel({ academicYear, term }: { academicYear: string; te
     { label: 'Category', value: (r) => r.category },
     { label: 'Allocated (MWK)', value: (r) => r.allocated },
     { label: 'Spent (MWK)', value: (r) => r.spent },
+    // Blank (not 0) when nothing is allocated to the category.
     { label: 'Utilisation (%)', value: (r) => r.utilisation },
+    { label: 'Unbudgeted', value: (r) => (r.unbudgeted ? 'Yes' : 'No') },
   ])
 
   return (
     <div className="space-y-5">
+      <p role="note" className="text-xs text-muted">
+        Spent is the live total of approved expenses (not the cached budget counter). For a term
+        this shows that term&apos;s budgets plus annual budgets, which count the year&apos;s spending to
+        date. Spend in a category with no budget is shown with nothing allocated.
+      </p>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {el ? (
           <SkeletonChart />
@@ -1595,14 +1635,20 @@ function FinanceCashFlowPanel({ academicYear }: { academicYear: string }) {
 
   useExportable<ApiCashFlowRow>(`Cash Flow ${academicYear}`, rows, [
     { label: 'Term', value: (r) => r.term },
-    { label: 'Revenue (MWK)', value: (r) => r.revenue },
-    { label: 'Expenses (MWK)', value: (r) => r.expenses },
+    { label: 'Fees collected on term invoices (MWK)', value: (r) => r.revenue },
+    { label: 'Approved expenses (MWK)', value: (r) => r.expenses },
     { label: 'Payroll (MWK)', value: (r) => r.payroll },
     { label: 'Net (MWK)', value: (r) => r.net },
   ])
 
   return (
     <div className="space-y-5">
+      <p role="note" className="text-xs text-muted">
+        Revenue is the fees applied to each term&apos;s invoices to date (not cash received in that
+        term). Expenses are approved expenses recorded for the term. Payroll is net pay for payroll
+        runs that are completed, awaiting approval, approved or locked, by the calendar month each
+        term spans; a payroll run for August falls outside every term and is not shown here.
+      </p>
       {rows && (
         <div className="grid grid-cols-3 gap-3">
           {rows.map((r) => (
@@ -1640,7 +1686,7 @@ function FinanceCashFlowPanel({ academicYear }: { academicYear: string }) {
                     dataKey="revenue"
                     fill={chartColorAt(1)}
                     radius={[4, 4, 0, 0]}
-                    name="Revenue"
+                    name="Fees collected"
                   />
                   <Bar
                     dataKey="expenses"
@@ -1668,7 +1714,7 @@ function FinanceCashFlowPanel({ academicYear }: { academicYear: string }) {
                 <table className="w-full text-sm min-w-130">
                   <thead>
                     <tr className="bg-page border-b border-base">
-                      {['Term', 'Revenue', 'Expenses', 'Payroll', 'Net'].map((h) => (
+                      {['Term', 'Fees collected', 'Expenses', 'Payroll', 'Net'].map((h) => (
                         <th
                           key={h}
                           className="px-4 py-2 text-left text-xs font-semibold text-muted uppercase"
@@ -1882,83 +1928,6 @@ function LibraryBorrowingPanel() {
     </div>
   )
 }
-
-function LibraryDigitalPanel() {
-  const { data: raw, isLoading } = useLibraryDigitalStats()
-  const stats = raw as
-    | {
-        byType: ApiCategoryBreakdown[]
-        bySubject: ApiCategoryBreakdown[]
-        total: number
-        approvedCount: number
-      }
-    | undefined
-
-  return (
-    <div className="space-y-5">
-      {stats && (
-        <div className="grid grid-cols-2 gap-3">
-          <KpiCard label="Total Resources" value={stats.total} />
-          <KpiCard label="Approved" value={stats.approvedCount} trend="up" />
-        </div>
-      )}
-      {isLoading ? (
-        <SkeletonChart />
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartCard title="By Resource Type">
-            {stats?.byType?.length ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie
-                    data={stats.byType}
-                    dataKey="value"
-                    nameKey="category"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={70}
-                  >
-                    {stats.byType.map((_, i) => (
-                      <Cell key={i} fill={chartColorAt(i)} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState />
-            )}
-          </ChartCard>
-          <ChartCard title="By Subject">
-            {stats?.bySubject?.length ? (
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={stats.bySubject} layout="vertical">
-                  <XAxis
-                    type="number"
-                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="category"
-                    tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
-                    width={100}
-                  />
-                  <Tooltip contentStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="value" fill={chartColorAt(4)} radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <EmptyState />
-            )}
-          </ChartCard>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── ACADEMIC STAFF PANELS ───────────────────────────────────────────────────
 
 function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; term: number }) {
   const { data: rows, isLoading } = useAcademicSubjectPerformance(academicYear, term)
@@ -2428,7 +2397,8 @@ function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; te
   const totalStaff = staffByDept?.reduce((s, d) => s + d.value, 0)
   const totalApplications = funnel?.find((f) => f.stage === 'Total Applications')?.count
   const lowAttendanceClasses = attendance?.byClass.filter((c) => c.attendanceRate < 85) ?? []
-  const underperformingClasses = classes?.filter((c) => c.average < 50) ?? []
+  // A class with no computed results has a null average — not an average of 0.
+  const underperformingClasses = classes?.filter((c) => c.average !== null && c.average < 50) ?? []
 
   // [PRODUCTION FIX] Each condition below is real, live data already
   // fetched for other panels on this page — this is what "issues the high
@@ -2497,7 +2467,7 @@ function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; te
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <SummaryStat
           label="Fee Collection"
-          value={finance ? `${finance.collectionPct ?? 0}%` : '—'}
+          value={finance && finance.collectionPct != null ? `${finance.collectionPct}%` : '—'}
         />
         <SummaryStat label="Total Staff" value={totalStaff ?? '—'} />
         <SummaryStat label="Applications" value={totalApplications ?? '—'} />
@@ -2617,7 +2587,7 @@ function FinanceSummaryPanel({ academicYear, term }: { academicYear: string; ter
           value={`MWK ${(data.outstanding ?? 0).toLocaleString()}`}
           warn={(data.outstanding ?? 0) > 0}
         />
-        <SummaryStat label="Collection" value={`${data.collectionPct ?? 0}%`} />
+        <SummaryStat label="Collection" value={data.collectionPct != null ? `${data.collectionPct}%` : '—'} />
       </div>
     </div>
   )
@@ -2666,11 +2636,13 @@ function AcademicSummaryPanel({ academicYear }: { academicYear: string }) {
                   <td className="px-4 py-3 text-muted">Form {c.form}</td>
                   <td className="px-4 py-3">{c.total}</td>
                   <td
-                    className={`px-4 py-3 font-medium ${c.passRate >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}
+                    className={`px-4 py-3 font-medium ${
+                      c.passRate === null ? 'text-muted' : c.passRate >= 50 ? 'text-brand-teal' : 'text-brand-coral'
+                    }`}
                   >
-                    {c.passRate}%
+                    {c.passRate === null ? '—' : `${c.passRate}%`}
                   </td>
-                  <td className="px-4 py-3">{c.avg}</td>
+                  <td className="px-4 py-3">{c.avg ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -2770,9 +2742,10 @@ function ReportsContent() {
   // filter (useViewingPeriod): the person's pick if they made one, otherwise
   // the school's current period from SystemSettings. Until the period
   // resolves, no period-scoped query fires with a wrong guess, so panels
-  // needing a year render only once one is known. The term select below
-  // writes THROUGH to the global filter.
-  const { academicYear: year, term: viewingTerm, isLoading: settingsLoading, setTerm } = useViewingPeriod()
+  // needing a year render only once one is known. Term comes only from the
+  // global header filter (this page's own term select duplicated it, and the
+  // export toolbar already records "Academic year / Term" in every export).
+  const { academicYear: year, term: viewingTerm, isLoading: settingsLoading } = useViewingPeriod()
   const term = viewingTerm ?? null
 
   // The active tab lives in the URL (?tab=) so dashboard KPIs can deep-link to a
@@ -2815,21 +2788,15 @@ function ReportsContent() {
               }}
             />
           )}
-          <select
-            value={term ?? ''}
-            onChange={(e) => setTerm(Number(e.target.value))}
-            disabled={term === null}
-            aria-label="Select term"
-            className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-brand-navy/20 disabled:opacity-50"
-          >
-            {[1, 2, 3].map((t) => (
-              <option key={t} value={t}>
-                Term {t}
-              </option>
-            ))}
-          </select>
+          {term !== null && (
+            <span className="text-xs text-muted" aria-label="Period shown">
+              Term {term}
+            </span>
+          )}
           <ExportToolbar
-            title={`Reports — ${(role ?? '').replace(/_/g, ' ')}`}
+            title={`Reports — ${(role ?? '').replace(/_/g, ' ')}${
+              tabs.find((t) => t.id === activeTab)?.label ? ` — ${tabs.find((t) => t.id === activeTab)?.label}` : ''
+            }`}
             filters={year ? [`Academic year: ${year}`, ...(term ? [`Term: ${term}`] : [])] : []}
           />
         </div>
@@ -2862,6 +2829,9 @@ function ReportsContent() {
           </div>
         )}
         {role === 'admin' && activeTab === 'adoption' && <AdminAdoptionTab />}
+        {role === 'admin' && activeTab === 'operations' && <AdminOperationsTab />}
+        {role === 'admin' && activeTab === 'assets' && <AssetsTab />}
+        {role === 'admin' && activeTab === 'inventory' && <InventoryTab />}
         {role === 'admin' && activeTab === 'audit' && <AdminAuditPanel />}
 
         {/* Every other role's panels are scoped to an academic year and term. */}
@@ -2903,7 +2873,7 @@ function ReportsContent() {
             {role === 'high_rank' && activeTab === 'completion' && (
               <div className="space-y-5">
                 <MarkCompletionTab academicYear={year} term={term} />
-                <ExamPipelineTab academicYear={year} term={term} />
+                <ExamWorkflowTab academicYear={year} term={term} />
               </div>
             )}
             {role === 'high_rank' && activeTab === 'finance' && (
@@ -2913,7 +2883,9 @@ function ReportsContent() {
               <FinanceAgingTab academicYear={year} term={term} />
             )}
             {role === 'high_rank' && activeTab === 'procurement' && <ProcurementTab />}
-            {role === 'high_rank' && activeTab === 'stocktake' && <StocktakeTab academicYear={year} />}
+            {role === 'high_rank' && activeTab === 'stocktake' && <StocktakeTab academicYear={year} {...(term !== null ? { term } : {})} />}
+            {role === 'high_rank' && activeTab === 'assets' && <AssetsTab />}
+            {role === 'high_rank' && activeTab === 'inventory' && <InventoryTab />}
             {role === 'high_rank' && activeTab === 'workforce' && (
               <div className="space-y-5">
                 <HrOverviewTab academicYear={year} />
@@ -2961,7 +2933,9 @@ function ReportsContent() {
               <FinanceScholarshipsPanel academicYear={year} />
             )}
             {role === 'finance' && activeTab === 'procurement' && <ProcurementTab />}
-            {role === 'finance' && activeTab === 'stocktake' && <StocktakeTab academicYear={year} />}
+            {role === 'finance' && activeTab === 'stocktake' && <StocktakeTab academicYear={year} {...(term !== null ? { term } : {})} />}
+            {role === 'finance' && activeTab === 'assets' && <AssetsTab />}
+            {role === 'finance' && activeTab === 'inventory' && <InventoryTab />}
             {role === 'finance' && activeTab === 'summary' && (
               <FinanceSummaryPanel academicYear={year} term={term} />
             )}
@@ -2976,7 +2950,8 @@ function ReportsContent() {
             {role === 'library' && activeTab === 'circulation' && <LibraryCirculationTab />}
             {role === 'library' && activeTab === 'borrowing' && <LibraryBorrowingPanel />}
             {role === 'library' && activeTab === 'fines' && <LibraryFinesTab />}
-            {role === 'library' && activeTab === 'digital' && <LibraryDigitalPanel />}
+            {role === 'library' && activeTab === 'digital' && <LibraryDigitalTab />}
+            {role === 'library' && activeTab === 'stock' && <LibraryStockTab />}
 
             {/* ── Lower Rank Panels ── */}
             {role === 'lower_rank' && activeTab === 'admissions' && (
@@ -3020,10 +2995,13 @@ function ReportsContent() {
               <MarkCompletionTab academicYear={year} term={term} />
             )}
             {role === 'exam_officer' && activeTab === 'pipeline' && (
-              <ExamPipelineTab academicYear={year} term={term} />
+              <ExamWorkflowTab academicYear={year} term={term} />
             )}
             {role === 'exam_officer' && activeTab === 'maneb' && (
-              <ManebAnalyticsPanel academicYear={year} />
+              <div className="space-y-5">
+                <ManebStatusCard academicYear={year} />
+                <ManebAnalyticsPanel academicYear={year} />
+              </div>
             )}
             {role === 'exam_officer' && activeTab === 'candidates' && (
               <ManebCandidatesPanel academicYear={year} />
@@ -3063,6 +3041,7 @@ function ReportsContent() {
             {role === 'student' && activeTab === 'fees' && (
               <StudentFeesTab academicYear={year} term={term} />
             )}
+            {role === 'student' && activeTab === 'placement' && <StudentPlacementTab />}
             {role === 'student' && activeTab === 'summary' && (
               <StudentSummaryPanel studentId={user?.uid ?? ''} />
             )}

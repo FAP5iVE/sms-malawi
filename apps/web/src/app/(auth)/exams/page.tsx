@@ -86,7 +86,6 @@ import { apiFetch } from '@/lib/api-client'
 import { EXAM_MARKS_ENTERABLE_STATUSES } from '@shared/schemas/exam'
 import { ModuleTabs }        from '@/components/shared/ModuleTabs'
 import { ModuleSurface }     from '@/components/shared/ModuleSurface'
-import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import {
   Calendar,
   Plus,
@@ -145,13 +144,15 @@ function ExamsPageInner() {
   const tabParam = searchParams.get('tab')
   const initialTab: Tab = tabParam && TABS.some((x) => x.id === tabParam) ? (tabParam as Tab) : 'exams'
 
-  const [tab, setTab] = useState<Tab>(initialTab)
+  const [pickedTab, setTab] = useState<Tab>(initialTab)
   // Term (like the year, below) follows the school's stored current period
   // until the user explicitly picks a different one.
-  // [UNIVERSAL PERIOD FILTER] Year AND term now come from the app-wide
-  // header filter (useViewingPeriod). This page's own year/term selects
-  // write THROUGH to it, so there is exactly one source of truth.
-  const { academicYear, term, setTerm, setAcademicYear } = useEffectiveViewingPeriod()
+  // [UNIVERSAL PERIOD FILTER] Year AND term come ONLY from the app-wide header
+  // filter (useViewingPeriod). This page used to carry its own year select and
+  // term select that wrote THROUGH to it — two controls for one value, on a
+  // page that already shows the period in its subtitle. They are gone; change
+  // the period from the header and every tab here follows.
+  const { academicYear, term } = useEffectiveViewingPeriod()
   const [pickedClassId, setSelectedClassId] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [marksExamId, setMarksExamId] = useState<string | null>(null)
@@ -167,6 +168,23 @@ function ExamsPageInner() {
   const [computeResult, setComputeResult] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
 
   const { data: myStudent, isLoading: myStudentLoading } = useStudentMe()
+
+  // ── STUDENT EXAM GUARD ─────────────────────────────────────────────────────
+  // A student sees ONLY the exams of the class they belong to. There is no
+  // class picker for them (it listed every class in the school), and:
+  //   • active student, no class yet  -> the Exams tab stays, with an
+  //     explanation (they are expected to be placed soon)
+  //   • NON-active student (graduated / archived / awaiting MANEB) with no
+  //     class -> the Exams tab is hidden entirely; My Results is what they
+  //     still need. The server (examService.listExams) enforces the same
+  //     scope, so this is presentation on top of a real guard.
+  // `studentResolved` matters: until /students/me answers (or if it fails) we
+  // must not conclude "no class" and hide a tab the student is entitled to.
+  const isStudent = role === 'student'
+  const studentResolved = isStudent && !!myStudent
+  const studentClassId = studentResolved ? (myStudent?.classId ?? null) : null
+  const studentHasNoClass = studentResolved && !studentClassId
+  const hideExamsTab = studentHasNoClass && myStudent?.status !== 'ACTIVE'
   // [PRODUCTION FIX] Academic year was a fixed read-only value derived
   // straight from schoolInfo.currentYear — no way to look at a past year's
   // exams, analytics, or MANEB records at all. Every other multi-year
@@ -184,7 +202,8 @@ function ExamsPageInner() {
     }
   }, [term, academicYear, setTitle, setSubtitle])
 
-  const { data: classesData } = useClasses(academicYear)
+  // Students never choose a class (their own is fixed), so don't fetch the school's class list for them.
+  const { data: classesData } = useClasses(academicYear, false, !isStudent)
   const classes = (classesData ?? []) as ApiClass[]
   // A class picked under another year is not in this year's list — treat it
   // as "no class selected" rather than querying with a stale id.
@@ -193,7 +212,8 @@ function ExamsPageInner() {
   const { data: examsData, isLoading: examsLoading } = useExams(
     selectedClassId || undefined,
     academicYear,
-    term
+    term,
+    !studentHasNoClass,   // no class => nothing to fetch (the server would return [] anyway)
   )
   const exams = (examsData ?? []) as ApiExam[]
   const marksExam = marksExamId ? exams.find((e) => e.id === marksExamId) : undefined
@@ -254,12 +274,17 @@ function ExamsPageInner() {
   const canViewAnalytics = can('exam.viewClassAnalytics')
   const canViewManeb = role === 'admin' || role === 'high_rank' || role === 'exam_officer'
   const visibleTabs = TABS.filter((t) => {
+    if (t.id === 'exams') return !hideExamsTab
     if (t.id === 'results') return role === 'student'
     if (t.id === 'analytics') return canViewAnalytics
     if (t.id === 'maneb') return canViewManeb
     if (MANAGEMENT_TABS.includes(t.id)) return role !== 'student' && role !== 'lower_rank'
     return true
   })
+  // The tab actually shown: the picked one if this person may see it, otherwise
+  // the first they can (e.g. a graduated student lands on My Results, and a
+  // deep link to a hidden tab can't render its content).
+  const tab: Tab = visibleTabs.some((t) => t.id === pickedTab) ? pickedTab : (visibleTabs[0]?.id ?? 'exams')
 
   // Per-exam workflow actions. One definition shared by the desktop table row
   // and the mobile card, so the two layouts can never drift apart.
@@ -329,17 +354,6 @@ function ExamsPageInner() {
              giving assistive tech and E2E heading-role checks a landmark. */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <h1 className="font-heading text-2xl font-bold text-brand-navy">Exams</h1>
-            {/* [PRODUCTION FIX] Academic year is now a real, standard
-               dropdown (same shared component Finance/Placements/Classes
-               use) instead of a fixed value with no way to change it —
-               applies across every tab (Exams, Analytics, MANEB) since
-               they all read the same page-level academicYear. */}
-            <AcademicYearSelect
-              value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              aria-label="Select academic year"
-              className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none"
-            />
           </div>
 
           {/* [PRODUCTION FIX] Tab strip + tab content now sit inside
@@ -367,31 +381,29 @@ function ExamsPageInner() {
           {tab === 'exams' && (
             <div className="space-y-5">
               <div className="flex items-center gap-3 flex-wrap">
-                <select
-                  value={selectedClassId}
-                  onChange={(e) => setSelectedClassId(e.target.value)}
-                  aria-label="Select class"
-                  className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none"
-                >
-                  <option value="">All classes…</option>
-                  {classes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={term}
-                  onChange={(e) => setTerm(Number(e.target.value))}
-                  aria-label="Select term"
-                  className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none"
-                >
-                  {[1, 2, 3].map((n) => (
-                    <option key={n} value={n}>
-                      Term {n}
-                    </option>
-                  ))}
-                </select>
+                {isStudent ? (
+                  // Read-only: a student's exams are their own class's, nothing else.
+                  myStudent?.className ? (
+                    <span className="inline-flex items-center gap-2 border border-base rounded-xl px-3 py-2 text-sm bg-surface text-body">
+                      <GraduationCap className="w-4 h-4 text-muted" aria-hidden />
+                      {myStudent.className}
+                    </span>
+                  ) : null
+                ) : (
+                  <select
+                    value={selectedClassId}
+                    onChange={(e) => setSelectedClassId(e.target.value)}
+                    aria-label="Select class"
+                    className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none"
+                  >
+                    <option value="">All classes…</option>
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 {canScheduleExam && (
                   <button
                     onClick={() => setShowForm(true)}
@@ -448,7 +460,11 @@ function ExamsPageInner() {
                 // panel's own side padding). Removed so the content sits
                 // directly on the panel, matching every other section.
                 <div className="text-center py-20 text-muted text-sm">
-                  No exams scheduled yet.{canScheduleExam && ' Click "Schedule Exam" to add one.'}
+                  {studentHasNoClass
+                    ? 'You have not been assigned to a class yet, so there are no exams to show. Please check with the school office.'
+                    : isStudent
+                      ? 'No exams have been released for your class in this term yet.'
+                      : <>No exams scheduled yet.{canScheduleExam && ' Click "Schedule Exam" to add one.'}</>}
                 </div>
               )}
 

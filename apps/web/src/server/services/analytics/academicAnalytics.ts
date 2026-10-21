@@ -29,6 +29,7 @@ import {
 } from './academicLogic'
 import { daysBetween, kpi, mean, ratioPct, thresholdKpi } from '@/server/services/reporting/kpi'
 import { compact, markCompletionInsight, passRateInsight, sortInsights } from '@/server/services/reporting/insights'
+import { enrichAttention, rankAttention } from './executiveLogic'
 
 const FINAL_STATUSES = ['MARKS_FINAL', 'RESULTS_APPROVED', 'RESULTS_RELEASED'] as const
 const MANEB_TYPES = ['MANEB_JCE', 'MANEB_MSCE'] as const
@@ -464,7 +465,6 @@ export async function getAcademicAttention(uid: string, academicYear: string, te
     { key: 'assignments-outstanding', severity: 'info', label: 'Assignments with work outstanding', count: assignments.totals.overdue, href: '/reports?tab=assignments' },
     { key: 'exams-this-week', severity: 'info', label: 'Exams in the next 7 days', count: week, href: '/reports?tab=readiness' },
   ]
-  const order = { critical: 0, watch: 1, info: 2, positive: 3 } as const
-  return items.filter((i) => (i.count ?? 0) > 0).sort((a, b) => order[a.severity] - order[b.severity])
+  return enrichAttention(rankAttention(items))
 }
 

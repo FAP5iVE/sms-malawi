@@ -25,9 +25,33 @@ export interface QuickAction {
 
 interface QuickActionsProps {
   actions: QuickAction[]
+  /** One wrapping row of small labelled links instead of a grid of tiles (saves a screen on phones). */
+  compact?: boolean
 }
 
-export function QuickActions({ actions }: QuickActionsProps) {
+export function QuickActions({ actions, compact = false }: QuickActionsProps) {
+  if (compact) {
+    return (
+      <section aria-label="Quick actions" className="bg-surface border border-base rounded-xl p-3 sm:p-4">
+        <h3 className="font-heading font-semibold text-sm text-brand-navy mb-2">Quick actions</h3>
+        <div className="flex flex-wrap gap-2">
+          {actions.map((action) => {
+            const Icon = action.icon
+            return (
+              <Link
+                key={action.label}
+                href={action.href}
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-base px-3 text-xs font-medium text-body hover:bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/30"
+              >
+                <Icon className={`w-4 h-4 ${action.text ?? 'text-brand-navy'}`} aria-hidden />
+                {action.label}
+              </Link>
+            )
+          })}
+        </div>
+      </section>
+    )
+  }
   return (
     <div className="bg-surface border border-base rounded-xl p-3 sm:p-5">
       <h3 className="font-heading font-semibold text-sm text-brand-navy mb-3 sm:mb-4">Quick Actions</h3>

@@ -72,7 +72,11 @@ export const PAGE_ACCESS: Record<string, readonly UserRole[]> = {
   // that can submit a request — not just the four student/class roles — needs
   // to open it to track its own submissions. What each person sees inside is
   // decided per request type by the server (approvalHubService), not here.
-  '/approvals': ALL_ROLES,
+  // Students are deliberately excluded: they never review anything, and the
+  // two flows they can start (placement claims, book recommendations) are
+  // tracked on their own pages (/placements, /library) — see
+  // approvalHubService.requesterLandingUrl().
+  '/approvals': ALL_STAFF,
   '/user-management': ['admin'],
   '/settings': ALL_ROLES,
   // R18 — University Placement Module. [OVERHAUL] The old two-page split

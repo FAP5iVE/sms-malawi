@@ -212,16 +212,21 @@ export const queryKeys = {
     lists: () => ['students', 'list'] as const,
     list: (filters: Record<string, unknown>) =>
       ['students', 'list', filters] as const,
-    detail: (id: string) => ['students', 'detail', id] as const,
+    // The optional period is APPENDED so existing prefix invalidations
+    // (['students','detail',id]) still match every period's cache entry.
+    detail: (id: string, period?: { academicYear?: string; term?: number }) =>
+      (period ? ['students', 'detail', id, period] : ['students', 'detail', id]) as readonly unknown[],
     /** R15 — student-role self-lookup (GET /students/me, useStudentMe). */
-    me: () => ['students', 'me'] as const,
+    me: (period?: { academicYear?: string; term?: number }) =>
+      (period ? ['students', 'me', period] : ['students', 'me']) as readonly unknown[],
     attendance: (id: string, term?: number) =>
       ['students', id, 'attendance', term] as const,
     feeStatus: (id: string) => ['students', id, 'fee-status'] as const,
     libraryStatus: (id: string) => ['students', id, 'library-status'] as const,
     riskFlags: (id: string) => ['students', id, 'risk'] as const,
     /** GET /students/at-risk, useHighRiskStudents(). */
-    atRisk: (limit?: number) => ['students', 'at-risk', limit ?? 6] as const,
+    atRisk: (limit?: number, period?: { academicYear?: string; term?: number }) =>
+      ['students', 'at-risk', limit ?? 6, period ?? null] as const,
     transcript: (id: string) => ['students', id, 'transcript'] as const,
     photo: (id: string) => ['students', id, 'photo'] as const,
   },
@@ -231,7 +236,8 @@ export const queryKeys = {
     all: () => ['classes'] as const,
     list: (filters?: Record<string, unknown>) =>
       ['classes', 'list', filters ?? {}] as const,
-    detail: (id: string) => ['classes', 'detail', id] as const,
+    detail: (id: string, period?: { academicYear?: string; term?: number }) =>
+      (period ? ['classes', 'detail', id, period] : ['classes', 'detail', id]) as readonly unknown[],
     timetable: (id: string, year?: string, term?: number) =>
       ['classes', id, 'timetable', year, term] as const,
     assignments: (id: string) => ['classes', id, 'assignments'] as const,

@@ -23,6 +23,7 @@ import {
 import { lastMonths, monthKey } from './libraryLogic'
 import { daysBetween, kpi, ratioPct, thresholdKpi } from '@/server/services/reporting/kpi'
 import { compact, sortInsights } from '@/server/services/reporting/insights'
+import { enrichAttention, rankAttention } from './executiveLogic'
 
 const STATUS_ORDER = ['PENDING', 'APPROVED', 'AWAITING_ADMISSION', 'ADMITTED', 'DENIED'] as const
 const STATUS_LABEL: Record<string, string> = {
@@ -244,6 +245,12 @@ export async function getAdmissionsOverview(
   }
 }
 
+/** Age of the oldest application that has been waiting less than 14 days (null when there is none). */
+function oldestAmongFresh(rows: readonly { createdAt: Date }[], now: Date): number | null {
+  const ages = rows.map((r) => daysBetween(r.createdAt, now)).filter((d) => d < 14)
+  return ages.length > 0 ? Math.max(...ages) : null
+}
+
 export async function getAdmissionsAttention(): Promise<AttentionItem[]> {
   const now = new Date()
   const [pendingRows, awaiting, noClass, noGuardianPhone, maneb] = await Promise.all([
@@ -254,14 +261,14 @@ export async function getAdmissionsAttention(): Promise<AttentionItem[]> {
     prisma.student.count({ where: { status: 'AWAITING_MANEB_RESULTS' } }),
   ])
   const stale = pendingRows.filter((p) => daysBetween(p.createdAt, now) >= 14).length
+  const oldestPending = pendingRows.length > 0 ? Math.max(...pendingRows.map((p) => daysBetween(p.createdAt, now))) : null
   const items: AttentionItem[] = [
-    { key: 'applications-stale', severity: 'critical', label: 'Applications waiting more than 14 days', count: stale, href: '/applications' },
-    { key: 'applications-pending', severity: 'watch', label: 'Applications waiting for review', count: pendingRows.length - stale, href: '/applications' },
+    { key: 'applications-stale', severity: 'critical', label: 'Applications waiting more than 14 days', count: stale, ageDays: oldestPending, href: '/applications' },
+    { key: 'applications-pending', severity: 'watch', label: 'Applications waiting for review', count: pendingRows.length - stale, ageDays: stale === pendingRows.length ? null : oldestAmongFresh(pendingRows, now), href: '/applications' },
     { key: 'awaiting-admission', severity: 'watch', label: 'Accepted applicants awaiting admission', count: awaiting, href: '/applications' },
     { key: 'students-no-class', severity: 'watch', label: 'Active students without a class', count: noClass, href: '/students' },
     { key: 'missing-guardian-phone', severity: 'info', label: 'Students missing a guardian phone number', count: noGuardianPhone, href: '/students' },
     { key: 'awaiting-maneb', severity: 'info', label: 'Students awaiting MANEB results', count: maneb, href: '/students' },
   ]
-  const order = { critical: 0, watch: 1, info: 2, positive: 3 } as const
-  return items.filter((i) => (i.count ?? 0) > 0).sort((a, b) => order[a.severity] - order[b.severity])
+  return enrichAttention(rankAttention(items))
 }

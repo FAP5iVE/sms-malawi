@@ -15,6 +15,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type {
   ApiMyPlacementResponse,
+  ApiOwnPlacementRecord,
   ApiUniversityPlacement,
   ApiPlacementEligibleStudent,
   ApiPlacementAnalytics,
@@ -40,7 +41,7 @@ export function useSubmitPlacementClaim() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: StudentClaimInput) =>
-      apiFetch<ApiUniversityPlacement>('/placements/me/claim', { method: 'POST', body: JSON.stringify(data) }),
+      apiFetch<ApiOwnPlacementRecord>('/placements/me/claim', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.placements.me() })
       qc.invalidateQueries({ queryKey: ['placements', 'registry'] })

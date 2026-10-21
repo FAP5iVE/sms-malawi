@@ -18,9 +18,8 @@ import 'server-only'
 import { prisma } from '@/lib/prisma'
 import * as auditService from '@/server/services/auditService'
 import type { UserRole } from '@shared/types/roles'
+import { balanceFromTransactions, INBOUND, OUTBOUND } from './inventoryBalance'
 
-const INBOUND: string[] = ['OPENING_BALANCE', 'RECEIPT', 'RETURN', 'ADJUSTMENT']
-const OUTBOUND: string[] = ['ISSUE', 'TRANSFER', 'DAMAGE', 'LOSS', 'DISPOSAL']
 // Note: TRANSFER is modelled as one outbound leg from sourceRoomId and one inbound
 // leg (also transactionType TRANSFER) into destinationRoomId — see transferStock().
 // A transfer's *net* effect on total quantity is zero; it only moves the
@@ -78,24 +77,8 @@ export async function updateItem(
 
 export async function getStockBalance(inventoryItemId: string) {
   const transactions = await prisma.inventoryTransaction.findMany({ where: { inventoryItemId } })
-
-  const byRoom = new Map<string, number>()
-  let total = 0
-
-  for (const t of transactions) {
-    const qty = Number(t.quantity)
-    if (t.transactionType === 'TRANSFER') {
-      if (t.sourceRoomId) byRoom.set(t.sourceRoomId, (byRoom.get(t.sourceRoomId) ?? 0) - qty)
-      if (t.destinationRoomId) byRoom.set(t.destinationRoomId, (byRoom.get(t.destinationRoomId) ?? 0) + qty)
-      continue // net zero on total — a transfer never changes how much exists, only where
-    }
-    const delta = INBOUND.includes(t.transactionType) ? qty : OUTBOUND.includes(t.transactionType) ? -qty : 0
-    total += delta
-    const room = t.destinationRoomId ?? t.sourceRoomId
-    if (room) byRoom.set(room, (byRoom.get(room) ?? 0) + delta)
-  }
-
-  return { inventoryItemId, total, byRoom: Object.fromEntries(byRoom) }
+  // The maths lives in inventoryBalance.ts so the inventory reports use the same rule.
+  return { inventoryItemId, ...balanceFromTransactions(transactions) }
 }
 
 export async function listTransactions(filters: { inventoryItemId?: string; departmentId?: string; roomId?: string; limit?: number }) {

@@ -20,7 +20,8 @@
  *   ('/assets' — same phase)
  */
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
@@ -126,13 +127,40 @@ export default function AssetsPage() {
         'exam_officer',
       ]}
     >
-      <AssetsContent />
+      {/* useSearchParams() needs a Suspense boundary or `next build` fails. */}
+      <Suspense fallback={<div className="p-8 text-center text-muted" role="status">Loading…</div>}>
+        <AssetsContent />
+      </Suspense>
     </RoleGuard>
   )
 }
 
+const isTab = (v: string | null): v is Tab => TABS.some((t) => t.id === v)
+const oneOf = (v: string | null, allowed: readonly string[]): string => (v !== null && allowed.includes(v) ? v : '')
+
+/**
+ * Report drill-downs arrive as /assets?tab=…&status=…&category=…&condition=…&asset=<id>
+ * (also ?stocktake=<id>, ?item=<code>, ?low=1). Every value is validated before
+ * use, so a stale or hand-edited link falls back to the unfiltered screen.
+ */
 function AssetsContent() {
-  const [tab, setTab] = useState<Tab>('register')
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const [tab, setTab] = useState<Tab>(isTab(tabParam) ? tabParam : 'register')
+  // Re-read ?tab= when only the query string changes (client-side navigation keeps this component mounted).
+  const [prevTabParam, setPrevTabParam] = useState(tabParam)
+  if (tabParam !== prevTabParam) {
+    setPrevTabParam(tabParam)
+    if (isTab(tabParam)) setTab(tabParam)
+  }
+  const preset = {
+    status: oneOf(searchParams.get('status'), STATUSES),
+    category: oneOf(searchParams.get('category'), CATEGORIES),
+    condition: oneOf(searchParams.get('condition'), CONDITIONS),
+    search: (searchParams.get('q') ?? '').slice(0, 100),
+    asset: searchParams.get('asset'),
+  }
+  const presetKey = JSON.stringify(preset)
   const { data: stats } = useInventoryStats()
 
   return (
@@ -213,12 +241,18 @@ function AssetsContent() {
         ))}
       </div>
 
-      {tab === 'register' && <RegisterTab />}
+      {tab === 'register' && <RegisterTab key={presetKey} preset={preset} />}
       {tab === 'rooms' && <RoomsTab />}
       {tab === 'mine' && <MyAssignedTab />}
       {tab === 'requests' && <RequestsTab />}
-      {tab === 'inventory' && <InventoryOperationsTab />}
-      {tab === 'stocktakes' && <StocktakesTab />}
+      {tab === 'inventory' && (
+        <InventoryOperationsTab
+          key={`${searchParams.get('item')}|${searchParams.get('low')}`}
+          initialSearch={(searchParams.get('item') ?? '').slice(0, 100)}
+          initialLowStock={searchParams.get('low') === '1'}
+        />
+      )}
+      {tab === 'stocktakes' && <StocktakesTab key={searchParams.get('stocktake') ?? 'all'} initialSelectedId={searchParams.get('stocktake')} />}
       {tab === 'locations' && <LocationsTab />}
       </ModuleSurface>
     </div>
@@ -229,19 +263,29 @@ function AssetsContent() {
 // REGISTER TAB
 // ═══════════════════════════════════════════════════════════
 
-function RegisterTab() {
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('')
-  const [status, setStatus] = useState('')
+interface RegisterPreset {
+  status: string
+  category: string
+  condition: string
+  search: string
+  asset: string | null
+}
+
+function RegisterTab({ preset }: { preset: RegisterPreset }) {
+  const [search, setSearch] = useState(preset.search)
+  const [category, setCategory] = useState(preset.category)
+  const [status, setStatus] = useState(preset.status)
+  const [condition, setCondition] = useState(preset.condition)
   const [formAsset, setFormAsset] = useState<ApiAsset | null | undefined>(undefined) // undefined = closed, null = create, ApiAsset = edit
   const [allocateAsset, setAllocateAsset] = useState<ApiAsset | null>(null)
   const [conditionAsset, setConditionAsset] = useState<ApiAsset | null>(null)
-  const [detailAssetId, setDetailAssetId] = useState<string | null>(null)
+  const [detailAssetId, setDetailAssetId] = useState<string | null>(preset.asset)
 
   const { data: assets, isLoading } = useAssets({
     search: search || undefined,
     category: category || undefined,
     status: status || undefined,
+    condition: condition || undefined,
   })
 
   return (
@@ -280,6 +324,19 @@ function RegisterTab() {
           {STATUSES.map((s) => (
             <option key={s} value={s}>
               {humanize(s)}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Filter by condition"
+          value={condition}
+          onChange={(e) => setCondition(e.target.value)}
+          className="border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+        >
+          <option value="">All conditions</option>
+          {CONDITIONS.map((c) => (
+            <option key={c} value={c}>
+              {humanize(c)}
             </option>
           ))}
         </select>

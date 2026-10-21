@@ -403,8 +403,8 @@ export type Permission =
   //    the "Malawi Higher Education Placement & Advisory" reference module) ──
   | 'placement.viewOwn'             // A graduated student views their own claim/placement status
   | 'placement.recordOwnChoice'     // A graduated student submits their own placement claim (Student Claim Portal)
-  | 'placement.view'                // View the Placement Registry & Analytics tab, and run the MSCE Advisory calculator (ALL roles, incl. student)
-  | 'placement.viewAnalytics'       // View cohort placement analytics (all roles, incl. student)
+  | 'placement.view'                // Run the MSCE Advisory calculator and see the catalogue (ALL roles, incl. student). Does NOT grant the registry — that is placement.viewAnalytics
+  | 'placement.viewAnalytics'       // View the cohort placement registry (named candidates, MSCE numbers/points) and cohort analytics (all staff roles — NOT student)
   | 'placement.manage'              // Record an official staff placement entry (Staff Placement Entry tab) (admin, high_rank)
   | 'placement.recordOutcome'       // Record an official staff placement entry (Staff Placement Entry tab) (also lower_rank — admissions-desk clerks)
   | 'placement.verifyOutcome'       // Approve or reject a student's claim (Claims Verification Desk) (admin, high_rank only)
@@ -1462,11 +1462,14 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'settings.viewPersonal',
     'settings.updateNotifPrefs',
 
-    // Placement — own placement self-service + cohort/analytics visibility (R18)
+    // Placement — own placement self-service + the advisory calculator (R18).
+    // Deliberately NO 'placement.viewAnalytics': the cohort registry and
+    // analytics carry other students' names, MSCE candidate numbers and points,
+    // so a student only ever reads their own record (/placements/me and
+    // /reporting/student/placement).
     'placement.viewOwn',
     'placement.recordOwnChoice',
     'placement.view',
-    'placement.viewAnalytics',
   ]),
 } as const
 

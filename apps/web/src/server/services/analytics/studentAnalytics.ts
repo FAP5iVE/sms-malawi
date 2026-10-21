@@ -19,6 +19,7 @@ import { checkBalanceGate } from '@/server/services/feeService'
 import { getPassMarkThreshold } from '@/server/services/gradeService'
 import { getTermDateRange } from '@/server/services/attendanceService'
 import { aggregateWeeks, attendanceRate } from './attendanceLogic'
+import { destinationNames } from './studentPlacementLogic'
 import { assignmentStatus, assignmentTotals, parseSubjectResults, subjectRows } from './studentLogic'
 import { daysBetween, kpi, previousPeriod, ratioPct, round, thresholdKpi } from '@/server/services/reporting/kpi'
 import { compact, sortInsights } from '@/server/services/reporting/insights'
@@ -252,8 +253,8 @@ export async function getStudentOverview(studentId: string, academicYear: string
     getStudentFees(studentId, academicYear),
     upcomingExamCount(ctx.classId, 14),
     prisma.universityPlacement.findFirst({
-      where: { studentId }, orderBy: { updatedAt: 'desc' },
-      select: { status: true, placedUniversityName: true },
+      where: { studentId }, orderBy: { createdAt: 'desc' },
+      select: { status: true, placedUniversityId: true, placedProgrammeId: true, placedUniversityName: true, placedProgrammeName: true },
     }),
   ])
 
@@ -297,8 +298,8 @@ export async function getStudentOverview(studentId: string, academicYear: string
     }),
     ...(placement
       ? [kpi({
-          key: 'placement', label: 'Placement', unit: 'text', value: placement.status === 'CONFIRMED' ? (placement.placedUniversityName ?? 'Confirmed') : placement.status === 'PENDING_APPROVAL' ? 'Claim under review' : 'Claim not approved',
-          description: 'Status of your university placement record.', href: '/placements',
+          key: 'placement', label: 'Placement', unit: 'text', value: placement.status === 'CONFIRMED' ? (destinationNames(placement).university ?? 'Confirmed') : placement.status === 'PENDING_APPROVAL' ? 'Claim under review' : 'Claim not approved',
+          description: 'Status of your university placement record.', href: '/reports?tab=placement',
         })]
       : []),
   ]

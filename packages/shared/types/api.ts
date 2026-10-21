@@ -33,6 +33,16 @@
 // Lightweight API response types shared between frontend hooks and backend routes
 // These do NOT need to match Prisma types exactly — just the fields the frontend uses
 
+/** Which module owns a risk factor — drives the deep link on the risk card. */
+export type ApiRiskDomain = 'FEES' | 'ACADEMICS' | 'ATTENDANCE' | 'LIBRARY'
+
+export interface ApiRiskFactor {
+  id: string
+  domain: ApiRiskDomain
+  severity: 'HIGH' | 'MEDIUM' | 'LOW'
+  detail: string
+}
+
 export interface ApiStudent {
   id: string
   registrationNo: string
@@ -55,6 +65,11 @@ export interface ApiStudent {
   class?: { id: string; name: string; form: number }
   feeBalance?: number
   riskLevel?: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH'
+  /** 0-100 composite from the unified risk engine (riskService). */
+  riskScore?: number
+  riskFactors?: ApiRiskFactor[]
+  /** Cross-module observations, e.g. "fee arrears together with absence…". */
+  riskInsights?: string[]
 }
 
 /** Response shape of POST /applications/:id/convert and POST /students/from-application/:id */
@@ -79,7 +94,9 @@ export interface ApiHighRiskStudent {
   lastName: string
   className: string | null
   riskLevel: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH'
+  riskScore?: number
   topFactor: string | null
+  domains?: ApiRiskDomain[]
 }
 
 export interface ApiHighRiskStudentsResponse {
@@ -584,7 +601,8 @@ export interface ApiFinanceSummary {
   totalOutstanding: number
   totalExpenses: number
   collectionTarget: number
-  collectionPercent: number // 0–100
+  /** 0–100, one decimal; null (not 0) when nothing has been billed for the term. */
+  collectionPercent: number | null
 }
 
 export interface ApiScholarship {
@@ -1035,7 +1053,8 @@ export interface ApiFinanceReport {
   collected?:     number   // NOTE: backend returns 'collected', not 'totalCollected'
   outstanding?:   number
   target?:        number
-  collectionPct?: number
+  /** null = nothing billed for the scope (never 0). */
+  collectionPct?: number | null
 }
 
 export interface ApiLibraryReport {
@@ -1071,8 +1090,10 @@ export interface ApiAcademicClassSummary {
   className: string
   form:      number
   total:     number
-  passRate:  number
-  avg:       number
+  /** null = the class has no computed results (never 0). */
+  passRate:  number | null
+  /** null = the class has no computed results (never 0). */
+  avg:       number | null
 }
 
 export interface ApiAcademicReport {
@@ -1127,9 +1148,14 @@ export interface ApiActivityHeatmapCell {
 export interface ApiClassPerformanceStat {
   className:    string
   form:         number
+  /** Students on the class roster. */
   studentCount: number
-  passRate:     number
-  average:      number
+  /** Students with a computed term result. */
+  assessed:     number
+  /** null = no computed results yet (never 0); a real 0 means nobody passed. */
+  passRate:     number | null
+  /** null = no computed results yet (never 0). */
+  average:      number | null
   term:         number
 }
 
@@ -1248,8 +1274,12 @@ export interface ApiBudgetVsActualRow {
   /** ExpenseCategory enum member — the real Budget-to-Expense join key. */
   category:    string
   allocated:   number
+  /** Live APPROVED expenses (never the cached Budget.spent column). */
   spent:       number
-  utilisation: number
+  /** spent ÷ allocated (percent); null when nothing is allocated (never 0). */
+  utilisation: number | null
+  /** True for spend in a category that has no budget in scope. */
+  unbudgeted:  boolean
 }
 
 /** GET /analytics/finance/outstanding-by-class. Not a plain
@@ -1520,8 +1550,11 @@ export interface ApiPlacementRecommendation {
 }
 
 // The signed-in student's own claim/placement + graduation eligibility.
+/** The student's own placement row — staff-internal fields (notes, staff uids, recorder name) are never sent. */
+export type ApiOwnPlacementRecord = Omit<ApiUniversityPlacement, 'notes' | 'recordedByUid' | 'verifiedByUid' | 'recordedByName'>
+
 export interface ApiMyPlacementResponse {
-  record:            ApiUniversityPlacement | null
+  record:            ApiOwnPlacementRecord | null
   // True once Student.status === 'GRADUATED' — the Student Claim Portal tab
   // only ever renders when this is true (below-MSCE / still-enrolled
   // students never see it).

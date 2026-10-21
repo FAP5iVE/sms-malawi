@@ -41,3 +41,126 @@ export interface ApiLibraryFines {
   collectionRate: number | null
   monthly: { label: string; assessed: number; collected: number }[]
 }
+
+// ─── Digital library (/reporting/library/digital) ───────────────────────────
+
+export interface ApiDigitalGroupRow {
+  key: string
+  label: string
+  resources: number
+  approved: number
+  pending: number
+  /** Recorded views in the window. */
+  views: number
+  /** Resources in the group viewed at least once in the window. */
+  resourcesViewed: number
+}
+
+export interface ApiDigitalUsageRow {
+  id: string
+  title: string
+  type: string
+  subject: string | null
+  form: number | null
+  views: number
+  uniqueViewers: number
+  lastViewedAt: string | null
+  approvedAt: string | null
+}
+
+export interface ApiDigitalPendingRow {
+  id: string
+  title: string
+  type: string
+  subject: string | null
+  form: number | null
+  submittedAt: string
+  ageDays: number
+}
+
+/** A measure the application does not record, so the report does not show it. */
+export interface ApiNotRecorded {
+  key: string
+  label: string
+  reason: string
+}
+
+export interface ApiLibraryDigital {
+  generatedAt: string
+  from: string
+  to: string
+  filters: { type: string | null; subject: string | null; form: number | null; status: 'approved' | 'pending' | null }
+  /** Earliest recorded view event ever; null if none. Views before this date were never recorded. */
+  trackingSince: string | null
+  catalogue: { total: number; approved: number; pending: number; oldestPendingDays: number | null }
+  usage: {
+    views: number
+    uniqueViewers: number
+    resourcesViewed: number
+    /** Approved resources viewed at least once ÷ approved resources; null when none are approved. */
+    usageRate: number | null
+    approvedNotViewed: number
+  }
+  byType: ApiDigitalGroupRow[]
+  bySubject: ApiDigitalGroupRow[]
+  byForm: ApiDigitalGroupRow[]
+  trend: { key: string; label: string; views: number }[]
+  trendUnit: 'day' | 'week'
+  mostUsed: ApiDigitalUsageRow[]
+  leastUsed: ApiDigitalUsageRow[]
+  pending: ApiDigitalPendingRow[]
+  /** The view table was larger than one pass reads, so usage figures cover only the latest events. */
+  viewsCapped: boolean
+  notRecorded: ApiNotRecorded[]
+}
+
+// ─── Physical stock (/reporting/library/stock) ──────────────────────────────
+
+export interface ApiLibraryStockCategoryRow {
+  category: string
+  titles: number
+  copies: number
+  available: number
+  onLoan: number
+  /** Copies neither on the shelf nor on loan — damaged or otherwise withdrawn. */
+  offShelf: number
+  availabilityRate: number | null
+}
+
+export interface ApiLibraryUnavailableRow {
+  bookId: string
+  title: string
+  author: string
+  category: string
+  copies: number
+  onLoan: number
+  overdue: number
+}
+
+export interface ApiLibraryStock {
+  generatedAt: string
+  windowDays: number
+  category: string | null
+  titles: number
+  copies: number
+  available: number
+  onLoan: number
+  offShelf: number
+  availabilityRate: number | null
+  /** Open loans past their due date (within the category filter, if one is set). */
+  overdueLoans: number
+  byCategory: ApiLibraryStockCategoryRow[]
+  /** Titles with copies owned but none available. */
+  unavailable: ApiLibraryUnavailableRow[]
+  condition: {
+    /** Copies marked damaged from the catalogue. Repairs are not recorded, so this is a running total. */
+    shelfDamagedCopies: number
+    /** Copies written off as lost from the catalogue. */
+    shelfLostCopies: number
+    /** Loans whose copy was never returned. */
+    loansLost: number
+    /** Loans returned damaged within the window. */
+    returnedDamaged: number
+  }
+  notRecorded: ApiNotRecorded[]
+}

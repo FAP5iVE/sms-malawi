@@ -46,6 +46,7 @@ import * as auditService from '@/server/services/auditService'
 import * as algolia from '@/server/services/algoliaService'
 import * as notificationService from '@/server/services/notificationService'
 import { resolveStudentFromUid } from '@/server/services/studentService'
+import { toOwnPlacementRecord } from '@/server/services/analytics/studentPlacementLogic'
 import {
   isManebRecordPlacementReady,
   computeEligibility,
@@ -210,7 +211,8 @@ export async function getMyPlacement(firebaseUid: string) {
   const certified = await findCertifiedMsceRecord(student.id)
 
   return {
-    record: raw ? mapPlacementRecord(raw, await resolveStaffNames([raw.recordedByUid, raw.verifiedByUid])) : null,
+    // Own record only, with staff-internal fields (notes, staff uids, recorder name, aggregate) removed.
+    record: raw ? toOwnPlacementRecord(mapPlacementRecord(raw, await resolveStaffNames([raw.verifiedByUid]))) : null,
     isGraduated:      student.status === 'GRADUATED',
     hasCertifiedMsce: certified !== null,
   }
@@ -281,7 +283,8 @@ export async function submitClaim(firebaseUid: string, input: StudentClaimInput)
   logger.info({ event: 'placement.claim.submitted', placementId: updated.id, studentId: student.id })
 
   void algolia.indexPlacement(toAlgoliaPlacement(updated))
-  return mapPlacementRecord(updated, await resolveStaffNames([updated.recordedByUid, updated.verifiedByUid]))
+  // The student's own claim: staff-internal fields are removed from what goes back to them.
+  return toOwnPlacementRecord(mapPlacementRecord(updated, await resolveStaffNames([updated.verifiedByUid])))
 }
 
 // ─────────────────────────────────────────────────────────

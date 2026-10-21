@@ -96,6 +96,8 @@ import { prisma }            from '@/lib/prisma'
 import { logger }            from '@/lib/logger'
 import { uploadFile, getSignedViewUrl, FILE_PREFIX } from '@/lib/storage'
 import * as settingsService  from '@/server/services/settingsService'
+import { getRasterSchoolLogo } from '@/server/services/schoolLogoService'
+import { drawLogoBadge }      from '@/server/services/pdfBranding'
 import * as attendanceService from '@/server/services/attendanceService'
 import { getManebExamType }  from '@shared/constants/malawi'
 import { computeManebAggregate, getGradeInfo } from '@/server/services/gradeService'
@@ -165,12 +167,16 @@ export async function getReportCardData(
   term:         1 | 2 | 3,
   academicYear: string,
 ): Promise<ReportCardData> {
-  const [student, identity] = await Promise.all([
+  const [student, identity, logo] = await Promise.all([
     prisma.student.findUniqueOrThrow({
       where:   { id: studentId },
       include: { class: { select: { id: true, name: true, form: true, teacherId: true } } },
     }),
     settingsService.getIdentitySettings(),
+    // Always resolves (admin upload, else the built-in school mark) — the card
+    // never prints an initials placeholder any more. Raster-only so the SAME
+    // value works for the on-screen print view and the jsPDF download.
+    getRasterSchoolLogo(),
   ])
 
   const classForm = student.class?.form ?? 1
@@ -187,7 +193,7 @@ export async function getReportCardData(
     schoolAddress: identity.schoolAddress,
     schoolPhone:   identity.schoolPhone,
     schoolEmail:   identity.schoolEmail || undefined,
-    schoolLogoUrl: identity.schoolLogoUrl || undefined,
+    schoolLogoUrl: logo.dataUri,
     student: {
       registrationNo: student.registrationNo,
       firstName:      student.firstName,
@@ -352,6 +358,8 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   // ── 1. Header ─────────────────────────────────────────────────────────────
   setFill(30, 58, 95)     // brand-navy
   doc.rect(ML, y, CW, 18, 'F')
+  // School logo, left of the title (white badge keeps the mark legible on navy)
+  drawLogoBadge(doc, data.schoolLogoUrl, ML + 2, y + 2, 14)
   setColor(255, 255, 255)
   setFont(14, 'bold')
   text(data.schoolName.toUpperCase(), W / 2, y + 8, { align: 'center' })

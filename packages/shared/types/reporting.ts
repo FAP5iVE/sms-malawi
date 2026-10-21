@@ -91,6 +91,12 @@ export interface AttentionItem {
   count: number | null
   detail?: string
   href?: string
+  /** Who normally acts on this (a role or team). Set by the server's routing table; absent when unknown. */
+  owner?: string
+  /** The next step, as a short verb phrase ("Review applications"). Absent when unknown. */
+  action?: string
+  /** Age in days of the oldest item in this group. Absent (not 0) when the age is not recorded. */
+  ageDays?: number | null
 }
 
 /** Standard multi-column table payload. */

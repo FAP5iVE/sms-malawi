@@ -24,6 +24,7 @@ import {
 import { compare, kpi, previousPeriod, ratioPct, thresholdKpi } from '@/server/services/reporting/kpi'
 import { THRESHOLDS } from '@/server/services/reporting/thresholds'
 import { attendanceInsight, compact, sortInsights } from '@/server/services/reporting/insights'
+import { enrichAttention, rankAttention } from './executiveLogic'
 
 export type AttendanceScope = { kind: 'school' } | { kind: 'teacher'; teacherUid: string }
 
@@ -268,6 +269,5 @@ export async function getAttendanceAttention(
     { key: 'chronic-absentees', severity: 'watch', label: 'Chronic absentees', count: r.chronic.length, href: '/reports?tab=attendance' },
     { key: 'stale-registers', severity: 'info', label: `Classes with no attendance marked in ${STALE_MARKING_DAYS} days`, count: stale.length, href: '/attendance' },
   ]
-  const order = { critical: 0, watch: 1, info: 2, positive: 3 } as const
-  return items.filter((i) => (i.count ?? 0) > 0).sort((a, b) => order[a.severity] - order[b.severity])
+  return enrichAttention(rankAttention(items))
 }

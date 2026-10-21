@@ -232,6 +232,8 @@ export interface AlgoliaStudent {
    *  header) — Algolia is the persistence layer for this cache value, kept
    *  fresh by the existing Monday 02:00 UTC cron rather than computed live. */
   riskLevel?:     'NONE' | 'LOW' | 'MEDIUM' | 'HIGH' | null
+  /** 0-100 composite from riskService — lets the index rank within a risk level. */
+  riskScore?:     number | null
 }
 
 export async function indexStudent(record: AlgoliaStudent): Promise<void> {

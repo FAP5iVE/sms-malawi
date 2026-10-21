@@ -17,6 +17,14 @@
  *   header comment below is corrected only now that all four are real.
  * [DEPENDS ON]: none
  *
+ * [UNIFIED RISK ENGINE] The data behind every variant now comes from
+ *   riskService.assessStudents() (fees + results + attendance + library). The
+ *   card variant shows the 0-100 score, each contributing factor with a link
+ *   to the module that owns it (only when the viewer's role can open that
+ *   module), and the engine's cross-module insights. It previously rendered
+ *   "No risk factors identified" for every student because the profile page
+ *   never passed factors in.
+ *
  * Compact coloured badge indicating a students computed risk level.
  * Used in: student list DataTable cells, student profile header,
  * class dashboard cards, and academic staff dashboard widgets.
@@ -37,8 +45,14 @@
  * Risk colours map to CSS custom properties so dark mode works correctly.
  */
 
-import { AlertTriangle, ShieldCheck, Info, AlertCircle } from 'lucide-react'
-import type { RiskLevel, RiskFactor } from '@/server/services/riskService'
+import Link from 'next/link'
+import { AlertTriangle, ShieldCheck, Info, AlertCircle, ArrowUpRight, Lightbulb } from 'lucide-react'
+import type { ApiRiskFactor, ApiRiskDomain } from '@shared/types/api'
+import { getAllowedRolesForPath } from '@shared/constants/pageAccess'
+import { useAuthStore } from '@/store/authStore'
+
+type RiskLevel  = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE'
+type RiskFactor = ApiRiskFactor
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIG
@@ -97,10 +111,33 @@ const RISK_CONFIG: Record<RiskLevel, {
 }
 
 const FACTOR_LABELS: Record<string, string> = {
-  FEE_DEBT:      'Outstanding fees',
-  POOR_GRADES:   'Academic performance',
-  HIGH_ABSENCE:  'Attendance concern',
-  SUBJECT_FAILS: 'Subject failures',
+  FEE_DEBT:        'Outstanding fees',
+  POOR_GRADES:     'Academic performance',
+  SUBJECT_FAILS:   'Subject failures',
+  GRADE_DECLINE:   'Declining results',
+  MISSED_EXAMS:    'Missed exams',
+  HIGH_ABSENCE:    'Attendance concern',
+  ABSENCE_STREAK:  'Consecutive absences',
+  LIBRARY_OVERDUE: 'Overdue library books',
+  LIBRARY_FINES:   'Library fines',
+}
+
+const DOMAIN_LABELS: Record<ApiRiskDomain, string> = {
+  FEES: 'Finances', ACADEMICS: 'Exams', ATTENDANCE: 'Attendance', LIBRARY: 'Library',
+}
+
+/**
+ * The module that owns each kind of factor. Attendance is marked on the class
+ * page for staff, while /attendance is the student-facing view — so that link
+ * depends on whether a class is known.
+ */
+function domainHref(domain: ApiRiskDomain, classId?: string | null): string {
+  switch (domain) {
+    case 'FEES':       return '/finances'
+    case 'ACADEMICS':  return '/exams'
+    case 'ATTENDANCE': return classId ? `/classes/${classId}` : '/classes'
+    case 'LIBRARY':    return '/library'
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,10 +148,18 @@ interface BadgeProps {
   riskLevel: RiskLevel
   variant?:  'badge' | 'dot' | 'card'
   factors?:  RiskFactor[]
+  /** Card only: 0-100 composite score from the engine. */
+  score?:    number
+  /** Card only: cross-module observations from the engine. */
+  insights?: string[]
+  /** Card only: lets the attendance factor link to the student's class page. */
+  classId?:  string | null
+  /** Badge/dot: hover text, typically the headline factor's detail. */
+  hint?:     string
   className?: string
 }
 
-function BadgeVariant({ riskLevel, className = '' }: { riskLevel: RiskLevel; className?: string }) {
+function BadgeVariant({ riskLevel, className = '', hint }: { riskLevel: RiskLevel; className?: string; hint?: string }) {
   const { label, icon: Icon, badge } = RISK_CONFIG[riskLevel]
   return (
     <span
@@ -124,6 +169,7 @@ function BadgeVariant({ riskLevel, className = '' }: { riskLevel: RiskLevel; cla
         ${badge} ${className}
       `}
       aria-label={`Risk level: ${label}`}
+      title={hint}
     >
       <Icon className="w-3 h-3 shrink-0" aria-hidden />
       {label}
@@ -135,13 +181,13 @@ function BadgeVariant({ riskLevel, className = '' }: { riskLevel: RiskLevel; cla
 // DOT VARIANT
 // ─────────────────────────────────────────────────────────────────────────────
 
-function DotVariant({ riskLevel }: { riskLevel: RiskLevel }) {
+function DotVariant({ riskLevel, hint }: { riskLevel: RiskLevel; hint?: string }) {
   const { label, dot } = RISK_CONFIG[riskLevel]
   return (
     <span
       className={`inline-block w-2.5 h-2.5 rounded-full ${dot} shrink-0`}
       aria-label={`Risk: ${label}`}
-      title={label}
+      title={hint ? `${label} — ${hint}` : label}
     />
   )
 }
@@ -150,8 +196,16 @@ function DotVariant({ riskLevel }: { riskLevel: RiskLevel }) {
 // CARD VARIANT — full detail with contributing factors
 // ─────────────────────────────────────────────────────────────────────────────
 
-function CardVariant({ riskLevel, factors = [] }: { riskLevel: RiskLevel; factors?: RiskFactor[] }) {
+function CardVariant({
+  riskLevel, factors = [], score, insights = [], classId,
+}: { riskLevel: RiskLevel; factors?: RiskFactor[]; score?: number; insights?: string[]; classId?: string | null }) {
   const { label, icon: Icon, card, cardTitle } = RISK_CONFIG[riskLevel]
+  const role      = useAuthStore((s) => s.role)
+  const superUser = useAuthStore((s) => s.superUser)
+
+  // Only link to a module this viewer can actually open.
+  const canOpen = (href: string) =>
+    superUser || (role != null && (getAllowedRolesForPath(href)?.includes(role) ?? false))
 
   return (
     <div className={`rounded-xl border p-4 ${card}`}>
@@ -160,31 +214,64 @@ function CardVariant({ riskLevel, factors = [] }: { riskLevel: RiskLevel; factor
         <span className={`font-heading font-bold text-sm ${cardTitle}`}>
           {label}
         </span>
+        {score != null && riskLevel !== 'NONE' && (
+          <span className="ml-auto text-xs text-muted tabular-nums" title="Composite of fees, results, attendance and library">
+            Score {score}/100
+          </span>
+        )}
       </div>
 
       {factors.length === 0 ? (
-        <p className="text-xs text-muted">No risk factors identified. Student is on track.</p>
+        <p className="text-xs text-muted">
+          {riskLevel === 'NONE'
+            ? 'No risk factors identified. Student is on track.'
+            : 'Flagged by the risk engine — no further detail is available to your role.'}
+        </p>
       ) : (
         <ul className="space-y-2">
-          {factors.map((f) => (
-            <li key={f.id} className="text-xs flex items-start gap-2">
-              <span
-                className={`
-                  shrink-0 mt-0.5 text-[9px] font-bold uppercase tracking-wide
-                  ${f.severity === 'HIGH'   ? 'text-status-danger'
-                  : f.severity === 'MEDIUM' ? 'text-status-warning'
-                  :                           'text-status-info'}
-                `}
-              >
-                {f.severity}
-              </span>
-              <span className="text-body leading-relaxed">
-                <strong>{FACTOR_LABELS[f.id] ?? f.id}:</strong>{' '}
-                {f.detail}
-              </span>
-            </li>
-          ))}
+          {factors.map((f) => {
+            const href = domainHref(f.domain, classId)
+            return (
+              <li key={f.id} className="text-xs flex items-start gap-2">
+                <span
+                  className={`
+                    shrink-0 mt-0.5 text-[9px] font-bold uppercase tracking-wide
+                    ${f.severity === 'HIGH'   ? 'text-status-danger'
+                    : f.severity === 'MEDIUM' ? 'text-status-warning'
+                    :                           'text-status-info'}
+                  `}
+                >
+                  {f.severity}
+                </span>
+                <span className="text-body leading-relaxed flex-1">
+                  <strong>{FACTOR_LABELS[f.id] ?? f.id}:</strong>{' '}
+                  {f.detail}
+                </span>
+                {canOpen(href) && (
+                  <Link
+                    href={href}
+                    className="shrink-0 inline-flex items-center gap-0.5 text-[11px] text-brand-teal hover:underline"
+                    aria-label={`Open ${DOMAIN_LABELS[f.domain]}`}
+                  >
+                    {DOMAIN_LABELS[f.domain]}
+                    <ArrowUpRight className="w-3 h-3" aria-hidden />
+                  </Link>
+                )}
+              </li>
+            )
+          })}
         </ul>
+      )}
+
+      {insights.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-base space-y-1.5">
+          {insights.map((text) => (
+            <p key={text} className="text-xs text-muted flex items-start gap-1.5 leading-relaxed">
+              <Lightbulb className="w-3 h-3 shrink-0 mt-0.5" aria-hidden />
+              {text}
+            </p>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -198,9 +285,13 @@ export function StudentRiskBadge({
   riskLevel,
   variant   = 'badge',
   factors,
+  score,
+  insights,
+  classId,
+  hint,
   className,
 }: BadgeProps) {
-  if (variant === 'dot')  return <DotVariant  riskLevel={riskLevel} />
-  if (variant === 'card') return <CardVariant riskLevel={riskLevel} factors={factors} />
-  return <BadgeVariant riskLevel={riskLevel} className={className} />
+  if (variant === 'dot')  return <DotVariant  riskLevel={riskLevel} hint={hint} />
+  if (variant === 'card') return <CardVariant riskLevel={riskLevel} factors={factors} score={score} insights={insights} classId={classId} />
+  return <BadgeVariant riskLevel={riskLevel} className={className} hint={hint} />
 }

@@ -496,7 +496,10 @@ financesRouter.post(
 financesRouter.get(
   '/payments/:id/receipt',
   verifyAuth,
-  requireRole(['admin', 'finance', 'student']),
+  // Same staff set that can open the Finances workspace and see invoices
+  // (FINANCE_ROLES = admin/high_rank/finance), plus the owning student.
+  // high_rank was missing here, so they could list payments but never open one.
+  requireRole([...FINANCE_ROLES, 'student']),
   async (req, res) => {
     const payment = await prisma.payment.findUniqueOrThrow({
       where: { id: String(req.params.id) },
@@ -509,8 +512,19 @@ financesRouter.get(
     if (req.user!.role === 'student') {
       await studentService.assertStudentOwnership(req.user!.uid, payment.invoice.studentId)
     }
-    if (!payment.receiptKey) return res.status(404).json({ error: 'Receipt not yet generated' })
-    const url = await getSignedViewUrl(payment.receiptKey)
+    // Self-heal: if generation failed when the payment was recorded (it is
+    // deliberately non-fatal there), build the receipt now instead of
+    // answering 404 for the rest of the payment's life.
+    let receiptKey = payment.receiptKey
+    if (!receiptKey) {
+      try {
+        receiptKey = await feeService.ensurePaymentReceipt(payment.id)
+      } catch (err) {
+        return sendError(res, err, { tags: { module: 'finances', route: 'receipt-regenerate' } })
+      }
+    }
+    if (!receiptKey) return res.status(404).json({ error: 'Receipt not yet generated' })
+    const url = await getSignedViewUrl(receiptKey)
     res.json({ url })
   }
 )

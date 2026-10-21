@@ -13,8 +13,6 @@
 
 /* ─────────────────────────────────────────────────────────
    FONT FACES
-   Self-hosted for zero network dependency — critical for
-   Malawi where CDN latency can be high.
    ───────────────────────────────────────────────────────── */
 
 @font-face {

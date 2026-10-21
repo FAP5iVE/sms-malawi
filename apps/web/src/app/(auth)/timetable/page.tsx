@@ -61,9 +61,9 @@ export default function TimetablePage() {
 }
 
 function TimetableContent() {
-  // Year AND term follow the universal header filter; the term select below
-  // writes through to it rather than keeping a competing local copy.
-  const { academicYear: currentYear, term, setTerm } = useEffectiveViewingPeriod()
+  // Year AND term come only from the universal header filter (the page's own
+  // term select was a second control for the same value and has been removed).
+  const { academicYear: currentYear, term } = useEffectiveViewingPeriod()
   const { data: classes = [] } = useClasses(currentYear)
   const [pickedClassId, setSelectedClassId] = useState('')
   // A class picked under another year is not in this year's list — fall back
@@ -107,16 +107,9 @@ function TimetableContent() {
             </option>
           ))}
         </select>
-        <select
-          value={term}
-          onChange={(e) => setTerm(Number(e.target.value))}
-          className="border border-base rounded-lg px-3 py-2 text-sm bg-surface"
-          aria-label="Select term"
-        >
-          <option value={1}>Term 1</option>
-          <option value={2}>Term 2</option>
-          <option value={3}>Term 3</option>
-        </select>
+        <span className="self-center text-xs text-muted" aria-label="Period shown">
+          Term {term} · {currentYear}
+        </span>
       </div>
 
       {!selectedClassId ? (

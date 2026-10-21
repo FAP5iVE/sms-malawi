@@ -114,7 +114,7 @@ const READ_ROLES: Record<FilePrefix, string[]> = {
   payslip:          ['admin', 'finance', 'hr', '__self'],   // __self = the staff member who owns it
   report_card:      ['admin', 'high_rank', 'exam_officer', 'academic', '__self'],
   transcript:       ['admin', 'high_rank', 'exam_officer', '__self'],
-  receipt:          ['admin', 'finance'],
+  receipt:          ['admin', 'high_rank', 'finance', '__self'],   // __self = the student whose invoice was paid
   ebook:            ['admin', 'library', 'academic', 'student'],
   past_paper:       ['admin', 'library', 'academic', 'student'],
   expense_receipt:  ['admin', 'finance'],

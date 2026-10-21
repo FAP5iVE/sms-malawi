@@ -91,3 +91,129 @@ export interface ApiExamPipeline {
   /** Exams not progressing, most urgent first. */
   blockers: ApiExamBlocker[]
 }
+
+// ─── Exam workflow (/reporting/exams/workflow) ──────────────────────────────
+
+export type ExamStageSource = 'audit' | 'marks' | 'exam_date' | 'updated_at'
+
+export interface ApiExamWorkflowRow extends ApiMarkCompletionRow {
+  /** Who must act next; null when nothing is due yet or the results are released. */
+  owner: ApiExamBlocker['owner'] | null
+  /** What that person has to do. */
+  nextAction: string | null
+  /** When the exam entered its current status, as best the records show. */
+  stageEnteredAt: string | null
+  /**
+   * Where that time came from: the audit entry for the transition, the marks, the exam date,
+   * or Exam.updatedAt (`updated_at`, approximate — it moves on any edit).
+   */
+  stageSource: ExamStageSource
+  daysInStage: number | null
+  delayed: boolean
+  /** Days the exam may stay in this stage before it counts as delayed. */
+  thresholdDays: number | null
+  marksStartedAt: string | null
+  finalisedAt: string | null
+  approvedAt: string | null
+  releasedAt: string | null
+  /** Times the marks were unlocked for re-entry after being finalised. */
+  unlockCount: number
+  /** Times marks were corrected during review. */
+  correctionCount: number
+}
+
+export interface ApiExamStageSummary {
+  key: ExamStageKey
+  label: string
+  count: number
+  delayed: number
+  avgDaysInStage: number | null
+  oldestDaysInStage: number | null
+}
+
+export interface ApiExamOwnerWork {
+  owner: ApiExamBlocker['owner']
+  exams: number
+  delayed: number
+  marksMissing: number
+  oldestDays: number | null
+}
+
+export interface ApiExamAuditEvent {
+  at: string
+  action: string
+  label: string
+  /** Rewrites or releases results. */
+  sensitive: boolean
+  exam: string
+  className: string | null
+  subject: string | null
+  actorRole: string
+  actor: string | null
+}
+
+export interface ApiExamWorkflow {
+  generatedAt: string
+  academicYear: string
+  term: number
+  filters: { classId: string | null; subject: string | null; teacherUid: string | null; status: string | null }
+  /** Choices for the filters, built from the whole scoped term so they never narrow as filters are applied. */
+  options: {
+    classes: { id: string; label: string }[]
+    subjects: string[]
+    teachers: { uid: string; label: string }[]
+    statuses: { key: ExamStageKey; label: string }[]
+  }
+  /** Days an exam may stay in a stage before it counts as delayed (report defaults — the school stores none). */
+  thresholds: { afterExamDate: number; marksEntry: number; approval: number; release: number }
+  totals: ApiMarkCompletion['totals'] & { delayed: number; released: number }
+  stages: ApiExamStageSummary[]
+  byOwner: ApiExamOwnerWork[]
+  byClass: ApiCompletionGroup[]
+  bySubject: ApiCompletionGroup[]
+  byTeacher: ApiCompletionGroup[]
+  rows: ApiExamWorkflowRow[]
+  rowsTruncated: boolean
+  /** Rows whose stage time is `updated_at` (approximate). */
+  approximateStageTimes: number
+  /**
+   * End-of-term results release readiness for the term (school-wide view only):
+   * the same rule the release action enforces.
+   */
+  termRelease: {
+    endTermExams: number
+    approved: number
+    released: number
+    notReady: { className: string; status: string }[]
+    readyToRelease: boolean
+    allReleased: boolean
+  } | null
+  /** Status changes and sensitive result actions, newest first. Null without exam.viewExamAuditLog. */
+  audit: ApiExamAuditEvent[] | null
+  auditTruncated: boolean
+  /** Always true: MANEB national exams are not school-entered and are reported separately. */
+  excludesManeb: boolean
+}
+
+// ─── MANEB status (/reporting/exams/maneb-status) ───────────────────────────
+
+export interface ApiManebStatus {
+  generatedAt: string
+  academicYear: string
+  /** These are MANEB records held by the school — external national examination data, not school-entered marks. */
+  source: 'external'
+  types: {
+    examType: string
+    candidates: number
+    byStatus: { status: string; count: number }[]
+    awaitingResults: number
+    resultsReceived: number
+    resultsWithoutGrade: number
+    /** Form that sits this exam (JCE: Form 2, MSCE: Form 4). */
+    form: number | null
+    /** Active students now in that form; null unless the year is the school's current year (past rosters are not kept). */
+    eligible: number | null
+    /** Eligible students without a MANEB record for the year; null when eligible is unknown. */
+    notRegistered: number | null
+  }[]
+}

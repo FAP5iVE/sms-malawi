@@ -1,6 +1,6 @@
 'use client'
 
-import type { ApiExamPipeline, ApiMarkCompletion } from '@shared/types/reporting-exams'
+import type { ApiExamPipeline, ApiExamWorkflow, ApiManebStatus, ApiMarkCompletion } from '@shared/types/reporting-exams'
 import { useReportingQuery } from '@/hooks/useReporting'
 import type { AttentionItem, HookOptions, PeriodParams, ReportSectionData } from './shared'
 
@@ -16,3 +16,9 @@ export const useMarkCompletion = (p: PeriodParams, o?: HookOptions) =>
   useReportingQuery<ApiMarkCompletion>(D, 'mark-completion', q(p), { enabled: on(p, o) })
 export const useExamPipeline = (p: PeriodParams, o?: HookOptions) =>
   useReportingQuery<ApiExamPipeline>(D, 'pipeline', q(p), { enabled: on(p, o) })
+
+type Filters = Record<string, string | undefined>
+export const useExamWorkflow = (p: PeriodParams, filters: Filters, o?: HookOptions) =>
+  useReportingQuery<ApiExamWorkflow>(D, 'workflow', { ...q(p), ...filters }, { enabled: on(p, o) })
+export const useManebStatus = (p: PeriodParams, o?: HookOptions) =>
+  useReportingQuery<ApiManebStatus>(D, 'maneb-status', { academicYear: p.academicYear }, { enabled: on(p, o) })

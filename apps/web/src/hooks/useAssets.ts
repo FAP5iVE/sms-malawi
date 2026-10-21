@@ -42,7 +42,7 @@ export interface ApiDepartmentRequestCount {
 // ─── REGISTER ─────────────────────────────────────────────
 
 export function useAssets(filters: {
-  category?: string; status?: string; search?: string
+  category?: string; status?: string; condition?: string; search?: string
   sortBy?: 'name' | 'category' | 'acquisitionDate' | 'acquisitionCost'
   sortDir?: 'asc' | 'desc'
 } = {}) {
@@ -236,4 +236,4 @@ export function useWriteOffAdvance() {
       apiFetch(`/assets/advances/${id}/write-off`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assets.all() }),
   })
-}
+}

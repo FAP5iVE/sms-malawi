@@ -19,7 +19,6 @@
 import { useState } from 'react'
 import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { usePlacementsQueue, useApprovePlacementClaim, useRejectPlacementClaim } from '@/hooks/usePlacements'
-import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { MotionBottomSheet } from '@/components/shared/MotionBottomSheet'
 import { ShieldCheck, Clock, FileCheck, Check, X, Loader2 } from 'lucide-react'
 import type { ApiUniversityPlacement } from '@shared/types/api'
@@ -100,9 +99,11 @@ function ClaimCard({
 
 export function ClaimsVerificationPanel() {
   // The school's stored current year (SystemSettings), never a literal.
-  // [UNIVERSAL PERIOD FILTER] The year follows the app-wide header filter; this
-  // panel's own year select writes through to it.
-  const { academicYear: effectiveYear, setAcademicYear } = useEffectiveViewingPeriod()
+  // [UNIVERSAL PERIOD FILTER] The year comes ONLY from the app-wide header
+  // filter. The year select this panel used to carry wrote through to it (picking
+  // a year here already moved the whole app), so it was a second control for one
+  // value; it is now a read-only label.
+  const { academicYear: effectiveYear } = useEffectiveViewingPeriod()
 
   const { data: queue = [], isLoading, isError, error } = usePlacementsQueue(effectiveYear)
   const approve = useApprovePlacementClaim()
@@ -139,11 +140,9 @@ export function ClaimsVerificationPanel() {
                 </span>
               )}
             </h3>
-            <AcademicYearSelect
-              value={effectiveYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              className="border border-base rounded-xl px-3 py-1.5 text-sm bg-page"
-            />
+            <span className="text-xs text-muted" aria-label="Academic year shown">
+              Intake {effectiveYear}
+            </span>
           </div>
           <p className="text-xs text-muted mt-0.5">
             Physically inspect the printed NCHE Gazette against student-submitted placement claims before granting approval.

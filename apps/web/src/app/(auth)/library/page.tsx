@@ -107,6 +107,7 @@ import type {
   ApiLibraryConditionEntry,
 }                            from '@shared/types/api'
 import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
+import { PrintLetterhead } from '@/components/shared/PrintLetterhead'
 
 /*
  * [CHANGE TYPE]: TARGETED EDIT
@@ -1217,15 +1218,31 @@ function LibraryContent() {
   // the module-level TABS list instead of duplicating them in a second array.
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const validTabIds = TABS.map((t) => t.id) as string[]
+  // Tabs this person may see. Recommendations is staff-facing (students hold no
+  // library.recommendResource, so its endpoint refuses them) and Reports is
+  // librarian/admin only. Deriving the list ONCE keeps the tab bar, the
+  // ?tab= deep-link check and the panel render in agreement — before, a
+  // student could deep-link straight into a tab the bar never showed them.
+  const isLibStaffRole = role === 'admin' || role === 'library'
+  const visibleTabs = TABS.filter((t) =>
+    (t.id !== 'reports' || isLibStaffRole) && !(t.id === 'recommendations' && role === 'student'),
+  )
+  const validTabIds = visibleTabs.map((t) => t.id) as string[]
   const initialTab: Tab = tabParam && validTabIds.includes(tabParam) ? (tabParam as Tab) : 'catalog'
 
   const [tab, setTab]               = useState<Tab>(initialTab)
-  const [search, setSearch]         = useState('')
+  // Deep links from the library report (?tab=catalog&category=…&q=…, ?tab=digital&type=…&form=…&subject=…
+  // &status=pending&resource=<id>) pre-set these filters; each value is validated, never trusted.
+  const BOOK_CATEGORY_IDS = ['TEXTBOOK', 'REFERENCE', 'FICTION', 'NONFICTION', 'SCIENCE', 'MATHEMATICS', 'HUMANITIES', 'PAST_PAPER', 'OTHER']
+  const presetCategory = searchParams.get('category') ?? ''
+  const presetType     = searchParams.get('type') ?? ''
+  const presetForm     = searchParams.get('form') ?? ''
+  const presetStatus   = searchParams.get('status') ?? ''
+  const [search, setSearch]         = useState(initialTab === 'catalog' ? (searchParams.get('q') ?? '').slice(0, 200) : '')
   // [PRODUCTION FIX 2026-07-27] category/available (catalog) and
   // type/form/subject (digital resources) all already worked server-side —
   // useBooks()/useDigitalResources() just never had callers passing them.
-  const [categoryFilter, setCategoryFilter]   = useState('')
+  const [categoryFilter, setCategoryFilter]   = useState(BOOK_CATEGORY_IDS.includes(presetCategory) ? presetCategory : '')
   const [availableOnly, setAvailableOnly]     = useState(false)
   // [PRODUCTION FIX 2026-07-28] Sort/publisher/year filters and group-by
   // all already worked server-side (or work purely client-side for
@@ -1238,9 +1255,12 @@ function LibraryContent() {
   const [groupBy, setGroupBy]                 = useState<'' | 'category' | 'publisher'>('')
   const [editingBook, setEditingBook]         = useState<ApiBook | null>(null)
   const [showAddBook, setShowAddBook]         = useState(false)
-  const [digitalTypeFilter, setDigitalTypeFilter] = useState('')
-  const [digitalFormFilter, setDigitalFormFilter] = useState('')
-  const [digitalSubjectFilter, setDigitalSubjectFilter] = useState('')
+  const [digitalTypeFilter, setDigitalTypeFilter] = useState(['EBOOK', 'PAST_PAPER', 'REFERENCE', 'STUDY_GUIDE'].includes(presetType) ? presetType : '')
+  const [digitalFormFilter, setDigitalFormFilter] = useState(['1', '2', '3', '4'].includes(presetForm) ? presetForm : '')
+  const [digitalSubjectFilter, setDigitalSubjectFilter] = useState(searchParams.get('subject') ?? '')
+  const [digitalStatusFilter, setDigitalStatusFilter] = useState<'' | 'pending' | 'approved'>(presetStatus === 'pending' || presetStatus === 'approved' ? presetStatus : '')
+  // One resource opened from a report row: shown on its own, with a way back to the full list.
+  const [focusResourceId, setFocusResourceId] = useState(searchParams.get('resource') ?? '')
   const [barcodeInput, setBarcodeInput] = useState('')
   const [scanResult, setScanResult] = useState<ApiBook | null>(null)
   const [scanError, setScanError]   = useState<string | null>(null)
@@ -1340,6 +1360,10 @@ function LibraryContent() {
     form:    digitalFormFilter ? Number(digitalFormFilter) : undefined,
     subject: digitalSubjectFilter || undefined,
   })
+  // Status and single-resource focus come from report deep links; the list itself is already filtered server-side.
+  const shownDigitalResources = (digitalResources as ApiDigitalResource[]).filter((r) =>
+    (digitalStatusFilter === '' || (digitalStatusFilter === 'pending' ? !r.approved : r.approved)) &&
+    (focusResourceId === '' || r.id === focusResourceId))
   const { data: recommendations = [] }  = useRecommendations('PENDING')
   const { data: fineWaivers = [] }      = useFineWaivers('PENDING')
 
@@ -1524,7 +1548,7 @@ function LibraryContent() {
 
       {/* Mobile-scrollable tab navigation — C7 */}
       <ModuleTabs<Tab>
-        tabs={TABS.filter((t) => t.id !== 'reports' || isLibStaff)}
+        tabs={visibleTabs}
         active={tab}
         onChange={setTab}
         variant="underline"
@@ -2121,6 +2145,25 @@ function LibraryContent() {
                 <option value="">All subjects</option>
                 {MALAWI_SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
+              <select
+                value={digitalStatusFilter}
+                onChange={(e) => setDigitalStatusFilter(e.target.value as '' | 'pending' | 'approved')}
+                className="border border-base rounded-xl px-3 py-2 text-sm bg-surface min-h-[44px]"
+                aria-label="Filter by approval status"
+              >
+                <option value="">All statuses</option>
+                <option value="approved">Approved</option>
+                <option value="pending">Pending approval</option>
+              </select>
+              {focusResourceId && (
+                <button
+                  type="button"
+                  onClick={() => setFocusResourceId('')}
+                  className="border border-base rounded-xl px-3 py-2 text-sm bg-surface min-h-[44px] text-brand-navy"
+                >
+                  Showing one resource — show all
+                </button>
+              )}
             </div>
             {isLibStaff && (
               <button
@@ -2133,12 +2176,12 @@ function LibraryContent() {
             )}
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(digitalResources as ApiDigitalResource[]).length === 0 && (
+            {shownDigitalResources.length === 0 && (
               <div className="col-span-full text-center py-16 text-muted text-sm">
                 No digital resources match these filters.
               </div>
             )}
-            {(digitalResources as ApiDigitalResource[]).map((r) => (
+            {shownDigitalResources.map((r) => (
               <div key={r.id} className="bg-surface border border-base rounded-xl p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -2185,7 +2228,7 @@ function LibraryContent() {
               </div>
             ))}
 
-            {(digitalResources as ApiDigitalResource[]).length === 0 && (
+            {shownDigitalResources.length === 0 && (
               <div className="col-span-3 text-center py-16 text-muted text-sm">
                 No digital resources yet.
               </div>
@@ -2238,7 +2281,7 @@ function LibraryContent() {
       )}
 
       {/* ── Recommendations tab ──────────────────────────────────────────── */}
-      {tab === 'recommendations' && (
+      {tab === 'recommendations' && role !== 'student' && (
         <div className="space-y-4">
           {/* [R21] Redesigned to match the screenshot's field set (Title,
               Author(s), Requester Name & Role, Class/Form/Department, Why
@@ -2358,6 +2401,7 @@ function LibraryContent() {
 
         return (
           <div className="space-y-4">
+            <PrintLetterhead title="Library Report" />
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <ModuleTabs<'fines' | 'circulation' | 'catalogDist' | 'clearance'>
                 tabs={[

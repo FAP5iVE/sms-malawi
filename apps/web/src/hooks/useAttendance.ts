@@ -34,6 +34,7 @@ export function useClassAttendance(classId: string, date: string) {
 export function useMarkAttendance() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: ({ classId, ...data }: { classId: string } & MarkAttendanceInput) =>
       apiFetch<{ message: string }>(`/attendance/class/${classId}`, {
         method: 'POST',

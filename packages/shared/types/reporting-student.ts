@@ -105,3 +105,44 @@ export interface ApiStudentAttendance {
   /** Most recent absence dates (ISO), newest first. */
   recentAbsences: string[]
 }
+
+// ─── Placement (own record, published information only) ────────────────────
+
+/**
+ * - published         a CONFIRMED placement exists
+ * - pending           the student's own claim is awaiting staff verification (not published)
+ * - not_approved      the student's own claim was rejected
+ * - none              eligible, but nothing has been recorded or published
+ * - awaiting_results  graduated, MSCE not yet certified
+ * - not_yet_eligible  not graduated, so placement does not apply yet
+ */
+export type ApiStudentPlacementState =
+  | 'published' | 'pending' | 'not_approved' | 'none' | 'awaiting_results' | 'not_yet_eligible'
+
+export interface ApiStudentPlacement {
+  state: ApiStudentPlacementState
+  headline: string
+  detail: string
+  eligibility: { graduated: boolean; certifiedMsce: boolean }
+  /** Present only when state is "published". */
+  placement: {
+    university: string | null
+    programme: string | null
+    admissionYear: string | null
+    confirmedOn: string | null
+    source: 'school_list' | 'verified_claim'
+  } | null
+  /** The student's own submission; present only while pending or after a rejection. */
+  claim: {
+    university: string | null
+    programme: string | null
+    admissionYear: string | null
+    reference: string | null
+    evidenceNote: string | null
+    submittedOn: string
+    reviewedOn: string | null
+    rejectionReason: string | null
+  } | null
+  /** True when the student may submit (or resubmit) a claim right now. */
+  canClaim: boolean
+}

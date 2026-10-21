@@ -465,8 +465,9 @@ analyticsRouter.get('/hr/leave-trend',
 
 /**
  * [R18 — NEW] Cohort university-placement analytics for an academic year.
- * Gated by placement.viewAnalytics (held by all nine roles, incl. student —
- * placement outcomes are culturally public at Malawian schools). The academic
+ * Gated by placement.viewAnalytics (held by every staff role, NOT the student
+ * role — a student reads only their own placement, via /reporting/student/placement).
+ * The academic
  * year defaults to the current one from settings when not supplied.
  */
 analyticsRouter.get('/placements',

@@ -29,6 +29,8 @@ import { Loader2, Plus, Send, Check, X, RotateCcw, Ban, Truck } from 'lucide-rea
 // PurchaseOrderStatus values) are also corrected throughout.
 
 type Tab = 'requisitions' | 'rfqs' | 'quotations' | 'orders' | 'receipts' | 'suppliers'
+export type ProcurementTabId = Tab
+export const PROCUREMENT_TABS: readonly ProcurementTabId[] = ['requisitions', 'rfqs', 'quotations', 'orders', 'receipts', 'suppliers']
 const tabs: Array<{ id: Tab; label: string }> = [
   { id: 'requisitions', label: 'Requisitions' }, { id: 'rfqs', label: 'RFQs' }, { id: 'quotations', label: 'Quotations' },
   { id: 'orders', label: 'Purchase Orders' }, { id: 'receipts', label: 'Goods Receipts' },
@@ -38,8 +40,8 @@ function humanize(s: string) { return s.replace(/_/g, ' ').toLowerCase().replace
 function money(v: number | undefined) { return formatMWK(Number(v ?? 0)) }
 function errorMessage(err: unknown, fallback: string) { return err instanceof Error ? err.message : fallback }
 
-export function ProcurementWorkspace() {
-  const [tab, setTab] = useState<Tab>('requisitions')
+export function ProcurementWorkspace({ initialTab = 'requisitions' }: { initialTab?: ProcurementTabId } = {}) {
+  const [tab, setTab] = useState<Tab>(initialTab)
   // Budget Windows now live with Budget allocations (Finance → Budget → Windows).
   // The viewing period is passed down so budget pickers offer THIS period's budgets.
   const { academicYear, term } = useViewingPeriod()

@@ -81,7 +81,8 @@ export function useApprovalBadge() {
   return useQuery({
     queryKey: queryKeys.approvals.badge(),
     queryFn: () => apiFetch<{ awaitingMyReview: number }>('/approvals/badge'),
-    enabled: initialized && !!role,
+    // Students have no Approvals page, so there is nothing to badge.
+    enabled: initialized && !!role && role !== 'student',
     staleTime: 30 * 1000,
     refetchInterval: POLL_MS,
   })

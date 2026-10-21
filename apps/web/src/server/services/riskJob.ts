@@ -55,11 +55,21 @@
 import 'server-only'
 import { prisma }            from '@/lib/prisma'
 import { logger }            from '@/lib/logger'
-import { assessStudentRisk } from '@/server/services/riskService'
+import { assessStudents, invalidateRiskOverview } from '@/server/services/riskService'
 import * as algolia          from '@/server/services/algoliaService'
 
-const CONCURRENT_LIMIT = 10
+/** Students assessed per batch — riskService runs ~7 queries per batch, not per student. */
+const BATCH_SIZE = 200
 
+/**
+ * Re-assess every ACTIVE student with the unified risk engine (fees + results +
+ * attendance + library) and push level + score to Algolia. Uses the same
+ * assessStudents() as the Students list, profile and class roster, so the weekly
+ * Algolia facet can never disagree with what staff see on screen.
+ *
+ * [CHANGE TYPE]: batched — previously 10 students at a time, each running its
+ * own set of queries; now one batched assessment per BATCH_SIZE students.
+ */
 export async function runRiskAssessmentJob(
   academicTerm: number,
   academicYear: string,
@@ -72,27 +82,33 @@ export async function runRiskAssessmentJob(
   let processed = 0
   let errors    = 0
 
-  for (let i = 0; i < students.length; i += CONCURRENT_LIMIT) {
-    const chunk = students.slice(i, i + CONCURRENT_LIMIT)
-    await Promise.allSettled(
-      chunk.map(async (s) => {
-        try {
-          const { riskLevel } = await assessStudentRisk(s.id, academicTerm, academicYear)
-          logger.info({ event: 'risk-job.student-assessed', studentId: s.id, riskLevel })
-          // [ALGOLIA ROLLOUT — Tier 1 item 3] see header comment — Algolia,
-          // not Postgres, is the persistence layer for this derived value.
-          // Fire-and-forget like every other algolia.* call site in this
-          // codebase: a failed push here just means this one student's
-          // riskLevel facet is stale until next Monday, not a job failure.
-          void algolia.updateStudent({ objectID: s.id, riskLevel })
+  for (let i = 0; i < students.length; i += BATCH_SIZE) {
+    const batch = students.slice(i, i + BATCH_SIZE)
+    try {
+      const assessed = await assessStudents(batch.map((s) => s.id), { academicYear, term: academicTerm })
+      await Promise.allSettled(
+        batch.map(async (s) => {
+          const a = assessed.get(s.id)
+          if (!a) { errors++; return }
+          logger.info({
+            event: 'risk-job.student-assessed',
+            studentId: s.id, riskLevel: a.riskLevel, riskScore: a.riskScore, domains: a.domains,
+          })
+          // Algolia is a derived-data cache here, not a system of record (see
+          // header): fire-and-forget, a failed push only leaves one student's
+          // facet stale until the next run.
+          void algolia.updateStudent({ objectID: s.id, riskLevel: a.riskLevel, riskScore: a.riskScore })
           processed++
-        } catch (err) {
-          logger.error({ event: 'risk-job.student-error', studentId: s.id, err })
-          errors++
-        }
-      }),
-    )
+        }),
+      )
+    } catch (err) {
+      logger.error({ event: 'risk-job.batch-error', offset: i, size: batch.length, err })
+      errors += batch.length
+    }
   }
+
+  // Dashboards read a short-lived aggregate; drop it so they reflect this run.
+  invalidateRiskOverview()
 
   logger.info(
     { event: 'risk-job.complete', processed, errors, academicTerm, academicYear },

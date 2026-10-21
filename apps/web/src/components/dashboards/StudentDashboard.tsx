@@ -52,7 +52,6 @@ import {
 import { QuickActions } from '@/components/shared/QuickActions'
 import { ListCard } from '@/components/shared/ListCard'
 import { TodaysTimetableList } from '@/components/shared/TodaysTimetableList'
-import { ChartCard } from '@/components/shared/ChartCard'
 import { Chart } from '@/components/shared/chart'
 import type { ChartDataPoint } from '@/components/shared/chart'
 import type { QuickAction } from '@/components/shared/QuickActions'
@@ -60,7 +59,9 @@ import { StudentResultsView } from '@/components/exams/StudentResultsView'
 import { useStudentMe } from '@/hooks/useStudents'
 import { useStudentPerformanceTrend, useOwnAttendance } from '@/hooks/useAnalytics'
 import { useMyOverview, useMyAttention } from '@/hooks/reporting/useStudentReporting'
-import { DashboardAttention, DashboardKpis } from './DashboardReport'
+import { DashboardAttention } from './DashboardReport'
+import { PrimaryOverviewKpis, ReportLinks, SecondaryKpis, TrendCard } from './DashboardSections'
+import type { ReportLink } from './DashboardSections'
 import { useMyTimetableToday } from '@/hooks/useClasses'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import { formatMWK } from '@shared/constants/malawi'
@@ -91,9 +92,21 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
 ]
 
+/** A student leads with results, attendance, fees and handed-in work; the rest sit in "More about my term". */
+const PREFERRED = ['average', 'attendance', 'feeBalance', 'assignments']
+
+const REPORT_LINKS: ReportLink[] = [
+  { label: 'Progress', href: '/reports?tab=progress', description: 'Results by subject' },
+  { label: 'Assignments', href: '/reports?tab=assignments', description: 'Handed in and due' },
+  { label: 'Attendance', href: '/reports?tab=attendance', description: 'Days present, absent, late' },
+  { label: 'Fees', href: '/reports?tab=fees', description: 'Invoices and balance' },
+  { label: 'Library', href: '/reports?tab=library', description: 'Books out and fines' },
+  { label: 'Placement', href: '/reports?tab=placement', description: 'Your university placement' },
+]
+
 export function StudentDashboard() {
   const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
-  const { data: me, isLoading: meLoading } = useStudentMe()
+  const { data: me, isLoading: meLoading, isError: meError, refetch: refetchMe } = useStudentMe()
   const period = { academicYear: academicYear ?? '', term: term ?? undefined }
   const overview = useMyOverview(period)
   const attention = useMyAttention(period)
@@ -101,7 +114,7 @@ export function StudentDashboard() {
   // Student performance trend (average % per term) — grade data sourced from
   // gradeService.ts via the R14 analytics endpoint. Unblocked by R7/R8's
   // grading reconciliation.
-  const { data: perfTrend = [], isLoading: perfLoading } = useStudentPerformanceTrend(me?.id ?? '')
+  const { data: perfTrend = [], isLoading: perfLoading, isError: perfError, refetch: refetchPerf } = useStudentPerformanceTrend(me?.id ?? '')
   const performanceData: ChartDataPoint[] = perfTrend.map((p) => ({
     x: `${p.academicYear} T${p.term}`,
     average: p.average,
@@ -109,7 +122,7 @@ export function StudentDashboard() {
 
   // Attendance breakdown (present / absent / late) for the current term —
   // unblocked by R6's Postgres Attendance model.
-  const { data: attendance, isLoading: attendanceLoading } = useOwnAttendance(
+  const { data: attendance, isLoading: attendanceLoading, isError: attendanceError, refetch: refetchAttendance } = useOwnAttendance(
     me?.id ?? '',
     academicYear,
     term,
@@ -124,18 +137,18 @@ export function StudentDashboard() {
   const attendanceLoadingAll = periodLoading || meLoading || attendanceLoading
   const perfLoadingAll = meLoading || perfLoading
 
-  const { data: timetableToday, isLoading: timetableLoading } = useMyTimetableToday()
+  const { data: timetableToday, isLoading: timetableLoading, isError: timetableError, refetch: refetchTimetable } = useMyTimetableToday()
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <DashboardKpis
-        title="My school life"
-        summary="Your results, attendance, assignments and fees in one place. Results appear once your term fees are cleared."
+      <PrimaryOverviewKpis
+        title="My term at a glance"
+        summary="Your results, attendance, fees and handed-in work. Results appear once your term fees are cleared."
         academicYear={academicYear}
         term={term}
         overview={overview}
+        preferred={PREFERRED}
         reportsHref="/reports?tab=progress"
-        placeholders={6}
       />
 
       {/* Fee-gated exam results notice — R15: shown only when the student's
@@ -157,12 +170,13 @@ export function StudentDashboard() {
         </div>
       )}
 
-      <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
-        <ChartCard
-          title="My Performance"
+        <TrendCard
+          title="My performance"
           sub="Average score per term"
           isLoading={perfLoadingAll}
+          isError={perfError}
+          onRetry={() => void refetchPerf()}
           height={220}
         >
           <Chart
@@ -173,11 +187,13 @@ export function StudentDashboard() {
             emptyStateMessage="No results published yet."
             ariaLabel="My average exam score per term over time"
           />
-        </ChartCard>
-        <ChartCard
-          title="My Attendance"
+        </TrendCard>
+        <TrendCard
+          title="My attendance"
           sub={term ? `Term ${term} · ${academicYear}` : 'This term'}
           isLoading={attendanceLoadingAll}
+          isError={attendanceError}
+          onRetry={() => void refetchAttendance()}
           height={220}
         >
           <Chart
@@ -192,13 +208,16 @@ export function StudentDashboard() {
                 : 'Attendance breakdown — no data available'
             }
           />
-        </ChartCard>
+        </TrendCard>
       </div>
+      <DashboardAttention query={attention} title="For you to look at" limit={5} />
       <ListCard
         title="Today's Timetable"
         sub="Your schedule today"
         isLoading={timetableLoading}
         isEmpty={(timetableToday ?? []).length === 0}
+        isError={timetableError}
+        onRetry={() => void refetchTimetable()}
         emptyMessage="No classes on your timetable today."
       >
         <TodaysTimetableList slots={timetableToday ?? []} />
@@ -212,11 +231,20 @@ export function StudentDashboard() {
             <p className="text-sm text-muted" role="status">
               {meLoading
                 ? 'Loading your student record…'
-                : 'Your student record could not be found. Please contact the school office.'}
+                : meError
+                  ? 'Your student record could not be loaded.'
+                  : 'Your student record could not be found. Please contact the school office.'}
+              {meError ? (
+                <button type="button" onClick={() => void refetchMe()} className="ml-2 min-h-11 rounded-lg border border-base px-3 text-xs font-medium text-brand-navy hover:bg-page">
+                  Retry
+                </button>
+              ) : null}
             </p>
           )}
       </div>
-      <DashboardAttention query={attention} title="For you to look at" />
+      <SecondaryKpis title="More about my term" overview={overview} preferred={PREFERRED} />
+      <QuickActions actions={QUICK_ACTIONS} compact />
+      <ReportLinks links={REPORT_LINKS} title="My reports" />
     </div>
   )
 }

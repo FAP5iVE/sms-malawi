@@ -62,6 +62,8 @@ import { prisma }             from '@/lib/prisma'
 import { logger }             from '@/lib/logger'
 import { uploadFile, getSignedViewUrl, FILE_PREFIX } from '@/lib/storage'
 import * as settingsService   from '@/server/services/settingsService'
+import { getRasterSchoolLogo } from '@/server/services/schoolLogoService'
+import { drawLogoBadge }       from '@/server/services/pdfBranding'
 import * as attendanceService from '@/server/services/attendanceService'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -95,6 +97,8 @@ export interface TranscriptData {
   dateOfBirth?:    string
   schoolName:      string
   schoolAddress:   string
+  /** Inline PNG/JPEG data URI of the school logo (see schoolLogoService). */
+  schoolLogoDataUri?: string
   records:         TranscriptTermRecord[]
   generatedAt:     string
 }
@@ -170,6 +174,7 @@ export async function getTranscriptData(studentId: string): Promise<TranscriptDa
     dateOfBirth:    student.dateOfBirth?.toISOString(),
     schoolName:     identity.schoolName,
     schoolAddress:  identity.schoolAddress,
+    schoolLogoDataUri: (await getRasterSchoolLogo()).dataUri,
     records,
     generatedAt:    new Date().toISOString(),
   }
@@ -191,6 +196,7 @@ export function generateTranscriptPDF(data: TranscriptData): Buffer {
   // Cover header
   doc.setFillColor(30, 58, 95)
   doc.rect(ML, y, CW, 20, 'F')
+  drawLogoBadge(doc, data.schoolLogoDataUri, ML + 2, y + 2, 16)
   doc.setTextColor(255, 255, 255)
   setFont(14, 'bold')
   doc.text(data.schoolName.toUpperCase(), W / 2, y + 8, { align: 'center' })

@@ -54,9 +54,10 @@ const STATUS_STYLE: Record<Status, { dot: string; bg: string; text: string }> = 
 
 function AttendanceContent() {
   const { data: me } = useStudentMe()
-  // Year/term follow the universal header filter; this page's own term
-  // select writes THROUGH to it (one source of truth, two access points).
-  const { academicYear: defaultYear, term: activeTerm, setTerm } = useEffectiveViewingPeriod()
+  // Year/term come only from the universal header filter. The page's own term
+  // select was a second control writing through to the same value; it is now a
+  // read-only label so the summary still says which period it describes.
+  const { academicYear: defaultYear, term: activeTerm } = useEffectiveViewingPeriod()
 
   const { data: summary, isLoading: summaryLoading } = useOwnAttendance(
     me?.id ?? '', defaultYear ?? '', activeTerm,
@@ -94,14 +95,9 @@ function AttendanceContent() {
       <div className="bg-surface rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
           <p className="font-heading font-semibold text-sm text-body">Term Summary</p>
-          <select
-            value={activeTerm}
-            onChange={(e) => setTerm(Number(e.target.value))}
-            className="border border-base rounded-lg px-3 py-1.5 text-sm bg-page min-h-[36px]"
-            aria-label="Select term"
-          >
-            {[1, 2, 3].map((t) => <option key={t} value={t}>Term {t}</option>)}
-          </select>
+          <span className="text-xs text-muted" aria-label="Period shown">
+            Term {activeTerm} · {defaultYear}
+          </span>
         </div>
         {summaryLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

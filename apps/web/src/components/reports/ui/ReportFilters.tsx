@@ -59,3 +59,32 @@ export const TERM_OPTIONS: readonly FilterOption[] = [
   { value: '2', label: 'Term 2' },
   { value: '3', label: 'Term 3' },
 ]
+
+/** A calendar-date filter (YYYY-MM-DD). Empty string means "not set". */
+export function FilterDate({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  min?: string
+  max?: string
+}) {
+  return (
+    <label className="flex min-w-32 flex-col gap-1 text-xs font-medium text-muted">
+      {label}
+      <input
+        type="date"
+        value={value}
+        min={min}
+        max={max}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-lg border border-base bg-surface px-2.5 py-2 text-sm text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+      />
+    </label>
+  )
+}

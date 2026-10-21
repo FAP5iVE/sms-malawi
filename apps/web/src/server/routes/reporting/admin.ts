@@ -6,6 +6,8 @@
  *   sessions   → userMgmt.viewActiveSessions
  *   governance → report.viewAuditLogs
  *   adoption   → userMgmt.viewActiveSessions
+ *   operations → report.viewSystemHealth or monitoring.view; each part of the
+ *                response is computed only for the permission that governs it
  * The overview/attention queue spans security and sessions, so it needs both
  * of those; live service health and error-monitoring figures are only added
  * when the caller also holds report.viewSystemHealth / monitoring.view.
@@ -13,7 +15,7 @@
 import type { Request } from 'express'
 import { Router } from 'express'
 import { verifyAuth } from '@/lib/verifyAuth'
-import { requireAllPermissions, requirePermission } from '@/server/middleware/verifyPermission'
+import { requireAllPermissions, requireAnyPermission, requirePermission } from '@/server/middleware/verifyPermission'
 import { hasPermission } from '@shared/types/permissions'
 import * as admin from '@/server/services/analytics/adminAnalytics'
 import { positiveInt } from './_shared'
@@ -56,4 +58,16 @@ adminReportingRouter.get('/governance', verifyAuth, requirePermission('report.vi
 
 adminReportingRouter.get('/adoption', verifyAuth, requirePermission('userMgmt.viewActiveSessions'), async (_req, res) => {
   res.json(await admin.getAdoptionReport())
+})
+
+adminReportingRouter.get('/operations', verifyAuth, requireAnyPermission(['report.viewSystemHealth', 'monitoring.view']), async (req, res) => {
+  const user = req.user!
+  const su = user.superUser === true
+  res.json(
+    await admin.getOperationsReport({
+      health: hasPermission(user.role, 'report.viewSystemHealth', su),
+      monitoring: hasPermission(user.role, 'monitoring.view', su),
+      database: hasPermission(user.role, 'report.viewDatabaseMetrics', su),
+    }),
+  )
 })

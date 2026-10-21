@@ -9,6 +9,7 @@ export function kpiTile(
   description: string,
   status: ReportStatus = 'neutral',
   subLabel?: string,
+  href?: string,
 ): ReportKpi {
-  return { key, label, value, unit, status, description, ...(subLabel ? { subLabel } : {}) }
+  return { key, label, value, unit, status, description, ...(subLabel ? { subLabel } : {}), ...(href ? { href } : {}) }
 }

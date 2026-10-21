@@ -31,6 +31,7 @@ import { useMemo } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { useStudentMe } from '@/hooks/useStudents'
 import { useStudentBalance, useFeeStructures, useFetchReceipt } from '@/hooks/useFinances'
+import { PrintLetterhead } from '@/components/shared/PrintLetterhead'
 import { formatMWK, FEE_SCHEDULE_LABELS } from '@shared/constants/malawi'
 import {
   Printer,
@@ -79,6 +80,7 @@ export function StudentPortalStatementTab({
 
   return (
     <div className="space-y-5">
+      <PrintLetterhead title="Student Financial Statement" />
       <div className="flex items-center justify-between gap-3 flex-wrap print:hidden">
         <div>
           <h2 className="font-heading font-semibold text-body">

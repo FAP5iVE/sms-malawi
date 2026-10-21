@@ -8,7 +8,7 @@
  *   /my-placement page, now deleted). Internal tabs mirror the reference
  *   module's five functional sections, each independently gated:
  *
- *     Registry & Analytics  — every role (placement.view is universal)
+ *     Registry & Analytics  — staff roles only (placement.viewAnalytics); students never see it
  *     MSCE Advisory          — every role (placement.view is universal;
  *                              a pure calculator, not tied to any record)
  *     Staff Entry            — placement.manage OR placement.recordOutcome
@@ -46,6 +46,8 @@ function PlacementsContent() {
   const { can, canAny, isInitialized } = usePermissions()
 
   const canViewOwn    = can('placement.viewOwn')
+  // The registry lists other students' names, candidate numbers and points: staff only, never the student role.
+  const canViewRegistry = can('placement.viewAnalytics')
   const canClaim      = can('placement.recordOwnChoice')
   const canStaffEnter = canAny(['placement.manage', 'placement.recordOutcome'])
   const canVerify     = can('placement.verifyOutcome')
@@ -57,22 +59,21 @@ function PlacementsContent() {
   const pendingCount = canVerify ? queue.filter((p) => p.status === 'PENDING_APPROVAL').length : 0
 
   const tabs = useMemo<TabItem<PlacementTab>[]>(() => {
-    const list: TabItem<PlacementTab>[] = [
-      { id: 'registry', label: 'Registry & Analytics', icon: ListChecks },
-      { id: 'advisory', label: 'MSCE Advisory', icon: Calculator },
-    ]
+    const list: TabItem<PlacementTab>[] = []
+    if (canViewRegistry) list.push({ id: 'registry', label: 'Registry & Analytics', icon: ListChecks })
+    list.push({ id: 'advisory', label: 'MSCE Advisory', icon: Calculator })
     if (canStaffEnter) list.push({ id: 'staffEntry', label: 'Staff Entry', icon: ClipboardEdit })
     if (canVerify) list.push({ id: 'verify', label: 'Verify Claims', icon: ShieldCheck, badge: pendingCount })
     if (showMyClaimTab) list.push({ id: 'myClaim', label: 'My Claim', icon: GraduationCap })
     return list
-  }, [canStaffEnter, canVerify, pendingCount, showMyClaimTab])
+  }, [canViewRegistry, canStaffEnter, canVerify, pendingCount, showMyClaimTab])
 
   // Raw selection state. This can transiently point at a tab id that no
   // longer exists in `tabs` (e.g. right after a role/graduation status
   // resolves) — that's fine, `activeTab` below derives the safe value
   // during render instead of "fixing" it in a follow-up effect + re-render.
   const [active, setActive] = useState<PlacementTab>('registry')
-  const activeTab = tabs.some((t) => t.id === active) ? active : 'registry'
+  const activeTab: PlacementTab = tabs.some((t) => t.id === active) ? active : (tabs[0]?.id ?? 'advisory')
 
   useEffect(() => {
     setTitle('University Placement')
@@ -88,7 +89,7 @@ function PlacementsContent() {
       <ModuleSurface>
       <ModuleTabs tabs={tabs} active={activeTab} onChange={setActive} id="placements" />
 
-      {activeTab === 'registry' && <PlacementRegistryPanel />}
+      {activeTab === 'registry' && canViewRegistry && <PlacementRegistryPanel />}
       {activeTab === 'advisory' && <PlacementAdvisoryChecker />}
       {activeTab === 'staffEntry' && canStaffEnter && <StaffPlacementEntryPanel />}
       {activeTab === 'verify' && canVerify && <ClaimsVerificationPanel />}
@@ -100,4 +101,4 @@ function PlacementsContent() {
 
 export default function PlacementsPage() {
   return <PlacementsContent />
-}
+}

@@ -22,6 +22,7 @@ import { getAttendanceAttention, getAttendanceOverview } from './attendanceAnaly
 import { getStocktakeVariance } from './operationsAnalytics'
 import { compare, kpi, previousPeriod, ratioPct, thresholdKpi, mean } from '@/server/services/reporting/kpi'
 import { compact, passRateInsight, sortInsights } from '@/server/services/reporting/insights'
+import { CLASS_PASS_FLOOR, enrichAttention, rankAttention, selectLowPassClasses, selectPrimaryKpis, selectWeakestClass } from './executiveLogic'
 
 export interface ExecutiveAccess {
   finance: boolean
@@ -32,9 +33,6 @@ export interface ExecutiveAccess {
   exams: boolean
   operations: boolean
 }
-
-/** A class is flagged when its pass rate is below this. */
-const CLASS_PASS_FLOOR = 60
 
 async function safe<T>(label: string, warnings: ReportWarning[], fn: () => Promise<T>): Promise<T | null> {
   try {
@@ -88,7 +86,9 @@ export async function getExecutiveOverview(
     access.operations ? safe('Stocktake', warnings, () => getStocktakeVariance(academicYear)) : skipped,
   ])
 
-  const lowPassClasses = (classes ?? []).filter((c) => c.studentCount > 0 && c.passRate > 0 && c.passRate < CLASS_PASS_FLOOR)
+  // A genuine 0% pass rate is a real result and must be flagged; only classes
+  // with no students or no computed results (passRate === null) are skipped.
+  const lowPassClasses = selectLowPassClasses(classes ?? [])
 
   const academic: ApiExecutiveGroup = {
     key: 'academic',
@@ -109,8 +109,8 @@ export async function getExecutiveOverview(
       kpi({ key: 'assessed', label: 'Students assessed', value: stats && stats.assessed > 0 ? stats.assessed : null, unit: 'count', description: 'Students with a computed term result (results are computed after release).' }),
       kpi({
         key: 'lowPassClasses', label: `Classes under ${CLASS_PASS_FLOOR}% pass`, value: classes && stats && stats.assessed > 0 ? lowPassClasses.length : null, unit: 'count',
-        description: `Classes with a term pass rate below ${CLASS_PASS_FLOOR}%.`,
-        status: lowPassClasses.length > 0 ? 'watch' : 'healthy', href: '/reports?tab=classes',
+        description: `Classes with students and a computed term pass rate below ${CLASS_PASS_FLOOR}% — including a genuine 0%. Classes with no computed results are not counted.`,
+        status: !classes || !stats || stats.assessed === 0 ? 'neutral' : lowPassClasses.length > 0 ? 'watch' : 'healthy', href: '/reports?tab=classes',
       }),
       ...pick(exams, ['markCompletion']),
     ],
@@ -140,16 +140,19 @@ export async function getExecutiveOverview(
     ],
   }
 
-  const weakest = (classes ?? []).filter((c) => c.passRate > 0).sort((a, b) => a.passRate - b.passRate)[0]
+  const weakest = selectWeakestClass(classes ?? [])
   const insights: ReportInsight[] = sortInsights(compact([
     passRateInsight(stats?.passRate ?? null, weakest ? weakest.className : null, '/reports?tab=classes'),
     ...[admissions, attendance, finance, hr, library, exams].flatMap((s) => (s?.insights ?? []).filter((i) => i.severity === 'critical')),
   ])).slice(0, 8)
 
+  const groups = [academic, students, financeGroup, operations].filter((g) => g.kpis.length > 0)
+
   return {
     academicYear,
     term,
-    groups: [academic, students, financeGroup, operations].filter((g) => g.kpis.length > 0),
+    primary: selectPrimaryKpis(groups),
+    groups,
     insights,
     warnings,
     generatedAt: new Date().toISOString(),
@@ -175,16 +178,11 @@ export async function getExecutiveAttention(
     access.operations ? getStocktakeVariance(academicYear).catch(() => null) : Promise.resolve(null),
   ])
 
-  const low = classes.filter((c) => c.studentCount > 0 && c.passRate > 0 && c.passRate < CLASS_PASS_FLOOR).length
+  const low = selectLowPassClasses(classes).length
   const own: AttentionItem[] = [
     { key: 'classes-low-pass', severity: 'watch', label: `Classes with a pass rate under ${CLASS_PASS_FLOOR}%`, count: low, href: '/reports?tab=classes' },
     { key: 'variances-open', severity: 'watch', label: 'Unresolved stocktake variances', count: variance?.unresolved ?? 0, href: '/reports?tab=stocktake' },
   ]
 
-  const order = { critical: 0, watch: 1, info: 2, positive: 3 } as const
-  return [...own, ...admissions, ...attendance, ...finance, ...hr, ...library, ...exams]
-    .filter((i) => (i.count ?? 0) > 0)
-    .sort((a, b) => order[a.severity] - order[b.severity])
-    .slice(0, 12)
+  return enrichAttention(rankAttention([...own, ...admissions, ...attendance, ...finance, ...hr, ...library, ...exams])).slice(0, 12)
 }
-

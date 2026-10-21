@@ -32,6 +32,9 @@ interface ListCardProps {
   isLoading: boolean
   isEmpty: boolean
   emptyMessage?: string
+  /** The request failed: shown as a failure (with Retry when `onRetry` is given), never as an empty list. */
+  isError?: boolean
+  onRetry?: () => void
   children: ReactNode
   className?: string
 }
@@ -42,6 +45,8 @@ export function ListCard({
   isLoading,
   isEmpty,
   emptyMessage = 'Nothing to show right now.',
+  isError = false,
+  onRetry,
   children,
   className = '',
 }: ListCardProps) {
@@ -58,6 +63,19 @@ export function ListCard({
           <div className="skeleton h-3 w-4/5 rounded" aria-hidden />
           <div className="skeleton h-3 w-3/5 rounded" aria-hidden />
         </div>
+      ) : isError ? (
+        <div role="alert" className="flex flex-col items-start gap-2">
+          <p className="text-sm text-muted">{title} could not be loaded.</p>
+          {onRetry ? (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="min-h-11 rounded-lg border border-base px-3 text-xs font-medium text-brand-navy hover:bg-page focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+            >
+              Retry
+            </button>
+          ) : null}
+        </div>
       ) : isEmpty ? (
         <p className="text-sm text-muted" role="status">{emptyMessage}</p>
       ) : (
@@ -65,4 +83,4 @@ export function ListCard({
       )}
     </div>
   )
-}
+}

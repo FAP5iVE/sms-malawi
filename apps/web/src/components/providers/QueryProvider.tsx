@@ -1,6 +1,6 @@
 'use client'
 import { useState }     from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools }               from '@tanstack/react-query-devtools'
 
 /**
@@ -19,8 +19,31 @@ const STALE = {
   REALTIME: 1000 * 20,              // 20 seconds
 } as const
 
+/**
+ * Student risk is DERIVED from fees, results, attendance and the library, and
+ * is shown on the Students list, the student profile, the class roster and the
+ * dashboard. When any mutation that changes one of those inputs succeeds
+ * (tagged `meta: { affectsRisk: true }` on the hook), refresh every query that
+ * carries risk so the badge moves immediately instead of up to STALE.MEDIUM
+ * (5 min) later. Tagging a hook is the only thing a module has to do to take
+ * part — the modules don't need to know about each other.
+ */
+const RISK_BEARING_QUERY_ROOTS: ReadonlyArray<readonly unknown[]> = [
+  ['students'],            // list, detail, me, at-risk
+  ['classes', 'detail'],   // class roster dots
+]
+
 function makeQueryClient(): QueryClient {
-  return new QueryClient({
+  const client: QueryClient = new QueryClient({
+    mutationCache: new MutationCache({
+      onSuccess: (_data, _variables, _context, mutation) => {
+        if (mutation.meta?.['affectsRisk'] === true) {
+          for (const queryKey of RISK_BEARING_QUERY_ROOTS) {
+            void client.invalidateQueries({ queryKey })
+          }
+        }
+      },
+    }),
     defaultOptions: {
       queries: {
         // Default: MEDIUM — overridden per-hook where needed
@@ -37,6 +60,7 @@ function makeQueryClient(): QueryClient {
       },
     },
   })
+  return client
 }
 
 let browserQueryClient: QueryClient | undefined

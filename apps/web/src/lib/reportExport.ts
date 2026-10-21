@@ -19,12 +19,15 @@
 
 import type { CsvCell, CsvColumn } from '@/lib/csv'
 import { csvFilename } from '@/lib/csv'
+import { DEFAULT_SCHOOL_LOGO_DATA_URI } from '@/lib/schoolLogoData'
 
 /** One exportable table. `rows` is held as unknown[] (type erased at the boundary). */
 export interface ExportTable {
   name: string
   columns: CsvColumn<never>[]
   rows: readonly unknown[]
+  /** Said out loud when the table is not the whole result (e.g. "First 300 largest balances only"). */
+  note?: string
 }
 
 export interface PackKpi {
@@ -42,6 +45,8 @@ export interface PackInsight {
 export interface ReportPackModel {
   title: string
   schoolName: string
+  /** PNG/JPEG data URI for the letterhead. Defaults to the built-in school mark. */
+  logoDataUri?: string
   /** e.g. ["Academic year: 2025/2026", "Term: 2"] */
   filters: string[]
   generatedAt: Date
@@ -57,6 +62,32 @@ export function tableToMatrix(table: ExportTable): CsvCell[][] {
     table.columns.map((c) => (c.value as (r: unknown) => CsvCell)(row)),
   )
   return [header, ...body]
+}
+
+/** What an export file needs to say about itself, so a printout or workbook can be read without the screen. */
+export interface ExportAbout {
+  title: string
+  schoolName: string
+  filters: string[]
+  generatedAt: Date
+}
+
+/**
+ * The "About this export" sheet: report, school, when it was generated, the
+ * filters that were applied, and for each table how many rows it holds and any
+ * note saying it is not the whole result. Pure; unit-tested.
+ */
+export function aboutMatrix(about: ExportAbout, tables: readonly ExportTable[]): CsvCell[][] {
+  const rows: CsvCell[][] = [
+    ['Report', about.title],
+    ['School', about.schoolName],
+    ['Generated', about.generatedAt.toLocaleString('en-GB')],
+    ['Filters', about.filters.length > 0 ? about.filters.join('; ') : 'None'],
+    [],
+    ['Table', 'Rows', 'Note'],
+  ]
+  for (const t of tables) rows.push([t.name, t.rows.length, t.note ?? 'Complete for the filters above'])
+  return rows
 }
 
 /** Excel sheet names: max 31 chars, none of : \ / ? * [ ], unique. */
@@ -88,7 +119,7 @@ function triggerDownload(blob: Blob, filename: string): void {
 }
 
 /** Download every table as one sheet each. Returns false when there is nothing to export. */
-export async function downloadXlsx(label: string, tables: readonly ExportTable[]): Promise<boolean> {
+export async function downloadXlsx(label: string, tables: readonly ExportTable[], about?: ExportAbout): Promise<boolean> {
   const withRows = tables.filter((t) => t.rows.length > 0)
   if (withRows.length === 0) return false
 
@@ -97,7 +128,16 @@ export async function downloadXlsx(label: string, tables: readonly ExportTable[]
   wb.creator = 'SMS Malawi'
   wb.created = new Date()
 
-  const names = sheetNames(withRows.map((t) => t.name))
+  // The About sheet is named first so a data table can never take its name.
+  const names = sheetNames([...(about ? ['About this export'] : []), ...withRows.map((t) => t.name)]).slice(about ? 1 : 0)
+  if (about) {
+    const info = wb.addWorksheet('About this export')
+    aboutMatrix(about, withRows).forEach((cells) => info.addRow(cells))
+    info.getColumn(1).font = { bold: true }
+    info.getColumn(1).width = 28
+    info.getColumn(2).width = 48
+    info.getColumn(3).width = 52
+  }
   withRows.forEach((table, i) => {
     const ws = wb.addWorksheet(names[i])
     const matrix = tableToMatrix(table)
@@ -163,16 +203,28 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
     y += 14
   }
 
-  // Title block
+  // Title block — school logo on the left, text beside it
+  const logoUri = model.logoDataUri ?? DEFAULT_SCHOOL_LOGO_DATA_URI
+  const logoFormat = /^data:image\/jpe?g/i.test(logoUri) ? 'JPEG' : 'PNG'
+  const logoSize = 46
+  let textX = margin
+  try {
+    doc.addImage(logoUri, logoFormat, margin, y - 12, logoSize, logoSize)
+    textX = margin + logoSize + 12
+  } catch {
+    // A bad logo must never block a report export — fall back to text only.
+  }
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(90)
-  doc.text(model.schoolName.toUpperCase(), margin, y)
+  doc.text(model.schoolName.toUpperCase(), textX, y)
   y += 20
   doc.setFontSize(20)
   doc.setTextColor(15, 52, 96)
-  doc.text(model.title, margin, y)
+  doc.text(model.title, textX, y)
   y += 18
+  // Meta line starts below the logo's bottom edge (y - 12 + logoSize)
+  y = Math.max(y, margin - 12 + logoSize + 6)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(90)
@@ -238,6 +290,13 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
       const cols = Math.min(headerRow.length, PDF_MAX_COLUMNS)
       const colW = contentW / cols
       heading(table.name)
+      if (table.note) {
+        doc.setFont('helvetica', 'italic')
+        doc.setFontSize(8)
+        doc.setTextColor(150, 80, 0)
+        doc.text(table.note, margin, y - 2)
+        y += 10
+      }
       const drawRow = (cells: CsvCell[], bold: boolean) => {
         const texts = cells.slice(0, cols).map((c) =>
           doc.splitTextToSize(String(c ?? ''), colW - 6).slice(0, 3) as string[],

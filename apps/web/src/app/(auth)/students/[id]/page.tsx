@@ -34,7 +34,7 @@ import { useRef } from 'react'
 import { useReactToPrint } from 'react-to-print'
 import { useStudent } from '@/hooks/useStudents'
 import { useReportCardData } from '@/hooks/useExams'
-import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
+import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
 import { StudentForm } from '@/components/students/StudentForm'
@@ -73,12 +73,14 @@ function ProfileContent() {
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({ contentRef: printRef })
 
-  // Year and default report-card term both come from the school's stored
-  // current period; the term selector below overrides only once used.
-  const { academicYear, term: currentTerm } = useEffectiveAcademicPeriod()
+  // Year and term come from the GLOBAL viewing period (header switcher) — the
+  // same period the risk card, fee balance and every other tab on this page are
+  // assessed for. This page used to read the school's *current* period and add
+  // its own report-card term select, so the report card could describe a
+  // different term from everything around it.
+  const { academicYear, term: viewingTerm } = useEffectiveViewingPeriod()
   const [showReportCard, setShowReportCard] = useState(false)
-  const [pickedReportCardTerm, setReportCardTerm] = useState<1 | 2 | 3 | null>(null)
-  const reportCardTerm = (pickedReportCardTerm ?? currentTerm) as 1 | 2 | 3
+  const reportCardTerm = viewingTerm as 1 | 2 | 3
   const {
     data:      reportCardData,
     isLoading: reportCardLoading,
@@ -126,21 +128,12 @@ function ProfileContent() {
           <Printer className="w-3.5 h-3.5" /> Print
         </button>
         <div className="flex items-center gap-1.5">
-          <select
-            value={reportCardTerm}
-            onChange={(e) => setReportCardTerm(Number(e.target.value) as 1 | 2 | 3)}
-            aria-label="Report card term"
-            className="border border-base rounded-lg text-sm px-2 py-1.5 bg-surface min-h-[36px]"
-          >
-            {[1, 2, 3].map((t) => (
-              <option key={t} value={t}>Term {t}</option>
-            ))}
-          </select>
           <button
             onClick={() => setShowReportCard(true)}
             className="flex items-center gap-1.5 border border-base px-3 py-1.5 rounded-lg text-sm hover:bg-page"
+            title={`Report card for Term ${reportCardTerm}, ${academicYear} — change the period from the header`}
           >
-            <FileText className="w-3.5 h-3.5" /> Report Card
+            <FileText className="w-3.5 h-3.5" /> Report Card · T{reportCardTerm}
           </button>
         </div>
       </div>
@@ -201,28 +194,40 @@ function ProfileContent() {
             </div>
           </div>
 
-          {(can('student.viewFeeStatus') || can('student.viewRiskStatus')) && (
+          {can('student.viewFeeStatus') && (
             <div className="pt-5">
               <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
                 Fee Status
               </p>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {can('student.viewFeeStatus') && (
-                  <div>
-                    <p className="text-xs text-muted mb-1">Outstanding Balance</p>
-                    <p
-                      className={`text-lg font-heading font-bold ${
-                        (student.feeBalance ?? 0) > 0 ? 'text-brand-coral' : 'text-brand-teal'
-                      }`}
-                    >
-                      {formatMWK(student.feeBalance ?? 0)}
-                    </p>
-                  </div>
-                )}
-                {can('student.viewRiskStatus') && (
-                  <StudentRiskBadge riskLevel={student.riskLevel ?? 'NONE'} variant="card" />
-                )}
+              <div>
+                <p className="text-xs text-muted mb-1">Outstanding Balance</p>
+                <p
+                  className={`text-lg font-heading font-bold ${
+                    (student.feeBalance ?? 0) > 0 ? 'text-brand-coral' : 'text-brand-teal'
+                  }`}
+                >
+                  {formatMWK(student.feeBalance ?? 0)}
+                </p>
               </div>
+            </div>
+          )}
+
+          {/* Risk is a composite of fees, exam results, attendance and library
+              (riskService), so it gets its own section rather than sitting under
+              "Fee Status". Each factor links to the module that owns it. */}
+          {can('student.viewRiskStatus') && (
+            <div className="pt-5">
+              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
+                Risk Overview
+              </p>
+              <StudentRiskBadge
+                riskLevel={student.riskLevel ?? 'NONE'}
+                variant="card"
+                factors={student.riskFactors}
+                score={student.riskScore}
+                insights={student.riskInsights}
+                classId={student.classId}
+              />
             </div>
           )}
         </div>

@@ -47,6 +47,7 @@ import {
 } from '@prisma/client'
 import type { UserRole } from '@shared/types/roles'
 import * as algolia from '@/server/services/algoliaService'
+import * as riskService from '@/server/services/riskService'
 import { sendEmail } from '@/lib/email'
 import { generateTempPassword } from '@/lib/tempPassword'
 
@@ -90,27 +91,38 @@ function isUniqueConstraintError(err: unknown): boolean {
 }
 
 // ─────────────────────────────────────────────────────────
-//  RISK LEVEL COMPUTATION
-//  Lightweight heuristic — computes a risk level string from
-//  available data without additional DB queries.
-//  Full riskService (Phase D7) will replace this with a richer model.
+//  RISK
+//  The old fee-only heuristic that lived here (computeRiskLevel — latest
+//  invoice only, a HIGH branch that could never fire) is gone. Every badge in
+//  the app — list, profile, class roster, dashboard — now comes from
+//  riskService.assessStudents(), so a student has ONE risk level for a given
+//  (academic year, term), derived from fees + results + attendance + library.
 // ─────────────────────────────────────────────────────────
 
-type RiskLevel = 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH'
+type RiskLevel = riskService.RiskLevel
 
-function computeRiskLevel(
-  feeBalance:   number,
-  feeTotal:     number,
-  termAverage?: number | null
-): RiskLevel {
-  const hasHighFeeDebt  = feeTotal > 0 && (feeBalance / feeTotal) > 0.5
-  const hasPoorGrades   = termAverage != null && termAverage < 40
-  const hasModestGrades = termAverage != null && termAverage < 50
+/** The period risk is assessed for; defaults to the school's current one. */
+export interface RiskPeriodInput {
+  academicYear?: string
+  term?:         number
+}
 
-  if (hasHighFeeDebt && hasPoorGrades)   return 'HIGH'
-  if (hasHighFeeDebt || hasPoorGrades)   return 'MEDIUM'
-  if (hasModestGrades)                    return 'LOW'
-  return 'NONE'
+const resolveRiskPeriod = riskService.resolveRiskPeriod
+
+/** The risk-related fields of an API student, for a given viewer. */
+function riskFields(
+  a: riskService.RiskAssessment | undefined,
+  status: string,
+  viewer: riskService.RiskViewer,
+): Pick<ApiStudentSummary, 'riskLevel' | 'riskScore' | 'riskFactors'> & { insights: string[] } {
+  // Non-ACTIVE students (graduated/archived/awaiting MANEB) have no live risk,
+  // and a viewer without student.viewRiskStatus gets no risk at all — not even
+  // a level, so the API never carries more than the UI is allowed to show.
+  if (!a || status !== 'ACTIVE' || !viewer.canViewRisk) {
+    return { riskLevel: 'NONE', riskScore: 0, riskFactors: [], insights: [] }
+  }
+  const r = riskService.redactAssessment(a, viewer.visibility)
+  return { riskLevel: r.riskLevel, riskScore: r.riskScore, riskFactors: r.factors, insights: r.insights }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -131,6 +143,9 @@ export interface ApiStudentSummary {
   photoKey:        string | null
   hasFirebaseUid:  boolean
   riskLevel:       RiskLevel
+  /** 0-100 composite from the unified engine (0 when not visible / not active). */
+  riskScore:       number
+  riskFactors:     riskService.RiskFactor[]
   feeBalance:      number
   currentBorrowings: number
   createdAt:       string
@@ -148,6 +163,8 @@ export interface ApiStudentDetail extends ApiStudentSummary {
   guardianPhone:   string
   guardianRelation:string
   updatedAt:       string
+  /** Cross-module risk observations (profile card only). */
+  riskInsights:    string[]
 }
 
 export interface StudentListResult {
@@ -165,6 +182,9 @@ export interface StudentQueryFilters {
   sex?:        Sex
   form?:       number
   hasRisk?:    boolean
+  /** Period risk is assessed for (the global viewing period); defaults to the school's current one. */
+  academicYear?: string
+  term?:         number
   page?:       number
   pageSize?:   number
   /**
@@ -315,7 +335,8 @@ const DEFAULT_PAGE_SIZE = 25
 const MAX_PAGE_SIZE     = 100
 
 export async function list(
-  filters: StudentQueryFilters
+  filters: StudentQueryFilters,
+  viewer: riskService.RiskViewer = riskService.NO_RISK_VIEWER,
 ): Promise<StudentListResult> {
   const {
     search,
@@ -382,15 +403,8 @@ export async function list(
         class: {
           select: { name: true, form: true },
         },
-        // Latest invoice for fee balance
-        invoices: {
-          orderBy:     { createdAt: 'desc' },
-          take:        1,
-          select: {
-            balance:     true,
-            totalAmount: true,
-          },
-        },
+        // Fee balance and risk both come from riskService (one source of truth);
+        // the old "latest invoice only" select is no longer needed here.
         // Active borrowings count
         borrowings: {
           where:  { status: 'ACTIVE' },
@@ -400,10 +414,13 @@ export async function list(
     }),
   ])
 
+  // ONE batched assessment for the whole page (≈7 queries, not 5 per row).
+  const period   = await resolveRiskPeriod(filters)
+  const assessed = await riskService.assessStudents(rows.map((r) => r.id), period)
+
   const students: ApiStudentSummary[] = rows.map((row) => {
-    const latestInvoice  = row.invoices[0] as { balance: Prisma.Decimal | number; totalAmount: Prisma.Decimal | number } | undefined
-    const feeBalance     = latestInvoice ? Number(latestInvoice.balance)     : 0
-    const feeTotal       = latestInvoice ? Number(latestInvoice.totalAmount)  : 0
+    const a    = assessed.get(row.id)
+    const risk = riskFields(a, row.status, viewer)
 
     return {
       id:              row.id,
@@ -418,8 +435,12 @@ export async function list(
       classForm:       row.class?.form  ?? null,
       photoKey:        row.photoKey,
       hasFirebaseUid:  Boolean(row.firebaseUid),
-      riskLevel:       computeRiskLevel(feeBalance, feeTotal),
-      feeBalance,
+      riskLevel:       risk.riskLevel,
+      riskScore:       risk.riskScore,
+      riskFactors:     risk.riskFactors,
+      // Outstanding through the viewed term — the same figure the FEE_DEBT risk
+      // factor uses, so "fees cleared" and the risk badge can't disagree.
+      feeBalance:      a?.metrics.feeBalance ?? 0,
       currentBorrowings: row.borrowings.length,
       createdAt:       row.createdAt.toISOString(),
     }
@@ -438,7 +459,11 @@ export async function list(
 //  GET BY ID
 // ─────────────────────────────────────────────────────────
 
-export async function getById(id: string): Promise<ApiStudentDetail | null> {
+export async function getById(
+  id: string,
+  period?: RiskPeriodInput,
+  viewer: riskService.RiskViewer = riskService.NO_RISK_VIEWER,
+): Promise<ApiStudentDetail | null> {
   const row = await prisma.student.findUnique({
     where:  { id },
     select: {
@@ -467,11 +492,6 @@ export async function getById(id: string): Promise<ApiStudentDetail | null> {
       class: {
         select: { name: true, form: true },
       },
-      invoices: {
-        orderBy: { createdAt: 'desc' },
-        take:    1,
-        select:  { balance: true, totalAmount: true },
-      },
       borrowings: {
         where:  { status: 'ACTIVE' },
         select: { id: true },
@@ -481,9 +501,8 @@ export async function getById(id: string): Promise<ApiStudentDetail | null> {
 
   if (!row) return null
 
-  const latestInvoice  = row.invoices[0] as { balance: Prisma.Decimal | number; totalAmount: Prisma.Decimal | number } | undefined
-  const feeBalance     = latestInvoice ? Number(latestInvoice.balance)    : 0
-  const feeTotal       = latestInvoice ? Number(latestInvoice.totalAmount) : 0
+  const assessment = (await riskService.assessStudents([row.id], await resolveRiskPeriod(period))).get(row.id)
+  const risk       = riskFields(assessment, row.status, viewer)
 
   return {
     id:              row.id,
@@ -507,8 +526,11 @@ export async function getById(id: string): Promise<ApiStudentDetail | null> {
     classForm:       row.class?.form  ?? null,
     photoKey:        row.photoKey,
     hasFirebaseUid:  Boolean(row.firebaseUid),
-    riskLevel:       computeRiskLevel(feeBalance, feeTotal),
-    feeBalance,
+    riskLevel:       risk.riskLevel,
+    riskScore:       risk.riskScore,
+    riskFactors:     risk.riskFactors,
+    riskInsights:    risk.insights,
+    feeBalance:      assessment?.metrics.feeBalance ?? 0,
     currentBorrowings: row.borrowings.length,
     status:          row.status,
     createdAt:       row.createdAt.toISOString(),
@@ -521,14 +543,16 @@ export async function getById(id: string): Promise<ApiStudentDetail | null> {
  * This is the student-role self-lookup path — no ID needed.
  */
 export async function getByFirebaseUid(
-  firebaseUid: string
+  firebaseUid: string,
+  period?: RiskPeriodInput,
+  viewer: riskService.RiskViewer = riskService.NO_RISK_VIEWER,
 ): Promise<ApiStudentDetail | null> {
   const row = await prisma.student.findUnique({
     where:  { firebaseUid },
     select: { id: true },
   })
   if (!row) return null
-  return getById(row.id)
+  return getById(row.id, period, viewer)
 }
 
 // ─────────────────────────────────────────────────────────

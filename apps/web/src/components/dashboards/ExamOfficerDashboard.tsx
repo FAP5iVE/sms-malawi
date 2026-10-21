@@ -39,9 +39,10 @@ import Link from 'next/link'
 import { QuickActions } from '@/components/shared/QuickActions'
 import { useExams } from '@/hooks/useExams'
 import { useExamOverview, useExamAttention, useExamPipeline } from '@/hooks/reporting/useExamsReporting'
-import { ChartCard } from '@/components/shared/ChartCard'
 import { Chart } from '@/components/shared/chart'
-import { DashboardAttention, DashboardKpis } from './DashboardReport'
+import { DashboardAttention } from './DashboardReport'
+import { PrimaryOverviewKpis, ReportLinks, SecondaryKpis, TrendCard } from './DashboardSections'
+import type { ReportLink } from './DashboardSections'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 import {
   examsInNextSevenDays,
@@ -92,9 +93,35 @@ const QUICK_ACTIONS: QuickAction[] = [
   },
 ]
 
+/** Lead with how complete the marks are and what is waiting on a decision; the rest sit in "More figures". */
+const PREFERRED = ['markCompletion', 'awaitingApproval', 'awaitingRelease', 'blocked']
+
+const REPORT_LINKS: ReportLink[] = [
+  { label: 'Workflow', href: '/reports?tab=pipeline', description: 'Every exam, its stage, who must act, audit trail' },
+  { label: 'Marks completion', href: '/reports?tab=completion', description: 'Entered and missing by class and subject' },
+  { label: 'Subjects', href: '/reports?tab=subjects', description: 'Performance by subject' },
+  { label: 'Marks', href: '/reports?tab=marks', description: 'Mark distributions' },
+  { label: 'MANEB', href: '/reports?tab=maneb', description: 'JCE and MSCE candidates and outcomes' },
+]
+
+function ExamsLoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div role="alert" className="flex flex-col items-start gap-2 py-4">
+      <p className="text-sm text-muted">Exams could not be loaded.</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="min-h-11 rounded-lg border border-base px-3 text-xs font-medium text-brand-navy hover:bg-page focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+      >
+        Retry
+      </button>
+    </div>
+  )
+}
+
 export function ExamOfficerDashboard() {
   const { academicYear, term, isLoading: periodLoading } = useViewingPeriod()
-  const { data: examsData, isLoading: examsLoading } = useExams(
+  const { data: examsData, isLoading: examsLoading, isError: examsError, refetch: refetchExams } = useExams(
     undefined,
     academicYear ?? '',
     term ?? 0,
@@ -110,17 +137,15 @@ export function ExamOfficerDashboard() {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <DashboardKpis
-        title="Examination overview"
-        summary="Where each exam is in its lifecycle — marking, approval and release — and what is holding results back. Each figure opens the report behind it."
+      <PrimaryOverviewKpis
+        title="Examinations at a glance"
+        summary="Where this term's exams are in marking, approval and release. Tap a figure to open its report."
         academicYear={academicYear}
         term={term}
         overview={overview}
+        preferred={PREFERRED}
         reportsHref="/reports?tab=completion"
-        showInsights
-        placeholders={8}
       />
-      <QuickActions actions={QUICK_ACTIONS} />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         {/* [PRODUCTION FIX 2026-07-28] Was a permanent PlaceholderWidget
             skeleton ("wired in R17" — never happened). exams is already
@@ -134,6 +159,8 @@ export function ExamOfficerDashboard() {
             <div className="space-y-2">
               {[1, 2, 3].map((i) => <div key={i} className="h-10 rounded-lg bg-page animate-pulse" />)}
             </div>
+          ) : examsError ? (
+            <ExamsLoadError onRetry={() => void refetchExams()} />
           ) : examsInNextSevenDays(exams).length === 0 ? (
             <p className="text-sm text-muted py-6 text-center">No exams scheduled this week.</p>
           ) : (
@@ -161,6 +188,8 @@ export function ExamOfficerDashboard() {
             <div className="space-y-2">
               {[1, 2, 3].map((i) => <div key={i} className="h-10 rounded-lg bg-page animate-pulse" />)}
             </div>
+          ) : examsError ? (
+            <ExamsLoadError onRetry={() => void refetchExams()} />
           ) : examsAwaitingRelease(exams).length === 0 ? (
             <p className="text-sm text-muted py-6 text-center">Nothing waiting on release.</p>
           ) : (
@@ -181,11 +210,12 @@ export function ExamOfficerDashboard() {
           )}
         </div>
       </div>
-      <ChartCard
+      <TrendCard
         title="Results pipeline"
         sub="Exams at each stage this term"
         isLoading={pipeline.isLoading}
-        height={200}
+        isError={pipeline.isError}
+        onRetry={() => void pipeline.refetch()}
       >
         <Chart
           type="bar"
@@ -195,8 +225,11 @@ export function ExamOfficerDashboard() {
           emptyStateMessage="No exams this term."
           ariaLabel="Number of exams at each stage of the results pipeline"
         />
-      </ChartCard>
-      <DashboardAttention query={attention} title="Examination exceptions" />
+      </TrendCard>
+      <DashboardAttention query={attention} title="Examination exceptions" limit={5} />
+      <SecondaryKpis title="More figures and findings" overview={overview} preferred={PREFERRED} showInsights />
+      <QuickActions actions={QUICK_ACTIONS} compact />
+      <ReportLinks links={REPORT_LINKS} />
     </div>
   )
 }

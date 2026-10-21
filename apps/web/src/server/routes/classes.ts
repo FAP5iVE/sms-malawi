@@ -49,6 +49,7 @@ import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission } from '@/server/middleware/verifyPermission'
 import { CreateClassSchema, UpdateClassSchema, CreateTimetableSlotSchema, CreateSubjectAssignmentSchema, SetClassSubjectPresetsSchema } from '@shared/schemas/student'
 import * as classService         from '@/server/services/classService'
+import * as riskService          from '@/server/services/riskService'
 import * as pendingActionService from '@/server/services/pendingActionService'
 import * as settingsService      from '@/server/services/settingsService'
 import { resolveStudentFromUid } from '@/server/services/studentService'
@@ -80,7 +81,12 @@ classesRouter.get(
   requirePermission('class.view'),
   async (req, res) => {
     const id = String(req.params.id)
-    const cls = await classService.getClass(id)
+    const year = typeof req.query.academicYear === 'string' && /^\d{4}\/\d{4}$/.test(req.query.academicYear) ? req.query.academicYear : undefined
+    const t = Number(req.query.term)
+    const cls = await classService.getClass(id, {
+      period: { academicYear: year, term: t === 1 || t === 2 || t === 3 ? t : undefined },
+      viewer: riskService.riskViewerFor(req.user?.role, req.user?.superUser === true),
+    })
     res.json(cls)
   }
 )

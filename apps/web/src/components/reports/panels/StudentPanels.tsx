@@ -5,14 +5,15 @@
  * for a term are shown only while that term's fee gate is open: held-back terms
  * are named, never described, and no figures are shown for them.
  */
+import Link from 'next/link'
 import { Lock } from 'lucide-react'
 import { Chart } from '@/components/shared/chart'
 import { ChartCard } from '@/components/shared/ChartCard'
 import {
-  useMyAssignments, useMyAttendance, useMyAttention, useMyFees, useMyLibrary, useMyOverview, useMyProgress,
+  useMyAssignments, useMyAttendance, useMyAttention, useMyFees, useMyLibrary, useMyOverview, useMyPlacementReport, useMyProgress,
 } from '@/hooks/reporting/useStudentReporting'
 import type {
-  ApiStudentAssignmentRow, ApiStudentLoanRow, ApiStudentSubjectRow, StudentAssignmentStatus,
+  ApiStudentAssignmentRow, ApiStudentLoanRow, ApiStudentPlacementState, ApiStudentSubjectRow, StudentAssignmentStatus,
 } from '@shared/types/reporting-student'
 import { formatCount, formatDate, formatMwk, formatPercent, formatScore } from '@/lib/reportFormat'
 import { ReportCard } from '../ui/ReportCard'
@@ -259,6 +260,91 @@ export function StudentFeesTab({ academicYear, term }: Period) {
             ]}
           />
         </QueryState>
+      </ReportCard>
+    </PanelStack>
+  )
+}
+
+const PLACEMENT_TONE: Record<ApiStudentPlacementState, string> = {
+  published: 'border-green-200 bg-green-50 text-green-900',
+  pending: 'border-amber-200 bg-amber-50 text-amber-900',
+  not_approved: 'border-red-200 bg-red-50 text-red-900',
+  none: 'border-base bg-page text-body',
+  awaiting_results: 'border-base bg-page text-body',
+  not_yet_eligible: 'border-base bg-page text-body',
+}
+
+function Field({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="break-words text-sm font-medium text-body">{value ?? 'Not given'}</dd>
+    </div>
+  )
+}
+
+/**
+ * My university placement. The server returns only this student's own,
+ * published information: a confirmed placement, or their own claim while it is
+ * still pending / after it was not approved, or a clear "nothing yet" state.
+ * There is no period filter and no way to ask about anyone else.
+ */
+export function StudentPlacementTab() {
+  const q = useMyPlacementReport()
+  const d = q.data
+  return (
+    <PanelStack>
+      <ReportCard title="My university placement" sub="Only your own record, and only what the school has published.">
+        <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
+          {d ? (
+            <div className="space-y-4">
+              <div className={`rounded-lg border p-3 sm:p-4 ${PLACEMENT_TONE[d.state]}`} role="status">
+                <p className="font-heading text-base font-semibold">{d.headline}</p>
+                <p className="mt-1 text-sm">{d.detail}</p>
+              </div>
+
+              {d.placement ? (
+                <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <Field label="University" value={d.placement.university} />
+                  <Field label="Programme" value={d.placement.programme} />
+                  <Field label="Intake year" value={d.placement.admissionYear} />
+                  <Field label="Confirmed on" value={d.placement.confirmedOn ? formatDate(d.placement.confirmedOn) : null} />
+                  <Field label="Source" value={d.placement.source === 'school_list' ? 'School’s official list' : 'Your claim, verified by staff'} />
+                </dl>
+              ) : null}
+
+              {d.claim ? (
+                <div>
+                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">What you submitted</h4>
+                  <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <Field label="University" value={d.claim.university} />
+                    <Field label="Programme" value={d.claim.programme} />
+                    <Field label="Intake year" value={d.claim.admissionYear} />
+                    <Field label="List reference" value={d.claim.reference} />
+                    <Field label="Submitted on" value={formatDate(d.claim.submittedOn)} />
+                    {d.claim.rejectionReason ? <Field label="Reason given" value={d.claim.rejectionReason} /> : null}
+                  </dl>
+                </div>
+              ) : null}
+
+              {d.canClaim ? (
+                <Link
+                  href="/placements"
+                  className="inline-flex items-center rounded-lg bg-brand-navy px-3 py-2 text-sm font-medium text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-brand-navy/30"
+                >
+                  {d.state === 'not_approved' ? 'Submit your claim again' : 'Tell the school where you were selected'}
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
+        </QueryState>
+      </ReportCard>
+      <ReportCard title="What this report shows">
+        <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
+          <li>Only your own placement. Other students’ placements, exam numbers and results are never shown here.</li>
+          <li>A placement counts as published only once it is on the school’s confirmed list. A claim you submit is shown as “under review” until staff verify it.</li>
+          <li>Placement opens after you graduate and your MSCE results are certified.</li>
+        </ul>
       </ReportCard>
     </PanelStack>
   )

@@ -35,6 +35,7 @@ import { prisma }  from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { SETTING_KEYS } from '@shared/types/settings'
 import * as settingsService from '@/server/services/settingsService'
+import { summariseInvoices } from '@/server/services/analytics/financeLogic'
 
 // ─── ADMIN REPORTS ────────────────────────────────────────
 export async function getAdminSystemReport() {
@@ -99,11 +100,21 @@ export async function getFeeCollectionReport(academicYear: string, term?: number
       take: 12,
     }),
   ])
-  const collected   = invoices.reduce((s, i) => s + Number(i.paidAmount), 0)
-  const outstanding = invoices.reduce((s, i) => s + Number(i.balance), 0)
-  const target      = invoices.reduce((s, i) => s + Number(i.totalAmount), 0)
-  const collectionPct = target > 0 ? Math.round((collected / target) * 100) : 0
-  return { collected, outstanding, target, collectionPct, invoices, expenses, payrollRuns }
+  // Shared with the dashboards and the finance reports (financeLogic) so every
+  // surface shows the same collected / outstanding / rate for the same scope.
+  const summary = summariseInvoices(
+    invoices.map((i) => ({ totalAmount: Number(i.totalAmount), paidAmount: Number(i.paidAmount), balance: Number(i.balance) })),
+  )
+  return {
+    collected: summary.collected,
+    outstanding: summary.outstanding,
+    target: summary.billed,
+    // null — not 0 — when nothing has been billed for the scope.
+    collectionPct: summary.collectionRate,
+    invoices,
+    expenses,
+    payrollRuns,
+  }
 }
 
 // ─── LIBRARY REPORTS ─────────────────────────────────────
@@ -196,8 +207,9 @@ export async function getAcademicReport(teacherUid: string, academicYear: string
         className: c.name,
         form: c.form,
         total: results.length,
-        passRate: results.length > 0 ? Math.round((results.filter((r) => r.passStatus).length / results.length) * 100) : 0,
-        avg: results.length > 0 ? Math.round(results.reduce((s, r) => s + Number(r.average), 0) / results.length * 10) / 10 : 0,
+        // null (not 0) when the class has no computed results — "not computed" is not "0% passed".
+        passRate: results.length > 0 ? Math.round((results.filter((r) => r.passStatus).length / results.length) * 100) : null,
+        avg: results.length > 0 ? Math.round(results.reduce((s, r) => s + Number(r.average), 0) / results.length * 10) / 10 : null,
       }
     })
   )
@@ -282,4 +294,4 @@ export async function getAuditLogs(filters: {
   })
 
   return { logs: enrichedLogs, total, page, pages: Math.ceil(total / limit) }
-}
+}

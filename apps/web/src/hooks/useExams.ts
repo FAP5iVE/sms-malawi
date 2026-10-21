@@ -26,7 +26,7 @@ import type { CreateExamInput, BulkMarkEntryInput, CreateManebRecordInput } from
 import type { ReportCardData } from '@/components/shared/PrintableReportCard'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 
-export function useExams(classId: string | undefined, academicYear: string, term: number) {
+export function useExams(classId: string | undefined, academicYear: string, term: number, enabled = true) {
   return useQuery({
     queryKey: queryKeys.exams.list({ classId: classId ?? null, academicYear, term }),
     queryFn:  () =>
@@ -35,7 +35,7 @@ export function useExams(classId: string | undefined, academicYear: string, term
           ? `/exams?classId=${classId}&academicYear=${academicYear}&term=${term}`
           : `/exams?academicYear=${academicYear}&term=${term}`
       ),
-    enabled: !!academicYear && !!term,
+    enabled: enabled && !!academicYear && !!term,
   })
 }
 
@@ -65,6 +65,7 @@ export function useEnterMarks(examId: string) {
 export function useCorrectMarks(examId: string) {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: BulkMarkEntryInput) =>
       apiFetch<unknown[]>(`/exams/${examId}/correct-marks`, { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
@@ -102,6 +103,7 @@ export function useApproveResults() {
 export function useReleaseResults() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (examId: string) => apiFetch<{ success: boolean }>(`/exams/${examId}/release`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.exams.all() }),
   })

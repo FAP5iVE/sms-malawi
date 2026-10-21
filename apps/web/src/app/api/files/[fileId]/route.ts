@@ -95,6 +95,22 @@ export async function GET(
         })
         ownerUid = student?.firebaseUid ?? undefined
       }
+    } else if (fileId.startsWith('receipt_')) {
+      // Payment -> Invoice -> Student. Receipts used to have no ownership
+      // branch (and READ_ROLES had no __self entry), so the student who PAID
+      // was refused their own receipt with a 403 even though the API route
+      // had already authorised them.
+      const payment = await prisma.payment.findFirst({
+        where: { receiptKey: fileId },
+        select: { invoice: { select: { studentId: true } } },
+      })
+      if (payment) {
+        const student = await prisma.student.findUnique({
+          where: { id: payment.invoice.studentId },
+          select: { firebaseUid: true },
+        })
+        ownerUid = student?.firebaseUid ?? undefined
+      }
     } else if (fileId.startsWith('transcript_')) {
       const student = await prisma.student.findFirst({
         where: { transcriptKey: fileId },

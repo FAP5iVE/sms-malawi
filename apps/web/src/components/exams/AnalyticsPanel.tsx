@@ -118,11 +118,10 @@ function PerClassTable({ rows }: { rows: ApiClassAnalyticsSummary[] }) {
 
 export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
   const [classId, setClassId] = useState(selectedClassId)
-  const [t, setT]             = useState(term)
   const [subject, setSubject] = useState('')
   const { data: classesData } = useClasses(academicYear)
   const classes               = (classesData ?? []) as ApiClass[]
-  const { data, isLoading, error } = useExamAnalytics(academicYear, t, { classId: classId || undefined, subject: subject || undefined })
+  const { data, isLoading, error } = useExamAnalytics(academicYear, term, { classId: classId || undefined, subject: subject || undefined })
 
   // MSCE-track classes are ranked and summarised on POINTS, not percentage —
   // but only for the overall result. A single-subject view is a percentage on
@@ -144,10 +143,6 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
           className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none">
           <option value="">All classes (per-class summary)</option>
           {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select value={t} onChange={(e) => setT(Number(e.target.value))} aria-label="Select term"
-          className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none">
-          {[1,2,3].map((n) => <option key={n} value={n}>Term {n}</option>)}
         </select>
         <select value={subject} onChange={(e) => setSubject(e.target.value)} aria-label="Filter by subject"
           className="border border-base rounded-xl px-3 py-2 text-sm bg-surface focus:outline-none">

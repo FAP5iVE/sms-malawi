@@ -106,6 +106,8 @@ interface RosterStudent {
   registrationNo: string
   sex: string
   riskLevel?: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH'
+  riskScore?: number
+  riskFactors?: Array<{ id: string; domain: string; severity: 'HIGH' | 'MEDIUM' | 'LOW'; detail: string }>
 }
 
 function ClassDetailContent() {
@@ -113,8 +115,9 @@ function ClassDetailContent() {
   const { data: cls, isLoading } = useClass(id)
   const { role, user } = useAuthStore()
    const { can } = usePermissions()
-  // Follows the universal header filter; the term select below writes through to it.
-  const { term, setTerm } = useEffectiveViewingPeriod()
+  // Follows the universal header filter (the timetable tab's own term select was a
+  // second control for the same value and has been removed).
+  const { term } = useEffectiveViewingPeriod()
   const { data: slots = [] } = useClassTimetable(id, term)
   const [activeTab, setActiveTab] = useState<Tab>('roster')
   const [showAssignmentForm, setShowAssignmentForm] = useState(false)
@@ -188,7 +191,13 @@ function ClassDetailContent() {
         key: 'riskLevel',
         label: 'Risk',
         priority: 'optional' as const,
-        render: (s: RosterStudent) => <StudentRiskBadge riskLevel={s.riskLevel ?? 'NONE'} variant="dot" />,
+        render: (s: RosterStudent) => (
+          <StudentRiskBadge
+            riskLevel={s.riskLevel ?? 'NONE'}
+            variant="dot"
+            hint={s.riskFactors?.[0]?.detail}
+          />
+        ),
       },
       {
         key: 'profile',
@@ -305,18 +314,7 @@ function ClassDetailContent() {
                 Add Slot
               </button>
             </RoleGuard>
-            <label className="flex items-center gap-2 text-sm text-muted ml-auto">
-              Term
-              <select
-                value={term}
-                onChange={(e) => setTerm(Number(e.target.value))}
-                className="border border-base rounded-lg px-2 py-1.5 text-sm bg-surface min-h-[36px]"
-              >
-                {[1, 2, 3].map((t) => (
-                  <option key={t} value={t}>Term {t}</option>
-                ))}
-              </select>
-            </label>
+            <span className="text-sm text-muted ml-auto" aria-label="Period shown">Term {term}</span>
           </div>
 
           {showSlotForm && (

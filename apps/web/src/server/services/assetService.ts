@@ -67,7 +67,7 @@ function toAlgoliaAsset(asset: {
 // ─── REGISTER (catalog) ─────────────────────────────────
 
 export async function listAssets(filters: {
-  category?: string; status?: string; search?: string
+  category?: string; status?: string; condition?: string; search?: string
   sortBy?: 'name' | 'category' | 'acquisitionDate' | 'acquisitionCost'
   sortDir?: 'asc' | 'desc'
 } = {}) {
@@ -75,6 +75,7 @@ export async function listAssets(filters: {
     where: {
       ...(filters.category ? { category: filters.category as never } : {}),
       ...(filters.status   ? { status: filters.status as never } : {}),
+      ...(filters.condition ? { condition: filters.condition as never } : {}),
       ...(filters.search   ? {
         OR: [
           { name:         { contains: filters.search, mode: 'insensitive' } },
@@ -522,4 +523,4 @@ export async function getInventoryStats() {
     pendingRequests,
     outstandingAdvancesMWK: Number(outstandingAdvances._sum.amount ?? 0),
   }
-}
+}
