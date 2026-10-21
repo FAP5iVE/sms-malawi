@@ -22,7 +22,8 @@ const base = {
 const certified = { examType: 'MSCE', status: 'CERTIFIED', subjectGrades: { Maths: '2', English: '3' } }
 
 // The fake client keeps references to these arrays, so each scenario refills them in place.
-const rows = { students: [] as unknown[], placements: [] as unknown[], maneb: [] as unknown[] }
+type Row = Record<string, unknown>
+const rows = { students: [] as Row[], placements: [] as Row[], maneb: [] as Row[] }
 
 vi.mock('@/lib/prisma', () => ({
   prisma: makeFakePrisma({

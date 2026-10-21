@@ -60,7 +60,7 @@ const DEFAULT_LOGO: SchoolLogo = {
 type LogoMime = SchoolLogo['mime']
 
 function normaliseMime(raw: string | undefined | null, bytes: Buffer): LogoMime | null {
-  const m = (raw ?? '').toLowerCase().split(';')[0].trim()
+  const m = ((raw ?? '').toLowerCase().split(';')[0] ?? '').trim()
   if (m === 'image/png' || m === 'image/jpeg' || m === 'image/webp' || m === 'image/svg+xml') return m
   if (m === 'image/jpg') return 'image/jpeg'
   // Sniff magic bytes when the server sent a generic content-type.
@@ -89,7 +89,7 @@ async function loadConfigured(ref: string): Promise<SchoolLogo | null> {
   // data: URI stored directly in the setting
   const dataMatch = /^data:(image\/[a-z+.-]+);base64,(.+)$/i.exec(value)
   if (dataMatch) {
-    const bytes = Buffer.from(dataMatch[2], 'base64')
+    const bytes = Buffer.from(dataMatch[2] ?? '', 'base64')
     const mime = normaliseMime(dataMatch[1], bytes)
     return mime && bytes.length <= MAX_BYTES ? build(bytes, mime) : null
   }
@@ -97,7 +97,8 @@ async function loadConfigured(ref: string): Promise<SchoolLogo | null> {
   // Our own authenticated proxy path, or a bare Appwrite file id
   const proxyMatch = /^\/api\/files\/([^/?#]+)/.exec(value)
   const bareId = !/^https?:\/\//i.test(value) && !value.startsWith('/') ? value : null
-  const fileId = proxyMatch ? decodeURIComponent(proxyMatch[1]) : bareId
+  const proxyId = proxyMatch?.[1]
+  const fileId = proxyId ? decodeURIComponent(proxyId) : bareId
   if (fileId) {
     const { buffer, mimeType } = await streamFile(fileId)
     const bytes = Buffer.from(buffer as ArrayBuffer)

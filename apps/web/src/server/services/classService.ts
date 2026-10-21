@@ -221,6 +221,7 @@ export async function getClass(
     },
   })
   const [withTeacherName] = await attachTeacherNames([cls])
+  if (!withTeacherName) throw new Error(`Class ${id} could not be loaded`)
 
   // The roster used to return raw student rows with no riskLevel, so every dot
   // in the class roster rendered "NONE". Attach the same engine output the

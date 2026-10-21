@@ -24,10 +24,12 @@ export function drawLogoBadge(doc: jsPDF, dataUri: string | undefined, x: number
   const m = DATA_URI_RE.exec(dataUri)
   if (!m) return false
   try {
+    const format = m[1]
+    if (!format) return false
     const pad = size * 0.1
     doc.setFillColor(255, 255, 255)
     doc.roundedRect(x, y, size, size, 1.8, 1.8, 'F')
-    doc.addImage(dataUri, m[1].toUpperCase() as 'PNG' | 'JPEG', x + pad, y + pad, size - 2 * pad, size - 2 * pad)
+    doc.addImage(dataUri, format.toUpperCase() as 'PNG' | 'JPEG', x + pad, y + pad, size - 2 * pad, size - 2 * pad)
     return true
   } catch {
     return false

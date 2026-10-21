@@ -137,11 +137,12 @@ describe('attention ranking and routing', () => {
     expect(rankAttention([item('a', 'critical', 0), item('b', 'watch', null), item('c', 'info', 1)]).map((i) => i.key)).toEqual(['c'])
   })
   it('adds owner and action from the routing table and keeps ones already set', () => {
-    const [a, b, c] = enrichAttention([
+    const input: Array<ReturnType<typeof item> & { owner?: string }> = [
       item('expenses-pending', 'watch', 2),
       { ...item('arrears-severe', 'critical', 3), owner: 'Bursar' },
       item('something-new', 'info', 1),
-    ])
+    ]
+    const [a, b, c] = enrichAttention(input)
     expect(a).toMatchObject({ owner: 'Headteacher', action: 'Approve or decline expenses' })
     expect(b).toMatchObject({ owner: 'Bursar', action: 'Collect overdue fees' })
     expect(c?.owner).toBeUndefined()
