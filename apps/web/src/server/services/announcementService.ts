@@ -905,7 +905,14 @@ function mapViewer(id: string, data: DocumentData): ViewerAnnouncement {
  * own composite index — the same reason the old client listener filtered
  * client-side, but now done on the trusted server.
  */
-export async function listForViewer(viewer: { uid: string; role: string; superUser?: boolean }): Promise<ViewerAnnouncement[]> {
+export async function listForViewer(
+  viewer: { uid: string; role: string; superUser?: boolean },
+  // [NEW] The Announcements page (and only it) opts in to seeing published
+  // NEWS / ADVERTISEMENT posts so its News and Academic Advertisements tabs
+  // can list them under "Published". Every other caller (dashboards, etc.)
+  // keeps the original behaviour of excluding public-only content.
+  opts: { includePublicPosts?: boolean } = {},
+): Promise<ViewerAnnouncement[]> {
   const snap = await getFirestore(getAdminApp())
     .collection(COLLECTIONS.ANNOUNCEMENTS)
     .where('status', '==', 'PUBLISHED')
@@ -915,19 +922,26 @@ export async function listForViewer(viewer: { uid: string; role: string; superUs
 
   return snap.docs
     .map((d) => mapViewer(d.id, d.data()))
-    .filter(
-      (a) =>
-        // [PRODUCTION FIX] NEWS and ADVERTISEMENT are public-site-only
-        // content (PUBLIC_ONLY_POST_TYPES) — neither must ever surface in
-        // a user's internal /announcements tab, no matter what
-        // targetAll/targetRoles happen to be on the doc.
-        !PUBLIC_ONLY_POST_TYPES.includes(a.postType) &&
-        // alpha_admin sees every published announcement, whoever it targeted.
-        (viewer.superUser === true ||
-          a.targetAll ||
-          a.targetRoles.includes(viewer.role) ||
-          a.createdByUid === viewer.uid),
-    )
+    .filter((a) => {
+      // NEWS and ADVERTISEMENT are public-site-only content
+      // (PUBLIC_ONLY_POST_TYPES): they carry no internal audience
+      // (targetAll=false, targetRoles=[]), so the role-targeting rule
+      // below would hide them from everyone except their author. They are
+      // already world-readable on the public site, so when a caller opts
+      // in via includePublicPosts they are listed for every signed-in
+      // user, and only when that flag is set — the dashboards' announcement
+      // rails never receive them.
+      if (PUBLIC_ONLY_POST_TYPES.includes(a.postType)) {
+        return opts.includePublicPosts === true && a.publicWebsite
+      }
+      // alpha_admin sees every published announcement, whoever it targeted.
+      return (
+        viewer.superUser === true ||
+        a.targetAll ||
+        a.targetRoles.includes(viewer.role) ||
+        a.createdByUid === viewer.uid
+      )
+    })
 }
 
 /** PENDING_APPROVAL announcements — for approvers' Pending tab. */

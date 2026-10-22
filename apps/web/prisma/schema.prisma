@@ -1716,6 +1716,29 @@ model UniversityPlacement {
 
 // ─────────────────SENTRY MONITORING CACHE ───────────────────────────────────────────────
 
+// ─── PROBLEM REPORTS ("Report a problem", open to every role) ───────────────
+// Persisted here as well as sent to Sentry so every report shows up
+// immediately in Monitoring > Feedback with who sent it, instead of depending
+// on Sentry's feedback ingestion/read-back delay.
+model ProblemReport {
+  id                String   @id @default(cuid())
+  uid               String   // Firebase UID of the signed-in reporter
+  role              String
+  reporterName      String
+  reporterIdNumber  String
+  reporterIdType    String   // EMPLOYEE_NUMBER | STUDENT_NUMBER
+  idMatchesAccount  Boolean? // null when the account has no profile record to compare with
+  message           String
+  pageUrl           String?
+  associatedIssueId String?
+  sentryEventId     String?
+  createdAt         DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([uid])
+  @@map("problem_reports")
+}
+
 model SentryIssueCache {
   id              String    @id @default(cuid())
   sentryIssueId   String    @unique

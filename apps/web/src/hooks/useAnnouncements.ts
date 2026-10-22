@@ -56,10 +56,18 @@ interface AnnouncementsResponse {
 }
 
 /** PUBLISHED announcements visible to the current user (server-resolved). */
-export function useAnnouncements() {
+export function useAnnouncements(opts: { includePublicPosts?: boolean } = {}) {
+  const includePublicPosts = opts.includePublicPosts === true
   const query = useQuery({
-    queryKey: queryKeys.announcements.list(),
-    queryFn: () => apiFetch<AnnouncementsResponse>('/announcements'),
+    // Distinct cache key per variant so the dashboards' plain list and the
+    // Announcements page's list (which also carries NEWS / ADVERTISEMENT)
+    // never overwrite each other. Both sit under announcements.all(), so
+    // existing invalidations still refresh both.
+    queryKey: queryKeys.announcements.list(includePublicPosts ? { includePublicPosts: true } : undefined),
+    queryFn: () =>
+      apiFetch<AnnouncementsResponse>(
+        includePublicPosts ? '/announcements?includePublicPosts=true' : '/announcements',
+      ),
     staleTime: 30_000,
   })
 

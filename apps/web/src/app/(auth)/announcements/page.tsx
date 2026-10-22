@@ -52,7 +52,8 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { useAuthStore } from '@/store/authStore'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { ModuleTabs, type TabItem } from '@/components/shared/ModuleTabs'
-import { Bell, PlusCircle, Megaphone, Check, Loader2, CalendarDays, X, Trash2, Newspaper, Landmark, FileEdit, PencilLine, Search } from 'lucide-react'
+import { Bell, PlusCircle, Megaphone, Check, Loader2, CalendarDays, X, Trash2, Newspaper, Landmark, FileEdit, PencilLine, Search, ExternalLink } from 'lucide-react'
+import { stripHtml } from '@/components/shared/PublicArchive'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,6 +87,18 @@ const CONTENT_TYPE_META: Record<PostType, ContentTypeMeta> = {
 /** Client-side only — filters whichever list (Published/Pending/Drafts)
  *  is currently on screen by title/body, against the already-fetched,
  *  already-permission-resolved result set. Never touches the network. */
+/** [NEW] Public-site page for a published post, for the post types that live
+ *  on the public site only (News -> /news/:id, Academic Advertisements ->
+ *  /academic-advertisements/:id). Both routes are in the edge proxy's
+ *  PUBLIC_PATHS and resolve the same Firestore document id used here, so
+ *  clicking a published item opens exactly that article. Returns null for the
+ *  other post types, which keep their existing non-linked rendering. */
+function publicPageHref(a: { id: string; postType: PostType }): string | null {
+  if (a.postType === 'NEWS') return `/news/${a.id}`
+  if (a.postType === 'ADVERTISEMENT') return `/academic-advertisements/${a.id}`
+  return null
+}
+
 function matchesSearch(item: { title: string; body: string }, query: string): boolean {
   const q = query.trim().toLowerCase()
   if (!q) return true
@@ -196,12 +209,27 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
           {deleteError}
         </p>
       )}
-      {announcements.map((a) => (
+      {announcements.map((a) => {
+        const publicHref = publicPageHref(a)
+        return (
         <div key={a.id} className="pb-5 border-b border-base last:border-b-0">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-heading font-semibold text-body">{a.title}</h3>
+                {publicHref ? (
+                  <a
+                    href={publicHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group inline-flex items-center gap-1.5 font-heading font-semibold text-body hover:text-brand-teal transition-colors"
+                  >
+                    {a.title}
+                    <ExternalLink className="w-3.5 h-3.5 text-muted group-hover:text-brand-teal shrink-0" aria-hidden="true" />
+                    <span className="sr-only">(opens the public page in a new tab)</span>
+                  </a>
+                ) : (
+                  <h3 className="font-heading font-semibold text-body">{a.title}</h3>
+                )}
                 {a.eventDate && (
                   <span className="inline-flex items-center gap-1 text-[10px] font-heading font-bold text-status-info">
                     <CalendarDays className="w-3 h-3" aria-hidden />
@@ -209,7 +237,11 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
                   </span>
                 )}
               </div>
-              <p className="text-sm text-muted mt-1 leading-relaxed">{a.body}</p>
+              {/* News / advert bodies are rich-text HTML — show a plain,
+                  clamped excerpt, never raw tags. */}
+              <p className={`text-sm text-muted mt-1 leading-relaxed ${publicHref ? 'line-clamp-3' : ''}`}>
+                {publicHref ? stripHtml(a.body) : a.body}
+              </p>
             </div>
             <div className="shrink-0 flex items-center gap-2">
               <span
@@ -262,7 +294,8 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
             </p>
           )}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -597,7 +630,9 @@ function DraftsList({
 }
 
 function AnnouncementsContent() {
-  const { announcements, loading: announcementsLoading, error: announcementsError } = useAnnouncements()
+  // includePublicPosts: this page's News / Academic Advertisements tabs list
+  // published public-only posts too (the plain feed excludes them).
+  const { announcements, loading: announcementsLoading, error: announcementsError } = useAnnouncements({ includePublicPosts: true })
   const { can } = usePermissions()
   const queryClient = useQueryClient()
   const [formMode, setFormMode] = useState<FormMode | null>(null)

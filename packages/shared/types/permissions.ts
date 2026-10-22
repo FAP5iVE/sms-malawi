@@ -412,7 +412,7 @@ export type Permission =
    // ── MONITORING (Sentry-backed admin dashboard) ─────────
   | 'monitoring.view'                // View the Sentry-backed monitoring dashboard (admin/high_rank only)
   | 'monitoring.manage'              // Acknowledge/resolve issues & toggle alerts from our own UI
-  | 'monitoring.submitFeedback'      // Submit in-app "report a problem" feedback (Sentry User Feedback) — every role
+  | 'monitoring.submitFeedback'      // Submit an in-app "Report a problem" (header / More menu) — granted to EVERY role
 
 // ─────────────────────────────────────────────────────────
 //  ROLE → PERMISSION MAP
@@ -797,6 +797,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
 
     // Announcements — own only
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.editOwn',
     'announcement.deleteOwn',
@@ -950,6 +951,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // Announcements — own only. [CONFIRMED 2026-08] library requires
     // approval like lower_rank — publishDirect intentionally excluded.
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.editOwn',
     'announcement.deleteOwn',
@@ -1056,6 +1058,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     // or lower_rank staff) [SEC-001][N3]. [CONFIRMED 2026-08] lower_rank
     // must always require approval — publishDirect intentionally excluded.
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.approvePublish',
     'announcement.reject',
@@ -1136,6 +1139,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
 
     // Announcements — own plus class approval authority
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.editOwn',
     'announcement.deleteOwn',
@@ -1229,6 +1233,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
 
     // Announcements — own only, pending approval
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.editOwn',
     'announcement.deleteOwn',
@@ -1329,6 +1334,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
 
     // Announcements — own only, pending approval
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.editOwn',
     'announcement.deleteOwn',
@@ -1425,6 +1431,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
 
     // Announcements — view all, create for own class (pending teacher approval)
     'announcement.view',
+    'monitoring.submitFeedback',     // "Report a problem" — every role, incl. those without monitoring.view
     'announcement.createWithApproval',
     'announcement.editOwn',
     'announcement.deleteOwn',

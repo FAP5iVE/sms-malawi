@@ -9,6 +9,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch, queryKeys } from '@/lib/api-client'
+import type { ProblemReportInput } from '@shared/schemas/problemReport'
 import type {
   ApiMonitoringSummary,
   ApiMonitoringIssue,
@@ -92,8 +93,10 @@ export function useMonitoringFeedback() {
 export function useSubmitFeedback() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (input: { message: string; associatedIssueId?: string }) =>
-      apiFetch<{ eventId: string }>('/monitoring/feedback', { method: 'POST', body: JSON.stringify(input) }),
+    // name + idNumber (employee/student number) are required — see
+    // @shared/schemas/problemReport. Open to every role.
+    mutationFn: (input: ProblemReportInput) =>
+      apiFetch<{ id: string; eventId?: string }>('/monitoring/feedback', { method: 'POST', body: JSON.stringify(input) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.monitoring.feedback() }),
     onError: (err) => console.error('[useSubmitFeedback] failed:', err),
   })

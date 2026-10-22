@@ -48,12 +48,14 @@ import {
   X,
   LogOut,
   ChevronRight,
+  MessageSquareWarning,
 } from 'lucide-react'
 import { logout }              from '@/components/providers/AuthProvider'
 import { useAuthStore }        from '@/store/authStore'
 import { useNavigation }       from '@/hooks/useNavigation'
 import { useMotionEnabled }    from '@/store/motionStore'
 import { ModeToggle }          from '@/components/shared/ModeToggle'
+import { ReportProblemModal }  from '@/components/shared/ReportProblemModal'
 import {
   reducedMotionVariants,
   reducedMotionTransition,
@@ -128,6 +130,9 @@ export function MobileBottomNav() {
   const motionEnabled              = useMotionEnabled()
 
   const [moreOpen, setMoreOpen]    = useState(false)
+  // "Report a problem" dialog — open to every role. State lives out here (not
+  // inside the More sheet) so the dialog survives the sheet closing.
+  const [reportOpen, setReportOpen] = useState(false)
 
   // Wait for auth + navigation to resolve before rendering nav items
   if (!role || !ready) return null
@@ -389,6 +394,22 @@ export function MobileBottomNav() {
               {/* Separator */}
               <div className="shrink-0 border-t border-base" />
 
+              {/* Report a problem — every role (incl. those without Monitoring) */}
+              <button
+                type="button"
+                onClick={() => {
+                  closeMore()
+                  setReportOpen(true)
+                }}
+                className="shrink-0 flex items-center gap-3.5 px-5 py-3 text-muted hover:bg-page hover:text-body transition-colors duration-150"
+              >
+                <MessageSquareWarning className="w-5 h-5 shrink-0" aria-hidden />
+                <span className="flex-1 text-left text-sm font-medium">Report a problem</span>
+                <ChevronRight className="w-4 h-4 shrink-0 opacity-35" aria-hidden />
+              </button>
+
+              <div className="shrink-0 border-t border-base" />
+
               {/* User section + theme + logout */}
               <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-4">
                 {/* Avatar + display name + role */}
@@ -440,6 +461,8 @@ export function MobileBottomNav() {
           </>
         )}
       </AnimatePresence>
+
+      {reportOpen && <ReportProblemModal onClose={() => setReportOpen(false)} />}
     </>
   )
 }

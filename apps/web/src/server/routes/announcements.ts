@@ -72,7 +72,13 @@ announcementsRouter.get(
     const { user } = req
     if (!user) return res.status(401).json({ error: 'Not authenticated.' })
     try {
-      const announcements = await announcementService.listForViewer({ uid: user.uid, role: user.role, superUser: user.superUser === true })
+      // [NEW] ?includePublicPosts=true — used by the Announcements page so
+      // its News / Academic Advertisements tabs can list published items.
+      const includePublicPosts = req.query.includePublicPosts === 'true'
+      const announcements = await announcementService.listForViewer(
+        { uid: user.uid, role: user.role, superUser: user.superUser === true },
+        { includePublicPosts },
+      )
       return res.json({ announcements })
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'announcements' } })

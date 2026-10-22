@@ -71,6 +71,7 @@ import {
   Bell,
   ChevronDown,
   LogOut,
+  MessageSquareWarning,
   Search,
   Settings,
   User,
@@ -94,6 +95,7 @@ import {
 } from '@/lib/motion'
 import { ROLE_LABELS }   from '@shared/types/roles'
 import { GlobalSearch }  from '@/components/shared/GlobalSearch'
+import { ReportProblemModal } from '@/components/shared/ReportProblemModal'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED PANEL MOTION (R15 — de-duplicates the identical variant/transition
@@ -453,6 +455,8 @@ export function PageHeader() {
   // Desktop dropdown open states
   const [bellOpen,  setBellOpen]  = useState(false)
   const [userOpen,  setUserOpen]  = useState(false)
+  // "Report a problem" dialog — available to every role from the user menu.
+  const [reportOpen, setReportOpen] = useState(false)
 
   // Mobile overlay states
   const [searchOpen,     setSearchOpen]     = useState(false)
@@ -794,6 +798,18 @@ export function PageHeader() {
                         <Settings className="w-4 h-4 shrink-0" aria-hidden />
                         Settings
                       </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setUserOpen(false)
+                          setReportOpen(true)
+                        }}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-muted hover:text-body hover:bg-page transition-colors"
+                      >
+                        <MessageSquareWarning className="w-4 h-4 shrink-0" aria-hidden />
+                        Report a problem
+                      </button>
                     </div>
 
                     {/* Sign out */}
@@ -831,6 +847,8 @@ export function PageHeader() {
         notifications={notifications}
         isLoading={notifLoading}
       />
+
+      {reportOpen && <ReportProblemModal onClose={() => setReportOpen(false)} />}
     </>
   )
 }
