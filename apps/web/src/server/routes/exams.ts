@@ -287,6 +287,30 @@ examsRouter.get('/results/:studentId', verifyAuth,
     }
   })
 
+// GET /exams/results/:studentId/class-standing — a student's standing inside
+// their OWN class: the class top ten plus best / average / lowest comparison,
+// overall and per subject. Same ownership rule and fee gate as /results/:id.
+// Never returns a bottom-ten list, and the lowest figures carry no name.
+examsRouter.get('/results/:studentId/class-standing', verifyAuth,
+  async (req, res) => {
+    const { academicYear, term } = req.query as { academicYear: string; term: string }
+    if (!academicYear || !term) return res.status(400).json({ error: 'academicYear and term are required' })
+    const sid = String(req.params.studentId)
+    if (req.user!.role === 'student') {
+      const own = await prisma.student.findUnique({
+        where:  { firebaseUid: req.user!.uid },
+        select: { id: true },
+      })
+      if (!own || own.id !== sid)
+        return res.status(403).json({ error: 'You can only view your own class standing.' })
+    }
+    try {
+      return res.json(await examService.getStudentClassStanding(sid, academicYear, Number(term)))
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'exams', route: 'class-standing' } })
+    }
+  })
+
 // POST /exams/compute — trigger term result computation
 examsRouter.post('/compute', verifyAuth, requirePermission('exam.computeResults'),
   async (req, res) => {
@@ -422,13 +446,21 @@ examsRouter.get('/analytics/class', verifyAuth, requireRole(['admin','high_rank'
 // teacher is scoped by the service to classes they teach.
 examsRouter.get('/analytics/top-bottom', verifyAuth, requirePermission('exam.viewClassAnalytics'),
   async (req, res) => {
-    const { classId, subject, academicYear, term, limit } = req.query as Record<string, string>
+    const { classId, form, subject, academicYear, term, limit } = req.query as Record<string, string>
     if (!academicYear || !term) return res.status(400).json({ error: 'academicYear and term are required' })
-    return res.json(await examService.getExamAnalytics(
-      academicYear, Number(term),
-      { classId: classId || undefined, subject: subject || undefined, limit: limit ? Number(limit) : undefined },
-      { uid: req.user!.uid, role: req.user!.role },
-    ))
+    const formNum = form ? Number(form) : undefined
+    if (formNum !== undefined && (!Number.isInteger(formNum) || formNum < 1 || formNum > 4)) {
+      return res.status(400).json({ error: 'form must be 1, 2, 3 or 4' })
+    }
+    try {
+      return res.json(await examService.getExamAnalytics(
+        academicYear, Number(term),
+        { classId: classId || undefined, form: formNum, subject: subject || undefined, limit: limit ? Number(limit) : undefined },
+        { uid: req.user!.uid, role: req.user!.role },
+      ))
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'exams', route: 'analytics-top-bottom' } })
+    }
   })
 
 // MANEB
@@ -465,4 +497,4 @@ examsRouter.post('/maneb/recompute', verifyAuth, requirePermission('exam.manageM
     const academicYear = typeof req.body?.academicYear === 'string' ? req.body.academicYear : undefined
     if (!academicYear) return res.status(400).json({ error: 'academicYear is required' })
     return res.json(await examService.recomputeManebAggregates(academicYear, { uid: req.user!.uid, role: req.user!.role }))
-  })
+  })

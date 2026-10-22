@@ -197,7 +197,7 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
           {r.position != null && r.classSize != null && (
             <span>Your position: <strong className="text-body">#{r.position} of {r.classSize}</strong></span>
           )}
-          <span className="text-[11px] italic">Benchmarks compare you to your class without naming other students.</span>
+          <span className="text-[11px] italic">Open the Analytics tab for your class top ten and a subject-by-subject comparison.</span>
         </div>
       )}
 

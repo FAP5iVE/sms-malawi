@@ -374,12 +374,22 @@ export function ResultsReleaseWorkflow({
     setError(null)
     setReleaseNote(null)
     try {
-      const res = await apiFetch<{ released: number; announced: boolean }>(
+      const res = await apiFetch<{
+        released: number; announced: boolean
+        notComputed?: { classId: string; className: string; reason: string }[]
+      }>(
         '/exams/release-term', { method: 'POST', body: JSON.stringify({ academicYear, term }) },
       )
+      // Results are computed as part of the release so the top ten exists to
+      // announce. A class that could not be computed is named here (it is left
+      // out of the announcement) and can be computed from the Exams tab.
+      const skipped = res.notComputed ?? []
       setReleaseNote(
         `Released ${res.released} end-of-term exam(s) in unison.` +
-        (res.announced ? ' Top-10 performers announced to the school.' : ''),
+        (res.announced ? ' Top-10 performers announced to the school.' : '') +
+        (skipped.length > 0
+          ? ` Results could not be computed for ${skipped.map((c) => c.className).join(', ')} — ${skipped[0]?.reason ?? ''}`
+          : ''),
       )
       await fetchExams()
     } catch (e) {
@@ -563,4 +573,4 @@ export function ResultsReleaseWorkflow({
       </AnimatePresence>
     </div>
   )
-}
+}

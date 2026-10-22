@@ -99,6 +99,59 @@ function publicPageHref(a: { id: string; postType: PostType }): string | null {
   return null
 }
 
+/** Renders a plain-text announcement body. Ordinary text keeps its line breaks
+ *  (the old <p> collapsed every "\n" into a space, which is what made the
+ *  top-performers post read as one clamped run-on paragraph). Bodies written
+ *  with the light structure the term-release post uses are laid out properly:
+ *    "# Form 1"      -> section heading
+ *    "## Form 1A"    -> class heading
+ *    "1. Name"       -> a ranked row (consecutive rows form one list)
+ *  Anything else is a paragraph. `clamp` shows a short excerpt (list cards). */
+function AnnouncementBody({ body, clamp = false }: { body: string; clamp?: boolean }) {
+  const lines = body.split('\n')
+  const structured = lines.some((l) => /^#{1,2} /.test(l) || /^\d+\. /.test(l))
+  if (!structured) {
+    return (
+      <p className={`text-sm text-muted mt-1 leading-relaxed whitespace-pre-line ${clamp ? 'line-clamp-3' : ''}`}>{body}</p>
+    )
+  }
+  if (clamp) {
+    // Excerpt: the opening sentence only, never raw markers.
+    const intro = lines.find((l) => l.trim() && !/^#{1,2} /.test(l) && !/^\d+\. /.test(l)) ?? ''
+    return <p className="text-sm text-muted mt-1 leading-relaxed line-clamp-2">{intro}</p>
+  }
+  const out: React.ReactNode[] = []
+  let rows: string[] = []
+  const flush = (key: string) => {
+    if (rows.length === 0) return
+    out.push(
+      <ol key={key} className="grid gap-x-6 gap-y-1 sm:grid-cols-2 mb-3">
+        {rows.map((r, i) => (
+          <li key={i} className="flex items-baseline gap-3 text-sm text-body">
+            <span className="w-6 shrink-0 text-right text-xs font-bold text-brand-teal tabular">{r.slice(0, r.indexOf('.'))}</span>
+            <span className="min-w-0">{r.slice(r.indexOf('.') + 2)}</span>
+          </li>
+        ))}
+      </ol>,
+    )
+    rows = []
+  }
+  lines.forEach((raw, i) => {
+    const l = raw.trimEnd()
+    if (/^\d+\. /.test(l)) { rows.push(l); return }
+    flush(`ol-${i}`)
+    if (/^# /.test(l)) {
+      out.push(<h4 key={i} className="font-heading font-bold text-brand-navy text-sm uppercase tracking-wide mt-5 mb-2 pb-1 border-b border-base">{l.slice(2)}</h4>)
+    } else if (/^## /.test(l)) {
+      out.push(<h5 key={i} className="font-heading font-semibold text-body text-sm mt-3 mb-1.5">{l.slice(3)}</h5>)
+    } else if (l.trim()) {
+      out.push(<p key={i} className="text-sm text-muted leading-relaxed mb-2">{l}</p>)
+    }
+  })
+  flush('ol-end')
+  return <div className="mt-2">{out}</div>
+}
+
 function matchesSearch(item: { title: string; body: string }, query: string): boolean {
   const q = query.trim().toLowerCase()
   if (!q) return true
@@ -239,9 +292,11 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
               </div>
               {/* News / advert bodies are rich-text HTML — show a plain,
                   clamped excerpt, never raw tags. */}
-              <p className={`text-sm text-muted mt-1 leading-relaxed ${publicHref ? 'line-clamp-3' : ''}`}>
-                {publicHref ? stripHtml(a.body) : a.body}
-              </p>
+              {publicHref ? (
+                <p className="text-sm text-muted mt-1 leading-relaxed line-clamp-3">{stripHtml(a.body)}</p>
+              ) : (
+                <AnnouncementBody body={a.body} />
+              )}
             </div>
             <div className="shrink-0 flex items-center gap-2">
               <span
@@ -419,7 +474,7 @@ function PendingApprovalList({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h3 className="font-heading font-semibold text-body">{a.title}</h3>
-              <p className="text-sm text-muted mt-1 leading-relaxed">{a.body}</p>
+              <AnnouncementBody body={a.body} />
             </div>
             <div className="shrink-0 flex flex-col gap-2">
               <button
@@ -582,7 +637,7 @@ function DraftsList({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h3 className="font-heading font-semibold text-body">{d.title || 'Untitled draft'}</h3>
-              {d.body && <p className="text-sm text-muted mt-1 leading-relaxed line-clamp-2">{d.body}</p>}
+              {d.body && <AnnouncementBody body={d.body} clamp />}
             </div>
             <div className="shrink-0 flex items-center gap-2">
               <button
@@ -829,4 +884,4 @@ function AnnouncementsContent() {
       </ModuleSurface>
     </div>
   )
-}
+}

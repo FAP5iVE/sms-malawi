@@ -729,9 +729,19 @@ export interface ApiClassAnalyticsSummary {
   atRiskCount:   number
 }
 
+/** One subject compared across the streams of a form (Form 1A vs Form 1B). */
+export interface ApiSubjectStreamComparison {
+  subject: string
+  overall: number | null
+  byClass: { classId: string; className: string; average: number; passRate: number; count: number }[]
+}
+
 export interface ApiExamAnalytics {
   metric:            'overall' | 'subject'
   subject:           string | null
+  /** What the rankings cover: one class, every stream of one form combined,
+   *  or the whole school (summary only — never ranked). */
+  scope:             'school' | 'class' | 'form'
   classId:           string | null
   className:         string | null
   form:              number | null
@@ -753,6 +763,42 @@ export interface ApiExamAnalytics {
   top:               ApiRankedStudent[]
   bottom:            ApiRankedStudent[]
   perClass:          ApiClassAnalyticsSummary[]
+  /** Form scope only — each subject side by side across the streams. */
+  subjectComparison: ApiSubjectStreamComparison[]
+}
+
+/** best / worst / mean of one measure inside the student's class. `worst` is a
+ *  bare number — it is never accompanied by a name. For MSCE points "best" is
+ *  the LOWEST total. */
+export interface ApiSpread { best: number; worst: number; average: number; count: number }
+
+export interface ApiSubjectStanding {
+  subject:  string
+  you:      number
+  best:     number
+  worst:    number
+  average:  number
+  position: number
+  outOf:    number
+}
+
+/** GET /exams/results/:studentId/class-standing */
+export interface ApiStudentClassStanding {
+  classId:        string
+  className:      string
+  form:           number
+  gradingTrack:   'JCE' | 'MSCE'
+  /** True when the class is ranked on MSCE aggregate points (lower is better). */
+  rankedByPoints: boolean
+  standing: {
+    position: number
+    outOf:    number
+    overall:  { you: number } & ApiSpread
+    points:   ({ you: number } & ApiSpread) | null
+    subjects: ApiSubjectStanding[]
+  }
+  /** The class's top ten only — there is deliberately no bottom list. */
+  topTen: { position: number; name: string; value: number; points: number | null; isYou: boolean }[]
 }
 
 export interface ApiManebRecord {

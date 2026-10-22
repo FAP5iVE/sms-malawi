@@ -116,6 +116,10 @@ import type { UserRole }    from '@shared/types/roles'
 import type { CreateExamInput, UpdateExamInput, BulkMarkEntryInput, CreateManebRecordInput } from '@shared/schemas/exam'
 import type { Decimal } from '@prisma/client/runtime/library'
 import { Prisma, type ExamStatus } from '@prisma/client'
+import {
+  sortBest, buildStudentStanding, buildTopPerformersBody,
+  type CohortMember, type StudentStanding,
+} from '@/server/services/analytics/examLogic'
 
 function toNumber(v: Decimal | number | null | undefined): number {
   if (v === null || v === undefined) return 0
@@ -657,6 +661,84 @@ export async function getStudentResults(studentId: string, academicYear: string,
   }
 }
 
+// ─── STUDENT: STANDING WITHIN OWN CLASS ──────────────────
+// What a student sees in Exams > Analytics once results are out: the top ten
+// of THEIR OWN class (names, as on the announcement), and how their marks sit
+// against the class best, the class average and the class lowest — overall and
+// subject by subject.
+//
+// Deliberately NOT returned: any bottom-ten list, or any name/id attached to
+// the lowest figures. "Lowest" is a bare number so a student can see the range
+// they sit in without anyone being singled out. Same fee gate as
+// getStudentResults(); there is no results row until the term is released and
+// computed, so an unreleased term returns null.
+export interface StudentClassStanding {
+  classId:      string
+  className:    string
+  form:         number
+  gradingTrack: 'JCE' | 'MSCE'
+  /** True when the class is ranked on MSCE aggregate points (lower is better). */
+  rankedByPoints: boolean
+  standing:     StudentStanding
+  topTen:       { position: number; name: string; value: number; points: number | null; isYou: boolean }[]
+}
+
+export async function getStudentClassStanding(
+  studentId: string, academicYear: string, term: number,
+): Promise<StudentClassStanding | null> {
+  const gateOpen = await checkBalanceGate(studentId, term, academicYear)
+  if (!gateOpen) {
+    throw Object.assign(new Error('Outstanding fee balance. Pay fees to view results.'), { status: 403 })
+  }
+  const mine = await prisma.termResult.findFirst({
+    where: { studentId, academicYear, term }, select: { classId: true },
+  })
+  if (!mine) return null
+
+  const [cls, rows] = await Promise.all([
+    prisma.class.findUnique({ where: { id: mine.classId }, select: { name: true, form: true } }),
+    prisma.termResult.findMany({
+      where:  { classId: mine.classId, academicYear, term },
+      select: { studentId: true, average: true, aggregatePoints: true, subjectResults: true },
+    }),
+  ])
+  if (!cls) return null
+
+  const students = await prisma.student.findMany({
+    where:  { id: { in: rows.map((r) => r.studentId) } },
+    select: { id: true, firstName: true, lastName: true },
+  })
+  const nameById = new Map(students.map((s) => [s.id, `${s.firstName} ${s.lastName}`]))
+
+  const cohort: CohortMember[] = rows.map((r) => {
+    const sr = (r.subjectResults as Record<string, { average: number }> | null) ?? {}
+    return {
+      studentId: r.studentId,
+      name:      nameById.get(r.studentId) ?? '—',
+      average:   toNumber(r.average),
+      points:    r.aggregatePoints,
+      subjects:  Object.fromEntries(Object.entries(sr).map(([k, v]) => [k, Number(v.average)])),
+    }
+  })
+
+  const track: 'JCE' | 'MSCE' = cls.form >= 3 ? 'MSCE' : 'JCE'
+  const byPoints = track === 'MSCE'
+  const standing = buildStudentStanding(studentId, cohort, byPoints)
+  if (!standing) return null
+
+  const topTen = sortBest(cohort.map((c) => ({ ...c, value: c.average })), byPoints)
+    .slice(0, 10)
+    .map((c, i) => ({
+      position: i + 1, name: c.name, value: c.average, points: c.points,
+      isYou: c.studentId === studentId,
+    }))
+
+  return {
+    classId: mine.classId, className: cls.name, form: cls.form,
+    gradingTrack: track, rankedByPoints: byPoints, standing, topTen,
+  }
+}
+
 // Exam statuses at which an exam's marks are final (not draft) - the only
 // ones a continuous assessment may be counted from.
 const CA_FINAL_STATUSES: ExamStatus[] = ['MARKS_FINAL', 'RESULTS_APPROVED', 'RESULTS_RELEASED']
@@ -1086,22 +1168,23 @@ export async function correctMarksInReview(
 }
 
 // RW-5 helper: per-class top-N performers for a term, from computed TermResults.
-// Names included (staff-facing announcement); no marks are exposed by callers
-// that build the public top-10 announcement — they use names + position only.
+// Names only (the announcement never shows marks). Ranked per class on the
+// class's own track: MSCE classes by aggregate points (LOWER is better), JCE
+// classes by average. The old query ordered everything by average descending,
+// which put the WORST MSCE candidates at the top of a Form 3/4 list.
 export interface ClassTopPerformers {
   classId: string
   className: string
   form: number
-  students: { studentId: string; name: string; average: number; position: number }[]
+  students: { studentId: string; name: string; average: number; points: number | null; position: number }[]
 }
 
 export async function getTopPerformersByClass(
   academicYear: string, term: number, limit = 10,
 ): Promise<ClassTopPerformers[]> {
   const results = await prisma.termResult.findMany({
-    where:   { academicYear, term },
-    orderBy: { average: 'desc' },
-    select:  { studentId: true, classId: true, average: true, classPosition: true, position: true },
+    where:  { academicYear, term },
+    select: { studentId: true, classId: true, average: true, aggregatePoints: true },
   })
   if (results.length === 0) return []
 
@@ -1111,30 +1194,42 @@ export async function getTopPerformersByClass(
     prisma.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true, form: true } }),
     prisma.student.findMany({ where: { id: { in: studentIds } }, select: { id: true, firstName: true, lastName: true } }),
   ])
-  const classById = new Map(classes.map((c) => [c.id, c]))
   const nameById = new Map(students.map((s) => [s.id, `${s.firstName} ${s.lastName}`]))
 
-  const byClass = new Map<string, ClassTopPerformers>()
-  for (const r of results) {
-    const cls = classById.get(r.classId)
-    if (!cls) continue
-    let bucket = byClass.get(r.classId)
-    if (!bucket) { bucket = { classId: r.classId, className: cls.name, form: cls.form, students: [] }; byClass.set(r.classId, bucket) }
-    if (bucket.students.length < limit) {
-      bucket.students.push({
+  const out: ClassTopPerformers[] = []
+  for (const cls of classes) {
+    const rows = results
+      .filter((r) => r.classId === cls.id)
+      .map((r) => ({
         studentId: r.studentId,
         name:      nameById.get(r.studentId) ?? '—',
-        average:   toNumber(r.average),
-        position:  r.classPosition || r.position || bucket.students.length + 1,
-      })
-    }
+        value:     toNumber(r.average),
+        points:    r.aggregatePoints,
+      }))
+    if (rows.length === 0) continue
+    out.push({
+      classId: cls.id, className: cls.name, form: cls.form,
+      students: sortBest(rows, cls.form >= 3).slice(0, limit).map((r, i) => ({
+        studentId: r.studentId, name: r.name, average: r.value, points: r.points, position: i + 1,
+      })),
+    })
   }
-  return Array.from(byClass.values()).sort((a, b) => a.form - b.form || a.className.localeCompare(b.className))
+  return out.sort((a, b) => a.form - b.form || a.className.localeCompare(b.className))
 }
 
 // RW-4 + RW-5: release ALL end-of-term exams for a term "in unison" — only once
-// every end-of-term exam is approved (all classes reviewed) — then post ONE
-// combined top-10 announcement (names only, no marks) across all classes.
+// every end-of-term exam is approved (all classes reviewed) — then compute the
+// term results for every class that was released and post ONE announcement of
+// each class's top ten (names only, no marks).
+//
+// Computing here is what makes the announcement possible at all:
+// computeTermResults() only reads RELEASED end-of-term exams, so before this
+// step existed the term results (and therefore the top ten) did not exist yet
+// at the moment the announcement was composed. A class whose results cannot be
+// computed (e.g. continuous assessment switched on but incomplete) is reported
+// in `notComputed` and left out of the announcement; it can be computed by hand
+// from the Exams tab. The announcement is only posted when this call actually
+// released something, so re-pressing the button never posts a duplicate.
 export async function releaseTermEndResults(academicYear: string, term: number, actor: ExamActor) {
   const endTermExams = await prisma.exam.findMany({
     where:  { academicYear, term, type: 'END_TERM' },
@@ -1166,32 +1261,49 @@ export async function releaseTermEndResults(academicYear: string, term: number, 
     metadata: { context: { academicYear, term, released: toRelease.length } },
   })
 
-  // RW-5: compose one combined top-10 announcement (names only, no marks).
-  let announced = false
-  let announcementId: string | null = null
-  const topByClass = await getTopPerformersByClass(academicYear, term, 10)
-  const withStudents = topByClass.filter((c) => c.students.length > 0)
-  if (withStudents.length > 0) {
-    const bodyLines: string[] = [`Congratulations to our Term ${term} top performers (${academicYear}):`, '']
-    for (const cls of withStudents) {
-      bodyLines.push(`${cls.className} (Form ${cls.form})`)
-      cls.students.forEach((st, i) => bodyLines.push(`${i + 1}. ${st.name}`))
-      bodyLines.push('')
+  // Compute results for every class that had an end-of-term exam released in
+  // this call, so the rankings reflect exactly what was just released.
+  const notComputed: { classId: string; className: string; reason: string }[] = []
+  if (toRelease.length > 0) {
+    const classIds = Array.from(new Set(toRelease.map((e) => e.classId)))
+    const names = new Map(
+      (await prisma.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true } }))
+        .map((c) => [c.id, c.name]),
+    )
+    for (const classId of classIds) {
+      try {
+        await computeTermResults(classId, academicYear, term, actor.uid)
+      } catch (err) {
+        notComputed.push({
+          classId, className: names.get(classId) ?? classId,
+          reason: err instanceof Error ? err.message : 'Could not compute results.',
+        })
+      }
     }
-    const created = await announcementService.createAnnouncement({
-      title:         `Term ${term} Top Performers — ${academicYear}`,
-      body:          bodyLines.join('\n').trim(),
-      targetAll:     true,
-      createdByUid:  actor.uid,
-      createdByRole: actor.role,
-      publicWebsite: false,
-    }, true)
-    announced = true
-    announcementId = (created as { id?: string } | null)?.id ?? null
   }
 
-  logger.info({ event: 'exam.term_released', academicYear, term, released: toRelease.length, announced, actorUid: actor.uid })
-  return { released: toRelease.length, announced, announcementId }
+  // RW-5: one announcement, each class's top ten, structured for reading.
+  let announced = false
+  let announcementId: string | null = null
+  if (toRelease.length > 0) {
+    const topByClass = await getTopPerformersByClass(academicYear, term, 10)
+    const withStudents = topByClass.filter((c) => c.students.length > 0)
+    if (withStudents.length > 0) {
+      const created = await announcementService.createAnnouncement({
+        title:         `Term ${term} Top Performers — ${academicYear}`,
+        body:          buildTopPerformersBody(term, academicYear, withStudents, 10),
+        targetAll:     true,
+        createdByUid:  actor.uid,
+        createdByRole: actor.role,
+        publicWebsite: false,
+      }, true)
+      announced = true
+      announcementId = (created as { id?: string } | null)?.id ?? null
+    }
+  }
+
+  logger.info({ event: 'exam.term_released', academicYear, term, released: toRelease.length, announced, notComputed: notComputed.length, actorUid: actor.uid })
+  return { released: toRelease.length, announced, announcementId, notComputed }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1232,9 +1344,20 @@ export interface ClassAnalyticsSummary {
   atRiskCount:  number
 }
 
+/** One subject compared across the streams of a form (Form 1A vs Form 1B). */
+export interface SubjectStreamComparison {
+  subject: string
+  /** Mean across every stream combined. */
+  overall: number | null
+  byClass: { classId: string; className: string; average: number; passRate: number; count: number }[]
+}
+
 export interface ExamAnalyticsResult {
   metric:            'overall' | 'subject'
   subject:           string | null
+  /** What the rankings cover: one class, every stream of one form combined,
+   *  or the whole school (summary only — never ranked). */
+  scope:             'school' | 'class' | 'form'
   /** Set only when a single class is selected. */
   classId:           string | null
   className:         string | null
@@ -1255,6 +1378,8 @@ export interface ExamAnalyticsResult {
   top:               RankedStudent[]
   bottom:            RankedStudent[]
   perClass:          ClassAnalyticsSummary[]
+  /** Form scope only — subject-by-subject comparison between the streams. */
+  subjectComparison: SubjectStreamComparison[]
 }
 
 // AN-1 (top/bottom-10, filters, tie-safe) + AN-3 (pass rate, grade distribution,
@@ -1264,7 +1389,7 @@ export interface ExamAnalyticsResult {
 export async function getExamAnalytics(
   academicYear: string,
   term: number,
-  opts: { classId?: string; subject?: string; limit?: number },
+  opts: { classId?: string; form?: number; subject?: string; limit?: number },
   actor: ExamActor,
 ): Promise<ExamAnalyticsResult> {
   const limit = Math.min(Math.max(opts.limit ?? 10, 1), 50)
@@ -1272,7 +1397,12 @@ export async function getExamAnalytics(
   // Scope: non-oversight (teacher) may only view a class they teach.
   if (!OVERSIGHT_ROLES.includes(actor.role)) {
     if (!opts.classId) {
-      throw Object.assign(new Error('Select a class you teach to view its analytics.'), { status: 403 })
+      throw Object.assign(
+        new Error(opts.form
+          ? 'Combined-stream analytics are available to exam office and leadership. Select a single class you teach.'
+          : 'Select a class you teach to view its analytics.'),
+        { status: 403 },
+      )
     }
     const assignments = await classService.getTeacherSubjectAssignments(actor.uid, academicYear)
     const teachesClass = Array.from(assignments).some((key) => key.startsWith(`${opts.classId}|`))
@@ -1281,10 +1411,21 @@ export async function getExamAnalytics(
     }
   }
 
-  const schoolWide = !opts.classId
+  // A single class wins over a form; a form means "every stream of that form
+  // in this academic year, combined" (Form 1A + Form 1B). Streams of one form
+  // share a syllabus and a grading track, so ranking them together IS
+  // meaningful — unlike ranking across forms.
+  const formClassIds = !opts.classId && opts.form
+    ? (await prisma.class.findMany({ where: { academicYear, form: opts.form }, select: { id: true } })).map((c) => c.id)
+    : null
+  const scope: 'school' | 'class' | 'form' = opts.classId ? 'class' : opts.form ? 'form' : 'school'
+  const schoolWide = scope === 'school'
 
   const results = await prisma.termResult.findMany({
-    where:  { academicYear, term, ...(opts.classId ? { classId: opts.classId } : {}) },
+    where:  {
+      academicYear, term,
+      ...(opts.classId ? { classId: opts.classId } : formClassIds ? { classId: { in: formClassIds } } : {}),
+    },
     select: {
       studentId: true, classId: true, average: true, grade: true,
       aggregatePoints: true, gradingTrack: true, passStatus: true, subjectResults: true,
@@ -1308,7 +1449,7 @@ export async function getExamAnalytics(
   const selectedClass = opts.classId ? classById.get(opts.classId) ?? null : null
   const selectedTrack: 'JCE' | 'MSCE' | null = selectedClass
     ? (selectedClass.form >= 3 ? 'MSCE' : 'JCE')
-    : null
+    : opts.form && scope === 'form' ? (opts.form >= 3 ? 'MSCE' : 'JCE') : null
 
   // Value per student: subject average when a subject filter is set, else
   // overall average. `points` is carried alongside so MSCE-track classes can
@@ -1349,6 +1490,8 @@ export async function getExamAnalytics(
       emptyReason = 'That class does not exist in the selected academic year.'
     } else if (opts.classId && results.length === 0) {
       emptyReason = `No results have been computed for ${selectedClass?.name ?? 'this class'} in Term ${term} of ${academicYear} yet. Open the Exams tab, select the class, and use "Compute Results" once its exams are released.`
+    } else if (scope === 'form' && results.length === 0) {
+      emptyReason = `No results have been computed for any Form ${opts.form} class in Term ${term} of ${academicYear} yet. Results are computed when the term's end-of-term exams are released.`
     } else if (opts.subject) {
       emptyReason = `No ${opts.subject} results were recorded for this selection in Term ${term}. Either the subject is not taught to this class, or its exam has not been released and computed yet.`
     } else {
@@ -1356,11 +1499,12 @@ export async function getExamAnalytics(
     }
     return {
       metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null,
+      scope,
       classId: opts.classId ?? null, className: selectedClass?.name ?? null,
-      form: selectedClass?.form ?? null, gradingTrack: selectedTrack,
+      form: selectedClass?.form ?? (scope === 'form' ? opts.form ?? null : null), gradingTrack: selectedTrack,
       schoolWide, emptyReason,
       total: 0, classAverage: null, averagePoints: null, passRate: null,
-      atRiskCount: 0, gradeDistribution: [], top: [], bottom: [], perClass: [],
+      atRiskCount: 0, gradeDistribution: [], top: [], bottom: [], perClass: [], subjectComparison: [],
     }
   }
 
@@ -1428,10 +1572,11 @@ export async function getExamAnalytics(
   if (schoolWide) {
     return {
       metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null,
+      scope,
       classId: null, className: null, form: null, gradingTrack: null,
       schoolWide: true, emptyReason: null,
       total, classAverage, averagePoints, passRate, atRiskCount,
-      gradeDistribution, top: [], bottom: [], perClass,
+      gradeDistribution, top: [], bottom: [], perClass, subjectComparison: [],
     }
   }
 
@@ -1458,25 +1603,54 @@ export async function getExamAnalytics(
   // a LOWER total is better. Students with no valid six-subject aggregate
   // sort last rather than sorting as if they scored a perfect 6.
   const rankByPoints = selectedTrack === 'MSCE' && !opts.subject
-  const keyOf = (r: typeof enriched[number]): number =>
-    rankByPoints ? (r.points ?? Number.POSITIVE_INFINITY) : r.value
-
-  const byBest = [...enriched].sort((a, b) =>
-    rankByPoints
-      ? (keyOf(a) - keyOf(b)) || a.name.localeCompare(b.name)
-      : (keyOf(b) - keyOf(a)) || a.name.localeCompare(b.name),
-  )
+  const byBest = sortBest(enriched, rankByPoints)
   const byWorst = [...byBest].reverse()
+
+  // Form scope: the same subject measured in each stream, side by side. Uses
+  // every subject (not just the filtered one) so the table is always complete.
+  let subjectComparison: SubjectStreamComparison[] = []
+  if (scope === 'form') {
+    const bySubject = new Map<string, Map<string, { sum: number; pass: number; n: number }>>()
+    for (const r of results) {
+      const sr = r.subjectResults as Record<string, { average: number; pass: boolean }> | null
+      if (!sr) continue
+      for (const [subj, cell] of Object.entries(sr)) {
+        const perClassMap = bySubject.get(subj) ?? new Map<string, { sum: number; pass: number; n: number }>()
+        const acc = perClassMap.get(r.classId) ?? { sum: 0, pass: 0, n: 0 }
+        acc.sum += Number(cell.average); acc.pass += cell.pass ? 1 : 0; acc.n += 1
+        perClassMap.set(r.classId, acc)
+        bySubject.set(subj, perClassMap)
+      }
+    }
+    subjectComparison = Array.from(bySubject.entries()).map(([subject, perClassMap]) => {
+      const all = Array.from(perClassMap.values())
+      const n = all.reduce((t, a) => t + a.n, 0)
+      return {
+        subject,
+        overall: n > 0 ? Math.round((all.reduce((t, a) => t + a.sum, 0) / n) * 100) / 100 : null,
+        byClass: Array.from(perClassMap.entries())
+          .map(([classId, a]) => ({
+            classId,
+            className: classById.get(classId)?.name ?? '—',
+            average:   Math.round((a.sum / a.n) * 100) / 100,
+            passRate:  Math.round((a.pass / a.n) * 100),
+            count:     a.n,
+          }))
+          .sort((x, y) => x.className.localeCompare(y.className)),
+      }
+    }).sort((a, b) => a.subject.localeCompare(b.subject))
+  }
 
   const top    = byBest.slice(0, limit).map((r, i) => ({ ...r, position: i + 1 }))
   const bottom = byWorst.slice(0, limit).map((r, i) => ({ ...r, position: i + 1 }))
 
   return {
     metric: opts.subject ? 'subject' : 'overall', subject: opts.subject ?? null,
+    scope,
     classId: opts.classId ?? null, className: selectedClass?.name ?? null,
-    form: selectedClass?.form ?? null, gradingTrack: selectedTrack,
+    form: selectedClass?.form ?? (scope === 'form' ? opts.form ?? null : null), gradingTrack: selectedTrack,
     schoolWide: false, emptyReason: null,
     total, classAverage, averagePoints, passRate, atRiskCount,
-    gradeDistribution, top, bottom, perClass,
+    gradeDistribution, top, bottom, perClass, subjectComparison,
   }
-}
+}

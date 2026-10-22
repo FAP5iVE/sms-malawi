@@ -72,7 +72,7 @@ import { useStudentMe } from '@/hooks/useStudents'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { ExamForm } from '@/components/exams/ExamForm'
 import { MarksEntrySheet } from '@/components/exams/MarksEntrySheet'
-import { AnalyticsPanel } from '@/components/exams/AnalyticsPanel'
+import { AnalyticsPanel, StudentAnalyticsPanel } from '@/components/exams/AnalyticsPanel'
 import { ManebPanel } from '@/components/exams/ManebPanel'
 import { StudentResultsView } from '@/components/exams/StudentResultsView'
 import { ReportCardGenerator } from '@/components/exams/ReportCardGenerator'
@@ -284,7 +284,9 @@ function ExamsPageInner() {
   const visibleTabs = TABS.filter((t) => {
     if (t.id === 'exams') return !hideExamsTab
     if (t.id === 'results') return role === 'student'
-    if (t.id === 'analytics') return canViewAnalytics
+    // Students get their own-class view (top ten + best/average/lowest
+    // comparison) under the same tab; staff keep the full analytics.
+    if (t.id === 'analytics') return canViewAnalytics || role === 'student'
     if (t.id === 'maneb') return canViewManeb
     if (MANAGEMENT_TABS.includes(t.id)) return role !== 'student' && role !== 'lower_rank'
     return true
@@ -601,11 +603,23 @@ function ExamsPageInner() {
 
           {/* ── ANALYTICS TAB ── */}
           {tab === 'analytics' && (
-            <AnalyticsPanel
-              academicYear={academicYear}
-              selectedClassId={selectedClassId}
-              term={term}
-            />
+            role === 'student' ? (
+              myStudent?.id ? (
+                <StudentAnalyticsPanel studentId={myStudent.id} academicYear={academicYear} term={term} />
+              ) : (
+                <p className="text-sm text-muted text-center py-16" role="status">
+                  {myStudentLoading
+                    ? 'Loading your student record…'
+                    : 'Your student record could not be found. Please contact the school office.'}
+                </p>
+              )
+            ) : (
+              <AnalyticsPanel
+                academicYear={academicYear}
+                selectedClassId={selectedClassId}
+                term={term}
+              />
+            )
           )}
 
           {/* ── MANEB TAB ── */}

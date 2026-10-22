@@ -42,6 +42,7 @@ import {
   HrReviewsTab,
 } from '@/components/reports/panels/HrPanels'
 import { ExamWorkflowTab, ManebStatusCard, MarkCompletionTab } from '@/components/reports/panels/ExamPanels'
+import { AnalyticsPanel } from '@/components/exams/AnalyticsPanel'
 import {
   LibraryOverviewSection,
   LibraryCirculationTab,
@@ -158,6 +159,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Wifi,
+  Trophy,
 } from 'lucide-react'
 import type {
   ApiCategoryBreakdown,
@@ -1071,6 +1073,18 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
           icon={<BarChart2 className="w-4 h-4" />}
         />
         <MarksDistributionPanel />
+      </div>
+      {/*
+       * Streams of one form (Form 1A / 1B) side by side, a consolidated
+       * Top 10 / Bottom 10 across both, and the single-class rankings. The
+       * same panel Exams > Analytics uses, so the two can never disagree.
+       */}
+      <div className="space-y-5">
+        <SectionHeader
+          title="Class & Stream Rankings"
+          icon={<Trophy className="w-4 h-4" />}
+        />
+        <AnalyticsPanel academicYear={academicYear} selectedClassId="" term={term} />
       </div>
     </div>
   )
@@ -3006,7 +3020,14 @@ function ReportsContent() {
               <ManebCandidatesPanel academicYear={year} />
             )}
             {role === 'exam_officer' && activeTab === 'subjects' && (
-              <AcademicSubjectsPanel academicYear={year} term={term} />
+              <div className="space-y-5">
+                <AcademicSubjectsPanel academicYear={year} term={term} />
+                <SectionHeader
+                  title="Class & Stream Rankings"
+                  icon={<Trophy className="w-4 h-4" />}
+                />
+                <AnalyticsPanel academicYear={year} selectedClassId="" term={term} />
+              </div>
             )}
             {role === 'exam_officer' && activeTab === 'marks' && <MarksDistributionPanel />}
             {role === 'exam_officer' && activeTab === 'placements' && (

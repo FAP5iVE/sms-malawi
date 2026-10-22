@@ -21,7 +21,7 @@
  */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { ApiExam, ApiExamMark, ApiTermResult, ApiManebRecord, ApiExamAnalytics } from '@shared/types/api'
+import type { ApiExam, ApiExamMark, ApiTermResult, ApiManebRecord, ApiExamAnalytics, ApiStudentClassStanding } from '@shared/types/api'
 import type { CreateExamInput, BulkMarkEntryInput, CreateManebRecordInput } from '@shared/schemas/exam'
 import type { ReportCardData } from '@/components/shared/PrintableReportCard'
 import { apiFetch, queryKeys } from '@/lib/api-client'
@@ -132,16 +132,30 @@ export function useStudentResults(studentId: string, academicYear: string, term:
 // at-risk). Oversight sees any class; teachers are scoped server-side.
 export function useExamAnalytics(
   academicYear: string, term: number,
-  opts: { classId?: string; subject?: string; limit?: number } = {},
+  opts: { classId?: string; form?: number; subject?: string; limit?: number } = {},
 ) {
   const params = new URLSearchParams({ academicYear, term: String(term) })
   if (opts.classId) params.set('classId', opts.classId)
+  else if (opts.form) params.set('form', String(opts.form))
   if (opts.subject) params.set('subject', opts.subject)
   if (opts.limit)   params.set('limit', String(opts.limit))
   return useQuery({
-    queryKey: ['exams', 'analytics', 'top-bottom', academicYear, term, opts.classId ?? '', opts.subject ?? '', opts.limit ?? 10],
+    queryKey: ['exams', 'analytics', 'top-bottom', academicYear, term, opts.classId ?? '', opts.form ?? 0, opts.subject ?? '', opts.limit ?? 10],
     queryFn:  () => apiFetch<ApiExamAnalytics>(`/exams/analytics/top-bottom?${params.toString()}`),
     enabled:  !!academicYear && !!term,
+  })
+}
+
+// A student's standing inside their own class: class top ten + best / average /
+// lowest comparison, overall and per subject. Fee-gated like useStudentResults.
+export function useStudentClassStanding(studentId: string, academicYear: string, term: number) {
+  return useQuery({
+    queryKey: ['exams', 'class-standing', studentId, academicYear, term],
+    queryFn:  () => apiFetch<ApiStudentClassStanding | null>(
+      `/exams/results/${studentId}/class-standing?academicYear=${academicYear}&term=${term}`,
+    ),
+    enabled:  !!studentId && !!academicYear && !!term,
+    retry:    false, // never retry a 403 fee gate
   })
 }
 
@@ -235,4 +249,4 @@ export function useReportCardData(studentId: string, academicYear: string, term:
     enabled:  !!studentId && !!academicYear && !!term,
     retry:    false, // never retry a 403 fee gate
   })
-}
+}

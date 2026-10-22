@@ -33,6 +33,13 @@ import {
   type AnnouncementEmailData,
 } from '@/server/templates/emails/announcement'
 
+/** Push preview of an announcement body: the first 200 characters, but for a
+ *  structured post (the term top-performers list uses "# " / "## " headings)
+ *  only the opening paragraph, so no heading markers or half a name list. */
+function pushPreview(body: string): string {
+  return (body.split(/\n\n(?=#{1,2} )/)[0] ?? body).slice(0, 200)
+}
+
 // ─────────────────────────────────────────────────────────
 //  TYPES
 // ─────────────────────────────────────────────────────────
@@ -553,7 +560,7 @@ export async function sendAnnouncementNotification(
   if (params.topic) {
     const pushPayload: PushNotificationPayload = {
       title: params.data.title,
-      body: params.data.body.slice(0, 200),
+      body: pushPreview(params.data.body),
       clickAction: '/announcements',
       tag: `announcement_${params.data.announcementId}`,
       data: {
@@ -594,7 +601,7 @@ export async function sendAnnouncementNotification(
 
       const pushPayload: PushNotificationPayload = {
         title: params.data.title,
-        body: params.data.body.slice(0, 200),
+        body: pushPreview(params.data.body),
         clickAction: '/announcements',
         tag: `announcement_${params.data.announcementId}`,
         data: {
