@@ -43,8 +43,6 @@ interface AcademicPolicy {
   term3_end:              string
   min_attendance_pct:     string
   report_card_comment_required: string
-  ca_weight_pct:          string
-  exam_weight_pct:        string
 }
 
 export function AcademicPolicySettings() {
@@ -66,8 +64,6 @@ export function AcademicPolicySettings() {
     term3_end:              '',
     min_attendance_pct:     '80',
     report_card_comment_required: 'true',
-    ca_weight_pct:          '30',
-    exam_weight_pct:        '70',
   })
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
@@ -105,7 +101,7 @@ export function AcademicPolicySettings() {
     <div className="space-y-6">
       <div>
         <h2 className="font-heading font-bold text-lg text-brand-navy">Academic Policy</h2>
-        <p className="text-sm text-muted mt-0.5">Term dates, attendance rules, and assessment weighting.</p>
+        <p className="text-sm text-muted mt-0.5">Term dates, attendance rules, and report card policy. Continuous assessment weighting is in Exam & Grading.</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
@@ -175,27 +171,8 @@ export function AcademicPolicySettings() {
           </div>
         </div>
 
-        {/* Assessment Weighting */}
-        <div className="pb-5 border-b border-base">
-          <h3 className="font-heading font-semibold text-sm text-body mb-4">Assessment Weighting</h3>
-          <div className="grid grid-cols-2 gap-4 max-w-xs">
-            <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">C.A. Weight (%)</label>
-              <input type="number" min={0} max={100}
-                value={policy.ca_weight_pct}
-                onChange={(e) => set('ca_weight_pct', e.target.value)}
-                className={inputCls} />
-            </div>
-            <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Exam Weight (%)</label>
-              <input type="number" min={0} max={100}
-                value={policy.exam_weight_pct}
-                onChange={(e) => set('exam_weight_pct', e.target.value)}
-                className={inputCls} />
-            </div>
-          </div>
-          <p className="text-xs text-muted mt-2">C.A. + Exam must sum to 100%.</p>
-        </div>
+        {/* [2026-10-22] Assessment Weighting moved to Exam & Grading > Continuous Assessment —
+            the old C.A./Exam % fields here were never read by the results calculation. */}
 
         {/* Report Card Policy */}
         <div>

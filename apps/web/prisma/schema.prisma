@@ -938,6 +938,13 @@ model Exam {
   venue         String
   maxMark       Decimal    @db.Decimal(6,2) @default(100)
   weightPercent Decimal    @db.Decimal(5,2) @default(100)
+  // Continuous-assessment slot (1..N, N = SETTING_KEYS.EXAM_CA_COUNT). Set only
+  // on WEEKLY_TEST/ASSIGNMENT/QUIZ/MIDTERM exams while CA aggregation is on;
+  // it decides which configured CA weight this exam carries in the term
+  // result. Null for END_TERM and when aggregation is off. At most one exam per
+  // (class, subject, year, term, slot) - NULLs are distinct in Postgres, so
+  // unslotted exams never collide.
+  caSlot        Int?
   academicYear  String
   term          Int
   status        ExamStatus @default(SCHEDULED)
@@ -946,6 +953,7 @@ model Exam {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
+  @@unique([classId, subject, academicYear, term, caSlot])
   @@index([classId, term])
   @@index([academicYear, term])
   @@map("exams")

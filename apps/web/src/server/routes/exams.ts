@@ -290,9 +290,20 @@ examsRouter.get('/results/:studentId', verifyAuth,
 // POST /exams/compute — trigger term result computation
 examsRouter.post('/compute', verifyAuth, requirePermission('exam.computeResults'),
   async (req, res) => {
-    const { classId, academicYear, term } = req.body as { classId: string; academicYear: string; term: number }
+    const { classId, academicYear, term, allowIncompleteCa } = req.body as {
+      classId: string; academicYear: string; term: number; allowIncompleteCa?: boolean
+    }
     if (!classId || !academicYear || !term) return res.status(400).json({ error: 'classId, academicYear and term are required' })
-    return res.json(await examService.computeTermResults(classId, academicYear, term, req.user!.uid))
+    try {
+      // allowIncompleteCa: only meaningful when continuous-assessment aggregation
+      // is on - see examService.ComputeTermResultsOptions.
+      return res.json(await examService.computeTermResults(
+        classId, academicYear, Number(term), req.user!.uid, { allowIncompleteCa: allowIncompleteCa === true },
+      ))
+    } catch (err: unknown) {
+      const e = err as Error & { missingCa?: string[] }
+      return sendError(res, err, { tags: { module: 'exams', route: 'compute' }, extraFields: e.missingCa ? { missingCa: e.missingCa } : undefined })
+    }
   })
 
 // GET /exams/report-card/:studentId — download a generated report card.

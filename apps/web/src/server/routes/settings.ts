@@ -65,6 +65,7 @@ import {
 }                            from '@/server/services/gradeService'
 import * as settingsService  from '@/server/services/settingsService'
 import { SETTING_KEYS, SETTING_META } from '@shared/types/settings'
+import { validateCaConfig } from '@shared/constants/exams'
 import type { SettingKey, DepartmentTitles } from '@shared/types/settings'
 import { logger }            from '@/lib/logger'
 import { sendError } from '@/server/lib/sendError'
@@ -171,7 +172,10 @@ settingsRouter
 const ACADEMIC_KEYS = [
   'term1_start', 'term1_end', 'term2_start', 'term2_end',
   'term3_start', 'term3_end', 'min_attendance_pct',
-  'report_card_comment_required', 'ca_weight_pct', 'exam_weight_pct',
+  'report_card_comment_required',
+  // [2026-10-22] 'ca_weight_pct'/'exam_weight_pct' removed: nothing ever read
+  // them. Continuous-assessment weighting now lives in Exam & Grading
+  // (SETTING_KEYS.EXAM_CA_*) and is what computeTermResults actually uses.
   'current_academic_year', 'current_term', 'next_term_date',
 ]
 
@@ -190,6 +194,25 @@ settingsRouter
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CONTINUOUS-ASSESSMENT CONFIG  (any authenticated user — read only)
+// Teachers need this to pick a CA slot when scheduling a test, and students see
+// the same weights on their results; the full /exam group below is staff-only.
+// ─────────────────────────────────────────────────────────────────────────────
+
+settingsRouter.get('/exam/ca-config', async (_req, res) => {
+  const v = await settingsService.getMany([
+    SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED,
+    SETTING_KEYS.EXAM_CA_COUNT,
+    SETTING_KEYS.EXAM_CA_WEIGHTS,
+  ])
+  return res.json({
+    enabled: v[SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED],
+    count:   v[SETTING_KEYS.EXAM_CA_COUNT],
+    weights: v[SETTING_KEYS.EXAM_CA_WEIGHTS],
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // EXAM SETTINGS  (admin | high_rank | exam_officer)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -199,17 +222,55 @@ settingsRouter
     const vals = await settingsService.getMany([
       SETTING_KEYS.PROMOTION_MIN_AVERAGE,
       SETTING_KEYS.PROMOTION_REQUIRED_PASSES,
+      SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED,
+      SETTING_KEYS.EXAM_CA_COUNT,
+      SETTING_KEYS.EXAM_CA_WEIGHTS,
     ])
     return res.json({
       promotion_min_average:     vals[SETTING_KEYS.PROMOTION_MIN_AVERAGE],
       promotion_required_passes: vals[SETTING_KEYS.PROMOTION_REQUIRED_PASSES],
+      ca_aggregate_enabled:      vals[SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED],
+      ca_count:                  vals[SETTING_KEYS.EXAM_CA_COUNT],
+      ca_weights:                vals[SETTING_KEYS.EXAM_CA_WEIGHTS],
     })
   })
   .patch(requireRole(['admin', 'high_rank']), async (req, res) => {
-    const body = req.body as { promotion_min_average?: number; promotion_required_passes?: number }
-    const updates: Array<{ key: typeof SETTING_KEYS.PROMOTION_MIN_AVERAGE | typeof SETTING_KEYS.PROMOTION_REQUIRED_PASSES; value: number }> = []
+    const body = req.body as {
+      promotion_min_average?: number; promotion_required_passes?: number
+      ca_aggregate_enabled?: boolean; ca_count?: number; ca_weights?: number[]
+    }
+    const updates: Array<{ key: SettingKey; value: number | boolean | number[] }> = []
     if (body.promotion_min_average     !== undefined) updates.push({ key: SETTING_KEYS.PROMOTION_MIN_AVERAGE,     value: body.promotion_min_average })
     if (body.promotion_required_passes !== undefined) updates.push({ key: SETTING_KEYS.PROMOTION_REQUIRED_PASSES, value: body.promotion_required_passes })
+
+    // ── Continuous assessment. count + weights are cross-field (length ===
+    // count, total < 100) so they are validated TOGETHER here - against the
+    // submitted values, falling back to the stored ones for whichever was not
+    // sent - before anything is written. Per-key shape is re-checked by
+    // settingsService.setMany's zod schemas.
+    const caTouched = body.ca_aggregate_enabled !== undefined || body.ca_count !== undefined || body.ca_weights !== undefined
+    if (caTouched) {
+      const cur = await settingsService.getMany([
+        SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED, SETTING_KEYS.EXAM_CA_COUNT, SETTING_KEYS.EXAM_CA_WEIGHTS,
+      ])
+      const next = {
+        enabled: body.ca_aggregate_enabled ?? cur[SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED],
+        count:   body.ca_count             ?? cur[SETTING_KEYS.EXAM_CA_COUNT],
+        weights: body.ca_weights           ?? cur[SETTING_KEYS.EXAM_CA_WEIGHTS],
+      }
+      // Count and weights are always kept consistent, so check them even when
+      // aggregation is being switched OFF: a saved-but-broken set would block
+      // the next time it is switched on.
+      const problem = (next.enabled || body.ca_count !== undefined || body.ca_weights !== undefined)
+        ? validateCaConfig({ count: next.count, weights: next.weights })
+        : null
+      if (problem) return res.status(400).json({ error: problem })
+      if (body.ca_aggregate_enabled !== undefined) updates.push({ key: SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED, value: next.enabled })
+      if (body.ca_count   !== undefined || body.ca_weights !== undefined) {
+        updates.push({ key: SETTING_KEYS.EXAM_CA_COUNT,   value: next.count })
+        updates.push({ key: SETTING_KEYS.EXAM_CA_WEIGHTS, value: next.weights })
+      }
+    }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No valid fields to update.' })

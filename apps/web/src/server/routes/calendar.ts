@@ -128,7 +128,7 @@ import { COLLECTIONS }       from '@shared/constants/storage'
 import { CreateCalendarEventSchema, UpdateCalendarEventSchema } from '@shared/schemas/calendarEvent'
 import * as settingsService     from '@/server/services/settingsService'
 import * as calendarEventService from '@/server/services/calendarEventService'
-import * as studentService      from '@/server/services/studentService'
+import * as assignmentService   from '@/server/services/assignmentService'
 import {
   ACADEMIC_VISIBLE_ROLES,
   LEAVE_VISIBLE_ROLES,
@@ -464,27 +464,16 @@ calendarRouter.get('/events',
     // [VISIBILITY] Added ASSIGNMENT_UNRESTRICTED_ROLES (high_rank, admin)
     // — the academic-own-created / student-own-class scoping was already
     // correct, but management had no visibility into assignments at all.
-    if (['academic', 'student', ...ASSIGNMENT_UNRESTRICTED_ROLES].includes(role)) {
-      let classId: string | null = null
-      let creatorUid: string | null = null
-      const unrestricted = ASSIGNMENT_UNRESTRICTED_ROLES.includes(role)
+    // [2026-10-22] Scoping now uses the single assignment-visibility rule
+    //      (assignmentService.scopeForViewer): a student sees only assigned
+    //      subjects of their own class; a teacher sees their class's
+    //      assignments plus the subjects they are assigned to elsewhere.
+    if (['academic', 'student', 'exam_officer', ...ASSIGNMENT_UNRESTRICTED_ROLES].includes(role)) {
+      const scope = await assignmentService.scopeForViewer({ uid, role })
 
-      if (!unrestricted) {
-        if (role === 'academic') {
-          creatorUid = uid
-        } else {
-          const student = await studentService.resolveStudentFromUid(uid)
-          classId = student?.classId ?? null
-        }
-      }
-
-      if (unrestricted || creatorUid || classId) {
+      if (scope) {
         const assignments = await prisma.assignment.findMany({
-          where: {
-            dueDate: { gte: rangeStart, lte: rangeEnd },
-            ...(creatorUid ? { createdByUid: creatorUid } : {}),
-            ...(classId ? { classId } : {}),
-          },
+          where: { AND: [scope, { dueDate: { gte: rangeStart, lte: rangeEnd } }] },
           include: { class: { select: { name: true } } },
         })
         for (const a of assignments) {

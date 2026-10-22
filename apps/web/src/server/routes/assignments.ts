@@ -80,6 +80,14 @@ async function requireAssignmentViewAccess(
   const { classId } = req.params as { classId: string }
   const user = req.user!
 
+  // This router is also mounted at /assignments (no :classId). Without a class
+  // there is nothing to authorise, and a missing classId must never fall
+  // through to an unfiltered query.
+  if (!classId) {
+    res.status(404).json({ error: 'Not found.' })
+    return
+  }
+
   if (hasAnyPermission(user.role, STAFF_ASSIGNMENT_VIEW_PERMISSIONS, user.superUser === true) && user.role !== 'student') {
     next()
     return
@@ -100,10 +108,18 @@ async function requireAssignmentViewAccess(
 }
 
 // GET /classes/:classId/assignments
-assignmentsRouter.get('/', verifyAuth, requireAssignmentViewAccess, async (req, res) => {
-  const { classId } = req.params as { classId: string }
-  const assignments = await assignmentService.listForClass(classId)
-  return res.json(assignments)
+// [2026-10-22] Scoped per viewer - see assignmentService.scopeForViewer().
+// Deliberately NOT behind requireAssignmentViewAccess: that gate is a broad
+// role check, whereas the real rule is subject-level.
+assignmentsRouter.get('/', verifyAuth, async (req, res) => {
+  const { classId } = req.params as { classId?: string }
+  if (!classId) return res.status(404).json({ error: 'Not found.' })
+  try {
+    const user = req.user!
+    return res.json(await assignmentService.listForViewer(classId, { uid: user.uid, role: user.role, superUser: user.superUser === true }))
+  } catch (err: unknown) {
+    return sendError(res, err, { tags: { module: 'assignments', route: 'list' } })
+  }
 })
 
 // POST /classes/:classId/assignments — 'academic' only. The ownership
@@ -117,22 +133,21 @@ assignmentsRouter.post(
     const { classId } = req.params as { classId: string }
     const user = req.user!
 
-    const targetClass = await prisma.class.findUnique({
-      where: { id: classId },
-      select: { teacherId: true },
-    })
-    if (!targetClass) {
-      return res.status(404).json({ error: 'Class not found.' })
-    }
-    if (targetClass.teacherId !== user.uid) {
-      return res.status(403).json({ error: 'You are not the assigned teacher for this class.' })
-    }
+    if (!classId) return res.status(404).json({ error: 'Not found.' })
 
     const parsed = CreateAssignmentSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
 
-    const assignment = await assignmentService.createAssignment(classId, parsed.data, user.uid, user.role)
-    return res.status(201).json(assignment)
+    // [2026-10-22] Ownership is now per SUBJECT: the subject must be assigned
+    // to a teacher in this class, and the actor must be that teacher or the
+    // class teacher (assignmentService.assertCanCreateForSubject, called by
+    // createAssignment).
+    try {
+      const assignment = await assignmentService.createAssignment(classId, parsed.data, user.uid, user.role)
+      return res.status(201).json(assignment)
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'assignments', route: 'create' } })
+    }
   }
 )
 
@@ -200,7 +215,8 @@ assignmentsRouter.post(
         student.id,
         fileKey,
         user.uid,
-        user.role
+        user.role,
+        String(req.params.classId),
       )
       return res.status(201).json(submission)
     } catch (err: unknown) {

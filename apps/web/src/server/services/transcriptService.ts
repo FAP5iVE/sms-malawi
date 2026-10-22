@@ -143,12 +143,16 @@ export async function getTranscriptData(studentId: string): Promise<TranscriptDa
       // computed and stored there; read directly, never recompute.
       const subjectResults = (tr.subjectResults ?? {}) as Record<
         string,
-        { average: number; grade: string; pass: boolean }
+        { average: number; grade: string; pass: boolean; ca?: { points: number }; exam?: { points: number } }
       >
       const subjects = Object.entries(subjectResults).map(([subject, s]) => ({
         subject,
         total: s.average,
         grade: s.grade,
+        // CA / Exam contribution to the final mark - only when continuous
+        // assessments were aggregated (examService.computeTermResults).
+        ...(s.ca   ? { caScore:   s.ca.points }   : {}),
+        ...(s.exam ? { examScore: s.exam.points } : {}),
       }))
 
       return {

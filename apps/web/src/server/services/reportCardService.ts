@@ -264,7 +264,13 @@ export async function getReportCardData(
   // array — read directly, never recompute.
   const subjectResults = (termResult?.subjectResults ?? {}) as Record<
     string,
-    { average: number; grade: string; pass: boolean }
+    {
+      average: number; grade: string; pass: boolean
+      // Present only when continuous assessments were aggregated into the
+      // mark (examService.computeTermResults); ca.points + exam.points === average.
+      ca?:   { points: number }
+      exam?: { points: number }
+    }
   >
 
   const subjects: SubjectGrade[] = Object.entries(subjectResults).map(([subject, s]) => ({
@@ -272,6 +278,10 @@ export async function getReportCardData(
     total:   s.average,
     grade:   s.grade,
     remarks: s.pass ? 'Pass' : 'Below pass mark',
+    // Fills the report card's C.A. / Exam columns (contribution to the final
+    // mark). Left undefined - rendered as a dash - when CA was not aggregated.
+    ...(s.ca   ? { caScore:   s.ca.points }   : {}),
+    ...(s.exam ? { examScore: s.exam.points } : {}),
   }))
 
   // PR-1: promotion is an ANNUAL determination — shown only on the Term 3

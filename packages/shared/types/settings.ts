@@ -166,6 +166,11 @@ export const SETTING_KEYS = {
   EXAM_MANEB_CENTRE_NAME:         'exam_maneb_centre_name',
   EXAM_MANEB_REG_DEADLINE:        'exam_maneb_reg_deadline',
 
+  // ── Continuous assessment (CA) aggregation into the end-of-term result
+  EXAM_CA_AGGREGATE_ENABLED:      'exam_ca_aggregate_enabled',
+  EXAM_CA_COUNT:                  'exam_ca_count',
+  EXAM_CA_WEIGHTS:                'exam_ca_weights',
+
   // ── Student promotion
   PROMOTION_MIN_AVERAGE:          'promotion_min_average',
   PROMOTION_REQUIRED_PASSES:      'promotion_required_passes',
@@ -306,6 +311,13 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.EXAM_MANEB_CENTRE_NUMBER]: string
   readonly [SETTING_KEYS.EXAM_MANEB_CENTRE_NAME]:   string
   readonly [SETTING_KEYS.EXAM_MANEB_REG_DEADLINE]:  string  // "YYYY-MM-DD"
+  // Continuous assessment. When EXAM_CA_AGGREGATE_ENABLED is true, the end-of-term
+  // mark of every subject = sum of (CA_i score% x EXAM_CA_WEIGHTS[i]) + (end-of-term
+  // exam score% x (100 - sum(EXAM_CA_WEIGHTS))). EXAM_CA_WEIGHTS has exactly
+  // EXAM_CA_COUNT whole-number entries (percent of the FINAL term mark).
+  readonly [SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED]: boolean
+  readonly [SETTING_KEYS.EXAM_CA_COUNT]:             number    // 1-10, default 2
+  readonly [SETTING_KEYS.EXAM_CA_WEIGHTS]:           number[]  // length === EXAM_CA_COUNT, default [15, 15]
 
   // ── Promotion
   readonly [SETTING_KEYS.PROMOTION_MIN_AVERAGE]:      number  // percent, default 35
@@ -613,6 +625,28 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     isPublic: false,
     description: 'MANEB candidate registration deadline for the current academic year (ISO date).',
     defaultValue: `${parseAcademicYear(DEFAULT_ACADEMIC_YEAR).endYear}-03-31`,
+  },
+
+  [SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED]: {
+    key: SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED,
+    category: SETTING_CATEGORIES.EXAM,
+    isPublic: false,
+    description: 'Whether continuous assessments are aggregated into the end-of-term result. When off, the term result is the end-of-term exam alone.',
+    defaultValue: false,
+  },
+  [SETTING_KEYS.EXAM_CA_COUNT]: {
+    key: SETTING_KEYS.EXAM_CA_COUNT,
+    category: SETTING_CATEGORIES.EXAM,
+    isPublic: false,
+    description: 'Number of continuous assessments per subject per term (used only when CA aggregation is on).',
+    defaultValue: 2,
+  },
+  [SETTING_KEYS.EXAM_CA_WEIGHTS]: {
+    key: SETTING_KEYS.EXAM_CA_WEIGHTS,
+    category: SETTING_CATEGORIES.EXAM,
+    isPublic: false,
+    description: 'Whole-number percent of the final term mark contributed by each continuous assessment, in order (CA 1, CA 2, ...). The end-of-term exam carries the remainder to 100.',
+    defaultValue: [15, 15],
   },
 
   // ── Promotion

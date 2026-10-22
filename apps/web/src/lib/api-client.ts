@@ -241,6 +241,8 @@ export const queryKeys = {
     timetable: (id: string, year?: string, term?: number) =>
       ['classes', id, 'timetable', year, term] as const,
     assignments: (id: string) => ['classes', id, 'assignments'] as const,
+    /** GET /classes/:id/subject-assignments - who teaches each subject in a class. */
+    subjectAssignments: (id: string, year?: string) => ['classes', id, 'subject-assignments', year ?? null] as const,
     subjectAssignmentsMine: (academicYear?: string) => ['classes', 'subject-assignments', 'mine', academicYear ?? null] as const,
     /** GET/PUT /classes/:id/subjects — preset subjects + 5-day lock state. */
     subjects: (id: string) => ['classes', id, 'subjects'] as const,

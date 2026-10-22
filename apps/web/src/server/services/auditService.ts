@@ -69,6 +69,7 @@ export const ACTION_SEVERITY: Readonly<Record<string, Severity>> = {
   'class.teacher_assigned':       SEVERITY.MEDIUM,
   'class.subject_assigned':       SEVERITY.MEDIUM,
   'class.subject_unassigned':     SEVERITY.MEDIUM,
+  'class.subject_teacher_changed': SEVERITY.MEDIUM,
   'class.subject_assignments_backfilled': SEVERITY.MEDIUM,
   // [NEW 2026-09-16 — Class Subject Presets]
   'class.subjects_set':           SEVERITY.MEDIUM,

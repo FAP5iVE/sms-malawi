@@ -8,6 +8,9 @@
  *   convention (Phase 1D-ii) — mobile bottom sheet, desktop dialog, shared
  *   form-state hook — simplified to a single step (no multi-step
  *   navigation) since the form has only four fields.
+ * [MAINT 2026-10-22]: Subject is now a dropdown limited to subjects the user
+ *   may set work for (passed in as subjectOptions) instead of free text, so an
+ *   assignment can only ever be attached to a subject with an owner.
  * [DEPENDS ON]: @shared/schemas/student (CreateAssignmentSchema),
  *   apps/web/src/hooks/useClasses.ts (useCreateAssignment),
  *   apps/web/src/components/students/StudentFormSections.tsx (Field,
@@ -30,9 +33,13 @@ import { Modal, MODAL_BTN_PRIMARY
 interface AssignmentFormProps {
   classId: string
   onClose: () => void
+  /** Subjects this user may set assignments for in this class (the subjects
+   *  they teach, or every assigned subject for the class teacher). The server
+   *  re-checks - see assignmentService.assertCanCreateForSubject. */
+  subjectOptions: string[]
 }
 
-export default function AssignmentForm({ classId, onClose }: AssignmentFormProps) {
+export default function AssignmentForm({ classId, onClose, subjectOptions }: AssignmentFormProps) {
   const { mutate: createAssignment, isPending } = useCreateAssignment()
 
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -74,12 +81,12 @@ export default function AssignmentForm({ classId, onClose }: AssignmentFormProps
       </Field>
 
       <Field label="Subject" error={errors.subject?.message} required>
-        <input
-          type="text"
-          {...register('subject')}
-          placeholder="e.g. Mathematics"
-          className={inputCls}
-        />
+        <select {...register('subject')} className={inputCls} defaultValue="">
+          <option value="" disabled>Select subject…</option>
+          {subjectOptions.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
       </Field>
 
       <Field label="Due Date" error={errors.dueDate?.message} required>

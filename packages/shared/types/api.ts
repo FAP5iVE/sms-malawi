@@ -681,7 +681,16 @@ export interface ApiTermResult {
   classPosition: number
   classTotal: number
   passStatus: boolean
-  subjectResults: Record<string, { average: number; grade: string; pass: boolean }>
+  /** `average` is the subject's final term mark (2 d.p.). `ca`/`exam` are present
+   *  only when continuous assessments were aggregated into it (Settings >
+   *  Exam & Grading): `ca.slots` = raw % scored in CA 1..N (null = no such
+   *  assessment), `ca.points` out of `ca.weight`, `exam.points` out of
+   *  `exam.weight`; ca.points + exam.points === average. */
+  subjectResults: Record<string, {
+    average: number; grade: string; pass: boolean
+    ca?:   { slots: Array<number | null>; points: number; weight: number }
+    exam?: { points: number; weight: number }
+  }>
   attendanceDays: number
   absentDays: number
   teacherComment: string | null

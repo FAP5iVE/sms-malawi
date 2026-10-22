@@ -82,7 +82,7 @@ import { useExams, useApproveResults, useReleaseResults } from '@/hooks/useExams
 import { useClasses } from '@/hooks/useClasses'
 import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { usePermissions } from '@/hooks/usePermissions'
-import { apiFetch } from '@/lib/api-client'
+import { apiFetch, ApiError } from '@/lib/api-client'
 import { EXAM_MARKS_ENTERABLE_STATUSES } from '@shared/schemas/exam'
 import { ModuleTabs }        from '@/components/shared/ModuleTabs'
 import { ModuleSurface }     from '@/components/shared/ModuleSurface'
@@ -166,6 +166,9 @@ function ExamsPageInner() {
   const [viewMarksExamId, setViewMarksExamId] = useState<string | null>(null)
   const [computing, setComputing] = useState(false)
   const [computeResult, setComputeResult] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  // Set when continuous assessment is on and some subject lacks a finalised CA:
+  // the server refused, and this lets the user explicitly compute anyway.
+  const [canComputeAnyway, setCanComputeAnyway] = useState(false)
 
   const { data: myStudent, isLoading: myStudentLoading } = useStudentMe()
 
@@ -232,20 +235,25 @@ function ExamsPageInner() {
   const canEnterMarks      = can('exam.enterOwnClassMarks')
   const canCorrect         = can('exam.correctMarksInReview')
 
-  async function handleCompute() {
+  async function handleCompute(allowIncompleteCa = false) {
     if (!selectedClassId) return
     setComputing(true)
     setComputeResult(null)
+    setCanComputeAnyway(false)
     try {
-      const result = await apiFetch<{ computed: number }>('/exams/compute', {
+      const result = await apiFetch<{ computed: number; caAggregated?: boolean; notes?: string[] }>('/exams/compute', {
         method: 'POST',
-        body: JSON.stringify({ classId: selectedClassId, academicYear, term }),
+        body: JSON.stringify({ classId: selectedClassId, academicYear, term, allowIncompleteCa }),
       })
+      const notes = result.notes?.length ? ` Note: ${result.notes.join(' ')}` : ''
       setComputeResult({
         kind: 'success',
-        text: `Computed results for ${result.computed} student(s).`,
+        text: `Computed results for ${result.computed} student(s)${result.caAggregated ? ' (continuous assessments included)' : ''}.${notes}`,
       })
     } catch (err) {
+      const missingCa = err instanceof ApiError && err.status === 409
+        && Array.isArray((err.details as { missingCa?: unknown } | undefined)?.missingCa)
+      setCanComputeAnyway(missingCa)
       setComputeResult({
         kind: 'error',
         text: err instanceof Error ? err.message : 'Failed to compute results.',
@@ -414,7 +422,7 @@ function ExamsPageInner() {
                 )}
                 {canComputeResults && selectedClassId && (
                   <button
-                    onClick={handleCompute}
+                    onClick={() => handleCompute()}
                     disabled={computing}
                     className="flex items-center gap-2 px-4 py-2 border border-base rounded-xl text-sm hover:bg-page disabled:opacity-60"
                   >
@@ -444,6 +452,17 @@ function ExamsPageInner() {
                   )}
                   {computeResult.text}
                 </p>
+              )}
+
+              {canComputeAnyway && (
+                <button
+                  type="button"
+                  onClick={() => handleCompute(true)}
+                  disabled={computing}
+                  className="px-4 py-2 border border-base rounded-xl text-sm hover:bg-page disabled:opacity-60"
+                >
+                  Compute anyway (move the missing CA weight to the end-of-term exam)
+                </button>
               )}
 
               {examsLoading && (

@@ -217,7 +217,11 @@ export async function getClass(
     include: {
       students: { where: { status: 'ACTIVE' }, orderBy: { lastName: 'asc' } },
       timetable: { orderBy: [{ day: 'asc' }, { periodStart: 'asc' }] },
-      assignments: { orderBy: { dueDate: 'asc' } },
+      // [2026-10-22] `assignments` is deliberately NOT included. This payload
+      // goes to every viewer of the class page, so including it leaked every
+      // subject's assignments to students and unrelated teachers. They are
+      // fetched from GET /classes/:id/assignments, scoped per viewer
+      // (assignmentService.scopeForViewer).
     },
   })
   const [withTeacherName] = await attachTeacherNames([cls])
@@ -852,6 +856,31 @@ export async function createSubjectAssignment(
     }
     throw err
   }
+}
+
+/**
+ * Hand a subject in a class to a different teacher (the unique row is kept,
+ * so history/ownership checks stay consistent). Same staff check as create.
+ */
+export async function updateSubjectAssignmentTeacher(
+  id: string, teacherUid: string, actorUid: string, actorRole: UserRole,
+) {
+  await assertIsTeacherStaff(teacherUid)
+  const before = await prisma.classSubjectAssignment.findUniqueOrThrow({
+    where: { id }, select: { classId: true, subject: true, teacherUid: true },
+  })
+  if (before.teacherUid === teacherUid) return prisma.classSubjectAssignment.findUniqueOrThrow({ where: { id } })
+
+  const updated = await prisma.classSubjectAssignment.update({ where: { id }, data: { teacherUid } })
+  await auditService.log({
+    action: 'class.subject_teacher_changed',
+    entityType: 'ClassSubjectAssignment',
+    entityId: id,
+    actorUid,
+    actorRole,
+    metadata: { before, after: { classId: before.classId, subject: before.subject, teacherUid } },
+  })
+  return updated
 }
 
 /** Remove a subject-teacher assignment. */

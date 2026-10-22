@@ -21,6 +21,7 @@ import { getTermDateRange } from '@/server/services/attendanceService'
 import { aggregateWeeks, attendanceRate } from './attendanceLogic'
 import { destinationNames } from './studentPlacementLogic'
 import { assignmentStatus, assignmentTotals, parseSubjectResults, subjectRows } from './studentLogic'
+import { assignedSubjectsForClass } from '@/server/services/assignmentService'
 import { daysBetween, kpi, previousPeriod, ratioPct, round, thresholdKpi } from '@/server/services/reporting/kpi'
 import { compact, sortInsights } from '@/server/services/reporting/insights'
 
@@ -121,8 +122,11 @@ export async function getStudentAssignments(studentId: string, academicYear: str
   const { start, end } = getTermDateRange(academicYear, term)
   const now = new Date()
 
+  // Only subjects that have a teacher assigned in the class - the same rule the
+  // class Assignments tab applies (assignmentService.scopeForViewer).
+  const subjects = await assignedSubjectsForClass(ctx.classId)
   const assignments = await prisma.assignment.findMany({
-    where: { classId: ctx.classId, dueDate: { gte: start, lte: end } },
+    where: { classId: ctx.classId, subject: { in: subjects }, dueDate: { gte: start, lte: end } },
     select: {
       id: true, title: true, subject: true, dueDate: true,
       submissions: { where: { studentId }, select: { status: true, submittedAt: true } },

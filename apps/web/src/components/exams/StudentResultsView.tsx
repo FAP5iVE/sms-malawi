@@ -120,6 +120,8 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
   const aggregateSubjects = r.aggregateSubjects ?? []
   const subjectEntries    = Object.entries(subjects)
   const passedCount       = subjectEntries.filter(([, d]) => d?.pass).length
+  // True when this term's marks were built from continuous assessments + exam.
+  const hasCa             = subjectEntries.some(([, d]) => !!d?.ca)
 
   // The headline card: "Points" for MSCE, "Grade" for JCE. Never "Grade"
   // with an averaged number behind it.
@@ -225,7 +227,13 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
         <table className="w-full text-sm border-collapse min-w-120">
           <thead>
             <tr className="bg-page border-b border-base">
-              {['Subject','Average','Grade','Result'].map((h) => (
+              {[
+                'Subject',
+                // When continuous assessments were aggregated, show how the mark
+                // is made up so it can be checked: CA + Exam = Final.
+                ...(hasCa ? ['CA', 'Exam', 'Final'] : ['Average']),
+                'Grade', 'Result',
+              ].map((h) => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase">{h}</th>
               ))}
             </tr>
@@ -243,6 +251,16 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
                       </span>
                     )}
                   </td>
+                  {hasCa && (
+                    <>
+                      <td className="px-4 py-3 text-muted">
+                        {data?.ca ? `${data.ca.points} / ${data.ca.weight}` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-muted">
+                        {data?.exam ? `${data.exam.points} / ${data.exam.weight}` : '—'}
+                      </td>
+                    </>
+                  )}
                   <td className="px-4 py-3">{pct(data?.average)}</td>
                   {/* Per-subject grade stays "Grade" on BOTH tracks — MSCE
                       subjects really are graded 1-9. Only the OVERALL result

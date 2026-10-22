@@ -50,6 +50,11 @@ export const CreateExamSchema = z.object({
   venue:         z.string().min(1),
   maxMark:       z.number().positive().max(1000).default(100),
   weightPercent: z.number().min(1).max(100).default(100),
+  // Which continuous-assessment slot (CA 1, CA 2, ...) this exam fills. Required
+  // by examService for WEEKLY_TEST/ASSIGNMENT/QUIZ/MIDTERM exams while CA
+  // aggregation is on; must be empty for END_TERM. Range-checked there against
+  // the configured CA count (this schema cannot know it).
+  caSlot:        z.number().int().min(1).max(10).nullable().optional(),
   academicYear:  z.string().min(1),
   term:          z.number().int().min(1).max(3),
 })

@@ -58,7 +58,7 @@
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { useClass, useClassTimetable } from '@/hooks/useClasses'
+import { useClass, useClassTimetable, useClassAssignments, useClassSubjectAssignments } from '@/hooks/useClasses'
 import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
@@ -67,14 +67,15 @@ import { RoleGuard } from '@/components/shared/RoleGuard'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
 import { AttendanceSheet } from '@/components/classes/AttendanceSheet'
 import AssignmentForm from '@/components/classes/AssignmentForm'
+import { SubjectTeachersPanel } from '@/components/classes/SubjectTeachersPanel'
 import { TimetableSlotForm } from '@/components/classes/TimetableSlotForm'
 import { DataTable } from '@/components/shared/DataTable'
 import type { DataColumn } from '@/components/shared/DataTable'
 import { ModuleTabs } from '@/components/shared/ModuleTabs'
 import type { TabItem } from '@/components/shared/ModuleTabs'
-import { ArrowLeft, Users, ClipboardCheck, Clock, BookOpen, Hourglass, Plus } from 'lucide-react'
+import { ArrowLeft, Users, ClipboardCheck, Clock, BookOpen, Hourglass, Plus, GraduationCap } from 'lucide-react'
 
-type Tab = 'roster' | 'attendance' | 'timetable' | 'assignments'
+type Tab = 'roster' | 'attendance' | 'timetable' | 'assignments' | 'subjects'
 
 // Mirrors students/[id]/page.tsx's own RoleGuard allowlist exactly — a
 // student-role viewer cannot reach that page, so the Roster tab's
@@ -122,9 +123,18 @@ function ClassDetailContent() {
   const [activeTab, setActiveTab] = useState<Tab>('roster')
   const [showAssignmentForm, setShowAssignmentForm] = useState(false)
   const [showSlotForm, setShowSlotForm] = useState(false)
-  // classService.getClass()'s Prisma `include` already returns assignments —
-  // no second request needed once the Assignments tab is opened.
-  const assignments = cls?.assignments ?? []
+  // [2026-10-22] Assignments come from their own scoped endpoint, not from the
+  // class payload: the server returns only what THIS viewer may see (students
+  // and subject teachers: their subject; class teacher: the whole class).
+  const { data: assignmentsData, isError: assignmentsDenied } = useClassAssignments(id)
+  const assignments = assignmentsData ?? []
+  const { data: subjectRows = [] } = useClassSubjectAssignments(id, role === 'student' ? undefined : cls?.academicYear)
+  const isClassTeacher = !!cls?.teacherId && cls.teacherId === user?.uid
+  // Subjects this user may set work for: the class teacher any assigned
+  // subject; a subject teacher only their own. (Server enforces the same.)
+  const assignableSubjects = role === 'academic'
+    ? subjectRows.filter((r) => isClassTeacher || r.teacherUid === user?.uid).map((r) => r.subject)
+    : []
 
   const canViewStudentProfile = role
     ? (STUDENT_PROFILE_VIEWER_ROLES as readonly string[]).includes(role)
@@ -169,6 +179,8 @@ function ClassDetailContent() {
     ...(canViewAttendance ? [{ id: 'attendance' as Tab, label: 'Attendance', icon: ClipboardCheck }] : []),
     { id: 'timetable', label: 'Timetable', icon: Clock },
     { id: 'assignments', label: 'Assignments', icon: BookOpen, badge: assignments.length },
+    // Who teaches each subject. Students have no use for it.
+    ...(role !== 'student' ? [{ id: 'subjects' as Tab, label: 'Subjects & teachers', icon: GraduationCap }] : []),
   ]
 
   // [PRODUCTION FIX 2026-07-31] Full attendance/classes audit finding: this
@@ -340,19 +352,27 @@ function ClassDetailContent() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-heading font-semibold text-brand-navy">Assignments</h3>
-            <RoleGuard allowed={['admin', 'high_rank', 'academic']}>
+            {/* Only a teacher who owns at least one subject here (or the class
+                teacher) can create - admin/high_rank oversee but do not set work. */}
+            {assignableSubjects.length > 0 && (
               <button
                 onClick={() => setShowAssignmentForm(true)}
                 className="flex items-center gap-2 bg-brand-teal text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-brand-teal-light transition-colors"
               >
                 + New Assignment
               </button>
-            </RoleGuard>
+            )}
           </div>
 
-          {assignments.length === 0 ? (
+          {assignmentsDenied ? (
             <div className="text-center py-12 text-muted text-sm border border-base rounded-xl">
-              No assignments yet. Click &quot;New Assignment&quot; to create one.
+              You don&apos;t have access to this class&apos;s assignments.
+            </div>
+          ) : assignments.length === 0 ? (
+            <div className="text-center py-12 text-muted text-sm border border-base rounded-xl">
+              {assignableSubjects.length > 0
+                ? 'No assignments yet. Click "New Assignment" to create one.'
+                : 'No assignments to show.'}
             </div>
           ) : (
             <div className="space-y-3">
@@ -369,8 +389,20 @@ function ClassDetailContent() {
         </div>
       )}
 
+      {activeTab === 'subjects' && (
+        <div className="space-y-4">
+          <h3 className="font-heading font-semibold text-brand-navy">Subjects &amp; teachers</h3>
+          <SubjectTeachersPanel
+            classId={id}
+            academicYear={cls.academicYear}
+            classTeacherUid={cls.teacherId}
+            canManage={can('class.assignSubject')}
+          />
+        </div>
+      )}
+
       {showAssignmentForm && (
-        <AssignmentForm classId={id} onClose={() => setShowAssignmentForm(false)} />
+        <AssignmentForm classId={id} subjectOptions={assignableSubjects} onClose={() => setShowAssignmentForm(false)} />
       )}
     </div>
   )

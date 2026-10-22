@@ -182,6 +182,73 @@ export function useCreateTimetableSlot() {
   })
 }
 
+// Assignments the signed-in user may see for this class. Scoped on the server
+// (assignmentService.scopeForViewer): students and subject teachers get only
+// their subject(s); the class teacher gets the whole class. Replaces reading
+// them off the class detail payload, which leaked everyone's assignments.
+export function useClassAssignments(classId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.classes.assignments(classId ?? ''),
+    queryFn:  () => apiFetch<ApiAssignment[]>(`/classes/${classId}/assignments`),
+    enabled:  !!classId,
+    retry:    false,
+  })
+}
+
+// ── Subject -> teacher assignment for one class (per academic year) ─────────
+export function useClassSubjectAssignments(classId: string | undefined, academicYear: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.classes.subjectAssignments(classId ?? '', academicYear),
+    queryFn:  () => apiFetch<ApiSubjectAssignment[]>(
+      `/classes/${classId}/subject-assignments?academicYear=${encodeURIComponent(academicYear ?? '')}`,
+    ),
+    enabled:  !!classId && !!academicYear,
+  })
+}
+
+function useInvalidateSubjectTeachers() {
+  const qc = useQueryClient()
+  // Everything that depends on "who teaches what": the panel, a teacher's own
+  // list (exam form, marks), and the assignment lists.
+  return () => qc.invalidateQueries({ queryKey: queryKeys.classes.all() })
+}
+
+export function useAssignSubjectTeacher() {
+  const invalidate = useInvalidateSubjectTeachers()
+  return useMutation({
+    mutationFn: (data: { classId: string; subject: string; teacherUid: string; academicYear: string }) =>
+      apiFetch<ApiSubjectAssignment>('/classes/subject-assignments', { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useChangeSubjectTeacher() {
+  const invalidate = useInvalidateSubjectTeachers()
+  return useMutation({
+    mutationFn: ({ id, teacherUid }: { id: string; teacherUid: string }) =>
+      apiFetch<ApiSubjectAssignment>(`/classes/subject-assignments/${id}`, { method: 'PATCH', body: JSON.stringify({ teacherUid }) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useRemoveSubjectTeacher() {
+  const invalidate = useInvalidateSubjectTeachers()
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<{ success: boolean }>(`/classes/subject-assignments/${id}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+  })
+}
+
+// One-time import of (class, subject, teacher) triples already in the timetable.
+export function useBackfillSubjectAssignments() {
+  const invalidate = useInvalidateSubjectTeachers()
+  return useMutation({
+    mutationFn: (academicYear: string) =>
+      apiFetch<{ created: number }>('/classes/subject-assignments/backfill', { method: 'POST', body: JSON.stringify({ academicYear }) }),
+    onSuccess: invalidate,
+  })
+}
+
 export function useCreateAssignment() {
   const qc = useQueryClient()
   return useMutation({

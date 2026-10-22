@@ -39,6 +39,16 @@ export function useExams(classId: string | undefined, academicYear: string, term
   })
 }
 
+// Continuous-assessment configuration (any signed-in user may read it).
+// Backs the CA-slot picker in ExamForm and the CA breakdown on results.
+export function useCaConfig() {
+  return useQuery({
+    queryKey: [...queryKeys.exams.all(), 'ca-config'] as const,
+    queryFn:  () => apiFetch<{ enabled: boolean; count: number; weights: number[] }>('/settings/exam/ca-config'),
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 export function useCreateExam() {
   const qc = useQueryClient()
   return useMutation({

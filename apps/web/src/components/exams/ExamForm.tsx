@@ -27,6 +27,13 @@
  *   narrows their own assigned-subjects list further still; in practice
  *   the two should already agree, since createSubjectAssignment also
  *   validates against the class's presets.
+ * [MAINT 2026-10-22 — Continuous Assessment]: when CA aggregation is on
+ *   (Settings > Exam & Grading) and the chosen type is a continuous
+ *   assessment (test/quiz/assignment/midterm), a "Continuous assessment"
+ *   picker (CA 1..N, with each slot's weight) appears and is required — it
+ *   decides which configured weight the exam carries in the term result.
+ *   examService.createExam() enforces the same rule (and one exam per slot per
+ *   class/subject/term) server-side.
  * [DEPENDS ON]: @/hooks/useClasses (useMySubjectAssignments,
  *   useClassSubjects), @/store/authStore,
  *   @shared/constants/malawi (MALAWI_SUBJECTS, isManebNationalTerm)
@@ -38,13 +45,13 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateExamSchema } from '@shared/schemas/exam'
 import type { CreateExamInput } from '@shared/schemas/exam'
-import { useCreateExam } from '@/hooks/useExams'
+import { useCreateExam, useCaConfig } from '@/hooks/useExams'
 import { useClasses, useMySubjectAssignments, useClassSubjects } from '@/hooks/useClasses'
 import { useAuthStore } from '@/store/authStore'
 import { Loader2, AlertTriangle } from 'lucide-react'
 import type { ApiClass } from '@shared/types/api'
 import { MALAWI_SUBJECTS, isManebNationalTerm } from '@shared/constants/malawi'
-import { EXAM_TYPES } from '@shared/constants/exams'
+import { EXAM_TYPES, isCaExamType } from '@shared/constants/exams'
 import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
 
 // CreateExamSchema has defaulted fields (maxMark, weightPercent), so its INPUT
@@ -68,6 +75,7 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
   const assignments = assignmentsData ?? []
 
   const createExam = useCreateExam()
+  const { data: caConfig } = useCaConfig()
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<ExamFormValues, unknown, CreateExamInput>({
@@ -107,9 +115,21 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
     return true
   })
 
+  // CA slot picker: shown for continuous-assessment types only while
+  // aggregation is on. The first option is the default type before the
+  // select has been touched.
+  const typeValue = watch('type') ?? availableTypes[0]?.value
+  const showCaSlot = !!caConfig?.enabled && !!typeValue && isCaExamType(typeValue)
+
   function onSubmit(data: CreateExamInput) {
     setSubmitError(null)
-    createExam.mutate(data, {
+    if (showCaSlot && !data.caSlot) {
+      setSubmitError(`Choose which continuous assessment this is (CA 1 to CA ${caConfig?.count}).`)
+      return
+    }
+    // A slot picked and then abandoned by switching type must not be sent.
+    const payload: CreateExamInput = { ...data, caSlot: showCaSlot ? data.caSlot ?? null : null }
+    createExam.mutate(payload, {
       onSuccess: onClose,
       onError: (err) => {
         setSubmitError(err instanceof Error ? err.message : 'Failed to schedule exam. Please try again.')
@@ -151,10 +171,25 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
             {availableTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
+        {showCaSlot && caConfig && (
+          <div>
+            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Continuous assessment</label>
+            <select
+              {...register('caSlot', { setValueAs: (v) => (v === '' || v == null ? null : Number(v)) })}
+              className={ic}
+              aria-label="Continuous assessment number"
+            >
+              <option value="">Select CA…</option>
+              {caConfig.weights.map((w, i) => (
+                <option key={i} value={i + 1}>CA {i + 1} — counts {w}% of the term mark</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Class</label>
           <select {...register('classId')} className={ic} aria-label="Class">
-            <option value="">Select class\u2026</option>
+            <option value="">Select class…</option>
             {availableClasses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           {errors.classId && <p className="text-xs text-brand-coral mt-1">{errors.classId.message}</p>}

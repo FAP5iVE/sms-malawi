@@ -72,8 +72,8 @@ import { DEFAULT_SCHOOL_LOGO_DATA_URI } from '@/lib/schoolLogoData'
 
 export interface SubjectGrade {
   subject:     string
-  caScore?:    number   // Continuous assessment — 30% weight
-  examScore?:  number   // End-term/midterm exam — 70% weight
+  caScore?:    number   // Continuous assessment points counted in `total` (weights set in Settings > Exam & Grading)
+  examScore?:  number   // End-of-term exam points counted in `total`; caScore + examScore === total
   total:       number   // Weighted total out of 100
   grade:       string   // A / B / C / D / F
   remarks?:    string   // e.g. "Improving", "Needs attention"

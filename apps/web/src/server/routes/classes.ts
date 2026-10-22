@@ -273,6 +273,17 @@ classesRouter.post('/subject-assignments/backfill', requirePermission('class.ass
   return res.json(result)
 })
 
+// PATCH /classes/subject-assignments/:assignmentId — give a subject to a
+// different teacher. Body: { teacherUid }.
+classesRouter.patch('/subject-assignments/:assignmentId', requirePermission('class.assignSubject'), async (req, res) => {
+  const { user } = req
+  if (!user) return res.status(401).json({ error: 'Not authenticated.' })
+  const teacherUid = typeof req.body?.teacherUid === 'string' ? req.body.teacherUid.trim() : ''
+  if (!teacherUid) return res.status(400).json({ error: 'teacherUid is required.' })
+  const updated = await classService.updateSubjectAssignmentTeacher(String(req.params.assignmentId), teacherUid, user.uid, user.role)
+  return res.json(updated)
+})
+
 // DELETE /classes/subject-assignments/:assignmentId — remove an assignment.
 classesRouter.delete('/subject-assignments/:assignmentId', requirePermission('class.assignSubject'), async (req, res) => {
   const id = String(req.params.assignmentId)

@@ -173,6 +173,16 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
     z.string().max(200),
   [SETTING_KEYS.EXAM_MANEB_REG_DEADLINE]:
     isoDateSchema,
+  [SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED]:
+    z.boolean(),
+  [SETTING_KEYS.EXAM_CA_COUNT]:
+    positiveIntSchema('Number of continuous assessments').max(10),
+  // Per-element validity only — the cross-field rules (length === count,
+  // sum < 100) live in validateCaConfig() and are enforced by the route,
+  // because a single-key schema cannot see the sibling EXAM_CA_COUNT.
+  [SETTING_KEYS.EXAM_CA_WEIGHTS]:
+    z.array(z.number().int('Each CA weight must be a whole number').min(1, 'Each CA weight must be at least 1%').max(99, 'A single CA weight cannot exceed 99%'))
+      .min(1, 'At least one CA weight is required').max(10),
 
   // ── Promotion
   [SETTING_KEYS.PROMOTION_MIN_AVERAGE]:

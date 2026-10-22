@@ -72,6 +72,15 @@
  * [DEPENDS ON]: apps/web/src/server/services/gradeService.ts (calcGrade),
  *   @shared/constants/malawi (getManebExamType)
  *
+ * [MAINT 2026-10-22 — Continuous Assessment aggregation]: new
+ *   getCaConfig()/resolveCaSlot() and a rewritten computeTermResults().
+ *   Settings (Exam & Grading) decide whether continuous assessments feed the
+ *   end-of-term result, how many there are, and each one's weight (see
+ *   SETTING_KEYS.EXAM_CA_*). createExam()/updateExam() require a valid, unused
+ *   caSlot for a CA exam while aggregation is on. The arithmetic lives in
+ *   @shared/constants/exams (computeSubjectTermMark - exact, half-up, no
+ *   floating-point drift); this file only gathers the inputs and persists.
+ *
  * [R8 ADDENDUM — Academics IV: Report Cards, Transcripts, Promotion & Risk
  *   Assessment]: listExams() now also returns className/totalStudents/
  *   feeBlockedCount/marksEntered per exam — ResultsReleaseWorkflow.tsx
@@ -94,6 +103,12 @@ import { logger }           from '@/lib/logger'
 import { checkBalanceGate } from '@/server/services/feeService'
 import { calcGrade, computeManebAggregate, computeInternalTermOutcome } from '@/server/services/gradeService'
 import { getManebExamType } from '@shared/constants/malawi'
+import {
+  isCaExamType, validateCaConfig, computeSubjectTermMark,
+  type CaConfig, type MarkComponent,
+} from '@shared/constants/exams'
+import * as settingsService from '@/server/services/settingsService'
+import { SETTING_KEYS } from '@shared/types/settings'
 import * as classService    from '@/server/services/classService'
 import * as auditService    from '@/server/services/auditService'
 import * as announcementService from '@/server/services/announcementService'
@@ -127,6 +142,68 @@ async function assertOwnsSubject(
       { status: 403 },
     )
   }
+}
+
+// ─── CONTINUOUS ASSESSMENT CONFIG + SLOT RULES ──────────
+/** Current CA configuration. Throws 409 if aggregation is ON but the stored
+ *  count/weights are inconsistent - a broken config must never silently
+ *  produce wrong marks. */
+export async function getCaConfig(): Promise<CaConfig> {
+  const v = await settingsService.getMany([
+    SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED,
+    SETTING_KEYS.EXAM_CA_COUNT,
+    SETTING_KEYS.EXAM_CA_WEIGHTS,
+  ])
+  const cfg: CaConfig = {
+    enabled: v[SETTING_KEYS.EXAM_CA_AGGREGATE_ENABLED],
+    count:   v[SETTING_KEYS.EXAM_CA_COUNT],
+    weights: v[SETTING_KEYS.EXAM_CA_WEIGHTS],
+  }
+  if (cfg.enabled) {
+    const problem = validateCaConfig(cfg)
+    if (problem) {
+      throw Object.assign(
+        new Error(`Continuous assessment settings are invalid: ${problem} Fix them in Settings > Exam & Grading.`),
+        { status: 409 },
+      )
+    }
+  }
+  return cfg
+}
+
+/** Validates/normalises the caSlot of an exam about to be written and returns
+ *  the value to store. `excludeExamId` exempts the exam being edited from its
+ *  own slot. */
+async function resolveCaSlot(
+  args: { type: string; caSlot: number | null | undefined; classId: string; subject: string; academicYear: string; term: number },
+  excludeExamId?: string,
+): Promise<number | null> {
+  const cfg = await getCaConfig()
+  const isCa = isCaExamType(args.type)
+
+  if (!isCa) {
+    if (args.caSlot != null)
+      throw Object.assign(new Error('Only continuous assessments (test, quiz, assignment, midterm) can have a CA slot.'), { status: 400 })
+    return null
+  }
+  if (!cfg.enabled) return null            // aggregation off: slots are not used
+
+  if (args.caSlot == null)
+    throw Object.assign(new Error(`Choose which continuous assessment this is (CA 1 to CA ${cfg.count}) - continuous assessments count toward the end-of-term result.`), { status: 400 })
+  if (args.caSlot < 1 || args.caSlot > cfg.count)
+    throw Object.assign(new Error(`CA slot must be between 1 and ${cfg.count}.`), { status: 400 })
+
+  const clash = await prisma.exam.findFirst({
+    where: {
+      classId: args.classId, subject: args.subject, academicYear: args.academicYear,
+      term: args.term, caSlot: args.caSlot,
+      ...(excludeExamId ? { id: { not: excludeExamId } } : {}),
+    },
+    select: { title: true },
+  })
+  if (clash)
+    throw Object.assign(new Error(`CA ${args.caSlot} for ${args.subject} this term is already used by "${clash.title}". Pick another slot.`), { status: 409 })
+  return args.caSlot
 }
 
 // ─── CREATE EXAM ─────────────────────────────────────────
@@ -165,8 +242,14 @@ export async function createExam(data: CreateExamInput, actor: ExamActor) {
   // subject the class doesn't offer, regardless of the actor's role.
   await classService.assertSubjectOfferedByClass(data.classId, data.subject)
 
+  // Continuous-assessment slot (see getCaConfig/resolveCaSlot).
+  const caSlot = await resolveCaSlot({
+    type: data.type, caSlot: data.caSlot, classId: data.classId,
+    subject: data.subject, academicYear: data.academicYear, term: data.term,
+  })
+
   const exam = await prisma.exam.create({
-    data: { ...data, date: new Date(data.date), createdByUid: actor.uid },
+    data: { ...data, caSlot, date: new Date(data.date), createdByUid: actor.uid },
     include: { class: { select: { name: true, form: true } } },
   })
   await auditService.log({
@@ -264,10 +347,16 @@ const EXAM_EDIT_LOCKED_STATUSES: ExamStatus[] = ['MARKS_FINAL', 'RESULTS_APPROVE
 export async function updateExam(id: string, data: UpdateExamInput, actor: ExamActor) {
   const existing = await prisma.exam.findUniqueOrThrow({
     where:  { id },
-    select: { classId: true, subject: true, academicYear: true, term: true, status: true, type: true },
+    select: { classId: true, subject: true, academicYear: true, term: true, status: true, type: true, caSlot: true },
   })
 
-  if (EXAM_EDIT_LOCKED_STATUSES.includes(existing.status)) {
+  // Re-labelling WHICH continuous assessment an exam is (its caSlot) never
+  // changes a mark, so it stays possible after finalization - otherwise a CA
+  // finalised before aggregation was switched on could never be slotted.
+  // Every other field is locked once marks are final.
+  const changedKeys = Object.entries(data).filter(([, v]) => v !== undefined).map(([k]) => k)
+  const onlyCaSlot  = changedKeys.length > 0 && changedKeys.every((k) => k === 'caSlot')
+  if (EXAM_EDIT_LOCKED_STATUSES.includes(existing.status) && !onlyCaSlot) {
     throw Object.assign(
       new Error('This exam\u2019s results are finalized and it can no longer be edited.'),
       { status: 409 },
@@ -303,9 +392,24 @@ export async function updateExam(id: string, data: UpdateExamInput, actor: ExamA
     throw new Error(`Form ${targetClass.form} Term ${nextTerm} is the national ${manebType} examination, administered by MANEB — the school does not set an internal end-of-term exam for this slot.`)
   }
 
+  // Re-resolve the CA slot only when something that determines it changed;
+  // a plain title/venue edit must not suddenly demand a slot.
+  const slotInputsChanged =
+    data.caSlot !== undefined || nextType !== existing.type || nextClassId !== existing.classId ||
+    nextSubject !== existing.subject || nextYear !== existing.academicYear || nextTerm !== existing.term
+  const nextCaSlot = slotInputsChanged
+    ? await resolveCaSlot({
+        type: nextType,
+        // Switching to a non-CA type drops the slot rather than erroring.
+        caSlot: data.caSlot !== undefined ? data.caSlot : (isCaExamType(nextType) ? existing.caSlot : null),
+        classId: nextClassId, subject: nextSubject, academicYear: nextYear, term: nextTerm,
+      }, id)
+    : undefined
+
   const exam = await prisma.exam.update({
     where: { id },
     data: {
+      ...(nextCaSlot         !== undefined ? { caSlot: nextCaSlot }                : {}),
       ...(data.type          !== undefined ? { type: data.type }                   : {}),
       ...(data.subject       !== undefined ? { subject: data.subject }             : {}),
       ...(data.classId       !== undefined ? { classId: data.classId }             : {}),
@@ -553,12 +657,53 @@ export async function getStudentResults(studentId: string, academicYear: string,
   }
 }
 
+// Exam statuses at which an exam's marks are final (not draft) - the only
+// ones a continuous assessment may be counted from.
+const CA_FINAL_STATUSES: ExamStatus[] = ['MARKS_FINAL', 'RESULTS_APPROVED', 'RESULTS_RELEASED']
+
+type ExamWithMarks = Prisma.ExamGetPayload<{ include: { marks: true } }>
+
+/** One student's score on one exam as the pure calculator expects it. A
+ *  student with no ExamMark row, no mark, or marked absent scores 0. */
+function toMarkComponent(exam: ExamWithMarks, studentId: string): MarkComponent {
+  const row = exam.marks.find((m) => m.studentId === studentId)
+  return {
+    mark:   row && row.mark !== null ? toNumber(row.mark) : null,
+    max:    toNumber(exam.maxMark),
+    absent: row?.absent ?? false,
+  }
+}
+
+export interface ComputeTermResultsOptions {
+  /** Aggregation ON only. When a subject has a CA slot with no finalised exam,
+   *  the default is to refuse (the school must finish its assessments). With
+   *  this flag the missing slot's weight moves to the end-of-term exam for
+   *  that subject and the gap is reported back. */
+  allowIncompleteCa?: boolean
+}
+
 // ─── COMPUTE TERM RESULTS ────────────────────────────────
 // Refuses to run for a MANEB national term (Form 2 Term 3 / Form 4 Term 3)
-// — those results come from MANEB itself (ManebRecord), never from
+// - those results come from MANEB itself (ManebRecord), never from
 // aggregating internally-marked Exam/ExamMark rows, even if some were
 // mistakenly created before createExam()'s own guard was added.
-export async function computeTermResults(classId: string, academicYear: string, term: number, actorUid: string) {
+//
+// [MAINT 2026-10-22 - Continuous Assessment aggregation] Reads the CA
+// settings (Settings > Exam & Grading):
+//   OFF -> a subject's term mark is its released end-of-term exam alone.
+//   ON  -> a subject's term mark = CA subtotal + end-of-term exam points, using
+//          each CA slot's configured weight (see @shared/constants/exams for
+//          the exact rule and rounding). Only CA exams whose marks are FINAL
+//          count; drafts never leak into a result.
+// Subjects are those with a RELEASED end-of-term exam this term (unchanged).
+// All arithmetic is delegated to computeSubjectTermMark(); the overall
+// average/total are computed here in integer hundredths, never with
+// accumulated floats, and the overall grade is taken from the rounded
+// average so what is printed is what was graded.
+export async function computeTermResults(
+  classId: string, academicYear: string, term: number, actorUid: string,
+  opts: ComputeTermResultsOptions = {},
+) {
   const classRecord = await prisma.class.findUniqueOrThrow({ where: { id: classId }, select: { form: true } })
   const classForm: number = classRecord.form // e.g. 1, 2, 3, or 4
 
@@ -569,33 +714,110 @@ export async function computeTermResults(classId: string, academicYear: string, 
     )
   }
 
+  const ca = await getCaConfig()   // throws 409 if aggregation is on but misconfigured
+
   const students = await prisma.student.findMany({ where: { classId, status: 'ACTIVE' } })
-  const exams = await prisma.exam.findMany({
-    where: { classId, academicYear, term, status: 'RESULTS_RELEASED' },
+  const allExams = await prisma.exam.findMany({
+    where:   { classId, academicYear, term },
     include: { marks: true },
   })
+
+  // Subjects + their end-of-term exam(s): RELEASED end-of-term exams only.
+  const endBySubject = new Map<string, ExamWithMarks[]>()
+  for (const e of allExams) {
+    if (e.type !== 'END_TERM' || e.status !== 'RESULTS_RELEASED') continue
+    const list = endBySubject.get(e.subject) ?? []
+    list.push(e)
+    endBySubject.set(e.subject, list)
+  }
+  if (endBySubject.size === 0) {
+    throw Object.assign(
+      new Error(`No released end-of-term exams exist for this class in Term ${term} - there is nothing to compute. Release the end-of-term results first.`),
+      { status: 409 },
+    )
+  }
+
+  // Continuous assessments (aggregation ON): usable = a CA type, slotted within
+  // the configured count, marks final.
+  const caBySubjectSlot = new Map<string, Map<number, ExamWithMarks>>()
+  const caNotes: string[] = []
+  if (ca.enabled) {
+    for (const e of allExams) {
+      if (!isCaExamType(e.type)) continue
+      const usable = e.caSlot !== null && e.caSlot >= 1 && e.caSlot <= ca.count && CA_FINAL_STATUSES.includes(e.status)
+      if (!usable) {
+        const why = e.caSlot === null ? 'has no CA slot'
+          : e.caSlot > ca.count ? `uses CA ${e.caSlot}, but only ${ca.count} CA(s) are configured`
+          : 'marks are not finalised'
+        caNotes.push(`${e.subject}: "${e.title}" ${why} and was not counted.`)
+        continue
+      }
+      const bySlot = caBySubjectSlot.get(e.subject) ?? new Map<number, ExamWithMarks>()
+      bySlot.set(e.caSlot!, e)
+      caBySubjectSlot.set(e.subject, bySlot)
+    }
+
+    // Readiness: every subject needs a usable exam in every slot.
+    const gaps: string[] = []
+    for (const subject of endBySubject.keys()) {
+      const slots = caBySubjectSlot.get(subject)
+      const lacking: number[] = []
+      for (let slot = 1; slot <= ca.count; slot++) if (!slots?.has(slot)) lacking.push(slot)
+      if (lacking.length > 0) gaps.push(`${subject}: CA ${lacking.join(', CA ')}`)
+    }
+    if (gaps.length > 0 && !opts.allowIncompleteCa) {
+      throw Object.assign(
+        new Error(
+          `Continuous assessment is switched on, but some subjects are missing a finalised CA: ${gaps.join('; ')}. ` +
+          `Create/finalise those assessments first, or compute anyway to move the missing CA weight onto the end-of-term exam.`,
+        ),
+        { status: 409, missingCa: gaps },
+      )
+    }
+    for (const g of gaps) caNotes.push(`Missing CA - ${g} (weight moved to the end-of-term exam).`)
+  }
+
   const results: { studentId: string; average: number; points: number | null }[] = []
 
   for (const student of students) {
-    const subjectMap: Record<string, { marks: number[] }> = {}
-    for (const exam of exams) {
-      const mark = exam.marks.find((m) => m.studentId === student.id)
-      if (!subjectMap[exam.subject]) subjectMap[exam.subject] = { marks: [] }
-      if (mark && !mark.absent && mark.mark !== null)
-        subjectMap[exam.subject]!.marks.push((toNumber(mark.mark) / toNumber(exam.maxMark)) * 100)
+    type SubjectResult = {
+      average: number; grade: string; pass: boolean
+      ca?:   { slots: Array<number | null>; points: number; weight: number }
+      exam?: { points: number; weight: number }
     }
-    const subjectResults: Record<string, { average: number; grade: string; pass: boolean }> = {}
-    let totalAvg = 0, subjectCount = 0
-    for (const [subject, data] of Object.entries(subjectMap)) {
-      const avg = data.marks.length > 0 ? data.marks.reduce((a, b) => a + b, 0) / data.marks.length : 0
-      // gradeService.calcGrade() is the single grade-boundary authority
-      // anywhere in the codebase now — persisted exactly as returned, no
-      // local override.
-      const { grade, pass } = await calcGrade(avg, 'INTERNAL', classForm)
-      subjectResults[subject] = { average: Math.round(avg * 100) / 100, grade, pass }
-      totalAvg += avg; subjectCount++
+    const subjectResults: Record<string, SubjectResult> = {}
+    let totalCents = 0
+
+    for (const [subject, endExams] of endBySubject) {
+      const slotExams = caBySubjectSlot.get(subject)
+      const r = computeSubjectTermMark({
+        aggregate: ca.enabled,
+        weights:   ca.enabled ? ca.weights : [],
+        ca:        ca.enabled
+          ? ca.weights.map((_, i) => { const ex = slotExams?.get(i + 1); return ex ? toMarkComponent(ex, student.id) : null })
+          : [],
+        exam:      endExams.map((ex) => toMarkComponent(ex, student.id)),
+      })
+      // gradeService.calcGrade() is the single grade-boundary authority — fed the
+      // ROUNDED term mark, exactly what the report card prints.
+      const { grade, pass } = await calcGrade(r.finalPercent, 'INTERNAL', classForm)
+      subjectResults[subject] = {
+        average: r.finalPercent, grade, pass,
+        ...(r.aggregated
+          ? {
+              ca:   { slots: r.caSlotPercents, points: r.caPoints, weight: r.caWeight },
+              exam: { points: r.examPoints, weight: r.examWeight },
+            }
+          : {}),
+      }
+      totalCents += Math.round(r.finalPercent * 100)
     }
-    const overallAvg = subjectCount > 0 ? totalAvg / subjectCount : 0
+
+    const subjectCount = Object.keys(subjectResults).length
+    // Mean of the (already 2 d.p.) subject marks, rounded half-up in integers.
+    const overallCents = Math.floor((2 * totalCents + subjectCount) / (2 * subjectCount))
+    const overallAvg   = overallCents / 100
+    const totalMark    = totalCents / 100
 
     // [MSCE CORRECTION] The overall result is NOT calcGrade(overallAvg).
     // Forms 3-4 are assessed on the MSCE 1-9 scale, whose overall result is
@@ -609,34 +831,24 @@ export async function computeTermResults(classId: string, academicYear: string, 
     )
     const outcome = await computeInternalTermOutcome(classForm, gradeMap, overallAvg)
 
+    const fields = {
+      totalMark,
+      average:           overallAvg,
+      grade:             outcome.overallGrade,
+      aggregatePoints:   outcome.aggregatePoints,
+      aggregateSubjects: outcome.aggregateSubjects,
+      gradingTrack:      outcome.track,
+      passStatus:        outcome.pass,
+      subjectResults,
+    }
+    // totalMark is refreshed on UPDATE too (it used to be written on create
+    // only, so a recompute left a stale total on the report card).
     await prisma.termResult.upsert({
-      where: { studentId_academicYear_term: { studentId: student.id, academicYear, term } },
-      create: {
-        studentId: student.id, classId, academicYear, term,
-        totalMark:         subjectCount * overallAvg,
-        average:           Math.round(overallAvg * 100) / 100,
-        grade:             outcome.overallGrade,
-        aggregatePoints:   outcome.aggregatePoints,
-        aggregateSubjects: outcome.aggregateSubjects,
-        gradingTrack:      outcome.track,
-        passStatus:        outcome.pass,
-        subjectResults,
-      },
-      update: {
-        average:           Math.round(overallAvg * 100) / 100,
-        grade:             outcome.overallGrade,
-        aggregatePoints:   outcome.aggregatePoints,
-        aggregateSubjects: outcome.aggregateSubjects,
-        gradingTrack:      outcome.track,
-        passStatus:        outcome.pass,
-        subjectResults,
-      },
+      where:  { studentId_academicYear_term: { studentId: student.id, academicYear, term } },
+      create: { studentId: student.id, classId, academicYear, term, ...fields },
+      update: fields,
     })
-    results.push({
-      studentId: student.id,
-      average:   overallAvg,
-      points:    outcome.aggregatePoints,
-    })
+    results.push({ studentId: student.id, average: overallAvg, points: outcome.aggregatePoints })
   }
 
   // [MSCE CORRECTION] Ranking direction differs by track. On the MSCE track
@@ -664,8 +876,8 @@ export async function computeTermResults(classId: string, academicYear: string, 
       data: { position: i + 1, classPosition: i + 1, classTotal },
     }))
   )
-  logger.info({ event: 'term_results.computed', classId, academicYear, term, count: results.length, actorUid })
-  return { computed: results.length }
+  logger.info({ event: 'term_results.computed', classId, academicYear, term, count: results.length, caAggregated: ca.enabled, actorUid })
+  return { computed: results.length, caAggregated: ca.enabled, notes: caNotes }
 }
 
 // ─── MANEB ────────────────────────────────────────────────
