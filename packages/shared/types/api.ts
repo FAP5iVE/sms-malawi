@@ -379,6 +379,11 @@ export interface ApiPayment {
   receiptKey?: string
   receiptUrl?: string // signed URL from R2 — generated on request
   paidAt: string
+  notes?: string | null
+  /** Staff-only: who recorded the payment (GET /finances/balance/:id as staff). */
+  recordedByName?: string | null
+  /** Which fee line(s) this payment was applied to. */
+  allocations?: { id: string; amount: number; lineItem?: { feeName: string } }[]
 }
 
 export interface ApiExpense {

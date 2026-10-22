@@ -164,15 +164,30 @@ payrollRouter.get('/my-salary', verifyAuth, async (req, res) => {
 //      "Viewing Employee" picker in My Pay existing specifically so they
 //      can do that. Now checks the same canReadFile() the file proxy uses,
 //      so both layers agree on who's allowed in.
+// 3. [PRODUCTION FIX] Payslips with no stored PDF (every seeded/demo payslip, or
+//    one whose generation failed at run time) used to 404 "Payslip PDF not
+//    ready" permanently. The route now authorises FIRST (against the payslip
+//    category, using the row's owner — there may be no file key yet), then
+//    builds the PDF on demand via payrollService.ensurePayslipPdf(), the same
+//    self-heal GET /finances/payments/:id/receipt already does for receipts.
 payrollRouter.get('/payslips/:id/download', verifyAuth, async (req, res) => {
   const payslip = await prisma.payslip.findUniqueOrThrow({
     where: { id: String(req.params.id) },
   })
-  if (!payslip.payslipKey) return res.status(404).json({ error: 'Payslip PDF not ready' })
-  if (!canReadFile(payslip.payslipKey, req.user!.role, req.user!.uid, payslip.staffUid)) {
+  // 'payslip_x' is a synthetic id: canReadFile() only reads the prefix to pick
+  // the READ_ROLES list, so this checks access to the category + ownership.
+  if (!canReadFile('payslip_x', req.user!.role, req.user!.uid, payslip.staffUid)) {
     return res.status(403).json({ error: 'Access denied' })
   }
-  const url = await getSignedViewUrl(payslip.payslipKey)
+  let payslipKey = payslip.payslipKey
+  if (!payslipKey) {
+    try {
+      payslipKey = await payrollService.ensurePayslipPdf(payslip.id)
+    } catch (err) {
+      return sendError(res, err, { tags: { module: 'payroll', route: 'payslip-regenerate' } })
+    }
+  }
+  const url = await getSignedViewUrl(payslipKey)
   res.json({ url })
 })
 

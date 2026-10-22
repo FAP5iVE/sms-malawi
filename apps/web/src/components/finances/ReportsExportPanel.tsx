@@ -13,6 +13,7 @@ import { getAuth } from 'firebase/auth'
 import { Download, Loader2, Eye, EyeOff } from 'lucide-react'
 import { buildApiUrl, apiFetch } from '@/lib/api-client'
 import { formatMWK } from '@shared/constants/malawi'
+import { downloadProtectedFile } from '@/lib/pdfPreview'
 
 interface ReportDef {
   type: string
@@ -102,7 +103,7 @@ export function ReportsExportPanel({ academicYear, term }: { academicYear: strin
       })
       if (!res.ok) throw new Error(`Export failed: ${res.status}`)
       const { downloadUrl } = (await res.json()) as { downloadUrl: string }
-      window.open(downloadUrl, '_blank', 'noopener,noreferrer')
+      await downloadProtectedFile(downloadUrl, `${type}.xlsx`)
     } catch (err) {
       console.error('Export error:', err)
       alert('Export failed. Please try again.')

@@ -284,7 +284,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
                 <span>
                   Classes are summarised separately because Forms 1–2 are graded on the
                   JCE letter scale and Forms 3–4 on the MSCE points scale. Select a single
-                  class — or a form&apos;s combined streams above to see its Top and Bottom 10.
+                  class or a form&apos;s combined streams above to see its Top and Bottom 10.
                 </span>
               </div>
               <PerClassTable rows={data.perClass} />
@@ -476,7 +476,7 @@ export function StudentAnalyticsPanel({ studentId, academicYear, term }: Student
         </div>
         {pts && (
           <p className="text-[11px] text-muted mt-2">
-            Points are your MSCE aggregate — lower is better, so the &qout;best&qout; points figure is the lowest total.
+            Points are your MSCE aggregate — lower is better, so the best points figure is the lowest total.
           </p>
         )}
       </div>

@@ -72,9 +72,11 @@ import {
   useRecordPayment,
   useAddInvoiceLineItem,
   useFetchReceipt,
+  useStudentBalance,
+  useStudentCredits,
 } from '@/hooks/useFinances'
 import { ApiError } from '@/lib/api-client'
-import { formatMWK, FEE_CATEGORY_LABELS, PAYMENT_METHOD_OPTIONS } from '@shared/constants/malawi'
+import { formatMWK, FEE_CATEGORY_LABELS, PAYMENT_METHOD_OPTIONS, PAYMENT_METHOD_LABELS } from '@shared/constants/malawi'
 import type { ApiInvoice, ApiFeeStructure } from '@shared/types/api'
 import { InvoiceNotes } from '@/components/finances/InvoiceNotes'
 import { StudentPortalStatementTab } from '@/components/finances/StudentPortalStatementTab'
@@ -205,8 +207,6 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
   const generateInvoice = useGenerateInvoice()
   const recordPayment = useRecordPayment()
   const addLineItem = useAddInvoiceLineItem()
-  const fetchReceipt = useFetchReceipt()
-
   const isNewInvoice = !existingInvoice
   const isBusy = generateInvoice.isPending || recordPayment.isPending || addLineItem.isPending
 
@@ -869,39 +869,12 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
         )}
       </div>
 
+      {/* Finance: the selected student's complete fee payment history (all
+          terms and years), not just this term's invoice. */}
+      {selectedStudent && <StudentPaymentHistory studentId={selectedStudent.id} />}
+
       {existingInvoice && (
         <div className="space-y-4">
-          {existingInvoice.payments && existingInvoice.payments.length > 0 && (
-            <div className="overflow-hidden">
-              <div className="px-4 py-3 border-b border-base">
-                <h3 className="font-heading text-sm font-semibold text-body">
-                  Payments &amp; Receipts
-                </h3>
-              </div>
-              <ul className="divide-y divide-base">
-                {existingInvoice.payments.map((p) => (
-                  <li key={p.id} className="px-4 py-2.5 flex items-center justify-between gap-2">
-                    <div className="text-sm">
-                      <span className="tabular font-medium text-body">{formatMWK(p.amount)}</span>
-                      <span className="text-muted">
-                        {' '}
-                        &middot; {new Date(p.paidAt).toLocaleDateString('en-GB')}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={fetchReceipt.isPending}
-                     onClick={() => fetchReceipt.mutate(p.id)}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-brand-teal hover:underline disabled:opacity-50"
-                    >
-                      <ReceiptIcon className="w-3.5 h-3.5" /> View Receipt{' '}
-                      <ExternalLink className="w-3 h-3" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
           <InvoiceNotes invoiceId={existingInvoice.id} />
         </div>
       )}
@@ -913,6 +886,173 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
           onCancel={() => setOverpaymentPrompt(null)}
           onConfirm={() => submit(true)}
         />
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// FEE PAYMENT HISTORY — finance staff: every payment a student has made, across
+// all terms and years, with the invoice it settled, which fee lines it paid,
+// who recorded it and a link to its receipt. Replaces the old "Payments &
+// Receipts" list, which only showed the current term's invoice. Data comes from
+// the existing GET /finances/balance/:studentId (academicYear=all).
+// ─────────────────────────────────────────────────────────────────────────
+
+function StudentPaymentHistory({ studentId }: { studentId: string }) {
+  const { data, isLoading, isError } = useStudentBalance(studentId, 'all')
+  const { data: credits = [] } = useStudentCredits(studentId)
+  const fetchReceipt = useFetchReceipt()
+  const [yearFilter, setYearFilter] = useState('all')
+
+  const invoices = useMemo(() => data?.invoices ?? [], [data?.invoices])
+  const years = useMemo(
+    () => [...new Set(invoices.map((i) => i.academicYear))].sort().reverse(),
+    [invoices],
+  )
+  const shownInvoices = useMemo(
+    () => (yearFilter === 'all' ? invoices : invoices.filter((i) => i.academicYear === yearFilter)),
+    [invoices, yearFilter],
+  )
+  const payments = useMemo(
+    () =>
+      shownInvoices
+        .flatMap((inv) =>
+          (inv.payments ?? []).map((p) => ({
+            ...p,
+            invoiceNumber: inv.invoiceNumber,
+            academicYear: inv.academicYear,
+            term: inv.term,
+          })),
+        )
+        .sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()),
+    [shownInvoices],
+  )
+
+  const billed = shownInvoices.reduce((sum, i) => sum + Number(i.totalAmount), 0)
+  const paid = shownInvoices.reduce((sum, i) => sum + Number(i.paidAmount), 0)
+  const outstanding = shownInvoices.reduce((sum, i) => sum + Number(i.balance), 0)
+  const creditTotal = credits.reduce((sum, c) => sum + Number(c.amount), 0)
+
+  return (
+    <div className="overflow-hidden space-y-4">
+      <div className="px-4 py-3 border-b border-base flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="font-heading text-sm font-semibold text-body">
+          Fee Payment History ({payments.length} payment{payments.length === 1 ? '' : 's'})
+        </h3>
+        {years.length > 1 && (
+          <select
+            value={yearFilter}
+            onChange={(e) => setYearFilter(e.target.value)}
+            aria-label="Filter payment history by academic year"
+            className="border border-base rounded-lg px-2.5 py-1.5 text-xs bg-surface text-body min-h-9"
+          >
+            <option value="all">All years</option>
+            {years.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="px-4"><div className="h-24 rounded-lg bg-page animate-pulse" /></div>
+      ) : isError ? (
+        <p className="px-4 text-sm text-status-danger">Could not load this student&rsquo;s payment history.</p>
+      ) : invoices.length === 0 ? (
+        <p className="px-4 pb-4 text-sm text-muted">No invoices have been issued to this student yet.</p>
+      ) : (
+        <>
+          <div className="px-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: 'Total billed', value: billed },
+              { label: 'Total paid', value: paid },
+              { label: 'Outstanding', value: outstanding },
+              { label: 'Advance credit', value: creditTotal },
+            ].map((c) => (
+              <div key={c.label} className="rounded-lg border border-base px-3 py-2">
+                <p className="text-xs text-muted">{c.label}</p>
+                <p className="font-heading font-semibold text-body tabular">{formatMWK(c.value)}</p>
+              </div>
+            ))}
+          </div>
+
+          {payments.length === 0 ? (
+            <p className="px-4 text-sm text-muted">No payments recorded{yearFilter === 'all' ? '' : ` for ${yearFilter}`}.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-170">
+                <thead>
+                  <tr className="border-b border-base bg-page text-left text-xs uppercase tracking-wide text-muted">
+                    <th className="px-4 py-2.5 font-semibold">Date</th>
+                    <th className="px-4 py-2.5 font-semibold">Invoice</th>
+                    <th className="px-4 py-2.5 font-semibold">Method / Ref</th>
+                    <th className="px-4 py-2.5 font-semibold">Applied to</th>
+                    <th className="px-4 py-2.5 font-semibold">Recorded by</th>
+                    <th className="px-4 py-2.5 font-semibold text-right">Amount</th>
+                    <th className="px-4 py-2.5" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((p) => (
+                    <tr key={p.id} className="border-b border-base last:border-0 align-top">
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {new Date(p.paidAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-mono text-xs">{p.invoiceNumber}</p>
+                        <p className="text-xs text-muted">{p.academicYear} &middot; Term {p.term}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p>{PAYMENT_METHOD_LABELS[p.method as keyof typeof PAYMENT_METHOD_LABELS] ?? p.method}</p>
+                        {p.reference && <p className="text-xs text-muted font-mono">{p.reference}</p>}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted">
+                        {p.allocations && p.allocations.length > 0
+                          ? p.allocations.map((a) => (
+                              <p key={a.id}>{a.lineItem?.feeName ?? 'Fee'}: {formatMWK(Number(a.amount))}</p>
+                            ))
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-xs">{p.recordedByName ?? '—'}</td>
+                      <td className="px-4 py-3 text-right tabular font-semibold whitespace-nowrap">
+                        {formatMWK(Number(p.amount))}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          disabled={fetchReceipt.isPending}
+                          onClick={() => fetchReceipt.mutate(p.id)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-brand-teal hover:underline disabled:opacity-50 whitespace-nowrap"
+                        >
+                          <ReceiptIcon className="w-3.5 h-3.5" /> View Receipt <ExternalLink className="w-3 h-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="px-4 pb-4">
+            <p className="text-xs uppercase tracking-wide text-muted font-semibold mb-2">Invoices</p>
+            <ul className="divide-y divide-base border border-base rounded-lg">
+              {shownInvoices.map((inv) => (
+                <li key={inv.id} className="px-3 py-2 flex items-center justify-between gap-3 flex-wrap text-xs">
+                  <span>
+                    <span className="font-mono">{inv.invoiceNumber}</span>
+                    <span className="text-muted"> &middot; {inv.academicYear} Term {inv.term}</span>
+                  </span>
+                  <span className="tabular">
+                    {formatMWK(Number(inv.paidAmount))} of {formatMWK(Number(inv.totalAmount))}
+                    <span className={`ml-2 font-semibold ${STATUS_COLORS[inv.status] ?? ''}`}>{inv.status}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
       )}
     </div>
   )

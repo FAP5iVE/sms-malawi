@@ -437,8 +437,34 @@ financesRouter.get(
       }
       id = student.id
     }
-    const result = await feeService.getStudentBalance(id, await yearFrom(req.query.academicYear))
-    res.json(serializeDecimals(result))
+    // [FINANCE PAYMENT HISTORY] Staff may pass academicYear=all to get the
+    // student's invoices + payments across every year (the full fee payment
+    // history). Students are always limited to one year, as before.
+    const isStaff = req.user!.role !== 'student'
+    const allYears = isStaff && req.query.academicYear === 'all'
+    const result = await feeService.getStudentBalance(
+      id,
+      allYears ? undefined : await yearFrom(req.query.academicYear),
+    )
+    if (!isStaff) return res.json(serializeDecimals(result))
+
+    // Staff also see WHO recorded each payment (Payment.recordedByUid is a
+    // plain Firebase-UID string with no Prisma relation, so resolve manually).
+    const uids = [...new Set(result.invoices.flatMap((inv) => inv.payments.map((p) => p.recordedByUid)))]
+    const profiles = uids.length
+      ? await prisma.staffProfile.findMany({
+          where: { uid: { in: uids } },
+          select: { uid: true, firstName: true, lastName: true },
+        })
+      : []
+    const nameByUid = new Map(profiles.map((s) => [s.uid, `${s.firstName} ${s.lastName}`]))
+    res.json(serializeDecimals({
+      ...result,
+      invoices: result.invoices.map((inv) => ({
+        ...inv,
+        payments: inv.payments.map((p) => ({ ...p, recordedByName: nameByUid.get(p.recordedByUid) ?? null })),
+      })),
+    }))
   }
 )
 

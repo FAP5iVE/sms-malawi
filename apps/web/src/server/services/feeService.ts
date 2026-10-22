@@ -104,13 +104,21 @@ export async function checkBalanceGate(
 // everything it needs in this one call. Previously returned bare Invoice
 // rows with neither relation, which is what left that section of the
 // student finance view permanently empty.
-export async function getStudentBalance(studentId: string, academicYear: string) {
+//
+// [FINANCE PAYMENT HISTORY] `academicYear` is now optional: omit it for the
+// student's invoices across EVERY year (the finance "Fee Payment History"
+// panel in InvoicesTab). Each payment also carries its allocations (which fee
+// line each part of it paid) so the history can show where the money went.
+export async function getStudentBalance(studentId: string, academicYear?: string) {
   const invoices = await prisma.invoice.findMany({
-    where: { studentId, academicYear },
-    orderBy: { term: 'asc' },
+    where: { studentId, ...(academicYear ? { academicYear } : {}) },
+    orderBy: [{ academicYear: 'asc' }, { term: 'asc' }],
     include: {
       lineItems: true,
-      payments: { orderBy: { paidAt: 'desc' } },
+      payments: {
+        orderBy: { paidAt: 'desc' },
+        include: { allocations: { include: { lineItem: { select: { feeName: true } } } } },
+      },
     },
   })
   const totalBalance = invoices.reduce(

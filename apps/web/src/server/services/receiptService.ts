@@ -31,39 +31,118 @@
  *      category (RECEIPT / PAYSLIP) and return `.fileId`.
  * [DEPENDS ON]: payrollService.ts (passes pensionPercent through, same
  *   phase)
+ *
+ * [CHANGE TYPE]: MAJOR REWRITE OF THE RENDERING ENGINE (same exports/signatures)
+ * [PURPOSE]: "Payslips and payment receipts never open, but report cards do."
+ *   Report cards and transcripts are drawn with jsPDF (pure JavaScript, runs
+ *   anywhere). Receipts and payslips were the only documents drawn by launching
+ *   headless Chromium (puppeteer-core + @sparticuz/chromium) inside the request
+ *   — and, for payslips, once per employee inside the payroll DB transaction.
+ *   Chromium cannot launch in the dev/seed/serverless environments that lack it,
+ *   so generation threw, receiptKey/payslipKey stayed null, and every preview
+ *   answered 404/500 (feeService.recordPayment deliberately swallows the
+ *   failure; the seed script documents "safely no-ops without storage/chromium").
+ *   Both documents are now drawn with jsPDF using the same branding helper
+ *   (pdfBranding.drawLogoBadge + schoolLogoService.getRasterSchoolLogo) as the
+ *   report card and transcript, so they work wherever those work.
+ *   generateReceipt()/generatePayslipPdf() keep their signatures and still
+ *   return the Appwrite fileId.
+ * [DEPENDS ON]: jspdf, pdfBranding.ts, schoolLogoService.ts
  */
 
-import puppeteer from 'puppeteer-core'
-import chromium from '@sparticuz/chromium'
+import { jsPDF } from 'jspdf'
 import { uploadFile, FILE_PREFIX } from '@/lib/storage'
 import { formatMWK } from '@shared/constants/malawi'
-import { escapeHtml } from '@/lib/escapeHtml'
-import { getSchoolLogo } from '@/server/services/schoolLogoService'
+import { getRasterSchoolLogo } from '@/server/services/schoolLogoService'
 import { getIdentitySettings } from '@/server/services/settingsService'
-import { LETTERHEAD_CSS, letterheadHtml } from '@/server/templates/documents/letterhead'
+import { drawLogoBadge } from '@/server/services/pdfBranding'
 
-async function launchBrowser() {
-  const isLocal = process.env.NODE_ENV !== 'production'
-  if (isLocal) {
-    // Use system Chrome in local dev — avoids needing to download Chromium
-    const executablePath =
-      process.platform === 'win32'
-        ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-        : process.platform === 'darwin'
-          ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-          : '/usr/bin/google-chrome'
-    return puppeteer.launch({
-      executablePath,
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    })
+interface DocBranding {
+  schoolName: string
+  schoolAddress: string
+  schoolPhone: string
+  schoolEmail: string
+}
+
+// --- SHARED jsPDF DRAWING HELPERS -------------------------
+const PAGE_W = 210
+const MARGIN = 20
+const CONTENT_W = PAGE_W - MARGIN * 2
+const NAVY: [number, number, number] = [15, 39, 68]
+const GREEN: [number, number, number] = [14, 138, 106]
+const MUTED: [number, number, number] = [100, 116, 139]
+const INK: [number, number, number] = [26, 37, 53]
+const RULE: [number, number, number] = [221, 228, 236]
+
+/** jsPDF's built-in Helvetica is WinAnsi only; Intl's currency output uses a
+ *  non-breaking space, which is safe, but normalise it so widths are predictable. */
+function pdfText(value: string | number): string {
+  return String(value).replace(/[\u00a0\u202f]/g, ' ')
+}
+
+/** Draws the navy letterhead (logo badge + school name + contact line + title).
+ *  @returns the y position (mm) where the document body should start. */
+function drawLetterhead(doc: jsPDF, logoDataUri: string, branding: DocBranding, title: string): number {
+  const top = 20
+  doc.setFillColor(NAVY[0], NAVY[1], NAVY[2])
+  doc.roundedRect(MARGIN, top, CONTENT_W, 26, 2, 2, 'F')
+  drawLogoBadge(doc, logoDataUri, MARGIN + 3, top + 3, 20)
+
+  const textX = MARGIN + 26 + (CONTENT_W - 26) / 2
+  doc.setTextColor(255, 255, 255)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(14)
+  const nameLines = doc.splitTextToSize(pdfText(branding.schoolName), CONTENT_W - 32) as string[]
+  doc.text(nameLines[0] ?? '', textX, top + 11, { align: 'center' })
+
+  const contact = [branding.schoolAddress, branding.schoolPhone, branding.schoolEmail]
+    .map((l) => (l ?? '').trim())
+    .filter(Boolean)
+    .join('  ·  ')
+  if (contact) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(183, 196, 214)
+    const contactLines = doc.splitTextToSize(pdfText(contact), CONTENT_W - 32) as string[]
+    doc.text(contactLines[0] ?? '', textX, top + 18, { align: 'center' })
   }
-  // Vercel production: use @sparticuz/chromium
-  // v133+ only exposes: args, executablePath() — NOT defaultViewport or headless
-  return puppeteer.launch({
-    args: chromium.args,
-    executablePath: await chromium.executablePath(),
-  })
+
+  doc.setTextColor(NAVY[0], NAVY[1], NAVY[2])
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.text(pdfText(title).toUpperCase(), MARGIN, top + 38)
+  return top + 46
+}
+
+interface DocRow { label: string; value: string; emphasis?: boolean }
+
+/** Draws label/value rows with a hairline under each. @returns the next free y. */
+function drawRows(doc: jsPDF, startY: number, rows: DocRow[]): number {
+  let y = startY
+  for (const r of rows) {
+    const c = r.emphasis ? GREEN : MUTED
+    doc.setFont('helvetica', r.emphasis ? 'bold' : 'normal')
+    doc.setFontSize(r.emphasis ? 12 : 10)
+    doc.setTextColor(c[0], c[1], c[2])
+    doc.text(pdfText(r.label), MARGIN + 3, y)
+    const v = r.emphasis ? GREEN : INK
+    doc.setTextColor(v[0], v[1], v[2])
+    doc.text(pdfText(r.value), MARGIN + CONTENT_W - 3, y, { align: 'right' })
+    doc.setDrawColor(RULE[0], RULE[1], RULE[2])
+    doc.line(MARGIN, y + 3, MARGIN + CONTENT_W, y + 3)
+    y += 9
+  }
+  return y
+}
+
+function drawFooter(doc: jsPDF): void {
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2])
+  doc.text(
+    pdfText(`Generated on ${new Date().toLocaleDateString('en-GB')}. This is a computer-generated document.`),
+    PAGE_W / 2, 282, { align: 'center' },
+  )
 }
 
 // --- PAYMENT RECEIPT PDF ----------------------------------
@@ -79,24 +158,11 @@ export async function generateReceipt(
   // Both real gaps, now closed: branding is the school's real identity
   // (getSchoolBranding(), same helper notificationService.ts already
   // uses), receiptPrefix is SETTING_KEYS receipt_prefix.
-  branding: { schoolName: string; schoolAddress: string; schoolPhone: string; schoolEmail: string },
+  branding: DocBranding,
   receiptPrefix: string,
 ): Promise<string> {
-  const logo = await getSchoolLogo()
-  const browser = await launchBrowser()
-  let pdfBuffer: Buffer
-  try {
-    const page = await browser.newPage()
-    await page.setContent(
-      buildReceiptHtml({ paymentId, invoice, payment, student, branding, receiptPrefix, logoDataUri: logo.dataUri }),
-      { waitUntil: 'load' },   // 'networkidle0' removed in puppeteer-core v24
-    )
-    pdfBuffer = Buffer.from(await page.pdf({ format: 'A4', printBackground: true }))
-  } finally {
-    // Previously a render error leaked the Chromium process (browser.close()
-    // was skipped) — on a warm serverless instance that compounds failures.
-    await browser.close()
-  }
+  const logo = await getRasterSchoolLogo()
+  const pdfBuffer = buildReceiptPdf({ paymentId, invoice, payment, student, branding, receiptPrefix, logoDataUri: logo.dataUri })
   const filename = `receipt_${paymentId}.pdf`
   const uploaded = await uploadFile(FILE_PREFIX.RECEIPT, pdfBuffer, filename, 'application/pdf')
   return uploaded.fileId
@@ -120,113 +186,87 @@ export async function generatePayslipPdf(
   month: number,
   year: number
 ): Promise<string> {
+  void payslipId
   const monthName = new Date(year, month - 1).toLocaleString('en-MW', { month: 'long' })
-  const [logo, identity] = await Promise.all([getSchoolLogo(), getIdentitySettings()])
-  const browser = await launchBrowser()
-  let pdfBuffer: Buffer
-  try {
-    const page = await browser.newPage()
-    await page.setContent(
-      buildPayslipHtml({
-        ...data, monthName, year,
-        logoDataUri: logo.dataUri,
-        branding: {
-          schoolName: identity.schoolName,
-          schoolAddress: identity.schoolAddress,
-          schoolPhone: identity.schoolPhone,
-          schoolEmail: identity.schoolEmail,
-        },
-      }),
-      { waitUntil: 'load' },
-    )
-    pdfBuffer = Buffer.from(await page.pdf({ format: 'A4', printBackground: true }))
-  } finally {
-    await browser.close()
-  }
+  const [logo, identity] = await Promise.all([getRasterSchoolLogo(), getIdentitySettings()])
+  const pdfBuffer = buildPayslipPdf({
+    ...data, monthName, year,
+    logoDataUri: logo.dataUri,
+    branding: {
+      schoolName: identity.schoolName,
+      schoolAddress: identity.schoolAddress,
+      schoolPhone: identity.schoolPhone,
+      schoolEmail: identity.schoolEmail,
+    },
+  })
   const filename = `payslip_${data.staffUid}_${year}-${String(month).padStart(2, '0')}.pdf`
   const uploaded = await uploadFile(FILE_PREFIX.PAYSLIP, pdfBuffer, filename, 'application/pdf')
   return uploaded.fileId
 }
 
-// --- HTML TEMPLATES ---------------------------------------
-function buildReceiptHtml(d: {
+// --- PDF BUILDERS -----------------------------------------
+function buildReceiptPdf(d: {
   paymentId: string
   invoice: { id: string; studentId: string; academicYear: string; term: number }
   payment: { amount: number; method: string; reference?: string | null; recordedAt: Date }
   student: { firstName: string; lastName: string; registrationNo: string }
-  branding: { schoolName: string; schoolAddress: string; schoolPhone: string; schoolEmail: string }
+  branding: DocBranding
   receiptPrefix: string
   logoDataUri: string
-}): string {
+}): Buffer {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const receiptNo = `${d.receiptPrefix}-${d.paymentId.slice(0, 8).toUpperCase()}`
-  const e = escapeHtml
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <style>
-    body{font-family:Arial,sans-serif;color:#1A2535;padding:40px;}
-    ${LETTERHEAD_CSS}
-    .body{padding:24px;border:1px solid #DDE4EC;border-top:none;border-radius:0 0 8px 8px;}
-    table{width:100%;border-collapse:collapse;margin-top:16px;}
-    td{padding:8px;border-bottom:1px solid #EEE;font-size:13px;}
-    td:first-child{color:#64748B;width:40%;}
-    .amount{font-size:24px;font-weight:700;color:#0E8A6A;margin:16px 0;}
-  </style></head>
-  <body>
-    ${letterheadHtml({
-      logoDataUri: d.logoDataUri,
-      schoolName: d.branding.schoolName,
-      contactLines: [d.branding.schoolAddress, d.branding.schoolPhone, d.branding.schoolEmail],
-      documentTitle: 'Payment Receipt',
-    })}
-    <div class="body">
-      <p class="amount">${e(formatMWK(d.payment.amount))}</p>
-      <table>
-        <tr><td>Receipt No</td><td>${e(receiptNo)}</td></tr>
-        <tr><td>Student</td><td>${e(d.student.firstName)} ${e(d.student.lastName)}</td></tr>
-        <tr><td>Reg No</td><td>${e(d.student.registrationNo)}</td></tr>
-        <tr><td>Academic Year</td><td>${e(d.invoice.academicYear)}</td></tr>
-        <tr><td>Term</td><td>${e(d.invoice.term)}</td></tr>
-        <tr><td>Method</td><td>${e(d.payment.method)}</td></tr>
-        ${d.payment.reference ? `<tr><td>Reference</td><td>${e(d.payment.reference)}</td></tr>` : ''}
-        <tr><td>Date</td><td>${e(d.payment.recordedAt.toLocaleDateString('en-MW'))}</td></tr>
-      </table>
-    </div>
-  </body></html>`
+  let y = drawLetterhead(doc, d.logoDataUri, d.branding, 'Payment Receipt')
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(22)
+  doc.setTextColor(GREEN[0], GREEN[1], GREEN[2])
+  doc.text(pdfText(formatMWK(d.payment.amount)), MARGIN + 3, y + 4)
+  y += 16
+
+  const rows: DocRow[] = [
+    { label: 'Receipt No', value: receiptNo },
+    { label: 'Student', value: `${d.student.firstName} ${d.student.lastName}` },
+    { label: 'Reg No', value: d.student.registrationNo },
+    { label: 'Academic Year', value: d.invoice.academicYear },
+    { label: 'Term', value: String(d.invoice.term) },
+    { label: 'Method', value: d.payment.method },
+  ]
+  if (d.payment.reference) rows.push({ label: 'Reference', value: d.payment.reference })
+  rows.push({ label: 'Date', value: d.payment.recordedAt.toLocaleDateString('en-MW') })
+  drawRows(doc, y, rows)
+  drawFooter(doc)
+  return Buffer.from(doc.output('arraybuffer'))
 }
 
-function buildPayslipHtml(data: {
+function buildPayslipPdf(data: {
   staffUid: string; staffName: string; grossSalary: number
   paye: number; pension: number; pensionPercent: number; loanDeduction: number; netSalary: number
   monthName: string; year: number
   logoDataUri: string
-  branding: { schoolName: string; schoolAddress: string; schoolPhone: string; schoolEmail: string }
-}): string {
-  const e = escapeHtml
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <style>
-    body{font-family:Arial,sans-serif;color:#1A2535;padding:40px;}
-    ${LETTERHEAD_CSS}
-    .body{padding:24px;border:1px solid #DDE4EC;border-top:none;border-radius:0 0 8px 8px;}
-    table{width:100%;border-collapse:collapse;margin-top:16px;}
-    td{padding:8px;border-bottom:1px solid #EEE;font-size:13px;}
-    td:first-child{color:#64748B;width:50%;}
-    .net{font-size:20px;font-weight:700;color:#0E8A6A;}
-  </style></head>
-  <body>
-    ${letterheadHtml({
-      logoDataUri: data.logoDataUri,
-      schoolName: data.branding.schoolName,
-      contactLines: [data.branding.schoolAddress, data.branding.schoolPhone, data.branding.schoolEmail],
-      documentTitle: `Payslip — ${data.monthName} ${data.year}`,
-    })}
-    <div class="body">
-      <p><strong>${e(data.staffName)}</strong> | UID: ${e(data.staffUid)}</p>
-      <table>
-        <tr><td>Gross Salary</td><td>${e(formatMWK(data.grossSalary))}</td></tr>
-        <tr><td>PAYE Tax</td><td>- ${e(formatMWK(data.paye))}</td></tr>
-        <tr><td>Pension (${e(data.pensionPercent)}%)</td><td>- ${e(formatMWK(data.pension))}</td></tr>
-        ${data.loanDeduction > 0 ? `<tr><td>Loan Deduction</td><td>- ${e(formatMWK(data.loanDeduction))}</td></tr>` : ''}
-        <tr><td class="net">Net Pay</td><td class="net">${e(formatMWK(data.netSalary))}</td></tr>
-      </table>
-    </div>
-  </body></html>`
+  branding: DocBranding
+}): Buffer {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  let y = drawLetterhead(doc, data.logoDataUri, data.branding, `Payslip — ${data.monthName} ${data.year}`)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(INK[0], INK[1], INK[2])
+  doc.text(pdfText(data.staffName), MARGIN + 3, y)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(MUTED[0], MUTED[1], MUTED[2])
+  doc.text(pdfText(`UID: ${data.staffUid}`), MARGIN + 3, y + 5)
+  y += 14
+
+  const rows: DocRow[] = [
+    { label: 'Gross Salary', value: formatMWK(data.grossSalary) },
+    { label: 'PAYE Tax', value: `- ${formatMWK(data.paye)}` },
+    { label: `Pension (${data.pensionPercent}%)`, value: `- ${formatMWK(data.pension)}` },
+  ]
+  if (data.loanDeduction > 0) rows.push({ label: 'Loan Deduction', value: `- ${formatMWK(data.loanDeduction)}` })
+  rows.push({ label: 'Net Pay', value: formatMWK(data.netSalary), emphasis: true })
+  drawRows(doc, y, rows)
+  drawFooter(doc)
+  return Buffer.from(doc.output('arraybuffer'))
 }

@@ -495,6 +495,51 @@ export async function getStaffPayslips(staffUid: string) {
  * not the stale flat SalaryStructure.allowances/loanBalance columns
  * confirmed to have zero readers elsewhere in this file.
  */
+/**
+ * Returns the payslip's PDF key, generating and saving the PDF first if the
+ * payslip has none. Mirrors feeService.ensurePaymentReceipt().
+ *
+ * [PRODUCTION FIX] Payslip rows can legitimately exist without a file: payroll
+ * runs created by the seed/demo script never generate one, and a storage or
+ * rendering failure at run time leaves payslipKey null. GET
+ * /payroll/payslips/:id/download used to answer 404 "Payslip PDF not ready"
+ * for those forever, so "View Payslip" failed for every payslip in that state.
+ * It now builds the PDF on first view from the figures already stored on the
+ * Payslip row (no recalculation — the PDF always matches what was paid).
+ * Idempotent: an existing payslipKey is returned as-is.
+ */
+export async function ensurePayslipPdf(payslipId: string): Promise<string> {
+  const payslip = await prisma.payslip.findUniqueOrThrow({
+    where: { id: payslipId },
+    include: { payrollRun: { select: { month: true, year: true } } },
+  })
+  if (payslip.payslipKey) return payslip.payslipKey
+
+  const gross = Number(payslip.grossSalary)
+  const pension = Number(payslip.pension)
+  // The rate that was actually applied, recovered from the stored amounts so a
+  // later change to the pension setting cannot rewrite history.
+  const pensionPercent = gross > 0 ? Math.round((pension / gross) * 10000) / 100 : 0
+
+  const payslipKey = await generatePayslipPdf(
+    payslip.id,
+    {
+      staffUid: payslip.staffUid,
+      staffName: payslip.staffName,
+      grossSalary: gross,
+      paye: Number(payslip.paye),
+      pension,
+      pensionPercent,
+      loanDeduction: Number(payslip.loanDeduction),
+      netSalary: Number(payslip.netSalary),
+    },
+    payslip.payrollRun.month,
+    payslip.payrollRun.year,
+  )
+  await prisma.payslip.update({ where: { id: payslip.id }, data: { payslipKey } })
+  return payslipKey
+}
+
 export async function getMySalaryStructure(staffUid: string): Promise<ApiSalaryStructure | null> {
   const [salary, staff, allowances] = await Promise.all([
     prisma.salaryStructure.findUnique({ where: { staffUid } }),

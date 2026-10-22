@@ -92,6 +92,42 @@ export function buildPdfPreviewUrl(rawUrl: string, token: string, origin: string
 }
 
 /**
+ * Downloads a protected file (e.g. a financial report .xlsx) that cannot be
+ * shown in the browser's viewer. Same /api/files/<id> proxy and same validation
+ * as openPdfPreview(), but sends the ID token in an Authorization header and
+ * saves the response as a file — the raw Appwrite URL these exports used to
+ * return is refused for private files.
+ */
+export async function downloadProtectedFile(rawUrl: string, fallbackName = 'download'): Promise<void> {
+  const user = getAuth().currentUser
+  if (!user) throw new PdfPreviewError('Your session has expired. Please sign in again.')
+  const token = await user.getIdToken()
+
+  // Reuse the proxy-path validation, then move the token into a header.
+  const checked = new URL(buildPdfPreviewUrl(rawUrl, token, window.location.origin))
+  checked.searchParams.delete('token')
+
+  const res = await fetch(checked.toString(), { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) {
+    throw new PdfPreviewError(
+      res.status === 403 ? 'You do not have permission to download this file.' : `Download failed (${res.status}).`,
+    )
+  }
+  const disposition = res.headers.get('Content-Disposition') ?? ''
+  const match = /filename\*=UTF-8''([^;]+)/i.exec(disposition)
+  const filename = match?.[1] ? safeDecode(match[1]) : fallbackName
+
+  const blobUrl = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000)
+}
+
+/**
  * Opens a stored PDF in a new browser tab, in the browser's native viewer.
  *
  * Call it directly from a click handler (or from a mutationFn started by one).

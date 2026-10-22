@@ -28,7 +28,7 @@
 import 'server-only'
 import ExcelJS from 'exceljs'
 import { prisma } from '@/lib/prisma'
-import { uploadFile, getDownloadUrl, FILE_PREFIX } from '@/lib/storage'
+import { uploadFile, getSignedViewUrl, FILE_PREFIX } from '@/lib/storage'
 import { formatMWK } from '@shared/constants/malawi'
 import { getRasterSchoolLogo } from '@/server/services/schoolLogoService'
 import { getIdentitySettings } from '@/server/services/settingsService'
@@ -80,8 +80,13 @@ export async function generateFinancialReport(
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   )
 
-  // Return a download URL so the frontend can download it
-  return getDownloadUrl(FILE_PREFIX.FINANCIAL_REPORT, uploaded.fileId)
+  // [PRODUCTION FIX] Returned getDownloadUrl() — a raw Appwrite REST URL. The
+  // financial_report files are private (not in PUBLIC_FILE_PREFIXES), so that
+  // URL is refused by Appwrite for every caller and the export "worked" but the
+  // download never did. Return this app's auth-checked /api/files/<id> proxy
+  // URL instead (READ_ROLES.financial_report = admin/finance/high_rank); the
+  // client downloads it with the caller's ID token (downloadProtectedFile).
+  return getSignedViewUrl(uploaded.fileId)
 }
 
 // --- SHEET BUILDERS --------------------------------------
