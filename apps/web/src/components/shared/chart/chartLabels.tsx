@@ -190,3 +190,31 @@ export function chartKey(detail?: (name: string) => string | undefined) {
     )
   }
 }
+
+/**
+ * A key with fixed entries, for charts whose colours encode a RULE (e.g. green
+ * for a pass, red for a fail) rather than a series, so Recharts has no series
+ * to build a key from. Use as `<Legend content={fixedKey([...])} />` —
+ * Recharts 3's `Legend` has no `payload` prop, `content` is the way in.
+ */
+export function fixedKey(items: ReadonlyArray<{ value: string; color: string }>) {
+  return function FixedKeyContent(): ReactNode {
+    return (
+      <ul
+        className="m-0 flex list-none flex-wrap items-center justify-center gap-x-4 gap-y-1 p-0 pt-2 text-[11px] text-body"
+        aria-label="Chart key"
+      >
+        {items.map((item) => (
+          <li key={item.value} className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+              style={{ backgroundColor: item.color }}
+            />
+            <span>{item.value}</span>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+}

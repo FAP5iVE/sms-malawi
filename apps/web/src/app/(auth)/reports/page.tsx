@@ -148,6 +148,7 @@ import {
   BAR_LABEL_PROPS,
   HBAR_LABEL_PROPS,
   chartKey,
+  fixedKey,
   truncateLabel,
   valueFormatter,
 } from '@/components/shared/chart/chartLabels'
@@ -2156,12 +2157,11 @@ function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
                   {/* Colour is set per grade (Cell), not per series, so the key spells out
                       what each colour means instead of showing one unnamed swatch. */}
                   <Legend
-                    wrapperStyle={{ fontSize: 11 }}
-                    payload={[
-                      { value: 'Grades A–B', type: 'square', color: chartColorAt(1) },
-                      { value: 'Other grades', type: 'square', color: chartColorAt(2) },
-                      { value: 'Grade U', type: 'square', color: chartColorAt(3) },
-                    ]}
+                    content={fixedKey([
+                      { value: 'Grades A–B', color: chartColorAt(1) },
+                      { value: 'Other grades', color: chartColorAt(2) },
+                      { value: 'Grade U', color: chartColorAt(3) },
+                    ])}
                   />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]} name="Students">
                     {stat.gradeDistribution.map((g, i) => (
@@ -2201,11 +2201,10 @@ function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
                       formatter={(v) => [`${num(v)}%`, 'Pass Rate']}
                     />
                     <Legend
-                      wrapperStyle={{ fontSize: 11 }}
-                      payload={[
-                        { value: 'Pass rate 50% or above', type: 'square', color: chartColorAt(1) },
-                        { value: 'Pass rate below 50%', type: 'square', color: chartColorAt(3) },
-                      ]}
+                      content={fixedKey([
+                        { value: 'Pass rate 50% or above', color: chartColorAt(1) },
+                        { value: 'Pass rate below 50%', color: chartColorAt(3) },
+                      ])}
                     />
                     <Bar dataKey="passRate" radius={[0, 4, 4, 0]} name="Pass Rate %">
                       {stat.subjectAverages.slice(0, 8).map((s, i) => (
