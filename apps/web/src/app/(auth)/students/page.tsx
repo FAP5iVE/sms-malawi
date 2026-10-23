@@ -31,6 +31,15 @@
  *     single unconfirmed tap — now routes through the shared ConfirmDialog
  *     stating exactly how many students it will archive.
  *
+ * [MAINT 2026-10-23 — Duplicate classes in the filter] The class dropdown listed
+ *   every class three times ("Form 2A" ×3). Class rows are ONE PER ACADEMIC
+ *   YEAR (promotion hands students to next year's row), and useClasses() with
+ *   no year returns every year's rows. The Active tab now lists only the
+ *   school's current-year classes — where active students actually are. The
+ *   other tabs (Graduated / Awaiting MANEB / Archived) hold students whose
+ *   class row is from an earlier year, so they list all years and show the year
+ *   in each option. Changing tab clears the class filter (the list changed).
+ *
  * C5 changes applied:
  *   • COLUMNS gain `priority` field — registrationNo + Student: 'critical' (always
  *     visible); Class: 'important' (md+); Status: 'important' (md+); Fees: 'optional' (lg+).
@@ -48,6 +57,7 @@ import { useState }                               from 'react'
 import { Archive, Pencil, UserPlus }              from 'lucide-react'
 import { useStudents, useArchiveStudent }          from '@/hooks/useStudents'
 import { useClasses }                             from '@/hooks/useClasses'
+import { useEffectiveAcademicPeriod }                from '@/hooks/useSettings'
 import { usePermissions }                         from '@/hooks/usePermissions'
 import { RoleGuard }                              from '@/components/shared/RoleGuard'
 import { ModuleSurface }                          from '@/components/shared/ModuleSurface'
@@ -234,7 +244,14 @@ function StudentsContent() {
   // supported `sex`, the UI just never surfaced it.
   const [sex, setSex] = useState<'' | 'MALE' | 'FEMALE'>('')
 
-  const { data: classes = [] } = useClasses()
+  // Active students live in the CURRENT year's class rows (see header note).
+  // Other tabs: every year, archived rows included, labelled with the year.
+  const { academicYear: schoolYear } = useEffectiveAcademicPeriod()
+  const classListIsAllYears = status !== 'ACTIVE'
+  const { data: classes = [] } = useClasses(
+    classListIsAllYears ? undefined : schoolYear,
+    classListIsAllYears,
+  )
 
   const { data, isLoading } = useStudents(
     sortBy && sortDir
@@ -324,7 +341,11 @@ function StudentsContent() {
               className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             >
               <option value="">All classes</option>
-              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {classListIsAllYears ? `${c.name} (${c.academicYear})` : c.name}
+                </option>
+              ))}
             </select>
           </div>
           <div className="flex-1 min-w-0 sm:flex-none sm:w-40">
@@ -385,6 +406,7 @@ function StudentsContent() {
         activeQuickFilter={status}
         onQuickFilter={(v) => {
           setStatus(v)
+          setClassId('')   // the class list changes with the tab
           setPage(1)
         }}
         rowKey="id"

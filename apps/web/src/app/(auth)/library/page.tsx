@@ -698,6 +698,11 @@ function IssueBookModal({
       title="Issue Book"
       onClose={onClose}
       size="md"
+      // [MAINT 2026-10-23 — Pop-up sizing] The Book / Student pickers open an
+      // absolutely-positioned results list INSIDE the scrolling body; at the
+      // default height only ~2 rows showed before it was clipped. Taller panel
+      // (always capped to the viewport) gives the list room. Size only.
+      panelClassName="[--modal-min-h:38rem] [--modal-sheet-min-h:75dvh]"
       bodyClassName="space-y-4"
       footer={
         <>

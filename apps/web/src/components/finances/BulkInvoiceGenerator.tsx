@@ -71,6 +71,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { useClasses } from '@/hooks/useClasses'
 import { useViewingPeriod } from '@/hooks/useViewingPeriod'
+import { useEffectiveAcademicPeriod } from '@/hooks/useSettings'
 import { useBulkGenerateInvoices } from '@/hooks/useFinances'
 import { formatMWK } from '@shared/constants/malawi'
 import type { ApiBulkInvoiceResult, ApiBulkInvoiceStudentResult } from '@shared/types/api'
@@ -284,7 +285,13 @@ function ImpactProjection({
 
 export function BulkInvoiceGenerator() {
   const motionEnabled = useMotionEnabled()
-  const { data: classes = [] } = useClasses()
+  // [MAINT 2026-10-23] Cohort list = the school's CURRENT-year classes. Class
+  // rows are one-per-year and the bulk generator matches students by exact
+  // classId (bulkInvoiceService), and enrolled students sit in the current
+  // year's rows. Unscoped, every class appeared once per year and picking a
+  // past year's row would match nobody.
+  const { academicYear: schoolYear } = useEffectiveAcademicPeriod()
+  const { data: classes = [] } = useClasses(schoolYear)
   const { academicYear: currentYear, term: currentTerm } = useViewingPeriod()
 
   const [classId, setClassId] = useState('ALL')

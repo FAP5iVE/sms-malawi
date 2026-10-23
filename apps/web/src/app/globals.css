@@ -1012,6 +1012,37 @@
   }
 }
 
+/* [MAINT 2026-10-23 — Pop-up sizing] MINIMUM heights, per Modal `size`.
+   Content-sized panels were too short to show a picker's results list or a
+   form comfortably (the list sat inside the scrolling body and got clipped).
+   Every minimum is wrapped in min(…, <the max-height above>) so it can NEVER
+   exceed the visible viewport — on a short laptop or a small phone the panel
+   simply fills the screen and the body scrolls, exactly as before.
+   `sm` (small confirm-style dialogs) and `screen` get no minimum.
+   A single dialog can ask for more with panelClassName, e.g.
+     [--modal-min-h:38rem] [--modal-sheet-min-h:75dvh]
+   --modal-min-h        → sm+ centred dialog      --modal-sheet-min-h → phone sheet
+   They are read with var(--x, default) rather than declared here on purpose:
+   this block is unlayered, so a declaration here would beat the caller's
+   Tailwind utility (layered) and the override would silently do nothing. */
+.app-modal-panel--md {
+  min-height: min(var(--modal-sheet-min-h, min(55dvh, 26rem)), calc(100dvh - env(safe-area-inset-top, 0px) - 0.75rem));
+}
+.app-modal-panel--lg {
+  min-height: min(var(--modal-sheet-min-h, min(62dvh, 30rem)), calc(100dvh - env(safe-area-inset-top, 0px) - 0.75rem));
+}
+.app-modal-panel--xl,
+.app-modal-panel--2xl {
+  min-height: min(var(--modal-sheet-min-h, min(70dvh, 34rem)), calc(100dvh - env(safe-area-inset-top, 0px) - 0.75rem));
+}
+
+@media (min-width: 640px) {
+  .app-modal-panel--md  { min-height: min(var(--modal-min-h, 28rem), calc(100dvh - 3rem)); }
+  .app-modal-panel--lg  { min-height: min(var(--modal-min-h, 32rem), calc(100dvh - 3rem)); }
+  .app-modal-panel--xl  { min-height: min(var(--modal-min-h, 36rem), calc(100dvh - 3rem)); }
+  .app-modal-panel--2xl { min-height: min(var(--modal-min-h, 40rem), calc(100dvh - 3rem)); }
+}
+
 /* Full-screen variant (size="screen"), e.g. the digital-resource reader. */
 .app-modal-panel.app-modal-panel--screen {
   width: 100vw;
@@ -1046,6 +1077,7 @@
   }
   .app-modal-panel {
     max-height: none !important;
+    min-height: 0 !important;
     height: auto !important;
     overflow: visible !important;
     box-shadow: none !important;

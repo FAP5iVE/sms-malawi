@@ -202,7 +202,6 @@ export function ReportCardGenerator() {
   const { role }      = useAuthStore()
   const motionEnabled = useMotionEnabled()
 
-  const { data: classes = [] } = useClasses()
   // Year AND term come from the GLOBAL viewing period. This generator used to
   // keep its own term select (defaulting to Term 1 no matter which term the
   // page was showing) and a free-text year box — so "Generate All" could quietly
@@ -210,6 +209,11 @@ export function ReportCardGenerator() {
   // switcher now decide which period is generated; the panel states it below.
   const { academicYear: effectiveAcademicYear, term: viewingTerm } = useEffectiveViewingPeriod()
   const term = viewingTerm as 1 | 2 | 3
+
+  // [MAINT 2026-10-23] Scoped to the viewed year, like the Exams page above it.
+  // With no year, every year's class rows came back — each class listed once
+  // per year, and a prior year's row could be picked for the wrong cards.
+  const { data: classes = [] } = useClasses(effectiveAcademicYear)
 
   const [classId,      setClassId]      = useState('')
   const [rows,         setRows]         = useState<StudentRow[]>([])

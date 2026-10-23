@@ -48,6 +48,7 @@ import { MALAWI_DISTRICTS }                   from '@shared/constants/malawi'
 import { GUARDIAN_RELATIONSHIPS }             from '@shared/constants/admissions'
 import { getCountriesForForm } from '@shared/constants/countries'
 import { useClasses }                         from '@/hooks/useClasses'
+import { useEffectiveAcademicPeriod }            from '@/hooks/useSettings'
 
 // The form is driven by the schema INPUT type (defaulted fields optional), so
 // register/errors must be typed on it — not on CreateStudentInput (the output),
@@ -156,6 +157,9 @@ export function FieldDivider({ title }: { title: string }) {
 export interface SectionProps {
   register: UseFormRegister<StudentFormValues>
   errors: FieldErrors<StudentFormValues>
+  /** Edit mode only: the student's saved Class.id. It may belong to an earlier
+   *  academic year (e.g. a graduate), so AcademicSection keeps it selectable. */
+  selectedClassId?: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -249,8 +253,17 @@ export function PersonalSection({ register, errors }: SectionProps) {
 // Fields: classId (form), status
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function AcademicSection({ register, errors }: SectionProps) {
-  const { data: classes, isLoading: classesLoading } = useClasses()
+export function AcademicSection({ register, errors, selectedClassId }: SectionProps) {
+  // [MAINT 2026-10-23] Class rows are one-per-academic-year, and useClasses()
+  // with no year returns all of them — so every class appeared once per year
+  // ("Form 2A" ×3) and a new student could be put in a PAST year's class by
+  // mistake. Offer only the school's current-year classes, plus (edit mode) the
+  // student's own saved class if it is from another year, labelled with its year.
+  const { academicYear } = useEffectiveAcademicPeriod()
+  const { data: allClasses, isLoading: classesLoading } = useClasses()
+  const classes = allClasses?.filter(
+    (c) => c.academicYear === academicYear || c.id === selectedClassId,
+  )
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
@@ -261,7 +274,7 @@ export function AcademicSection({ register, errors }: SectionProps) {
           <option value="">{classesLoading ? 'Loading classes…' : 'Select class…'}</option>
           {classes?.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {c.academicYear === academicYear ? c.name : `${c.name} (${c.academicYear})`}
             </option>
           ))}
         </select>

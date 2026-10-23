@@ -413,7 +413,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   }
 
   // ── Shared section props ────────────────────────────────────────────────────
-  const sectionProps = { register, errors }
+  const sectionProps = { register, errors, selectedClassId: existingStudent?.classId }
 
   // Animation variant sets
   const backdropVariants   = reducedMotionVariants(motionEnabled, OVERLAY_VARIANTS)

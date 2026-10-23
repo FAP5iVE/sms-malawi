@@ -43,6 +43,20 @@
  *   footer's submit button works while staying pinned outside the scroll area.
  *   Modals are mounted only while visible (`{show && <Modal …/>}`) — there is no
  *   `open` prop.
+ *
+ * [MAINT 2026-10-23 — Pop-up sizing] SIZE ONLY — behaviour is unchanged.
+ *   Dialogs were content-sized and narrow, so forms felt cramped and anything
+ *   that opens a list inside the body (student / book pickers) was clipped by
+ *   the scrolling body. Now:
+ *     • `size` widths are one notch wider (see SIZE_CLASS).
+ *     • Each size gets a sensible MIN height via the `app-modal-panel--<size>`
+ *       class (globals.css). Short dialogs stay compact (`sm` has none); the
+ *       min is always capped to the visible viewport, so nothing can exceed the
+ *       screen. Phones keep the full-width bottom sheet, just not a sliver.
+ *     • A dialog that needs more room (e.g. one with a results dropdown) can
+ *       raise it per-instance with `panelClassName`, e.g.
+ *       `panelClassName="[--modal-min-h:38rem] [--modal-sheet-min-h:75dvh]"`
+ *       (`--modal-min-h` = sm+ dialog, `--modal-sheet-min-h` = phone sheet).
  */
 
 import {
@@ -78,12 +92,14 @@ export const MODAL_BTN_DANGER = `${BTN_BASE} bg-brand-coral text-white hover:bg-
 
 export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'screen'
 
+// Widths apply from `sm` (640px) up; the panel is also bounded by the overlay's
+// 1.5rem side padding, so on a small tablet it can never overflow the screen.
 const SIZE_CLASS: Record<ModalSize, string> = {
-  sm: 'sm:max-w-sm',
-  md: 'sm:max-w-md',
-  lg: 'sm:max-w-lg',
-  xl: 'sm:max-w-2xl',
-  '2xl': 'sm:max-w-4xl',
+  sm: 'sm:max-w-[28rem]',   // 448px  (was 384)
+  md: 'sm:max-w-[34rem]',   // 544px  (was 448)
+  lg: 'sm:max-w-[40rem]',   // 640px  (was 512)
+  xl: 'sm:max-w-3xl',       // 768px  (was 672)
+  '2xl': 'sm:max-w-[60rem]', // 960px (was 896)
   screen: '',
 }
 
@@ -325,7 +341,9 @@ export function Modal({
         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
         className={[
           'app-modal-panel relative flex w-full flex-col bg-surface shadow-2xl overflow-hidden outline-none',
-          isScreen ? 'app-modal-panel--screen' : 'rounded-t-3xl sm:rounded-3xl',
+          isScreen
+            ? 'app-modal-panel--screen'
+            : `rounded-t-3xl sm:rounded-3xl app-modal-panel--${size}`,
           SIZE_CLASS[size],
           panelClassName,
         ].join(' ')}
