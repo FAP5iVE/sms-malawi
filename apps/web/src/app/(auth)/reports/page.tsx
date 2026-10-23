@@ -141,8 +141,16 @@ import {
   Cell,
   Legend,
   ComposedChart,
+  LabelList,
 } from 'recharts'
 import type { PieLabelRenderProps } from 'recharts'
+import {
+  BAR_LABEL_PROPS,
+  HBAR_LABEL_PROPS,
+  chartKey,
+  truncateLabel,
+  valueFormatter,
+} from '@/components/shared/chart/chartLabels'
 import {
   TrendingUp,
   BookOpen,
@@ -520,6 +528,7 @@ function AdminOverviewPanel() {
               />
               <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
               <Tooltip contentStyle={{ fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
               <Area
                 type="monotone"
                 dataKey="value"
@@ -541,19 +550,22 @@ function AdminOverviewPanel() {
           <ChartCard title="Activity by Entity Type">
             {entity && entity.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={entity} layout="vertical">
+                <BarChart data={entity} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
                   <XAxis
                     type="number"
                     tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
                   />
                   <YAxis
-                    type="category"
+                    type="category" interval={0}
                     dataKey="category"
                     tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
                     width={100}
                   />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [num(v), 'Actions']} />
-                  <Bar dataKey="value" fill={chartColorAt(1)} radius={[0, 4, 4, 0]} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="value" fill={chartColorAt(1)} radius={[0, 4, 4, 0]} name="Actions">
+                    <LabelList dataKey="value" {...HBAR_LABEL_PROPS} formatter={valueFormatter('number')} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -576,16 +588,19 @@ function AdminActionBreakdownChart() {
   if (!data?.length) return <EmptyState />
   return (
     <ResponsiveContainer width="100%" height={200}>
-      <BarChart data={data.slice(0, 8)} layout="vertical">
+      <BarChart data={data.slice(0, 8)} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
         <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
         <YAxis
-          type="category"
+          type="category" interval={0}
           dataKey="category"
           tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
           width={130}
         />
         <Tooltip contentStyle={{ fontSize: 12 }} />
-        <Bar dataKey="value" fill={chartColorAt(2)} radius={[0, 4, 4, 0]} />
+        <Legend wrapperStyle={{ fontSize: 11 }} />
+        <Bar dataKey="value" fill={chartColorAt(2)} radius={[0, 4, 4, 0]} name="Actions">
+          <LabelList dataKey="value" {...HBAR_LABEL_PROPS} formatter={valueFormatter('number')} />
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   )
@@ -917,7 +932,7 @@ function HighRankPerformancePanel({ academicYear, term }: { academicYear: string
         <ChartCard title="School Pass Rate Trend — All Terms">
           {trend && trend.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={trend.map((t) => ({ ...t, label: `${t.academicYear} T${t.term}` }))}>
+              <LineChart data={trend.map((t) => ({ ...t, label: `${t.academicYear} T${t.term}` }))} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis
                   dataKey="label"
@@ -935,16 +950,18 @@ function HighRankPerformancePanel({ academicYear, term }: { academicYear: string
                   stroke={chartColorAt(1)}
                   strokeWidth={2}
                   dot
-                  name="Pass Rate %"
-                />
+                  name="Pass Rate %">
+                  <LabelList dataKey="passRate" {...BAR_LABEL_PROPS} formatter={valueFormatter('percent')} />
+                </Line>
                 <Line
                   type="monotone"
                   dataKey="average"
                   stroke={chartColorAt(0)}
                   strokeWidth={2}
                   dot
-                  name="Average %"
-                />
+                  name="Average %">
+                  <LabelList dataKey="average" {...BAR_LABEL_PROPS} formatter={valueFormatter('percent')} />
+                </Line>
               </LineChart>
             </ResponsiveContainer>
           ) : (
@@ -995,29 +1012,35 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
         <ChartCard title="Class Comparison — Average Score">
           {classes && classes.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={classes}>
+              <BarChart data={classes} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis
                   dataKey="className"
                   tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                  interval={0}
+                  tickFormatter={(v: unknown) => truncateLabel(v, 14)}
+                  angle={-30} textAnchor="end" height={56}
                 />
                 <YAxis
                   domain={[0, 100]}
                   tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
                 />
                 <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, '']} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar
                   dataKey="average"
                   fill={chartColorAt(0)}
                   radius={[4, 4, 0, 0]}
-                  name="Average %"
-                />
+                  name="Average %">
+                  <LabelList dataKey="average" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('percent')} />
+                </Bar>
                 <Bar
                   dataKey="passRate"
                   fill={chartColorAt(1)}
                   radius={[4, 4, 0, 0]}
-                  name="Pass Rate %"
-                />
+                  name="Pass Rate %">
+                  <LabelList dataKey="passRate" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('percent')} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -1037,23 +1060,28 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
         <ChartCard title="Subject Average Comparison">
           {subjects && subjects.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={subjects.slice(0, 12)}>
+              <BarChart data={subjects.slice(0, 12)} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis
                   dataKey="subject"
                   tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
+                  interval={0}
+                  tickFormatter={(v: unknown) => truncateLabel(v, 14)}
+                  angle={-30} textAnchor="end" height={56}
                 />
                 <YAxis
                   domain={[0, 100]}
                   tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
                 />
                 <Tooltip contentStyle={{ fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar
                   dataKey="average"
                   fill={chartColorAt(2)}
                   radius={[4, 4, 0, 0]}
-                  name="Average %"
-                />
+                  name="Average %">
+                  <LabelList dataKey="average" {...BAR_LABEL_PROPS} formatter={valueFormatter('percent')} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -1144,25 +1172,27 @@ function HighRankTeachersPanel({ academicYear, term }: { academicYear: string; t
           <ChartCard title="Teacher Effectiveness — Student Average Score">
             {teachers && teachers.length > 0 ? (
               <ResponsiveContainer width="100%" height={Math.max(180, teachers.length * 36)}>
-                <BarChart data={teachers} layout="vertical">
+                <BarChart data={teachers} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
                   <XAxis
                     type="number"
                     domain={[0, 100]}
                     tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
                   />
                   <YAxis
-                    type="category"
+                    type="category" interval={0}
                     dataKey="teacherName"
                     tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
                     width={130}
                   />
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [`${num(v)}%`, '']} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar
                     dataKey="avgStudentScore"
                     fill={chartColorAt(4)}
                     radius={[0, 4, 4, 0]}
-                    name="Avg Student Score %"
-                  />
+                    name="Avg Student Score %">
+                    <LabelList dataKey="avgStudentScore" {...HBAR_LABEL_PROPS} formatter={valueFormatter('percent')} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -1228,7 +1258,7 @@ function HighRankEnrollmentPanel() {
         <ChartCard title="Student Enrollment Trend — Last 12 Months">
           {trend && trend.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
-              <ComposedChart data={trend}>
+              <ComposedChart data={trend} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis
                   dataKey="month"
@@ -1241,22 +1271,25 @@ function HighRankEnrollmentPanel() {
                   dataKey="enrolled"
                   fill={chartColorAt(1)}
                   radius={[4, 4, 0, 0]}
-                  name="New Enrolled"
-                />
+                  name="New Enrolled">
+                  <LabelList dataKey="enrolled" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('number')} />
+                </Bar>
                 <Bar
                   dataKey="departed"
                   fill={chartColorAt(3)}
                   radius={[4, 4, 0, 0]}
-                  name="Departed"
-                />
+                  name="Departed">
+                  <LabelList dataKey="departed" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('number')} />
+                </Bar>
                 <Line
                   type="monotone"
                   dataKey="net"
                   stroke={chartColorAt(2)}
                   strokeWidth={2}
                   dot={false}
-                  name="Net Change"
-                />
+                  name="Net Change">
+                  <LabelList dataKey="net" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('number')} />
+                </Line>
               </ComposedChart>
             </ResponsiveContainer>
           ) : (
@@ -1294,7 +1327,7 @@ function HighRankFinancePanel({ academicYear, term }: { academicYear: string; te
           <ChartCard title="Fees Collected vs Expenses & Payroll by Term">
             {cashFlow && cashFlow.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={cashFlow.map((r) => ({ ...r, label: `Term ${r.term}` }))}>
+                <BarChart data={cashFlow.map((r) => ({ ...r, label: `Term ${r.term}` }))} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                   <XAxis
                     dataKey="label"
@@ -1310,20 +1343,23 @@ function HighRankFinancePanel({ academicYear, term }: { academicYear: string; te
                     dataKey="revenue"
                     fill={chartColorAt(1)}
                     radius={[4, 4, 0, 0]}
-                    name="Fees collected"
-                  />
+                    name="Fees collected">
+                    <LabelList dataKey="revenue" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
                   <Bar
                     dataKey="expenses"
                     fill={chartColorAt(3)}
                     radius={[4, 4, 0, 0]}
-                    name="Expenses"
-                  />
+                    name="Expenses">
+                    <LabelList dataKey="expenses" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
                   <Bar
                     dataKey="payroll"
                     fill={chartColorAt(2)}
                     radius={[4, 4, 0, 0]}
-                    name="Payroll"
-                  />
+                    name="Payroll">
+                    <LabelList dataKey="payroll" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -1399,7 +1435,7 @@ function FinanceCollectionPanel() {
       ) : (
         <ChartCard title="Daily Fee Collection — Last 30 Days">
           <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={dayData ?? []}>
+            <BarChart data={dayData ?? []} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
               <XAxis
                 dataKey="label"
@@ -1410,7 +1446,10 @@ function FinanceCollectionPanel() {
                 tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`}
               />
               <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), 'Collected']} />
-              <Bar dataKey="value" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="value" fill={chartColorAt(1)} radius={[4, 4, 0, 0]} name="Collected (MWK)">
+                <LabelList dataKey="value" {...BAR_LABEL_PROPS} formatter={valueFormatter('mwk')} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -1420,7 +1459,7 @@ function FinanceCollectionPanel() {
       ) : (
         <ChartCard title="Monthly Collection & Cumulative — Last 12 Months">
           <ResponsiveContainer width="100%" height={200}>
-            <ComposedChart data={monthData ?? []}>
+            <ComposedChart data={monthData ?? []} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
               <XAxis
                 dataKey="month"
@@ -1444,16 +1483,18 @@ function FinanceCollectionPanel() {
                 dataKey="collected"
                 fill={chartColorAt(1)}
                 radius={[4, 4, 0, 0]}
-                name="Monthly"
-              />
+                name="Monthly">
+                <LabelList dataKey="collected" {...BAR_LABEL_PROPS} formatter={valueFormatter('mwk')} />
+              </Bar>
               <Line
                 yAxisId="right"
                 dataKey="cumulative"
                 stroke={chartColorAt(2)}
                 strokeWidth={2}
                 dot={false}
-                name="Cumulative"
-              />
+                name="Cumulative">
+                <LabelList dataKey="cumulative" {...BAR_LABEL_PROPS} formatter={valueFormatter('mwk')} />
+              </Line>
             </ComposedChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -1492,14 +1533,14 @@ function FinanceOutstandingPanel({ academicYear, term }: { academicYear: string;
           {rows && rows.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={rows} layout="vertical">
+                <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
                   <XAxis
                     type="number"
                     tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
                     tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`}
                   />
                   <YAxis
-                    type="category"
+                    type="category" interval={0}
                     dataKey="className"
                     tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
                     width={80}
@@ -1508,7 +1549,10 @@ function FinanceOutstandingPanel({ academicYear, term }: { academicYear: string;
                     contentStyle={{ fontSize: 12 }}
                     formatter={(v) => [mwk(v), 'Outstanding']}
                   />
-                  <Bar dataKey="outstanding" fill={chartColorAt(3)} radius={[0, 4, 4, 0]} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="outstanding" fill={chartColorAt(3)} radius={[0, 4, 4, 0]} name="Outstanding (MWK)">
+                    <LabelList dataKey="outstanding" {...HBAR_LABEL_PROPS} formatter={valueFormatter('mwk')} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
               <div className="mt-4 table-scroll">
@@ -1581,8 +1625,8 @@ function FinanceExpensesPanel({ academicYear, term }: { academicYear: string; te
                     dataKey="value"
                     nameKey="category"
                     cx="50%"
-                    cy="50%"
-                    outerRadius={80}
+                    cy="45%"
+                    outerRadius={62}
                     label={(p: PieLabelRenderProps) =>
                       `${p.name ?? ''} ${Math.round((p.percent ?? 0) * 100)}%`
                     }
@@ -1594,6 +1638,17 @@ function FinanceExpensesPanel({ academicYear, term }: { academicYear: string; te
                     ))}
                   </Pie>
                   <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), '']} />
+                  {/* The key names every slice with its exact amount and share. */}
+                  <Legend
+                    verticalAlign="bottom"
+                    content={chartKey((name) => {
+                      const slice = expenses.find((e) => e.category === name)
+                      if (!slice) return undefined
+                      const total = expenses.reduce((sum, e) => sum + num(e.value), 0)
+                      const share = total > 0 ? Math.round((num(slice.value) / total) * 100) : 0
+                      return `${mwk(slice.value)} · ${share}%`
+                    })}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -1607,7 +1662,7 @@ function FinanceExpensesPanel({ academicYear, term }: { academicYear: string; te
           <ChartCard title="Budget vs Actual by Category">
             {budgets && budgets.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={budgets} layout="vertical">
+                <BarChart data={budgets} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
                   <XAxis
                     type="number"
                     tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
@@ -1617,7 +1672,7 @@ function FinanceExpensesPanel({ academicYear, term }: { academicYear: string; te
                       but not on Expense, and therefore never joined. The row's key
                       is now the ExpenseCategory it is actually budgeted against. */}
                   <YAxis
-                    type="category"
+                    type="category" interval={0}
                     dataKey="category"
                     tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
                     width={110}
@@ -1628,9 +1683,12 @@ function FinanceExpensesPanel({ academicYear, term }: { academicYear: string; te
                     dataKey="allocated"
                     fill={chartColorAt(0)}
                     radius={[0, 4, 4, 0]}
-                    name="Allocated"
-                  />
-                  <Bar dataKey="spent" fill={chartColorAt(2)} radius={[0, 4, 4, 0]} name="Spent" />
+                    name="Allocated">
+                    <LabelList dataKey="allocated" {...HBAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
+                  <Bar dataKey="spent" fill={chartColorAt(2)} radius={[0, 4, 4, 0]} name="Spent">
+                    <LabelList dataKey="spent" {...HBAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -1683,7 +1741,7 @@ function FinanceCashFlowPanel({ academicYear }: { academicYear: string }) {
           {rows && rows.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={220}>
-                <ComposedChart data={rows.map((r) => ({ ...r, label: `Term ${r.term}` }))}>
+                <ComposedChart data={rows.map((r) => ({ ...r, label: `Term ${r.term}` }))} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                   <XAxis
                     dataKey="label"
@@ -1699,28 +1757,32 @@ function FinanceCashFlowPanel({ academicYear }: { academicYear: string }) {
                     dataKey="revenue"
                     fill={chartColorAt(1)}
                     radius={[4, 4, 0, 0]}
-                    name="Fees collected"
-                  />
+                    name="Fees collected">
+                    <LabelList dataKey="revenue" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
                   <Bar
                     dataKey="expenses"
                     fill={chartColorAt(3)}
                     radius={[4, 4, 0, 0]}
-                    name="Expenses"
-                  />
+                    name="Expenses">
+                    <LabelList dataKey="expenses" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
                   <Bar
                     dataKey="payroll"
                     fill={chartColorAt(2)}
                     radius={[4, 4, 0, 0]}
-                    name="Payroll"
-                  />
+                    name="Payroll">
+                    <LabelList dataKey="payroll" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Bar>
                   <Line
                     type="monotone"
                     dataKey="net"
                     stroke={chartColorAt(0)}
                     strokeWidth={2}
                     dot
-                    name="Net"
-                  />
+                    name="Net">
+                    <LabelList dataKey="net" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+                  </Line>
                 </ComposedChart>
               </ResponsiveContainer>
               <div className="mt-4 table-scroll">
@@ -1801,6 +1863,7 @@ function FinancePayrollPanel() {
                   tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(1)}M`}
                 />
                 <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), 'Payroll']} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Area
                   type="monotone"
                   dataKey="value"
@@ -1851,24 +1914,26 @@ function LibraryOverviewPanel() {
           {top && top.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={top} layout="vertical">
+                <BarChart data={top} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
                   <XAxis
                     type="number"
                     tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
                   />
                   <YAxis
-                    type="category"
+                    type="category" interval={0}
                     dataKey="title"
                     tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
                     width={160}
                   />
                   <Tooltip contentStyle={{ fontSize: 12 }} />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar
                     dataKey="borrowCount"
                     fill={chartColorAt(1)}
                     radius={[0, 4, 4, 0]}
-                    name="Borrows"
-                  />
+                    name="Borrows">
+                    <LabelList dataKey="borrowCount" {...HBAR_LABEL_PROPS} formatter={valueFormatter('number')} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
               <div className="mt-4 space-y-1">
@@ -1922,6 +1987,7 @@ function LibraryBorrowingPanel() {
                 />
                 <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                 <Tooltip contentStyle={{ fontSize: 12 }} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Area
                   type="monotone"
                   dataKey="value"
@@ -1966,11 +2032,14 @@ function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; t
           <ChartCard title="Subject Performance — My Classes">
             {rows && rows.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={rows.slice(0, 12)}>
+                <BarChart data={rows.slice(0, 12)} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                   <XAxis
                     dataKey="subject"
                     tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
+                    interval={0}
+                    tickFormatter={(v: unknown) => truncateLabel(v, 14)}
+                    angle={-30} textAnchor="end" height={56}
                   />
                   <YAxis
                     domain={[0, 100]}
@@ -1982,14 +2051,16 @@ function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; t
                     dataKey="average"
                     fill={chartColorAt(0)}
                     radius={[4, 4, 0, 0]}
-                    name="Average %"
-                  />
+                    name="Average %">
+                    <LabelList dataKey="average" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('percent')} />
+                  </Bar>
                   <Bar
                     dataKey="passRate"
                     fill={chartColorAt(1)}
                     radius={[4, 4, 0, 0]}
-                    name="Pass Rate %"
-                  />
+                    name="Pass Rate %">
+                    <LabelList dataKey="passRate" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('percent')} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -2073,13 +2144,25 @@ function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <ChartCard title={`${stat.examType} Grade Distribution`}>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={stat.gradeDistribution}>
+                <BarChart data={stat.gradeDistribution} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
                   <XAxis
                     dataKey="category"
                     tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                    interval={0}
+                    tickFormatter={(v: unknown) => truncateLabel(v, 14)}
                   />
                   <YAxis tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }} />
                   <Tooltip contentStyle={{ fontSize: 12 }} />
+                  {/* Colour is set per grade (Cell), not per series, so the key spells out
+                      what each colour means instead of showing one unnamed swatch. */}
+                  <Legend
+                    wrapperStyle={{ fontSize: 11 }}
+                    payload={[
+                      { value: 'Grades A–B', type: 'square', color: chartColorAt(1) },
+                      { value: 'Other grades', type: 'square', color: chartColorAt(2) },
+                      { value: 'Grade U', type: 'square', color: chartColorAt(3) },
+                    ]}
+                  />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]} name="Students">
                     {stat.gradeDistribution.map((g, i) => (
                       <Cell
@@ -2093,6 +2176,7 @@ function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
                         }
                       />
                     ))}
+                    <LabelList dataKey="value" {...BAR_LABEL_PROPS} formatter={valueFormatter('number')} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -2100,14 +2184,14 @@ function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
             <ChartCard title={`${stat.examType} Subject Pass Rates`}>
               {stat.subjectAverages.length > 0 ? (
                 <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={stat.subjectAverages.slice(0, 8)} layout="vertical">
+                  <BarChart data={stat.subjectAverages.slice(0, 8)} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
                     <XAxis
                       type="number"
                       domain={[0, 100]}
                       tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
                     />
                     <YAxis
-                      type="category"
+                      type="category" interval={0}
                       dataKey="subject"
                       tick={{ fontSize: 9, fill: 'var(--color-muted-foreground)' }}
                       width={100}
@@ -2116,10 +2200,18 @@ function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
                       contentStyle={{ fontSize: 12 }}
                       formatter={(v) => [`${num(v)}%`, 'Pass Rate']}
                     />
+                    <Legend
+                      wrapperStyle={{ fontSize: 11 }}
+                      payload={[
+                        { value: 'Pass rate 50% or above', type: 'square', color: chartColorAt(1) },
+                        { value: 'Pass rate below 50%', type: 'square', color: chartColorAt(3) },
+                      ]}
+                    />
                     <Bar dataKey="passRate" radius={[0, 4, 4, 0]} name="Pass Rate %">
                       {stat.subjectAverages.slice(0, 8).map((s, i) => (
                         <Cell key={i} fill={s.passRate >= 50 ? chartColorAt(1) : chartColorAt(3)} />
                       ))}
+                      <LabelList dataKey="passRate" {...HBAR_LABEL_PROPS} formatter={valueFormatter('percent')} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -2170,25 +2262,27 @@ function FinanceScholarshipsPanel({ academicYear }: { academicYear: string }) {
       </div>
       <ChartCard title={`Scholarship Value — ${academicYear}`}>
         <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={data.byScholarship} layout="vertical">
+          <BarChart data={data.byScholarship} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
             <XAxis
               type="number"
               tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
               tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`}
             />
             <YAxis
-              type="category"
+              type="category" interval={0}
               dataKey="name"
               tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
               width={130}
             />
             <Tooltip contentStyle={{ fontSize: 12 }} formatter={(v) => [mwk(v), 'Discount']} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
             <Bar
               dataKey="totalDiscount"
               fill={chartColorAt(4)}
               radius={[0, 4, 4, 0]}
-              name="Discount"
-            />
+              name="Discount">
+              <LabelList dataKey="totalDiscount" {...HBAR_LABEL_PROPS} formatter={valueFormatter('mwk')} />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
@@ -2268,11 +2362,13 @@ function MarksDistributionPanel() {
       ) : buckets && buckets.length > 0 ? (
         <ChartCard title="Marks Distribution">
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={buckets}>
+            <BarChart data={buckets} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
               <XAxis
                 dataKey="bucket"
                 tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
+                interval={0}
+                tickFormatter={(v: unknown) => truncateLabel(v, 14)}
               />
               <YAxis
                 allowDecimals={false}
@@ -2282,7 +2378,10 @@ function MarksDistributionPanel() {
                 contentStyle={{ fontSize: 12 }}
                 formatter={(v) => [`${num(v)} students`, '']}
               />
-              <Bar dataKey="count" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Students" />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="count" fill={chartColorAt(0)} radius={[4, 4, 0, 0]} name="Students">
+                <LabelList dataKey="count" {...BAR_LABEL_PROPS} formatter={valueFormatter('number')} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -2515,23 +2614,28 @@ function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; te
       {data.classStats && data.classStats.length > 0 ? (
         <ChartCard title="Class Sizes">
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={data.classStats}>
+            <BarChart data={data.classStats} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
               <XAxis
                 dataKey="name"
                 tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                interval={0}
+                tickFormatter={(v: unknown) => truncateLabel(v, 14)}
+                angle={-30} textAnchor="end" height={56}
               />
               <YAxis
                 allowDecimals={false}
                 tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
               />
               <Tooltip contentStyle={{ fontSize: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar
                 dataKey="_count.students"
                 fill={chartColorAt(0)}
                 radius={[4, 4, 0, 0]}
-                name="Students"
-              />
+                name="Students">
+                <LabelList dataKey="_count.students" {...BAR_LABEL_PROPS} formatter={valueFormatter('number')} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -2542,11 +2646,14 @@ function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; te
       {enrollmentByClass.length > 0 && (
         <ChartCard title="Active Enrollment vs Total Roster by Class">
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={enrollmentByClass}>
+            <BarChart data={enrollmentByClass} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
               <XAxis
                 dataKey="name"
                 tick={{ fontSize: 10, fill: 'var(--color-muted-foreground)' }}
+                interval={0}
+                tickFormatter={(v: unknown) => truncateLabel(v, 14)}
+                angle={-30} textAnchor="end" height={56}
               />
               <YAxis
                 allowDecimals={false}
@@ -2564,14 +2671,16 @@ function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; te
                 dataKey="roster"
                 fill={chartColorAt(0)}
                 radius={[4, 4, 0, 0]}
-                name="Total Roster"
-              />
+                name="Total Roster">
+                <LabelList dataKey="roster" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('number')} />
+              </Bar>
               <Bar
                 dataKey="active"
                 fill={chartColorAt(1)}
                 radius={[4, 4, 0, 0]}
-                name="Active Students"
-              />
+                name="Active Students">
+                <LabelList dataKey="active" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('number')} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>

@@ -12,6 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    exam:           { count: vi.fn() },
     systemSettings: { findUnique: vi.fn() },
     student:        { findMany: vi.fn() },
     class:          { findMany: vi.fn() },
@@ -21,10 +22,22 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
+vi.mock('@/server/services/settingsService', () => ({
+  get: vi.fn(async (key: string) => {
+    const values: Record<string, number> = {
+      current_term: 3,
+      promotion_min_average: 35,
+      promotion_required_passes: 5,
+    }
+    return values[key]
+  }),
+}))
+
 import { prisma } from '@/lib/prisma'
 import * as svc from '../promotionService'
 
 const mp = prisma as unknown as {
+  exam:           { count: ReturnType<typeof vi.fn> }
   systemSettings: { findUnique: ReturnType<typeof vi.fn> }
   student:        { findMany: ReturnType<typeof vi.fn> }
   class:          { findMany: ReturnType<typeof vi.fn> }
@@ -37,6 +50,7 @@ describe('promotionService.runPromotion (preview mode)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     // Thresholds fall back to SETTING_META defaults when no row exists.
+    mp.exam.count.mockResolvedValue(2)
     mp.systemSettings.findUnique.mockResolvedValue(null)
     mp.student.findMany.mockResolvedValue([
       {

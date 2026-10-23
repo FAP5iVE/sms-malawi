@@ -24,7 +24,18 @@
  *   routes to Recharts (`bar`/`stackedBar`/`line`/`area`/`pie`/`donut`), but it
  *   implements every `ChartType` so an explicit `library="recharts"` override
  *   never hits an unhandled case.
+ *
+ *   LABELLING (every chart, no exceptions — see ./chartLabels.tsx):
+ *     - every bar, and every point of a short line/area, prints its VALUE on
+ *       the chart (counts, %, or MWK per the series' `format`);
+ *     - every pie/donut slice prints its NAME and SHARE beside it, and the key
+ *       lists each slice with its exact value; a donut also shows its total in
+ *       the hole; a radial gauge prints its value and name in the centre;
+ *     - every chart has a key, INCLUDING single-series ones (it used to be
+ *       hidden for one series, leaving the colour unexplained);
+ *     - category names are never skipped on a crowded axis.
  * [DEPENDS ON]:
+ *   - ./chartLabels (shared on-chart label + key helpers)
  *   - @/components/ui/chart (ChartContainer/Tooltip/Legend foundation, R-pre)
  *   - @/lib/chartPalette (R16 CHART_PALETTE / chartColorAt)
  *   - ./types (R17 ChartProps contract)
@@ -40,11 +51,14 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
+  Label,
+  LabelList,
   Line,
   LineChart,
   Pie,
   PieChart,
   PolarAngleAxis,
+  PolarRadiusAxis,
   RadialBar,
   RadialBarChart,
   XAxis,
@@ -54,12 +68,24 @@ import {
 import {
   ChartContainer,
   ChartLegend,
-  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart'
 import { chartColorAt } from '@/lib/chartPalette'
+import {
+  BAR_LABEL_PROPS,
+  MAX_LABELLED_POINTS,
+  PieSliceLabel,
+  categoryAxisLayout,
+  chartKey,
+  formatChartValue,
+  formatChartValueFull,
+  inferValueFormat,
+  truncateLabel,
+  valueFormatter,
+  type ValueFormat,
+} from './chartLabels'
 import type { ChartProps, ChartSeriesConfig } from './types'
 
 const DEFAULT_HEIGHT = 300
@@ -88,48 +114,107 @@ function toPieSlices(props: ChartProps): { name: string; value: number }[] {
   }))
 }
 
-function CartesianAxes() {
+/** The value format a series is written in (explicit `format`, else inferred from its label). */
+function formatOf(series: ChartSeriesConfig | undefined): ValueFormat {
+  return inferValueFormat(series?.label, series?.format)
+}
+
+/** Room above the plot so the top-most bar/point label is never clipped. */
+const CARTESIAN_MARGIN = { top: 22, right: 12, left: 0, bottom: 0 } as const
+
+function CartesianAxes({
+  categories,
+  yFormat,
+}: {
+  categories: Array<string | number>
+  yFormat: ValueFormat
+}) {
+  const layout = categoryAxisLayout(categories)
   return (
     <>
       <CartesianGrid vertical={false} strokeDasharray="3 3" />
-      <XAxis dataKey="x" tickLine={false} axisLine={false} tickMargin={8} />
-      <YAxis tickLine={false} axisLine={false} tickMargin={8} width={44} />
+      <XAxis
+        dataKey="x"
+        tickLine={false}
+        axisLine={false}
+        tickMargin={8}
+        tickFormatter={(v: unknown) => truncateLabel(v)}
+        {...layout}
+      />
+      <YAxis
+        tickLine={false}
+        axisLine={false}
+        tickMargin={8}
+        width={yFormat === 'mwk' ? 72 : 48}
+        tickFormatter={(v: unknown) => formatChartValue(v, yFormat)}
+      />
     </>
   )
+}
+
+/** The key. Always rendered — a single-series chart still says what its colour is. */
+function Key({ detail }: { detail?: (name: string) => string | undefined }) {
+  return <ChartLegend verticalAlign="bottom" content={chartKey(detail)} />
 }
 
 function renderChart(props: ChartProps): React.ReactElement {
   const { type, data, series } = props
   const stacked = type === 'stackedBar'
+  const categories = data.map((d) => d.x)
+  const yFormat = formatOf(series[0])
+  // Many bars → smaller value text so neighbours don't collide.
+  const barLabelSize = series.length * data.length > 24 ? 8 : BAR_LABEL_PROPS.fontSize
+  // A point label per point is only legible on a short series.
+  const labelPoints = data.length <= MAX_LABELLED_POINTS
 
   switch (type) {
     case 'bar':
     case 'stackedBar':
       return (
-        <BarChart data={data} accessibilityLayer>
-          <CartesianAxes />
+        <BarChart data={data} accessibilityLayer margin={CARTESIAN_MARGIN}>
+          <CartesianAxes categories={categories} yFormat={yFormat} />
           <ChartTooltip content={<ChartTooltipContent />} />
-          {series.length > 1 ? <ChartLegend content={<ChartLegendContent />} /> : null}
-          {series.map((s) => (
-            <Bar
-              key={s.key}
-              dataKey={s.key}
-              name={s.label}
-              fill={colorVar(s.key)}
-              radius={stacked ? 0 : [4, 4, 0, 0]}
-              stackId={stacked ? 'stack' : undefined}
-            />
-          ))}
+          <Key />
+          {series.map((s) => {
+            const fmt = formatOf(s)
+            return (
+              <Bar
+                key={s.key}
+                dataKey={s.key}
+                name={s.label}
+                fill={colorVar(s.key)}
+                radius={stacked ? 0 : [4, 4, 0, 0]}
+                stackId={stacked ? 'stack' : undefined}
+              >
+                {stacked ? (
+                  <LabelList
+                    dataKey={s.key}
+                    position="center"
+                    fontSize={10}
+                    fill="#fff"
+                    formatter={(v: unknown) => (Number(v) === 0 ? '' : formatChartValue(v, fmt))}
+                  />
+                ) : (
+                  <LabelList
+                    dataKey={s.key}
+                    {...BAR_LABEL_PROPS}
+                    fontSize={barLabelSize}
+                    formatter={valueFormatter(fmt)}
+                  />
+                )}
+              </Bar>
+            )
+          })}
         </BarChart>
       )
 
     case 'line':
     case 'timeSeries':
       return (
-        <LineChart data={data} accessibilityLayer>
-          <CartesianAxes />
+        <LineChart data={data} accessibilityLayer margin={CARTESIAN_MARGIN}>
+          <CartesianAxes categories={categories} yFormat={yFormat} />
           <ChartTooltip content={<ChartTooltipContent />} />
-          {series.length > 1 ? <ChartLegend content={<ChartLegendContent />} /> : null}
+          <Key />
           {series.map((s) => (
             <Line
               key={s.key}
@@ -138,18 +223,26 @@ function renderChart(props: ChartProps): React.ReactElement {
               name={s.label}
               stroke={colorVar(s.key)}
               strokeWidth={2}
-              dot={false}
-            />
+              dot={labelPoints}
+            >
+              {labelPoints ? (
+                <LabelList
+                  dataKey={s.key}
+                  {...BAR_LABEL_PROPS}
+                  formatter={valueFormatter(formatOf(s))}
+                />
+              ) : null}
+            </Line>
           ))}
         </LineChart>
       )
 
     case 'area':
       return (
-        <AreaChart data={data} accessibilityLayer>
-          <CartesianAxes />
+        <AreaChart data={data} accessibilityLayer margin={CARTESIAN_MARGIN}>
+          <CartesianAxes categories={categories} yFormat={yFormat} />
           <ChartTooltip content={<ChartTooltipContent />} />
-          {series.length > 1 ? <ChartLegend content={<ChartLegendContent />} /> : null}
+          <Key />
           {series.map((s) => (
             <Area
               key={s.key}
@@ -160,19 +253,37 @@ function renderChart(props: ChartProps): React.ReactElement {
               fill={colorVar(s.key)}
               fillOpacity={0.15}
               strokeWidth={2}
-            />
+              dot={labelPoints}
+            >
+              {labelPoints ? (
+                <LabelList
+                  dataKey={s.key}
+                  {...BAR_LABEL_PROPS}
+                  formatter={valueFormatter(formatOf(s))}
+                />
+              ) : null}
+            </Area>
           ))}
         </AreaChart>
       )
 
     case 'combo':
       return (
-        <ComposedChart data={data} accessibilityLayer>
-          <CartesianAxes />
+        <ComposedChart data={data} accessibilityLayer margin={CARTESIAN_MARGIN}>
+          <CartesianAxes categories={categories} yFormat={yFormat} />
           <ChartTooltip content={<ChartTooltipContent />} />
-          <ChartLegend content={<ChartLegendContent />} />
+          <Key />
           {series.map((s) => {
             const kind = s.kind ?? 'bar'
+            const fmt = formatOf(s)
+            const label = (
+              <LabelList
+                dataKey={s.key}
+                {...BAR_LABEL_PROPS}
+                fontSize={barLabelSize}
+                formatter={valueFormatter(fmt)}
+              />
+            )
             if (kind === 'line') {
               return (
                 <Line
@@ -182,8 +293,10 @@ function renderChart(props: ChartProps): React.ReactElement {
                   name={s.label}
                   stroke={colorVar(s.key)}
                   strokeWidth={2}
-                  dot={false}
-                />
+                  dot={labelPoints}
+                >
+                  {labelPoints ? label : null}
+                </Line>
               )
             }
             if (kind === 'area') {
@@ -197,7 +310,9 @@ function renderChart(props: ChartProps): React.ReactElement {
                   fill={colorVar(s.key)}
                   fillOpacity={0.15}
                   strokeWidth={2}
-                />
+                >
+                  {labelPoints ? label : null}
+                </Area>
               )
             }
             return (
@@ -207,7 +322,9 @@ function renderChart(props: ChartProps): React.ReactElement {
                 name={s.label}
                 fill={colorVar(s.key)}
                 radius={[4, 4, 0, 0]}
-              />
+              >
+                {label}
+              </Bar>
             )
           })}
         </ComposedChart>
@@ -216,20 +333,58 @@ function renderChart(props: ChartProps): React.ReactElement {
     case 'pie':
     case 'donut': {
       const slices = toPieSlices(props)
+      const fmt = formatOf(series[0])
+      const total = slices.reduce((sum, sl) => sum + sl.value, 0)
+      // Key entry per slice: exact value and share, e.g. "42 · 35%".
+      const detail = (name: string): string | undefined => {
+        const slice = slices.find((sl) => sl.name === name)
+        if (!slice) return undefined
+        const pct = total > 0 ? Math.round((slice.value / total) * 100) : 0
+        return `${formatChartValueFull(slice.value, fmt)} · ${pct}%`
+      }
       return (
-        <PieChart accessibilityLayer>
+        <PieChart accessibilityLayer margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
           <ChartTooltip content={<ChartTooltipContent nameKey="name" hideLabel />} />
+          <Key detail={detail} />
           <Pie
             data={slices}
             dataKey="value"
             nameKey="name"
-            innerRadius={type === 'donut' ? 60 : 0}
-            outerRadius={90}
+            innerRadius={type === 'donut' ? '38%' : 0}
+            outerRadius="62%"
             paddingAngle={type === 'donut' ? 2 : 0}
+            label={PieSliceLabel}
+            labelLine
           >
             {slices.map((slice, index) => (
-              <Cell key={slice.name} fill={chartColorAt(index)} />
+              <Cell key={`${slice.name}-${index}`} fill={chartColorAt(index)} />
             ))}
+            {type === 'donut' ? (
+              <Label
+                position="center"
+                content={({ viewBox }) => {
+                  if (!viewBox || !('cx' in viewBox) || !('cy' in viewBox)) return null
+                  const cx = Number(viewBox.cx)
+                  const cy = Number(viewBox.cy)
+                  return (
+                    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+                      <tspan
+                        x={cx}
+                        y={cy - 4}
+                        fontSize={18}
+                        fontWeight={700}
+                        className="fill-current text-body"
+                      >
+                        {formatChartValue(total, fmt)}
+                      </tspan>
+                      <tspan x={cx} y={cy + 14} fontSize={11} className="fill-current text-muted">
+                        Total
+                      </tspan>
+                    </text>
+                  )
+                }}
+              />
+            ) : null}
           </Pie>
         </PieChart>
       )
@@ -255,6 +410,32 @@ function renderChart(props: ChartProps): React.ReactElement {
             fill={first?.color ?? chartColorAt(0)}
             background
           />
+          {/* The gauge's own label: its value, and what it measures. */}
+          <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+            <Label
+              content={({ viewBox }) => {
+                if (!viewBox || !('cx' in viewBox) || !('cy' in viewBox)) return null
+                const cx = Number(viewBox.cx)
+                const cy = Number(viewBox.cy)
+                return (
+                  <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+                    <tspan
+                      x={cx}
+                      y={cy - 4}
+                      fontSize={22}
+                      fontWeight={700}
+                      className="fill-current text-body"
+                    >
+                      {formatChartValue(value, 'percent')}
+                    </tspan>
+                    <tspan x={cx} y={cy + 16} fontSize={11} className="fill-current text-muted">
+                      {first?.label ?? ''}
+                    </tspan>
+                  </text>
+                )
+              }}
+            />
+          </PolarRadiusAxis>
         </RadialBarChart>
       )
     }

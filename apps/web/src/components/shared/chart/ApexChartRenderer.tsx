@@ -22,7 +22,17 @@
  *   re-renders the chart in the right palette. The `ariaLabel` is applied to a
  *   `role="img"` wrapper, closing the same screen-reader gap the Recharts
  *   renderer does.
+ *
+ *   LABELLING (every chart, no exceptions — mirrors RechartsRenderer):
+ *     - bars and (short) line/area points print their VALUE on the chart;
+ *     - pie/donut slices print their SHARE on the slice, the key lists each
+ *       slice by NAME with its exact value, and a donut shows its total;
+ *     - the key is always shown (it was hidden for single-series charts);
+ *     - category names are rotated rather than dropped when the axis is crowded.
+ *   All formatter functions are module-level / cached so their identity is
+ *   stable across renders (see the [BUG FIX] notes below).
  * [DEPENDS ON]:
+ *   - ./chartLabels (shared value formatting)
  *   - react-apexcharts / apexcharts (R-pre; stack deps)
  *   - next-themes (resolved light/dark mode)
  *   - @/lib/chartPalette (R16 chartColorAt)
@@ -38,6 +48,13 @@ import type { ComponentType } from 'react'
 import { useMemo } from 'react'
 
 import { chartColorAt } from '@/lib/chartPalette'
+import {
+  MAX_LABELLED_POINTS,
+  formatChartValue,
+  formatChartValueFull,
+  inferValueFormat,
+  type ValueFormat,
+} from './chartLabels'
 import type { ChartProps, ChartSeriesConfig, ChartType } from './types'
 
 const DEFAULT_HEIGHT = 300
@@ -101,6 +118,60 @@ function formatRadialValue(v: number): string {
   return `${Math.round(Number(v))}%`
 }
 
+// ─── STABLE LABEL FORMATTERS ─────────────────────────────────────────────────
+// Same reasoning as `formatRadialValue` above: react-apexcharts treats a
+// function-valued option as "changed" unless it is the SAME reference, so each
+// formatter is created once per distinct format combination and cached, never
+// recreated inline on a render. They read everything else they need from the
+// `opts.w` object ApexCharts hands them, not from a closure.
+
+const formatterCache = new Map<string, unknown>()
+
+function stable<T>(key: string, make: () => T): T {
+  if (!formatterCache.has(key)) formatterCache.set(key, make())
+  return formatterCache.get(key) as T
+}
+
+type ApexOpts = { seriesIndex?: number; w?: { globals?: { series?: unknown[]; seriesTotals?: number[] } } }
+
+/** Bar-top / point label: each series is written in its own format. */
+function valueLabelFormatter(formats: ValueFormat[]) {
+  return stable(`value:${formats.join('|')}`, () => (val: string | number | number[], opts?: ApexOpts) =>
+    formatChartValue(val, formats[opts?.seriesIndex ?? 0] ?? formats[0] ?? 'number'),
+  )
+}
+
+/** Axis tick / tooltip value for the first series' format. */
+function axisFormatter(format: ValueFormat) {
+  return stable(`axis:${format}`, () => (val: number) => formatChartValue(val, format))
+}
+
+function tooltipFormatter(formats: ValueFormat[]) {
+  return stable(`tip:${formats.join('|')}`, () => (val: number, opts?: ApexOpts) =>
+    formatChartValueFull(val, formats[opts?.seriesIndex ?? 0] ?? formats[0] ?? 'number'),
+  )
+}
+
+/** Pie/donut slice label: the slice's share. The NAME lives in the key. */
+function formatSliceShare(val: string | number | number[]): string {
+  return `${Math.round(Number(val))}%`
+}
+
+/** Pie/donut key entry: "Name — value" (exact figure, series format). */
+function pieLegendFormatter(format: ValueFormat) {
+  return stable(`pielegend:${format}`, () => (name: string, opts?: ApexOpts) => {
+    const raw = opts?.w?.globals?.series?.[opts?.seriesIndex ?? -1]
+    return raw === undefined ? name : `${name} — ${formatChartValueFull(raw, format)}`
+  })
+}
+
+/** Donut hole: the total of all slices. */
+function donutTotalFormatter(format: ValueFormat) {
+  return stable(`donuttotal:${format}`, () => (w?: ApexOpts['w']) =>
+    formatChartValue((w?.globals?.seriesTotals ?? []).reduce((a, b) => a + b, 0), format),
+  )
+}
+
 /** Map a `ChartType` to the ApexCharts base `chart.type`. */
 function apexBaseType(type: ChartType): ApexBaseType {
   switch (type) {
@@ -152,6 +223,11 @@ export function ApexChartRenderer(props: ChartProps): React.ReactElement {
 
   const isEmpty = data.length === 0 || series.length === 0
   const base = apexBaseType(type)
+  // One format per series (explicit `format`, else inferred from its label).
+  // Joined into a primitive so the options memo below only changes when a
+  // format really does, not whenever the caller passes a fresh `series` array.
+  const formatKey = series.map((s) => inferValueFormat(s.label, s.format)).join('|')
+  const labelPoints = data.length <= MAX_LABELLED_POINTS
 
   // [BUG FIX] Previously computed inline in the component body on every
   // render, producing brand-new array/object references even when `data`
@@ -210,54 +286,115 @@ export function ApexChartRenderer(props: ChartProps): React.ReactElement {
     }
   }, [base, type, data, series])
 
-  const options: ApexOptions = useMemo(() => ({
-    chart: {
-      type: base,
-      background: 'transparent',
-      stacked: type === 'stackedBar',
-      zoom: { enabled: Boolean(zoomable) },
-      toolbar: { show: Boolean(exportable) },
-      fontFamily: 'inherit',
-      parentHeightOffset: 0,
-    },
-    theme: { mode },
-    colors,
-    labels,
-    dataLabels: { enabled: base === 'radialBar' },
-    stroke: { curve: 'smooth', width: base === 'line' ? 2 : 1 },
-    fill: { opacity: base === 'area' ? 0.15 : 1 },
-    legend: { show: series.length > 1 || base === 'pie' || base === 'donut', position: 'bottom' },
-    grid: { borderColor: mode === 'dark' ? '#2a2f3a' : '#e5e7eb', strokeDashArray: 4 },
-    plotOptions: {
-      bar: { columnWidth: '55%', borderRadius: 4 },
-      radialBar: {
-        hollow: { size: '62%' },
-        dataLabels: {
-          name: { show: true, fontSize: '12px' },
-          value: { show: true, formatter: formatRadialValue },
+  const options: ApexOptions = useMemo(() => {
+    const formats = (formatKey ? formatKey.split('|') : ['number']) as ValueFormat[]
+    const firstFormat = formats[0] ?? 'number'
+    const isPie = base === 'pie' || base === 'donut'
+    const isStacked = type === 'stackedBar'
+    const labelText = mode === 'dark' ? '#e4eaf3' : '#0f172a'
+
+    // On-chart labels. Radial gauges draw their own centre label (plotOptions
+    // below), so `dataLabels` stays on for them only to keep that label.
+    const dataLabels: ApexOptions['dataLabels'] = isPie
+      ? {
+          enabled: true,
+          formatter: formatSliceShare,
+          style: { fontSize: '11px', fontWeight: 600 },
+          dropShadow: { enabled: false },
+        }
+      : base === 'radialBar'
+        ? { enabled: true }
+        : {
+            // Bars always carry their value; line/area points only when short enough to read.
+            enabled: base === 'bar' || labelPoints,
+            formatter: valueLabelFormatter(formats),
+            offsetY: (base === 'bar' || type === 'combo') && !isStacked ? -18 : -6,
+            style: { fontSize: '10px', fontWeight: 500, colors: isStacked ? ['#fff'] : [labelText] },
+            background: { enabled: false },
+            dropShadow: { enabled: false },
+          }
+
+    return {
+      chart: {
+        type: base,
+        background: 'transparent',
+        stacked: isStacked,
+        zoom: { enabled: Boolean(zoomable) },
+        toolbar: { show: Boolean(exportable) },
+        fontFamily: 'inherit',
+        parentHeightOffset: 0,
+      },
+      theme: { mode },
+      colors,
+      labels,
+      dataLabels,
+      stroke: { curve: 'smooth', width: base === 'line' ? 2 : 1 },
+      fill: { opacity: base === 'area' ? 0.15 : 1 },
+      markers: { size: base === 'bar' || isPie || base === 'radialBar' ? 0 : labelPoints ? 3 : 0 },
+      // The key is ALWAYS shown (a single-series chart still says what its
+      // colour is); a radial gauge names itself in its centre instead.
+      legend: {
+        show: base !== 'radialBar',
+        position: 'bottom',
+        ...(isPie ? { formatter: pieLegendFormatter(firstFormat) } : {}),
+      },
+      grid: { borderColor: mode === 'dark' ? '#2a2f3a' : '#e5e7eb', strokeDashArray: 4 },
+      plotOptions: {
+        // Column labels sit ABOVE the bar (stacked ones stay centred inside it).
+        bar: {
+          columnWidth: '55%',
+          borderRadius: 4,
+          dataLabels: { position: isStacked ? 'center' : 'top' },
+        },
+        pie: {
+          donut: {
+            labels: {
+              show: base === 'donut',
+              total: { show: true, label: 'Total', formatter: donutTotalFormatter(firstFormat) },
+            },
+          },
+        },
+        radialBar: {
+          hollow: { size: '62%' },
+          dataLabels: {
+            name: { show: true, fontSize: '12px' },
+            value: { show: true, formatter: formatRadialValue },
+          },
         },
       },
-    },
-    // [BUG FIX] Was `xaxis: undefined` for pie/donut/radialBar — an
-    // explicitly-*present* key set to undefined, not an absent one.
-    // ApexCharts' own internal create() reads
-    // `w.config.xaxis.convertedCatToNumeric` with no optional chaining,
-    // assuming its own default-merge step always leaves `xaxis` as a real
-    // object; that merge appears to be a shallow one that lets an
-    // explicit `undefined` from a later chart.updateOptions() call
-    // overwrite (rather than skip past) its previously-merged default —
-    // exactly reproducing "Cannot read properties of undefined (reading
-    // 'convertedCatToNumeric')" on a live production monitoring dashboard.
-    // Spreading the key in only when it's a real object — versus always
-    // having the key present with a sometimes-undefined value — means
-    // ApexCharts' own default never gets an explicit `undefined` to
-    // collide with on any update cycle, not just the first mount.
-    ...(base === 'pie' || base === 'donut' || base === 'radialBar'
-      ? {}
-      : { xaxis: { categories, axisBorder: { show: false }, axisTicks: { show: false } } }),
-    tooltip: { theme: mode },
-    noData: { text: emptyStateMessage ?? 'No data to display.' },
-  }), [base, type, mode, zoomable, exportable, emptyStateMessage, colors, labels, categories, series])
+      // [BUG FIX] Was `xaxis: undefined` for pie/donut/radialBar — an
+      // explicitly-*present* key set to undefined, not an absent one.
+      // ApexCharts' own internal create() reads
+      // `w.config.xaxis.convertedCatToNumeric` with no optional chaining,
+      // assuming its own default-merge step always leaves `xaxis` as a real
+      // object; that merge appears to be a shallow one that lets an
+      // explicit `undefined` from a later chart.updateOptions() call
+      // overwrite (rather than skip past) its previously-merged default —
+      // exactly reproducing "Cannot read properties of undefined (reading
+      // 'convertedCatToNumeric')" on a live production monitoring dashboard.
+      // Spreading the key in only when it's a real object — versus always
+      // having the key present with a sometimes-undefined value — means
+      // ApexCharts' own default never gets an explicit `undefined` to
+      // collide with on any update cycle, not just the first mount.
+      ...(isPie || base === 'radialBar'
+        ? {}
+        : {
+            xaxis: {
+              categories,
+              axisBorder: { show: false },
+              axisTicks: { show: false },
+              // Never silently drop a category name: tilt crowded names instead.
+              labels: { rotate: -35, rotateAlways: false, hideOverlappingLabels: false, trim: true },
+            },
+            yaxis: { labels: { formatter: axisFormatter(firstFormat) } },
+          }),
+      tooltip: {
+        theme: mode,
+        ...(isPie || base === 'radialBar' ? {} : { y: { formatter: tooltipFormatter(formats) } }),
+      },
+      noData: { text: emptyStateMessage ?? 'No data to display.' },
+    }
+  }, [base, type, mode, zoomable, exportable, emptyStateMessage, colors, labels, categories, formatKey, labelPoints])
 
   return (
     <figure className="w-full" aria-label={ariaLabel} role="group">
@@ -283,4 +420,4 @@ export function ApexChartRenderer(props: ChartProps): React.ReactElement {
       )}
     </figure>
   )
-}
+}

@@ -33,7 +33,7 @@ vi.mock('@/lib/prisma', () => ({
   }),
 }))
 
-import { getStudentPlacement } from '../studentPlacementReport'
+const { getStudentPlacement } = await import( '../studentPlacementReport')
 
 const others = [
   { ...base, studentId: 'stu-a', status: 'CONFIRMED', placedUniversityName: 'OTHER UNI A', placedProgrammeName: 'OTHER PROG A' },

@@ -487,10 +487,10 @@ export function StudentAnalyticsPanel({ studentId, academicYear, term }: Student
           <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide">Subject by subject</h3>
           <Chart type="bar" data={chartData}
             series={[
-              { key: 'you',     label: 'You' },
-              { key: 'average', label: 'Class average' },
-              { key: 'best',    label: 'Class best' },
-              { key: 'lowest',  label: 'Class lowest' },
+              { key: 'you',     label: 'You',           format: 'percent' },
+              { key: 'average', label: 'Class average', format: 'percent' },
+              { key: 'best',    label: 'Class best',    format: 'percent' },
+              { key: 'lowest',  label: 'Class lowest',  format: 'percent' },
             ]}
             height={280}
             emptyStateMessage="No subject results yet."

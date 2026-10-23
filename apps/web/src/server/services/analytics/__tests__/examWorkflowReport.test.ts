@@ -99,8 +99,8 @@ vi.mock('@/server/services/classService', () => ({
     new Set(assignments.filter((a) => a.teacherUid === uid).map((a) => `${a.classId}|${a.subject}`)),
 }))
 
-import { getExamPipeline, getExamWorkflow, getManebStatus, getMarkCompletion } from '../examAnalytics'
-import { examsAwaitingMarks, examsAwaitingRelease, examsReleased } from '@/lib/examFilters'
+const { getExamPipeline, getExamWorkflow, getManebStatus, getMarkCompletion } = await import('../examAnalytics')
+const { examsAwaitingMarks, examsAwaitingRelease, examsReleased } = await import ('@/lib/examFilters')
 
 const school = { kind: 'school' } as const
 const Y = '2025/2026'

@@ -441,6 +441,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
    'student.viewFeeStatus',          // See fee status on student record
    'student.viewLibraryStatus',      // See library borrowing status on student record
    'student.viewAttendance',         // See attendance records for any student
+   'student.viewRiskStatus',         // See computed risk level on student record
 
     // Classes — oversight only
     'class.view',

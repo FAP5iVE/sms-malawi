@@ -6,6 +6,7 @@ import { useBudgetWindows } from '@/hooks/useProcurement'
 import { useDepartmentTitles } from '@/hooks/useSettings'
 import { formatMWK } from '@shared/constants/malawi'
 import { MOBILE_BREAKPOINT } from '@shared/constants/breakpoints'
+import { formatChartValue } from '@/components/shared/chart/chartLabels'
 import { Plus, Loader2 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useTheme } from 'next-themes'
@@ -81,13 +82,14 @@ export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: s
     chart: { type: 'bar' as const, toolbar: { show: false }, height: 300, background: 'transparent' },
     theme: { mode: chartMode },
     grid: { borderColor: chartMode === 'dark' ? '#2a2f3a' : '#e5e7eb' },
-    plotOptions: { bar: { horizontal: false, columnWidth: '55%' } },
+    plotOptions: { bar: { horizontal: false, columnWidth: '55%', dataLabels: { position: 'top' as const } } },
     xaxis: {
       categories,
       labels: {
         rotate: -45,
         trim: true,
-        hideOverlappingLabels: true,
+        // Never drop a budget line's name: rotate it instead.
+        hideOverlappingLabels: false,
         style: { fontSize: '11px' },
       },
     },
@@ -101,12 +103,18 @@ export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: s
     // is, and that distinction isn't in this bar pair.
     colors: ['#0F2744', '#0E8A6A'],
     legend: { position: 'top' as const, labels: { colors: chartMode === 'dark' ? '#e4eaf3' : '#0f172a' } },
-    // Per-bar numeric labels are dropped in favor of the tooltip below and
-    // the y-axis scale — exact figures are one tap away, and the chart
-    // reads as a clean shape instead of a wall of small numbers on every
-    // bar. This also removes the white-on-white illegible labels that
-    // appeared whenever a bar was too short for its label to fit inside it.
-    dataLabels: { enabled: false },
+    // Every bar carries its own value. The labels sit ABOVE the bar in the
+    // theme's text colour (not inside it), which is what avoids the earlier
+    // white-on-white problem: a short bar never has to contain its label.
+    dataLabels: {
+      enabled: true,
+      offsetY: -18,
+      // Compact but precise: 250 000 → "MWK 250K", not a rounded "MWK 0.3M".
+      formatter: (v: number) => formatChartValue(v, 'mwk'),
+      style: { fontSize: '10px', colors: [chartMode === 'dark' ? '#e4eaf3' : '#0f172a'] },
+      background: { enabled: false },
+      dropShadow: { enabled: false },
+    },
     tooltip: {
       y: { formatter: (v: number) => formatMWK(v) },
     },
@@ -310,4 +318,4 @@ export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: s
       )}
     </div>
   )
-}
+}

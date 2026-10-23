@@ -18,8 +18,9 @@
 
 import { useState } from 'react'
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList, ResponsiveContainer,
 } from 'recharts'
+import { BAR_LABEL_PROPS, valueFormatter } from '@/components/shared/chart/chartLabels'
 import { TrendingUp, Users2 } from 'lucide-react'
 import { formatMWK } from '@shared/constants/malawi'
 import { useFinancePayrollBreakdown } from '@/hooks/useAnalytics'
@@ -124,16 +125,24 @@ export function PayrollInsightsTab() {
         )}
         {!isLoading && points.length > 0 && (
           <ResponsiveContainer width="100%" height={340}>
-            <ComposedChart data={points} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
+            <ComposedChart data={points} margin={{ top: 22, right: 20, bottom: 5, left: 10 }}>
               <CartesianGrid strokeDasharray="none" stroke="var(--color-border)" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-muted-foreground, #64748b)' }} axisLine={false} tickLine={false} />
               <YAxis tickFormatter={formatCompactMWK} tick={{ fontSize: 11, fill: 'var(--color-muted-foreground, #64748b)' }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '16px' }} />
-              <Bar dataKey="totalGross" name="Gross Payroll" fill="var(--color-brand-teal, #0d9488)" radius={[4, 4, 0, 0]} maxBarSize={28} />
-              <Bar dataKey="totalPaye" name="PAYE Tax" fill="var(--color-brand-coral, #f97316)" radius={[4, 4, 0, 0]} maxBarSize={28} opacity={0.75} />
-              <Bar dataKey="totalPension" name="Pension" fill="var(--color-brand-amber, #f59e0b)" radius={[4, 4, 0, 0]} maxBarSize={28} opacity={0.75} />
-              <Line type="monotone" dataKey="totalNet" name="Net Disbursed" stroke="var(--color-brand-navy, #1e3a5f)" strokeWidth={2} dot={{ fill: 'var(--color-brand-navy, #1e3a5f)', r: 3 }} />
+              <Bar dataKey="totalGross" name="Gross Payroll" fill="var(--color-brand-teal, #0d9488)" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                <LabelList dataKey="totalGross" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+              </Bar>
+              <Bar dataKey="totalPaye" name="PAYE Tax" fill="var(--color-brand-coral, #f97316)" radius={[4, 4, 0, 0]} maxBarSize={28} opacity={0.75}>
+                <LabelList dataKey="totalPaye" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+              </Bar>
+              <Bar dataKey="totalPension" name="Pension" fill="var(--color-brand-amber, #f59e0b)" radius={[4, 4, 0, 0]} maxBarSize={28} opacity={0.75}>
+                <LabelList dataKey="totalPension" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+              </Bar>
+              <Line type="monotone" dataKey="totalNet" name="Net Disbursed" stroke="var(--color-brand-navy, #1e3a5f)" strokeWidth={2} dot={{ fill: 'var(--color-brand-navy, #1e3a5f)', r: 3 }}>
+                <LabelList dataKey="totalNet" position="bottom" fontSize={9} className="fill-current text-body" formatter={valueFormatter('mwk')} />
+              </Line>
             </ComposedChart>
           </ResponsiveContainer>
         )}

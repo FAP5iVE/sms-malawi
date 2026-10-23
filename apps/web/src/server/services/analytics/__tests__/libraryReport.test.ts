@@ -62,8 +62,8 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
-import { getLibraryDigital, getLibraryStock } from '../libraryAnalytics'
-import { recordDigitalResourceView } from '../../digitalViewRecorder'
+const { getLibraryDigital, getLibraryStock } = await import ('../libraryAnalytics')
+const { recordDigitalResourceView } = await import ('../../digitalViewRecorder')
 
 describe('digital library report', () => {
   it('reports the catalogue and usage separately, from recorded views only', async () => {

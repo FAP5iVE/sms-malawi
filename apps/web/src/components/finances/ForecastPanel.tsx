@@ -46,8 +46,10 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  LabelList,
   ResponsiveContainer,
 }                               from 'recharts'
+import { BAR_LABEL_PROPS, valueFormatter } from '@/components/shared/chart/chartLabels'
 import { TrendingUp, Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 import { apiFetch }             from '@/lib/api-client'
 import { formatMWK }            from '@shared/constants/malawi'
@@ -292,7 +294,7 @@ export function ForecastPanel() {
             Monthly Cash Flow — Actual (solid) vs Forecast (light)
           </p>
           <ResponsiveContainer width="100%" height={320}>
-            <ComposedChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
+            <ComposedChart data={chartData} margin={{ top: 22, right: 20, bottom: 5, left: 10 }}>
               <CartesianGrid strokeDasharray="none" stroke="var(--color-border)" vertical={false} />
               <XAxis
                 dataKey="label"
@@ -310,8 +312,12 @@ export function ForecastPanel() {
               <Legend
                 wrapperStyle={{ fontSize: '12px', paddingTop: '16px' }}
               />
-              <Bar dataKey="actual"   name="Actual Revenue" fill="var(--color-brand-teal, #0d9488)" radius={[4,4,0,0]} maxBarSize={32} />
-              <Bar dataKey="forecast" name="Forecast Revenue" fill="var(--color-brand-amber, #f59e0b)" radius={[4,4,0,0]} maxBarSize={32} opacity={0.65} />
+              <Bar dataKey="actual"   name="Actual Revenue" fill="var(--color-brand-teal, #0d9488)" radius={[4,4,0,0]} maxBarSize={32}>
+                <LabelList dataKey="actual" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+              </Bar>
+              <Bar dataKey="forecast" name="Forecast Revenue" fill="var(--color-brand-amber, #f59e0b)" radius={[4,4,0,0]} maxBarSize={32} opacity={0.65}>
+                <LabelList dataKey="forecast" {...BAR_LABEL_PROPS} fontSize={9} formatter={valueFormatter('mwk')} />
+              </Bar>
               <Line
                 type="monotone"
                 dataKey="netFlow"
@@ -320,7 +326,9 @@ export function ForecastPanel() {
                 strokeWidth={2}
                 dot={{ fill: 'var(--color-brand-navy, #1e3a5f)', r: 3 }}
                 strokeDasharray="4 2"
-              />
+              >
+                <LabelList dataKey="netFlow" position="bottom" fontSize={9} className="fill-current text-body" formatter={valueFormatter('mwk')} />
+              </Line>
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -333,4 +341,4 @@ export function ForecastPanel() {
       )}
     </div>
   )
-}
+}

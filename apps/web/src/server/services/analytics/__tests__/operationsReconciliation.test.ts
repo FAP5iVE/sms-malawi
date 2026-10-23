@@ -107,8 +107,8 @@ vi.mock('@/lib/prisma', () => ({
   }),
 }))
 
-import { getAssetRegisterReport, getProcurementValue, getStockReport, getStocktakeReport } from '../operationsAnalytics'
-import { openCommitments } from '../financeAnalytics'
+const { getAssetRegisterReport, getProcurementValue, getStockReport, getStocktakeReport } = await import ('../operationsAnalytics')
+const { openCommitments } = await import ('../financeAnalytics')
 
 describe('asset register report', () => {
   it('totals agree with the register: valuation excludes disposed rows only', async () => {

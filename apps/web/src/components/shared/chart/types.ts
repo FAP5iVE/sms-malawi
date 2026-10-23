@@ -69,7 +69,16 @@ export interface ChartSeriesConfig {
   label: string
   color?: string
   kind?: 'bar' | 'line' | 'area'
+  /**
+   * How this series' values are written on the chart (bar tops, line points,
+   * pie slices, axis ticks). Optional: a label containing "%" is treated as a
+   * percentage and one containing "MWK" as money, otherwise a plain count.
+   */
+  format?: ValueFormat
 }
+
+/** How a series' numbers are written on the chart. */
+export type ValueFormat = 'number' | 'percent' | 'mwk'
 
 /**
  * The complete, library-agnostic description of a chart. This is the only type

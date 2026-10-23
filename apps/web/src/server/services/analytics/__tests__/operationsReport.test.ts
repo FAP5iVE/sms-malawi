@@ -71,7 +71,7 @@ vi.mock('@/server/services/monitoringService', () => ({ getSummary: async () => 
 vi.mock('@/server/services/sessionService', () => ({ ACTIVE_GRACE_MS: 180_000, getSessionSummary: async () => ({}) }))
 vi.mock('@/server/services/vercelMonitoringService', () => ({ isVercelMonitoringConfigured: () => state.vercelConfigured }))
 
-import { getOperationsReport } from '../adminAnalytics'
+const { getOperationsReport } = await import ( '../adminAnalytics')
 
 const FULL = { health: true, monitoring: true, database: true }
 

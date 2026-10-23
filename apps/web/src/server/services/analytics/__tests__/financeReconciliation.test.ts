@@ -134,14 +134,14 @@ vi.mock('@/lib/prisma', () => ({
   prisma: makeFakePrisma({ invoice: invoices, payment: payments, budget: budgets, expense: expenses, purchaseOrder: purchaseOrders, installment: installments }),
 }))
 
-import {
+const {
   billing,
   getFinanceAging,
   getFinanceAttention,
   getFinanceOverview,
   getPaymentMix,
   loadBudgetPosition,
-} from '../financeAnalytics'
+} = await import ('../financeAnalytics')
 import { groupOutstandingByClass } from '../financeLogic'
 
 const kpiOf = (overview: Awaited<ReturnType<typeof getFinanceOverview>>, key: string) => {

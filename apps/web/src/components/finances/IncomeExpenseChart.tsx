@@ -74,9 +74,9 @@ export function IncomeExpenseChart({
         data={data}
 
         series={[
-          { key: 'revenue', label: 'Revenue', kind: 'bar', color: 'var(--color-brand-teal, #0e8a6a)' },
-          { key: 'expenses', label: 'Expenses', kind: 'bar', color: 'var(--color-brand-coral, #dc4f3a)' },
-          { key: 'net', label: 'Net', kind: 'line', color: 'var(--color-brand-navy, #1e3a5f)' },
+          { key: 'revenue', label: 'Revenue', kind: 'bar', format: 'mwk', color: 'var(--color-brand-teal, #0e8a6a)' },
+          { key: 'expenses', label: 'Expenses', kind: 'bar', format: 'mwk', color: 'var(--color-brand-coral, #dc4f3a)' },
+          { key: 'net', label: 'Net', kind: 'line', format: 'mwk', color: 'var(--color-brand-navy, #1e3a5f)' },
         ]}
         height={260}
         emptyStateMessage="No income or expense data for this year yet."
