@@ -103,7 +103,7 @@ export function LibraryDashboard() {
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
         title="Library at a glance"
-        summary="Books out, what is overdue and what is on the shelf. Tap a figure to open its report."
+        summary="See which books are out, what is overdue and what is available to borrow."
         overview={overview}
         preferred={PREFERRED}
         reportsHref="/reports?tab=overview"

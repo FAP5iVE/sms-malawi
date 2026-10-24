@@ -139,7 +139,7 @@ export function ExamOfficerDashboard() {
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
         title="Examinations at a glance"
-        summary="Where this term's exams are in marking, approval and release. Tap a figure to open its report."
+        summary="Check marking progress, results awaiting approval and exams still to be completed."
         academicYear={academicYear}
         term={term}
         overview={overview}

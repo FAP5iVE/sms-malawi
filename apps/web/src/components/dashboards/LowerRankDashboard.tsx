@@ -111,7 +111,7 @@ export function LowerRankDashboard() {
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
         title="Registry at a glance"
-        summary="Students on the roll, the admissions queue and attendance exceptions. Tap a figure to open its report."
+        summary="Keep up with admissions, student registration and attendance issues that need follow-up."
         academicYear={academicYear}
         term={term}
         overview={overview}

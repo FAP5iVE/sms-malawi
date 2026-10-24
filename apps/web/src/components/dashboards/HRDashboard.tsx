@@ -138,7 +138,7 @@ export function HRDashboard() {
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
         title="Workforce at a glance"
-        summary="Headcount, who is away and the decisions waiting on you. Tap a figure to open its report."
+        summary="Check staff numbers, upcoming contract dates, leave and requests waiting for a decision."
         academicYear={academicYear}
         overview={overview}
         preferred={PREFERRED}

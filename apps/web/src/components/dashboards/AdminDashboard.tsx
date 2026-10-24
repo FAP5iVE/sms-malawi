@@ -123,7 +123,7 @@ export function AdminDashboard() {
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
         title="Administration at a glance"
-        summary="Platform health, sign-in security and who is using the system. Tap a figure to open its report."
+        summary="Review sign-ins, see how the system is being used and check for issues that need attention."
         overview={overview}
         preferred={PREFERRED}
         reportsHref="/reports?tab=overview"

@@ -111,7 +111,7 @@ export function AcademicDashboard() {
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
         title="Teaching at a glance"
-        summary="Results, attendance and marks across the classes you teach. Tap a figure to open its report."
+        summary="See how your classes are doing and follow up on missing marks or students who may need help."
         academicYear={academicYear}
         term={term}
         overview={overview}

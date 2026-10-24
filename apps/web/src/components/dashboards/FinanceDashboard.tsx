@@ -112,7 +112,7 @@ export function FinanceDashboard() {
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
         title="Finance at a glance"
-        summary="Collection, what is owed and how much of the budget is spent. Tap a figure to open its report."
+        summary="See what has come in, what is still owed and how spending compares with the budget."
         academicYear={academicYear}
         term={term}
         overview={overview}

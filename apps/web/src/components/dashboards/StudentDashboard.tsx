@@ -143,7 +143,7 @@ export function StudentDashboard() {
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
         title="My term at a glance"
-        summary="Your results, attendance, fees and handed-in work. Results appear once your term fees are cleared."
+        summary="Check your results, attendance and assignments for the selected term."
         academicYear={academicYear}
         term={term}
         overview={overview}

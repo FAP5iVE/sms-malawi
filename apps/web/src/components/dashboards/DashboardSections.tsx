@@ -50,7 +50,7 @@ export function PrimaryKpis({
     <section aria-label="School at a glance" className="space-y-3">
       <DashboardIntro
         title="School at a glance"
-        summary="The four figures that matter most this term. Tap one to open the report behind it."
+        summary="Review school results, attendance, enrolment and finances in one place."
         academicYear={academicYear}
         term={term}
         reportsHref="/reports?tab=overview"
