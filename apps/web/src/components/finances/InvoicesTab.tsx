@@ -1136,15 +1136,17 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
         )}
       </div>
 
-      {/* Finance: the selected student's complete fee payment history (all
-          terms and years), not just this term's invoice. */}
-      {selectedStudent && <StudentPaymentHistory studentId={selectedStudent.id} />}
-
+      {/* Transaction notes sit directly under the Save / Record Payment
+          button, ahead of the payment history. */}
       {existingInvoice && (
         <div className="space-y-4">
           <InvoiceNotes invoiceId={existingInvoice.id} />
         </div>
       )}
+
+      {/* Finance: the selected student's complete fee payment history (all
+          terms and years), not just this term's invoice. */}
+      {selectedStudent && <StudentPaymentHistory studentId={selectedStudent.id} />}
 
       {overpaymentPrompt && (
         <OverpaymentConfirmModal
