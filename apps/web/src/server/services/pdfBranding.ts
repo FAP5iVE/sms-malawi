@@ -552,7 +552,12 @@ export function drawStamp(doc: jsPDF, o: StampOptions): void {
   const k = r / 15
   try {
     doc.saveGraphicsState()
-    doc.setGState(new doc.GState({ opacity: 0.92 }))
+    // jsPDF's typings declare `GState` as an instance type, not a constructor,
+    // though it is constructible at runtime — cast to satisfy strict TS.
+    const GState = (doc as unknown as {
+      GState: new (params: { opacity: number }) => unknown
+    }).GState
+    doc.setGState(new GState({ opacity: 0.92 }) as Parameters<jsPDF['setGState']>[0])
   } catch { /* opacity is cosmetic */ }
 
   strokeColor(doc, color)
