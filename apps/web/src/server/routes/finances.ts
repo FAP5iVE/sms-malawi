@@ -513,6 +513,12 @@ financesRouter.post(
       if (err instanceof feeService.OverpaymentConfirmationRequiredError) {
         return res.status(409).json({ error: err.message, overpayments: err.overpayments })
       }
+      // [FIXED 2026-10-22] Same invoice, amount, method and reference (or an
+      // identical payment seconds ago) -- an accidental double-submit. 409, no
+      // `overpayments` field, so the client shows it as an error message.
+      if (err instanceof feeService.DuplicatePaymentError) {
+        return res.status(409).json({ error: err.message, duplicate: true })
+      }
       return sendError(res, err, { tags: { module: 'finances', route: 'record-payment' } })
     }
   }

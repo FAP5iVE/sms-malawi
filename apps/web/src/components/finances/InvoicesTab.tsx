@@ -60,7 +60,7 @@
  *   InvoiceNotes.tsx (preserved, unchanged, re-mounted here)
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -127,6 +127,20 @@ interface OverpaymentItem {
   excess: number
 }
 
+// Remembers what a half-finished submit already created on the server (the
+// invoice, its line items) so that a retry -- e.g. after the overpayment
+// confirmation -- continues the SAME transaction instead of generating a
+// second invoice or adding the same fee line twice.
+interface SubmitFlow {
+  studentId: string
+  invoiceId: string
+  lineItemIdByFee: Map<string, string>
+}
+
+// All money maths on this screen goes through cents-rounding so floating
+// point noise (0.1 + 0.2) can never show up as a phantom balance or credit.
+const round2 = (n: number): number => Math.round(n * 100) / 100
+
 // ─────────────────────────────────────────────────────────────────────────
 // ENTRY POINT — routes staff to Invoice Entry & Allocation, students to
 // the dedicated Student Portal Statement screen (this used to be a small
@@ -174,6 +188,13 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
+  // submitLockRef closes the gap between a click and React re-rendering the
+  // button as disabled -- a fast double-click / Enter-key repeat could
+  // otherwise fire submit() twice and record the same payment twice.
+  const submitLockRef = useRef(false)
+  const lastSeededStudentRef = useRef<string | null>(null)
+  const flowRef = useRef<SubmitFlow | null>(null)
+
   // ── Data ──
   // useStudents() returns the paginated { students, total, page, pages }
   // shape, not a bare array -- only fetch once the search string is
@@ -185,10 +206,11 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
   })
   const searchResults = studentSearch.length >= 2 ? (searchData?.students ?? []) : []
   const { data: selectedStudent } = useStudent(selectedStudentId ?? '')
-  const { data: studentInvoices = [] } = useInvoices(
-    { studentId: selectedStudentId ?? undefined, academicYear, term },
-    !!selectedStudentId
-  )
+  const {
+    data: studentInvoices = [],
+    isLoading: invoicesLoading,
+    isFetching: invoicesFetching,
+  } = useInvoices({ studentId: selectedStudentId ?? undefined, academicYear, term }, !!selectedStudentId)
   const existingInvoice: ApiInvoice | undefined = studentInvoices[0]
 
   const { data: eligibleFees = [], isLoading: eligibleLoading } = useFeeStructures(
@@ -210,13 +232,45 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
   const isNewInvoice = !existingInvoice
   const isBusy = generateInvoice.isPending || recordPayment.isPending || addLineItem.isPending
 
-  // ── Reset the ledger whenever the selected student or their invoice
-  //    identity changes -- a fresh form for a fresh subject. ──
-  const initKey = selectedStudent ? `${selectedStudent.id}:${existingInvoice?.id ?? 'new'}` : null
-  useEffect(() => {
-    if (!selectedStudent || !initKey || initKey === rowsInitializedFor) return
+  // ── Ledger identity ──
+  // [FIXED 2026-10-22] The ledger used to be keyed on `studentId:invoiceId`
+  // only. After recording a payment against an EXISTING invoice that key never
+  // changed, so (a) it was rebuilt once from the not-yet-refetched, pre-payment
+  // invoice and (b) never rebuilt again when the fresh invoice arrived -- the
+  // Balance column and Arrears stayed red until a manual refresh, inviting the
+  // same payment to be recorded twice. The key now includes a fingerprint of
+  // the server numbers the ledger is built from (status, balance, every line's
+  // amount and balance), so ANY server-side change re-syncs it automatically.
+  const invoiceFingerprint = existingInvoice
+    ? [
+        existingInvoice.id,
+        existingInvoice.status,
+        Number(existingInvoice.balance),
+        ...existingInvoice.lineItems.map(
+          (li) => `${li.id}:${Number(li.amount)}:${Number(li.balance)}`
+        ),
+      ].join('|')
+    : `new:${eligibleFees.map((f) => f.id).join(',')}`
+  const initKey = selectedStudent ? `${selectedStudent.id}:${invoiceFingerprint}` : null
 
-    const nextRows = existingInvoice
+  // True while the invoice / fee queries that decide what the ledger shows
+  // have not answered yet. Without this the screen briefly behaved as a
+  // "new invoice" for a student who already has one (and, with eligible fees
+  // still loading, could seed an empty ledger that never filled in).
+  const ledgerLoading =
+    !!selectedStudentId && (invoicesLoading || (isNewInvoice && eligibleLoading))
+  // True whenever what is on screen may not match the server: still loading,
+  // a refetch in flight, or the ledger not yet rebuilt from the latest data.
+  // Submitting is blocked during this window so nothing can be recorded
+  // against stale balances.
+  const ledgerSyncing =
+    ledgerLoading || invoicesFetching || (!!initKey && initKey !== rowsInitializedFor)
+
+  useEffect(() => {
+    if (!selectedStudent || !initKey || ledgerLoading || initKey === rowsInitializedFor) return
+
+    const studentId = selectedStudent.id
+    const nextRows: Row[] = existingInvoice
       ? existingInvoice.lineItems.map((li) => {
           const fee = li.feeStructureId ? feesById.get(li.feeStructureId) : undefined
           return {
@@ -250,42 +304,96 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
         }))
 
     queueMicrotask(() => {
-      setRows(nextRows)
-      setPaymentAmount('')
-      setPaymentReference('')
-      setPaymentNotes('')
-      setAdditionalDiscount('')
-      setSubmitError(null)
-      setSuccessMessage(null)
+      const sameStudent = lastSeededStudentRef.current === studentId
+      lastSeededStudentRef.current = studentId
+
+      setRows((prev) => {
+        // A different student gets a clean form. The SAME student only gets
+        // fresh server numbers -- what the cashier already typed (e.g. while
+        // the overpayment confirmation is open after the invoice was just
+        // created) and any not-yet-saved "+ Add a line" rows are kept.
+        if (!sameStudent) return nextRows
+        const prevByFee = new Map(prev.map((r) => [r.feeStructureId, r]))
+        const merged = nextRows.map((r) => ({
+          ...r,
+          allocation: prevByFee.get(r.feeStructureId)?.allocation ?? '',
+        }))
+        const unsaved = prev.filter(
+          (r) => !r.lineItemId && !merged.some((m) => m.feeStructureId === r.feeStructureId)
+        )
+        return [...merged, ...unsaved]
+      })
+      if (!sameStudent) {
+        setPaymentAmount('')
+        setPaymentReference('')
+        setPaymentNotes('')
+        setAdditionalDiscount('')
+        setSubmitError(null)
+        setSuccessMessage(null)
+      }
       setRowsInitializedFor(initKey)
     })
-  }, [initKey, selectedStudent, existingInvoice, eligibleFees, feesById, rowsInitializedFor])
+  }, [initKey, selectedStudent, existingInvoice, eligibleFees, feesById, rowsInitializedFor, ledgerLoading])
 
-  // ── Live totals — recalculate on every keystroke, exactly as requested ──
-  const totalFixedFees = rows.reduce((sum, r) => sum + r.fixedAmount, 0)
-  const totalAllocated = rows.reduce((sum, r) => sum + (Number(r.allocation) || 0), 0)
-  const totalBalanceOwed = rows.reduce((sum, r) => sum + r.balance, 0)
-
+  // ── Live totals — recalculate on every keystroke ──
   const scholarshipPreview = 0 // server computes the real figure at generateInvoice() time; see discountApplied below for the manual portion this screen actually controls
-  const manualDiscountValue = Number(additionalDiscount) || 0
+  const manualDiscountValue = Math.max(0, Number(additionalDiscount) || 0)
+  const totalFixedFees = round2(rows.reduce((sum, r) => sum + r.fixedAmount, 0))
   const netFeesDue = isNewInvoice
-    ? Math.max(0, totalFixedFees - scholarshipPreview - manualDiscountValue)
-    : totalBalanceOwed
+    ? Math.max(0, round2(totalFixedFees - scholarshipPreview - manualDiscountValue))
+    : round2(rows.reduce((sum, r) => sum + r.balance, 0))
+  // A new invoice's discount is spread proportionally over its lines by the
+  // server (computeInvoiceCharges); mirror that so per-line figures match.
+  const discountFactor =
+    isNewInvoice && totalFixedFees > 0 ? Math.min(1, netFeesDue / totalFixedFees) : 1
 
-  const paymentCommitted = Number(paymentAmount) || 0
-  const unallocatedCash = Math.max(0, Math.round((paymentCommitted - totalAllocated) * 100) / 100)
+  // One derived row per fee line. `owed` is what the line can still absorb;
+  // anything allocated beyond it is `excess` -- exactly the per-line rule
+  // feeService.recordPayment() applies (applied = min(allocation, balance),
+  // the rest becomes advance credit).
+  const ledger = rows.map((r) => {
+    const alloc = Math.max(0, Number(r.allocation) || 0)
+    const owed = isNewInvoice ? round2(r.balance * discountFactor) : r.balance
+    return {
+      ...r,
+      alloc,
+      owed,
+      applied: Math.min(alloc, owed),
+      excess: Math.max(0, round2(alloc - owed)),
+      remaining: Math.max(0, round2(owed - alloc)),
+    }
+  })
+
+  const totalAllocated = round2(ledger.reduce((sum, r) => sum + r.alloc, 0))
+  const appliedToFees = round2(ledger.reduce((sum, r) => sum + r.applied, 0))
+  const lineExcess = round2(ledger.reduce((sum, r) => sum + r.excess, 0))
+
+  const paymentCommitted = Math.max(0, Number(paymentAmount) || 0)
+  const unallocatedCash = Math.max(0, round2(paymentCommitted - totalAllocated))
   const allocationExceedsCommitted = totalAllocated > paymentCommitted + 0.01
-  // [FIXED 2026-09-06] Was `netFeesDue - paymentCommitted` -- meaning this
-  // only reacted to the top "Amount of Payment Being Paid" field, and
-  // ignored every fee-line allocation input entirely (Total Payment
-  // Allocated could differ from Total Payment Committed whenever some of
-  // the payment is left unallocated -- see the overpayment-confirmation
-  // flow below). Balance Due is what's still owed on the FEES themselves,
-  // so it must be driven by what's actually been allocated to them, not by
-  // the raw amount handed over -- this is also what makes it update live as
-  // you type into any individual fee line's allocation box, not just the
-  // payment-amount field.
-  const arrearsBalance = Math.max(0, Math.round((netFeesDue - totalAllocated) * 100) / 100)
+
+  // [FIXED 2026-10-22] Overpayment, live. Money that will NOT reduce the
+  // invoice and instead becomes advance credit = cash entered but not
+  // allocated to any fee, plus anything allocated beyond a line's own
+  // balance. Previously only the first part was visible (as a small grey
+  // "Unallocated" figure) while Arrears showed a reassuring 0.00 -- nothing
+  // said how much the family was overpaying until the server's 409 popup.
+  const overpaymentTotal = round2(lineExcess + unallocatedCash)
+  const hasOverpayment = overpaymentTotal > 0.01
+  const overpaymentBreakdown = [
+    ...ledger
+      .filter((r) => r.excess > 0.01)
+      .map((r) => ({ key: r.key, label: r.feeName, amount: r.excess })),
+    ...(unallocatedCash > 0.01
+      ? [{ key: 'unallocated', label: 'Unallocated cash', amount: unallocatedCash }]
+      : []),
+  ]
+
+  // [FIXED 2026-10-22] Arrears used to be `netFeesDue - totalAllocated`, which
+  // counted money allocated BEYOND a line's balance as if it paid another
+  // line: Tuition over-allocated by 50,000 hid 50,000 still owed on Levy.
+  // Only what each line can really absorb reduces what is owed.
+  const arrearsBalance = Math.max(0, round2(netFeesDue - appliedToFees))
 
   // [FIXED 2026-09-06] The button used to require canRecordPayment
   // unconditionally, even for a brand-new invoice being created with $0
@@ -299,27 +407,48 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
   // route's own requireRole()/permission check regardless of what the
   // frontend shows.
   const canOperateScreen = canGenerateInvoice || canRecordPayment
+  const needsAllocation = paymentCommitted > 0 && totalAllocated <= 0
+  const hasUnsavedLines = !isNewInvoice && rows.some((r) => !r.lineItemId)
+  // [FIXED 2026-10-22] On an existing invoice with nothing typed, the button
+  // read "Save Changes" and was enabled although there was nothing to save.
+  const hasWorkToSave = isNewInvoice ? rows.length > 0 : paymentCommitted > 0 || hasUnsavedLines
   const canSubmit =
     !!selectedStudent &&
-    rows.length > 0 &&
+    hasWorkToSave &&
     !allocationExceedsCommitted &&
-    !(paymentCommitted > 0 && totalAllocated <= 0) &&
+    !needsAllocation &&
     !isBusy &&
+    !ledgerSyncing &&
     canOperateScreen
 
+  function resetForm() {
+    setRows([])
+    setPaymentAmount('')
+    setPaymentReference('')
+    setPaymentNotes('')
+    setAdditionalDiscount('')
+    setSubmitError(null)
+    setSuccessMessage(null)
+    setOverpaymentPrompt(null)
+    setRowsInitializedFor(null)
+    lastSeededStudentRef.current = null
+    flowRef.current = null
+  }
+
   function selectStudent(id: string) {
+    resetForm()
     setSelectedStudentId(id)
     setStudentSearch('')
-    setRowsInitializedFor(null)
   }
 
   function changeStudent() {
+    resetForm()
     setSelectedStudentId(null)
-    setRowsInitializedFor(null)
     router.replace('/finances?tab=invoices')
   }
 
   function updateAllocation(key: string, value: string) {
+    setSuccessMessage(null)
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, allocation: value } : r)))
   }
 
@@ -349,30 +478,51 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
     setAddLineValue('')
   }
 
+  // [FIXED 2026-10-22] The running `pool` used to be mutated INSIDE the
+  // setRows updater. React may call an updater twice (StrictMode in dev,
+  // concurrent re-runs), and the second call started with an already-drained
+  // pool -- leaving every allocation blank. The distribution is now computed
+  // once, from the rendered ledger, and the finished result is set.
   function autoDistribute() {
     let pool = paymentCommitted
-    setRows((prev) =>
-      prev.map((r) => {
+    setSuccessMessage(null)
+    setRows(
+      rows.map((r, i) => {
         if (pool <= 0) return { ...r, allocation: '' }
-        const take = Math.min(r.balance, pool)
-        pool = Math.round((pool - take) * 100) / 100
+        const take = Math.min(ledger[i]?.owed ?? r.balance, pool)
+        pool = round2(pool - take)
         return { ...r, allocation: take > 0 ? String(take) : '' }
       })
     )
   }
 
   async function submit(confirmOverpayment = false) {
-    if (!selectedStudent) return
+    if (!selectedStudent || submitLockRef.current) return
+    submitLockRef.current = true
     setSubmitError(null)
+    setSuccessMessage(null)
+
+    const studentId = selectedStudent.id
+    const studentName = `${selectedStudent.firstName} ${selectedStudent.lastName}`
+    const amount = paymentCommitted // snapshot -- the inputs are locked while saving, but be explicit
+
     try {
-      let invoiceId = existingInvoice?.id
-      const lineItemIdByFee = new Map(
-        (existingInvoice?.lineItems ?? []).map((li) => [li.feeStructureId ?? '', li.id])
-      )
+      // Continue a half-finished attempt for this student (invoice already
+      // created, overpayment awaiting confirmation) rather than starting over.
+      const resumed = flowRef.current?.studentId === studentId ? flowRef.current : null
+      let invoiceId = existingInvoice?.id ?? resumed?.invoiceId
+      const createdNow = !invoiceId
+      const lineItemIdByFee = resumed?.lineItemIdByFee ?? new Map<string, string>()
+      for (const li of existingInvoice?.lineItems ?? []) {
+        lineItemIdByFee.set(li.feeStructureId ?? '', li.id)
+      }
+      const remember = (id: string) => {
+        flowRef.current = { studentId, invoiceId: id, lineItemIdByFee }
+      }
 
       if (!invoiceId) {
         const created = await generateInvoice.mutateAsync({
-          studentId: selectedStudent.id,
+          studentId,
           academicYear,
           term,
           feeStructureIds: rows.map((r) => r.feeStructureId),
@@ -380,15 +530,18 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
         })
         invoiceId = created.id
         for (const li of created.lineItems) lineItemIdByFee.set(li.feeStructureId ?? '', li.id)
+        remember(invoiceId)
       } else {
         for (const r of rows) {
-          if (r.lineItemId) continue
+          // Already on the invoice (or added by an earlier attempt) -- never add twice.
+          if (r.lineItemId || lineItemIdByFee.has(r.feeStructureId)) continue
           const updated = await addLineItem.mutateAsync({
             invoiceId,
             feeStructureId: r.feeStructureId,
           })
           const newLi = updated.lineItems.find((li) => li.feeStructureId === r.feeStructureId)
           if (newLi) lineItemIdByFee.set(r.feeStructureId, newLi.id)
+          remember(invoiceId)
         }
       }
 
@@ -399,44 +552,68 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
       if (!invoiceId)
         throw new Error('Could not resolve an invoice to record this payment against.')
 
-      if (paymentCommitted > 0) {
+      if (amount > 0) {
         const allocations = rows
           .map((r) => ({
             lineItemId: lineItemIdByFee.get(r.feeStructureId) ?? '',
             amount: Number(r.allocation) || 0,
           }))
           .filter((a) => a.lineItemId && a.amount > 0)
+        if (allocations.length === 0) {
+          throw new Error('Allocate this payment to at least one fee before recording it.')
+        }
 
         await recordPayment.mutateAsync({
           invoiceId,
-          amount: paymentCommitted,
+          amount,
           method: paymentMethod,
-          reference: paymentReference || undefined,
-          notes: paymentNotes || undefined,
+          reference: paymentReference.trim() || undefined,
+          notes: paymentNotes.trim() || undefined,
           allocations,
           confirmOverpayment,
         })
       }
 
-      setSuccessMessage(
-        paymentCommitted > 0
-          ? `Payment of ${formatMWK(paymentCommitted)} recorded for ${selectedStudent.firstName} ${selectedStudent.lastName}.`
-          : `Invoice created for ${selectedStudent.firstName} ${selectedStudent.lastName}.`
-      )
+      // Credit actually created: only ever non-zero on the confirmed
+      // resubmission, and taken from the server's own breakdown when we have it.
+      const promptTotal = round2((overpaymentPrompt ?? []).reduce((sum, i) => sum + i.excess, 0))
+      const creditSaved = confirmOverpayment ? (promptTotal > 0 ? promptTotal : overpaymentTotal) : 0
+
+      // Clear everything that described THIS payment, right now, instead of
+      // relying on a re-seed: an overpayment on an already-PAID invoice leaves
+      // every line balance unchanged, so nothing else would clear the form --
+      // and a form still holding the old amount is how a payment gets
+      // recorded twice.
+      flowRef.current = null
       setOverpaymentPrompt(null)
-      setRowsInitializedFor(null) // reload real state (invoice now exists / balances updated)
+      setPaymentAmount('')
+      setPaymentReference('')
+      setPaymentNotes('')
+      setAdditionalDiscount('')
+      setRows((prev) => prev.map((r) => ({ ...r, allocation: '' })))
+      setSuccessMessage(
+        amount > 0
+          ? `Payment of ${formatMWK(amount)} recorded for ${studentName}.${
+              creditSaved > 0
+                ? ` ${formatMWK(creditSaved)} was saved as advance credit for their next invoice.`
+                : ''
+            }`
+          : createdNow
+            ? `Invoice created for ${studentName}.`
+            : `Fee lines added to the invoice for ${studentName}.`
+      )
     } catch (err) {
-      if (
-        err instanceof ApiError &&
-        err.status === 409 &&
-        err.details &&
-        typeof err.details === 'object'
-      ) {
-        const details = err.details as { overpayments?: OverpaymentItem[] }
-        setOverpaymentPrompt(details.overpayments ?? [])
+      const details =
+        err instanceof ApiError && err.status === 409 && err.details && typeof err.details === 'object'
+          ? (err.details as { overpayments?: unknown })
+          : null
+      if (details && Array.isArray(details.overpayments)) {
+        setOverpaymentPrompt(details.overpayments as OverpaymentItem[])
       } else {
         setSubmitError(err instanceof Error ? err.message : 'Something went wrong recording this.')
       }
+    } finally {
+      submitLockRef.current = false
     }
   }
 
@@ -583,7 +760,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                 <button
                   type="button"
                   onClick={autoDistribute}
-                  disabled={paymentCommitted <= 0}
+                  disabled={paymentCommitted <= 0 || isBusy}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-teal hover:underline disabled:opacity-40 disabled:no-underline"
                 >
                   <Wand2 className="w-3.5 h-3.5" /> Auto-Distribute Payment
@@ -599,8 +776,12 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                     type="number"
                     min="0"
                     value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 tabular"
+                    onChange={(e) => {
+                      setSuccessMessage(null)
+                      setPaymentAmount(e.target.value)
+                    }}
+                    disabled={isBusy}
+                    className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 tabular disabled:opacity-60"
                   />
                 </div>
                 <div>
@@ -611,7 +792,8 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                     id="pay-method"
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value as PaymentMethodValue)}
-                    className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+                    disabled={isBusy}
+                    className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 disabled:opacity-60"
                   >
                     {PAYMENT_METHOD_OPTIONS.map((m) => (
                       <option key={m.value} value={m.value}>
@@ -628,7 +810,8 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                     id="pay-ref"
                     value={paymentReference}
                     onChange={(e) => setPaymentReference(e.target.value)}
-                    className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+                    disabled={isBusy}
+                    className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -640,6 +823,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                   id="pay-notes"
                   value={paymentNotes}
                   onChange={(e) => setPaymentNotes(e.target.value)}
+                  disabled={isBusy}
                   rows={2}
                   placeholder="Add any specific notes, payment terms, or receipt remarks here…"
                   className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page resize-none"
@@ -651,6 +835,45 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                 {' · '}Unallocated:{' '}
                 <strong className="text-body">{formatMWK(unallocatedCash)}</strong>
               </p>
+              {hasOverpayment && !allocationExceedsCommitted && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="rounded-lg border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/20 px-3.5 py-3 space-y-1.5"
+                >
+                  <p className="flex items-center justify-between gap-3 text-sm font-semibold text-amber-800 dark:text-amber-300">
+                    <span className="inline-flex items-center gap-1.5">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      Overpayment
+                    </span>
+                    <span className="tabular">{formatMWK(overpaymentTotal)}</span>
+                  </p>
+                  <p className="text-xs text-amber-800/90 dark:text-amber-300/90">
+                    {arrearsBalance <= 0
+                      ? 'The fees on this invoice will be fully settled. '
+                      : 'This is more than the fee lines below can absorb. '}
+                    The extra {formatMWK(overpaymentTotal)} will be saved as an advance credit and
+                    applied automatically to this student&rsquo;s next invoice. You will be asked to
+                    confirm when you save.
+                  </p>
+                  {overpaymentBreakdown.length > 0 && (
+                    <ul className="text-xs text-amber-800/90 dark:text-amber-300/90 space-y-0.5">
+                      {overpaymentBreakdown.map((b) => (
+                        <li key={b.key} className="flex items-center justify-between gap-3">
+                          <span>{b.label}</span>
+                          <span className="tabular font-medium">+{formatMWK(b.amount)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {unallocatedCash > 0.01 && arrearsBalance > 0 && (
+                    <p className="text-xs text-amber-800/90 dark:text-amber-300/90">
+                      Fees are still owed &mdash; use Auto-Distribute or allocate this cash to them
+                      to avoid creating credit.
+                    </p>
+                  )}
+                </div>
+              )}
               {allocationExceedsCommitted && (
                 <p className="text-brand-coral text-sm flex items-center gap-1.5">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -662,13 +885,29 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
 
             {/* Fee Line Items Ledger */}
             <div className="p-4 sm:p-6 space-y-3">
-              <h3 className="font-heading text-sm font-semibold text-body">
-                Fee Line Items Ledger ({rows.length})
-              </h3>
-              {eligibleLoading && isNewInvoice ? (
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-heading text-sm font-semibold text-body">
+                  Fee Line Items Ledger ({rows.length})
+                </h3>
+                {ledgerSyncing && (
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    className="inline-flex items-center gap-1.5 text-xs text-muted"
+                  >
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Updating balances…
+                  </span>
+                )}
+              </div>
+              {ledgerLoading && rows.length === 0 ? (
                 <div className="h-24 rounded-lg bg-page animate-pulse" />
               ) : (
-                <div className="border border-base rounded-lg overflow-hidden">
+                <div
+                  aria-busy={ledgerSyncing}
+                  className={`border border-base rounded-lg overflow-hidden transition-opacity ${
+                    ledgerSyncing ? 'opacity-60' : ''
+                  }`}
+                >
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm min-w-140">
                       <thead>
@@ -696,9 +935,8 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                             </td>
                           </tr>
                         ) : (
-                          rows.map((row) => {
-                            const alloc = Number(row.allocation) || 0
-                            const overBalance = alloc > row.balance + 0.01
+                          ledger.map((row) => {
+                            const overBalance = row.excess > 0.01
                             return (
                               <tr key={row.key} className="border-b border-base last:border-0">
                                 <td className="px-4 py-2.5">
@@ -721,8 +959,9 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                                     min="0"
                                     value={row.allocation}
                                     onChange={(e) => updateAllocation(row.key, e.target.value)}
+                                    disabled={isBusy}
                                     placeholder="0"
-                                    className={`w-28 border rounded-lg px-2 py-1.5 text-sm bg-page tabular text-right ml-auto block min-h-11 ${
+                                    className={`w-28 border rounded-lg px-2 py-1.5 text-sm bg-page tabular text-right ml-auto block min-h-11 disabled:opacity-60 ${
                                       overBalance
                                         ? 'border-amber-400 dark:border-amber-600'
                                         : 'border-base'
@@ -730,14 +969,12 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                                   />
                                   {overBalance && (
                                     <p className="text-[11px] text-amber-600 dark:text-amber-400 text-right mt-0.5">
-                                      exceeds balance — becomes credit
+                                      +{formatMWK(row.excess)} over balance — becomes credit
                                     </p>
                                   )}
                                 </td>
                                 <td className="px-4 py-2.5 text-right tabular font-semibold">
-                                  {formatMWK(
-                                    Math.max(0, Math.round((row.balance - alloc) * 100) / 100)
-                                  )}
+                                  {formatMWK(row.remaining)}
                                 </td>
                                 <td className="px-2 py-2.5 text-center">
                                   {!row.lineItemId && (
@@ -762,7 +999,8 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                     <select
                       value={addLineValue}
                       onChange={(e) => setAddLineValue(e.target.value)}
-                      className="flex-1 min-w-11 border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
+                      disabled={isBusy}
+                      className="flex-1 min-w-11 border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 disabled:opacity-60"
                     >
                       <option value="">+ Add a line…</option>
                       {addLineOptions.map((f) => (
@@ -774,7 +1012,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                     <button
                       type="button"
                       onClick={addLine}
-                      disabled={!addLineValue}
+                      disabled={!addLineValue || isBusy}
                       className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3 py-2 text-sm font-medium text-body hover:bg-surface disabled:opacity-40 min-h-11"
                     >
                       <Plus className="w-4 h-4" /> Add line
@@ -798,13 +1036,24 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                     min="0"
                     value={additionalDiscount}
                     onChange={(e) => setAdditionalDiscount(e.target.value)}
-                    className="w-32 border border-base rounded-lg px-2 py-1 text-sm bg-page tabular text-right min-h-9"
+                    disabled={isBusy}
+                    className="w-32 border border-base rounded-lg px-2 py-1 text-sm bg-page tabular text-right min-h-9 disabled:opacity-60"
                   />
                 </div>
               )}
               <TotalRow label="Net Total Fees Due" value={formatMWK(netFeesDue)} />
               <TotalRow label="Total Payment Committed" value={formatMWK(paymentCommitted)} />
               <TotalRow label="Total Payment Allocated" value={formatMWK(totalAllocated)} />
+              {paymentCommitted > 0 && (
+                <TotalRow label="Applied to Fees" value={formatMWK(appliedToFees)} />
+              )}
+              {hasOverpayment && (
+                <TotalRow
+                  label="Overpayment → Advance Credit"
+                  value={`+${formatMWK(overpaymentTotal)}`}
+                  tone="warn"
+                />
+              )}
               <div className="border-t border-base pt-2 mt-1 flex items-center justify-between">
                 <span className="font-heading font-semibold text-body">Arrears / Balance Due</span>
                 <span
@@ -813,6 +1062,12 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                   {formatMWK(arrearsBalance)}
                 </span>
               </div>
+              {hasOverpayment && arrearsBalance <= 0 && (
+                <p className="text-xs text-right text-amber-700 dark:text-amber-400">
+                  Fully settled &mdash; with {formatMWK(overpaymentTotal)} overpaid, carried
+                  forward as credit
+                </p>
+              )}
             </div>
 
             {/* Submit */}
@@ -822,8 +1077,18 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                   <AlertTriangle className="w-4 h-4 shrink-0" /> {submitError}
                 </p>
               )}
+              {needsAllocation && !allocationExceedsCommitted && (
+                <p className="text-sm text-muted flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
+                  Allocate this payment to at least one fee — or use Auto-Distribute.
+                </p>
+              )}
               {successMessage && (
-                <p className="text-emerald-600 dark:text-emerald-400 text-sm flex items-center gap-1.5">
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="text-emerald-600 dark:text-emerald-400 text-sm flex items-center gap-1.5"
+                >
                   <CheckCircle2 className="w-4 h-4 shrink-0" /> {successMessage}
                 </p>
               )}
@@ -834,20 +1099,22 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                   disabled={!canSubmit}
                   className="inline-flex items-center gap-2 bg-brand-deep text-white rounded-lg px-5 py-2.5 text-sm font-semibold disabled:opacity-50 min-h-11"
                 >
-                  {isBusy ? (
+                  {isBusy || ledgerSyncing ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <ArrowRight className="w-4 h-4" />
                   )}
                   {isBusy
                     ? 'Saving…'
-                    : existingInvoice
-                      ? paymentCommitted > 0
-                        ? 'Record Payment'
-                        : 'Save Changes'
-                      : paymentCommitted > 0
-                        ? 'Save Invoice & Record Payment'
-                        : 'Save Invoice'}
+                    : ledgerSyncing
+                      ? 'Updating balances…'
+                      : existingInvoice
+                        ? paymentCommitted > 0
+                          ? 'Record Payment'
+                          : 'Save Changes'
+                        : paymentCommitted > 0
+                          ? 'Save Invoice & Record Payment'
+                          : 'Save Invoice'}
                 </button>
               ) : (
                 // [FIXED 2026-09-06] Was a silently-missing button with no
@@ -1078,11 +1345,26 @@ function MetaField({
   )
 }
 
-function TotalRow({ label, value }: { label: string; value: string }) {
+function TotalRow({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string
+  tone?: 'warn'
+}) {
+  const warn = tone === 'warn'
   return (
     <div className="flex items-center justify-between py-0.5">
-      <span className="text-muted">{label}</span>
-      <span className="font-medium text-body tabular">{value}</span>
+      <span className={warn ? 'text-amber-700 dark:text-amber-400 font-medium' : 'text-muted'}>
+        {label}
+      </span>
+      <span
+        className={`font-medium tabular ${warn ? 'text-amber-700 dark:text-amber-400' : 'text-body'}`}
+      >
+        {value}
+      </span>
     </div>
   )
 }

@@ -341,6 +341,23 @@ export class OverpaymentConfirmationRequiredError extends Error {
   }
 }
 
+// [FIXED 2026-10-22] Thrown when a payment matches one already recorded on the
+// same invoice -- see the duplicate guard in recordPayment(). The route maps it
+// to a 409 with a plain message (no `overpayments`), which the client shows as
+// an error instead of an overpayment prompt.
+export class DuplicatePaymentError extends Error {
+  constructor() {
+    super(
+      'This looks like a duplicate of a payment already recorded on this invoice (same amount, method and reference). Refresh the invoice to see its latest balance before recording it again.'
+    )
+    this.name = 'DuplicatePaymentError'
+  }
+}
+
+// Same amount + method inside this window is treated as an accidental
+// double-submit (double-click, retry after a slow response, a second tab).
+const DUPLICATE_PAYMENT_WINDOW_MS = 2 * 60 * 1000
+
 // [PRODUCTION FIX] Full rewrite. A payment previously applied as one
 // undifferentiated amount against the whole invoice. It now allocates
 // across specific fee-type line items (data.allocations), which is what
@@ -363,49 +380,74 @@ export class OverpaymentConfirmationRequiredError extends Error {
 //      OverpaymentConfirmationRequiredError so the client can warn and
 //      get explicit confirmation first, exactly as requested.
 export async function recordPayment(data: RecordPaymentInput, actorUid: string, actorRole: string) {
-  const invoice = await prisma.invoice.findUniqueOrThrow({
-    where: { id: data.invoiceId },
-    include: { payments: true, lineItems: true },
-  })
+  // [FIXED 2026-10-22] The invoice (balances, existing payments) used to be read
+  // OUTSIDE the transaction that wrote the payment. Two requests for the same
+  // invoice -- a double-click, a retry, two cashiers -- could both read the
+  // same balances, both pass validation and both be recorded. Everything now
+  // happens inside one transaction that first takes a row lock on the invoice:
+  // the second request waits, re-reads the committed state (including the
+  // first payment) and is validated against that.
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "invoices" WHERE "id" = ${data.invoiceId} FOR UPDATE`
 
-  const allocationTotal = Math.round(data.allocations.reduce((sum, a) => sum + a.amount, 0) * 100) / 100
-  if (allocationTotal > data.amount + 0.01) {
-    throw new Error(
-      `Allocated amount MWK ${allocationTotal.toLocaleString()} cannot exceed the total payment MWK ${data.amount.toLocaleString()}.`
-    )
-  }
-
-  const lineItemsById = new Map(invoice.lineItems.map((li) => [li.id, li]))
-  for (const a of data.allocations) {
-    const li = lineItemsById.get(a.lineItemId)
-    if (!li) throw new Error('One or more allocated fees do not belong to this invoice.')
-    if (li.invoiceId !== invoice.id) throw new Error('One or more allocated fees do not belong to this invoice.')
-  }
-
-  // Detect per-line-item overpayment (allocation > that fee's own balance).
-  const overpayments = data.allocations
-    .map((a) => {
-      const li = lineItemsById.get(a.lineItemId)!
-      const excess = Math.round((a.amount - Number(li.balance)) * 100) / 100
-      return excess > 0.01 ? { lineItemId: a.lineItemId, feeName: li.feeName, excess } : null
+    const invoice = await tx.invoice.findUniqueOrThrow({
+      where: { id: data.invoiceId },
+      include: { payments: true, lineItems: true },
     })
-    .filter((x): x is { lineItemId: string; feeName: string; excess: number } => x !== null)
 
-  // The unallocated remainder (paid but not assigned to any fee) is also
-  // effectively an overpayment against nothing in particular.
-  const unallocatedRemainder = Math.round((data.amount - allocationTotal) * 100) / 100
-  if (unallocatedRemainder > 0.01) {
-    overpayments.push({ lineItemId: '', feeName: 'Unallocated', excess: unallocatedRemainder })
-  }
+    // Duplicate guard. A bank / mobile-money transaction id (6+ chars with a
+    // digit, e.g. NB783476292362) identifies ONE real-world payment, so the same
+    // id + amount + method on this invoice is never legitimate. Without such a
+    // reference, an identical payment inside the short window is an
+    // accidental resubmit.
+    const incomingRef = (data.reference ?? '').trim().toLowerCase()
+    const isTransactionRef = incomingRef.length >= 6 && /\d/.test(incomingRef)
+    const isDuplicate = invoice.payments.some((p) => {
+      if (p.method !== data.method) return false
+      if (Math.abs(Number(p.amount) - data.amount) > 0.01) return false
+      if (isTransactionRef && (p.reference ?? '').trim().toLowerCase() === incomingRef) return true
+      return Date.now() - p.paidAt.getTime() < DUPLICATE_PAYMENT_WINDOW_MS
+    })
+    if (isDuplicate) throw new DuplicatePaymentError()
 
-  if (overpayments.length > 0 && !data.confirmOverpayment) {
-    throw new OverpaymentConfirmationRequiredError(overpayments)
-  }
+    const allocationTotal = Math.round(data.allocations.reduce((sum, a) => sum + a.amount, 0) * 100) / 100
+    if (allocationTotal > data.amount + 0.01) {
+      throw new Error(
+        `Allocated amount MWK ${allocationTotal.toLocaleString()} cannot exceed the total payment MWK ${data.amount.toLocaleString()}.`
+      )
+    }
 
-  const totalCreditToCreate = overpayments.reduce((sum, o) => sum + o.excess, 0)
-  const appliedToInvoice = Math.round((data.amount - totalCreditToCreate) * 100) / 100
+    const lineItemsById = new Map(invoice.lineItems.map((li) => [li.id, li]))
+    for (const a of data.allocations) {
+      const li = lineItemsById.get(a.lineItemId)
+      if (!li) throw new Error('One or more allocated fees do not belong to this invoice.')
+      if (li.invoiceId !== invoice.id) throw new Error('One or more allocated fees do not belong to this invoice.')
+    }
 
-  const [payment, updatedInvoice] = await prisma.$transaction(async (tx) => {
+    // Detect per-line-item overpayment (allocation > that fee's own balance).
+    const overpayments = data.allocations
+      .map((a) => {
+        const li = lineItemsById.get(a.lineItemId)!
+        const excess = Math.round((a.amount - Number(li.balance)) * 100) / 100
+        return excess > 0.01 ? { lineItemId: a.lineItemId, feeName: li.feeName, excess } : null
+      })
+      .filter((x): x is { lineItemId: string; feeName: string; excess: number } => x !== null)
+
+    // The unallocated remainder (paid but not assigned to any fee) is also
+    // effectively an overpayment against nothing in particular.
+    const unallocatedRemainder = Math.round((data.amount - allocationTotal) * 100) / 100
+    if (unallocatedRemainder > 0.01) {
+      overpayments.push({ lineItemId: '', feeName: 'Unallocated', excess: unallocatedRemainder })
+    }
+
+    // Nothing has been written yet, so throwing here rolls back nothing.
+    if (overpayments.length > 0 && !data.confirmOverpayment) {
+      throw new OverpaymentConfirmationRequiredError(overpayments)
+    }
+
+    const totalCreditToCreate = overpayments.reduce((sum, o) => sum + o.excess, 0)
+    const appliedToInvoice = Math.round((data.amount - totalCreditToCreate) * 100) / 100
+
     const p = await tx.payment.create({
       data: {
         invoiceId: data.invoiceId,
@@ -454,8 +496,9 @@ export async function recordPayment(data: RecordPaymentInput, actorUid: string, 
       where: { id: data.invoiceId },
       data: { paidAmount: newPaid, balance: newBalance, status: newStatus },
     })
-    return [p, inv] as const
+    return { invoice, payment: p, updatedInvoice: inv }
   })
+  const { invoice, payment, updatedInvoice } = result
 
   const student = await prisma.student.findUnique({
     where: { id: invoice.studentId },

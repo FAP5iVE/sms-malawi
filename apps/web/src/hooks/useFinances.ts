@@ -132,9 +132,17 @@ export function useRecordPayment() {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    onSuccess: (_result, variables) => {
-      qc.invalidateQueries({ queryKey: queryKeys.finances.all() })
-      qc.invalidateQueries({ queryKey: queryKeys.finances.invoice(variables.invoiceId) })
+    // [FIXED 2026-10-22] These invalidations used to be fire-and-forget, so
+    // mutateAsync() resolved while the invoice refetch was still in flight and
+    // Invoice Entry & Allocation rebuilt its ledger from the PRE-payment
+    // invoice (red balance until a manual refresh -> invitation to record the
+    // same payment twice). Returning the promise keeps the mutation pending --
+    // and the form locked -- until the fresh balances have actually landed.
+    onSuccess: async (_result, variables) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
+        qc.invalidateQueries({ queryKey: queryKeys.finances.invoice(variables.invoiceId) }),
+      ])
     },
   })
 }
@@ -151,7 +159,11 @@ export function useGenerateInvoice() {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
+    // Awaited -- see useRecordPayment: the caller continues straight on to
+    // record a payment against this invoice and must see it in the cache.
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: queryKeys.finances.all() })
+    },
   })
 }
 
@@ -455,9 +467,12 @@ export function useAddInvoiceLineItem() {
         method: 'POST',
         body: JSON.stringify({ feeStructureId }),
       }),
-    onSuccess: (_result, variables) => {
-      qc.invalidateQueries({ queryKey: queryKeys.finances.invoice(variables.invoiceId) })
-      qc.invalidateQueries({ queryKey: queryKeys.finances.all() })
+    // Awaited -- see useRecordPayment.
+    onSuccess: async (_result, variables) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.finances.invoice(variables.invoiceId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
+      ])
     },
   })
 }
