@@ -239,6 +239,9 @@ export function ExportToolbar({
       await openReportPdfPreview({
         title,
         schoolName: identity?.schoolName ?? 'School Management System',
+        ...(identity?.schoolSlogan ? { schoolMotto: identity.schoolSlogan } : {}),
+        schoolContact: [identity?.schoolAddress, identity?.schoolPhone ? `Tel: ${identity.schoolPhone}` : '', identity?.schoolEmail]
+          .map((v) => (v ?? '').trim()).filter(Boolean).join('  ·  '),
         filters: allFilters,
         generatedAt: new Date(),
         kpis,

@@ -113,13 +113,13 @@ function addBanner(ws: ExcelJS.Worksheet, brand: SheetBrand, title: string, subt
   const last = Math.max(colCount, 3)
   const name = ws.getCell('B1')
   name.value = brand.schoolName
-  name.font = { bold: true, size: 15, color: { argb: 'FF0F2744' } }
+  name.font = { bold: true, size: 15, color: { argb: 'FF1E3A5F' } }
   name.alignment = { vertical: 'middle' }
   ws.mergeCells(1, 2, 1, last)
 
   const t = ws.getCell('B2')
   t.value = title
-  t.font = { bold: true, size: 12, color: { argb: 'FF1A2535' } }
+  t.font = { bold: true, size: 12, color: { argb: 'FF0F172A' } }
   t.alignment = { vertical: 'middle' }
   ws.mergeCells(2, 2, 2, last)
 
@@ -138,7 +138,7 @@ function styleHeader(ws: ExcelJS.Worksheet, cols: string[], rowNumber = 1) {
     const cell = headerRow.getCell(i + 1)
     cell.value = col
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F2744' } }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }
     cell.alignment = { horizontal: 'left' }
   })
   headerRow.commit()

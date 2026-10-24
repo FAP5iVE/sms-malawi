@@ -45,6 +45,10 @@ export interface PackInsight {
 export interface ReportPackModel {
   title: string
   schoolName: string
+  /** School motto, printed under the name in the letterhead. */
+  schoolMotto?: string
+  /** "Address · Tel: … · email" — one pre-joined line for the letterhead. */
+  schoolContact?: string
   /** PNG/JPEG data URI for the letterhead. Defaults to the built-in school mark. */
   logoDataUri?: string
   /** e.g. ["Academic year: 2025/2026", "Term: 2"] */
@@ -171,13 +175,43 @@ const SEVERITY_LABEL: Record<PackInsight['severity'], string> = {
   positive: 'GOOD',
 }
 
+/** The brand navy (--brand-navy, light mode) — a printed pack is paper, so it never re-themes. */
+const NAVY: [number, number, number] = [30, 58, 95]
+const AMBER_ON_NAVY: [number, number, number] = [245, 185, 66]
+const ON_NAVY: [number, number, number] = [214, 224, 237]
+
+interface PdfFamilies { body: string; head: string }
+
+/** Registers the system typefaces (DM Sans body, Inter headings) on a client-side jsPDF.
+ *  The font data is a separate lazily-loaded chunk; any failure falls back to Helvetica so an
+ *  export is never blocked by a typeface. */
+async function registerBrandFonts(doc: { addFileToVFS(n: string, d: string): unknown; addFont(f: string, fam: string, s: string): unknown }): Promise<PdfFamilies> {
+  try {
+    const { PDF_FONT_DATA } = await import('@/lib/pdfFontData')
+    const faces = [
+      ['DMSans-Regular', 'DMSans', 'normal'], ['DMSans-Bold', 'DMSans', 'bold'],
+      ['Inter-SemiBold', 'Inter', 'normal'], ['Inter-Bold', 'Inter', 'bold'],
+    ] as const
+    for (const [key, family, style] of faces) {
+      doc.addFileToVFS(`${key}.ttf`, PDF_FONT_DATA[key])
+      doc.addFont(`${key}.ttf`, family, style)
+    }
+    return { body: 'DMSans', head: 'Inter' }
+  } catch {
+    return { body: 'helvetica', head: 'helvetica' }
+  }
+}
+
 const PDF_MAX_COLUMNS = 8
 const PDF_MAX_ROWS = 60
 
 /** Builds the PDF blob. Exported separately so callers/tests can reuse it. */
 export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
   const { jsPDF } = await import('jspdf')
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+  const doc = new jsPDF({ unit: 'pt', format: 'a4', compress: true })
+  const fam = await registerBrandFonts(doc)
+  /** The custom faces have no italic; fall back to the regular face (Helvetica keeps real italic). */
+  const italic = fam.body === 'helvetica' ? 'italic' : 'normal'
   const pageW = doc.internal.pageSize.getWidth()
   const pageH = doc.internal.pageSize.getHeight()
   const margin = 40
@@ -193,9 +227,9 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
 
   const heading = (text: string) => {
     ensure(30)
-    doc.setFont('helvetica', 'bold')
+    doc.setFont(fam.body, 'bold')
     doc.setFontSize(12)
-    doc.setTextColor(15, 52, 96)
+    doc.setTextColor(...NAVY)
     doc.text(text, margin, y)
     y += 6
     doc.setDrawColor(200)
@@ -203,34 +237,52 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
     y += 14
   }
 
-  // Title block — school logo on the left, text beside it
+  // Letterhead — the same panel every school document uses: rounded brand navy, logo
+  // directly on it at the left, name / motto / contact centred. The report's own title
+  // and filters sit beneath it.
   const logoUri = model.logoDataUri ?? DEFAULT_SCHOOL_LOGO_DATA_URI
   const logoFormat = /^data:image\/jpe?g/i.test(logoUri) ? 'JPEG' : 'PNG'
   const logoSize = 46
-  let textX = margin
+  const padX = 14
+  const textW = contentW - (padX + logoSize + 12) * 2
+  const contactLines = model.schoolContact ? (doc.splitTextToSize(model.schoolContact, textW) as string[]).slice(0, 2) : []
+  const panelH = Math.max(logoSize + 20, 26 + (model.schoolMotto ? 13 : 0) + contactLines.length * 10 + 16)
+  doc.setFillColor(...NAVY)
+  doc.roundedRect(margin, y, contentW, panelH, 8, 8, 'F')
   try {
-    doc.addImage(logoUri, logoFormat, margin, y - 12, logoSize, logoSize)
-    textX = margin + logoSize + 12
+    doc.addImage(logoUri, logoFormat, margin + padX, y + (panelH - logoSize) / 2, logoSize, logoSize)
   } catch {
     // A bad logo must never block a report export — fall back to text only.
   }
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(90)
-  doc.text(model.schoolName.toUpperCase(), textX, y)
-  y += 20
-  doc.setFontSize(20)
-  doc.setTextColor(15, 52, 96)
-  doc.text(model.title, textX, y)
-  y += 18
-  // Meta line starts below the logo's bottom edge (y - 12 + logoSize)
-  y = Math.max(y, margin - 12 + logoSize + 6)
-  doc.setFont('helvetica', 'normal')
+  let ty = y + (panelH - (16 + (model.schoolMotto ? 13 : 0) + contactLines.length * 10)) / 2 + 13
+  doc.setFont(fam.head, 'bold')
+  doc.setFontSize(15)
+  doc.setTextColor(255, 255, 255)
+  doc.text(model.schoolName.toUpperCase(), pageW / 2, ty, { align: 'center', maxWidth: textW })
+  if (model.schoolMotto) {
+    ty += 13
+    doc.setFont(fam.body, 'bold')
+    doc.setFontSize(8.5)
+    doc.setTextColor(...AMBER_ON_NAVY)
+    doc.text(model.schoolMotto, pageW / 2, ty, { align: 'center', maxWidth: textW })
+  }
+  doc.setFont(fam.body, 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(...ON_NAVY)
+  contactLines.forEach((ln) => { ty += 10; doc.text(ln, pageW / 2, ty, { align: 'center' }) })
+  y += panelH + 22
+
+  doc.setFont(fam.head, 'bold')
+  doc.setFontSize(16)
+  doc.setTextColor(...NAVY)
+  doc.text(model.title.toUpperCase(), pageW / 2, y, { align: 'center', charSpace: 1.2 })
+  y += 15
+  doc.setFont(fam.body, 'normal')
   doc.setFontSize(9)
-  doc.setTextColor(90)
+  doc.setTextColor(100, 116, 139)
   const meta = [...model.filters, `Generated ${model.generatedAt.toLocaleString('en-GB')}`].join('  •  ')
   const metaLines = doc.splitTextToSize(meta, contentW) as string[]
-  doc.text(metaLines, margin, y)
+  doc.text(metaLines, pageW / 2, y, { align: 'center' })
   y += metaLines.length * 12 + 10
 
   // KPI summary (2 per row for legibility)
@@ -242,16 +294,16 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
       ;[model.kpis[i], model.kpis[i + 1]].forEach((k, col) => {
         if (!k) return
         const x = margin + col * colW
-        doc.setFont('helvetica', 'normal')
+        doc.setFont(fam.body, 'normal')
         doc.setFontSize(8)
         doc.setTextColor(110)
         doc.text(k.label, x, y)
-        doc.setFont('helvetica', 'bold')
+        doc.setFont(fam.body, 'bold')
         doc.setFontSize(13)
         doc.setTextColor(20)
         doc.text(k.value, x, y + 15)
         if (k.sub) {
-          doc.setFont('helvetica', 'normal')
+          doc.setFont(fam.body, 'normal')
           doc.setFontSize(8)
           doc.setTextColor(110)
           doc.text(k.sub, x, y + 26, { maxWidth: colW - 12 })
@@ -268,11 +320,11 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
     model.insights.forEach((ins) => {
       const lines = doc.splitTextToSize(`${ins.title} — ${ins.detail}`, contentW - 60) as string[]
       ensure(lines.length * 11 + 8)
-      doc.setFont('helvetica', 'bold')
+      doc.setFont(fam.body, 'bold')
       doc.setFontSize(8)
       doc.setTextColor(ins.severity === 'critical' ? 190 : ins.severity === 'watch' ? 160 : 70, ins.severity === 'critical' ? 40 : ins.severity === 'watch' ? 100 : 70, 40)
       doc.text(SEVERITY_LABEL[ins.severity], margin, y)
-      doc.setFont('helvetica', 'normal')
+      doc.setFont(fam.body, 'normal')
       doc.setFontSize(9)
       doc.setTextColor(30)
       doc.text(lines, margin + 60, y)
@@ -291,7 +343,7 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
       const colW = contentW / cols
       heading(table.name)
       if (table.note) {
-        doc.setFont('helvetica', 'italic')
+        doc.setFont(fam.body, italic)
         doc.setFontSize(8)
         doc.setTextColor(150, 80, 0)
         doc.text(table.note, margin, y - 2)
@@ -307,7 +359,7 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
           doc.setFillColor(238, 242, 247)
           doc.rect(margin, y - 8, contentW, h, 'F')
         }
-        doc.setFont('helvetica', bold ? 'bold' : 'normal')
+        doc.setFont(fam.body, bold ? 'bold' : 'normal')
         doc.setFontSize(8)
         doc.setTextColor(30)
         texts.forEach((t, i) => doc.text(t, margin + i * colW + 3, y))
@@ -317,7 +369,7 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
       matrix.slice(1, PDF_MAX_ROWS + 1).forEach((r) => drawRow(r, false))
       if (matrix.length - 1 > PDF_MAX_ROWS) {
         ensure(14)
-        doc.setFont('helvetica', 'italic')
+        doc.setFont(fam.body, italic)
         doc.setFontSize(8)
         doc.setTextColor(110)
         doc.text(`${matrix.length - 1 - PDF_MAX_ROWS} more rows — export to Excel for the full table.`, margin, y)
@@ -325,7 +377,7 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
       }
       if (headerRow.length > cols) {
         ensure(14)
-        doc.setFont('helvetica', 'italic')
+        doc.setFont(fam.body, italic)
         doc.setFontSize(8)
         doc.setTextColor(110)
         doc.text(`${headerRow.length - cols} further columns omitted — export to Excel for all columns.`, margin, y)
@@ -338,7 +390,7 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
   const pages = doc.getNumberOfPages()
   for (let p = 1; p <= pages; p += 1) {
     doc.setPage(p)
-    doc.setFont('helvetica', 'normal')
+    doc.setFont(fam.body, 'normal')
     doc.setFontSize(8)
     doc.setTextColor(120)
     doc.text(`${model.schoolName} — ${model.title}`, margin, pageH - 24)

@@ -78,7 +78,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
-import { generatePayslipPdf } from '@/server/services/receiptService'
+import { generatePayslipPdf, type PayslipEarnings } from '@/server/services/receiptService'
 import * as settingsService from '@/server/services/settingsService'
 import * as hrService from '@/server/services/hrService'
 import * as auditService from '@/server/services/auditService'
@@ -298,12 +298,19 @@ export async function processMonthlyPayroll(
     },
   })
   const allowanceTotalByUid = new Map<string, number>()
+  // The itemised lines behind those totals — the payslip PDF prints each one
+  // (Base Salary, Allowance (Housing), ...) instead of a single gross figure.
+  const allowanceLinesByUid = new Map<string, Array<{ type: string; amount: number }>>()
   for (const a of allowances) {
     allowanceTotalByUid.set(
       a.staffUid,
       (allowanceTotalByUid.get(a.staffUid) ?? 0) + Number(a.amount)
     )
+    const lines = allowanceLinesByUid.get(a.staffUid) ?? []
+    lines.push({ type: a.type, amount: Number(a.amount) })
+    allowanceLinesByUid.set(a.staffUid, lines)
   }
+  const earningsByUid = new Map<string, PayslipEarnings>()
 
   let totalGross = 0
   let totalNet = 0
@@ -326,6 +333,11 @@ export async function processMonthlyPayroll(
 
     totalGross += gross
     totalNet += net
+
+    earningsByUid.set(sal.staffUid, {
+      baseSalary: Number(sal.baseSalary),
+      allowances: allowanceLinesByUid.get(sal.staffUid) ?? [],
+    })
 
     payslipData.push({
       staffUid: sal.staffUid,
@@ -354,7 +366,12 @@ export async function processMonthlyPayroll(
         })
 
         // Generate payslip PDF → store in Appwrite
-        const pdfKey = await generatePayslipPdf(payslip.id, { ...ps, pensionPercent }, month, year)
+        const pdfKey = await generatePayslipPdf(
+          payslip.id,
+          { ...ps, pensionPercent, earnings: earningsByUid.get(ps.staffUid), runByUid, processedAt: new Date() },
+          month,
+          year,
+        )
         await tx.payslip.update({ where: { id: payslip.id }, data: { payslipKey: pdfKey } })
       }
 
@@ -511,7 +528,7 @@ export async function getStaffPayslips(staffUid: string) {
 export async function ensurePayslipPdf(payslipId: string): Promise<string> {
   const payslip = await prisma.payslip.findUniqueOrThrow({
     where: { id: payslipId },
-    include: { payrollRun: { select: { month: true, year: true } } },
+    include: { payrollRun: { select: { month: true, year: true, runByUid: true, completedAt: true } } },
   })
   if (payslip.payslipKey) return payslip.payslipKey
 
@@ -532,6 +549,11 @@ export async function ensurePayslipPdf(payslipId: string): Promise<string> {
       pensionPercent,
       loanDeduction: Number(payslip.loanDeduction),
       netSalary: Number(payslip.netSalary),
+      // No earnings here: this payslip pre-dates its PDF, so the breakdown is
+      // rebuilt inside generatePayslipPdf from the staff allowances in force
+      // for that month (the stored gross stays the source of truth).
+      runByUid: payslip.payrollRun.runByUid,
+      processedAt: payslip.payrollRun.completedAt ?? payslip.createdAt,
     },
     payslip.payrollRun.month,
     payslip.payrollRun.year,
