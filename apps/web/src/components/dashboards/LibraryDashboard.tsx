@@ -129,39 +129,50 @@ export function LibraryDashboard() {
         {/* [PRODUCTION FIX 2026-07-29] Was a permanent PlaceholderWidget
             stub, deferred during the librarian console build and never
             actually closed out. Real data via getOverdueByClass(). */}
-        <div className="bg-surface border border-base rounded-xl p-4 h-32 md:h-40 flex flex-col">
-          <p className="font-heading font-semibold text-sm text-brand-navy mb-2">Overdue Students</p>
-          {overdueLoading ? (
-            <div className="space-y-1.5 flex-1">
-              {[1, 2].map((i) => <div key={i} className="h-6 rounded-lg bg-page animate-pulse" />)}
+        {/* [FIX] Was `h-32 md:h-40` — a fixed 128/160px box beside a ~330px chart
+            card, so it read as a short stub and clipped the list. On md+ the
+            wrapper takes the grid row's height (set by the Borrowing trend
+            card) and the card is absolutely filled into it, so a long list
+            scrolls inside the card instead of stretching the row. Same frame,
+            padding and title/sub styling as ChartCard. */}
+        <div className="relative md:min-h-72">
+          <div className="flex h-full flex-col rounded-xl border border-base bg-surface p-3 sm:p-5 md:absolute md:inset-0">
+            <div className="mb-3 sm:mb-4">
+              <p className="font-heading font-semibold text-sm text-brand-navy">Overdue Students</p>
+              <p className="mt-1 text-xs text-muted">Open loans past their due date, by class</p>
             </div>
-          ) : overdueError ? (
-            <div role="alert" className="flex flex-1 flex-col items-start gap-2">
-              <p className="text-sm text-muted">Overdue books could not be loaded.</p>
-              <button
-                type="button"
-                onClick={() => void refetchOverdue()}
-                className="min-h-11 rounded-lg border border-base px-3 text-xs font-medium text-brand-navy hover:bg-page focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
-              >
-                Retry
-              </button>
-            </div>
-          ) : overdueByClass.length === 0 ? (
-            <p className="text-sm text-muted flex-1 flex items-center justify-center text-center">
-              No overdue books right now.
-            </p>
-          ) : (
-            <div className="space-y-2 overflow-y-auto flex-1">
-              {overdueByClass.map((c) => (
-                <div key={c.className}>
-                  <p className="text-xs font-heading font-semibold text-muted uppercase">{c.className} · {c.students.length}</p>
-                  {c.students.slice(0, 3).map((s, i) => (
-                    <p key={i} className="text-xs text-body truncate">{s.studentName} — {s.bookTitle}</p>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
+            {overdueLoading ? (
+              <div className="flex-1 space-y-2" role="status" aria-label="Overdue students — loading">
+                {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-8 w-full rounded-lg" aria-hidden />)}
+              </div>
+            ) : overdueError ? (
+              <div role="alert" className="flex flex-1 flex-col items-start gap-2">
+                <p className="text-sm text-muted">Overdue books could not be loaded.</p>
+                <button
+                  type="button"
+                  onClick={() => void refetchOverdue()}
+                  className="min-h-11 rounded-lg border border-base px-3 text-xs font-medium text-brand-navy hover:bg-page focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : overdueByClass.length === 0 ? (
+              <p className="flex flex-1 items-center justify-center py-8 text-center text-sm text-muted">
+                No overdue books right now.
+              </p>
+            ) : (
+              <div className="min-h-0 max-h-72 flex-1 space-y-3 overflow-y-auto pr-1 md:max-h-none">
+                {overdueByClass.map((c) => (
+                  <div key={c.className}>
+                    <p className="text-xs font-heading font-semibold text-muted uppercase">{c.className} · {c.students.length}</p>
+                    {c.students.slice(0, 3).map((s, i) => (
+                      <p key={i} className="truncate text-xs text-body">{s.studentName} — {s.bookTitle}</p>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <DashboardAttention query={attention} title="Library attention queue" limit={5} />

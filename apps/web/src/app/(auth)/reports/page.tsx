@@ -23,7 +23,6 @@ import { useRouter } from 'next/navigation'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import type { UserRole } from '@shared/types/roles'
 import { SuperUserRoleSwitcher } from '@/components/shared/SuperUserRoleSwitcher'
-import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
 import { AdminSessionsPanel } from '@/components/reports/AdminSessionsPanel'
 import { ExecutiveOverviewTab } from '@/components/reports/panels/ExecutivePanels'
@@ -768,7 +767,7 @@ function AdminAuditPanel() {
           )}
         </p>
       </div>
-      <div className="overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-base bg-surface">
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse table-fixed">
             <colgroup>
@@ -1113,7 +1112,7 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
           title="Class & Stream Rankings"
           icon={<Trophy className="w-4 h-4" />}
         />
-        <AnalyticsPanel academicYear={academicYear} selectedClassId="" term={term} />
+        <AnalyticsPanel academicYear={academicYear} selectedClassId="" term={term} framed />
       </div>
     </div>
   )
@@ -1201,44 +1200,46 @@ function HighRankTeachersPanel({ academicYear, term }: { academicYear: string; t
             )}
           </ChartCard>
           {teachers && teachers.length > 0 && (
-            <div className="table-scroll">
-              <table className="w-full text-sm min-w-130">
-                <thead>
-                  <tr className="bg-page border-b border-base">
-                    {['Teacher', 'Department', 'Classes', 'Avg Score', 'Pass Rate'].map((h) => (
-                      <th
-                        key={h}
-                        className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-base">
-                  {teachers.map((t) => (
-                    <tr key={t.teacherUid} className="hover:bg-page">
-                      <td className="px-4 py-3 font-medium text-brand-navy">{t.teacherName}</td>
-                      <td className="px-4 py-3 text-muted text-xs">{t.department}</td>
-                      <td className="px-4 py-3">{t.classesCount}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`font-bold ${t.avgStudentScore >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}
+            <div className="overflow-hidden rounded-xl border border-base bg-surface">
+              <div className="table-scroll">
+                <table className="w-full text-sm min-w-130">
+                  <thead>
+                    <tr className="bg-page border-b border-base">
+                      {['Teacher', 'Department', 'Classes', 'Avg Score', 'Pass Rate'].map((h) => (
+                        <th
+                          key={h}
+                          className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase"
                         >
-                          {t.avgStudentScore}%
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`font-semibold ${t.avgPassRate >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}
-                        >
-                          {t.avgPassRate}%
-                        </span>
-                      </td>
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-base">
+                    {teachers.map((t) => (
+                      <tr key={t.teacherUid} className="hover:bg-page">
+                        <td className="px-4 py-3 font-medium text-brand-navy">{t.teacherName}</td>
+                        <td className="px-4 py-3 text-muted text-xs">{t.department}</td>
+                        <td className="px-4 py-3">{t.classesCount}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`font-bold ${t.avgStudentScore >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}
+                          >
+                            {t.avgStudentScore}%
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`font-semibold ${t.avgPassRate >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}
+                          >
+                            {t.avgPassRate}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>
@@ -2069,38 +2070,40 @@ function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; t
             )}
           </ChartCard>
           {rows && rows.length > 0 && (
-            <div className="table-scroll">
-              <table className="w-full text-sm min-w-130">
-                <thead>
-                  <tr className="bg-page border-b border-base">
-                    {['Subject', 'Class', 'Students', 'Avg Score', 'Pass Rate'].map((h) => (
-                      <th
-                        key={h}
-                        className="px-4 py-2 text-left text-xs font-semibold text-muted uppercase"
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-base">
-                  {rows.map((r, i) => (
-                    <tr key={i} className="hover:bg-page">
-                      <td className="px-4 py-2 font-medium text-brand-navy">{r.subject}</td>
-                      <td className="px-4 py-2 text-muted text-xs">{r.className}</td>
-                      <td className="px-4 py-2">{r.studentCount}</td>
-                      <td className="px-4 py-2 font-bold text-brand-navy">{r.average}%</td>
-                      <td className="px-4 py-2">
-                        <span
-                          className={`text-xs font-semibold ${r.passRate >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}
+            <div className="overflow-hidden rounded-xl border border-base bg-surface">
+              <div className="table-scroll">
+                <table className="w-full text-sm min-w-130">
+                  <thead>
+                    <tr className="bg-page border-b border-base">
+                      {['Subject', 'Class', 'Students', 'Avg Score', 'Pass Rate'].map((h) => (
+                        <th
+                          key={h}
+                          className="px-4 py-2 text-left text-xs font-semibold text-muted uppercase"
                         >
-                          {r.passRate}%
-                        </span>
-                      </td>
+                          {h}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-base">
+                    {rows.map((r, i) => (
+                      <tr key={i} className="hover:bg-page">
+                        <td className="px-4 py-2 font-medium text-brand-navy">{r.subject}</td>
+                        <td className="px-4 py-2 text-muted text-xs">{r.className}</td>
+                        <td className="px-4 py-2">{r.studentCount}</td>
+                        <td className="px-4 py-2 font-bold text-brand-navy">{r.average}%</td>
+                        <td className="px-4 py-2">
+                          <span
+                            className={`text-xs font-semibold ${r.passRate >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}
+                          >
+                            {r.passRate}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>
@@ -2285,7 +2288,7 @@ function FinanceScholarshipsPanel({ academicYear }: { academicYear: string }) {
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
-      <div className="overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-base bg-surface">
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
@@ -2436,7 +2439,7 @@ function ManebCandidatesPanel({ academicYear }: { academicYear: string }) {
       {isLoading ? (
         <SkeletonChart />
       ) : candidates && candidates.length > 0 ? (
-        <div className="overflow-hidden">
+        <div className="overflow-hidden rounded-xl border border-base bg-surface">
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
@@ -2735,7 +2738,7 @@ function AcademicSummaryPanel({ academicYear }: { academicYear: string }) {
         title={`My Classes — ${academicYear}`}
         icon={<GraduationCap className="w-4 h-4" />}
       />
-      <div className="overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-base bg-surface">
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
@@ -2791,7 +2794,7 @@ function StudentSummaryPanel({ studentId }: { studentId: string }) {
   return (
     <div className="space-y-5">
       <SectionHeader title="My Results" icon={<FileText className="w-4 h-4" />} />
-      <div className="overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-base bg-surface">
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
@@ -2923,7 +2926,9 @@ function ReportsContent() {
         </div>
       </div>
 
-      <ModuleSurface>
+      {/* Sections sit directly on the page background (like the dashboards), not inside
+          a ModuleSurface panel. Cards inside — ReportCard, ChartCard, KPI tiles — are unchanged. */}
+      <div className="space-y-4 md:space-y-5">
         {/* ── Tab Bar ── */}
         {(ROLE_TABS[role ?? ''] ?? []).length > 1 && (
           <RoleTabs role={role ?? ''} active={activeTab} onChange={setActiveTab} />
@@ -3134,7 +3139,7 @@ function ReportsContent() {
                   title="Class & Stream Rankings"
                   icon={<Trophy className="w-4 h-4" />}
                 />
-                <AnalyticsPanel academicYear={year} selectedClassId="" term={term} />
+                <AnalyticsPanel academicYear={year} selectedClassId="" term={term} framed />
               </div>
             )}
             {role === 'exam_officer' && activeTab === 'marks' && <MarksDistributionPanel />}
@@ -3175,7 +3180,7 @@ function ReportsContent() {
             )}
           </>
         )}
-      </ModuleSurface>
+      </div>
     </div>
   )
 }
