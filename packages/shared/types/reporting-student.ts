@@ -70,6 +70,29 @@ export interface ApiStudentLoanRow {
   issuedAt: string
   dueDate: string
   daysOverdue: number
+  /**
+   * What the late fee would be if the book were returned today (days overdue × the
+   * school's daily rate). A running figure, NOT yet charged — the fine is only created
+   * when the book is returned. 0 when the book is not overdue.
+   */
+  accruedLateFee: number
+}
+
+/** Why a library fine was raised. */
+export type ApiStudentFineKind = 'LATE' | 'DAMAGED' | 'LOST' | 'OTHER'
+
+/** One library fine charged to the student, with its outcome. */
+export interface ApiStudentFineRow {
+  id: string
+  bookTitle: string
+  kind: ApiStudentFineKind
+  amount: number
+  /** What the librarian recorded (e.g. "6 overdue day(s) at MWK 100/day", or a description of the damage). */
+  reason: string
+  status: 'PENDING' | 'PAID' | 'WAIVED'
+  createdAt: string
+  /** When it was paid or waived; null while pending. */
+  settledAt: string | null
 }
 
 export interface ApiStudentLibrary {
@@ -79,6 +102,12 @@ export interface ApiStudentLibrary {
   borrowedThisYear: number
   finesPendingAmount: number
   finesPendingCount: number
+  /** MWK charged per day a book is late — the school's setting. */
+  finePerDay: number
+  /** Sum of every open loan's accruedLateFee: what is building up on books still out. Not yet charged. */
+  accruedLateFeeTotal: number
+  /** Every library fine for this student, newest first (pending, paid and waived). */
+  fines: ApiStudentFineRow[]
 }
 
 export interface ApiStudentFees {

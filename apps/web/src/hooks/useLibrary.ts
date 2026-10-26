@@ -24,7 +24,7 @@ import type {
   CreateRecommendationInput, ReviewRecommendationInput, RejectRecommendationInput,
   CreateFineWaiverInput, RejectFineWaiverInput, CreateDigitalResourceInput,
 } from '@shared/schemas/library'
-import type { ApiResourceRecommendation, ApiFineWaiverRequest, ApiLibraryFine, ApiLibraryConditionEntry } from '@shared/types/api'
+import type { ApiResourceRecommendation, ApiFineWaiverRequest, ApiLibraryFine, ApiLibraryConditionEntry, ApiMyBorrowings, ApiMyFine } from '@shared/types/api'
 import type { CreateLibraryFineInput } from '@shared/schemas/finance'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { uploadFileDirectly } from '@/lib/directUpload'
@@ -134,7 +134,13 @@ export function useReturnBook() {
     meta: { successMessage: 'Book returned', failureTitle: 'Could not return book', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: ({ borrowingId, data }: { borrowingId: string; data: ReturnBorrowingInput }) =>
       apiFetch(`/library/borrowings/${borrowingId}/return`, { method: 'PATCH', body: JSON.stringify(data) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.library.all() })
+      // A return can now raise fines, so the library dashboard / Reports figures (a separate
+      // cache from queryKeys.library) and Finance's fines list must refresh too.
+      qc.invalidateQueries({ queryKey: queryKeys.reporting.domain('library') })
+      qc.invalidateQueries({ queryKey: queryKeys.finances.libraryFines() })
+    },
   })
 }
 
@@ -162,12 +168,32 @@ export function useMarkBookCondition() {
 export function useBorrowings(filters: {
   studentId?: string; staffId?: string; status?: string; overdue?: boolean
   unreturned?: boolean; dueSoon?: boolean; search?: string
-} = {}) {
+} = {}, options: { enabled?: boolean } = {}) {
   const params = new URLSearchParams()
   Object.entries(filters).forEach(([k, v]) => { if (v !== undefined && v !== '') params.set(k, String(v)) })
   return useQuery({
     queryKey: queryKeys.library.borrowings(filters),
     queryFn: () => apiFetch<import('@shared/types/api').ApiBorrowing[]>(`/library/borrowings/list?${params}`),
+    // The list route is library-desk only; a student or teacher must not fire it (it would just 403).
+    enabled: options.enabled ?? true,
+  })
+}
+
+/** The signed-in person's OWN loans, past and present — for anyone without library-desk access. */
+export function useMyBorrowings(options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: queryKeys.library.myBorrowings(),
+    queryFn: () => apiFetch<ApiMyBorrowings>('/library/my/borrowings'),
+    enabled: options.enabled ?? true,
+  })
+}
+
+/** The signed-in person's OWN library fines (late, damaged, lost), with the state of any waiver request. */
+export function useMyFines(options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: queryKeys.library.myFines(),
+    queryFn: () => apiFetch<ApiMyFine[]>('/library/my/fines'),
+    enabled: options.enabled ?? true,
   })
 }
 
@@ -254,11 +280,13 @@ export function useRejectRecommendation() {
 }
 
 // ─── FINE WAIVER REQUESTS ──────────────────────────────────
-export function useFineWaivers(status?: string) {
+export function useFineWaivers(status?: string, options: { enabled?: boolean } = {}) {
   const params = status ? `?status=${encodeURIComponent(status)}` : ''
   return useQuery({
     queryKey: queryKeys.library.fineWaivers(status),
     queryFn: () => apiFetch<ApiFineWaiverRequest[]>(`/library/fine-waivers${params}`),
+    // Reviewing waivers needs library.waiveFine / finance.waiveFine; everyone else only files requests.
+    enabled: options.enabled ?? true,
   })
 }
 
@@ -268,7 +296,10 @@ export function useCreateFineWaiver() {
     meta: { successMessage: 'Fine waiver created', failureTitle: 'Could not create fine waiver' },
     mutationFn: (data: CreateFineWaiverInput) =>
       apiFetch('/library/fine-waivers', { method: 'POST', body: JSON.stringify(data) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.fineWaivers() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.library.fineWaivers() })
+      qc.invalidateQueries({ queryKey: queryKeys.library.myFines() })   // the fine now shows "waiver requested"
+    },
     onError: (err) => { console.error('[useCreateFineWaiver] failed', err) },
   })
 }
@@ -346,12 +377,14 @@ export function useConditionReport() {
 // studentId/staffId/paidAt/waivedAt are needed by the Clearance Checker
 // (per-student pending-fine lookup) and the Treasury CSV export
 // (paidAt), both built client-side from this same query.
-export function useFines(status?: string) {
+export function useFines(status?: string, options: { enabled?: boolean } = {}) {
   const params = status ? `?status=${encodeURIComponent(status)}` : ''
   return useQuery({
     queryKey: ['library', 'fines', status ?? null] as const,
+    enabled: options.enabled ?? true,
     queryFn: () => apiFetch<Array<{
       id: string; bookTitle: string; amount: number; reason: string; status: string
+      kind: 'LATE' | 'DAMAGED' | 'LOST' | 'OTHER'
       studentId?: string | null; staffId?: string | null
       borrowerName: string; createdAt: string; paidAt?: string; waivedAt?: string
     }>>(`/library/fines${params}`),
@@ -368,7 +401,12 @@ export function useClearFine() {
   return useMutation({
     meta: { successMessage: 'Fine cleared', failureTitle: 'Could not clear the fine', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (id: string) => apiFetch(`/library/fines/${id}/clear`, { method: 'PATCH', body: JSON.stringify({}) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['library', 'fines'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['library', 'fines'] })
+      qc.invalidateQueries({ queryKey: queryKeys.library.stats() })
+      // The dashboard's "Fines pending" and the Reports fines tab read a separate cache.
+      qc.invalidateQueries({ queryKey: queryKeys.reporting.domain('library') })
+    },
   })
 }
 
@@ -389,6 +427,7 @@ export function useAssessFine() {
       qc.invalidateQueries({ queryKey: ['library', 'fines'] })
       qc.invalidateQueries({ queryKey: queryKeys.finances.libraryFines() })
       qc.invalidateQueries({ queryKey: queryKeys.library.stats() })
+      qc.invalidateQueries({ queryKey: queryKeys.reporting.domain('library') })
     },
     onError: (err) => { console.error('[useAssessFine] failed', err) },
   })
@@ -403,6 +442,7 @@ export function useWaiveFineDirect() {
       qc.invalidateQueries({ queryKey: ['library', 'fines'] })
       qc.invalidateQueries({ queryKey: queryKeys.finances.libraryFines() })
       qc.invalidateQueries({ queryKey: queryKeys.library.stats() })
+      qc.invalidateQueries({ queryKey: queryKeys.reporting.domain('library') })
     },
     onError: (err) => { console.error('[useWaiveFineDirect] failed', err) },
   })
@@ -416,4 +456,4 @@ export function useOverdueByClass() {
       students: { studentName: string; bookTitle: string; dueDate: string }[]
     }[]>('/library/reports/overdue-by-class'),
   })
-}
+}

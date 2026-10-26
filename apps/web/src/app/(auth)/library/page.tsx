@@ -73,7 +73,6 @@ import {
   useApproveRecommendation,
   useRejectRecommendation,
   useFineWaivers,
-  useCreateFineWaiver,
   useApproveFineWaiver,
   useRejectFineWaiver,
   useUpdateBook,
@@ -91,6 +90,7 @@ import {
 }                            from '@/hooks/useLibrary'
 import { apiFetch }          from '@/lib/api-client'
 import { usePermissions }    from '@/hooks/usePermissions'
+import { MyBorrowingsPanel, FineWaiverRequestPanel, FINE_KIND_LABEL } from '@/components/library/MyLibrary'
 import { DigitalResourceViewer } from '@/components/library/DigitalResourceViewer'
 import {
   BookOpen, Scan, FileText, AlertTriangle, Eye, Check, X as XIcon, Undo2, Pencil, Archive,
@@ -773,10 +773,11 @@ function IssueBookModal({
 // [R21] "marking a physical book condition is not wired any where" —
 // ReturnBorrowingSchema already accepted condition/notes; the return
 // button just always sent condition:'GOOD'. This modal is the actual
-// condition picker, and — since returnBook() only ever fines overdue
-// days, never damage/loss — chains a second, separate mutation (the same
-// "+ Assess Fine" endpoint) when the librarian records a damage/loss fee,
-// so a damaged/lost return finally has a real financial consequence.
+// condition picker. The damage / loss fee now travels WITH the return
+// (ReturnBorrowingSchema.fee) and the server saves both in one transaction.
+// It used to be a second "+ Assess Fine" call made after the return; that call
+// was rejected by validation (null studentId/staffId) and its error was
+// swallowed, so a copy could be marked lost/damaged with nothing charged.
 function ReturnBookModal({
   borrowing, onClose,
 }: {
@@ -784,7 +785,6 @@ function ReturnBookModal({
   onClose: () => void
 }) {
   const returnBook  = useReturnBook()
-  const assessFine  = useAssessFine()
   const [condition, setCondition] = useState<'GOOD' | 'DAMAGED' | 'LOST'>('GOOD')
   const [notes, setNotes]         = useState('')
   const [feeAmount, setFeeAmount] = useState('')
@@ -793,26 +793,19 @@ function ReturnBookModal({
   const bookTitle = borrowing.book?.title ?? 'this book'
   const needsFee = condition !== 'GOOD'
 
+  const fee = Number(feeAmount)
+  const feeInvalid = needsFee && feeAmount.trim() !== '' && !(fee >= 0)
+
   function handleSubmit() {
+    if (feeInvalid) return
     returnBook.mutate({
       borrowingId: borrowing.id,
-      data: { condition, notes: notes.trim() || undefined },
-    }, {
-      onSuccess: () => {
-        const fee = Number(feeAmount)
-        if (needsFee && fee > 0) {
-          assessFine.mutate({
-            studentId: borrowing.studentId,
-            staffId: borrowing.staffId,
-            bookTitle,
-            amount: fee,
-            reason: notes.trim() || `Book returned ${condition.toLowerCase()}.`,
-          }, { onSuccess: onClose, onError: onClose })
-        } else {
-          onClose()
-        }
+      data: {
+        condition,
+        notes: notes.trim() || undefined,
+        fee: needsFee && fee > 0 ? fee : undefined,
       },
-    })
+    }, { onSuccess: onClose })
   }
 
   return (
@@ -829,10 +822,10 @@ function ReturnBookModal({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={returnBook.isPending || assessFine.isPending}
+            disabled={returnBook.isPending || feeInvalid}
             className={MODAL_BTN_PRIMARY}
           >
-            {returnBook.isPending || assessFine.isPending ? 'Processing…' : 'Confirm Return'}
+            {returnBook.isPending ? 'Processing…' : 'Confirm Return'}
           </button>
         </>
       }
@@ -875,7 +868,9 @@ function ReturnBookModal({
             />
           </div>
           <div>
-            <label htmlFor="return-fee" className="text-xs text-muted mb-1 block">Fine amount (MK) <span className="text-muted/70">(optional — leave blank to skip)</span></label>
+            <label htmlFor="return-fee" className="text-xs text-muted mb-1 block">
+              Amount to charge the borrower (MK) <span className="text-muted/70">(optional — leave blank for no charge)</span>
+            </label>
             <input
               id="return-fee"
               type="number"
@@ -1287,8 +1282,6 @@ function LibraryContent() {
   const [recRequesterName, setRecRequesterName] = useState('')
   const [recRequesterRole, setRecRequesterRole] = useState<'Student' | 'Staff' | 'Parent' | 'Other'>('Student')
   const [recRequesterClass, setRecRequesterClass] = useState('')
-  const [waiverFineId, setWaiverFineId] = useState('')
-  const [waiverReason, setWaiverReason] = useState('')
   const [workflowMessage, setWorkflowMessage] = useState<string | null>(null)
 
   // [R21] Borrowings tab sub-navigation — "Active Borrowings" / "Fine
@@ -1307,6 +1300,11 @@ function LibraryContent() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   const isLibStaff = ['admin', 'library'].includes(role ?? '')
+  const { can } = usePermissions()
+  // Who may see EVERY loan (matches GET /library/borrowings/list: library staff + headteacher).
+  // Everyone else — students, teachers, finance, HR … — sees only their own loans and fines.
+  const seesAllLoans = isLibStaff || role === 'high_rank'
+  const canReviewWaivers = can('library.waiveFine')   // same gate as the review list below
 
   const { data: stats }             = useLibraryStats()
   const { data: books = [],  isLoading } = useBooks({
@@ -1326,7 +1324,7 @@ function LibraryContent() {
   // export can all derive their numbers client-side from one dataset —
   // the visible list is then filtered from the same data, not a second
   // network round trip per status.
-  const { data: allFines = [] } = useFines()
+  const { data: allFines = [] } = useFines(undefined, { enabled: isLibStaff })
   const [fineStatusFilter, setFineStatusFilter] = useState<'' | 'PENDING' | 'PAID' | 'WAIVED'>('PENDING')
   const fines = fineStatusFilter ? allFines.filter((f) => f.status === fineStatusFilter) : allFines
   const clearFine = useClearFine()
@@ -1352,7 +1350,7 @@ function LibraryContent() {
   // the All/Active/Due Soon/Overdue chips then filter this same set
   // client-side (DUE SOON isn't a stored status — see
   // borrowingDisplayStatus() above).
-  const { data: activeLoans = [] } = useBorrowings({ unreturned: true, search: borrowingsSearch || undefined })
+  const { data: activeLoans = [] } = useBorrowings({ unreturned: true, search: borrowingsSearch || undefined }, { enabled: seesAllLoans })
   const visibleLoans = (activeLoans as ApiBorrowing[]).filter((b) => {
     if (borrowingsFilter === 'all') return true
     const displayStatus = borrowingDisplayStatus(b)
@@ -1370,14 +1368,13 @@ function LibraryContent() {
     (digitalStatusFilter === '' || (digitalStatusFilter === 'pending' ? !r.approved : r.approved)) &&
     (focusResourceId === '' || r.id === focusResourceId))
   const { data: recommendations = [] }  = useRecommendations('PENDING')
-  const { data: fineWaivers = [] }      = useFineWaivers('PENDING')
+  const { data: fineWaivers = [] }      = useFineWaivers('PENDING', { enabled: canReviewWaivers })
 
   const scanBarcode        = useScanBarcode()
   const renewBorrowing     = useRenewBorrowing()
   const createRecommendation  = useCreateRecommendation()
   const approveRecommendation = useApproveRecommendation()
   const rejectRecommendation  = useRejectRecommendation()
-  const createFineWaiver      = useCreateFineWaiver()
   const approveFineWaiver     = useApproveFineWaiver()
   const rejectFineWaiver      = useRejectFineWaiver()
   const approveDigitalResource = useApproveDigitalResource()
@@ -1492,20 +1489,6 @@ function LibraryContent() {
     a.download = filename
     a.click()
     URL.revokeObjectURL(url)
-  }
-
-  function handleSubmitFineWaiver() {
-    if (!waiverFineId.trim() || !waiverReason.trim()) return
-    createFineWaiver.mutate(
-      { fineId: waiverFineId, reason: waiverReason },
-      {
-        onSuccess: () => {
-          setWaiverFineId(''); setWaiverReason('')
-          setWorkflowMessage('Fine waiver request submitted for review.')
-        },
-        onError: (err) => setWorkflowMessage(err instanceof Error ? err.message : 'Could not submit waiver request.'),
-      },
-    )
   }
 
   return (
@@ -1888,8 +1871,8 @@ function LibraryContent() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <ModuleTabs<'active' | 'waivers'>
               tabs={[
-                { id: 'active',  label: 'Active Borrowings',  icon: Repeat, badge: (activeLoans as ApiBorrowing[]).length },
-                { id: 'waivers', label: 'Fine Waiver Portal',  icon: Shield, badge: fineWaivers.length },
+                { id: 'active',  label: seesAllLoans ? 'Active Borrowings' : 'My Borrowings', icon: Repeat, badge: seesAllLoans ? (activeLoans as ApiBorrowing[]).length : undefined },
+                { id: 'waivers', label: 'Fine Waiver Portal',  icon: Shield, badge: canReviewWaivers ? fineWaivers.length : undefined },
               ]}
               active={borrowingsSubTab}
               onChange={setBorrowingsSubTab}
@@ -1907,7 +1890,9 @@ function LibraryContent() {
             </PermissionGuard>
           </div>
 
-          {borrowingsSubTab === 'active' && (
+          {borrowingsSubTab === 'active' && !seesAllLoans && <MyBorrowingsPanel />}
+
+          {borrowingsSubTab === 'active' && seesAllLoans && (
             <div className="space-y-3">
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex-1 min-w-56 relative">
@@ -2065,31 +2050,9 @@ function LibraryContent() {
 
           {borrowingsSubTab === 'waivers' && (
             <div className="space-y-4">
-              <div className="space-y-3 pb-4 border-b border-base">
-                <h3 className="font-heading font-semibold text-sm text-body">Request a Fine Waiver</h3>
-                <p className="text-xs text-muted">
-                  Have an outstanding library fine you&apos;d like reviewed? Submit the fine ID with your reason below.
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="waiver-fine-id" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Fine ID</label>
-                    <input id="waiver-fine-id" value={waiverFineId} onChange={(e) => setWaiverFineId(e.target.value)}
-                      placeholder="e.g. FINE-101"
-                      className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
-                  </div>
-                  <div>
-                    <label htmlFor="waiver-reason" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Reason</label>
-                    <input id="waiver-reason" value={waiverReason} onChange={(e) => setWaiverReason(e.target.value)}
-                      placeholder="Explain circumstance (e.g. financial hardship, verified flood damage, medical leave)…"
-                      className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
-                  </div>
-                </div>
-                <button type="button" onClick={handleSubmitFineWaiver} disabled={createFineWaiver.isPending}
-                  className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60">
-                  {createFineWaiver.isPending ? 'Submitting…' : 'Submit Waiver Request'}
-                </button>
-                {workflowMessage && <p className="text-sm text-brand-teal">{workflowMessage}</p>}
-              </div>
+              {/* [FIX] Was a free-text "Fine ID" box nobody could fill in. The person now picks from
+                  the fines charged to them (late, damaged and lost), each with its waiver status. */}
+              <FineWaiverRequestPanel />
 
               <PermissionGuard permission="library.waiveFine">
                 <div className="pt-1">
@@ -2100,7 +2063,14 @@ function LibraryContent() {
                     <ul className="divide-y divide-base">
                       {fineWaivers.map((w) => (
                         <li key={w.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
-                          <span>{w.reason} — MWK {w.amount}</span>
+                          <span className="min-w-0">
+                            <span className="block font-medium text-body">
+                              {w.borrowerName ?? 'Borrower'} — {w.bookTitle ?? 'Book'}
+                              {w.kind ? <span className="ml-2 text-xs font-semibold text-muted">{FINE_KIND_LABEL[w.kind]}</span> : null}
+                              <span className="ml-2 text-xs font-semibold">{formatMWK(w.amount)}</span>
+                            </span>
+                            <span className="block text-xs text-muted">Their reason: {w.reason}</span>
+                          </span>
                           <div className="flex gap-3">
                             <button type="button" onClick={() => approveFineWaiver.mutate(w.id)}
                               disabled={approveFineWaiver.isPending || rejectFineWaiver.isPending}
@@ -2512,7 +2482,9 @@ function LibraryContent() {
                               {f.borrowerName} — {f.bookTitle}
                               {f.status === 'PENDING' && <span className="ml-2 text-xs font-semibold text-status-warning">PENDING</span>}
                             </p>
-                            <p className="text-xs text-muted">{f.reason} · {formatMWK(f.amount)}</p>
+                            <p className="text-xs text-muted">
+                              <span className="font-semibold">{FINE_KIND_LABEL[f.kind] ?? 'Fine'}</span> · {f.reason} · {formatMWK(f.amount)}
+                            </p>
                           </div>
                           {f.status === 'PENDING' ? (
                             <div className="flex items-center gap-3 shrink-0">
@@ -2731,4 +2703,4 @@ function LibraryContent() {
       </ModuleSurface>
     </div>
   )
-}
+}

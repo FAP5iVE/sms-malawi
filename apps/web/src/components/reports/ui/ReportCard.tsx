@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { useFlatSurface } from '@/components/shared/FlatSurface'
 
 export function ReportCard({
   title,
@@ -27,8 +28,10 @@ export function ReportCard({
   children: ReactNode
   className?: string
 }) {
+  // On the Reports page the card sits on a ModuleSurface panel: no second card, just the section.
+  const flat = useFlatSurface()
   return (
-    <section className={cn('rounded-xl border border-base bg-surface p-3 sm:p-5', className)}>
+    <section className={cn(!flat && 'rounded-xl border border-base bg-surface p-3 sm:p-5', className)}>
       <header className="mb-3 flex items-start justify-between gap-3 sm:mb-4">
         <div className="min-w-0">
           <h3 className="font-heading text-sm font-semibold text-brand-navy">{title}</h3>

@@ -8,7 +8,7 @@
  * balance is reported only as "withheld", never with its figures.
  */
 import 'server-only'
-import { addDays } from 'date-fns'
+import { addDays, differenceInDays } from 'date-fns'
 import { prisma } from '@/lib/prisma'
 import type { AttentionItem, ReportInsight, ReportSectionData } from '@shared/types/reporting'
 import type {
@@ -22,6 +22,8 @@ import { aggregateWeeks, attendanceRate } from './attendanceLogic'
 import { destinationNames } from './studentPlacementLogic'
 import { assignmentStatus, assignmentTotals, parseSubjectResults, subjectRows } from './studentLogic'
 import { assignedSubjectsForClass } from '@/server/services/assignmentService'
+import * as settingsService from '@/server/services/settingsService'
+import { SETTING_KEYS } from '@shared/types/settings'
 import { daysBetween, kpi, previousPeriod, ratioPct, round, thresholdKpi } from '@/server/services/reporting/kpi'
 import { compact, sortInsights } from '@/server/services/reporting/insights'
 
@@ -168,7 +170,7 @@ export async function getStudentAttendance(studentId: string, academicYear: stri
 export async function getStudentLibrary(studentId: string, academicYear: string): Promise<ApiStudentLibrary> {
   const now = new Date()
   const { start } = getTermDateRange(academicYear, 1)
-  const [open, borrowedThisYear, fines] = await Promise.all([
+  const [open, borrowedThisYear, fines, fineRows, finePerDay] = await Promise.all([
     prisma.borrowing.findMany({
       where: { studentId, returnedAt: null, status: { not: 'LOST' } },
       select: { id: true, issuedAt: true, dueDate: true, book: { select: { title: true } } },
@@ -180,14 +182,28 @@ export async function getStudentLibrary(studentId: string, academicYear: string)
       _sum: { amount: true },
       _count: { _all: true },
     }),
+    // The student's whole fine history, so they can see what each charge was for.
+    prisma.libraryFine.findMany({
+      where: { studentId },
+      select: { id: true, bookTitle: true, kind: true, amount: true, reason: true, status: true, createdAt: true, paidAt: true, waivedAt: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+    settingsService.get(SETTING_KEYS.LIBRARY_FINE_PER_DAY),
   ])
-  const loans = open.map((o) => ({
-    borrowingId: o.id,
-    bookTitle: o.book.title,
-    issuedAt: o.issuedAt.toISOString(),
-    dueDate: o.dueDate.toISOString(),
-    daysOverdue: Math.max(0, daysBetween(o.dueDate, now)),
-  }))
+  const loans = open.map((o) => {
+    const daysOverdue = Math.max(0, daysBetween(o.dueDate, now))
+    return {
+      borrowingId: o.id,
+      bookTitle: o.book.title,
+      issuedAt: o.issuedAt.toISOString(),
+      dueDate: o.dueDate.toISOString(),
+      daysOverdue,
+      // The same rule returnBook() applies at return time (full 24-hour days past the due date,
+      // via differenceInDays), shown early so the charge is no surprise. `daysOverdue` above is a
+      // calendar-date count for display, so it can read one higher than the days actually charged.
+      accruedLateFee: Math.max(0, differenceInDays(now, o.dueDate)) * finePerDay,
+    }
+  })
   return {
     activeLoans: loans.length,
     overdueLoans: loans.filter((l) => l.daysOverdue > 0).length,
@@ -195,6 +211,18 @@ export async function getStudentLibrary(studentId: string, academicYear: string)
     borrowedThisYear,
     finesPendingAmount: num(fines._sum.amount),
     finesPendingCount: fines._count._all,
+    finePerDay,
+    accruedLateFeeTotal: loans.reduce((sum, l) => sum + l.accruedLateFee, 0),
+    fines: fineRows.map((f) => ({
+      id: f.id,
+      bookTitle: f.bookTitle,
+      kind: f.kind,
+      amount: num(f.amount),
+      reason: f.reason,
+      status: f.status,
+      createdAt: f.createdAt.toISOString(),
+      settledAt: (f.paidAt ?? f.waivedAt)?.toISOString() ?? null,
+    })),
   }
 }
 

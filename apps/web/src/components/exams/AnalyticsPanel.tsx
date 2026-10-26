@@ -46,22 +46,7 @@ import { Trophy, Users, TrendingUp, AlertTriangle, Info, Medal } from 'lucide-re
 import type { ApiClass, ApiRankedStudent, ApiClassAnalyticsSummary, ApiSubjectStreamComparison } from '@shared/types/api'
 import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
 
-interface Props {
-  academicYear: string
-  selectedClassId: string
-  term: number
-  /**
-   * Draw the comparison tables in their own bordered card. Off by default: on the
-   * Exams page the panel already sits inside ModuleSurface, where a second card
-   * would be a box-within-a-box. The Reports page has no outer panel, so it opts in.
-   */
-  framed?: boolean
-}
-
-/** Card around a table when `framed`; otherwise the table is left as it was. */
-function TableFrame({ framed, children }: { framed?: boolean; children: React.ReactNode }) {
-  return framed ? <div className="overflow-hidden rounded-xl border border-base bg-surface">{children}</div> : <>{children}</>
-}
+interface Props { academicYear: string; selectedClassId: string; term: number }
 
 function RankList({
   title, rows, accent, usePoints,
@@ -97,49 +82,47 @@ function RankList({
   )
 }
 
-function PerClassTable({ rows, framed }: { rows: ApiClassAnalyticsSummary[]; framed?: boolean }) {
+function PerClassTable({ rows }: { rows: ApiClassAnalyticsSummary[] }) {
   return (
-    <TableFrame framed={framed}>
-      // [PRODUCTION FIX] Was its own bordered/bg-surface card — now nested
-      // inside ModuleSurface's own panel (exams/page.tsx), which made this
-      // read as a box-within-a-box and ate into the panel's side padding.
-      // The header row's bg-page + row dividers already give the table
-      // definition without a second outer card.
-      <div className="table-scroll">
-        <table className="w-full text-sm border-collapse min-w-130">
-          <thead>
-            <tr className="bg-page border-b border-base">
-              {['Class', 'Graded as', 'Students', 'Average', 'Aggregate', 'Pass rate', 'At risk'].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wide">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-base">
-            {rows.map((c) => (
-              <tr key={c.classId} className="hover:bg-page">
-                <td className="px-4 py-3 font-medium text-body">{c.className}</td>
-                <td className="px-4 py-3 text-xs text-muted">
-                  {c.gradingTrack === 'MSCE' ? 'MSCE — points' : 'JCE — grades'}
-                </td>
-                <td className="px-4 py-3 text-muted">{c.total}</td>
-                <td className="px-4 py-3">{c.classAverage != null ? `${c.classAverage.toFixed(1)}%` : '—'}</td>
-                <td className="px-4 py-3">
-                  {c.gradingTrack === 'MSCE'
-                    ? (c.averagePoints != null ? `${c.averagePoints} pts` : '—')
-                    : <span className="text-muted text-xs">n/a</span>}
-                </td>
-                <td className="px-4 py-3">{c.passRate != null ? `${c.passRate}%` : '—'}</td>
-                <td className={`px-4 py-3 font-semibold ${c.atRiskCount > 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>
-                  {c.atRiskCount}
-                </td>
-              </tr>
+    // [PRODUCTION FIX] Was its own bordered/bg-surface card — now nested
+    // inside ModuleSurface's own panel (exams/page.tsx), which made this
+    // read as a box-within-a-box and ate into the panel's side padding.
+    // The header row's bg-page + row dividers already give the table
+    // definition without a second outer card.
+    <div className="table-scroll">
+      <table className="w-full text-sm border-collapse min-w-130">
+        <thead>
+          <tr className="bg-page border-b border-base">
+            {['Class', 'Graded as', 'Students', 'Average', 'Aggregate', 'Pass rate', 'At risk'].map((h) => (
+              <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wide">
+                {h}
+              </th>
             ))}
-          </tbody>
-        </table>
-      </div>
-    </TableFrame>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-base">
+          {rows.map((c) => (
+            <tr key={c.classId} className="hover:bg-page">
+              <td className="px-4 py-3 font-medium text-body">{c.className}</td>
+              <td className="px-4 py-3 text-xs text-muted">
+                {c.gradingTrack === 'MSCE' ? 'MSCE — points' : 'JCE — grades'}
+              </td>
+              <td className="px-4 py-3 text-muted">{c.total}</td>
+              <td className="px-4 py-3">{c.classAverage != null ? `${c.classAverage.toFixed(1)}%` : '—'}</td>
+              <td className="px-4 py-3">
+                {c.gradingTrack === 'MSCE'
+                  ? (c.averagePoints != null ? `${c.averagePoints} pts` : '—')
+                  : <span className="text-muted text-xs">n/a</span>}
+              </td>
+              <td className="px-4 py-3">{c.passRate != null ? `${c.passRate}%` : '—'}</td>
+              <td className={`px-4 py-3 font-semibold ${c.atRiskCount > 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>
+                {c.atRiskCount}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -155,47 +138,45 @@ function streamGroups(classes: ApiClass[]): { form: number; names: string[] }[] 
 
 /** Subject-by-subject, stream-by-stream. The stronger stream in each row is in
  *  the brand teal; the gap column says by how many points. */
-function StreamSubjectTable({ rows, streams, framed }: { rows: ApiSubjectStreamComparison[]; streams: string[]; framed?: boolean }) {
+function StreamSubjectTable({ rows, streams }: { rows: ApiSubjectStreamComparison[]; streams: string[] }) {
   return (
-    <TableFrame framed={framed}>
-      <div className="table-scroll">
-        <table className="w-full text-sm border-collapse min-w-130">
-          <thead>
-            <tr className="bg-page border-b border-base">
-              {['Subject', ...streams, 'Combined', 'Gap'].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wide">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-base">
-            {rows.map((r) => {
-              const avgs = streams.map((n) => r.byClass.find((c) => c.className === n)?.average ?? null)
-              const present = avgs.filter((a): a is number => a !== null)
-              const top = present.length ? Math.max(...present) : null
-              const gap = present.length > 1 ? Math.max(...present) - Math.min(...present) : null
-              return (
-                <tr key={r.subject} className="hover:bg-page">
-                  <td className="px-4 py-3 font-medium text-body">{r.subject}</td>
-                  {avgs.map((a, i) => (
-                    <td key={streams[i]} className={`px-4 py-3 tabular ${a !== null && a === top && gap ? 'text-brand-teal font-semibold' : 'text-body'}`}>
-                      {a !== null ? `${a.toFixed(1)}%` : '—'}
-                    </td>
-                  ))}
-                  <td className="px-4 py-3 tabular text-muted">{r.overall !== null ? `${r.overall.toFixed(1)}%` : '—'}</td>
-                  <td className={`px-4 py-3 tabular ${gap !== null && gap >= 10 ? 'text-brand-coral font-semibold' : 'text-muted'}`}>
-                    {gap !== null ? `${gap.toFixed(1)} pts` : '—'}
+    <div className="table-scroll">
+      <table className="w-full text-sm border-collapse min-w-130">
+        <thead>
+          <tr className="bg-page border-b border-base">
+            {['Subject', ...streams, 'Combined', 'Gap'].map((h) => (
+              <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wide">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-base">
+          {rows.map((r) => {
+            const avgs = streams.map((n) => r.byClass.find((c) => c.className === n)?.average ?? null)
+            const present = avgs.filter((a): a is number => a !== null)
+            const top = present.length ? Math.max(...present) : null
+            const gap = present.length > 1 ? Math.max(...present) - Math.min(...present) : null
+            return (
+              <tr key={r.subject} className="hover:bg-page">
+                <td className="px-4 py-3 font-medium text-body">{r.subject}</td>
+                {avgs.map((a, i) => (
+                  <td key={streams[i]} className={`px-4 py-3 tabular ${a !== null && a === top && gap ? 'text-brand-teal font-semibold' : 'text-body'}`}>
+                    {a !== null ? `${a.toFixed(1)}%` : '—'}
                   </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-    </TableFrame>
+                ))}
+                <td className="px-4 py-3 tabular text-muted">{r.overall !== null ? `${r.overall.toFixed(1)}%` : '—'}</td>
+                <td className={`px-4 py-3 tabular ${gap !== null && gap >= 10 ? 'text-brand-coral font-semibold' : 'text-muted'}`}>
+                  {gap !== null ? `${gap.toFixed(1)} pts` : '—'}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
-export function AnalyticsPanel({ academicYear, selectedClassId, term, framed }: Props) {
+export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
   // `scope` is a class id, "form:N" (every stream of Form N combined) or ''.
   const [scope, setScope]     = useState(selectedClassId)
   const [subject, setSubject] = useState('')
@@ -306,7 +287,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term, framed }: 
                   class or a form&apos;s combined streams above to see its Top and Bottom 10.
                 </span>
               </div>
-              <PerClassTable rows={data.perClass} framed={framed} />
+              <PerClassTable rows={data.perClass} />
             </>
           )}
 
@@ -325,7 +306,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term, framed }: 
                     <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide mb-3">
                       Stream comparison
                     </h3>
-                    <PerClassTable rows={data.perClass} framed={framed} />
+                    <PerClassTable rows={data.perClass} />
                   </div>
                   {data.subjectComparison.length > 0 && (
                     <div className="pb-2 space-y-4">
@@ -337,7 +318,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term, framed }: 
                         height={260}
                         emptyStateMessage="No subject results for these streams yet."
                         ariaLabel={`Subject averages for each Form ${data.form} stream`} />
-                      <StreamSubjectTable rows={data.subjectComparison} streams={streamNames} framed={framed} />
+                      <StreamSubjectTable rows={data.subjectComparison} streams={streamNames} />
                     </div>
                   )}
                 </>

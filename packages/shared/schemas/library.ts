@@ -56,6 +56,13 @@ export const IssueBorrowingSchema = z.object({
 export const ReturnBorrowingSchema = z.object({
   condition: z.enum(['GOOD','DAMAGED','LOST']).default('GOOD'),
   notes:     z.string().optional(),
+  /**
+   * MWK charged to the borrower for a DAMAGED or LOST copy. Recorded in the same
+   * transaction as the return (as a DAMAGED/LOST LibraryFine), so a return and its
+   * charge can never get out of step. Ignored for GOOD; 0 / omitted = no charge.
+   * Separate from the overdue (LATE) fine, which is always computed server-side.
+   */
+  fee:       z.number().nonnegative().max(99_999_999).optional(),
 })
 
 // [R21.2] "no where to change [a book's] status" outside of the return

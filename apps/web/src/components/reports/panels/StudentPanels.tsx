@@ -13,7 +13,7 @@ import {
   useMyAssignments, useMyAttendance, useMyAttention, useMyFees, useMyLibrary, useMyOverview, useMyPlacementReport, useMyProgress,
 } from '@/hooks/reporting/useStudentReporting'
 import type {
-  ApiStudentAssignmentRow, ApiStudentLoanRow, ApiStudentPlacementState, ApiStudentSubjectRow, StudentAssignmentStatus,
+  ApiStudentAssignmentRow, ApiStudentFineKind, ApiStudentFineRow, ApiStudentLoanRow, ApiStudentPlacementState, ApiStudentSubjectRow, StudentAssignmentStatus,
 } from '@shared/types/reporting-student'
 import { formatCount, formatDate, formatMwk, formatPercent, formatScore } from '@/lib/reportFormat'
 import { ReportCard } from '../ui/ReportCard'
@@ -154,6 +154,19 @@ export function StudentAssignmentsTab({ academicYear, term }: Period) {
   )
 }
 
+const FINE_KIND_LABEL: Record<ApiStudentFineKind, string> = {
+  LATE: 'Late return',
+  DAMAGED: 'Damaged book',
+  LOST: 'Lost book',
+  OTHER: 'Other',
+}
+
+const FINE_STATUS_LABEL: Record<ApiStudentFineRow['status'], string> = {
+  PENDING: 'To pay',
+  PAID: 'Paid',
+  WAIVED: 'Waived',
+}
+
 export function StudentLibraryTab({ academicYear, term }: Period) {
   const q = useMyLibrary({ academicYear, term })
   const d = q.data
@@ -166,9 +179,30 @@ export function StudentLibraryTab({ academicYear, term }: Period) {
           kpiTile('overdue', 'Overdue', d.overdueLoans, 'count', 'Books past their due date.', d.overdueLoans > 0 ? 'critical' : 'healthy'),
           kpiTile('year', 'Borrowed this year', d.borrowedThisYear, 'count', 'Books you have borrowed in this academic year.'),
           kpiTile('fines', 'Library fines owed', d.finesPendingAmount, 'mwk', 'Unpaid library fines.', d.finesPendingAmount > 0 ? 'watch' : 'healthy', d.finesPendingCount > 0 ? `${d.finesPendingCount} fine${d.finesPendingCount === 1 ? '' : 's'}` : undefined),
+          ...(d.accruedLateFeeTotal > 0
+            ? [kpiTile('accruing', 'Late fee building up', d.accruedLateFeeTotal, 'mwk', `Not charged yet. Late books cost MWK ${d.finePerDay.toLocaleString('en-GB')} per day and the fee is added when the book is returned.`, 'critical')]
+            : []),
         ] : undefined}
       />
-      <ReportCard title="Books I have out">
+      <ReportCard title="My library fines" sub="Every charge, what it was for, and whether it is paid">
+        <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
+          <ReportTable<ApiStudentFineRow>
+            rows={d?.fines}
+            rowKey={(r) => r.id}
+            exportLabel="My library fines"
+            emptyMessage="You have no library fines."
+            columns={[
+              { key: 'date', label: 'Date', sortValue: (r) => r.createdAt, cell: (r) => formatDate(r.createdAt), exportValue: (r) => formatDate(r.createdAt) },
+              { key: 'kind', label: 'Reason', sortValue: (r) => FINE_KIND_LABEL[r.kind], cell: (r) => FINE_KIND_LABEL[r.kind], exportValue: (r) => FINE_KIND_LABEL[r.kind] },
+              { key: 'book', label: 'Book', sortValue: (r) => r.bookTitle },
+              { key: 'detail', label: 'Details', hideOnMobile: true, sortValue: (r) => r.reason },
+              { key: 'amount', label: 'Amount', align: 'right', sortValue: (r) => r.amount, cell: (r) => formatMwk(r.amount), exportValue: (r) => r.amount },
+              { key: 'status', label: 'Status', sortValue: (r) => FINE_STATUS_LABEL[r.status], cell: (r) => FINE_STATUS_LABEL[r.status], exportValue: (r) => FINE_STATUS_LABEL[r.status] },
+            ]}
+          />
+        </QueryState>
+      </ReportCard>
+      <ReportCard title="Books I have out" sub={d ? `A late book costs MWK ${d.finePerDay.toLocaleString('en-GB')} for each full day it is overdue. The fee is added when you return it.` : undefined}>
         <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
           <ReportTable<ApiStudentLoanRow>
             rows={d?.loans}
@@ -180,6 +214,7 @@ export function StudentLibraryTab({ academicYear, term }: Period) {
               { key: 'issued', label: 'Borrowed', hideOnMobile: true, sortValue: (r) => r.issuedAt, cell: (r) => formatDate(r.issuedAt), exportValue: (r) => formatDate(r.issuedAt) },
               { key: 'due', label: 'Due back', sortValue: (r) => r.dueDate, cell: (r) => formatDate(r.dueDate), exportValue: (r) => formatDate(r.dueDate) },
               { key: 'late', label: 'Days overdue', align: 'right', sortValue: (r) => r.daysOverdue, cell: (r) => (r.daysOverdue > 0 ? formatCount(r.daysOverdue) : '—'), exportValue: (r) => r.daysOverdue },
+              { key: 'accrued', label: 'Late fee so far', align: 'right', sortValue: (r) => r.accruedLateFee, cell: (r) => (r.accruedLateFee > 0 ? formatMwk(r.accruedLateFee) : '—'), exportValue: (r) => r.accruedLateFee },
             ]}
           />
         </QueryState>

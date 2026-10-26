@@ -557,6 +557,8 @@ export interface ApiLibraryFine {
   bookTitle: string
   amount: number
   reason: string
+  /** Why it was raised: overdue days, a damaged or lost copy, or a manual fine. */
+  kind: 'LATE' | 'DAMAGED' | 'LOST' | 'OTHER'
   status: 'PENDING' | 'PAID' | 'WAIVED'
   createdAt: string
   paidAt?: string
@@ -599,6 +601,58 @@ export interface ApiFineWaiverRequest {
   reviewNotes?: string
   reviewedAt?: string
   createdAt: string
+  /** Added for reviewers: who owes the fine, for which book, and why it was raised. */
+  borrowerName?: string
+  bookTitle?: string
+  kind?: 'LATE' | 'DAMAGED' | 'LOST' | 'OTHER'
+  fineReason?: string
+}
+
+/** Why a library fine was raised. */
+export type ApiLibraryFineKind = 'LATE' | 'DAMAGED' | 'LOST' | 'OTHER'
+
+/** One of the signed-in person's own loans (GET /library/my/borrowings). */
+export interface ApiMyBorrowing {
+  id: string
+  bookTitle: string
+  author: string
+  barcode: string | null
+  issuedAt: string
+  dueDate: string
+  returnedAt: string | null
+  /** OVERDUE is derived from the due date while the book is still out. */
+  status: 'ACTIVE' | 'OVERDUE' | 'RETURNED' | 'LOST'
+  /** How it came back: GOOD, DAMAGED or LOST. */
+  condition: 'GOOD' | 'DAMAGED' | 'LOST'
+  daysOverdue: number
+  /** Late fee building up on a book still out (days overdue × daily rate). Not charged until it is returned. */
+  accruedLateFee: number
+  /** Total of every fine raised on this loan (late, damaged, lost). */
+  chargedTotal: number
+  /** The part of chargedTotal still unpaid. */
+  chargedPending: number
+}
+
+export interface ApiMyBorrowings {
+  /** MWK charged per full day a book is overdue — the school's setting. */
+  finePerDay: number
+  loans: ApiMyBorrowing[]
+}
+
+/** One of the signed-in person's own library fines (GET /library/my/fines). */
+export interface ApiMyFine {
+  id: string
+  bookTitle: string
+  kind: ApiLibraryFineKind
+  amount: number
+  reason: string
+  status: 'PENDING' | 'PAID' | 'WAIVED'
+  borrowingId: string | null
+  createdAt: string
+  /** When it was paid or waived; null while pending. */
+  settledAt: string | null
+  /** The latest waiver request on this fine, if any. */
+  waiver: { id: string; status: 'PENDING' | 'APPROVED' | 'REJECTED'; reason: string; reviewNotes: string | null; createdAt: string } | null
 }
 
 export interface ApiFinanceSummary {

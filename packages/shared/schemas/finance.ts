@@ -276,11 +276,14 @@ export const CreateBudgetSchema = z.object({
 // library.ts's issueBorrowing()/returnBook() already do; the previous
 // studentId-only shape made staff fines impossible to record here.
 export const CreateLibraryFineSchema = z.object({
-  studentId: z.string().min(1).optional(),
-  staffId:   z.string().min(1).optional(),
+  // nullish, not optional: an API borrowing carries `studentId: null` for a staff
+  // loan (and `staffId: null` for a student loan), and JSON keeps those nulls.
+  studentId: z.string().min(1).nullish(),
+  staffId:   z.string().min(1).nullish(),
   bookTitle: z.string().min(1),
   amount:    z.number().positive(),
   reason:    z.string().min(1),
+  kind:      z.enum(['LATE', 'DAMAGED', 'LOST', 'OTHER']).optional(),   // omitted → the column default, OTHER
 }).refine((data) => !!data.studentId || !!data.staffId, {
   message: 'Either studentId or staffId is required.',
   path: ['studentId'],

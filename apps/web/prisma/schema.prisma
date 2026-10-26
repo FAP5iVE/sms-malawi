@@ -798,11 +798,12 @@ model LibraryFine {
   studentId       String?         // R12: made optional — a staff borrower's fine has no studentId (see staffId below)
   staffId         String?         // R12: NEW — plain, non-relational, mirroring studentId's existing established convention on this model (this model has never used a real Prisma @relation for the borrower, per finances.ts's own documented reasoning); populated when the underlying Borrowing is a STAFF loan
   bookTitle       String
-  borrowingId     String?         @unique            // R12: NEW — formalizes the borrowingId-shaped FK concept libraryWorkflowService.ts's fine-waiver workflow already assumed existed
+  borrowingId     String?                            // R12: NEW — formalizes the borrowingId-shaped FK concept libraryWorkflowService.ts's fine-waiver workflow already assumed existed. No longer @unique: one return can now carry a LATE fine AND a DAMAGED/LOST fine (see `kind`).
   borrowing       Borrowing?      @relation(fields: [borrowingId], references: [id])
   firestoreDocId  String?         @unique            // R10: Firestore is no longer part of this workflow (Prisma is the sole system of record) — kept optional, not dropped, pending R11's explicit confirmation of whether the library domain still needs it for anything else
   amount          Decimal         @db.Decimal(10, 2)
   reason          String
+  kind            FineKind        @default(OTHER)   // why it was raised — LATE (overdue days), DAMAGED, LOST, or OTHER (manual "Assess Fine")
   status          FineStatus      @default(PENDING)
   markedByUid     String          // librarian who raised the fine
   paidAt          DateTime?
@@ -815,6 +816,7 @@ model LibraryFine {
   @@index([studentId])
   @@index([staffId])
   @@index([status])
+  @@index([borrowingId])
   @@map("library_fines")
 }
 
@@ -823,6 +825,13 @@ enum FineStatus {
   PAID 
   WAIVED 
   }
+
+enum FineKind {
+  LATE
+  DAMAGED
+  LOST
+  OTHER
+}
 
   // ─── ACCOUNTING LEDGER (Phase D6) ────────────────────────
 
@@ -1352,7 +1361,7 @@ model Borrowing {
   student      Student?     @relation(fields: [studentId], references: [id], onDelete: Cascade)
   staffId      String?
   staff        StaffProfile? @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  libraryFine  LibraryFine?   // R12: reciprocal side of LibraryFine.borrowingId — at most one fine per borrowing
+  libraryFines LibraryFine[]  // reciprocal side of LibraryFine.borrowingId — a return can carry a LATE fine and a DAMAGED/LOST fine
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 

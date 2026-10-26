@@ -7,6 +7,7 @@
  * section because the value flows from one piece of state in the tab.
  */
 import type { ReactNode } from 'react'
+import { useFlatSurface } from '@/components/shared/FlatSurface'
 
 export interface FilterOption {
   value: string
@@ -47,8 +48,9 @@ export function FilterSelect({
 }
 
 export function FilterBar({ children, ariaLabel = 'Report filters' }: { children: ReactNode; ariaLabel?: string }) {
+  const flat = useFlatSurface()
   return (
-    <div role="group" aria-label={ariaLabel} className="flex flex-wrap items-end gap-3 rounded-xl border border-base bg-surface p-3">
+    <div role="group" aria-label={ariaLabel} className={`flex flex-wrap items-end gap-3 ${flat ? '' : 'rounded-xl border border-base bg-surface p-3'}`}>
       {children}
     </div>
   )

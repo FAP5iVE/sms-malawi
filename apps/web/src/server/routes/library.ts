@@ -287,6 +287,18 @@ libraryRouter.patch('/recommendations/:id/reject', verifyAuth, requirePermission
     return res.json({ ok: true })
   })
 
+// ── MY OWN LOANS AND FINES (registered before GET /:id — see header) ──
+// Scoped to the signed-in person by auth uid; nothing is read from the request.
+libraryRouter.get('/my/borrowings', verifyAuth, requirePermission('library.viewOwnBorrowings'),
+  async (req, res) => {
+    return res.json(await libService.listMyBorrowings(req.user!.uid))
+  })
+
+libraryRouter.get('/my/fines', verifyAuth, requirePermission('library.viewOwnFines'),
+  async (req, res) => {
+    return res.json(await libService.listMyFines(req.user!.uid))
+  })
+
 // ── FINE WAIVER REQUESTS (registered before GET /:id — see header) ──
 libraryRouter.get('/fine-waivers', verifyAuth, requireAnyPermission(['library.waiveFine', 'finance.waiveFine']),
   async (req, res) => {
@@ -296,14 +308,20 @@ libraryRouter.get('/fine-waivers', verifyAuth, requireAnyPermission(['library.wa
     ))
   })
 
-// Self-service create — any authenticated user may request a waiver on a
-// fine (narrowing, not granting, per sms-erp-security's established
-// self-service pattern); createFineWaiverRequest() itself confirms the
-// fine exists and still has an outstanding balance.
+// Self-service create — a person may request a waiver on a fine charged to THEM.
+// Previously any signed-in user could name any fine id; ownership is now checked
+// (library / finance staff who hold waiveFine may still file on someone's behalf).
+// createFineWaiverRequest() itself confirms the fine exists and still has an
+// outstanding balance.
 libraryRouter.post('/fine-waivers', verifyAuth,
   async (req, res) => {
     const parsed = CreateFineWaiverSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    const su = req.user!.superUser === true
+    const mayActForOthers = hasPermission(req.user!.role, 'library.waiveFine', su) || hasPermission(req.user!.role, 'finance.waiveFine', su)
+    if (!mayActForOthers && !(await libService.fineBelongsTo(req.user!.uid, parsed.data.fineId))) {
+      return res.status(403).json({ error: 'You can only request a waiver on a fine charged to you.' })
+    }
     try {
       const id = await workflowService.createFineWaiverRequest({
         ...parsed.data,

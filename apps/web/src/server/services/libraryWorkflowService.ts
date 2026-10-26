@@ -224,20 +224,29 @@ export async function rejectFineWaiver(
 export async function listFineWaiverRequests(
   status?: 'PENDING' | 'APPROVED' | 'REJECTED',
 ) {
-  return prisma.fineWaiverRequest.findMany({
+  const rows = await prisma.fineWaiverRequest.findMany({
     where:   status ? { status } : {},
-    include: {
-      fine: {
-        include: {
-          borrowing: {
-            include: {
-              student: { select: { firstName: true, lastName: true, registrationNo: true } },
-              book:    { select: { title: true } },
-            },
-          },
-        },
-      },
-    },
+    include: { fine: true },
     orderBy: { createdAt: 'desc' },
   })
+
+  // The reviewer has to see WHO owes it, for WHICH book and WHY (late / damaged / lost) —
+  // a bare "reason — MWK amount" row is not enough to approve or reject. LibraryFine keeps
+  // plain string studentId/staffId (no relation), so names are batch-resolved.
+  const studentIds = [...new Set(rows.map((r) => r.fine.studentId).filter((id): id is string => !!id))]
+  const staffIds   = [...new Set(rows.map((r) => r.fine.staffId).filter((id): id is string => !!id))]
+  const [students, staff] = await Promise.all([
+    studentIds.length ? prisma.student.findMany({ where: { id: { in: studentIds } }, select: { id: true, firstName: true, lastName: true } }) : [],
+    staffIds.length   ? prisma.staffProfile.findMany({ where: { id: { in: staffIds } }, select: { id: true, firstName: true, lastName: true } }) : [],
+  ])
+  const nameById = new Map([...students, ...staff].map((p) => [p.id, `${p.firstName} ${p.lastName}`]))
+
+  return rows.map((r) => ({
+    ...r,
+    amount:       Number(r.amount),
+    bookTitle:    r.fine.bookTitle,
+    kind:         r.fine.kind,
+    fineReason:   r.fine.reason,
+    borrowerName: nameById.get(r.fine.studentId ?? r.fine.staffId ?? '') ?? 'Unknown',
+  }))
 }
