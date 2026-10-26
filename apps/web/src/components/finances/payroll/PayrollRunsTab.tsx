@@ -306,6 +306,7 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
         title="Submit for Approval?"
         description="Sends this run to a High Rank staff member for approval. You won't be able to edit salary structures affecting this run once approved."
         confirmLabel="Submit"
+        confirming={submitMutation.isPending}
         onConfirm={() => runAction(() => submitMutation.mutateAsync(run.id))}
         onCancel={() => setConfirmAction(null)}
       />
@@ -314,6 +315,7 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
         title="Approve This Payroll Run?"
         description="Confirms the calculated amounts are correct and clears the run for Finance to lock and post."
         confirmLabel="Approve"
+        confirming={approveMutation.isPending}
         onConfirm={() => runAction(() => approveMutation.mutateAsync(run.id))}
         onCancel={() => setConfirmAction(null)}
       />
@@ -323,6 +325,7 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
         description="Posts the payroll journal entry to the accounting ledger and permanently locks this month. This cannot be undone without a rollback."
         confirmLabel="Lock & Post"
         destructive
+        confirming={lockMutation.isPending}
         onConfirm={() => runAction(() => lockMutation.mutateAsync(run.id))}
         onCancel={() => setConfirmAction(null)}
       />
@@ -332,6 +335,7 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
         description="Permanently deletes this calculation (it never reached a usable state) so this month can be run again from scratch. Nothing has been submitted, approved, or posted — there's nothing to preserve."
         confirmLabel="Discard & Allow Retry"
         destructive
+        confirming={discardMutation.isPending}
         onConfirm={() => runAction(() => discardMutation.mutateAsync(run.id))}
         onCancel={() => setConfirmAction(null)}
       />

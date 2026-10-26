@@ -93,6 +93,7 @@ export function useMonitoringFeedback() {
 export function useSubmitFeedback() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Feedback submitted', failureTitle: 'Could not submit feedback' },
     // name + idNumber (employee/student number) are required — see
     // @shared/schemas/problemReport. Open to every role.
     mutationFn: (input: ProblemReportInput) =>

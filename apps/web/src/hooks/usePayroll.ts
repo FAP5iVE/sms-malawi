@@ -125,6 +125,7 @@ export async function downloadPayslip(payslipId: string): Promise<void> {
  */
 export function useDownloadPayslip() {
   return useMutation({
+    meta: { feedback: 'manual' },
     mutationFn: (payslipId: string) => downloadPayslip(payslipId),
   })
 }
@@ -195,6 +196,7 @@ function useInvalidateAllPayroll() {
 export function useRunPayroll() {
   const invalidate = useInvalidateAllPayroll()
   return useMutation({
+    meta: { successMessage: 'Payroll run started', failureTitle: 'Could not run payroll' },
     mutationFn: (data: { month: number; year: number }) =>
       apiFetch<{ runId: string; status: string }>('/payroll/run', {
         method: 'POST',
@@ -207,6 +209,7 @@ export function useRunPayroll() {
 export function useSubmitPayrollForApproval() {
   const invalidate = useInvalidateAllPayroll()
   return useMutation({
+    meta: { successMessage: 'Payroll submitted for approval', failureTitle: 'Could not submit payroll for approval' },
     mutationFn: (runId: string) =>
       apiFetch<ApiPayrollRun>(`/payroll/runs/${runId}/submit-for-approval`, { method: 'POST', body: JSON.stringify({}) }),
     onSuccess: invalidate,
@@ -216,6 +219,7 @@ export function useSubmitPayrollForApproval() {
 export function useApprovePayrollRun() {
   const invalidate = useInvalidateAllPayroll()
   return useMutation({
+    meta: { successMessage: 'Payroll run approved', failureTitle: 'Could not approve payroll run' },
     mutationFn: (runId: string) =>
       apiFetch<ApiPayrollRun>(`/payroll/runs/${runId}/approve`, { method: 'POST', body: JSON.stringify({}) }),
     onSuccess: invalidate,
@@ -225,6 +229,7 @@ export function useApprovePayrollRun() {
 export function useLockPayrollRun() {
   const invalidate = useInvalidateAllPayroll()
   return useMutation({
+    meta: { successMessage: 'Payroll run locked', failureTitle: 'Could not lock payroll run' },
     mutationFn: (runId: string) =>
       apiFetch<ApiPayrollRun>(`/payroll/runs/${runId}/lock`, { method: 'POST', body: JSON.stringify({}) }),
     onSuccess: invalidate,
@@ -234,6 +239,7 @@ export function useLockPayrollRun() {
 export function useRollbackPayrollRun() {
   const invalidate = useInvalidateAllPayroll()
   return useMutation({
+    meta: { successMessage: 'Payroll run rolled back', failureTitle: 'Could not roll back the payroll run' },
     mutationFn: ({ runId, reason }: { runId: string; reason: string }) =>
       apiFetch<ApiPayrollRun>(`/payroll/runs/${runId}/rollback`, {
         method: 'POST',
@@ -251,6 +257,7 @@ export function useRollbackPayrollRun() {
 export function useDiscardStuckRun() {
   const invalidate = useInvalidateAllPayroll()
   return useMutation({
+    meta: { successMessage: 'Stuck payroll run discarded', failureTitle: 'Could not discard the payroll run' },
     mutationFn: (runId: string) =>
       apiFetch<{ discarded: boolean }>(`/payroll/runs/${runId}/discard`, { method: 'POST', body: JSON.stringify({}) }),
     onSuccess: invalidate,

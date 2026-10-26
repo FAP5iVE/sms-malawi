@@ -43,6 +43,7 @@ import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
 import { AnnouncementSchema, AnnouncementDraftSchema } from '@shared/schemas/announcement'
 import { apiFetch } from '@/lib/api-client'
+import { notifySuccess, notifyError, getErrorMessage } from '@/lib/feedback'
 import { uploadFileDirectly } from '@/lib/directUpload'
 import { X, Loader2, ImagePlus, Save } from 'lucide-react'
 import { USER_ROLES } from '@shared/types/roles'
@@ -210,9 +211,11 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
         })
       }
       onClose()
+      notifySuccess('Draft saved')
     } catch (err) {
       console.error(`Failed to save ${noun} draft:`, err)
-      setError(err instanceof Error ? err.message : `Failed to save draft. Please try again.`)
+      setError(getErrorMessage(err, `Failed to save draft. Please try again.`))
+      notifyError('Could not save the draft', err)
     } finally {
       setSavingDraft(false)
     }
@@ -271,9 +274,11 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
         })
       }
       onClose()
+      notifySuccess(`${noun.charAt(0).toUpperCase()}${noun.slice(1)} submitted`)
     } catch (err) {
       console.error(`Failed to post ${noun}:`, err)
-      setError(err instanceof Error ? err.message : `Failed to post ${noun}. Please try again.`)
+      setError(getErrorMessage(err, `Failed to post ${noun}. Please try again.`))
+      notifyError(`Could not post the ${noun}`, err)
     } finally {
       setLoading(false)
     }

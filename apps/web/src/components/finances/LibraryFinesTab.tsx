@@ -37,7 +37,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { formatMWK } from '@shared/constants/malawi'
-import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { CheckCircle, XCircle, AlertTriangle, Loader2 } from 'lucide-react'
 import { usePermissions } from '@/hooks/usePermissions'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -61,11 +61,13 @@ export function LibraryFinesTab() {
   })
 
   const markPaid = useMutation({
+    meta: { successMessage: 'Fine marked as paid', failureTitle: 'Could not mark the fine as paid' },
     mutationFn: (id: string) => apiFetch(`/finances/library-fines/${id}/pay`, { method: 'PATCH' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.libraryFines() }),
   })
 
   const waive = useMutation({
+    meta: { successMessage: 'Fine waived', failureTitle: 'Could not waive the fine' },
     mutationFn: (id: string) =>
       apiFetch(`/finances/library-fines/${id}/waive`, { method: 'PATCH' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.libraryFines() }),
@@ -112,11 +114,15 @@ export function LibraryFinesTab() {
                   {canPay && (
                     <button
                       onClick={() => markPaid.mutate(fine.id)}
-                      className="p-1 text-brand-teal hover:text-brand-teal-light transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      disabled={markPaid.isPending}
+                      aria-busy={markPaid.isPending && markPaid.variables === fine.id}
+                      className="p-1 text-brand-teal hover:text-brand-teal-light transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-50"
                       aria-label="Mark as paid"
                       title="Mark paid"
                     >
-                      <CheckCircle className="w-4 h-4" />
+                      {markPaid.isPending && markPaid.variables === fine.id
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <CheckCircle className="w-4 h-4" />}
                     </button>
                   )}
                   {canWaive && (
@@ -147,10 +153,12 @@ export function LibraryFinesTab() {
             : ''
         }
         confirmLabel="Waive Fine"
+        confirmingLabel="Waiving…"
+        confirming={waive.isPending}
         destructive
         onConfirm={() => {
-          if (pendingWaive) waive.mutate(pendingWaive.id)
-          setPendingWaive(null)
+          // Stays open with a spinner until the server answers.
+          if (pendingWaive) waive.mutate(pendingWaive.id, { onSettled: () => setPendingWaive(null) })
         }}
         onCancel={() => setPendingWaive(null)}
       />

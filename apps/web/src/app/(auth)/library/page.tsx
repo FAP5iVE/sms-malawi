@@ -1386,6 +1386,7 @@ function LibraryContent() {
 
   function handleScan(barcode: string) {
     if (!barcode) return
+    if (scanBarcode.isPending) return
     setScanError(null)
     setScanResult(null)
     scanBarcode.mutate(barcode, {
@@ -1681,10 +1682,13 @@ function LibraryContent() {
                   <button
                     type="button"
                     onClick={() => handleScan(barcodeInput)}
+                    disabled={scanBarcode.isPending}
+                    aria-busy={scanBarcode.isPending}
                     aria-label="Look up barcode"
-                    className="bg-brand-deep text-white px-3 py-2 rounded-xl text-sm min-h-11"
+                    className="bg-brand-deep text-white px-3 py-2 rounded-xl text-sm min-h-11 inline-flex items-center gap-2 disabled:opacity-70"
                   >
-                    Look up
+                    {scanBarcode.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />}
+                    {scanBarcode.isPending ? 'Looking up…' : 'Look up'}
                   </button>
                 </div>
               ) : <span />}
@@ -2098,11 +2102,21 @@ function LibraryContent() {
                         <li key={w.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
                           <span>{w.reason} — MWK {w.amount}</span>
                           <div className="flex gap-3">
-                            <button type="button" onClick={() => approveFineWaiver.mutate(w.id)} aria-label="Approve waiver" className="text-brand-teal min-h-11 min-w-11 flex items-center justify-center"><Check className="w-4 h-4" /></button>
+                            <button type="button" onClick={() => approveFineWaiver.mutate(w.id)}
+                              disabled={approveFineWaiver.isPending || rejectFineWaiver.isPending}
+                              aria-busy={approveFineWaiver.isPending && approveFineWaiver.variables === w.id}
+                              aria-label="Approve waiver" className="text-brand-teal min-h-11 min-w-11 flex items-center justify-center disabled:opacity-50">
+                              {approveFineWaiver.isPending && approveFineWaiver.variables === w.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                            </button>
                             <button type="button" onClick={() => {
                               const reason = window.prompt('Reason for rejecting this waiver request:')
                               if (reason) rejectFineWaiver.mutate({ id: w.id, reason })
-                            }} aria-label="Reject waiver" className="text-brand-coral min-h-11 min-w-11 flex items-center justify-center"><XIcon className="w-4 h-4" /></button>
+                            }}
+                              disabled={approveFineWaiver.isPending || rejectFineWaiver.isPending}
+                              aria-busy={rejectFineWaiver.isPending && rejectFineWaiver.variables?.id === w.id}
+                              aria-label="Reject waiver" className="text-brand-coral min-h-11 min-w-11 flex items-center justify-center disabled:opacity-50">
+                              {rejectFineWaiver.isPending && rejectFineWaiver.variables?.id === w.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XIcon className="w-4 h-4" />}
+                            </button>
                           </div>
                         </li>
                       ))}
@@ -2373,11 +2387,21 @@ function LibraryContent() {
                         )}
                       </div>
                       <div className="flex gap-3 shrink-0">
-                        <button type="button" onClick={() => approveRecommendation.mutate({ id: r.id })} aria-label="Approve recommendation" className="text-brand-teal min-h-11 min-w-11 flex items-center justify-center"><Check className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => approveRecommendation.mutate({ id: r.id })}
+                          disabled={approveRecommendation.isPending || rejectRecommendation.isPending}
+                          aria-busy={approveRecommendation.isPending && approveRecommendation.variables?.id === r.id}
+                          aria-label="Approve recommendation" className="text-brand-teal min-h-11 min-w-11 flex items-center justify-center disabled:opacity-50">
+                          {approveRecommendation.isPending && approveRecommendation.variables?.id === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                        </button>
                         <button type="button" onClick={() => {
                           const reason = window.prompt('Reason for rejecting this recommendation:')
                           if (reason) rejectRecommendation.mutate({ id: r.id, reason })
-                        }} aria-label="Reject recommendation" className="text-brand-coral min-h-11 min-w-11 flex items-center justify-center"><XIcon className="w-4 h-4" /></button>
+                        }}
+                          disabled={approveRecommendation.isPending || rejectRecommendation.isPending}
+                          aria-busy={rejectRecommendation.isPending && rejectRecommendation.variables?.id === r.id}
+                          aria-label="Reject recommendation" className="text-brand-coral min-h-11 min-w-11 flex items-center justify-center disabled:opacity-50">
+                          {rejectRecommendation.isPending && rejectRecommendation.variables?.id === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XIcon className="w-4 h-4" />}
+                        </button>
                       </div>
                     </li>
                   ))}

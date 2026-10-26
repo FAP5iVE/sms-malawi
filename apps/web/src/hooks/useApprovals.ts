@@ -118,6 +118,7 @@ function useRefreshAfterDecision() {
 export function useApprovalDecision() {
   const refresh = useRefreshAfterDecision()
   return useMutation({
+    meta: { feedback: 'manual' },
     mutationFn: ({ source, sourceId, ...body }: DecisionVars) =>
       apiFetch<{ ok: true; key: string }>(`/approvals/${source}/${encodeURIComponent(sourceId)}/decision`, {
         method: 'POST',
@@ -130,6 +131,7 @@ export function useApprovalDecision() {
 export function useBulkApprovalDecision() {
   const refresh = useRefreshAfterDecision()
   return useMutation({
+    meta: { feedback: 'manual' },
     mutationFn: (vars: BulkDecisionVars) =>
       apiFetch<ApprovalBulkResult>('/approvals/bulk', {
         method: 'POST',

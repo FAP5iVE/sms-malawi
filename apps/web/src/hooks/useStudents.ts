@@ -128,6 +128,7 @@ export function useStudent(id: string) {
 export function useCreateStudent() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Student created', failureTitle: 'Could not create student' },
     mutationFn: (data: CreateStudentInput) =>
       apiFetch<ApiStudent>('/students', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.students.all() }),
@@ -137,6 +138,7 @@ export function useCreateStudent() {
 export function useUpdateStudent() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Student updated', failureTitle: 'Could not update student' },
     mutationFn: ({ id, ...data }: { id: string } & UpdateStudentInput) =>
       apiFetch<ApiStudent>(`/students/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: (_data, variables) => {
@@ -152,6 +154,7 @@ export function useUpdateStudent() {
 export function useArchiveStudent() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Student archived', failureTitle: 'Could not archive student' },
     mutationFn: (id: string) =>
       apiFetch<{ archived: boolean }>(`/students/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.students.all() }),

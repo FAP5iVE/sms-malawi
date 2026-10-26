@@ -385,9 +385,13 @@ function SalaryEditor({ staff }: { staff: ApiStaffProfile }) {
                   type="button"
                   aria-label={`Remove ${a.type}`}
                   onClick={() => deleteAllowance.mutate({ allowanceId: a.id, staffId: staff.id })}
-                  className="p-1.5 rounded-lg text-muted hover:bg-brand-coral/10 hover:text-brand-coral transition-colors"
+                  disabled={deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id}
+                  aria-busy={deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id}
+                  className="p-1.5 rounded-lg text-muted hover:bg-brand-coral/10 hover:text-brand-coral transition-colors disabled:opacity-50"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  {deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id
+                    ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
+                    : <Trash2 className="w-4 h-4" />}
                 </button>
               </div>
             </div>

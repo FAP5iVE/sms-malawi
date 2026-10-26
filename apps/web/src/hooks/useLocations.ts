@@ -39,6 +39,7 @@ export function useDepartments(includeInactive = false) {
 export function useCreateDepartment() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Department created', failureTitle: 'Could not create department' },
     mutationFn: (data: { code: string; name: string; description?: string }) => apiFetch('/locations/departments', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['locations', 'departments'] }),
   })
@@ -46,6 +47,7 @@ export function useCreateDepartment() {
 export function useUpdateDepartment() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Department updated', failureTitle: 'Could not update department' },
     mutationFn: ({ id, ...data }: { id: string; name?: string; description?: string; isActive?: boolean }) => apiFetch(`/locations/departments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['locations', 'departments'] }),
   })
@@ -60,6 +62,7 @@ export function useBuildings(includeInactive = false) {
 export function useCreateBuilding() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Building created', failureTitle: 'Could not create building' },
     mutationFn: (data: { code: string; name: string; description?: string }) => apiFetch('/locations/buildings', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['locations', 'buildings'] }),
   })
@@ -67,6 +70,7 @@ export function useCreateBuilding() {
 export function useUpdateBuilding() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Building updated', failureTitle: 'Could not update building' },
     mutationFn: ({ id, ...data }: { id: string; name?: string; description?: string; isActive?: boolean }) => apiFetch(`/locations/buildings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['locations', 'buildings'] }),
   })
@@ -80,6 +84,7 @@ export function useRooms(filters: { buildingId?: string; departmentId?: string; 
 export function useCreateRoom() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Room created', failureTitle: 'Could not create room' },
     mutationFn: (data: { buildingId: string; code: string; name: string; roomType: string; departmentId?: string; custodianUid?: string }) => apiFetch('/locations/rooms', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['locations', 'rooms'] }),
   })
@@ -87,6 +92,7 @@ export function useCreateRoom() {
 export function useUpdateRoom() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Room updated', failureTitle: 'Could not update room' },
     mutationFn: ({ id, ...data }: { id: string; name?: string; roomType?: string; departmentId?: string | null; custodianUid?: string | null; isActive?: boolean }) => apiFetch(`/locations/rooms/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['locations', 'rooms'] }),
   })
@@ -103,6 +109,7 @@ export function useLegacyMappings(status?: string) {
 export function useProposeDepartmentMappings() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Mappings proposed', failureTitle: 'Could not propose the mappings' },
     mutationFn: () => apiFetch('/locations/mappings/propose-departments', { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['locations', 'mappings'] }),
   })
@@ -110,6 +117,7 @@ export function useProposeDepartmentMappings() {
 export function useProposeLocationMappings() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Mappings proposed', failureTitle: 'Could not propose the mappings' },
     mutationFn: () => apiFetch('/locations/mappings/propose-locations', { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['locations', 'mappings'] }),
   })
@@ -117,6 +125,7 @@ export function useProposeLocationMappings() {
 export function useApproveMapping() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Mapping approved', failureTitle: 'Could not approve mapping' },
     mutationFn: ({ id, notes }: { id: string; notes?: string }) => apiFetch(`/locations/mappings/${id}/approve`, { method: 'POST', body: JSON.stringify({ notes }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['locations', 'mappings'] }),
   })
@@ -124,6 +133,7 @@ export function useApproveMapping() {
 export function useRejectMapping() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Mapping rejected', failureTitle: 'Could not reject mapping' },
     mutationFn: ({ id, notes }: { id: string; notes?: string }) => apiFetch(`/locations/mappings/${id}/reject`, { method: 'POST', body: JSON.stringify({ notes }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['locations', 'mappings'] }),
   })
@@ -131,6 +141,7 @@ export function useRejectMapping() {
 export function useApplyApprovedMappings() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Mappings applied', failureTitle: 'Could not apply the mappings' },
     mutationFn: () => apiFetch('/locations/mappings/apply', { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['locations', 'mappings'] }),
   })

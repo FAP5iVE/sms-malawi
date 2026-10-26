@@ -99,6 +99,7 @@ export function useInventoryItems(filters: { category?: string; search?: string;
 export function useCreateInventoryItem() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Inventory item created', failureTitle: 'Could not create inventory item' },
     mutationFn: (data: { itemCode: string; name: string; category?: string; description?: string; unitOfMeasure: string; reorderLevel?: number; reorderQuantity?: number }) =>
       apiFetch('/inventory/items', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.all() }),
@@ -108,6 +109,7 @@ export function useCreateInventoryItem() {
 export function useUpdateInventoryItem() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Inventory item updated', failureTitle: 'Could not update inventory item' },
     mutationFn: ({ id, ...data }: { id: string; name?: string; category?: string; description?: string; reorderLevel?: number; reorderQuantity?: number; isActive?: boolean }) =>
       apiFetch(`/inventory/items/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.all() }),
@@ -125,6 +127,7 @@ export function useInventoryTransactions(itemId?: string) {
 export function useReceiveInventory() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Stock received', failureTitle: 'Could not receive the stock' },
     mutationFn: (data: { inventoryItemId: string; quantity: number; destinationRoomId?: string; departmentId?: string; reason?: string }) =>
       apiFetch('/inventory/transactions/receipt', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.all() }),
@@ -134,6 +137,7 @@ export function useReceiveInventory() {
 export function useIssueInventory() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Inventory issued', failureTitle: 'Could not issue inventory' },
     mutationFn: (data: { inventoryItemId: string; quantity: number; sourceRoomId?: string; departmentId?: string; reason?: string }) =>
       apiFetch('/inventory/transactions/issue', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.all() }),
@@ -143,6 +147,7 @@ export function useIssueInventory() {
 export function useTransferInventory() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Inventory transferred', failureTitle: 'Could not transfer inventory' },
     // sourceRoomId/destinationRoomId are both required — a transfer moves
     // stock between two specific rooms; there's no department-to-department
     // transfer concept in the schema (InventoryTransaction has one
@@ -156,6 +161,7 @@ export function useTransferInventory() {
 export function useAdjustInventory() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Stock adjusted', failureTitle: 'Could not adjust the stock' },
     mutationFn: (data: { inventoryItemId: string; quantity: number; direction: 'INCREASE' | 'DECREASE'; reason: string }) =>
       apiFetch('/inventory/transactions/adjust', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.all() }),
@@ -184,6 +190,7 @@ export function useStocktake(id: string) {
 export function useCreateStocktake() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Stocktake created', failureTitle: 'Could not create stocktake' },
     // custodianUid is NOT client input — the server derives it from the
     // room's own custodianUid when roomId is given (stocktakeService.createStocktake).
     mutationFn: (data: { academicYear: string; term?: number; roomId?: string; departmentId?: string; notes?: string }) =>
@@ -195,6 +202,7 @@ export function useCreateStocktake() {
 export function useStartStocktake() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Stocktake started', failureTitle: 'Could not start stocktake' },
     mutationFn: (id: string) => apiFetch(`/stocktakes/${id}/start`, { method: 'POST' }),
     onSuccess: (_data, id) => {
       qc.invalidateQueries({ queryKey: inventoryKeys.stocktakes() })
@@ -206,6 +214,7 @@ export function useStartStocktake() {
 export function useRecordStocktakeLine() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Count recorded', failureTitle: 'Could not record the count' },
     // Matches stocktakesRouter's POST /:id/lines exactly: stocktakeId goes in
     // the URL, the body is just the existing line being counted.
     mutationFn: ({ stocktakeId, ...data }: { stocktakeId: string; lineId: string; actualQuantity: number; condition?: string; notes?: string }) =>
@@ -217,6 +226,7 @@ export function useRecordStocktakeLine() {
 export function useCompleteStocktake() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Stocktake completed', failureTitle: 'Could not complete stocktake' },
     mutationFn: (id: string) => apiFetch(`/stocktakes/${id}/complete`, { method: 'POST' }),
     onSuccess: (_data, id) => {
       qc.invalidateQueries({ queryKey: inventoryKeys.stocktakes() })
@@ -228,6 +238,7 @@ export function useCompleteStocktake() {
 export function useResolveInventoryVariance() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Inventory variance resolved', failureTitle: 'Could not resolve inventory variance' },
     mutationFn: ({ stocktakeId, varianceId, resolution, resolutionNote }: { stocktakeId: string; varianceId: string; resolution: 'RESOLVED' | 'WRITTEN_OFF'; resolutionNote?: string }) =>
       apiFetch(`/stocktakes/${stocktakeId}/variances/${varianceId}/resolve`, { method: 'POST', body: JSON.stringify({ resolution, resolutionNote }) }),
     onSuccess: (_data, variables) => qc.invalidateQueries({ queryKey: inventoryKeys.stocktake(variables.stocktakeId) }),

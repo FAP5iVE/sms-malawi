@@ -57,7 +57,7 @@ import { TeacherSelect } from '@/components/shared/TeacherSelect'
 import { ClassSubjectsField } from '@/components/classes/ClassSubjectsField'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import type { ApiClass } from '@shared/types/api'
-import { Users, ChevronRight, UserPlus, Pencil, Archive, Inbox, ArchiveRestore, GraduationCap } from 'lucide-react'
+import { Users, ChevronRight, UserPlus, Pencil, Archive, Inbox, ArchiveRestore, GraduationCap, Loader2 } from 'lucide-react'
 import { Modal, MODAL_BTN_PRIMARY
 } from '@/components/shared/Modal'
 
@@ -121,10 +121,11 @@ function ClassesContent() {
     [yearClasses]
   )
 
-  function handleArchive(id: string) {
+  function handleArchive(id: string, onSettled?: () => void) {
     setActionError(null)
     archive.mutate(id, {
       onError: (err) => setActionError(err instanceof Error ? err.message : 'Failed to archive class.'),
+      onSettled,
     })
   }
 
@@ -242,10 +243,13 @@ function ClassesContent() {
                                       ? handleArchive(cls.id)
                                       : setPendingArchiveClass({ id: cls.id, name: cls.name })
                                   }
-                                  className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-muted hover:bg-white/60 hover:text-brand-coral transition-colors"
+                                  disabled={archive.isPending}
+                                  className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-muted hover:bg-white/60 hover:text-brand-coral transition-colors disabled:opacity-50"
                                   aria-label={cls.status === 'ARCHIVED' ? `Restore ${cls.name}` : `Archive ${cls.name}`}
                                 >
-                                  {cls.status === 'ARCHIVED' ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+                                  {archive.isPending && archive.variables === cls.id
+                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
+                                    : cls.status === 'ARCHIVED' ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
                                 </button>
                               )}
                             </div>
@@ -293,10 +297,12 @@ function ClassesContent() {
         title={`Archive ${pendingArchiveClass?.name ?? 'this class'}?`}
         description="This will affect every enrolled student's roster, timetable, and attendance history for this class. Records are preserved and can be restored by an administrator."
         confirmLabel="Archive Class"
+        confirmingLabel="Archiving…"
+        confirming={archive.isPending}
         destructive
         onConfirm={() => {
-          if (pendingArchiveClass) handleArchive(pendingArchiveClass.id)
-          setPendingArchiveClass(null)
+          // Dialog stays open with a spinner until the server answers.
+          if (pendingArchiveClass) handleArchive(pendingArchiveClass.id, () => setPendingArchiveClass(null))
         }}
         onCancel={() => setPendingArchiveClass(null)}
       />

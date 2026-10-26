@@ -126,6 +126,15 @@ function toNumber(v: Decimal | number | null | undefined): number {
   return typeof v === 'number' ? v : Number(v)
 }
 
+// A rule violation the user can fix (bad input, wrong stage of the workflow).
+// The global error handler hides the message of any status >= 500 in
+// production, so a plain `new Error(...)` reached the UI as the useless
+// "An internal server error occurred." Giving these a 4xx status lets the
+// real reason ("Missing marks for 3 student(s)…") reach the toast.
+function httpError(status: 400 | 403 | 404 | 409, message: string): Error & { status: number } {
+  return Object.assign(new Error(message), { status })
+}
+
 // ─── EXAM ACTOR + SUBJECT-OWNERSHIP GUARD (AC-2..AC-6) ───
 // Every mutating/oversight entry point now takes the acting user's uid AND
 // role. admin / high_rank / exam_officer oversee every class and subject and
@@ -222,7 +231,7 @@ async function resolveCaSlot(
 // phase closes.
 export async function createExam(data: CreateExamInput, actor: ExamActor) {
   if (data.type === 'MANEB_JCE' || data.type === 'MANEB_MSCE') {
-    throw new Error(
+    throw httpError(400,
       `${data.type === 'MANEB_JCE' ? 'JCE' : 'MSCE'} results come from MANEB, not internal marks entry. Record them via the MANEB panel (createManebRecord) once MANEB releases results.`
     )
   }
@@ -230,7 +239,7 @@ export async function createExam(data: CreateExamInput, actor: ExamActor) {
   const targetClass = await prisma.class.findUniqueOrThrow({ where: { id: data.classId }, select: { form: true } })
   const manebType = getManebExamType(targetClass.form, data.term)
   if (manebType && data.type === 'END_TERM') {
-    throw new Error(
+    throw httpError(400,
       `Form ${targetClass.form} Term ${data.term} is the national ${manebType} examination, administered by MANEB — the school does not set an internal end-of-term exam for this slot. Record results via the MANEB panel once MANEB releases them.`
     )
   }
@@ -339,19 +348,31 @@ export async function listExams(classId: string | undefined, academicYear: strin
   )
 }
 
-// ─── UPDATE / DELETE EXAM ────────────────────────────────
-// Editing an exam once its results are finalized/approved/released is
-// blocked (marks/results already derive from it). Editing is subject-
-// ownership-scoped, and any change to classId/subject/term/type re-runs the
-// MANEB guard so an exam cannot be mutated into a national MANEB slot (or a
-// MANEB_* type) that createExam() would have rejected. Deleting is likewise
-// blocked once marks exist or results are locked.
+// ─── UPDATE / DELETE EXAM ────────────────────────────────────────────────
+// WHO may change an exam, and UNTIL WHEN:
+//   • WHO   — oversight roles (admin / high_rank / exam_officer) and the
+//             teacher assigned to the exam's (class, subject) — see
+//             assertOwnsSubject. A teacher's `exam.edit` / `exam.delete`
+//             permission alone never reaches another teacher's exam.
+//   • UNTIL — the teacher CONFIRMS (finalizes) the marks. Up to that point
+//             (SCHEDULED → IN_PROGRESS → MARKS_PENDING → MARKS_DRAFT) the
+//             exam can still be edited or deleted; from MARKS_FINAL onward it
+//             is locked for good (approval / release build on those marks).
+//             An exam an exam officer later "unlocks" is back to
+//             MARKS_PENDING, but it was confirmed once, so it stays
+//             undeletable (see FINALIZED guard in deleteExam).
+// Any change to classId/subject/term/type re-runs the MANEB guard so an exam
+// cannot be mutated into a national MANEB slot (or a MANEB_* type) that
+// createExam() would have rejected.
 const EXAM_EDIT_LOCKED_STATUSES: ExamStatus[] = ['MARKS_FINAL', 'RESULTS_APPROVED', 'RESULTS_RELEASED']
 
 export async function updateExam(id: string, data: UpdateExamInput, actor: ExamActor) {
   const existing = await prisma.exam.findUniqueOrThrow({
     where:  { id },
-    select: { classId: true, subject: true, academicYear: true, term: true, status: true, type: true, caSlot: true },
+    select: {
+      classId: true, subject: true, academicYear: true, term: true, status: true, type: true, caSlot: true,
+      _count: { select: { marks: true } },
+    },
   })
 
   // Re-labelling WHICH continuous assessment an exam is (its caSlot) never
@@ -361,10 +382,7 @@ export async function updateExam(id: string, data: UpdateExamInput, actor: ExamA
   const changedKeys = Object.entries(data).filter(([, v]) => v !== undefined).map(([k]) => k)
   const onlyCaSlot  = changedKeys.length > 0 && changedKeys.every((k) => k === 'caSlot')
   if (EXAM_EDIT_LOCKED_STATUSES.includes(existing.status) && !onlyCaSlot) {
-    throw Object.assign(
-      new Error('This exam\u2019s results are finalized and it can no longer be edited.'),
-      { status: 409 },
-    )
+    throw httpError(409, 'The marks for this exam have been confirmed, so it can no longer be edited.')
   }
 
   // Ownership on the current (class, subject).
@@ -381,6 +399,23 @@ export async function updateExam(id: string, data: UpdateExamInput, actor: ExamA
     await assertOwnsSubject(actor, nextClassId, nextSubject, nextYear)
   }
 
+  // Marks that were already typed in belong to the students of the CURRENT
+  // class and to this exam's scale. Moving the exam to another class would
+  // orphan them, and shrinking the maximum below a recorded mark would leave
+  // an impossible mark behind - refuse both with a clear reason instead.
+  if (existing._count.marks > 0) {
+    if (data.classId !== undefined && data.classId !== existing.classId) {
+      throw httpError(409, 'Marks have already been entered for this exam, so it cannot be moved to another class. Delete it and schedule a new one instead.')
+    }
+    if (data.maxMark !== undefined) {
+      const highest = await prisma.examMark.aggregate({ where: { examId: id }, _max: { mark: true } })
+      const top = toNumber(highest._max.mark)
+      if (data.maxMark < top) {
+        throw httpError(409, `A mark of ${top} has already been entered, so the maximum mark cannot be lowered below ${top}.`)
+      }
+    }
+  }
+
   // [NEW 2026-09-16 — Class Subject Presets] Same shared gate createExam
   // uses — re-checked on every update (not just class/subject changes)
   // since it's a cheap query and keeps the rule uniform.
@@ -388,12 +423,12 @@ export async function updateExam(id: string, data: UpdateExamInput, actor: ExamA
 
   // MANEB re-guard.
   if (nextType === 'MANEB_JCE' || nextType === 'MANEB_MSCE') {
-    throw new Error(`${nextType === 'MANEB_JCE' ? 'JCE' : 'MSCE'} results come from MANEB, not internal marks entry — record them via the MANEB panel.`)
+    throw httpError(400, `${nextType === 'MANEB_JCE' ? 'JCE' : 'MSCE'} results come from MANEB, not internal marks entry — record them via the MANEB panel.`)
   }
   const targetClass = await prisma.class.findUniqueOrThrow({ where: { id: nextClassId }, select: { form: true } })
   const manebType = getManebExamType(targetClass.form, nextTerm)
   if (manebType && nextType === 'END_TERM') {
-    throw new Error(`Form ${targetClass.form} Term ${nextTerm} is the national ${manebType} examination, administered by MANEB — the school does not set an internal end-of-term exam for this slot.`)
+    throw httpError(400, `Form ${targetClass.form} Term ${nextTerm} is the national ${manebType} examination, administered by MANEB — the school does not set an internal end-of-term exam for this slot.`)
   }
 
   // Re-resolve the CA slot only when something that determines it changed;
@@ -440,25 +475,41 @@ export async function updateExam(id: string, data: UpdateExamInput, actor: ExamA
 export async function deleteExam(id: string, actor: ExamActor) {
   const existing = await prisma.exam.findUniqueOrThrow({
     where:  { id },
-    select: { classId: true, subject: true, academicYear: true, status: true, _count: { select: { marks: true } } },
+    select: {
+      classId: true, subject: true, academicYear: true, status: true,
+      _count: { select: { marks: true } },
+    },
   })
 
-  if (EXAM_EDIT_LOCKED_STATUSES.includes(existing.status) || existing._count.marks > 0) {
-    throw Object.assign(
-      new Error('This exam has marks or released results and cannot be deleted.'),
-      { status: 409 },
-    )
+  // Ownership first: someone who may not touch this exam should not learn
+  // anything about its state from the error they get back.
+  await assertOwnsSubject(actor, existing.classId, existing.subject, existing.academicYear)
+
+  if (EXAM_EDIT_LOCKED_STATUSES.includes(existing.status)) {
+    throw httpError(409, 'The marks for this exam have been confirmed, so it can no longer be deleted.')
+  }
+  // An exam officer's "unlock" rewinds a confirmed exam to MARKS_PENDING, but
+  // its marks still carry the finalizedAt stamp from the teacher's
+  // confirmation - treat "was ever confirmed" as permanent.
+  const everFinalized = await prisma.examMark.count({ where: { examId: id, finalizedAt: { not: null } } })
+  if (everFinalized > 0) {
+    throw httpError(409, 'The marks for this exam were confirmed earlier, so it can no longer be deleted.')
   }
 
-  await assertOwnsSubject(actor, existing.classId, existing.subject, existing.academicYear)
-  await prisma.exam.delete({ where: { id } })
+  // Only the teacher's own unconfirmed (draft) marks can be left at this
+  // point; they go with the exam, atomically.
+  const discardedDraftMarks = existing._count.marks
+  await prisma.$transaction([
+    prisma.examMark.deleteMany({ where: { examId: id } }),
+    prisma.exam.delete({ where: { id } }),
+  ])
   await auditService.log({
     action: 'exam.deleted', entityType: 'Exam', entityId: id,
     actorUid: actor.uid, actorRole: actor.role,
-    metadata: { before: { classId: existing.classId, subject: existing.subject } },
+    metadata: { before: { classId: existing.classId, subject: existing.subject, status: existing.status, discardedDraftMarks } },
   })
-  logger.info({ event: 'exam.deleted', examId: id, actorUid: actor.uid })
-  return { success: true }
+  logger.info({ event: 'exam.deleted', examId: id, actorUid: actor.uid, discardedDraftMarks })
+  return { success: true, discardedDraftMarks }
 }
 
 // ─── ENTER MARKS (bulk upsert) ────────────────────────────
@@ -474,8 +525,47 @@ const ADVANCEABLE_TO_MARKS_DRAFT: ExamStatus[] = ['SCHEDULED', 'IN_PROGRESS', 'M
 // silent re-entry through this path.
 const MARKS_LOCKED_STATUSES: ExamStatus[] = ['MARKS_FINAL', 'RESULTS_APPROVED', 'RESULTS_RELEASED']
 
+type MarkEntryInput = BulkMarkEntryInput['entries'][number]
+
+/** Rejects a batch that is empty, spans several exams, or breaks the exam's
+ *  maximum. Shared by enterMarks (draft) and finalizeMarks (with entries). */
+function assertValidMarkBatch(examId: string, title: string, maxMark: number, entries: MarkEntryInput[]): void {
+  if (entries.length === 0) throw httpError(400, 'There are no marks to save.')
+  if (entries.some((e) => e.examId !== examId)) {
+    throw httpError(400, 'All marks in one submission must belong to the same exam.')
+  }
+  for (const e of entries) {
+    if (e.mark !== undefined && e.mark > maxMark)
+      throw httpError(400, `Mark ${e.mark} exceeds the maximum of ${maxMark} for "${title}".`)
+  }
+}
+
+/** Every submitted student must be an active member of the exam's class -
+ *  a sheet built for the wrong class (or a stale/tampered request) must not
+ *  write marks against students who never sat this exam. */
+function assertEntriesBelongToClass(entries: MarkEntryInput[], activeStudentIds: ReadonlySet<string>): void {
+  const stray = entries.filter((e) => !activeStudentIds.has(e.studentId))
+  if (stray.length > 0) {
+    throw httpError(400, `${stray.length} of the submitted students are not active members of this exam's class.`)
+  }
+}
+
+function markUpserts(
+  db: Pick<typeof prisma, 'examMark'>,
+  entries: MarkEntryInput[], isDraft: boolean, actorUid: string,
+) {
+  return entries.map((e) =>
+    db.examMark.upsert({
+      where: { examId_studentId: { examId: e.examId, studentId: e.studentId } },
+      create: { ...e, mark: e.mark ?? null, comment: e.comment ?? null, enteredByUid: actorUid, isDraft },
+      update: { mark: e.mark ?? null, absent: e.absent ?? false, comment: e.comment ?? null, isDraft, enteredByUid: actorUid },
+    }),
+  )
+}
+
 export async function enterMarks(data: BulkMarkEntryInput, actor: ExamActor) {
   const { entries, isDraft } = data
+  if (entries.length === 0) throw httpError(400, 'There are no marks to save.')
   const exam = await prisma.exam.findUniqueOrThrow({ where: { id: entries[0]!.examId } })
 
   // AC-2: only the assigned subject teacher (or an oversight role) may enter.
@@ -483,32 +573,21 @@ export async function enterMarks(data: BulkMarkEntryInput, actor: ExamActor) {
 
   // AC-5: no edits after marks are finalized.
   if (MARKS_LOCKED_STATUSES.includes(exam.status)) {
-    throw Object.assign(
-      new Error('Marks for this exam are finalized and can no longer be edited.'),
-      { status: 409 },
-    )
+    throw httpError(409, 'Marks for this exam are finalized and can no longer be edited.')
   }
 
-  const max = toNumber(exam.maxMark)
-  for (const e of entries) {
-    if (e.mark !== undefined && e.mark > max)
-      throw new Error(`Mark ${e.mark} exceeds maximum ${max} for exam ${exam.title}`)
-  }
-  const upserted = await prisma.$transaction(
-    entries.map((e) =>
-      prisma.examMark.upsert({
-        where: { examId_studentId: { examId: e.examId, studentId: e.studentId } },
-        create: { ...e, mark: e.mark ?? null, comment: e.comment ?? null, enteredByUid: actor.uid, isDraft },
-        update: { mark: e.mark ?? null, absent: e.absent ?? false, comment: e.comment ?? null, isDraft, enteredByUid: actor.uid },
-      })
-    )
-  )
+  assertValidMarkBatch(exam.id, exam.title, toNumber(exam.maxMark), entries)
+  const classStudents = await prisma.student.findMany({
+    where: { classId: exam.classId, status: 'ACTIVE' }, select: { id: true },
+  })
+  assertEntriesBelongToClass(entries, new Set<string>(classStudents.map((s: { id: string }) => s.id)))
+  const upserted = await prisma.$transaction(markUpserts(prisma, entries, isDraft, actor.uid))
 
   if (isDraft && ADVANCEABLE_TO_MARKS_DRAFT.includes(exam.status)) {
     await prisma.exam.update({ where: { id: exam.id }, data: { status: 'MARKS_DRAFT' } })
   }
 
-  logger.info({ event: 'marks.enter', examId: entries[0]!.examId, count: entries.length, isDraft, actorUid: actor.uid })
+  logger.info({ event: 'marks.enter', examId: exam.id, count: entries.length, isDraft, actorUid: actor.uid })
   return upserted
 }
 
@@ -527,7 +606,12 @@ export async function getMarksForExam(examId: string, actor: ExamActor) {
 }
 
 // ─── FINALIZE MARKS ──────────────────────────────────────
-export async function finalizeMarks(examId: string, actor: ExamActor) {
+// `entries` (optional): the marks sheet as it is on the teacher's screen. When
+// given, they are saved and the exam is finalized in ONE transaction, so the
+// teacher's "Finalize" click can never end up half-done (marks saved as final
+// but the exam still open) and never depends on what happened to be saved as
+// a draft earlier. Without entries, whatever is already saved is finalized.
+export async function finalizeMarks(examId: string, actor: ExamActor, entries?: MarkEntryInput[]) {
   const exam = await prisma.exam.findUniqueOrThrow({
     where: { id: examId },
     include: { class: { include: { students: { where: { status: 'ACTIVE' } } } } },
@@ -536,24 +620,51 @@ export async function finalizeMarks(examId: string, actor: ExamActor) {
   // AC-5: only the assigned subject teacher (or an oversight role) may finalize.
   await assertOwnsSubject(actor, exam.classId, exam.subject, exam.academicYear)
 
-  const marks = await prisma.examMark.findMany({
+  if (MARKS_LOCKED_STATUSES.includes(exam.status)) {
+    throw httpError(409, 'The marks for this exam are already finalized.')
+  }
+  if (entries && entries.length > 0) {
+    assertValidMarkBatch(exam.id, exam.title, toNumber(exam.maxMark), entries)
+  }
+
+  const activeIds = new Set<string>(exam.class.students.map((s: { id: string }) => s.id))
+  const batch = entries ?? []
+  assertEntriesBelongToClass(batch, activeIds)
+
+  // What the sheet WILL contain once the batch is applied: saved rows, with
+  // the submitted entries layered on top. Validated BEFORE anything is
+  // written, so a refusal leaves the exam exactly as it was.
+  const saved = await prisma.examMark.findMany({
     where:  { examId },
     select: { studentId: true, mark: true, absent: true },
   })
-  const markedIds = marks.map((m) => m.studentId)
-  const missing = exam.class.students.filter((s) => !markedIds.includes(s.id))
+  const resulting = new Map<string, { mark: number | null; absent: boolean }>(
+    saved.map((m) => [m.studentId, { mark: m.mark === null ? null : toNumber(m.mark), absent: m.absent }]),
+  )
+  for (const e of batch) resulting.set(e.studentId, { mark: e.mark ?? null, absent: e.absent ?? false })
+
+  const missing = [...activeIds].filter((id) => !resulting.has(id))
   if (missing.length > 0)
-    throw new Error(`Missing marks for ${missing.length} student(s). Enter all marks first.`)
+    throw httpError(409, `Missing marks for ${missing.length} student(s). Enter all marks first.`)
 
   // Row *existence* alone is not enough — a row can exist with mark: null
   // and absent: false (an uninitialized client-side entry that was upserted
   // with defaults but never actually given a real value). Reject those too.
-  const invalid = marks.filter((m) => m.mark === null && !m.absent)
+  const invalid = [...activeIds].filter((id) => {
+    const r = resulting.get(id)
+    return !r || (r.mark === null && !r.absent)
+  })
   if (invalid.length > 0)
-    throw new Error(`${invalid.length} student(s) have no mark entered and are not marked absent. Enter a mark or mark them absent before finalizing.`)
+    throw httpError(409, `${invalid.length} student(s) have no mark entered and are not marked absent. Enter a mark or mark them absent before finalizing.`)
 
-  await prisma.examMark.updateMany({ where: { examId }, data: { isDraft: false, finalizedAt: new Date() } })
-  await prisma.exam.update({ where: { id: examId }, data: { status: 'MARKS_FINAL' } })
+  // One atomic batch: every upsert, the lock stamp, and the status change
+  // commit together or not at all.
+  await prisma.$transaction([
+    ...markUpserts(prisma, batch, false, actor.uid),
+    prisma.examMark.updateMany({ where: { examId }, data: { isDraft: false, finalizedAt: new Date() } }),
+    prisma.exam.update({ where: { id: examId }, data: { status: 'MARKS_FINAL' } }),
+  ])
+
   await auditService.log({
     action: 'exam.marks_finalized', entityType: 'Exam', entityId: examId,
     actorUid: actor.uid, actorRole: actor.role,
@@ -565,7 +676,7 @@ export async function finalizeMarks(examId: string, actor: ExamActor) {
 
 export async function approveResults(examId: string, actor: ExamActor) {
   const exam = await prisma.exam.findUniqueOrThrow({ where: { id: examId } })
-  if (exam.status !== 'MARKS_FINAL') throw new Error('Marks must be finalized before approval.')
+  if (exam.status !== 'MARKS_FINAL') throw httpError(409, 'Marks must be finalized before approval.')
   await prisma.exam.update({ where: { id: examId }, data: { status: 'RESULTS_APPROVED' } })
   await auditService.log({
     action: 'exam.results_approved', entityType: 'Exam', entityId: examId,
@@ -577,7 +688,7 @@ export async function approveResults(examId: string, actor: ExamActor) {
 
 export async function releaseResults(examId: string, actor: ExamActor) {
   const exam = await prisma.exam.findUniqueOrThrow({ where: { id: examId } })
-  if (exam.status !== 'RESULTS_APPROVED') throw new Error('Results must be approved before release.')
+  if (exam.status !== 'RESULTS_APPROVED') throw httpError(409, 'Results must be approved before release.')
   await prisma.exam.update({ where: { id: examId }, data: { status: 'RESULTS_RELEASED' } })
   await auditService.log({
     action: 'exam.results_released', entityType: 'Exam', entityId: examId,
@@ -791,7 +902,7 @@ export async function computeTermResults(
 
   const manebType = getManebExamType(classForm, term)
   if (manebType) {
-    throw new Error(
+    throw httpError(400,
       `Form ${classForm} Term ${term} is the national ${manebType} examination — results come from MANEB, not internal computation. Record them via the MANEB panel once MANEB releases them.`
     )
   }
@@ -1147,7 +1258,7 @@ export async function correctMarksInReview(
   }
   const max = toNumber(exam.maxMark)
   for (const e of entries) {
-    if (e.mark !== undefined && e.mark > max) throw new Error(`Mark ${e.mark} exceeds maximum ${max} for exam ${exam.title}`)
+    if (e.mark !== undefined && e.mark > max) throw httpError(400, `Mark ${e.mark} exceeds the maximum of ${max} for "${exam.title}".`)
   }
 
   const updated = await prisma.$transaction(

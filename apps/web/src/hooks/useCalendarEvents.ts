@@ -43,6 +43,7 @@ export function useCalendarEvents(start: string, end: string) {
 export function useCreateCalendarEvent() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Calendar event created', failureTitle: 'Could not create calendar event' },
     mutationFn: (input: CreateCalendarEventInput) =>
       apiFetch('/calendar/events', { method: 'POST', body: JSON.stringify(input) }),
     onSuccess: () => {
@@ -57,6 +58,7 @@ export function useCreateCalendarEvent() {
 export function useUpdateCalendarEvent() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Calendar event updated', failureTitle: 'Could not update calendar event' },
     mutationFn: ({ id, input }: { id: string; input: UpdateCalendarEventInput }) =>
       apiFetch(`/calendar/events/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     onSuccess: () => {
@@ -71,6 +73,7 @@ export function useUpdateCalendarEvent() {
 export function useDeleteCalendarEvent() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Calendar event deleted', failureTitle: 'Could not delete calendar event' },
     mutationFn: (id: string) => apiFetch(`/calendar/events/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all() })

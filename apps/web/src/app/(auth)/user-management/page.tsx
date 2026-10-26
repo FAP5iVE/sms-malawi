@@ -58,7 +58,7 @@ import { useUsers, useUpdateUserRole, useToggleUserDisabled, useSendPasswordRese
 import { useSystemHealth } from '@/hooks/useReports'
 import { queryKeys } from '@/lib/api-client'
 import type { ApiFirebaseUser, ApiUserListResponse, ApiSystemHealth, ApiServiceHealth } from '@shared/types/api'
-import { UserPlus, Shield, Power, Key, Activity, Search, ArrowUpDown } from 'lucide-react'
+import { UserPlus, Shield, Power, Key, Activity, Search, ArrowUpDown, Loader2 } from 'lucide-react'
 import { USER_ROLES, ROLE_LABELS } from '@shared/types/roles'
 
 export default function UserManagementPage() {
@@ -231,7 +231,9 @@ function UserManagementContent() {
             aria-label={`Role for ${u.displayName ?? u.email}`}
             value={u.role ?? ''}
             onChange={(e) => updateRole.mutate({ uid: u.uid, role: e.target.value })}
-            className="border border-base rounded-lg px-2 py-1 text-xs bg-page text-body focus:outline-none"
+            disabled={updateRole.isPending && updateRole.variables?.uid === u.uid}
+            aria-busy={updateRole.isPending && updateRole.variables?.uid === u.uid}
+            className="border border-base rounded-lg px-2 py-1 text-xs bg-page text-body focus:outline-none disabled:opacity-60"
           >
             {USER_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
           </select>
@@ -253,12 +255,20 @@ function UserManagementContent() {
                   : setPendingDisable(u)
               }
               title={u.disabled ? 'Enable user' : 'Disable user'}
-              className="p-1.5 hover:bg-page rounded-lg text-muted">
-              <Power className="w-3.5 h-3.5" />
+              disabled={toggleDisabled.isPending && toggleDisabled.variables?.uid === u.uid}
+              aria-busy={toggleDisabled.isPending && toggleDisabled.variables?.uid === u.uid}
+              className="p-1.5 hover:bg-page rounded-lg text-muted disabled:opacity-60">
+              {toggleDisabled.isPending && toggleDisabled.variables?.uid === u.uid
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Power className="w-3.5 h-3.5" />}
             </button>
             <button onClick={() => resetPassword.mutate(u.uid)} title="Send password reset"
-              className="p-1.5 hover:bg-page rounded-lg text-muted">
-              <Key className="w-3.5 h-3.5" />
+              disabled={resetPassword.isPending && resetPassword.variables === u.uid}
+              aria-busy={resetPassword.isPending && resetPassword.variables === u.uid}
+              className="p-1.5 hover:bg-page rounded-lg text-muted disabled:opacity-60">
+              {resetPassword.isPending && resetPassword.variables === u.uid
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Key className="w-3.5 h-3.5" />}
             </button>
           </div>
         </td>
@@ -312,7 +322,9 @@ function UserManagementContent() {
             aria-label={`Role for ${u.displayName ?? u.email}`}
             value={u.role ?? ''}
             onChange={(e) => updateRole.mutate({ uid: u.uid, role: e.target.value })}
-            className="flex-1 min-w-0 min-h-11 border border-base rounded-lg px-2 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
+            disabled={updateRole.isPending && updateRole.variables?.uid === u.uid}
+            aria-busy={updateRole.isPending && updateRole.variables?.uid === u.uid}
+            className="flex-1 min-w-0 min-h-11 border border-base rounded-lg px-2 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25 disabled:opacity-60"
           >
             {USER_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
           </select>
@@ -324,17 +336,25 @@ function UserManagementContent() {
                 : setPendingDisable(u)
             }
             aria-label={u.disabled ? `Enable ${u.displayName ?? u.email}` : `Disable ${u.displayName ?? u.email}`}
-            className="touch-target shrink-0 border border-base rounded-lg text-muted active:bg-page"
+            disabled={toggleDisabled.isPending && toggleDisabled.variables?.uid === u.uid}
+            aria-busy={toggleDisabled.isPending && toggleDisabled.variables?.uid === u.uid}
+            className="touch-target shrink-0 border border-base rounded-lg text-muted active:bg-page disabled:opacity-60"
           >
-            <Power className="w-4 h-4" aria-hidden />
+            {toggleDisabled.isPending && toggleDisabled.variables?.uid === u.uid
+              ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
+              : <Power className="w-4 h-4" aria-hidden />}
           </button>
           <button
             type="button"
             onClick={() => resetPassword.mutate(u.uid)}
             aria-label={`Send password reset to ${u.displayName ?? u.email}`}
-            className="touch-target shrink-0 border border-base rounded-lg text-muted active:bg-page"
+            disabled={resetPassword.isPending && resetPassword.variables === u.uid}
+            aria-busy={resetPassword.isPending && resetPassword.variables === u.uid}
+            className="touch-target shrink-0 border border-base rounded-lg text-muted active:bg-page disabled:opacity-60"
           >
-            <Key className="w-4 h-4" aria-hidden />
+            {resetPassword.isPending && resetPassword.variables === u.uid
+              ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
+              : <Key className="w-4 h-4" aria-hidden />}
           </button>
         </div>
       </li>
@@ -533,10 +553,12 @@ function UserManagementContent() {
         title={`Disable ${pendingDisable?.displayName ?? pendingDisable?.email ?? 'this user'}?`}
         description="They will be immediately signed out and unable to log back in until an admin re-enables their account."
         confirmLabel="Disable User"
+        confirmingLabel="Disabling…"
+        confirming={toggleDisabled.isPending}
         destructive
         onConfirm={() => {
-          if (pendingDisable) toggleDisabled.mutate({ uid: pendingDisable.uid, disabled: true })
-          setPendingDisable(null)
+          // Stays open with a spinner until the server answers.
+          if (pendingDisable) toggleDisabled.mutate({ uid: pendingDisable.uid, disabled: true }, { onSettled: () => setPendingDisable(null) })
         }}
         onCancel={() => setPendingDisable(null)}
       />

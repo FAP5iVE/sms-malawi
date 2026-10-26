@@ -40,6 +40,7 @@ export function useUsers() {
 export function useCreateUser() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'User created', failureTitle: 'Could not create user' },
     mutationFn: (data: CreateUserInput) => apiFetch('/users', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.admin.users() }),
   })
@@ -48,6 +49,7 @@ export function useCreateUser() {
 export function useUpdateUserRole() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'User role updated', failureTitle: 'Could not update user role' },
     mutationFn: ({ uid, role }: { uid: string; role: string }) =>
       apiFetch('/users/role', { method: 'PATCH', body: JSON.stringify({ uid, role }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.admin.users() }),
@@ -57,6 +59,7 @@ export function useUpdateUserRole() {
 export function useToggleUserDisabled() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'User access updated', failureTitle: 'Could not update the user' },
     mutationFn: ({ uid, disabled }: { uid: string; disabled: boolean }) =>
       apiFetch(`/users/${uid}/disable`, { method: 'PATCH', body: JSON.stringify({ disabled }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.admin.users() }),
@@ -65,6 +68,7 @@ export function useToggleUserDisabled() {
 
 export function useSendPasswordReset() {
   return useMutation({
+    meta: { successMessage: 'Password reset sent', failureTitle: 'Could not send password reset' },
     mutationFn: (uid: string) => apiFetch(`/users/${uid}/reset-password`, { method: 'POST' }),
   })
 }
@@ -76,6 +80,7 @@ export function useNotificationPrefs() {
 export function useUpdateNotificationPrefs() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Notification preferences saved', failureTitle: 'Could not save notification preferences' },
     mutationFn: (data: NotificationPrefInput) =>
       apiFetch('/users/me/notification-prefs', { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.admin.notifPrefs() }),

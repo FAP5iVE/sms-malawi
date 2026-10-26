@@ -58,6 +58,7 @@ export function useSessionActivity(sessionId: string | null) {
 export function useForceLogout() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'User signed out', failureTitle: 'Could not sign the user out' },
     mutationFn: (uid: string) => apiFetch<{ success: true }>(`/sessions/${uid}/force-logout`, { method: 'POST' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sessions'] })

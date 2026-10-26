@@ -73,6 +73,7 @@ export function useLibraryStats() {
 export function useCreateBook() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Book created', failureTitle: 'Could not create book' },
     mutationFn: (data: CreateBookInput) => apiFetch('/library', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
   })
@@ -81,6 +82,7 @@ export function useCreateBook() {
 export function useUploadDigitalResource() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Digital resource uploaded', failureTitle: 'Could not upload digital resource' },
     mutationFn: async (input: CreateDigitalResourceInput & { file: File }) => {
       const { file, ...meta } = input
       // [PRODUCTION FIX] Was FormData → POST /library/digital/upload
@@ -110,6 +112,7 @@ export function useUploadDigitalResource() {
 export function useApproveDigitalResource() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Digital resource approved', failureTitle: 'Could not approve digital resource' },
     mutationFn: (resourceId: string) => apiFetch(`/library/digital/${resourceId}/approve`, { method: 'PATCH', body: JSON.stringify({}) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
     onError: (err) => { console.error('[useApproveDigitalResource] failed', err) },
@@ -119,7 +122,7 @@ export function useApproveDigitalResource() {
 export function useIssueBorrowing() {
   const qc = useQueryClient()
   return useMutation({
-    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
+    meta: { successMessage: 'Borrowing issued', failureTitle: 'Could not issue borrowing', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: IssueBorrowingInput) => apiFetch('/library/borrowings/issue', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
   })
@@ -128,7 +131,7 @@ export function useIssueBorrowing() {
 export function useReturnBook() {
   const qc = useQueryClient()
   return useMutation({
-    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
+    meta: { successMessage: 'Book returned', failureTitle: 'Could not return book', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: ({ borrowingId, data }: { borrowingId: string; data: ReturnBorrowingInput }) =>
       apiFetch(`/library/borrowings/${borrowingId}/return`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
@@ -143,7 +146,7 @@ export function useReturnBook() {
 export function useMarkBookCondition() {
   const qc = useQueryClient()
   return useMutation({
-    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
+    meta: { successMessage: 'Book condition updated', failureTitle: 'Could not update the book condition', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: ({ bookId, data }: { bookId: string; data: MarkBookConditionInput }) =>
       apiFetch(`/library/${bookId}/condition`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
@@ -174,7 +177,7 @@ export function useBorrowings(filters: {
 export function useRenewBorrowing() {
   const qc = useQueryClient()
   return useMutation({
-    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
+    meta: { successMessage: 'Borrowing renewed', failureTitle: 'Could not renew the borrowing', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (borrowingId: string) => apiFetch(`/library/borrowings/${borrowingId}/renew`, { method: 'PATCH', body: JSON.stringify({}) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
     onError: (err) => { console.error('[useRenewBorrowing] failed', err) },
@@ -220,6 +223,7 @@ export function useRecommendations(status?: string, enabled = true) {
 export function useCreateRecommendation() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Recommendation created', failureTitle: 'Could not create recommendation' },
     mutationFn: (data: CreateRecommendationInput) =>
       apiFetch('/library/recommendations', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.recommendations() }),
@@ -230,6 +234,7 @@ export function useCreateRecommendation() {
 export function useApproveRecommendation() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Recommendation approved', failureTitle: 'Could not approve recommendation' },
     mutationFn: ({ id, notes }: { id: string; notes?: ReviewRecommendationInput['notes'] }) =>
       apiFetch(`/library/recommendations/${id}/approve`, { method: 'PATCH', body: JSON.stringify({ notes }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.recommendations() }),
@@ -240,6 +245,7 @@ export function useApproveRecommendation() {
 export function useRejectRecommendation() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Recommendation rejected', failureTitle: 'Could not reject recommendation' },
     mutationFn: ({ id, reason }: { id: string; reason: RejectRecommendationInput['reason'] }) =>
       apiFetch(`/library/recommendations/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.recommendations() }),
@@ -259,6 +265,7 @@ export function useFineWaivers(status?: string) {
 export function useCreateFineWaiver() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Fine waiver created', failureTitle: 'Could not create fine waiver' },
     mutationFn: (data: CreateFineWaiverInput) =>
       apiFetch('/library/fine-waivers', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.fineWaivers() }),
@@ -269,7 +276,7 @@ export function useCreateFineWaiver() {
 export function useApproveFineWaiver() {
   const qc = useQueryClient()
   return useMutation({
-    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
+    meta: { successMessage: 'Fine waiver approved', failureTitle: 'Could not approve fine waiver', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (id: string) => apiFetch(`/library/fine-waivers/${id}/approve`, { method: 'PATCH', body: JSON.stringify({}) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.fineWaivers() }),
     onError: (err) => { console.error('[useApproveFineWaiver] failed', err) },
@@ -279,6 +286,7 @@ export function useApproveFineWaiver() {
 export function useRejectFineWaiver() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Fine waiver rejected', failureTitle: 'Could not reject fine waiver' },
     mutationFn: ({ id, reason }: { id: string; reason: RejectFineWaiverInput['reason'] }) =>
       apiFetch(`/library/fine-waivers/${id}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.fineWaivers() }),
@@ -294,6 +302,7 @@ export function useRejectFineWaiver() {
 export function useUpdateBook() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Book updated', failureTitle: 'Could not update book' },
     mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
       apiFetch(`/library/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.books() }),
@@ -303,6 +312,7 @@ export function useUpdateBook() {
 export function useArchiveBook() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Book archived', failureTitle: 'Could not archive book' },
     mutationFn: (id: string) => apiFetch(`/library/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.books() }),
   })
@@ -356,7 +366,7 @@ export function useFines(status?: string) {
 export function useClearFine() {
   const qc = useQueryClient()
   return useMutation({
-    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
+    meta: { successMessage: 'Fine cleared', failureTitle: 'Could not clear the fine', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (id: string) => apiFetch(`/library/fines/${id}/clear`, { method: 'PATCH', body: JSON.stringify({}) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['library', 'fines'] }),
   })
@@ -373,7 +383,7 @@ export function useClearFine() {
 export function useAssessFine() {
   const qc = useQueryClient()
   return useMutation({
-    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
+    meta: { successMessage: 'Fine assessed', failureTitle: 'Could not assess the fine', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: CreateLibraryFineInput) => apiFetch<ApiLibraryFine>('/finances/library-fines', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['library', 'fines'] })
@@ -387,7 +397,7 @@ export function useAssessFine() {
 export function useWaiveFineDirect() {
   const qc = useQueryClient()
   return useMutation({
-    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
+    meta: { successMessage: 'Fine waived', failureTitle: 'Could not waive the fine', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (id: string) => apiFetch<ApiLibraryFine>(`/finances/library-fines/${id}/waive`, { method: 'PATCH', body: JSON.stringify({}) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['library', 'fines'] })

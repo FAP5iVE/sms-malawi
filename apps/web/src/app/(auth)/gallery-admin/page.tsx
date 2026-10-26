@@ -24,6 +24,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { apiFetch, queryKeys } from '@/lib/api-client'
+import { notifySuccess, notifyError, getErrorMessage } from '@/lib/feedback'
 import { uploadFileDirectly } from '@/lib/directUpload'
 import { Images, ImagePlus, Loader2, Trash2, X } from 'lucide-react'
 // [NEW] Click-a-photo-to-view-full-size — grid itself is unchanged (kept
@@ -92,8 +93,10 @@ function UploadForm({ onDone }: { onDone: () => void }) {
         }),
       })
       onDone()
+      notifySuccess('Photo uploaded')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload photo. Please try again.')
+      setError(getErrorMessage(err, 'Failed to upload photo. Please try again.'))
+      notifyError('Could not upload the photo', err)
     } finally {
       setLoading(false)
     }
@@ -207,8 +210,10 @@ function GalleryContent() {
       await apiFetch(`/gallery/${id}`, { method: 'DELETE' })
       await queryClient.invalidateQueries({ queryKey: queryKeys.gallery.all() })
       setConfirmId(null)
-    } catch {
-      setDeleteError('Failed to delete photo. Please try again.')
+      notifySuccess('Photo deleted')
+    } catch (err) {
+      setDeleteError(getErrorMessage(err, 'Failed to delete photo. Please try again.'))
+      notifyError('Could not delete the photo', err)
     } finally {
       setDeletingId(null)
     }

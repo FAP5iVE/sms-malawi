@@ -74,6 +74,7 @@ export function useRoomInventory() {
 export function useCreateAsset() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Asset created', failureTitle: 'Could not create asset' },
     mutationFn: (data: CreateAssetInput) => apiFetch('/assets', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assets.all() }),
   })
@@ -82,6 +83,7 @@ export function useCreateAsset() {
 export function useUpdateAsset() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Asset updated', failureTitle: 'Could not update asset' },
     mutationFn: ({ id, data }: { id: string; data: UpdateAssetInput }) =>
       apiFetch(`/assets/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assets.all() }),
@@ -91,6 +93,7 @@ export function useUpdateAsset() {
 export function useMarkAssetCondition() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Asset condition updated', failureTitle: 'Could not update the asset condition' },
     mutationFn: ({ id, data }: { id: string; data: MarkAssetConditionInput }) =>
       apiFetch(`/assets/${id}/condition`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assets.all() }),
@@ -100,6 +103,7 @@ export function useMarkAssetCondition() {
 export function useDisposeAsset() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Asset disposed', failureTitle: 'Could not dispose of the asset' },
     mutationFn: ({ id, data }: { id: string; data: DisposeAssetInput }) =>
       apiFetch(`/assets/${id}/dispose`, { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assets.all() }),
@@ -126,6 +130,7 @@ export function useMyAssignedAssets() {
 export function useAllocateAsset() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Asset allocated', failureTitle: 'Could not allocate the asset' },
     mutationFn: ({ assetId, data }: { assetId: string; data: AllocateAssetInput }) =>
       apiFetch(`/assets/${assetId}/allocate`, { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assets.all() }),
@@ -135,6 +140,7 @@ export function useAllocateAsset() {
 export function useReturnAsset() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Asset returned', failureTitle: 'Could not return asset' },
     mutationFn: ({ assignmentId, data }: { assignmentId: string; data: ReturnAssetInput }) =>
       apiFetch(`/assets/assignments/${assignmentId}/return`, { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assets.all() }),
@@ -171,6 +177,7 @@ export function useMyAssetRequests() {
 export function useCreateAssetRequest() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Asset request created', failureTitle: 'Could not create asset request' },
     mutationFn: (data: CreateAssetRequestInput) => apiFetch('/assets/requests', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assets.all() }),
   })
@@ -179,6 +186,7 @@ export function useCreateAssetRequest() {
 export function useApproveAssetRequest() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Asset request approved', failureTitle: 'Could not approve asset request' },
     mutationFn: ({ id, data }: { id: string; data: ReviewAssetRequestInput }) =>
       apiFetch(`/assets/requests/${id}/approve`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assets.all() }),
@@ -188,6 +196,7 @@ export function useApproveAssetRequest() {
 export function useRejectAssetRequest() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Asset request rejected', failureTitle: 'Could not reject asset request' },
     mutationFn: ({ id, data }: { id: string; data: RejectAssetRequestInput }) =>
       apiFetch(`/assets/requests/${id}/reject`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assets.all() }),
@@ -214,6 +223,7 @@ export function useAdvances(status?: string) {
 export function useRecordAdvance() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Advance recorded', failureTitle: 'Could not record advance' },
     mutationFn: ({ requestId, data }: { requestId: string; data: RecordAdvanceInput }) =>
       apiFetch(`/assets/requests/${requestId}/advances`, { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assets.all() }),
@@ -223,6 +233,7 @@ export function useRecordAdvance() {
 export function useReconcileAdvance() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Advance reconciled', failureTitle: 'Could not reconcile the advance' },
     mutationFn: ({ id, data }: { id: string; data: ReconcileAdvanceInput }) =>
       apiFetch(`/assets/advances/${id}/reconcile`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assets.all() }),
@@ -232,6 +243,7 @@ export function useReconcileAdvance() {
 export function useWriteOffAdvance() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Advance written off', failureTitle: 'Could not write off the advance' },
     mutationFn: ({ id, data }: { id: string; data: WriteOffAdvanceInput }) =>
       apiFetch(`/assets/advances/${id}/write-off`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assets.all() }),

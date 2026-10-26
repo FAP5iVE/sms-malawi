@@ -54,6 +54,7 @@ export function useVercelAlerts() {
 export function useAcknowledgeVercelAlert() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Alert acknowledged', failureTitle: 'Could not acknowledge the alert' },
     mutationFn: (id: string) => apiFetch<{ ok: true }>(`/monitoring/vercel/alerts/${id}/acknowledge`, { method: 'PATCH' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.vercelMonitoring.alerts() })

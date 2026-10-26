@@ -52,6 +52,7 @@ import {
   ChevronRight,
   Filter,
   Plus,
+  Loader2,
   CalendarDays,
   Search,
   X,
@@ -101,7 +102,9 @@ interface MobileCalendarViewProps {
    *  quick-add, which creates immediately rather than opening a form).
    *  Full detail can always be added afterwards via the row's Edit action,
    *  which opens the same CalendarEventFormDialog the desktop view uses. */
-  onQuickAdd: (title: string) => void
+  onQuickAdd: (title: string, onCreated: () => void) => void
+  /** True while the quick-add request is in flight (input + button lock, spinner shows). */
+  quickAdding?: boolean
   /** Opens the full CalendarEventFormDialog (category/time/location) on
    *  the selected day — the sub-header's Add Event button, distinct from
    *  the quick-add bar's title-only creation. */
@@ -133,6 +136,7 @@ export function MobileCalendarView({
   canEdit,
   canDelete,
   onQuickAdd,
+  quickAdding = false,
   onOpenCreate,
   onEditEvent,
   onRequestDelete,
@@ -149,9 +153,10 @@ export function MobileCalendarView({
   function handleQuickAdd(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = quickTitle.trim()
-    if (trimmed.length < 2) return
-    onQuickAdd(trimmed)
-    setQuickTitle('')
+    if (trimmed.length < 2 || quickAdding) return
+    // Cleared only once the event really exists - a failed add keeps the
+    // typed title so nothing is lost (the failure is toasted).
+    onQuickAdd(trimmed, () => setQuickTitle(''))
   }
 
   return (
@@ -389,15 +394,20 @@ export function MobileCalendarView({
                 type="text"
                 value={quickTitle}
                 onChange={(e) => setQuickTitle(e.target.value)}
+                disabled={quickAdding}
                 placeholder={`Add event on ${formatMonthShort(monthDate)} ${Number(selectedDateKey.split('-')[2])}`}
                 className="flex-1 min-w-0 px-4 py-2.5 min-h-[44px] text-sm bg-surface border border-base rounded-full text-body placeholder-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
               />
               <button
                 type="submit"
-                aria-label="Add event"
-                className="w-11 h-11 shrink-0 rounded-full bg-brand-teal hover:bg-brand-teal-light text-white flex items-center justify-center transition-colors shadow-sm"
+                disabled={quickAdding}
+                aria-busy={quickAdding}
+                aria-label={quickAdding ? 'Adding event' : 'Add event'}
+                className="w-11 h-11 shrink-0 rounded-full bg-brand-teal hover:bg-brand-teal-light text-white flex items-center justify-center transition-colors shadow-sm disabled:opacity-70"
               >
-                <Plus className="w-5 h-5" aria-hidden="true" />
+                {quickAdding
+                  ? <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                  : <Plus className="w-5 h-5" aria-hidden="true" />}
               </button>
             </form>
           )}

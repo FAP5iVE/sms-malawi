@@ -65,6 +65,7 @@ export function useApplication(id: string) {
 export function useUpdateApplicationStatus() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Application status updated', failureTitle: 'Could not update application status' },
     mutationFn: ({ id, status, notes }: { id: string; status: string; notes?: string }) =>
       apiFetch<ApiApplication>(`/applications/${id}/status`, {
         method: 'PATCH',
@@ -77,6 +78,7 @@ export function useUpdateApplicationStatus() {
 export function useConvertToStudent() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Applicant enrolled as a student', failureTitle: 'Could not enrol the applicant' },
     mutationFn: ({ id, classId, createLoginAccount }: { id: string; classId?: string; createLoginAccount?: boolean }) =>
       apiFetch<ApiConvertApplicationResult>(`/applications/${id}/convert`, {
         method: 'POST',

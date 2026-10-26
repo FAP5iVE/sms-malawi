@@ -637,6 +637,8 @@ export interface ApiExam {
   term: number
   status: string
   createdByUid: string
+  /** Which continuous assessment this is (1..N); null for non-CA exams. */
+  caSlot?: number | null
   _count?: { marks: number }
   /** Only populated by GET /exams (examService.listExams(), R8) */
   className?:       string

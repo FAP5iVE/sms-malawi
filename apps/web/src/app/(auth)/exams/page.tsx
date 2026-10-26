@@ -78,12 +78,13 @@ import { StudentResultsView } from '@/components/exams/StudentResultsView'
 import { ReportCardGenerator } from '@/components/exams/ReportCardGenerator'
 import { PromotionEngine } from '@/components/exams/PromotionEngine'
 import { ResultsReleaseWorkflow } from '@/components/exams/ResultsReleaseWorkflow'
-import { useExams, useApproveResults, useReleaseResults } from '@/hooks/useExams'
+import { useExams, useApproveResults, useReleaseResults, useDeleteExam } from '@/hooks/useExams'
 import { useClasses } from '@/hooks/useClasses'
 import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { usePermissions } from '@/hooks/usePermissions'
 import { apiFetch, ApiError } from '@/lib/api-client'
-import { EXAM_MARKS_ENTERABLE_STATUSES } from '@shared/schemas/exam'
+import { EXAM_MARKS_ENTERABLE_STATUSES, EXAM_MODIFIABLE_STATUSES } from '@shared/schemas/exam'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { ModuleTabs }        from '@/components/shared/ModuleTabs'
 import { ModuleSurface }     from '@/components/shared/ModuleSurface'
 import {
@@ -99,6 +100,8 @@ import {
   Printer,
   TrendingUp,
   Send,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
 import type { ApiExam, ApiClass } from '@shared/types/api'
 import { Modal } from '@/components/shared/Modal'
@@ -156,6 +159,9 @@ function ExamsPageInner() {
   const [pickedClassId, setSelectedClassId] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [marksExamId, setMarksExamId] = useState<string | null>(null)
+  // Edit / delete of a scheduled exam (allowed until the teacher confirms its marks).
+  const [editExamId, setEditExamId] = useState<string | null>(null)
+  const [deleteExamId, setDeleteExamId] = useState<string | null>(null)
   // [PRODUCTION FIX 2026-07-28] Separate from marksExamId (teacher entry)
   // — exam officers reviewing before approval reuse the same sheet in
   // read-only mode, but need their own state so opening one doesn't
@@ -220,12 +226,15 @@ function ExamsPageInner() {
   )
   const exams = (examsData ?? []) as ApiExam[]
   const marksExam = marksExamId ? exams.find((e) => e.id === marksExamId) : undefined
+  const editExam = editExamId ? exams.find((e) => e.id === editExamId) : undefined
+  const deleteTarget = deleteExamId ? exams.find((e) => e.id === deleteExamId) : undefined
   const reviewExam = reviewExamId ? exams.find((e) => e.id === reviewExamId) : undefined
   const detailExam = detailExamId ? exams.find((e) => e.id === detailExamId) : undefined
   const viewMarksExam = viewMarksExamId ? exams.find((e) => e.id === viewMarksExamId) : undefined
 
   const approveResults = useApproveResults()
   const releaseResults = useReleaseResults()
+  const deleteExam = useDeleteExam()
   const { can } = usePermissions()
 
   const canScheduleExam    = can('exam.create')
@@ -234,6 +243,8 @@ function ExamsPageInner() {
   const canRelease         = can('exam.authorizeRelease')
   const canEnterMarks      = can('exam.enterOwnClassMarks')
   const canCorrect         = can('exam.correctMarksInReview')
+  const canEditExam        = can('exam.edit')
+  const canDeleteExam      = can('exam.delete')
 
   async function handleCompute(allowIncompleteCa = false) {
     if (!selectedClassId) return
@@ -299,8 +310,30 @@ function ExamsPageInner() {
   // Per-exam workflow actions. One definition shared by the desktop table row
   // and the mobile card, so the two layouts can never drift apart.
   function renderExamActions(exam: ApiExam) {
+    // The owner may change or remove an exam until the teacher confirms
+    // (finalizes) its marks; from then on it is locked. The server enforces the
+    // same window and ownership - this only decides what is OFFERED.
+    const modifiable = (EXAM_MODIFIABLE_STATUSES as readonly string[]).includes(exam.status)
     return (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            {canEditExam && modifiable && (
+              <button
+                onClick={() => setEditExamId(exam.id)}
+                className="text-xs text-muted hover:text-brand-teal flex items-center gap-1 min-h-11 md:min-h-0"
+                aria-label={`Edit ${exam.title}`}
+              >
+                <Pencil className="w-3 h-3" /> Edit
+              </button>
+            )}
+            {canDeleteExam && modifiable && (
+              <button
+                onClick={() => setDeleteExamId(exam.id)}
+                className="text-xs text-muted hover:text-brand-coral flex items-center gap-1 min-h-11 md:min-h-0"
+                aria-label={`Delete ${exam.title}`}
+              >
+                <Trash2 className="w-3 h-3" /> Delete
+              </button>
+            )}
             {canEnterMarks &&
               (EXAM_MARKS_ENTERABLE_STATUSES as readonly string[]).includes(exam.status) && (
                 <button
@@ -329,18 +362,20 @@ function ExamsPageInner() {
               <button
                 onClick={() => approveResults.mutate(exam.id)}
                 disabled={approveResults.isPending}
+                aria-busy={approveResults.isPending && approveResults.variables === exam.id}
                 className="text-xs font-semibold px-3 py-1.5 min-h-11 md:min-h-0 rounded-lg border border-brand-navy text-brand-navy hover:bg-brand-navy hover:text-white transition-colors disabled:opacity-60"
               >
-                {approveResults.isPending ? 'Approving…' : 'Approve'}
+                {approveResults.isPending && approveResults.variables === exam.id ? 'Approving…' : 'Approve'}
               </button>
             )}
             {canRelease && exam.status === 'RESULTS_APPROVED' && (
               <button
                 onClick={() => releaseResults.mutate(exam.id)}
                 disabled={releaseResults.isPending}
+                aria-busy={releaseResults.isPending && releaseResults.variables === exam.id}
                 className="text-xs font-semibold px-3 py-1.5 min-h-11 md:min-h-0 rounded-lg bg-brand-teal text-white hover:bg-brand-teal-light transition-colors disabled:opacity-60"
               >
-                {releaseResults.isPending ? 'Releasing…' : 'Release to Students'}
+                {releaseResults.isPending && releaseResults.variables === exam.id ? 'Releasing…' : 'Release to Students'}
               </button>
             )}
           </div>
@@ -690,11 +725,42 @@ function ExamsPageInner() {
         {showForm && (
           <ExamForm onClose={() => setShowForm(false)} academicYear={academicYear} term={term} />
         )}
+        {editExamId && editExam && (
+          <ExamForm
+            exam={editExam}
+            onClose={() => setEditExamId(null)}
+            academicYear={editExam.academicYear}
+            term={editExam.term}
+          />
+        )}
+        <ConfirmDialog
+          open={!!deleteExamId}
+          title={deleteTarget ? `Delete "${deleteTarget.title}"?` : 'Delete exam?'}
+          description={
+            deleteTarget && (deleteTarget.marksEntered ?? 0) > 0
+              ? `${deleteTarget.marksEntered} draft mark(s) already entered for this exam will be discarded with it. This cannot be undone.`
+              : 'This exam will be removed from the schedule. This cannot be undone.'
+          }
+          confirmLabel="Delete Exam"
+          confirmingLabel="Deleting…"
+          confirming={deleteExam.isPending}
+          destructive
+          onConfirm={() => {
+            if (!deleteExamId) return
+            deleteExam.mutate(deleteExamId, {
+              // Success/failure toasts come from the shared mutation feedback.
+              onSettled: () => setDeleteExamId(null),
+            })
+          }}
+          onCancel={() => setDeleteExamId(null)}
+        />
         {marksExamId && (
           <MarksEntrySheet
             examId={marksExamId}
-            classId={selectedClassId}
-            maxMark={marksExam?.maxMark ?? 100}
+            // The exam's OWN class: selectedClassId is '' under "All classes",
+            // which loaded the wrong (or no) student list into the sheet.
+            classId={marksExam?.classId ?? selectedClassId}
+            maxMark={Number(marksExam?.maxMark ?? 100)}
             onClose={() => setMarksExamId(null)}
           />
         )}
@@ -702,7 +768,7 @@ function ExamsPageInner() {
           <MarksEntrySheet
             examId={reviewExamId}
             classId={reviewExam.classId}
-            maxMark={reviewExam.maxMark ?? 100}
+            maxMark={Number(reviewExam.maxMark ?? 100)}
             onClose={() => setReviewExamId(null)}
             correctionMode={canCorrect}
             readOnly={!canCorrect}
@@ -714,7 +780,7 @@ function ExamsPageInner() {
           <MarksEntrySheet
             examId={viewMarksExamId}
             classId={viewMarksExam.classId}
-            maxMark={viewMarksExam.maxMark ?? 100}
+            maxMark={Number(viewMarksExam.maxMark ?? 100)}
             onClose={() => setViewMarksExamId(null)}
             readOnly
           />

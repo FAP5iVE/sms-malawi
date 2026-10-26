@@ -34,6 +34,13 @@
  *   decides which configured weight the exam carries in the term result.
  *   examService.createExam() enforces the same rule (and one exam per slot per
  *   class/subject/term) server-side.
+ * [MAINT 2026-10-26 — Edit before marks are confirmed]: the form now also
+ *   EDITS an exam (pass `exam`). The owner may change an exam's details until
+ *   the teacher finalizes its marks; the server enforces that and the
+ *   screens only offer Edit before then. Once marks have been entered the
+ *   class is locked (they belong to that class's students). Buttons show
+ *   "Saving…"/"Scheduling…", and success/failure are toasted (global
+ *   mutation feedback) with the reason repeated inline.
  * [DEPENDS ON]: @/hooks/useClasses (useMySubjectAssignments,
  *   useClassSubjects), @/store/authStore,
  *   @shared/constants/malawi (MALAWI_SUBJECTS, isManebNationalTerm)
@@ -45,11 +52,13 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CreateExamSchema } from '@shared/schemas/exam'
 import type { CreateExamInput } from '@shared/schemas/exam'
-import { useCreateExam, useCaConfig } from '@/hooks/useExams'
+import { useCreateExam, useUpdateExam, useCaConfig } from '@/hooks/useExams'
+import { getErrorMessage } from '@/lib/feedback'
 import { useClasses, useMySubjectAssignments, useClassSubjects } from '@/hooks/useClasses'
 import { useAuthStore } from '@/store/authStore'
 import { Loader2, AlertTriangle } from 'lucide-react'
-import type { ApiClass } from '@shared/types/api'
+import type { ApiClass, ApiExam } from '@shared/types/api'
+import type { UpdateExamInput } from '@shared/schemas/exam'
 import { MALAWI_SUBJECTS, isManebNationalTerm } from '@shared/constants/malawi'
 import { EXAM_TYPES, isCaExamType } from '@shared/constants/exams'
 import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
@@ -61,11 +70,18 @@ import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shar
 // "two different Resolver types" mismatch.
 type ExamFormValues = z.input<typeof CreateExamSchema>
 
-interface Props { onClose: () => void; academicYear: string; term: number }
+interface Props {
+  onClose: () => void
+  academicYear: string
+  term: number
+  /** When given, the form edits this exam instead of scheduling a new one. */
+  exam?: ApiExam
+}
 
 const ic = 'w-full border border-base rounded-xl px-4 py-3 text-sm bg-surface text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal transition-all'
 
-export function ExamForm({ onClose, academicYear, term }: Props) {
+export function ExamForm({ onClose, academicYear, term, exam }: Props) {
+  const isEdit = !!exam
   const { role } = useAuthStore()
   const isTeacher = role === 'academic'
 
@@ -75,12 +91,25 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
   const assignments = assignmentsData ?? []
 
   const createExam = useCreateExam()
+  const updateExam = useUpdateExam()
+  const pending = createExam.isPending || updateExam.isPending
+  // Marks already typed in belong to this class's students.
+  const classLocked = isEdit && (exam?.marksEntered ?? exam?._count?.marks ?? 0) > 0
   const { data: caConfig } = useCaConfig()
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<ExamFormValues, unknown, CreateExamInput>({
     resolver: zodResolver(CreateExamSchema),
-    defaultValues: { academicYear, term, maxMark: 100, weightPercent: 100 },
+    defaultValues: exam
+      ? {
+          academicYear: exam.academicYear, term: exam.term,
+          title: exam.title, type: exam.type as ExamFormValues['type'],
+          classId: exam.classId, subject: exam.subject,
+          date: exam.date.slice(0, 10), timeStart: exam.timeStart, timeEnd: exam.timeEnd,
+          venue: exam.venue, maxMark: Number(exam.maxMark), weightPercent: Number(exam.weightPercent),
+          caSlot: exam.caSlot ?? null,
+        }
+      : { academicYear, term, maxMark: 100, weightPercent: 100 },
   })
 
   const selectedClassId = watch('classId')
@@ -129,11 +158,32 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
     }
     // A slot picked and then abandoned by switching type must not be sent.
     const payload: CreateExamInput = { ...data, caSlot: showCaSlot ? data.caSlot ?? null : null }
+
+    if (exam) {
+      // Send only what actually changed: the server re-runs its class/subject/
+      // slot checks on whatever it receives, so an untouched field is noise.
+      const original: Record<string, unknown> = {
+        title: exam.title, type: exam.type, classId: exam.classId, subject: exam.subject,
+        date: exam.date.slice(0, 10), timeStart: exam.timeStart, timeEnd: exam.timeEnd, venue: exam.venue,
+        maxMark: Number(exam.maxMark), weightPercent: Number(exam.weightPercent), caSlot: exam.caSlot ?? null,
+      }
+      const changed = Object.fromEntries(
+        Object.entries(payload).filter(([k, v]) => k in original && original[k] !== v),
+      ) as UpdateExamInput
+      if (Object.keys(changed).length === 0) {
+        setSubmitError('Nothing has changed yet.')
+        return
+      }
+      updateExam.mutate({ examId: exam.id, data: changed }, {
+        onSuccess: onClose,
+        onError: (err) => setSubmitError(getErrorMessage(err, 'Failed to update the exam. Please try again.')),
+      })
+      return
+    }
+
     createExam.mutate(payload, {
       onSuccess: onClose,
-      onError: (err) => {
-        setSubmitError(err instanceof Error ? err.message : 'Failed to schedule exam. Please try again.')
-      },
+      onError: (err) => setSubmitError(getErrorMessage(err, 'Failed to schedule exam. Please try again.')),
     })
   }
 
@@ -143,18 +193,18 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
 
   return (
     <Modal
-      title="Schedule Exam"
+      title={isEdit ? 'Edit Exam' : 'Schedule Exam'}
       onClose={onClose}
       size="lg"
       onSubmit={handleSubmit(onSubmit)}
-      busy={createExam.isPending}
+      busy={pending}
       footer={
         <>
-          <button type="button" onClick={onClose} className={MODAL_BTN_SECONDARY}>Cancel</button>
-          <button type="submit" disabled={createExam.isPending}
+          <button type="button" onClick={onClose} disabled={pending} className={MODAL_BTN_SECONDARY}>Cancel</button>
+          <button type="submit" disabled={pending} aria-busy={pending}
             className={MODAL_BTN_PRIMARY}>
-            {createExam.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Schedule Exam
+            {pending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {isEdit ? (pending ? 'Saving…' : 'Save Changes') : (pending ? 'Scheduling…' : 'Schedule Exam')}
           </button>
         </>
       }
@@ -188,11 +238,17 @@ export function ExamForm({ onClose, academicYear, term }: Props) {
         )}
         <div>
           <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Class</label>
-          <select {...register('classId')} className={ic} aria-label="Class">
+          {/* Not `disabled`: react-hook-form drops disabled fields from the submitted values,
+              which would fail the required-classId check. Locked visually and from the keyboard instead. */}
+          <select {...register('classId')} className={`${ic}${classLocked ? ' pointer-events-none opacity-60' : ''}`}
+            aria-label="Class" aria-disabled={classLocked} tabIndex={classLocked ? -1 : undefined}>
             <option value="">Select class…</option>
             {availableClasses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           {errors.classId && <p className="text-xs text-brand-coral mt-1">{errors.classId.message}</p>}
+          {classLocked && (
+            <p className="text-xs text-muted mt-1">Marks have been entered, so the class can&apos;t be changed.</p>
+          )}
           {isTeacher && availableClasses.length === 0 && (
             <p className="text-xs text-muted mt-1">You have no subject assignments for {academicYear}.</p>
           )}

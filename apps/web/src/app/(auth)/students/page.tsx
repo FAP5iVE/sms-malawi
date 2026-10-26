@@ -259,6 +259,7 @@ function StudentsContent() {
       : { status, page, search: search || undefined, classId: classId || undefined, sex: sex || undefined },
   )
   const archive             = useArchiveStudent()
+  const [bulkArchiving, setBulkArchiving] = useState(false)
   const { can }             = usePermissions()
 
   // [PRODUCTION FIX 2026-07-27] Fee balance and risk level were shown to
@@ -272,13 +273,6 @@ function StudentsContent() {
     if (col.key === 'riskLevel')  return can('student.viewRiskStatus')
     return true
   })
-
-  function handleArchive(id: string) {
-    setActionError(null)
-    archive.mutate(id, {
-      onError: (err) => setActionError(err instanceof Error ? err.message : 'Failed to archive student.'),
-    })
-  }
 
   // ── Mobile per-row actions — rendered in the C3 bottom-sheet, gated on
   // the actual permission each action requires rather than shown
@@ -463,9 +457,19 @@ function StudentsContent() {
             : ''
         }
         confirmLabel="Archive"
+        confirmingLabel="Archiving…"
+        confirming={bulkArchiving}
         destructive
-        onConfirm={() => {
-          pendingArchiveIds?.forEach((id) => handleArchive(id))
+        onConfirm={async () => {
+          const ids = pendingArchiveIds ?? []
+          setActionError(null)
+          setBulkArchiving(true)
+          // Wait for every request: the dialog shows a spinner meanwhile, and a
+          // partial failure is reported (individual failures are toasted too).
+          const results = await Promise.allSettled(ids.map((id) => archive.mutateAsync(id)))
+          const failed = results.filter((r) => r.status === 'rejected').length
+          if (failed > 0) setActionError(`${failed} of ${ids.length} student(s) could not be archived.`)
+          setBulkArchiving(false)
           setPendingArchiveIds(null)
         }}
         onCancel={() => setPendingArchiveIds(null)}

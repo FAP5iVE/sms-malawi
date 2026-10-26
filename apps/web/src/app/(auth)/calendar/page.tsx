@@ -207,6 +207,9 @@ function CalendarContent() {
 
   const confirmDelete = useCallback(() => {
     if (!deleteTarget) return
+    // Dialog stays open (spinner on its button) until the server answers; the
+    // result is toasted by the shared mutation feedback. On failure it stays
+    // open so the user can retry or cancel.
     deleteEvent.mutate(manualEventDbId(deleteTarget.id), {
       onSuccess: () => setDeleteTarget(null),
     })
@@ -216,12 +219,12 @@ function CalendarContent() {
   // detail (category/time/location) can always be added afterwards via
   // the row's Edit action, which opens this same CalendarEventFormDialog.
   const quickAdd = useCallback(
-    (title: string) => {
+    (title: string, onCreated: () => void) => {
       createEvent.mutate({
         title,
         category: DEFAULT_EVENT_CATEGORY,
         startDate: new Date(`${selectedDateKey}T09:00`).toISOString(),
-      })
+      }, { onSuccess: onCreated })
     },
     [createEvent, selectedDateKey]
   )
@@ -286,6 +289,7 @@ function CalendarContent() {
         canEdit={canEdit}
         canDelete={canDelete}
         onQuickAdd={quickAdd}
+        quickAdding={createEvent.isPending}
         onOpenCreate={openCreate}
         onEditEvent={openEdit}
         onRequestDelete={requestDelete}
@@ -310,6 +314,8 @@ function CalendarContent() {
             : ''
         }
         confirmLabel="Delete Event"
+        confirmingLabel="Deleting…"
+        confirming={deleteEvent.isPending}
         destructive
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}

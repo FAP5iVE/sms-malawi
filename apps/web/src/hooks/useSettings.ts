@@ -279,6 +279,7 @@ export function useBatchUpdateSettings() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { successMessage: 'Settings saved', failureTitle: 'Could not save the settings' },
     mutationFn: (variables: BatchUpdateVariables) =>
       apiFetch<BatchUpdateResponse>('/settings/batch', {
         method: 'POST',

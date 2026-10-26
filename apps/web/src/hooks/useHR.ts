@@ -71,6 +71,7 @@ export function useStaffProfile(id: string) {
 export function useCreateStaff() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Staff created', failureTitle: 'Could not create staff' },
     mutationFn: (data: CreateStaffInput) => apiFetch('/hr', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
   })
@@ -79,6 +80,7 @@ export function useCreateStaff() {
 export function useUpdateStaff() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Staff updated', failureTitle: 'Could not update staff' },
     mutationFn: ({ id, data }: { id: string; data: UpdateStaffInput }) =>
       apiFetch(`/hr/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: (_result, { id }) => {
@@ -113,6 +115,7 @@ export function useSalary(staffId: string) {
 export function useUpdateSalary() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Salary updated', failureTitle: 'Could not update salary' },
     mutationFn: ({ staffId, data }: { staffId: string; data: UpdateSalaryInput }) =>
       apiFetch(`/hr/${staffId}/salary`, { method: 'PUT', body: JSON.stringify(data) }),
     onSuccess: (_result, { staffId }) => {
@@ -147,6 +150,7 @@ export function useAllowances(staffId: string) {
 export function useAddAllowance() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Allowance added', failureTitle: 'Could not add allowance' },
     mutationFn: ({ staffId, data }: { staffId: string; data: CreateAllowanceInput }) =>
       apiFetch<ApiAllowance>(`/hr/${staffId}/allowances`, { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: (_result, { staffId }) => {
@@ -158,6 +162,7 @@ export function useAddAllowance() {
 export function useDeleteAllowance() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Allowance deleted', failureTitle: 'Could not delete allowance' },
     mutationFn: ({ allowanceId }: { allowanceId: string; staffId: string }) =>
       apiFetch(`/hr/allowances/${allowanceId}`, { method: 'DELETE' }),
     onSuccess: (_result, { staffId }) => {
@@ -182,6 +187,7 @@ export function useLeaveRequests(filters: { staffId?: string; status?: string } 
 export function useApplyForLeave() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Leave request submitted', failureTitle: 'Could not submit the leave request' },
     mutationFn: (data: LeaveRequestInput) => apiFetch('/hr/leave/apply', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
   })
@@ -190,6 +196,7 @@ export function useApplyForLeave() {
 export function useReviewLeave() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Leave request reviewed', failureTitle: 'Could not review the leave request' },
     mutationFn: ({ id, data }: { id: string; data: ReviewLeaveInput }) =>
       apiFetch<ApiLeaveRequest & { conflictResult: ConflictCheckResult }>(
         `/hr/leave/requests/${id}/review`,
@@ -202,6 +209,7 @@ export function useReviewLeave() {
 export function useRequestLoan() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Loan requested', failureTitle: 'Could not request loan' },
     mutationFn: (data: LoanRequestInput) => apiFetch('/hr/loans/request', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
   })
@@ -246,6 +254,7 @@ export function useMyLoans() {
 export function useApproveLoan() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Loan approved', failureTitle: 'Could not approve loan' },
     mutationFn: (loanId: string) => apiFetch<ApiStaffLoan>(`/hr/loans/${loanId}/approve`, { method: 'PATCH' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
   })
@@ -254,6 +263,7 @@ export function useApproveLoan() {
 export function useDisburseLoan() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Loan disbursed', failureTitle: 'Could not disburse the loan' },
     mutationFn: (loanId: string) => apiFetch<ApiStaffLoan>(`/hr/loans/${loanId}/disburse`, { method: 'PATCH' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
   })
@@ -262,6 +272,7 @@ export function useDisburseLoan() {
 export function useRecordLoanRepayment() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Loan repayment recorded', failureTitle: 'Could not record loan repayment' },
     mutationFn: ({ loanId, amount }: { loanId: string; amount: number }) =>
       apiFetch<ApiStaffLoan>(`/hr/loans/${loanId}/repay`, {
         method: 'PATCH',
@@ -295,6 +306,7 @@ export function useUpcomingContractExpiries(days = 60) {
 export function useAddPerformanceNote() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Performance note added', failureTitle: 'Could not add performance note' },
     mutationFn: (data: PerformanceNoteInput) => apiFetch('/hr/performance', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
   })

@@ -552,10 +552,13 @@ function SalarySection({ staffId }: { staffId: string }) {
                     <button
                       type="button"
                       onClick={() => deleteAllowance.mutate({ allowanceId: a.id, staffId })}
+                      disabled={deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id}
+                      aria-busy={deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id}
                       aria-label={`Remove ${a.type} allowance`}
-                      className="shrink-0 text-brand-coral hover:underline text-xs font-semibold"
+                      className="shrink-0 text-brand-coral hover:underline text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1"
                     >
-                      Remove
+                      {deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id && <Loader2 className="w-3 h-3 animate-spin" aria-hidden />}
+                      {deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id ? 'Removing…' : 'Remove'}
                     </button>
                   </li>
                 ))}

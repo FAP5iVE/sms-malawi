@@ -295,6 +295,7 @@ export function usePublicFeeStructure(year?: string) {
 
 export function useNewsletterSubscribe() {
   return useMutation({
+    meta: { feedback: 'manual' },
     mutationFn: (data: { email: string; name?: string }) =>
       apiFetch<{ message: string }>('/public/newsletter/subscribe', {
         method: 'POST',
@@ -307,6 +308,7 @@ export function useNewsletterSubscribe() {
  *  the "Send us a message" form had no backend at all before this. */
 export function useContactForm() {
   return useMutation({
+    meta: { feedback: 'manual' },
     mutationFn: (data: { name: string; email: string; subject: string; message: string }) =>
       apiFetch<{ message: string }>('/public/contact', {
         method: 'POST',

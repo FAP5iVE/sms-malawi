@@ -742,6 +742,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'exam.view',
     'exam.create',
     'exam.edit',
+    'exam.delete',              // Ownership + lock rules enforced in examService.deleteExam
     'exam.unlockMarks',
     'exam.correctMarksInReview',
     'exam.authorizeRelease',
@@ -1201,6 +1202,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'exam.view',
     'exam.create',
     'exam.edit',
+    'exam.delete',              // Own (class, subject) only — enforced in examService.deleteExam
     'exam.enterOwnClassMarks',
     'exam.finalizeMarks',
     'exam.computeResults',

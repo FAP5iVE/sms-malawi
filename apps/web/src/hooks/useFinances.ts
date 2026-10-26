@@ -126,7 +126,7 @@ export function useStudentBalance(studentId: string, academicYear: string, enabl
 export function useRecordPayment() {
   const qc = useQueryClient()
   return useMutation({
-    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
+    meta: { successMessage: 'Payment recorded', failureTitle: 'Could not record payment', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: RecordPaymentInput) =>
       apiFetch<{ payment: unknown; invoice: ApiInvoice }>('/finances/payments', {
         method: 'POST',
@@ -153,7 +153,7 @@ export function useRecordPayment() {
 export function useGenerateInvoice() {
   const qc = useQueryClient()
   return useMutation({
-    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
+    meta: { successMessage: 'Invoice generated', failureTitle: 'Could not generate invoice', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: GenerateInvoiceInput) =>
       apiFetch<ApiInvoice>('/finances/invoices/generate', {
         method: 'POST',
@@ -188,6 +188,7 @@ export function useExpenses(filters: { academicYear?: string; term?: number } = 
 export function useCreateExpense() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Expense created', failureTitle: 'Could not create expense' },
     mutationFn: (data: CreateExpenseInput) =>
       apiFetch<ApiExpense>('/finances/expenses', {
         method: 'POST',
@@ -200,6 +201,7 @@ export function useCreateExpense() {
 export function useUploadExpenseReceipt() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Expense receipt uploaded', failureTitle: 'Could not upload expense receipt' },
     mutationFn: ({ expenseId, file }: { expenseId: string; file: File }) => {
       const formData = new FormData()
       formData.append('file', file)
@@ -230,6 +232,7 @@ function receiptErrorMessage(err: unknown): string {
 
 export function useViewExpenseReceipt() {
   return useMutation({
+    meta: { feedback: 'manual' },
     mutationFn: (expenseId: string) => openReceiptPreview(`/finances/expenses/${expenseId}/receipt`),
     onError: (err) => toast.error(receiptErrorMessage(err)),
   })
@@ -241,6 +244,7 @@ export function useViewExpenseReceipt() {
 export function useApproveExpense() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Expense approved', failureTitle: 'Could not approve expense' },
     mutationFn: ({ expenseId, paidImmediately = true }: { expenseId: string; paidImmediately?: boolean }) =>
       apiFetch<ApiExpense>(`/finances/expenses/${expenseId}/approve`, {
         method: 'PATCH',
@@ -257,6 +261,7 @@ export function useApproveExpense() {
 export function useMarkExpensePaid() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Expense marked as paid', failureTitle: 'Could not mark the expense as paid' },
     mutationFn: (expenseId: string) =>
       apiFetch<ApiExpense>(`/finances/expenses/${expenseId}/mark-paid`, { method: 'PATCH' }),
     onSuccess: () => {
@@ -276,6 +281,7 @@ export function useDebts() {
 export function useRejectExpense() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Expense rejected', failureTitle: 'Could not reject expense' },
     mutationFn: (expenseId: string) =>
       apiFetch<ApiExpense>(`/finances/expenses/${expenseId}/reject`, { method: 'PATCH' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
@@ -317,6 +323,7 @@ export function useBudgetVsActual(academicYear: string, term?: number, enabled =
 export function useCreateBudget() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Budget created', failureTitle: 'Could not create budget' },
     mutationFn: (data: CreateBudgetInput) =>
       apiFetch('/finances/budget', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.finances.all() }),
@@ -368,6 +375,7 @@ export function useStudentCredits(studentId: string, enabled = true) {
 export function useCreateFeeStructure() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Fee structure created', failureTitle: 'Could not create fee structure' },
     mutationFn: (data: CreateFeeStructureInput) =>
       apiFetch('/finances/fee-structures', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['finances', 'fee-structures'] }),
@@ -390,6 +398,7 @@ export function useScholarships() {
 // .mutate(paymentId) from a click; nothing is cached, so no URL goes stale.
 export function useFetchReceipt() {
   return useMutation({
+    meta: { feedback: 'manual' },
     mutationFn: (paymentId: string) => openReceiptPreview(`/finances/payments/${paymentId}/receipt`),
     onError: (err) => toast.error(receiptErrorMessage(err)),
   })
@@ -400,6 +409,7 @@ export function useFetchReceipt() {
 export function useUpdateFeeStructure() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Fee structure updated', failureTitle: 'Could not update fee structure' },
     mutationFn: ({ id, data }: { id: string; data: UpdateFeeStructureInput }) =>
       apiFetch<ApiFeeStructure>(`/finances/fee-structures/${id}`, {
         method: 'PATCH',
@@ -428,6 +438,7 @@ export function useFeeCommitments(studentId: string, academicYear: string, enabl
 export function useUpsertFeeCommitment() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Fee commitment saved', failureTitle: 'Could not save the fee commitment' },
     mutationFn: (data: CreateStudentFeeCommitmentInput) =>
       apiFetch<ApiStudentFeeCommitment>('/finances/fee-commitments', {
         method: 'POST',
@@ -447,6 +458,7 @@ export function useUpsertFeeCommitment() {
 export function useUpdateFeeCommitmentStatus() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Fee commitment status updated', failureTitle: 'Could not update fee commitment status' },
     mutationFn: ({ id, data }: { id: string; data: UpdateStudentFeeCommitmentInput }) =>
       apiFetch<ApiStudentFeeCommitment>(`/finances/fee-commitments/${id}`, {
         method: 'PATCH',
@@ -461,7 +473,7 @@ export function useUpdateFeeCommitmentStatus() {
 export function useAddInvoiceLineItem() {
   const qc = useQueryClient()
   return useMutation({
-    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
+    meta: { successMessage: 'Invoice line item added', failureTitle: 'Could not add invoice line item', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: ({ invoiceId, feeStructureId }: AddInvoiceLineItemInput) =>
       apiFetch<ApiInvoice>(`/finances/invoices/${invoiceId}/line-items`, {
         method: 'POST',
@@ -488,7 +500,7 @@ export function useAddInvoiceLineItem() {
 export function useBulkGenerateInvoices() {
   const qc = useQueryClient()
   return useMutation({
-    meta: { affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
+    meta: { feedback: 'manual', affectsRisk: true },   // refreshes student risk badges (see QueryProvider)
     mutationFn: (data: BulkGenerateInvoicesInput) =>
       apiFetch<ApiBulkInvoiceResult>('/finances/invoices/bulk-generate', {
         method: 'POST',

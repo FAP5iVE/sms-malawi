@@ -90,12 +90,13 @@
 import { Router }              from 'express'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission }   from '@/server/middleware/verifyPermission'
-import { CreateExamSchema, UpdateExamSchema, BulkMarkEntrySchema, CreateManebRecordSchema } from '@shared/schemas/exam'
+import { CreateExamSchema, UpdateExamSchema, BulkMarkEntrySchema, FinalizeMarksSchema, CreateManebRecordSchema } from '@shared/schemas/exam'
 import * as examService        from '@/server/services/examService'
 import { getSignedViewUrl, canReadFile } from '@/lib/storage'
 import { prisma }              from '@/lib/prisma'
 import * as reportCardService  from '@/server/services/reportCardService'
 import { sendError } from '@/server/lib/sendError'
+import { serializeDecimals } from '@/lib/serialize'
 
 export const examsRouter = Router()
 
@@ -151,7 +152,9 @@ examsRouter.get('/', verifyAuth, requirePermission('exam.view'),
   async (req, res) => {
     const { classId, academicYear, term } = req.query as Record<string, string | undefined>
     if (!academicYear || !term) return res.status(400).json({ error: 'academicYear and term are required' })
-    return res.json(await examService.listExams(classId, academicYear, Number(term), { uid: req.user!.uid, role: req.user!.role }))
+    // serializeDecimals: Prisma Decimals (maxMark, weightPercent) otherwise
+    // reach the browser as STRINGS despite ApiExam typing them as numbers.
+    return res.json(serializeDecimals(await examService.listExams(classId, academicYear, Number(term), { uid: req.user!.uid, role: req.user!.role })))
   })
 
 
@@ -160,7 +163,7 @@ examsRouter.post('/', verifyAuth, requirePermission('exam.create'),
   async (req, res) => {
     const parsed = CreateExamSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    return res.status(201).json(await examService.createExam(parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+    return res.status(201).json(serializeDecimals(await examService.createExam(parsed.data, { uid: req.user!.uid, role: req.user!.role })))
   })
 
 // PATCH /exams/:id — subject-ownership-scoped; blocked once results are
@@ -171,11 +174,12 @@ examsRouter.patch('/:id', verifyAuth, requirePermission('exam.edit'),
     const id = String(req.params.id)
     const parsed = UpdateExamSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    return res.json(await examService.updateExam(id, parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+    return res.json(serializeDecimals(await examService.updateExam(id, parsed.data, { uid: req.user!.uid, role: req.user!.role })))
   })
 
-// DELETE /exams/:id — subject-ownership-scoped; blocked once marks exist or
-// results are locked (enforced in examService.deleteExam).
+// DELETE /exams/:id — subject-ownership-scoped; allowed until the teacher
+// confirms (finalizes) the marks, locked from then on (enforced in
+// examService.deleteExam). Unconfirmed draft marks go with the exam.
 examsRouter.delete('/:id', verifyAuth, requirePermission('exam.delete'),
   async (req, res) => {
     const id = String(req.params.id)
@@ -187,13 +191,23 @@ examsRouter.post('/:id/marks', verifyAuth, requirePermission('exam.enterOwnClass
   async (req, res) => {
     const parsed = BulkMarkEntrySchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    return res.json(await examService.enterMarks(parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+    // Path param wins over whatever the body claims: marks can only ever be
+    // written to the exam the URL names.
+    const examId = String(req.params.id)
+    if (parsed.data.entries.some((e) => e.examId !== examId)) {
+      return res.status(400).json({ error: 'The marks submitted do not belong to this exam.' })
+    }
+    return res.json(serializeDecimals(await examService.enterMarks(parsed.data, { uid: req.user!.uid, role: req.user!.role })))
   })
 
 // GET /exams/:id/marks — read back previously-saved marks (draft-restore)
 examsRouter.get('/:id/marks', verifyAuth, requirePermission('exam.viewDraftMarks'),
   async (req, res) => {
-    return res.json(await examService.getMarksForExam(String(req.params.id), { uid: req.user!.uid, role: req.user!.role }))
+    // serializeDecimals is the draft-restore fix: `mark` is a Prisma Decimal,
+    // which JSON-serializes to a STRING ("45"). The sheet then sent that string
+    // back on Save/Finalize, the numeric schema rejected it, and the click
+    // appeared to do nothing.
+    return res.json(serializeDecimals(await examService.getMarksForExam(String(req.params.id), { uid: req.user!.uid, role: req.user!.role })))
   })
 
 // POST /exams/:id/correct-marks — RW-1: exam_officer/high_rank correct
@@ -202,7 +216,7 @@ examsRouter.post('/:id/correct-marks', verifyAuth, requirePermission('exam.corre
   async (req, res) => {
     const parsed = BulkMarkEntrySchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
-    return res.json(await examService.correctMarksInReview(String(req.params.id), parsed.data.entries, { uid: req.user!.uid, role: req.user!.role }))
+    return res.json(serializeDecimals(await examService.correctMarksInReview(String(req.params.id), parsed.data.entries, { uid: req.user!.uid, role: req.user!.role })))
   })
 
 // GET /exams/fee-blocked?classId=&academicYear=&term= — RW-2: which students are
@@ -224,10 +238,17 @@ examsRouter.post('/release-term', verifyAuth, requirePermission('exam.authorizeR
     return res.json(await examService.releaseTermEndResults(academicYear, Number(term), { uid: req.user!.uid, role: req.user!.role }))
   })
 
-// POST /exams/:id/finalize — teacher finalizes marks
+// POST /exams/:id/finalize — teacher confirms (finalizes) marks. The optional
+// body carries the sheet itself so save + confirm is one atomic step.
 examsRouter.post('/:id/finalize', verifyAuth, requirePermission('exam.finalizeMarks'),
   async (req, res) => {
-    await examService.finalizeMarks(String(req.params.id), { uid: req.user!.uid, role: req.user!.role })
+    const parsed = FinalizeMarksSchema.safeParse(req.body ?? {})
+    if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    const examId = String(req.params.id)
+    if (parsed.data.entries?.some((e) => e.examId !== examId)) {
+      return res.status(400).json({ error: 'The marks submitted do not belong to this exam.' })
+    }
+    await examService.finalizeMarks(examId, { uid: req.user!.uid, role: req.user!.role }, parsed.data.entries)
     return res.json({ success: true })
   })
 

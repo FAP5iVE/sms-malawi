@@ -102,6 +102,29 @@ export function buildApiUrl(path: string): string {
   return `${resolveApiBase()}/api${suffix}`
 }
 
+// Shape of an error response body. Most routes answer `{ error: string }`,
+// but Zod-validated routes answer `{ errors: { formErrors, fieldErrors } }`
+// (the flattened ZodError) - which used to surface as a useless
+// "API error 400". messageFromBody() turns either into a sentence a person
+// can act on.
+interface ErrorBody {
+  error?: string
+  errors?: { formErrors?: string[]; fieldErrors?: Record<string, string[] | undefined> }
+}
+
+function messageFromBody(body: ErrorBody, status: number): string {
+  if (typeof body.error === 'string' && body.error.trim()) return body.error
+  const form = body.errors?.formErrors?.filter(Boolean) ?? []
+  const fields = Object.entries(body.errors?.fieldErrors ?? {})
+    .filter(([, msgs]) => msgs && msgs.length > 0)
+    .map(([field, msgs]) => `${field}: ${(msgs ?? []).join(', ')}`)
+  const parts = [...form, ...fields]
+  if (parts.length > 0) return `Please check the form - ${parts.join('; ')}`
+  return `API error ${status}`
+}
+
+const NETWORK_ERROR_MESSAGE = 'Could not reach the server. Check your internet connection and try again.'
+
 export async function apiFetch<T>(
   path: string,
   options?: RequestInit,
@@ -132,10 +155,17 @@ export async function apiFetch<T>(
   }
 
   // ── First attempt
-  const res = await fetch(url, {
-    ...options,
-    headers: await buildHeaders(false),
-  })
+  // A dropped connection makes fetch() REJECT (TypeError: Failed to fetch)
+  // rather than return a response - without this the user saw a raw browser
+  // message, or (with no handler) nothing at all.
+  const firstHeaders = await buildHeaders(false)
+  let res: Response
+  try {
+    res = await fetch(url, { ...options, headers: firstHeaders })
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
+    throw new ApiError(NETWORK_ERROR_MESSAGE, 0)
+  }
 
   // ── 401: force-refresh token and retry once
   // (tokenOverride callers cannot force-refresh — there is no live user
@@ -151,11 +181,9 @@ export async function apiFetch<T>(
         })
 
         if (!retryRes.ok) {
-          const body = (await retryRes.json().catch(() => ({}))) as {
-            error?: string
-          }
+          const body = (await retryRes.json().catch(() => ({}))) as ErrorBody
           throw new ApiError(
-            body.error ?? `API error ${retryRes.status}`,
+            messageFromBody(body, retryRes.status),
             retryRes.status,
             body,
           )
@@ -171,8 +199,8 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string }
-    throw new ApiError(body.error ?? `API error ${res.status}`, res.status, body)
+    const body = (await res.json().catch(() => ({}))) as ErrorBody
+    throw new ApiError(messageFromBody(body, res.status), res.status, body)
   }
 
   return res.json() as Promise<T>

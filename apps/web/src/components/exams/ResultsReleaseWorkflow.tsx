@@ -69,6 +69,7 @@ import {
   EASE,
 }                                         from '@/lib/motion'
 import { apiFetch }                       from '@/lib/api-client'
+import { notifySuccess, notifyError, getErrorMessage } from '@/lib/feedback'
 import { Modal } from '@/components/shared/Modal'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -342,9 +343,11 @@ export function ResultsReleaseWorkflow({
     setError(null)
     try {
       await apiFetch(`/exams/${examId}/${action}`, { method: 'POST' })
+      notifySuccess(action === 'approve' ? 'Results approved' : 'Results released to students')
       await fetchExams()
     } catch (e) {
-      setError(e instanceof Error ? e.message : `Failed to ${action}`)
+      setError(getErrorMessage(e, `Failed to ${action}`))
+      notifyError(action === 'approve' ? 'Could not approve the results' : 'Could not release the results', e)
     } finally {
       setActionLoading(null)
     }
@@ -391,9 +394,11 @@ export function ResultsReleaseWorkflow({
           ? ` Results could not be computed for ${skipped.map((c) => c.className).join(', ')} — ${skipped[0]?.reason ?? ''}`
           : ''),
       )
+      notifySuccess(`Released ${res.released} end-of-term exam(s)`)
       await fetchExams()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to release term results')
+      setError(getErrorMessage(e, 'Failed to release term results'))
+      notifyError('Could not release the term results', e)
     } finally {
       setReleasing(false)
     }

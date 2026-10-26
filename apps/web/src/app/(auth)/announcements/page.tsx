@@ -51,6 +51,7 @@ import { AnnouncementForm } from '@/components/announcements/AnnouncementForm'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useAuthStore } from '@/store/authStore'
 import { apiFetch, queryKeys } from '@/lib/api-client'
+import { notifySuccess, notifyError, getErrorMessage } from '@/lib/feedback'
 import { ModuleTabs, type TabItem } from '@/components/shared/ModuleTabs'
 import { Bell, PlusCircle, Megaphone, Check, Loader2, CalendarDays, X, Trash2, Newspaper, Landmark, FileEdit, PencilLine, Search, ExternalLink } from 'lucide-react'
 import { stripHtml } from '@/components/shared/PublicArchive'
@@ -220,8 +221,10 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
       await apiFetch(`/announcements/${id}`, { method: 'DELETE' })
       await queryClient.invalidateQueries({ queryKey: queryKeys.announcements.all() })
       setConfirmId(null)
-    } catch {
-      setDeleteError('Failed to delete announcement. Please try again.')
+      notifySuccess('Announcement deleted')
+    } catch (err) {
+      setDeleteError(getErrorMessage(err, 'Failed to delete announcement. Please try again.'))
+      notifyError('Could not delete the announcement', err)
     } finally {
       setDeletingId(null)
     }
@@ -393,8 +396,10 @@ function PendingApprovalList({
     try {
       await apiFetch(`/announcements/${id}/approve`, { method: 'PATCH' })
       await queryClient.invalidateQueries({ queryKey: queryKeys.announcements.all() })
-    } catch {
-      setError('Failed to approve announcement. Please try again.')
+      notifySuccess('Announcement approved and published')
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to approve announcement. Please try again.'))
+      notifyError('Could not approve the announcement', err)
     } finally {
       setBusyId(null)
     }
@@ -411,8 +416,10 @@ function PendingApprovalList({
       await queryClient.invalidateQueries({ queryKey: queryKeys.announcements.all() })
       setRejectingId(null)
       setReason('')
-    } catch {
-      setError('Failed to reject announcement. Please try again.')
+      notifySuccess('Announcement rejected')
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to reject announcement. Please try again.'))
+      notifyError('Could not reject the announcement', err)
     } finally {
       setBusyId(null)
     }
@@ -580,8 +587,10 @@ function DraftsList({
       await apiFetch(`/announcements/${id}`, { method: 'DELETE' })
       await queryClient.invalidateQueries({ queryKey: queryKeys.announcements.drafts() })
       setConfirmId(null)
-    } catch {
-      setDeleteError('Failed to delete draft. Please try again.')
+      notifySuccess('Draft deleted')
+    } catch (err) {
+      setDeleteError(getErrorMessage(err, 'Failed to delete draft. Please try again.'))
+      notifyError('Could not delete the draft', err)
     } finally {
       setDeletingId(null)
     }

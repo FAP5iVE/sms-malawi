@@ -39,6 +39,14 @@ export const EXAM_MARKS_ENTERABLE_STATUSES = ExamStatusSchema.extract([
   'MARKS_DRAFT',
 ]).options
 
+// Statuses during which an exam may still be EDITED or DELETED by its owner:
+// everything up to the moment the teacher confirms (finalizes) the marks.
+// From MARKS_FINAL onward approval/release build on those marks, so the exam
+// is locked. Same set as EXAM_MARKS_ENTERABLE_STATUSES on purpose - one
+// moment ends both "marks can still be typed in" and "exam can still be
+// changed" - but named separately so each rule reads for what it means.
+export const EXAM_MODIFIABLE_STATUSES = EXAM_MARKS_ENTERABLE_STATUSES
+
 export const CreateExamSchema = z.object({
   type:          z.enum(['WEEKLY_TEST','ASSIGNMENT','QUIZ','MIDTERM','END_TERM','MANEB_JCE','MANEB_MSCE']),
   subject:       z.string().min(1),
@@ -77,6 +85,13 @@ export const BulkMarkEntrySchema = z.object({
   isDraft: z.boolean().default(true),
 })
 
+// POST /exams/:id/finalize. `entries` is the sheet as the teacher sees it, so
+// saving the marks and confirming them happen in one atomic step; omit it to
+// finalize whatever is already saved.
+export const FinalizeMarksSchema = z.object({
+  entries: z.array(MarkEntrySchema).min(1).optional(),
+})
+
 export const TeacherCommentSchema = z.object({
   studentId:      z.string().min(1),
   academicYear:   z.string().min(1),
@@ -106,6 +121,7 @@ export const PromotionRulesSchema = z.object({
 export type CreateExamInput       = z.input<typeof CreateExamSchema>
 export type UpdateExamInput        = z.infer<typeof UpdateExamSchema>
 export type BulkMarkEntryInput     = z.infer<typeof BulkMarkEntrySchema>
+export type FinalizeMarksInput     = z.infer<typeof FinalizeMarksSchema>
 export type CreateManebRecordInput = z.infer<typeof CreateManebRecordSchema>
 export type PromotionRulesInput    = z.infer<typeof PromotionRulesSchema>
 export type ExamStatus             = z.infer<typeof ExamStatusSchema>

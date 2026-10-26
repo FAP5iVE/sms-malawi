@@ -106,6 +106,7 @@ export function useClassSubjects(classId: string | undefined) {
 export function useSetClassSubjectPresets() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Class subject presets updated', failureTitle: 'Could not set class subject presets' },
     mutationFn: ({ classId, subjects }: { classId: string; subjects: string[] }) =>
       apiFetch<ApiClassSubjectsMeta>(`/classes/${classId}/subjects`, {
         method: 'PUT',
@@ -124,6 +125,7 @@ export function useSetClassSubjectPresets() {
 export function useCreateClass() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Class created', failureTitle: 'Could not create class' },
     mutationFn: (data: CreateClassInput) =>
       apiFetch<ApiClass>('/classes', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.classes.all() }),
@@ -133,6 +135,7 @@ export function useCreateClass() {
 export function useUpdateClass() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Class updated', failureTitle: 'Could not update class' },
     mutationFn: ({ id, ...data }: { id: string } & UpdateClassInput) =>
       apiFetch<ApiClass>(`/classes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: (_data, variables) => {
@@ -148,6 +151,7 @@ export function useUpdateClass() {
 export function useArchiveClass() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Class archived', failureTitle: 'Could not archive class' },
     mutationFn: (id: string) =>
       apiFetch<ApiClass>(`/classes/${id}`, { method: 'DELETE' }),
     onSuccess: (_data, id) => {
@@ -163,6 +167,7 @@ export function useArchiveClass() {
 export function useCreateTimetableSlot() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Timetable slot created', failureTitle: 'Could not create timetable slot' },
     // POST /classes/:id/timetable — gated server-side to admin/high_rank/exam_officer.
     // classId travels in the URL; the body carries the rest of the slot.
     mutationFn: ({ classId, ...data }: { classId: string } & CreateTimetableSlotInput) =>
@@ -216,6 +221,7 @@ function useInvalidateSubjectTeachers() {
 export function useAssignSubjectTeacher() {
   const invalidate = useInvalidateSubjectTeachers()
   return useMutation({
+    meta: { successMessage: 'Subject teacher assigned', failureTitle: 'Could not assign subject teacher' },
     mutationFn: (data: { classId: string; subject: string; teacherUid: string; academicYear: string }) =>
       apiFetch<ApiSubjectAssignment>('/classes/subject-assignments', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: invalidate,
@@ -225,6 +231,7 @@ export function useAssignSubjectTeacher() {
 export function useChangeSubjectTeacher() {
   const invalidate = useInvalidateSubjectTeachers()
   return useMutation({
+    meta: { successMessage: 'Subject teacher changed', failureTitle: 'Could not change the subject teacher' },
     mutationFn: ({ id, teacherUid }: { id: string; teacherUid: string }) =>
       apiFetch<ApiSubjectAssignment>(`/classes/subject-assignments/${id}`, { method: 'PATCH', body: JSON.stringify({ teacherUid }) }),
     onSuccess: invalidate,
@@ -234,6 +241,7 @@ export function useChangeSubjectTeacher() {
 export function useRemoveSubjectTeacher() {
   const invalidate = useInvalidateSubjectTeachers()
   return useMutation({
+    meta: { successMessage: 'Subject teacher removed', failureTitle: 'Could not remove subject teacher' },
     mutationFn: (id: string) => apiFetch<{ success: boolean }>(`/classes/subject-assignments/${id}`, { method: 'DELETE' }),
     onSuccess: invalidate,
   })
@@ -243,6 +251,7 @@ export function useRemoveSubjectTeacher() {
 export function useBackfillSubjectAssignments() {
   const invalidate = useInvalidateSubjectTeachers()
   return useMutation({
+    meta: { successMessage: 'Subject assignments backfilled', failureTitle: 'Could not backfill the assignments' },
     mutationFn: (academicYear: string) =>
       apiFetch<{ created: number }>('/classes/subject-assignments/backfill', { method: 'POST', body: JSON.stringify({ academicYear }) }),
     onSuccess: invalidate,
@@ -252,6 +261,7 @@ export function useBackfillSubjectAssignments() {
 export function useCreateAssignment() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Assignment created', failureTitle: 'Could not create assignment' },
     mutationFn: ({ classId, ...data }: { classId: string } & CreateAssignmentInput) =>
       apiFetch<ApiAssignment>(`/classes/${classId}/assignments`, {
         method: 'POST',
@@ -270,6 +280,7 @@ export function useCreateAssignment() {
 export function useSubmitAssignment() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { successMessage: 'Assignment submitted', failureTitle: 'Could not submit assignment' },
     mutationFn: async ({ classId, assignmentId, file }: { classId: string; assignmentId: string; file: File }) => {
       // [PRODUCTION FIX] Was FormData → POST .../submit (multer, 25MB
       // limit) — going through this app's own Vercel function for the raw
