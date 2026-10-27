@@ -175,9 +175,9 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
   const lateCount = Object.values(record).filter((v) => v === 'LATE').length
 
   return (
-    <div className="bg-surface rounded-xl overflow-hidden">
+    <div className="overflow-hidden">
       {/* ── Date navigation ──────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-base gap-3 flex-wrap">
+      <div className="flex items-center justify-between py-3 border-b border-base gap-3 flex-wrap">
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -231,7 +231,7 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
       </div>
 
       {readOnly && (
-        <div className="px-5 py-2 bg-brand-teal/8 border-b border-base flex items-start gap-2">
+        <div className="mt-3 px-4 py-2 rounded-xl bg-brand-teal/8 flex items-start gap-2">
           <Lock className="w-3.5 h-3.5 text-brand-teal shrink-0 mt-0.5" aria-hidden />
           <p className="text-xs text-brand-teal">
             View only — {classTeacherName
@@ -242,7 +242,7 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
       )}
 
       {saveError && (
-        <div className="px-5 py-2 bg-brand-coral/10 border-b border-base flex items-center gap-2">
+        <div className="mt-3 px-4 py-2 rounded-xl bg-brand-coral/10 flex items-center gap-2">
           <AlertTriangle className="w-3.5 h-3.5 text-brand-coral shrink-0" aria-hidden />
           <p className="text-xs text-brand-coral">{saveError}</p>
         </div>
@@ -250,7 +250,7 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
 
       {/* ── Bulk action ──────────────────────────────────────────────── */}
       {!readOnly && students.length > 0 && (
-        <div className="px-5 py-2.5 border-b border-base bg-page/60">
+        <div className="py-2.5 border-b border-base">
           <button
             type="button"
             onClick={markAllPresent}
@@ -266,11 +266,11 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
       {isError ? (
         <AttendanceLoadError error={error} onRetry={() => refetch()} retrying={isFetching} />
       ) : isLoading ? (
-        <div className="p-5 space-y-2">
+        <div className="py-5 space-y-2">
           {students.map((s) => <div key={s.id} className="h-12 rounded-lg bg-page animate-pulse" />)}
         </div>
       ) : students.length === 0 ? (
-        <p className="px-5 py-10 text-center text-muted text-sm">No students assigned to this class yet.</p>
+        <p className="py-10 text-center text-muted text-sm">No students assigned to this class yet.</p>
       ) : (
         <div className="divide-y divide-base">
           {students.map((student) => {
@@ -278,7 +278,7 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
             return (
               <div
                 key={student.id}
-                className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-page transition-colors flex-wrap sm:flex-nowrap"
+                className="flex items-center justify-between gap-3 px-2 -mx-2 py-3 rounded-lg hover:bg-page transition-colors flex-wrap sm:flex-nowrap"
               >
                 <p className="text-sm font-medium text-body min-w-0 flex-1">
                   {student.firstName} {student.lastName}

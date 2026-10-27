@@ -91,7 +91,7 @@ export function SubjectTeachersPanel({ classId, academicYear, classTeacherUid, c
 
   if (subjects.length === 0) {
     return (
-      <div className="text-center py-12 text-muted text-sm border border-base rounded-xl">
+      <div className="text-center py-12 text-muted text-sm">
         This class has no subjects configured yet. Set its subjects first (edit the class), then
         assign a teacher to each here.
       </div>
@@ -137,11 +137,11 @@ export function SubjectTeachersPanel({ classId, academicYear, classTeacherUid, c
       )}
       {notice && <p role="status" className="text-xs text-muted">{notice}</p>}
 
-      <ul className="divide-y divide-base border border-base rounded-xl bg-surface">
+      <ul className="divide-y divide-base">
         {subjects.map((subject) => {
           const row = byName.get(subject)
           return (
-            <li key={subject} className="flex flex-wrap items-center gap-3 px-4 py-3">
+            <li key={subject} className="flex flex-wrap items-center gap-3 py-3">
               <div className="min-w-[10rem] flex-1">
                 <p className="font-heading font-semibold text-sm text-body">{subject}</p>
                 {row && row.teacherUid === classTeacherUid && (

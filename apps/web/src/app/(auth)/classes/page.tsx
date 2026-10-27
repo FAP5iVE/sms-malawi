@@ -171,7 +171,7 @@ function ClassesContent() {
       )}
 
       {!isLoading && yearClasses.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center bg-surface border border-base rounded-xl">
+        <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
           <Inbox className="w-8 h-8 text-muted" aria-hidden />
           <div>
             <p className="font-heading font-semibold text-body">

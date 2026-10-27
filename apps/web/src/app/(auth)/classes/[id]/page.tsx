@@ -72,6 +72,7 @@ import { TimetableSlotForm } from '@/components/classes/TimetableSlotForm'
 import { DataTable } from '@/components/shared/DataTable'
 import type { DataColumn } from '@/components/shared/DataTable'
 import { ModuleTabs } from '@/components/shared/ModuleTabs'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import type { TabItem } from '@/components/shared/ModuleTabs'
 import { ArrowLeft, Users, ClipboardCheck, Clock, BookOpen, Hourglass, Plus, GraduationCap } from 'lucide-react'
 
@@ -271,6 +272,11 @@ function ClassDetailContent() {
         </div>
       </div>
 
+      {/* [2026-10 — Match Exams] Tab strip + tab content sit inside the shared
+          ModuleSurface panel (same as Exams/Classes list). The header above
+          stays outside it. Everything inside draws FLAT on the panel — no
+          second bordered card per row/table/list. */}
+      <ModuleSurface>
       {/* Tabs */}
       <ModuleTabs<Tab>
         id="class-detail-tabs"
@@ -288,6 +294,7 @@ function ClassDetailContent() {
           isLoading={false}
           columns={rosterColumns}
           rowKey="id"
+          bordered={false}
           emptyMessage="No students assigned to this class yet."
         />
       )}
@@ -306,7 +313,7 @@ function ClassDetailContent() {
           ) : (
             // Defensive: the tab is hidden for these roles, so this is only
             // reachable if permissions change while the page is open.
-            <div className="bg-surface rounded-xl p-6 text-center text-sm text-muted">
+            <div className="py-12 text-center text-sm text-muted">
               You don&apos;t have permission to view this class&apos;s attendance.
             </div>
           )}
@@ -343,6 +350,7 @@ function ClassDetailContent() {
             isLoading={false}
             columns={timetableColumns}
             rowKey="id"
+            bordered={false}
             emptyMessage={`No timetable for Term ${term}.`}
           />
         </div>
@@ -365,26 +373,27 @@ function ClassDetailContent() {
           </div>
 
           {assignmentsDenied ? (
-            <div className="text-center py-12 text-muted text-sm border border-base rounded-xl">
+            <div className="text-center py-12 text-muted text-sm">
               You don&apos;t have access to this class&apos;s assignments.
             </div>
           ) : assignments.length === 0 ? (
-            <div className="text-center py-12 text-muted text-sm border border-base rounded-xl">
+            <div className="text-center py-12 text-muted text-sm">
               {assignableSubjects.length > 0
                 ? 'No assignments yet. Click "New Assignment" to create one.'
                 : 'No assignments to show.'}
             </div>
           ) : (
-            <div className="space-y-3">
+            // Flat rows divided by hairlines — no per-assignment card inside the panel.
+            <ul className="divide-y divide-base">
               {assignments.map((a) => (
-                <div key={a.id} className="bg-surface border border-base rounded-xl p-4">
+                <li key={a.id} className="py-3">
                   <p className="font-heading font-semibold text-body">{a.title}</p>
                   <p className="text-sm text-muted mt-0.5">
                     {a.subject} · Due: {new Date(a.dueDate).toLocaleDateString()}
                   </p>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       )}
@@ -400,6 +409,8 @@ function ClassDetailContent() {
           />
         </div>
       )}
+
+      </ModuleSurface>
 
       {showAssignmentForm && (
         <AssignmentForm classId={id} subjectOptions={assignableSubjects} onClose={() => setShowAssignmentForm(false)} />
