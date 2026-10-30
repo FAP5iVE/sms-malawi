@@ -47,6 +47,9 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { getIdTokenFromRequest } from '@/lib/verifyAuth'
 import { canReadFile, streamFile } from '@/lib/storage'
 import { prisma } from '@/lib/prisma'
+import { canAccessAssignmentFile } from '@/server/services/assignmentService'
+import { isSuperUserClaim } from '@shared/constants/superUser'
+import { isInlineSafeMime } from '@shared/utils/assignment'
 
 /**
  * F3 — Secure file proxy route.
@@ -111,6 +114,20 @@ export async function GET(
         })
         ownerUid = student?.firebaseUid ?? undefined
       }
+    } else if (fileId.startsWith('assignment_submission_')) {
+      // [2026-10-27] A student's own submission file: owner = that student.
+      // (No branch existed, so students were refused the file they uploaded.)
+      const sub = await prisma.assignmentSubmission.findFirst({
+        where: { fileKey: fileId },
+        select: { studentId: true },
+      })
+      if (sub) {
+        const student = await prisma.student.findUnique({
+          where: { id: sub.studentId },
+          select: { firebaseUid: true },
+        })
+        ownerUid = student?.firebaseUid ?? undefined
+      }
     } else if (fileId.startsWith('transcript_')) {
       const student = await prisma.student.findFirst({
         where: { transcriptKey: fileId },
@@ -127,9 +144,29 @@ export async function GET(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // ── 3b. Assignment material needs more than a role: the viewer must be in
+  //        the class / teach the subject (assignmentService decides). ────────
+  if (fileId.startsWith('assignment_')) {
+    const ok = await canAccessAssignmentFile(fileId, {
+      uid,
+      role: role as import('@shared/types/roles').UserRole,
+      superUser: isSuperUserClaim(decoded['superUser']),
+    })
+    if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   // ── 4. Stream file bytes ──────────────────────────────────────────────────
   try {
     const { buffer, mimeType, filename } = await streamFile(fileId)
+    // [2026-10-28] Teachers' attachments and students' hand-ins are user-supplied
+    // and served from the APP's origin, so a script-capable file (html, svg, xml...)
+    // opened here would run with the viewer's session. Uploads are allowlisted at
+    // claim time (shared/utils/assignment.ts); as defence in depth, anything that is
+    // not a PDF or a raster image is forced to DOWNLOAD, and non-PDF responses carry
+    // a sandboxing CSP. (PDFs stay inline-capable: PDF.js reads them through fetch.)
+    const isAssignmentFile = fileId.startsWith('assignment_')
+    const inline = !isAssignmentFile || isInlineSafeMime(mimeType)
+    const sandbox = isAssignmentFile && ((mimeType ?? '').split(';')[0] ?? '').trim().toLowerCase() !== 'application/pdf'
     return new NextResponse(buffer as BodyInit, {
       status: 200,
       headers: {
@@ -137,10 +174,11 @@ export async function GET(
         // response. PDF.js consumes the bytes through fetch, so it does not
         // depend on Chrome's built-in PDF plugin.
         'Content-Type': mimeType,
-        'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
+        'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(filename)}`,
         'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'no-referrer',
+        ...(sandbox ? { 'Content-Security-Policy': "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox" } : {}),
       },
     })
   } catch (err) {

@@ -269,6 +269,10 @@ export const queryKeys = {
     timetable: (id: string, year?: string, term?: number) =>
       ['classes', id, 'timetable', year, term] as const,
     assignments: (id: string) => ['classes', id, 'assignments'] as const,
+    /** GET /classes/:id/assignments/:assignmentId - nested under `assignments`, so invalidating the list refreshes it too. */
+    assignmentDetail: (id: string, assignmentId: string) => ['classes', id, 'assignments', 'detail', assignmentId] as const,
+    /** GET /classes/:id/assignments/:assignmentId/roster (teacher's class list). */
+    assignmentRoster: (id: string, assignmentId: string) => ['classes', id, 'assignments', 'roster', assignmentId] as const,
     /** GET /classes/:id/subject-assignments - who teaches each subject in a class. */
     subjectAssignments: (id: string, year?: string) => ['classes', id, 'subject-assignments', year ?? null] as const,
     subjectAssignmentsMine: (academicYear?: string) => ['classes', 'subject-assignments', 'mine', academicYear ?? null] as const,

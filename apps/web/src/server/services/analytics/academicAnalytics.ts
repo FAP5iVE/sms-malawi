@@ -28,6 +28,7 @@ import {
   ABSENCE_FLAG_PCT, DECLINE_POINTS, assignmentStats, distribution, flagStudent, scorePct, spreadKind, summarise,
 } from './academicLogic'
 import { daysBetween, kpi, mean, ratioPct, thresholdKpi } from '@/server/services/reporting/kpi'
+import { deadlineFor } from '@shared/utils/assignment'
 import { compact, markCompletionInsight, passRateInsight, sortInsights } from '@/server/services/reporting/insights'
 import { enrichAttention, rankAttention } from './executiveLogic'
 
@@ -262,7 +263,7 @@ export async function getAssignmentReport(uid: string, academicYear: string, ter
   })
 
   // Completion only counts assignments already due; one still open cannot be "missing" yet.
-  const due = rows.filter((r) => new Date(r.dueDate).getTime() < now.getTime())
+  const due = rows.filter((r) => deadlineFor(new Date(r.dueDate)).getTime() < now.getTime())
   const expected = due.reduce((s, r) => s + r.expected, 0)
   const submitted = due.reduce((s, r) => s + r.submitted, 0)
   const late = due.reduce((s, r) => s + r.late, 0)

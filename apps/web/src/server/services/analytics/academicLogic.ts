@@ -1,6 +1,7 @@
 /** Pure teaching-analytics maths (no database access, unit-tested). */
 import type { SpreadKind, StudentFlag } from '@shared/types/reporting-academic'
 import { mean, median, ratioPct, stdDev } from '@/server/services/reporting/kpi'
+import { deadlineFor } from '@shared/utils/assignment'
 
 export const ABSENCE_FLAG_PCT = 15
 /** Minimum recorded days before an absence rate can flag a student. */
@@ -96,6 +97,7 @@ export interface AssignmentInput {
 export function assignmentStats(a: AssignmentInput, now: Date) {
   return {
     completionRate: ratioPct(a.submitted, a.expected),
-    overdue: a.dueDate.getTime() < now.getTime() && a.submitted < a.expected,
+    // Past the end of the due day (Malawi time) - the shared deadline rule.
+    overdue: deadlineFor(a.dueDate).getTime() < now.getTime() && a.submitted < a.expected,
   }
 }

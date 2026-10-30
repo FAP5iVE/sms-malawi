@@ -172,6 +172,12 @@ function NotificationList({
   onClose,
   onViewAll,
 }: NotificationListProps) {
+  const router = useRouter()
+  // [2026-10-27] Feed items that carry an in-app link (e.g. a new assignment ->
+  // /classes/<id>?tab=assignments&assignment=<id>) open it on click. Only
+  // same-site paths are followed.
+  const safeLink = (url: string | null): string | null =>
+    url && url.startsWith('/') && !url.startsWith('//') ? url : null
   return (
     <>
       <div className="max-h-72 overflow-y-auto divide-y divide-base">
@@ -199,12 +205,33 @@ function NotificationList({
             </p>
           </div>
         ) : (
-          notifications.map((n) => (
+          notifications.map((n) => {
+            const link = safeLink(n.actionUrl)
+            const open = () => {
+              if (!link) return
+              onClose()
+              router.push(link)
+            }
+            return (
             <div
               key={n.id}
+              {...(link
+                ? {
+                    role: 'link' as const,
+                    tabIndex: 0,
+                    onClick: open,
+                    onKeyDown: (e: React.KeyboardEvent) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        open()
+                      }
+                    },
+                  }
+                : {})}
               className={[
                 'flex items-start gap-2.5 px-4 py-3',
                 'hover:bg-page transition-colors',
+                link ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/40' : '',
                 n.unread ? 'bg-brand-teal/5' : '',
               ].join(' ')}
             >
@@ -227,7 +254,8 @@ function NotificationList({
                 )}
               </div>
             </div>
-          ))
+            )
+          })
         )}
       </div>
 

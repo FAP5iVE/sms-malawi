@@ -106,22 +106,113 @@ export interface ApiHighRiskStudentsResponse {
 export interface ApiAssignmentSubmission {
   studentId: string
   status: 'SUBMITTED' | 'LATE' | 'MISSING'
+  /** Student's own hand-in: the instant. Teacher-recorded: noon of the day the teacher entered. */
   submittedAt: string
+  /** The private storage key is never sent - open the file through the authorised endpoint. */
+  hasFile: boolean
+  fileName?: string | null
+  note?: string | null
+  /** True when a teacher recorded this hand-in (rather than the student sending it). */
+  recordedByTeacher: boolean
+  /** Session marks - only when the teacher chose marks AND entered one. Never feeds exams or C.A. */
+  marks?: number | null
+  /** Shown to the student only together with a mark. */
+  feedback?: string | null
+  markedAt?: string | null
+  /** Version for stale-edit detection. */
+  updatedAt: string
+}
+
+export interface ApiAssignmentAttachment {
+  id: string
+  /** Storage id of a PRIVATE (FILE) or public-image (IMAGE) object; access is authorised by the file proxy. */
+  fileKey: string
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  kind: 'FILE' | 'IMAGE'
+  /** Ready-to-use URL: direct view URL for IMAGE, same-origin /api/files proxy path for FILE. */
+  url: string
+}
+
+/** Per-student state shown in the roster. */
+export type ApiAssignmentStudentStatus = 'NOT_SUBMITTED' | 'SUBMITTED' | 'LATE'
+
+/** What a student sees (shared/utils/assignment.ts studentAssignmentState). The tab badge counts PENDING. */
+export type ApiAssignmentStudentState = 'PENDING' | 'OVERDUE' | 'SUBMITTED' | 'LATE'
+
+export interface ApiAssignmentStats {
+  totalStudents: number
+  viewed: number
+  submitted: number   // on time
+  late: number
+  notSubmitted: number
+  marked: number
 }
 
 export interface ApiAssignment {
   id: string
   title: string
+  /** Task content - sanitised rich-text HTML (legacy plain text is converted on read). */
   description?: string | null
+  /** What the student must hand in - sanitised rich-text HTML. */
+  requirements?: string | null
   subject: string
   classId: string
   dueDate: string
   createdByUid: string
+  createdByName?: string | null
   createdAt: string
-  // Only populated by GET /classes/:classId/assignments (assignmentsRouter's
-  // Prisma `include: { submissions: ... }`) — not present when an
-  // Assignment is read via classService.getClass()'s own nested include.
+  /** Also the edit version: send it back as expectedUpdatedAt when saving. */
+  updatedAt: string
+  marksEnabled?: boolean
+  maxMarks?: number | null
+  attachmentCount?: number
+  /** True when the signed-in viewer may edit/mark/delete this assignment. */
+  canManage?: boolean
+  /** Staff viewers: class-wide progress counts. */
+  stats?: ApiAssignmentStats
+  /** Student viewer: their own state. `mine` is null until they hand in. */
+  mine?: ApiAssignmentSubmission | null
+  myStatus?: ApiAssignmentStudentStatus
+  myState?: ApiAssignmentStudentState
+  /** Student viewer: when they first opened it (null = never opened = show "New"). */
+  viewedAt?: string | null
+  /** Student viewers only: their own row (kept for older callers). */
   submissions?: ApiAssignmentSubmission[]
+}
+
+/** GET /classes/:classId/assignments/:id */
+export interface ApiAssignmentDetail extends ApiAssignment {
+  attachments: ApiAssignmentAttachment[]
+}
+
+/** One class-list row of GET /classes/:classId/assignments/:id/roster */
+export interface ApiAssignmentRosterRow {
+  studentId: string
+  firstName: string
+  lastName: string
+  registrationNo: string
+  viewedAt: string | null
+  lastViewedAt: string | null
+  viewCount: number
+  status: ApiAssignmentStudentStatus
+  submittedAt: string | null
+  hasFile: boolean
+  fileName: string | null
+  note: string | null
+  recordedByTeacher: boolean
+  marks: number | null
+  feedback: string | null
+  markedAt: string | null
+  /** null = no record yet. Send back as expectedUpdatedAt when saving. */
+  updatedAt: string | null
+}
+
+export interface ApiAssignmentRoster {
+  assignment: Pick<ApiAssignment, 'id' | 'title' | 'subject' | 'dueDate' | 'marksEnabled' | 'maxMarks' | 'canManage'> & { postedAt: string }
+  stats: ApiAssignmentStats
+  rows: ApiAssignmentRosterRow[]
 }
 
 export interface ApiClass {

@@ -13,6 +13,21 @@ describe('student logic', () => {
     expect(assignmentStatus({ status: 'MISSING', submittedAt: d('2026-10-01') }, d('2026-10-20'), now)).toBe('PENDING')
   })
 
+  it('judges the due DAY in Malawi time: legacy (midnight-UTC) and new rows agree', () => {
+    const legacyDue = d('2026-10-05')                       // old rows: midnight UTC of the due day
+    const newDue = new Date('2026-10-05T21:59:59.999Z')     // new rows: last millisecond of the day in Malawi
+    for (const due of [legacyDue, newDue]) {
+      // 12:00 in Malawi on the due day: still PENDING (this used to read OVERDUE for legacy rows)
+      expect(assignmentStatus(null, due, new Date('2026-10-05T10:00:00Z'))).toBe('PENDING')
+      // just after midnight Malawi time the next day: OVERDUE
+      expect(assignmentStatus(null, due, new Date('2026-10-05T22:00:00Z'))).toBe('OVERDUE')
+      // handed in on the due day (even late in the evening): on time
+      expect(assignmentStatus({ status: 'SUBMITTED', submittedAt: new Date('2026-10-05T21:30:00Z') }, due, new Date('2026-10-10T00:00:00Z'))).toBe('SUBMITTED')
+      // handed in after midnight Malawi time even if the stored status says SUBMITTED: late
+      expect(assignmentStatus({ status: 'SUBMITTED', submittedAt: new Date('2026-10-05T22:30:00Z') }, due, new Date('2026-10-10T00:00:00Z'))).toBe('LATE')
+    }
+  })
+
   it('counts completion only against work already due', () => {
     const t = assignmentTotals(['SUBMITTED', 'LATE', 'OVERDUE', 'PENDING'])
     expect(t).toEqual({ total: 4, submitted: 1, late: 1, pending: 1, overdue: 1, completionRate: 66.7 })

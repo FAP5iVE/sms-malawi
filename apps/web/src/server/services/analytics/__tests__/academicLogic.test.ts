@@ -50,4 +50,12 @@ describe('academic logic', () => {
     expect(assignmentStats({ expected: 10, submitted: 10, late: 0, dueDate: new Date('2026-10-01') }, now).overdue).toBe(false)
     expect(assignmentStats({ expected: 0, submitted: 0, late: 0, dueDate: new Date('2026-10-20') }, now)).toEqual({ completionRate: null, overdue: false })
   })
+
+  it('is not "overdue" until the due day has ended in Malawi time', () => {
+    const due = new Date('2026-10-05T00:00:00Z') // a legacy row: the due day is 5 Oct
+    const a = { expected: 10, submitted: 4, late: 0, dueDate: due }
+    expect(assignmentStats(a, new Date('2026-10-05T10:00:00Z')).overdue).toBe(false) // 12:00 on the due day
+    expect(assignmentStats(a, new Date('2026-10-05T21:59:59Z')).overdue).toBe(false) // 23:59:59 Malawi time
+    expect(assignmentStats(a, new Date('2026-10-05T22:00:01Z')).overdue).toBe(true)  // just after midnight
+  })
 })

@@ -47,6 +47,11 @@
  *      Roles with neither (students) don't get the tab at all. If a viewer
  *      is somehow refused by the API, AttendanceSheet shows an inline
  *      "restricted" panel instead of crashing the page.
+ *   7. [2026-10-28 — Assignment workflow] The Assignments tab is the full
+ *      teacher <-> student loop, implemented in components/classes/assignments/
+ *      (AssignmentsTab and friends) - this page only mounts it. It opens straight to
+ *      an assignment from the notification deep link (?assignment=<id>, with or
+ *      without ?tab=), and its tab badge uses the shared "still to do" definition.
  * [DEPENDS ON]: apps/web/src/hooks/useClasses.ts, @shared/types/api,
  *   apps/web/src/components/classes/AssignmentForm.tsx,
  *   apps/web/src/components/classes/AttendanceSheet.tsx (rewritten in the
@@ -55,8 +60,8 @@
  */
 'use client'
 
-import { useState } from 'react'
-import { useParams } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useClass, useClassTimetable, useClassAssignments, useClassSubjectAssignments } from '@/hooks/useClasses'
 import { useAuthStore } from '@/store/authStore'
@@ -66,7 +71,8 @@ import type { ApiTimetableSlot } from '@shared/types/api'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
 import { AttendanceSheet } from '@/components/classes/AttendanceSheet'
-import AssignmentForm from '@/components/classes/AssignmentForm'
+import { AssignmentsTab, countOutstanding } from '@/components/classes/assignments/AssignmentsTab'
+import { ApiError } from '@/lib/api-client'
 import { SubjectTeachersPanel } from '@/components/classes/SubjectTeachersPanel'
 import { TimetableSlotForm } from '@/components/classes/TimetableSlotForm'
 import { DataTable } from '@/components/shared/DataTable'
@@ -92,7 +98,10 @@ export default function ClassDetailPage() {
     <RoleGuard
       allowed={['admin', 'high_rank', 'lower_rank', 'academic', 'exam_officer', 'student']}
     >
-      <ClassDetailContent />
+      {/* useSearchParams() (the notification deep link) requires a Suspense boundary. */}
+      <Suspense fallback={<div className="skeleton h-40 rounded-xl" aria-busy="true" />}>
+        <ClassDetailContent />
+      </Suspense>
     </RoleGuard>
   )
 }
@@ -121,13 +130,18 @@ function ClassDetailContent() {
   // second control for the same value and has been removed).
   const { term } = useEffectiveViewingPeriod()
   const { data: slots = [] } = useClassTimetable(id, term)
-  const [activeTab, setActiveTab] = useState<Tab>('roster')
-  const [showAssignmentForm, setShowAssignmentForm] = useState(false)
+  // Notification deep link: /classes/<id>?tab=assignments&assignment=<assignmentId>
+  const searchParams = useSearchParams()
+  const deepLinkedAssignment = searchParams.get('assignment')
+  const [activeTab, setActiveTab] = useState<Tab>(
+    searchParams.get('tab') === 'assignments' || deepLinkedAssignment ? 'assignments' : 'roster',
+  )
   const [showSlotForm, setShowSlotForm] = useState(false)
   // [2026-10-22] Assignments come from their own scoped endpoint, not from the
   // class payload: the server returns only what THIS viewer may see (students
   // and subject teachers: their subject; class teacher: the whole class).
-  const { data: assignmentsData, isError: assignmentsDenied } = useClassAssignments(id)
+  const { data: assignmentsData, error: assignmentsError, isLoading: assignmentsLoading, refetch: refetchAssignments } = useClassAssignments(id)
+  const assignmentsDenied = assignmentsError instanceof ApiError && assignmentsError.status === 403
   const assignments = assignmentsData ?? []
   const { data: subjectRows = [] } = useClassSubjectAssignments(id, role === 'student' ? undefined : cls?.academicYear)
   const isClassTeacher = !!cls?.teacherId && cls.teacherId === user?.uid
@@ -179,7 +193,14 @@ function ClassDetailContent() {
     // than offering a tab that can only dead-end.
     ...(canViewAttendance ? [{ id: 'attendance' as Tab, label: 'Attendance', icon: ClipboardCheck }] : []),
     { id: 'timetable', label: 'Timetable', icon: Clock },
-    { id: 'assignments', label: 'Assignments', icon: BookOpen, badge: assignments.length },
+    {
+      id: 'assignments',
+      label: 'Assignments',
+      icon: BookOpen,
+      // A student's badge counts work still to do and still on time (the shared
+      // "PENDING" definition); staff see the total.
+      badge: role === 'student' ? countOutstanding(assignments) : assignments.length,
+    },
     // Who teaches each subject. Students have no use for it.
     ...(role !== 'student' ? [{ id: 'subjects' as Tab, label: 'Subjects & teachers', icon: GraduationCap }] : []),
   ]
@@ -357,45 +378,17 @@ function ClassDetailContent() {
       )}
 
       {activeTab === 'assignments' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-heading font-semibold text-brand-navy">Assignments</h3>
-            {/* Only a teacher who owns at least one subject here (or the class
-                teacher) can create - admin/high_rank oversee but do not set work. */}
-            {assignableSubjects.length > 0 && (
-              <button
-                onClick={() => setShowAssignmentForm(true)}
-                className="flex items-center gap-2 bg-brand-teal text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-brand-teal-light transition-colors"
-              >
-                + New Assignment
-              </button>
-            )}
-          </div>
-
-          {assignmentsDenied ? (
-            <div className="text-center py-12 text-muted text-sm">
-              You don&apos;t have access to this class&apos;s assignments.
-            </div>
-          ) : assignments.length === 0 ? (
-            <div className="text-center py-12 text-muted text-sm">
-              {assignableSubjects.length > 0
-                ? 'No assignments yet. Click "New Assignment" to create one.'
-                : 'No assignments to show.'}
-            </div>
-          ) : (
-            // Flat rows divided by hairlines — no per-assignment card inside the panel.
-            <ul className="divide-y divide-base">
-              {assignments.map((a) => (
-                <li key={a.id} className="py-3">
-                  <p className="font-heading font-semibold text-body">{a.title}</p>
-                  <p className="text-sm text-muted mt-0.5">
-                    {a.subject} · Due: {new Date(a.dueDate).toLocaleDateString()}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <AssignmentsTab
+          classId={id}
+          role={role ?? ''}
+          assignments={assignments}
+          denied={assignmentsDenied}
+          loading={assignmentsLoading}
+          loadError={assignmentsError && !assignmentsDenied ? (assignmentsError instanceof Error ? assignmentsError.message : 'Could not load the assignments.') : null}
+          onRetry={() => void refetchAssignments()}
+          assignableSubjects={assignableSubjects}
+          initialOpenId={deepLinkedAssignment}
+        />
       )}
 
       {activeTab === 'subjects' && (
@@ -410,11 +403,7 @@ function ClassDetailContent() {
         </div>
       )}
 
-      </ModuleSurface>
-
-      {showAssignmentForm && (
-        <AssignmentForm classId={id} subjectOptions={assignableSubjects} onClose={() => setShowAssignmentForm(false)} />
-      )}
+        </ModuleSurface>
     </div>
   )
 }

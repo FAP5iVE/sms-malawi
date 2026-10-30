@@ -38,20 +38,58 @@
  *   also names a "GET /:id" route to harden — no such route exists
  *   anywhere in this codebase (only GET /, POST /, and now POST /:id/submit
  *   are defined here).
+ * [MAINT 2026-10-28 — Assignment workflow, merged & hardened]: the full set
+ *     GET    /                              list (scoped per viewer)
+ *     POST   /                              create  (subject teacher / class teacher)
+ *     POST   /attachments/image|file/upload-ticket   teacher pictures / documents
+ *     GET    /:id                           detail  (a pure read - no side effects)
+ *     POST   /:id/view                      a student opened it (atomic, debounced)
+ *     PATCH  /:id                           edit    (stale-edit check via expectedUpdatedAt)
+ *     DELETE /:id                           delete  (refused once real work exists)
+ *     GET    /:id/roster                    class list: opened / submitted / late / not submitted
+ *     PUT    /:id/submissions/:studentId    record one student (submitted-on required)
+ *     GET    /:id/submissions/:studentId/file   authorised URL for one hand-in file
+ *     POST   /:id/submit/upload-ticket      student hand-in upload credential
+ *     POST   /:id/submit                    student hand-in (file and/or note)
+ *   Every rule lives in assignmentService.ts; this file authenticates, validates
+ *   the ids and body, and delegates. The router is also mounted without a
+ *   :classId, so every id in the path is validated before any handler runs.
  * [DEPENDS ON]: apps/web/src/server/services/assignmentService.ts,
  *   apps/web/src/lib/storage.ts, @shared/schemas/student
- *   (CreateAssignmentSchema)
+ *   (CreateAssignmentSchema, UpdateAssignmentSchema, MarkSubmissionSchema)
  */
 import { Router, type Request, type Response, type NextFunction } from 'express'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { hasAnyPermission, type Permission } from '@shared/types/permissions'
 import { prisma } from '@/lib/prisma'
-import { CreateAssignmentSchema } from '@shared/schemas/student'
+import {
+  CreateAssignmentSchema,
+  UpdateAssignmentSchema,
+  MarkSubmissionSchema,
+  SubmitAssignmentSchema,
+  IdParamSchema,
+} from '@shared/schemas/student'
 import * as assignmentService from '@/server/services/assignmentService'
-import { createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
+import { createDirectUploadTicket, FILE_PREFIX, getSignedViewUrl } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
 
 export const assignmentsRouter = Router({ mergeParams: true })
+
+// Every id that reaches a handler is shape-checked first: a missing :classId (the
+// router is also mounted at /assignments) is a 404, a malformed id of any kind a
+// 400 - neither ever reaches a query.
+assignmentsRouter.use((req: Request, res: Response, next: NextFunction) => {
+  const { classId } = req.params as { classId?: string }
+  if (!classId) { res.status(404).json({ error: 'Not found.' }); return }
+  if (!IdParamSchema.safeParse(classId).success) { res.status(400).json({ error: 'Invalid class id.' }); return }
+  next()
+})
+for (const name of ['id', 'studentId'] as const) {
+  assignmentsRouter.param(name, (_req, res, next, value) => {
+    if (!IdParamSchema.safeParse(value).success) { res.status(400).json({ error: `Invalid ${name === 'id' ? 'assignment' : 'student'} id.` }); return }
+    next()
+  })
+}
 
 // Staff permissions that grant visibility into ANY class's assignments —
 // class.viewAnalytics (school-wide oversight: admin, high_rank,
@@ -151,10 +189,118 @@ assignmentsRouter.post(
   }
 )
 
-// POST /classes/:classId/assignments/:id/submit/upload-ticket — mints a
-// one-time Appwrite upload credential for this student's submission file.
-// Submissions are private (FILE_PREFIX.ASSIGNMENT_SUBMISSION is not one of
-// the public prefixes), so the file gets no public read permission.
+const viewerOf = (req: Request) => {
+  const u = req.user!
+  return { uid: u.uid, role: u.role, superUser: u.superUser === true }
+}
+
+// POST /classes/:classId/assignments/attachments/image/upload-ticket
+// POST /classes/:classId/assignments/attachments/file/upload-ticket
+// One-time upload credentials for a teacher's assignment pictures (public-read
+// prefix, so they show in <img> tags) and documents (private). Declared before
+// the /:id routes. Gate: a teacher who can post at least one subject here.
+for (const [kind, prefix] of [['image', FILE_PREFIX.ASSIGNMENT_IMAGE], ['file', FILE_PREFIX.ASSIGNMENT_FILE]] as const) {
+  assignmentsRouter.post(
+    `/attachments/${kind}/upload-ticket`,
+    verifyAuth,
+    requireRole(['academic']),
+    async (req: Request, res: Response) => {
+      try {
+        await assignmentService.assertCanPostInClass(String(req.params.classId), viewerOf(req))
+        res.json(await createDirectUploadTicket(prefix))
+      } catch (err: unknown) {
+        return sendError(res, err, { tags: { module: 'assignments', route: `attachment-${kind}-ticket` } })
+      }
+    },
+  )
+}
+
+// GET /classes/:classId/assignments/:id — full detail. A pure read: opening an
+// assignment is recorded by POST /:id/view, so refetches/retries/prefetches can
+// never change the data.
+assignmentsRouter.get('/:id', verifyAuth, async (req: Request, res: Response) => {
+  try {
+    return res.json(await assignmentService.getDetail(String(req.params.classId), String(req.params.id), viewerOf(req)))
+  } catch (err: unknown) {
+    return sendError(res, err, { tags: { module: 'assignments', route: 'detail' } })
+  }
+})
+
+// POST /classes/:classId/assignments/:id/view — the student opened the assignment.
+assignmentsRouter.post('/:id/view', verifyAuth, requireRole(['student']), async (req: Request, res: Response) => {
+  try {
+    return res.json(await assignmentService.recordView(String(req.params.classId), String(req.params.id), viewerOf(req)))
+  } catch (err: unknown) {
+    return sendError(res, err, { tags: { module: 'assignments', route: 'view' } })
+  }
+})
+
+// PATCH /classes/:classId/assignments/:id — subject teacher / class teacher only
+assignmentsRouter.patch('/:id', verifyAuth, requireRole(['academic']), async (req: Request, res: Response) => {
+  const parsed = UpdateAssignmentSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+  try {
+    return res.json(await assignmentService.updateAssignment(String(req.params.classId), String(req.params.id), parsed.data, viewerOf(req)))
+  } catch (err: unknown) {
+    return sendError(res, err, { tags: { module: 'assignments', route: 'update' } })
+  }
+})
+
+// DELETE /classes/:classId/assignments/:id — refused once real work exists
+assignmentsRouter.delete('/:id', verifyAuth, requireRole(['academic']), async (req: Request, res: Response) => {
+  try {
+    return res.json(await assignmentService.deleteAssignment(String(req.params.classId), String(req.params.id), viewerOf(req)))
+  } catch (err: unknown) {
+    return sendError(res, err, { tags: { module: 'assignments', route: 'delete' } })
+  }
+})
+
+// GET /classes/:classId/assignments/:id/roster — the class list with who has
+// opened it and who has handed in / is late / has not. Staff only (a student gets
+// 403 from the service); admin / high_rank / exam_officer see it read-only.
+assignmentsRouter.get('/:id/roster', verifyAuth, async (req: Request, res: Response) => {
+  try {
+    return res.json(await assignmentService.getRoster(String(req.params.classId), String(req.params.id), viewerOf(req)))
+  } catch (err: unknown) {
+    return sendError(res, err, { tags: { module: 'assignments', route: 'roster' } })
+  }
+})
+
+// PUT /classes/:classId/assignments/:id/submissions/:studentId — record one student.
+// Body: { status: SUBMITTED | LATE | MISSING, submittedOn (required unless MISSING),
+//         marks?, feedback?, expectedUpdatedAt? }. Only the subject teacher / class teacher.
+assignmentsRouter.put('/:id/submissions/:studentId', verifyAuth, requireRole(['academic']), async (req: Request, res: Response) => {
+  const parsed = MarkSubmissionSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+  try {
+    return res.json(
+      await assignmentService.markStudent(
+        String(req.params.classId), String(req.params.id), String(req.params.studentId), parsed.data, viewerOf(req),
+      ),
+    )
+  } catch (err: unknown) {
+    return sendError(res, err, { tags: { module: 'assignments', route: 'mark-student' } })
+  }
+})
+
+// GET /classes/:classId/assignments/:id/submissions/:studentId/file — the
+// authorised way to open one hand-in. The storage id is never in list payloads; it
+// is resolved here after the student-is-self / teacher-has-the-class check, and the
+// file proxy then authorises the download again.
+assignmentsRouter.get('/:id/submissions/:studentId/file', verifyAuth, async (req: Request, res: Response) => {
+  try {
+    const fileId = await assignmentService.getSubmissionFileId(
+      String(req.params.classId), String(req.params.id), String(req.params.studentId), viewerOf(req),
+    )
+    return res.json({ url: await getSignedViewUrl(fileId) })
+  } catch (err: unknown) {
+    return sendError(res, err, { tags: { module: 'assignments', route: 'submission-file' } })
+  }
+})
+
+// POST /classes/:classId/assignments/:id/submit/upload-ticket — mints a one-time
+// upload credential for this student's hand-in file. Hand-ins are private
+// (FILE_PREFIX.ASSIGNMENT_SUBMISSION is not a public prefix): no public read.
 assignmentsRouter.post(
   '/:id/submit/upload-ticket',
   verifyAuth,
@@ -164,61 +310,31 @@ assignmentsRouter.post(
       if (req.user!.role !== 'student') {
         return res.status(403).json({ error: 'Only enrolled students may submit assignments.' })
       }
-      const ticket = await createDirectUploadTicket(FILE_PREFIX.ASSIGNMENT_SUBMISSION)
-      res.json(ticket)
+      res.json(await createDirectUploadTicket(FILE_PREFIX.ASSIGNMENT_SUBMISSION))
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'assignments', route: 'submit-upload-ticket' } })
     }
   }
 )
 
-// POST /classes/:classId/assignments/:id/submit — records a submission the
-// browser has ALREADY uploaded directly to Appwrite via .../submit/
-// upload-ticket (if there is a file at all — a submission may be file-
-// less). Takes the resulting fileId (JSON body), not the file itself.
-// [PRODUCTION FIX] Was multer-based (25MB limit), going through this app's
-// own Vercel function for the raw file bytes — hitting the same two hard
-// limits as every other upload in this codebase (Vercel's 4.5MB
-// request-body cap, and no retry on a dropped connection mid-upload).
+// POST /classes/:classId/assignments/:id/submit — hand in work the browser has
+// ALREADY uploaded straight to storage (file and/or note). The student is derived
+// from the signed-in user inside the service - never from the request - and the
+// uploaded file is verified there (prefix, unclaimed, stored type/size/age).
 assignmentsRouter.post(
   '/:id/submit',
   verifyAuth,
   requireAssignmentViewAccess,
   async (req: Request, res: Response) => {
+    const body = SubmitAssignmentSchema.safeParse(req.body)
+    if (!body.success) {
+      return res.status(400).json({ error: body.error.issues[0]?.message ?? 'Invalid hand-in.' })
+    }
     try {
-      const user = req.user!
-      if (user.role !== 'student') {
-        return res.status(403).json({ error: 'Only enrolled students may submit assignments.' })
-      }
-
-      const assignmentId = String(req.params.id)
-
-      const student = await prisma.student.findFirst({
-        where:  { firebaseUid: user.uid },
-        select: { id: true },
-      })
-      if (!student) {
-        return res.status(404).json({ error: 'No student record is linked to this account.' })
-      }
-
-      let fileKey: string | null = null
-      const fileId = typeof req.body?.fileId === 'string' ? req.body.fileId : undefined
-      if (fileId) {
-        if (!fileId.startsWith(`${FILE_PREFIX.ASSIGNMENT_SUBMISSION}_`)) {
-          return res.status(400).json({ error: 'Invalid fileId — upload the file via .../submit/upload-ticket first.' })
-        }
-        fileKey = fileId
-      }
-
       const submission = await assignmentService.submitAssignment(
-        assignmentId,
-        student.id,
-        fileKey,
-        user.uid,
-        user.role,
-        String(req.params.classId),
+        String(req.params.classId), String(req.params.id), viewerOf(req), body.data,
       )
-      return res.status(201).json(submission)
+      return res.status(201).json({ id: submission.id, status: submission.status, submittedAt: submission.submittedAt })
     } catch (err: unknown) {
       return sendError(res, err, { tags: { module: 'assignments', route: 'submit' } })
     }

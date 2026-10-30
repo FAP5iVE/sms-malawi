@@ -47,9 +47,48 @@ const IMG_MARGIN_TOP_RE = [/^4px$/, /^12px$/]
 const IMG_MARGIN_SIDE_RE = [/^0$/, /^0px$/, /^16px$/, /^auto$/]
 const IMG_MAX_WIDTH_RE = [/^45%$/, /^100%$/]
 
-export function sanitizeRichText(html: string): string {
+/** Longest LaTeX source kept (characters). Matches the editor's maxLength. */
+export const MAX_MATH_LENGTH = 500
+
+/**
+ * @param opts.math - allow the formula node RichTextEditor emits when its math
+ *   option is on:  <span data-math="LATEX" data-display="inline|block">LATEX</span>.
+ *   ONLY the LaTeX source is stored (never rendered markup); the browser draws it
+ *   with KaTeX (trust off, macro-expansion capped). Here the source is capped at
+ *   MAX_MATH_LENGTH - a longer one is NOT truncated (that would silently change
+ *   the maths) but stripped to its plain-text content, which stays readable - and
+ *   data-display is forced to "inline" or "block". Off by default so News /
+ *   announcement bodies keep their original, narrower allowlist.
+ */
+export function sanitizeRichText(
+  html: string,
+  opts: {
+    math?: boolean
+    /** When set, <img> tags whose src does not start with this prefix are dropped
+     *  (assignments only allow pictures hosted in the school's own storage). */
+    imageSrcPrefix?: string
+  } = {},
+): string {
   return sanitizeHtml(html, {
     allowedTags: ALLOWED_TAGS,
+    exclusiveFilter: opts.imageSrcPrefix
+      ? (frame) => frame.tag === 'img' && !(frame.attribs.src ?? '').startsWith(opts.imageSrcPrefix!)
+      : undefined,
+    transformTags: opts.math
+      ? {
+          span: (tagName, attribs) => {
+            const next = { ...attribs }
+            const latex = next['data-math']
+            if (typeof latex !== 'string' || latex.trim() === '' || latex.length > MAX_MATH_LENGTH) {
+              delete next['data-math']
+              delete next['data-display']
+            } else {
+              next['data-display'] = next['data-display'] === 'block' ? 'block' : 'inline'
+            }
+            return { tagName, attribs: next }
+          },
+        }
+      : undefined,
     allowedAttributes: {
       // Tiptap's TextAlign extension writes `style="text-align: ..."` on
       // block elements — allow only that one property, only those four
@@ -63,7 +102,7 @@ export function sanitizeRichText(html: string): string {
       img: ['src', 'alt', 'data-align', 'style'],
       // Tiptap's Color extension (via TextStyle) wraps colored text in
       // <span style="color: ...">. No other use of <span> is emitted.
-      span: ['style'],
+      span: opts.math ? ['style', 'data-math', 'data-display'] : ['style'],
     },
     allowedSchemes: ['http', 'https', 'mailto'],
     allowedSchemesByTag: {

@@ -116,6 +116,52 @@ export async function pushToFeed(uid: string, item: FeedItemInput): Promise<void
 }
 
 /**
+ * IDEMPOTENT fan-out. Writes one feed item per uid under a DETERMINISTIC document
+ * id derived from `dedupeKey` (e.g. "assignment_<id>_posted"). Re-running with the
+ * same key - a retried request, a double click, a re-processed job - cannot create
+ * a second item for anyone. Returns the uids whose item was CREATED by this call;
+ * callers send the device push only to those, so a retry never double-notifies.
+ *
+ * Items are created one by one (Firestore's batch.create() would abort the whole
+ * batch if a single document already exists). A failure for one uid is logged and
+ * that uid is simply not in the returned list.
+ */
+export async function pushToManyFeedsOnce(
+  uids: string[],
+  item: FeedItemInput,
+  dedupeKey: string,
+): Promise<string[]> {
+  const unique = Array.from(new Set(uids.filter(Boolean)))
+  if (unique.length === 0) return []
+  const docId = dedupeKey.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 200)
+  const created: string[] = []
+  const CONCURRENCY = 25
+  for (let i = 0; i < unique.length; i += CONCURRENCY) {
+    const slice = unique.slice(i, i + CONCURRENCY)
+    await Promise.all(slice.map(async (uid) => {
+      try {
+        await itemsCollection(uid).doc(docId).create({
+          title: item.title,
+          body: item.body,
+          type: item.type ?? 'INFO',
+          category: item.category,
+          read: false,
+          actionUrl: item.actionUrl ?? null,
+          createdAt: Timestamp.now(),
+          readAt: null,
+        })
+        created.push(uid)
+      } catch (err) {
+        const code = (err as { code?: number | string }).code
+        if (code === 6 || code === 'already-exists') return // already delivered on an earlier attempt
+        logger.error({ err, uid, category: item.category }, '[notificationFeed] pushToManyFeedsOnce failed')
+      }
+    }))
+  }
+  return created
+}
+
+/**
  * Fan a single item out to many users. Uses a batched write (chunked to stay
  * within Firestore's 500-op batch limit). Best-effort per the same rationale.
  */

@@ -1,16 +1,21 @@
 /** Pure student-report helpers (no database access, unit-tested). */
 import type { StudentAssignmentStatus } from '@shared/types/reporting-student'
 import { ratioPct, round } from '@/server/services/reporting/kpi'
+import { deadlineFor } from '@shared/utils/assignment'
 
 export function assignmentStatus(
   submission: { status: string; submittedAt: Date } | null,
   dueDate: Date,
   now: Date,
 ): StudentAssignmentStatus {
+  // ONE deadline rule for the whole product (shared/utils/assignment.ts): the end of
+  // the due day in Malawi time. (This used to compare against the end of the UTC day
+  // and `dueDate < now`, which called a legacy row OVERDUE two hours into its due day.)
+  const deadline = deadlineFor(dueDate).getTime()
   if (submission && submission.status !== 'MISSING') {
-    return submission.status === 'LATE' || submission.submittedAt.getTime() > dueDate.getTime() + 86_399_999 ? 'LATE' : 'SUBMITTED'
+    return submission.status === 'LATE' || submission.submittedAt.getTime() > deadline ? 'LATE' : 'SUBMITTED'
   }
-  return dueDate.getTime() < now.getTime() ? 'OVERDUE' : 'PENDING'
+  return deadline < now.getTime() ? 'OVERDUE' : 'PENDING'
 }
 
 export function assignmentTotals(statuses: readonly StudentAssignmentStatus[]) {

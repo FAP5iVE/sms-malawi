@@ -187,17 +187,96 @@ export const SetClassSubjectPresetsSchema = z.object({
 })
 
 // ─── ASSIGNMENT ──────────────────────────────────────────
-export const CreateAssignmentSchema = z.object({
-  title: z.string().min(3, 'Title is required').max(200),
-  description: z.string().optional(),
-  subject: z.string().min(1, 'Subject is required'),
-  dueDate: z.string().min(1, 'Due date is required'),
+// [2026-10-28 Assignment workflow - merged & hardened]
+// `description` is the task CONTENT and `requirements` what the student must hand
+// in - rich-text HTML that the server re-sanitises on save AND on read. Marks are
+// an optional per-assignment choice, are session marks only, and NEVER feed exams
+// or continuous assessment.
+//
+// SIZE: the API parses JSON with express.json({ limit: '50kb' }) (lib/api-app.ts).
+// The two rich-text fields are therefore capped in UTF-8 BYTES (not characters -
+// Chichewa, accents and formulas are multi-byte) so that a form the schema accepts
+// can never be rejected by the body parser with an unfriendly 413.
+import {
+  ASSIGNMENT_LIMITS, isValidYmd, richTextHasContent, utf8Length,
+} from '@shared/utils/assignment'
+
+const ID_PARAM = /^[A-Za-z0-9_-]{1,64}$/
+/** Route params that carry record / file ids. Reject anything else before it reaches a query. */
+export const IdParamSchema = z.string().regex(ID_PARAM, 'Invalid id')
+
+// Plain text typed by a person (title, note, feedback): no control characters.
+// (React escapes it on output; this is hygiene, not the XSS defence.)
+const NO_CONTROL = /^[^\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]*$/
+const plain = (max: number) => z.string().trim().max(max).regex(NO_CONTROL, 'Contains invalid characters')
+
+const YmdSchema = z.string().refine(isValidYmd, 'Enter a valid date')
+
+// A file the teacher attached. Only the storage id is accepted: name, type and
+// size are read from the stored object by the server (never trusted from here).
+export const AssignmentAttachmentInputSchema = z.object({
+  fileKey: z.string().regex(ID_PARAM, 'Invalid attachment'),
 })
 
-// The file itself arrives as multipart form data (multer), not JSON — this
-// schema validates only the metadata fields sent alongside the file.
+const AssignmentBaseSchema = z.object({
+  title: plain(200).min(3, 'Title is required'),
+  subject: z.string().trim().min(1, 'Subject is required').max(100),
+  dueDate: YmdSchema,
+  description: z.string()
+    .refine((v) => utf8Length(v) <= ASSIGNMENT_LIMITS.maxContentBytes, 'The content is too long - split it into two assignments')
+    .refine(richTextHasContent, 'Write the assignment content'),
+  requirements: z.string()
+    .refine((v) => utf8Length(v) <= ASSIGNMENT_LIMITS.maxRequirementsBytes, 'The requirements are too long')
+    .optional(),
+  marksEnabled: z.boolean().default(false),
+  maxMarks: z.number().int('Total marks must be a whole number').min(1, 'Total marks must be at least 1').max(1000).nullable().optional(),
+  attachments: z.array(AssignmentAttachmentInputSchema)
+    .max(ASSIGNMENT_LIMITS.maxAttachments, `At most ${ASSIGNMENT_LIMITS.maxAttachments} attachments`)
+    .default([]),
+})
+
+const requireMaxMarks = (v: { marksEnabled?: boolean; maxMarks?: number | null }, ctx: z.RefinementCtx) => {
+  if (v.marksEnabled && !v.maxMarks) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['maxMarks'], message: 'Enter the total marks' })
+  }
+}
+
+export const CreateAssignmentSchema = AssignmentBaseSchema.superRefine(requireMaxMarks)
+
+// PATCH: every field optional; `attachments`, when sent, is the FULL desired list.
+// `expectedUpdatedAt` (the updatedAt the editor loaded) makes the edit fail with
+// 409 instead of silently overwriting a newer change by another teacher.
+export const UpdateAssignmentSchema = AssignmentBaseSchema
+  .omit({ subject: true })
+  .partial()
+  .extend({ expectedUpdatedAt: z.string().datetime().optional() })
+  .superRefine(requireMaxMarks)
+
+// Student hand-in. The file (if any) was uploaded straight to storage first via
+// .../submit/upload-ticket; this carries its id plus an optional note.
 export const SubmitAssignmentSchema = z.object({
-  note: z.string().optional(),
+  fileId: z.string().regex(ID_PARAM, 'Invalid file').optional(),
+  note: plain(2000).optional(),
+}).refine((v) => !!v.fileId || !!v.note, { message: 'Attach a file or write a note to hand in', path: ['note'] })
+
+// Teacher records one student. The teacher chooses Submitted / Late submission /
+// Not submitted; the server checks the choice against the authoritative lateness
+// rule (shared/utils/assignment.ts) so a record can never contradict its own date.
+export const MarkSubmissionSchema = z.object({
+  status: z.enum(['SUBMITTED', 'LATE', 'MISSING']),
+  submittedOn: YmdSchema.optional(),
+  marks: z.number().finite('Enter a valid mark').min(0, 'Marks cannot be negative').nullable().optional(),
+  feedback: plain(2000).optional(),
+  // The version the teacher's dialog loaded: an ISO timestamp, or null meaning
+  // "there was no record yet". A mismatch is a 409, never a silent overwrite.
+  expectedUpdatedAt: z.string().datetime().nullable().optional(),
+}).superRefine((v, ctx) => {
+  if (v.status !== 'MISSING' && !v.submittedOn) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['submittedOn'], message: 'Enter the date the work was submitted' })
+  }
+  if (v.status === 'MISSING' && v.marks != null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['marks'], message: 'Marks can only be given to submitted work' })
+  }
 })
 
 // ─── ATTENDANCE ──────────────────────────────────────────
@@ -222,6 +301,9 @@ export type CreateTimetableSlotInput = z.infer<typeof CreateTimetableSlotSchema>
 export type CreateSubjectAssignmentInput = z.infer<typeof CreateSubjectAssignmentSchema>
 export type SetClassSubjectPresetsInput = z.infer<typeof SetClassSubjectPresetsSchema>
 export type CreateAssignmentInput = z.infer<typeof CreateAssignmentSchema>
+export type UpdateAssignmentInput = z.infer<typeof UpdateAssignmentSchema>
+export type AssignmentAttachmentInput = z.infer<typeof AssignmentAttachmentInputSchema>
 export type SubmitAssignmentInput = z.infer<typeof SubmitAssignmentSchema>
+export type MarkSubmissionInput = z.infer<typeof MarkSubmissionSchema>
 export type MarkAttendanceInput = z.infer<typeof MarkAttendanceSchema>
 export type AttendanceEntryInput = z.infer<typeof AttendanceEntrySchema>

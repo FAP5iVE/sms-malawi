@@ -1088,3 +1088,28 @@
     padding: 0 !important;
   }
 }
+
+
+/* ── Formulas in assignment text (KaTeX) ─────────────────────────────────────
+   A long formula must scroll inside its own box, never widen the page - this
+   matters most on narrow Android screens. Applies to the editor and to the
+   read-only renderer alike (both emit <span data-math data-display>). */
+span[data-math] {
+  max-width: 100%;
+}
+span[data-math][data-display="block"] {
+  display: block;
+  margin: 0.5rem 0;
+  text-align: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+span[data-math]:not([data-display="block"]) {
+  display: inline-block;
+  vertical-align: middle;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+span[data-math] .katex-display {
+  margin: 0;
+}

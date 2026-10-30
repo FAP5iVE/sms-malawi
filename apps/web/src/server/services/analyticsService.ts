@@ -1300,7 +1300,8 @@ export async function getAcademicAssignmentCompletion(
       title: true,
       subject: true,
       dueDate: true,
-      _count: { select: { submissions: true } },
+      // [2026-10-27] Only real hand-ins count: a teacher's explicit "not submitted" marker is a MISSING row.
+      _count: { select: { submissions: { where: { status: { not: 'MISSING' } } } } },
     },
     orderBy: { dueDate: 'desc' },
     take: 30,

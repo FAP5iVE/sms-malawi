@@ -107,17 +107,75 @@ enum ClassStatus {
 model Assignment {
   id          String    @id @default(cuid())
   title       String
+  // [2026-10-27 Assignment workflow] `description` now holds the task CONTENT
+  // as sanitised rich-text HTML (formatting, images, math formulae); older rows
+  // hold plain text, which renders fine as a single paragraph.
   description String?
+  requirements String?                    // rich-text HTML: what the student must hand in / how it is judged
   subject     String
   classId     String
   class       Class     @relation(fields: [classId], references: [id])
+  // Stored as the END of the due day in school time (Africa/Blantyre, UTC+2).
+  // Legacy rows hold midnight UTC of the due day; deadlineFor() in
+  // packages/shared/utils/assignment.ts treats both as "due at the end of that
+  // calendar day" (no historical row is rewritten).
   dueDate     DateTime
   createdByUid String                     // teacher Firebase UID
+  // Optional, per-assignment choice. Session marks only - they are NEVER fed
+  // into exam results or continuous assessment; they exist so the teacher can
+  // see whether students are keeping up with the session.
+  marksEnabled Boolean   @default(false)
+  maxMarks     Int?
   submissions AssignmentSubmission[]
+  attachments AssignmentAttachment[]
+  views       AssignmentView[]
   createdAt   DateTime  @default(now())
+  // Also the edit "version": PATCH may send the updatedAt it loaded and gets a 409
+  // instead of silently overwriting a newer change.
+  updatedAt   DateTime  @default(now()) @updatedAt
 
   @@index([classId])
+  @@index([classId, dueDate])   // class listing ordered by deadline
   @@map("assignments")
+}
+
+// Files and pictures the teacher attaches to an assignment. kind = 'IMAGE'
+// (public-read prefix, shown as a thumbnail) or 'FILE' (private, downloaded
+// through the authenticated /api/files proxy).
+model AssignmentAttachment {
+  id           String     @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  // A storage object belongs to AT MOST ONE attachment: a client can never claim a
+  // file another record already uses (and removing one record can never delete a
+  // file that another still references).
+  fileKey      String     @unique
+  fileName     String     // from the STORED object's metadata, never from the client
+  mimeType     String     // idem
+  sizeBytes    Int        @default(0)   // idem
+  kind         String     @default("FILE")   // derived from the key prefix: IMAGE | FILE
+  uploadedByUid String?   // the teacher who attached it (ownership / audit)
+  createdAt    DateTime   @default(now())
+
+  @@index([assignmentId])
+  @@map("assignment_attachments")
+}
+
+// One row per (assignment, student): when the student first/last opened it.
+// Written when a student opens the assignment; read by the teacher's progress
+// view ("who has seen it").
+model AssignmentView {
+  id            String     @id @default(cuid())
+  assignmentId  String
+  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId     String
+  firstViewedAt DateTime   @default(now())
+  lastViewedAt  DateTime   @default(now())
+  viewCount     Int        @default(1)
+
+  @@unique([assignmentId, studentId])
+  @@index([assignmentId])
+  @@map("assignment_views")
 }
 
 model AssignmentSubmission {
@@ -125,11 +183,25 @@ model AssignmentSubmission {
   assignmentId String
   assignment   Assignment @relation(fields: [assignmentId], references: [id])
   studentId    String
-  fileKey      String?   // Appwrite object key for uploaded file (single-bucket, FILE_PREFIX.ASSIGNMENT_SUBMISSION-namespaced — see lib/storage.ts)
+  fileKey      String?   @unique   // Appwrite object key for uploaded file (single-bucket, FILE_PREFIX.ASSIGNMENT_SUBMISSION-namespaced — see lib/storage.ts). Unique: one stored file backs at most one hand-in (NULLs are distinct, so note-only/MISSING rows are unaffected).
+  fileName     String?   // from the stored object's metadata, for display
+  note         String?   // optional message from the student
+  // For SUBMITTED / LATE: when the work came in (a student's own submission =
+  // the moment they sent it; a teacher-recorded one = the "submitted on" date
+  // the teacher entered). For MISSING (explicitly marked not submitted) the
+  // value is just the time the row was written and must be ignored.
   submittedAt  DateTime  @default(now())
   status       SubmissionStatus @default(SUBMITTED)
+  recordedByUid String?  // set when a TEACHER recorded the submission on the student's behalf
+  marks        Float?    // session marks - only when Assignment.marksEnabled
+  feedback     String?
+  markedAt     DateTime?
+  markedByUid  String?
+  // Edit "version" for the teacher's marking dialog (409 on a stale save).
+  updatedAt    DateTime  @default(now()) @updatedAt
 
   @@unique([assignmentId, studentId])
+  @@index([studentId])
   @@map("assignment_submissions")
 }
 
@@ -798,12 +870,11 @@ model LibraryFine {
   studentId       String?         // R12: made optional — a staff borrower's fine has no studentId (see staffId below)
   staffId         String?         // R12: NEW — plain, non-relational, mirroring studentId's existing established convention on this model (this model has never used a real Prisma @relation for the borrower, per finances.ts's own documented reasoning); populated when the underlying Borrowing is a STAFF loan
   bookTitle       String
-  borrowingId     String?                            // R12: NEW — formalizes the borrowingId-shaped FK concept libraryWorkflowService.ts's fine-waiver workflow already assumed existed. No longer @unique: one return can now carry a LATE fine AND a DAMAGED/LOST fine (see `kind`).
+  borrowingId     String?         @unique            // R12: NEW — formalizes the borrowingId-shaped FK concept libraryWorkflowService.ts's fine-waiver workflow already assumed existed
   borrowing       Borrowing?      @relation(fields: [borrowingId], references: [id])
   firestoreDocId  String?         @unique            // R10: Firestore is no longer part of this workflow (Prisma is the sole system of record) — kept optional, not dropped, pending R11's explicit confirmation of whether the library domain still needs it for anything else
   amount          Decimal         @db.Decimal(10, 2)
   reason          String
-  kind            FineKind        @default(OTHER)   // why it was raised — LATE (overdue days), DAMAGED, LOST, or OTHER (manual "Assess Fine")
   status          FineStatus      @default(PENDING)
   markedByUid     String          // librarian who raised the fine
   paidAt          DateTime?
@@ -816,7 +887,6 @@ model LibraryFine {
   @@index([studentId])
   @@index([staffId])
   @@index([status])
-  @@index([borrowingId])
   @@map("library_fines")
 }
 
@@ -825,13 +895,6 @@ enum FineStatus {
   PAID 
   WAIVED 
   }
-
-enum FineKind {
-  LATE
-  DAMAGED
-  LOST
-  OTHER
-}
 
   // ─── ACCOUNTING LEDGER (Phase D6) ────────────────────────
 
@@ -1361,7 +1424,7 @@ model Borrowing {
   student      Student?     @relation(fields: [studentId], references: [id], onDelete: Cascade)
   staffId      String?
   staff        StaffProfile? @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  libraryFines LibraryFine[]  // reciprocal side of LibraryFine.borrowingId — a return can carry a LATE fine and a DAMAGED/LOST fine
+  libraryFine  LibraryFine?   // R12: reciprocal side of LibraryFine.borrowingId — at most one fine per borrowing
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 

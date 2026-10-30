@@ -77,6 +77,17 @@ export const FILE_PREFIX = {
   LOAN_DOCUMENT:    'loan_doc',
   APPLICATION_DOC:  'application_doc',
   ASSIGNMENT_SUBMISSION: 'assignment_submission',
+  // [2026-10-27 Assignment workflow] Teacher-side assignment material.
+  //   ASSIGNMENT_FILE  - attached documents (private; class members only, via
+  //                      the /api/files proxy + assignmentService.canAccessAssignmentFile).
+  //   ASSIGNMENT_IMAGE - pictures attached to / embedded in an assignment. These
+  //                      must load in an <img> tag (no Authorization header), so
+  //                      they sit in PUBLIC_FILE_PREFIXES like announcement
+  //                      images: readable by anyone holding the unguessable
+  //                      file URL, listed nowhere. Keep exam papers out of
+  //                      pictures if that matters - attach them as files.
+  ASSIGNMENT_FILE:  'assignment_file',
+  ASSIGNMENT_IMAGE: 'assignment_image',
   FINANCIAL_REPORT: 'financial_report',
   DIGITAL_RESOURCE: 'digital_resource',
   // [PRODUCTION FIX 2026-07-28] Public landing-page assets — served via
@@ -122,6 +133,10 @@ const READ_ROLES: Record<FilePrefix, string[]> = {
   loan_doc:         ['admin', 'hr', 'finance'],
   application_doc:  ['admin', 'high_rank', 'lower_rank'],
   assignment_submission: ['admin', 'high_rank', 'academic', '__self'],
+  // Role gate only - the route ALSO verifies class membership / teaching
+  // relationship (assignmentService.canAccessAssignmentFile).
+  assignment_file:  ['admin', 'high_rank', 'academic', 'exam_officer', 'student'],
+  assignment_image: ['admin', 'high_rank', 'finance', 'library', 'lower_rank', 'academic', 'hr', 'exam_officer', 'student'],
   financial_report: ['admin', 'finance', 'high_rank'],
   digital_resource: ['admin', 'high_rank', 'finance', 'library', 'academic', 'hr', 'exam_officer', 'student'],
   // Public assets — every internal role may view them too (used by any
@@ -265,6 +280,8 @@ const PUBLIC_FILE_PREFIXES: readonly FilePrefix[] = [
   // unauthenticated landing-page visitors — same reasoning as
   // LEADERSHIP_PHOTO/SCHOOL_GALLERY above.
   FILE_PREFIX.DISCOVER_PHOTO,
+  // Assignment pictures render inside rich-text <img> tags - see FILE_PREFIX.ASSIGNMENT_IMAGE.
+  FILE_PREFIX.ASSIGNMENT_IMAGE,
 ]
 
 export interface DirectUploadTicket {
