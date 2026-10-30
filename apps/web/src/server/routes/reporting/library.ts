@@ -30,7 +30,7 @@ libraryReportingRouter.get('/fines', ...gate, async (req, res) => {
 })
 
 const DIGITAL_TYPES = ['EBOOK', 'PAST_PAPER', 'REFERENCE', 'STUDY_GUIDE'] as const
-const DIGITAL_STATUSES = ['approved', 'pending'] as const
+const DIGITAL_STATUSES = ['approved', 'pending', 'rejected'] as const
 const BOOK_CATEGORIES = ['TEXTBOOK', 'REFERENCE', 'FICTION', 'NONFICTION', 'SCIENCE', 'MATHEMATICS', 'HUMANITIES', 'PAST_PAPER', 'OTHER'] as const
 const MAX_DAYS = 730
 
@@ -58,7 +58,7 @@ libraryReportingRouter.get('/digital', ...gate, async (req, res) => {
     ...(type ? { type } : {}),
     ...(subject ? { subject } : {}),
     ...(form !== undefined ? { form } : {}),
-    ...(status ? { status: status as 'approved' | 'pending' } : {}),
+    ...(status ? { status: status as 'approved' | 'pending' | 'rejected' } : {}),
   }))
 })
 

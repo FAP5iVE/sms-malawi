@@ -50,6 +50,7 @@ export interface ApiDigitalGroupRow {
   resources: number
   approved: number
   pending: number
+  rejected: number
   /** Recorded views in the window. */
   views: number
   /** Resources in the group viewed at least once in the window. */
@@ -89,10 +90,10 @@ export interface ApiLibraryDigital {
   generatedAt: string
   from: string
   to: string
-  filters: { type: string | null; subject: string | null; form: number | null; status: 'approved' | 'pending' | null }
+  filters: { type: string | null; subject: string | null; form: number | null; status: 'approved' | 'pending' | 'rejected' | null }
   /** Earliest recorded view event ever; null if none. Views before this date were never recorded. */
   trackingSince: string | null
-  catalogue: { total: number; approved: number; pending: number; oldestPendingDays: number | null }
+  catalogue: { total: number; approved: number; pending: number; rejected: number; oldestPendingDays: number | null }
   usage: {
     views: number
     uniqueViewers: number
@@ -161,6 +162,18 @@ export interface ApiLibraryStock {
     loansLost: number
     /** Loans returned damaged within the window. */
     returnedDamaged: number
+  }
+  /**
+   * Renewals, from the count stored on each loan. Only the latest renewal date is kept per loan, so a loan counts
+   * once in the window it was last renewed in. Renewals made before the count was stored were never recorded.
+   */
+  renewals: {
+    /** Loans whose latest renewal falls in the window. */
+    loansRenewed: number
+    /** Renewals recorded in total on those loans (a loan renewed twice adds two). */
+    renewalCount: number
+    /** Earliest renewal date recorded; null if no renewal has been recorded yet. */
+    trackingSince: string | null
   }
   notRecorded: ApiNotRecorded[]
 }

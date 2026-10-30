@@ -1429,6 +1429,8 @@ model Borrowing {
   fineAmount   Decimal?       @db.Decimal(8,2)
   fineId       String?        // links to LibraryFine if created
   notes        String?
+  renewalCount Int            @default(0)  // times this loan has been renewed; renewals made before this column existed were only logged, never stored
+  lastRenewedAt DateTime?                  // when the loan was last renewed; null = never renewed (or renewed before this column existed)
   studentId    String?
   student      Student?     @relation(fields: [studentId], references: [id], onDelete: Cascade)
   staffId      String?
@@ -1441,6 +1443,7 @@ model Borrowing {
   @@index([staffId])
   @@index([status])
   @@index([dueDate])
+  @@index([lastRenewedAt])
   @@map("borrowings")
 }
 
@@ -1476,6 +1479,11 @@ model DigitalResource {
   approved     Boolean          @default(false)
   approvedByUid String?
   approvedAt   DateTime?
+  // A resource is APPROVED when `approved`, REJECTED when it is not approved and `rejectedAt` is set,
+  // and otherwise awaiting approval. `approved` stays a plain flag so every existing read of it still works.
+  rejectedAt   DateTime?
+  rejectedByUid String?
+  rejectionReason String?
   createdAt    DateTime         @default(now())
   views         DigitalResourceView[]
 

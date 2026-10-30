@@ -569,12 +569,14 @@ export async function renewBorrowing(borrowingId: string, actorUid: string, days
   if (borrowing.status === 'RETURNED' || borrowing.status === 'LOST') {
     throw new Error('This loan has already been closed out and cannot be renewed.')
   }
-  const newDueDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+  const now = new Date()
+  const newDueDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
+  // The count and date are stored on the loan so reports can state how often loans are renewed.
   const updated = await prisma.borrowing.update({
     where: { id: borrowingId },
-    data: { dueDate: newDueDate, status: 'ACTIVE' },
+    data: { dueDate: newDueDate, status: 'ACTIVE', renewalCount: { increment: 1 }, lastRenewedAt: now },
   })
-  logger.info({ event: 'book.renewed', borrowingId, newDueDate, actorUid })
+  logger.info({ event: 'book.renewed', borrowingId, newDueDate, actorUid, renewalCount: updated.renewalCount })
   return updated
 }
 
@@ -734,10 +736,33 @@ export async function recordDigitalResource(
 }
 
 export async function approveDigitalResource(resourceId: string, actorUid: string) {
+  const resource = await prisma.digitalResource.findUniqueOrThrow({ where: { id: resourceId } })
+  if (resource.approved) return resource // already approved: nothing to change, and the approval date stays as first recorded
+  if (resource.rejectedAt) {
+    throw Object.assign(new Error('This resource was rejected. Ask for a corrected copy to be uploaded instead.'), { status: 409 })
+  }
   return prisma.digitalResource.update({
     where: { id: resourceId },
     data: { approved: true, approvedByUid: actorUid, approvedAt: new Date() },
   })
+}
+
+/**
+ * Turns down an uploaded resource. The row is kept (not deleted) with who rejected it, when and why, so the
+ * uploader can be told and the reports can count rejections. A rejected resource stays hidden from students.
+ */
+export async function rejectDigitalResource(resourceId: string, actorUid: string, reason: string) {
+  const trimmed = reason.trim()
+  if (!trimmed) throw Object.assign(new Error('Give a reason for rejecting this resource.'), { status: 400 })
+  const resource = await prisma.digitalResource.findUniqueOrThrow({ where: { id: resourceId } })
+  if (resource.approved) throw Object.assign(new Error('This resource is already approved, so it cannot be rejected.'), { status: 409 })
+  if (resource.rejectedAt) throw Object.assign(new Error('This resource has already been rejected.'), { status: 409 })
+  const updated = await prisma.digitalResource.update({
+    where: { id: resourceId },
+    data: { rejectedAt: new Date(), rejectedByUid: actorUid, rejectionReason: trimmed },
+  })
+  logger.info({ event: 'digital_resource.rejected', resourceId, actorUid })
+  return updated
 }
 
 export async function getDigitalResourceViewUrl(resourceId: string, actorRole: string, viewerUid?: string): Promise<string> {

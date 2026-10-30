@@ -80,9 +80,11 @@ describe('gates mirror each module’s own route guard', () => {
     expect(m.return).toBeDefined()
   })
 
-  it('digital resources can only be approved (nothing in the system can reject them)', () => {
+  it('digital resources can be approved or rejected (with a reason), but not returned', () => {
     const m = APPROVAL_SOURCE_META.digital_resource
-    expect(m.reject).toBeUndefined()
+    // Rejecting uses the same permission as approving, so the two can never drift apart.
+    expect(m.reject).toEqual(m.approve)
+    expect(m.reasonRequired).toBe(true)
     expect(m.return).toBeUndefined()
   })
 

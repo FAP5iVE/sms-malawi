@@ -14,13 +14,14 @@ const NOW = new Date('2026-03-31T12:00:00Z')
 const ago = (d: number) => new Date(NOW.getTime() - d * 86_400_000)
 
 const r = (id: string, over: Record<string, unknown> = {}) => ({
-  id, title: `Res ${id}`, type: 'EBOOK', subject: 'Biology', form: 2, approved: true, createdAt: ago(100), approvedAt: ago(90), ...over,
+  id, title: `Res ${id}`, type: 'EBOOK', subject: 'Biology', form: 2, approved: true, createdAt: ago(100), approvedAt: ago(90), rejectedAt: null, ...over,
 })
 const resources = [
   r('r1'),
   r('r2', { type: 'PAST_PAPER', subject: 'Maths', form: 4 }),
   r('r3', { type: 'PAST_PAPER', subject: null, form: null }),
   r('r4', { approved: false, approvedAt: null, createdAt: ago(20) }),
+  r('r5', { approved: false, approvedAt: null, createdAt: ago(15), rejectedAt: ago(10), type: 'STUDY_GUIDE', subject: 'Chemistry', form: 3 }),
 ]
 const byId = new Map(resources.map((x) => [x.id, x]))
 const view = (id: string, resourceId: string, viewerUid: string, d: number) => ({ id, resourceId, viewerUid, viewedAt: ago(d), resource: byId.get(resourceId) })
@@ -33,11 +34,11 @@ const book = (id: string, category: string, total: number, available: number) =>
 const books = [book('b1', 'TEXTBOOK', 10, 4), book('b2', 'FICTION', 3, 0), book('b3', 'REFERENCE', 2, 1)]
 const bookOf = (id: string) => books.find((b) => b.id === id)
 const loan = (id: string, bookId: string, dueDate: Date, over: Record<string, unknown> = {}) => ({
-  id, bookId, dueDate, returnedAt: null, status: 'ACTIVE', condition: 'GOOD', book: bookOf(bookId), ...over,
+  id, bookId, dueDate, returnedAt: null, status: 'ACTIVE', condition: 'GOOD', book: bookOf(bookId), renewalCount: 0, lastRenewedAt: null, ...over,
 })
 const borrowings = [
-  ...Array.from({ length: 5 }, (_, i) => loan(`l${i}`, 'b1', ago(-10))),
-  loan('l5', 'b2', ago(30)), loan('l6', 'b2', ago(-10)),
+  ...Array.from({ length: 5 }, (_, i) => loan(`l${i}`, 'b1', ago(-10), i === 0 ? { renewalCount: 2, lastRenewedAt: ago(5) } : {})),
+  loan('l5', 'b2', ago(30), { renewalCount: 3, lastRenewedAt: ago(100) }), loan('l6', 'b2', ago(-10), { renewalCount: 1, lastRenewedAt: ago(3) }),
   loan('l7', 'b3', ago(40), { returnedAt: ago(35), condition: 'DAMAGED' }),
   loan('l8', 'b1', ago(200), { status: 'LOST' }),
 ]
@@ -68,7 +69,7 @@ const { recordDigitalResourceView } = await import ('../../digitalViewRecorder')
 describe('digital library report', () => {
   it('reports the catalogue and usage separately, from recorded views only', async () => {
     const d = await getLibraryDigital({ days: 30 }, NOW)
-    expect(d.catalogue).toEqual({ total: 4, approved: 3, pending: 1, oldestPendingDays: 20 })
+    expect(d.catalogue).toEqual({ total: 5, approved: 3, pending: 1, rejected: 1, oldestPendingDays: 20 })
     expect(d.usage).toEqual({ views: 4, uniqueViewers: 2, resourcesViewed: 2, usageRate: 66.7, approvedNotViewed: 1 })
     expect(d.mostUsed.map((x) => [x.id, x.views])).toEqual([['r1', 3], ['r2', 1]])
     expect(d.leastUsed[0]).toMatchObject({ id: 'r3', views: 0, lastViewedAt: null })
@@ -92,9 +93,12 @@ describe('digital library report', () => {
     expect(past.catalogue.total).toBe(2)
     expect(past.usage.views).toBe(1)
     const pending = await getLibraryDigital({ days: 30, status: 'pending' }, NOW)
-    expect(pending.catalogue).toMatchObject({ total: 1, approved: 0, pending: 1 })
+    expect(pending.catalogue).toMatchObject({ total: 1, approved: 0, pending: 1, rejected: 0 })
     expect(pending.usage.views).toBe(0)
     expect(pending.usage.usageRate).toBeNull()
+    const rejected = await getLibraryDigital({ days: 30, status: 'rejected' }, NOW)
+    expect(rejected.catalogue).toMatchObject({ total: 1, approved: 0, pending: 0, rejected: 1 })
+    expect(rejected.pending).toEqual([])
     const form = await getLibraryDigital({ days: 30, form: 2 }, NOW)
     expect(form.catalogue.total).toBe(2)
     const subject = await getLibraryDigital({ days: 30, subject: 'Maths' }, NOW)
@@ -108,7 +112,9 @@ describe('digital library report', () => {
 
   it('names what is not recorded and never exposes viewers', async () => {
     const d = await getLibraryDigital({ days: 30 }, NOW)
-    expect(d.notRecorded.map((n) => n.key)).toEqual(expect.arrayContaining(['downloads', 'searches', 'rejections']))
+    expect(d.notRecorded.map((n) => n.key)).toEqual(expect.arrayContaining(['downloads', 'searches']))
+    // Rejections are recorded now, so they are no longer listed as missing.
+    expect(d.notRecorded.map((n) => n.key)).not.toContain('rejections')
     expect(JSON.stringify(d)).not.toMatch(/"u1"|"u2"|viewerUid/)
   })
 
@@ -143,9 +149,13 @@ describe('physical stock report', () => {
     expect(s.condition).toEqual({ shelfDamagedCopies: 0, shelfLostCopies: 0, loansLost: 0, returnedDamaged: 0 })
   })
 
-  it('does not report renewals', async () => {
-    const s = await getLibraryStock({}, NOW)
-    expect(s.notRecorded.map((n) => n.key)).toContain('renewals')
+  it('reports renewals from the count stored on each loan', async () => {
+    const s = await getLibraryStock({ days: 90 }, NOW)
+    // l0 (renewed twice, 5 days ago) and l6 (once, 3 days ago); l5 was last renewed 100 days ago, outside the window.
+    expect(s.renewals).toEqual({ loansRenewed: 2, renewalCount: 3, trackingSince: ago(100).toISOString() })
+    expect((await getLibraryStock({ days: 4 }, NOW)).renewals).toMatchObject({ loansRenewed: 1, renewalCount: 1 })
+    expect((await getLibraryStock({ category: 'FICTION', days: 90 }, NOW)).renewals).toMatchObject({ loansRenewed: 1, renewalCount: 1 })
+    expect(s.notRecorded.map((n) => n.key)).not.toContain('renewals')
   })
 })
 

@@ -5,9 +5,10 @@
  *   resource recommendations, and digital-resource uploads awaiting
  *   approval. Decisions delegate to libraryWorkflowService / libraryService.
  *
- *   Digital resources only surface while pending: DigitalResource has a plain
- *   `approved` flag with no reject state, and every already-approved upload
- *   would otherwise flood the Approved tab with rows that never needed review.
+ *   Digital resources surface while pending or rejected. Already-approved
+ *   uploads are left out: they would flood the Approved tab with rows that
+ *   never needed review. DigitalResource keeps a plain `approved` flag, and a
+ *   resource is rejected when it is unapproved and `rejectedAt` is set.
  */
 
 import 'server-only'
@@ -204,7 +205,7 @@ export const bookRecommendationAdapter: ApprovalAdapter = {
   },
 }
 
-// ─── DIGITAL RESOURCES (pending only) ─────────────────────
+// ─── DIGITAL RESOURCES (pending and rejected) ─────────────
 
 type ResourceRow = Prisma.DigitalResourceGetPayload<Record<string, never>>
 
@@ -213,13 +214,18 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function resourceStatus(r: ResourceRow): ApprovalStatus {
+  if (r.approved) return 'APPROVED'
+  return r.rejectedAt ? 'REJECTED' : 'PENDING'
+}
+
 function resourceItem(r: ResourceRow, names: Map<string, string>): AdapterItem {
   return makeItem('digital_resource', {
     sourceId: r.id,
     title: `Digital resource — ${r.title}`,
     summary: [humanize(r.type), r.subject].filter(Boolean).join(' · '),
-    status: r.approved ? 'APPROVED' : 'PENDING',
-    sourceStatus: r.approved ? 'APPROVED' : 'AWAITING_APPROVAL',
+    status: resourceStatus(r),
+    sourceStatus: r.approved ? 'APPROVED' : r.rejectedAt ? 'REJECTED' : 'AWAITING_APPROVAL',
     requester: person(r.uploadedByUid, names.get(r.uploadedByUid) ?? ''),
     details: detailList([
       ['Title', r.title],
@@ -231,8 +237,11 @@ function resourceItem(r: ResourceRow, names: Map<string, string>): AdapterItem {
       ['Format', r.mimeType],
     ]),
     createdAt: r.createdAt,
-    decidedAt: r.approvedAt,
-    decidedBy: r.approvedByUid ? person(r.approvedByUid, names.get(r.approvedByUid) ?? '') : null,
+    decidedAt: r.approvedAt ?? r.rejectedAt,
+    decidedBy: (r.approvedByUid ?? r.rejectedByUid)
+      ? person((r.approvedByUid ?? r.rejectedByUid) as string, names.get((r.approvedByUid ?? r.rejectedByUid) as string) ?? '')
+      : null,
+    decisionNotes: r.rejectionReason,
   })
 }
 
@@ -240,35 +249,45 @@ export const digitalResourceAdapter: ApprovalAdapter = {
   source: 'digital_resource',
 
   async list(q) {
-    if (q.statuses && !q.statuses.includes('PENDING')) return []
+    const wantPending = !q.statuses || q.statuses.includes('PENDING')
+    const wantRejected = !q.statuses || q.statuses.includes('REJECTED')
+    if (!wantPending && !wantRejected) return []
     const createdAt = dateFilter(q)
     const rows = await prisma.digitalResource.findMany({
       where: {
         approved: false,
+        // Both wanted: every unapproved row. One wanted: split on whether a rejection date is set.
+        ...(wantPending && wantRejected ? {} : wantRejected ? { rejectedAt: { not: null } } : { rejectedAt: null }),
         ...(q.requesterUid ? { uploadedByUid: q.requesterUid } : {}),
         ...(createdAt ? { createdAt } : {}),
       },
       orderBy: { createdAt: q.order },
       take: q.take,
     })
-    const names = await lookupNames(rows.map((r) => r.uploadedByUid))
+    const names = await lookupNames(rows.flatMap((r) => [r.uploadedByUid, r.rejectedByUid]))
     return rows.map((r) => resourceItem(r, names))
   },
 
   async counts(requesterUid) {
-    const pending = await prisma.digitalResource.count({
-      where: { approved: false, ...(requesterUid ? { uploadedByUid: requesterUid } : {}) },
-    })
-    return { ...emptyCounts(), PENDING: pending }
+    const who = requesterUid ? { uploadedByUid: requesterUid } : {}
+    const [pending, rejected] = await Promise.all([
+      prisma.digitalResource.count({ where: { approved: false, rejectedAt: null, ...who } }),
+      prisma.digitalResource.count({ where: { approved: false, rejectedAt: { not: null }, ...who } }),
+    ])
+    return { ...emptyCounts(), PENDING: pending, REJECTED: rejected }
   },
 
   async get(id) {
     const r = await prisma.digitalResource.findUnique({ where: { id } })
     if (!r) return null
-    return resourceItem(r, await lookupNames([r.uploadedByUid, r.approvedByUid]))
+    return resourceItem(r, await lookupNames([r.uploadedByUid, r.approvedByUid, r.rejectedByUid]))
   },
 
   async approve(id, actor) {
     await libraryService.approveDigitalResource(id, actor.uid)
+  },
+
+  async reject(id, actor, input) {
+    await libraryService.rejectDigitalResource(id, actor.uid, input.notes)
   },
 }

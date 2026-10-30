@@ -133,7 +133,7 @@ export async function getLibraryReport() {
       orderBy: { _count: { bookId: 'desc' } },
       take: 10,
     }),
-    prisma.digitalResource.count({ where: { approved: false } }),
+    prisma.digitalResource.count({ where: { approved: false, rejectedAt: null } }),
   ])
   return { stats, overdueBorrowings, topBooks, pendingApprovals }
 }

@@ -16,7 +16,7 @@ import {
 } from '@/hooks/reporting/useLibraryReporting'
 import type {
   ApiDigitalGroupRow, ApiDigitalPendingRow, ApiDigitalUsageRow, ApiLibraryCountRow, ApiLibraryStockCategoryRow,
-  ApiLibraryUnavailableRow, ApiNotRecorded, ApiOverdueRow,
+  ApiLibraryUnavailableRow, ApiOverdueRow,
 } from '@shared/types/reporting-library'
 import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
 import { formatCount, formatDate, formatDays, formatMwk } from '@/lib/reportFormat'
@@ -165,21 +165,6 @@ function link(path: string, params: Record<string, string | undefined>): string 
 
 const dateOrUndefined = (v: string | undefined) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined)
 
-function NotRecorded({ items }: { items: readonly ApiNotRecorded[] | undefined }) {
-  if (!items?.length) return null
-  return (
-    <ReportCard title="What this report cannot show" sub="The application does not record these, so they are left out rather than shown as zero">
-      <ul className="space-y-2 text-sm">
-        {items.map((n) => (
-          <li key={n.key}>
-            <span className="font-medium text-brand-navy">{n.label}.</span> <span className="text-muted">{n.reason}</span>
-          </li>
-        ))}
-      </ul>
-    </ReportCard>
-  )
-}
-
 // ─── Digital library ──────────────────────────────────────────────────────────
 
 const DIGITAL_WINDOWS = [
@@ -198,6 +183,7 @@ const FORM_OPTIONS = [1, 2, 3, 4].map((f) => ({ value: String(f), label: `Form $
 const STATUS_OPTIONS = [
   { value: 'approved', label: 'Approved' },
   { value: 'pending', label: 'Awaiting approval' },
+  { value: 'rejected', label: 'Rejected' },
 ]
 const SUBJECT_OPTIONS = MALAWI_SUBJECTS.map((s) => ({ value: s, label: s }))
 
@@ -237,6 +223,7 @@ export function LibraryDigitalTab() {
         kpis={d ? [
           kpiTile('resources', 'Digital resources', d.catalogue.total, 'count', 'Resources in the digital library that match the filters. Having a resource available says nothing about whether it is used.', 'neutral', `${formatCount(d.catalogue.approved)} approved`, manage({ type, form, subject })),
           kpiTile('pending', 'Awaiting approval', d.catalogue.pending, 'count', 'Uploaded resources that no one has approved yet. Students cannot open them.', d.catalogue.pending > 0 ? 'watch' : 'healthy', d.catalogue.oldestPendingDays !== null ? `Oldest ${d.catalogue.oldestPendingDays} days` : undefined, manage({ status: 'pending' })),
+          kpiTile('rejected', 'Rejected', d.catalogue.rejected, 'count', 'Uploaded resources that library staff turned down. They stay hidden from students and are kept with the reason given.', 'neutral', undefined, manage({ status: 'rejected' })),
           kpiTile('views', 'Views', d.usage.views, 'count', 'Times an approved resource was opened in the period. A person re-opening the same resource within ten minutes counts once.', 'neutral', `${formatCount(d.usage.uniqueViewers)} different people`),
           kpiTile('viewed', 'Resources used', d.usage.usageRate, 'percent', 'Approved resources opened at least once in the period ÷ approved resources.', 'neutral', `${formatCount(d.usage.resourcesViewed)} of ${formatCount(d.catalogue.approved)} approved`),
           kpiTile('unused', 'Approved, not opened', d.usage.approvedNotViewed, 'count', 'Approved resources with no recorded view in the period.', d.usage.approvedNotViewed > 0 && d.catalogue.approved > 0 ? 'watch' : 'neutral'),
@@ -318,8 +305,6 @@ export function LibraryDigitalTab() {
           />
         </QueryState>
       </ReportCard>
-
-      <NotRecorded items={d?.notRecorded} />
     </PanelStack>
   )
 }
@@ -343,6 +328,7 @@ function GroupTable({
         { key: 'label', label: noun, sortValue: (r) => r.label },
         { key: 'resources', label: 'Resources', align: 'right', sortValue: (r) => r.resources, cell: (r) => formatCount(r.resources) },
         { key: 'pending', label: 'Awaiting approval', align: 'right', hideOnMobile: true, sortValue: (r) => r.pending, cell: (r) => formatCount(r.pending) },
+        { key: 'rejected', label: 'Rejected', align: 'right', hideOnMobile: true, sortValue: (r) => r.rejected, cell: (r) => formatCount(r.rejected) },
         { key: 'viewed', label: 'Opened', align: 'right', hideOnMobile: true, sortValue: (r) => r.resourcesViewed, cell: (r) => formatCount(r.resourcesViewed) },
         { key: 'views', label: 'Views', align: 'right', sortValue: (r) => r.views, cell: (r) => formatCount(r.views) },
       ]}
@@ -401,7 +387,7 @@ export function LibraryStockTab() {
     <PanelStack>
       <FilterBar ariaLabel="Physical stock filters">
         <FilterSelect label="Category" value={category ?? ''} onChange={setCategory} options={BOOK_CATEGORY_OPTIONS} allLabel="All categories" />
-        <FilterSelect label="Damaged on return" value={String(days)} onChange={setWindowParam} options={STOCK_WINDOWS} />
+        <FilterSelect label="Returns and renewals in" value={String(days)} onChange={setWindowParam} options={STOCK_WINDOWS} />
       </FilterBar>
 
       <ReportKpiStrip
@@ -411,6 +397,7 @@ export function LibraryStockTab() {
           kpiTile('available', 'On the shelf', d.availabilityRate, 'percent', 'Copies available to borrow now ÷ copies owned.', 'neutral', `${formatCount(d.available)} of ${formatCount(d.copies)} copies`),
           kpiTile('onLoan', 'On loan', d.onLoan, 'count', 'Copies currently borrowed and not returned (lost copies excluded).', 'neutral', d.overdueLoans > 0 ? `${formatCount(d.overdueLoans)} overdue` : undefined, '/library?tab=borrowings'),
           kpiTile('offShelf', 'Neither on shelf nor on loan', d.offShelf, 'count', 'Copies owned that are not available and not out on loan — for example, copies marked damaged.', d.offShelf > 0 ? 'watch' : 'neutral'),
+          kpiTile('renewed', 'Loans renewed', d.renewals.loansRenewed, 'count', 'Loans whose latest renewal falls in the period. Only the latest renewal date is kept for each loan, so a loan is counted once, in the period it was last renewed. Renewals made before the count was stored were not recorded.', 'neutral', `${formatCount(d.renewals.renewalCount)} renewals in total on these loans`, '/library?tab=borrowings'),
           kpiTile('damaged', 'Damaged or lost', damagedOrLost, 'count', 'Copies marked damaged or lost from the catalogue, plus loans never returned. Repairs are not recorded, so this is a running total.', damagedOrLost ? 'watch' : 'neutral', d ? `${d.condition.shelfDamagedCopies} damaged · ${d.condition.shelfLostCopies + d.condition.loansLost} lost` : undefined),
         ] : undefined}
       />
@@ -488,8 +475,6 @@ export function LibraryStockTab() {
           ) : null}
         </QueryState>
       </ReportCard>
-
-      <NotRecorded items={d?.notRecorded} />
     </PanelStack>
   )
 }

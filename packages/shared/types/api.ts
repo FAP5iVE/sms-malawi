@@ -1100,6 +1100,9 @@ export interface ApiBorrowing {
   condition?: string
   notes?: string
   fineAmount?: number
+  /** Times this loan has been renewed (0 when never renewed). */
+  renewalCount?: number
+  lastRenewedAt?: string
   book?: { title: string; author: string; isbn?: string; barcode?: string }
   /** R21 — joined in listBorrowings() so the Borrowings table can show a
    *  real borrower name/registration/class without a second round trip. */
@@ -1191,6 +1194,9 @@ export interface ApiDigitalResource {
   approved: boolean
   uploadedByUid: string
   approvedAt?: string
+  /** Set when the resource was rejected (it is then not approved and stays hidden from students). */
+  rejectedAt?: string
+  rejectionReason?: string
 }
 
 export interface ApiLibraryStats {

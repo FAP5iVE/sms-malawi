@@ -181,7 +181,7 @@ export async function getLibraryAttention(): Promise<AttentionItem[]> {
   const [overdueSevere, overdueAny, pendingApprovals, lost, lowStock, oldestOverdue] = await Promise.all([
     prisma.borrowing.count({ where: { returnedAt: null, status: { not: 'LOST' }, dueDate: { lt: subDays(now, 30) } } }),
     prisma.borrowing.count({ where: { returnedAt: null, status: { not: 'LOST' }, dueDate: { lt: now } } }),
-    prisma.digitalResource.count({ where: { approved: false } }),
+    prisma.digitalResource.count({ where: { approved: false, rejectedAt: null } }),
     prisma.borrowing.count({ where: { status: 'LOST' } }),
     prisma.book.count({ where: { availableCopies: 0 } }),
     prisma.borrowing.findFirst({
@@ -208,12 +208,10 @@ export async function getLibraryAttention(): Promise<AttentionItem[]> {
 export const DIGITAL_NOT_RECORDED: readonly ApiNotRecorded[] = [
   { key: 'downloads', label: 'Downloads', reason: 'Resources are opened in the in-app viewer through a signed link. No download event is stored, so downloads cannot be counted.' },
   { key: 'searches', label: 'Searches and unsuccessful searches', reason: 'Searches are not logged, so search demand and searches that found nothing are unknown.' },
-  { key: 'rejections', label: 'Rejected resources', reason: 'A resource is either approved or waiting. There is no rejected state, so rejections are not counted.' },
   { key: 'reading', label: 'Reading time and completion', reason: 'Only the moment a resource is opened is recorded.' },
 ]
 
 export const STOCK_NOT_RECORDED: readonly ApiNotRecorded[] = [
-  { key: 'renewals', label: 'Renewals', reason: 'Renewing a loan moves its due date and is written only to the server log. No renewal count is stored, so renewals cannot be reported.' },
   { key: 'repairs', label: 'Repaired copies', reason: 'Damaged copies are not marked as repaired later, so the damaged total is a running figure.' },
 ]
 
@@ -228,7 +226,7 @@ export interface DigitalFilters {
   type?: string
   subject?: string
   form?: number
-  status?: 'approved' | 'pending'
+  status?: 'approved' | 'pending' | 'rejected'
 }
 
 export async function getLibraryDigital(f: DigitalFilters = {}, now: Date = new Date()): Promise<ApiLibraryDigital> {
@@ -241,14 +239,16 @@ export async function getLibraryDigital(f: DigitalFilters = {}, now: Date = new 
     ...(f.type ? { type: f.type } : {}),
     ...(f.subject ? { subject: f.subject } : {}),
     ...(f.form !== undefined ? { form: f.form } : {}),
-    ...(f.status ? { approved: f.status === 'approved' } : {}),
+    ...(f.status === 'approved' ? { approved: true } : {}),
+    ...(f.status === 'pending' ? { approved: false, rejectedAt: null } : {}),
+    ...(f.status === 'rejected' ? { approved: false, rejectedAt: { not: null } } : {}),
   }
   const hasResourceFilter = Object.keys(resourceWhere).length > 0
 
   const [resources, views, first] = await Promise.all([
     prisma.digitalResource.findMany({
       where: resourceWhere as never,
-      select: { id: true, title: true, type: true, subject: true, form: true, approved: true, createdAt: true, approvedAt: true },
+      select: { id: true, title: true, type: true, subject: true, form: true, approved: true, createdAt: true, approvedAt: true, rejectedAt: true },
     }),
     prisma.digitalResourceView.findMany({
       where: { viewedAt: { gte: from, lte: to }, ...(hasResourceFilter ? { resource: resourceWhere } : {}) } as never,
@@ -286,7 +286,7 @@ export async function getLibraryStock(f: { category?: string; days?: number } = 
   const bookFilter = f.category ? { category: f.category } : {}
   const onBook = f.category ? { book: bookFilter } : {}
 
-  const [books, open, logs, loansLost, returnedDamaged] = await Promise.all([
+  const [books, open, logs, loansLost, returnedDamaged, renewedLoans, firstRenewal] = await Promise.all([
     prisma.book.findMany({
       where: bookFilter as never,
       select: { id: true, title: true, author: true, category: true, totalCopies: true, availableCopies: true },
@@ -298,6 +298,15 @@ export async function getLibraryStock(f: { category?: string; days?: number } = 
     prisma.bookConditionLog.findMany({ where: onBook as never, select: { condition: true, copies: true } }),
     prisma.borrowing.count({ where: { status: 'LOST', ...onBook } as never }),
     prisma.borrowing.count({ where: { condition: 'DAMAGED', returnedAt: { gte: since }, ...onBook } as never }),
+    prisma.borrowing.findMany({
+      where: { lastRenewedAt: { gte: since, lte: now }, ...onBook } as never,
+      select: { renewalCount: true },
+    }),
+    prisma.borrowing.findFirst({
+      where: { lastRenewedAt: { not: null } } as never,
+      orderBy: { lastRenewedAt: 'asc' },
+      select: { lastRenewedAt: true },
+    }),
   ])
 
   const stock = summariseStock(books.map((b) => ({ ...b, category: String(b.category) })), open, now)
@@ -321,6 +330,11 @@ export async function getLibraryStock(f: { category?: string; days?: number } = 
       shelfLostCopies: copiesFor('LOST'),
       loansLost,
       returnedDamaged,
+    },
+    renewals: {
+      loansRenewed: renewedLoans.length,
+      renewalCount: renewedLoans.reduce((s, l) => s + num(l.renewalCount), 0),
+      trackingSince: firstRenewal?.lastRenewedAt ? firstRenewal.lastRenewedAt.toISOString() : null,
     },
     notRecorded: [...STOCK_NOT_RECORDED],
   }

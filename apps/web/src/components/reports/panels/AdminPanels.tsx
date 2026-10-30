@@ -441,18 +441,6 @@ export function AdminOperationsTab() {
           )}
         </QueryState>
       </ReportCard>
-
-      <ReportCard title="What this report cannot show" sub="Not recorded by the system, so nothing is estimated">
-        <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
-          <ul className="space-y-2 text-sm">
-            {(d?.notRecorded ?? []).map((n) => (
-              <li key={n.key}>
-                <span className="font-medium text-brand-navy">{n.label}.</span> <span className="text-muted">{n.reason}</span>
-              </li>
-            ))}
-          </ul>
-        </QueryState>
-      </ReportCard>
     </PanelStack>
   )
 }

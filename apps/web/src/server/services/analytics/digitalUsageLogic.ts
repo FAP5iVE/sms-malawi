@@ -21,6 +21,8 @@ export interface DigitalResourceRow {
   approved: boolean
   createdAt: Date
   approvedAt: Date | null
+  /** Set when the resource was rejected; an unapproved row without it is still awaiting a decision. */
+  rejectedAt?: Date | null
 }
 
 export interface DigitalViewRow {
@@ -57,6 +59,7 @@ export interface GroupRow {
   resources: number
   approved: number
   pending: number
+  rejected: number
   views: number
   /** Distinct resources in the group that were viewed at least once in the window. */
   resourcesViewed: number
@@ -69,7 +72,7 @@ export interface TrendPoint {
 }
 
 export interface DigitalUsage {
-  catalogue: { total: number; approved: number; pending: number; oldestPendingDays: number | null }
+  catalogue: { total: number; approved: number; pending: number; rejected: number; oldestPendingDays: number | null }
   usage: {
     views: number
     uniqueViewers: number
@@ -139,9 +142,10 @@ function group(
   const m = new Map<string, GroupRow>()
   for (const r of resources) {
     const { key, label: l } = keyOf(r)
-    const g = m.get(key) ?? { key, label: l, resources: 0, approved: 0, pending: 0, views: 0, resourcesViewed: 0 }
+    const g = m.get(key) ?? { key, label: l, resources: 0, approved: 0, pending: 0, rejected: 0, views: 0, resourcesViewed: 0 }
     g.resources += 1
     if (r.approved) g.approved += 1
+    else if (r.rejectedAt) g.rejected += 1
     else g.pending += 1
     const v = views.get(r.id)?.views ?? 0
     g.views += v
@@ -194,7 +198,8 @@ export function summariseDigitalUsage(
   }
 
   const approved = resources.filter((r) => r.approved)
-  const pendingRows = resources.filter((r) => !r.approved)
+  const pendingRows = resources.filter((r) => !r.approved && !r.rejectedAt)
+  const rejectedRows = resources.filter((r) => !r.approved && !!r.rejectedAt)
   const viewedApproved = approved.filter((r) => (per.get(r.id)?.views ?? 0) > 0)
 
   const pending: PendingRow[] = pendingRows
@@ -227,6 +232,7 @@ export function summariseDigitalUsage(
       total: resources.length,
       approved: approved.length,
       pending: pendingRows.length,
+      rejected: rejectedRows.length,
       oldestPendingDays: pending[0]?.ageDays ?? null,
     },
     usage: {

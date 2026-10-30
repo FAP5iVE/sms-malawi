@@ -44,7 +44,7 @@ describe('summariseDigitalUsage', () => {
   const s = summariseDigitalUsage(resources, views, win, NOW)
 
   it('separates the catalogue from usage', () => {
-    expect(s.catalogue).toEqual({ total: 4, approved: 3, pending: 1, oldestPendingDays: 20 })
+    expect(s.catalogue).toEqual({ total: 4, approved: 3, pending: 1, rejected: 0, oldestPendingDays: 20 })
     expect(s.usage).toEqual({ views: 4, uniqueViewers: 2, resourcesViewed: 2, usageRate: 66.7, approvedNotViewed: 1 })
   })
 
@@ -78,6 +78,32 @@ describe('summariseDigitalUsage', () => {
     expect(none.usage.usageRate).toBeNull()
     expect(none.usage.views).toBe(0)
     expect(none.leastUsed).toEqual([])
+  })
+})
+
+describe('rejected resources', () => {
+  const resources = [
+    res('a1'),
+    res('p1', { approved: false, approvedAt: null, createdAt: D('2026-03-11') }),
+    res('x1', { approved: false, approvedAt: null, createdAt: D('2026-03-01'), rejectedAt: D('2026-03-05') }),
+    res('x2', { approved: false, approvedAt: null, createdAt: D('2026-03-02'), rejectedAt: D('2026-03-06'), type: 'PAST_PAPER' }),
+  ]
+  const s = summariseDigitalUsage(resources, [], win, NOW)
+
+  it('counts rejected resources separately from approved and awaiting ones', () => {
+    expect(s.catalogue).toEqual({ total: 4, approved: 1, pending: 1, rejected: 2, oldestPendingDays: 20 })
+    expect(s.catalogue.approved + s.catalogue.pending + s.catalogue.rejected).toBe(s.catalogue.total)
+  })
+
+  it('keeps rejected resources out of the awaiting-approval list and the usage figures', () => {
+    expect(s.pending.map((p) => p.id)).toEqual(['p1'])
+    expect(s.usage.usageRate).toBe(0)
+    expect(s.leastUsed.map((r) => r.id)).toEqual(['a1'])
+  })
+
+  it('splits each group into approved, awaiting and rejected', () => {
+    expect(s.byType.map((r) => [r.label, r.resources, r.approved, r.pending, r.rejected]))
+      .toEqual([['eBook', 3, 1, 1, 1], ['Past paper', 1, 0, 0, 1]])
   })
 })
 

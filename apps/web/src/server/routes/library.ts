@@ -251,6 +251,18 @@ libraryRouter.get('/digital/:id/view', verifyAuth, requirePermission('library.vi
 libraryRouter.patch('/digital/:id/approve', verifyAuth, requirePermission('library.approveDigitalResource'),
   async (req, res) => { return res.json(await libService.approveDigitalResource(String(req.params.id), req.user!.uid))})
 
+// PATCH /digital/:id/reject — turns down an upload, keeping it with who/when/why.
+// Same permission as approving: whoever may approve resources may also reject them.
+libraryRouter.patch('/digital/:id/reject', verifyAuth, requirePermission('library.approveDigitalResource'),
+  async (req, res) => {
+    try {
+      const { reason } = (req.body ?? {}) as { reason?: string }
+      return res.json(await libService.rejectDigitalResource(String(req.params.id), req.user!.uid, String(reason ?? '')))
+    } catch (err: unknown) {
+      return sendError(res, err, { defaultStatus: 400, tags: { module: 'library' } })
+    }
+  })
+
 // ── RESOURCE RECOMMENDATIONS (registered before GET /:id — see header) ──
 libraryRouter.get('/recommendations', verifyAuth, requirePermission('library.recommendResource'),
   async (req, res) => {

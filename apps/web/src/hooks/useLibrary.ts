@@ -119,6 +119,18 @@ export function useApproveDigitalResource() {
   })
 }
 
+// Turning down an upload needs a reason, which is kept with the resource and shown to library staff.
+export function useRejectDigitalResource() {
+  const qc = useQueryClient()
+  return useMutation({
+    meta: { successMessage: 'Digital resource rejected', failureTitle: 'Could not reject digital resource' },
+    mutationFn: ({ resourceId, reason }: { resourceId: string; reason: string }) =>
+      apiFetch(`/library/digital/${resourceId}/reject`, { method: 'PATCH', body: JSON.stringify({ reason }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.library.all() }),
+    onError: (err) => { console.error('[useRejectDigitalResource] failed', err) },
+  })
+}
+
 export function useIssueBorrowing() {
   const qc = useQueryClient()
   return useMutation({

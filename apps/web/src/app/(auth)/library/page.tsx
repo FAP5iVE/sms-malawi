@@ -80,6 +80,7 @@ import {
   useCreateBook,
   useUploadDigitalResource,
   useApproveDigitalResource,
+  useRejectDigitalResource,
   useCatalogReportStats,
   useConditionReport,
   useFines,
@@ -144,6 +145,12 @@ function borrowingDisplayStatus(b: ApiBorrowing): 'OVERDUE' | 'DUE_SOON' | 'ACTI
   const daysLeft = Math.ceil((new Date(b.dueDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
   if (b.status === 'ACTIVE' && daysLeft <= 3) return 'DUE_SOON'
   return 'ACTIVE'
+}
+
+/** Where a digital resource stands: approved, rejected, or still waiting for a decision. */
+function digitalResourceState(r: ApiDigitalResource): 'approved' | 'rejected' | 'pending' {
+  if (r.approved) return 'approved'
+  return r.rejectedAt ? 'rejected' : 'pending'
 }
 
 function borrowingCountdownLabel(b: ApiBorrowing): string {
@@ -1258,9 +1265,12 @@ function LibraryContent() {
   const [digitalTypeFilter, setDigitalTypeFilter] = useState(['EBOOK', 'PAST_PAPER', 'REFERENCE', 'STUDY_GUIDE'].includes(presetType) ? presetType : '')
   const [digitalFormFilter, setDigitalFormFilter] = useState(['1', '2', '3', '4'].includes(presetForm) ? presetForm : '')
   const [digitalSubjectFilter, setDigitalSubjectFilter] = useState(searchParams.get('subject') ?? '')
-  const [digitalStatusFilter, setDigitalStatusFilter] = useState<'' | 'pending' | 'approved'>(presetStatus === 'pending' || presetStatus === 'approved' ? presetStatus : '')
+  const [digitalStatusFilter, setDigitalStatusFilter] = useState<'' | 'pending' | 'approved' | 'rejected'>(presetStatus === 'pending' || presetStatus === 'approved' || presetStatus === 'rejected' ? presetStatus : '')
   // One resource opened from a report row: shown on its own, with a way back to the full list.
   const [focusResourceId, setFocusResourceId] = useState(searchParams.get('resource') ?? '')
+  // The resource currently being rejected, and the reason typed so far.
+  const [rejectingResourceId, setRejectingResourceId] = useState('')
+  const [rejectReason, setRejectReason] = useState('')
   const [barcodeInput, setBarcodeInput] = useState('')
   const [scanResult, setScanResult] = useState<ApiBook | null>(null)
   const [scanError, setScanError]   = useState<string | null>(null)
@@ -1365,7 +1375,7 @@ function LibraryContent() {
   })
   // Status and single-resource focus come from report deep links; the list itself is already filtered server-side.
   const shownDigitalResources = (digitalResources as ApiDigitalResource[]).filter((r) =>
-    (digitalStatusFilter === '' || (digitalStatusFilter === 'pending' ? !r.approved : r.approved)) &&
+    (digitalStatusFilter === '' || digitalResourceState(r) === digitalStatusFilter) &&
     (focusResourceId === '' || r.id === focusResourceId))
   const { data: recommendations = [] }  = useRecommendations('PENDING')
   const { data: fineWaivers = [] }      = useFineWaivers('PENDING', { enabled: canReviewWaivers })
@@ -1378,6 +1388,7 @@ function LibraryContent() {
   const approveFineWaiver     = useApproveFineWaiver()
   const rejectFineWaiver      = useRejectFineWaiver()
   const approveDigitalResource = useApproveDigitalResource()
+  const rejectDigitalResource  = useRejectDigitalResource()
 
   const s = stats as ApiLibraryStats | undefined
 
@@ -1971,7 +1982,7 @@ function LibraryContent() {
                           </span>
                         </div>
                         <p className="text-sm text-body mt-1">{b.book?.title ?? 'Untitled'}</p>
-                        <p className="text-xs text-muted">{borrowingCountdownLabel(b)}</p>
+                        <p className="text-xs text-muted">{borrowingCountdownLabel(b)}{b.renewalCount ? ` · Renewed ${b.renewalCount}×` : ''}</p>
                         <div className="flex items-center gap-3 mt-2">
                           <PermissionGuard permission="library.issueBook">
                             <button type="button" onClick={() => handleRenew(b.id)} disabled={renewBorrowing.isPending} className="text-xs font-semibold text-brand-navy underline">Renew (+14d)</button>
@@ -2136,13 +2147,14 @@ function LibraryContent() {
               </select>
               <select
                 value={digitalStatusFilter}
-                onChange={(e) => setDigitalStatusFilter(e.target.value as '' | 'pending' | 'approved')}
+                onChange={(e) => setDigitalStatusFilter(e.target.value as '' | 'pending' | 'approved' | 'rejected')}
                 className="border border-base rounded-xl px-3 py-2 text-sm bg-surface min-h-[44px]"
                 aria-label="Filter by approval status"
               >
                 <option value="">All statuses</option>
                 <option value="approved">Approved</option>
                 <option value="pending">Pending approval</option>
+                <option value="rejected">Rejected</option>
               </select>
               {focusResourceId && (
                 <button
@@ -2180,26 +2192,66 @@ function LibraryContent() {
                       {r.subject ? ` · ${r.subject}` : ''}
                       {r.form    ? ` · Form ${r.form}` : ''}
                     </p>
-                    {!r.approved && (
+                    {digitalResourceState(r) === 'pending' && (
                       <span className="text-xs text-status-warning">
                         Pending Approval
                       </span>
+                    )}
+                    {digitalResourceState(r) === 'rejected' && (
+                      <>
+                        <span className="text-xs text-status-danger">Rejected</span>
+                        {r.rejectionReason && (
+                          <p className="text-xs text-muted mt-1">Reason: {r.rejectionReason}</p>
+                        )}
+                      </>
                     )}
                     {/* [FIX] "library staff are the approval authority" —
                         library.approveDigitalResource was already granted
                         to the library role and PATCH /digital/:id/approve
                         already worked; this button (and the hook behind
                         it) is the only piece that was actually missing. */}
-                    {!r.approved && (
+                    {digitalResourceState(r) === 'pending' && (
                       <PermissionGuard permission="library.approveDigitalResource">
-                        <button
-                          type="button"
-                          onClick={() => approveDigitalResource.mutate(r.id)}
-                          disabled={approveDigitalResource.isPending}
-                          className="block mt-1.5 text-xs font-semibold text-brand-teal underline disabled:opacity-50"
-                        >
-                          {approveDigitalResource.isPending ? 'Approving…' : 'Approve'}
-                        </button>
+                        <div className="mt-1.5 flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => approveDigitalResource.mutate(r.id)}
+                            disabled={approveDigitalResource.isPending}
+                            className="text-xs font-semibold text-brand-teal underline disabled:opacity-50"
+                          >
+                            {approveDigitalResource.isPending ? 'Approving…' : 'Approve'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setRejectingResourceId(rejectingResourceId === r.id ? '' : r.id); setRejectReason('') }}
+                            className="text-xs font-semibold text-status-danger underline"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                        {rejectingResourceId === r.id && (
+                          <div className="mt-2 space-y-2">
+                            <label className="block text-xs text-muted" htmlFor={`reject-reason-${r.id}`}>Reason for rejecting (required)</label>
+                            <textarea
+                              id={`reject-reason-${r.id}`}
+                              value={rejectReason}
+                              onChange={(e) => setRejectReason(e.target.value)}
+                              rows={2}
+                              className="w-full border border-base rounded-xl px-3 py-2 text-sm bg-surface"
+                            />
+                            <button
+                              type="button"
+                              disabled={rejectReason.trim().length === 0 || rejectDigitalResource.isPending}
+                              onClick={() => rejectDigitalResource.mutate(
+                                { resourceId: r.id, reason: rejectReason.trim() },
+                                { onSuccess: () => { setRejectingResourceId(''); setRejectReason('') } },
+                              )}
+                              className="text-xs font-semibold text-white bg-status-danger rounded-lg px-3 py-1.5 disabled:opacity-50"
+                            >
+                              {rejectDigitalResource.isPending ? 'Rejecting…' : 'Confirm rejection'}
+                            </button>
+                          </div>
+                        )}
                       </PermissionGuard>
                     )}
                   </div>

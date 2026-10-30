@@ -374,7 +374,7 @@ export function StudentPlacementTab() {
           ) : null}
         </QueryState>
       </ReportCard>
-      <ReportCard title="What this report shows">
+      <ReportCard title="How placement works">
         <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
           <li>Only your own placement. Other students’ placements, exam numbers and results are never shown here.</li>
           <li>A placement counts as published only once it is on the school’s confirmed list. A claim you submit is shown as “under review” until staff verify it.</li>
