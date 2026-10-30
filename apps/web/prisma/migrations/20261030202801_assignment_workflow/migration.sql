@@ -1,14 +1,9 @@
 /*
   Warnings:
 
-  - You are about to drop the column `kind` on the `library_fines` table. All the data in the column will be lost.
   - A unique constraint covering the columns `[fileKey]` on the table `assignment_submissions` will be added. If there are existing duplicate values, this will fail.
-  - A unique constraint covering the columns `[borrowingId]` on the table `library_fines` will be added. If there are existing duplicate values, this will fail.
 
 */
--- DropIndex
-DROP INDEX "library_fines_borrowingId_idx";
-
 -- AlterTable
 ALTER TABLE "assignment_submissions" ADD COLUMN     "feedback" TEXT,
 ADD COLUMN     "fileName" TEXT,
@@ -24,12 +19,6 @@ ALTER TABLE "assignments" ADD COLUMN     "marksEnabled" BOOLEAN NOT NULL DEFAULT
 ADD COLUMN     "maxMarks" INTEGER,
 ADD COLUMN     "requirements" TEXT,
 ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
-
--- AlterTable
-ALTER TABLE "library_fines" DROP COLUMN "kind";
-
--- DropEnum
-DROP TYPE "FineKind";
 
 -- CreateTable
 CREATE TABLE "assignment_attachments" (
@@ -78,9 +67,6 @@ CREATE INDEX "assignment_submissions_studentId_idx" ON "assignment_submissions"(
 
 -- CreateIndex
 CREATE INDEX "assignments_classId_dueDate_idx" ON "assignments"("classId", "dueDate");
-
--- CreateIndex
-CREATE UNIQUE INDEX "library_fines_borrowingId_key" ON "library_fines"("borrowingId");
 
 -- AddForeignKey
 ALTER TABLE "assignment_attachments" ADD CONSTRAINT "assignment_attachments_assignmentId_fkey" FOREIGN KEY ("assignmentId") REFERENCES "assignments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
