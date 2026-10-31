@@ -362,7 +362,7 @@ function SessionDetailModal({ sessionId, onClose }: { sessionId: string; onClose
                               )}
                             </td>
                           </tr>
-                          {open && expandable && (
+                          {open && expandable && entry.metadata != null && (
                             <tr className="bg-page">
                               <td colSpan={5} className="px-4 py-3">
                                 <EntryDetails metadata={entry.metadata} />
