@@ -72,7 +72,13 @@ authRouter.post('/log-login-success', verifyAuth, async (req, res) => {
 // surface as a user-facing error, so the client hook (useSessionHeartbeat)
 // swallows rejections same as the FCM registration path does.
 authRouter.post('/heartbeat', verifyAuth, async (req, res) => {
-  await sessionService.heartbeat(req.user!.uid)
+  // Passing the opener lets heartbeat() start a session for a signed-in
+  // user who has none at all (signed in before tracking existed).
+  await sessionService.heartbeat(req.user!.uid, {
+    role: req.user!.role,
+    userAgent: req.headers['user-agent'],
+    ipAddress: req.ip,
+  })
   res.status(204).end()
 })
 

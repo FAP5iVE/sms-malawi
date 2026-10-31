@@ -1,5 +1,32 @@
 import 'server-only'
 
+/**
+ * [CHANGE TYPE]: TARGETED EDIT (Sessions / Audit completeness)
+ * [PURPOSE]: Make every audit entry land in the log, with the time the
+ *   action actually happened, so Reports > Audit Log and the per-session
+ *   activity view (Reports > Sessions) show the same, complete record.
+ *   Three defects fixed here:
+ *   (1) logAsync() entries carried no timestamp when queued to Redis, so
+ *       AuditLog.createdAt became the moment of the later FLUSH. On a
+ *       serverless host the flush often runs in a later invocation, so the
+ *       entry showed up in the audit log — but dated outside the session
+ *       window it belonged to, i.e. "visible in Audit Log, missing from the
+ *       session". Entries now carry `occurredAt` from enqueue time.
+ *   (2) Fire-and-forget writes could be dropped when the function froze
+ *       right after the response. A request-scoped AuditRequestContext
+ *       (AsyncLocalStorage) now tracks every in-flight write so the
+ *       activity middleware (server/middleware/activityLog.ts) can await
+ *       them before the response is sent.
+ *   (3) The MEDIUM severity filter / stats ignored any action not listed in
+ *       ACTION_SEVERITY, although resolveSeverity() treats those as MEDIUM.
+ *       Auto-recorded request entries are unmapped, so they would have been
+ *       invisible to a MEDIUM filter. LOGIN_* (the strings auth.ts really
+ *       writes) are now mapped too.
+ *   Also: queryByActor() gained `offset` and countByActor() was added so the
+ *   session pop-up can page through a long session.
+ */
+
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { logger } from '@/lib/logger'
@@ -36,6 +63,9 @@ export const ACTION_SEVERITY: Readonly<Record<string, Severity>> = {
   'auth.password_changed':        SEVERITY.HIGH,
   'auth.session_revoked':         SEVERITY.CRITICAL,
   'auth.token_refreshed':         SEVERITY.LOW,
+  // The strings routes/auth.ts actually writes (and analytics queries read).
+  'LOGIN_SUCCESS':                SEVERITY.LOW,
+  'LOGIN_FAILED':                 SEVERITY.HIGH,
   'user.created':                 SEVERITY.CRITICAL,
   'user.role_changed':            SEVERITY.CRITICAL,
   'user.suspended':               SEVERITY.CRITICAL,
@@ -261,6 +291,64 @@ export interface AuditEntry {
   actorRole: UserRole | string
   /** Optional structured metadata with before/after state and context. */
   metadata?: AuditMetadata
+  /**
+   * When the action happened. Set automatically by logAsync() at enqueue
+   * time so a deferred flush can't re-date the entry. Leave unset for
+   * log()/logBatch() — the database stamps those at insert, which is
+   * already the moment of the action.
+   */
+  occurredAt?: string
+}
+
+// ─────────────────────────────────────────────────────────
+//  REQUEST-SCOPED AUDIT CONTEXT
+//  Created per HTTP request by server/middleware/activityLog.ts. Lets that
+//  middleware (a) wait for fire-and-forget writes before the response is
+//  sent and (b) know whether the route already audited what it did, so it
+//  only records a generic entry when the route recorded nothing itself.
+//  Outside a request (cron jobs, scripts) there is no context and every
+//  function below behaves exactly as before.
+// ─────────────────────────────────────────────────────────
+
+export interface AuditRequestContext {
+  /** Writes started during this request that have not settled yet. */
+  pending: Set<Promise<unknown>>
+  /** Number of audit entries written (or being written) during this request. */
+  entriesWritten: number
+}
+
+const auditContextStore = new AsyncLocalStorage<AuditRequestContext>()
+
+export function createAuditContext(): AuditRequestContext {
+  return { pending: new Set(), entriesWritten: 0 }
+}
+
+/** Run `fn` (and everything it awaits) inside `ctx`. */
+export function runWithAuditContext<T>(ctx: AuditRequestContext, fn: () => T): T {
+  return auditContextStore.run(ctx, fn)
+}
+
+/** Resolve once every audit write started in `ctx` has settled (never rejects). */
+export async function settleAuditWrites(ctx: AuditRequestContext): Promise<void> {
+  // Loop: a settling write may itself start another (e.g. enqueue → flush).
+  while (ctx.pending.size > 0) {
+    await Promise.allSettled([...ctx.pending])
+  }
+}
+
+function noteEntries(count: number): void {
+  const ctx = auditContextStore.getStore()
+  if (ctx) ctx.entriesWritten += count
+}
+
+function trackWrite<T>(promise: Promise<T>): Promise<T> {
+  const ctx = auditContextStore.getStore()
+  if (ctx) {
+    ctx.pending.add(promise)
+    const done = () => { ctx.pending.delete(promise) }
+    promise.then(done, done)
+  }
+  return promise
 }
 
 // ─────────────────────────────────────────────────────────
@@ -352,17 +440,20 @@ export function createDiff(
  *   })
  */
 export async function log(entry: AuditEntry): Promise<void> {
-  await prisma.auditLog.create({
-    data: {
-      action:     entry.action,
-      entityType: entry.entityType,
-      entityId:   entry.entityId,
-      actorUid:   entry.actorUid,
-      actorRole:  entry.actorRole,
-     metadata: (entry.metadata ?? Prisma.JsonNull) as Prisma.InputJsonValue,
-    },
-    select: { id: true }, // Minimal select — we don't use the returned row
-  })
+  noteEntries(1)
+  await trackWrite(
+    prisma.auditLog.create({
+      data: {
+        action:     entry.action,
+        entityType: entry.entityType,
+        entityId:   entry.entityId,
+        actorUid:   entry.actorUid,
+        actorRole:  entry.actorRole,
+        metadata:   (entry.metadata ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+      },
+      select: { id: true }, // Minimal select — we don't use the returned row
+    })
+  )
 }
 
 /**
@@ -390,24 +481,32 @@ export async function log(entry: AuditEntry): Promise<void> {
 // MEDIUM/LOW entry the old un-awaited create() could lose.
 const AUDIT_QUEUE_KEY = 'audit:queue'
 
-export function logAsync(entry: AuditEntry): void {
+export function logAsync(input: AuditEntry): void {
+  // Stamp the moment of the action NOW. Without this, an entry parked in
+  // Redis was dated by whichever later invocation flushed it (see header).
+  const entry: AuditEntry = { ...input, occurredAt: input.occurredAt ?? new Date().toISOString() }
+  noteEntries(1)
+
   const redis = getRedis()
 
   if (redis) {
     // Enqueue durably, then opportunistically drain. Once the LPUSH resolves
     // the entry lives in Redis; even if this instance is recycled before the
-    // flush finishes, a later flush (here or via cron) still persists it.
-    redis
-      .lpush(AUDIT_QUEUE_KEY, entry)
-      .then(() => flushAuditQueue())
-      .catch((err: unknown) => {
-        logger.error({ err, entry }, '[auditService] logAsync enqueue failed')
-      })
+    // flush finishes, a later flush (here or via cron) still persists it —
+    // now with its original timestamp. The whole chain is tracked so the
+    // request middleware can wait for it before sending the response.
+    trackWrite(
+      redis
+        .lpush(AUDIT_QUEUE_KEY, entry)
+        .then(() => flushAuditQueue())
+    ).catch((err: unknown) => {
+      logger.error({ err, entry }, '[auditService] logAsync enqueue failed')
+    })
     return
   }
 
-  prisma.auditLog
-    .create({
+  trackWrite(
+    prisma.auditLog.create({
       data: {
         action:     entry.action,
         entityType: entry.entityType,
@@ -415,13 +514,14 @@ export function logAsync(entry: AuditEntry): void {
         actorUid:   entry.actorUid,
         actorRole:  entry.actorRole,
         metadata:   (entry.metadata ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+        createdAt:  new Date(entry.occurredAt as string),
       },
       select: { id: true },
     })
-    .catch((err: unknown) => {
-      // Never let an audit log failure propagate — log internally only
-      logger.error({ err, entry }, '[auditService] logAsync write failed')
-    })
+  ).catch((err: unknown) => {
+    // Never let an audit log failure propagate — log internally only
+    logger.error({ err, entry }, '[auditService] logAsync write failed')
+  })
 }
 
 /**
@@ -450,6 +550,8 @@ export async function flushAuditQueue(max = 100): Promise<number> {
         actorUid:   entry.actorUid,
         actorRole:  entry.actorRole,
         metadata:   (entry.metadata ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+        // Entries queued before occurredAt existed have none → DB default.
+        ...(entry.occurredAt ? { createdAt: new Date(entry.occurredAt) } : {}),
       })),
     })
     return drained.length
@@ -476,19 +578,22 @@ export async function flushAuditQueue(max = 100): Promise<number> {
 export async function logBatch(entries: AuditEntry[]): Promise<void> {
   if (entries.length === 0) return
 
-  await prisma.$transaction(
-    entries.map((entry) =>
-      prisma.auditLog.create({
-        data: {
-          action:     entry.action,
-          entityType: entry.entityType,
-          entityId:   entry.entityId,
-          actorUid:   entry.actorUid,
-          actorRole:  entry.actorRole,
-          metadata: (entry.metadata ?? Prisma.JsonNull) as Prisma.InputJsonValue,
-        },
-        select: { id: true },
-      })
+  noteEntries(entries.length)
+  await trackWrite(
+    prisma.$transaction(
+      entries.map((entry) =>
+        prisma.auditLog.create({
+          data: {
+            action:     entry.action,
+            entityType: entry.entityType,
+            entityId:   entry.entityId,
+            actorUid:   entry.actorUid,
+            actorRole:  entry.actorRole,
+            metadata:   (entry.metadata ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+          },
+          select: { id: true },
+        })
+      )
     )
   )
 }
@@ -528,7 +633,7 @@ export async function query(
 
   // Build Prisma where clause
   const where: {
-    action?: { contains: string; mode: 'insensitive' } | { in: string[] }
+    action?: { contains: string; mode: 'insensitive' } | { in: string[] } | { notIn: string[] }
     entityType?: string
     entityId?: string
     actorUid?: string
@@ -545,7 +650,16 @@ export async function query(
   // If severity filter is set, collect all actions matching that severity
   // and use them as an IN filter — we can't store severity in the DB
   // without a schema migration.
-  if (severity) {
+  if (severity === SEVERITY.MEDIUM) {
+    // MEDIUM is also what resolveSeverity() returns for any action that is
+    // NOT listed in ACTION_SEVERITY (including every auto-recorded request
+    // entry), so match "everything that isn't explicitly another level"
+    // rather than only the explicitly-MEDIUM list.
+    const notMedium = Object.entries(ACTION_SEVERITY)
+      .filter(([, s]) => s !== SEVERITY.MEDIUM)
+      .map(([a]) => a)
+    where.action = { notIn: notMedium }
+  } else if (severity) {
     const matchingActions = Object.entries(ACTION_SEVERITY)
       .filter(([, s]) => s === severity)
       .map(([a]) => a)
@@ -661,28 +775,43 @@ export async function queryByEntity(
   }))
 }
 
+function buildActorWhere(
+  actorUid: string,
+  filters?: { dateFrom?: Date; dateTo?: Date }
+): { actorUid: string; createdAt?: { gte?: Date; lte?: Date } } {
+  const where: { actorUid: string; createdAt?: { gte?: Date; lte?: Date } } = { actorUid }
+  if (filters?.dateFrom || filters?.dateTo) {
+    where.createdAt = {}
+    if (filters.dateFrom) where.createdAt.gte = filters.dateFrom
+    if (filters.dateTo)   where.createdAt.lte = filters.dateTo
+  }
+  return where
+}
+
+/** Total entries queryByActor() would match with the same date bounds. */
+export async function countByActor(
+  actorUid: string,
+  filters?: { dateFrom?: Date; dateTo?: Date }
+): Promise<number> {
+  return prisma.auditLog.count({ where: buildActorWhere(actorUid, filters) })
+}
+
 /**
  * Get all audit entries produced by a specific actor (Firebase UID).
  * Ordered most-recent first. Cap at 200 entries per call.
  */
 export async function queryByActor(
   actorUid: string,
-  filters?: { dateFrom?: Date; dateTo?: Date; limit?: number }
+  filters?: { dateFrom?: Date; dateTo?: Date; limit?: number; offset?: number }
 ): Promise<AuditLogRow[]> {
-  const where: {
-    actorUid: string
-    createdAt?: { gte?: Date; lte?: Date }
-  } = { actorUid }
-
-  if (filters?.dateFrom || filters?.dateTo) {
-    where.createdAt = {}
-    if (filters.dateFrom) where.createdAt.gte = filters.dateFrom
-    if (filters.dateTo)   where.createdAt.lte = filters.dateTo
-  }
+  const where = buildActorWhere(actorUid, filters)
 
   const rows = await prisma.auditLog.findMany({
     where,
-    orderBy: { createdAt: 'desc' },
+    // id as a tie-breaker keeps page boundaries stable when several entries
+    // share a millisecond (a bulk action writes many at once).
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    skip: Math.max(filters?.offset ?? 0, 0),
     take: Math.min(filters?.limit ?? 100, 200),
     select: {
       id:         true,
@@ -813,13 +942,14 @@ export async function getAuditStats(daysBack = 7): Promise<{
 
   const criticalActions = Object.entries(ACTION_SEVERITY).filter(([, s]) => s === SEVERITY.CRITICAL).map(([a]) => a)
   const highActions     = Object.entries(ACTION_SEVERITY).filter(([, s]) => s === SEVERITY.HIGH).map(([a]) => a)
-  const mediumActions   = Object.entries(ACTION_SEVERITY).filter(([, s]) => s === SEVERITY.MEDIUM).map(([a]) => a)
+  // MEDIUM = every action not explicitly CRITICAL/HIGH/LOW (see resolveSeverity default).
+  const nonMediumActions = Object.entries(ACTION_SEVERITY).filter(([, s]) => s !== SEVERITY.MEDIUM).map(([a]) => a)
   const lowActions      = Object.entries(ACTION_SEVERITY).filter(([, s]) => s === SEVERITY.LOW).map(([a]) => a)
 
   const [critical, high, medium, low, totalToday, totalPeriod] = await prisma.$transaction([
     prisma.auditLog.count({ where: { action: { in: criticalActions }, createdAt: { gte: since7d } } }),
     prisma.auditLog.count({ where: { action: { in: highActions },     createdAt: { gte: since7d } } }),
-    prisma.auditLog.count({ where: { action: { in: mediumActions },   createdAt: { gte: since7d } } }),
+    prisma.auditLog.count({ where: { action: { notIn: nonMediumActions }, createdAt: { gte: since7d } } }),
     prisma.auditLog.count({ where: { action: { in: lowActions },      createdAt: { gte: since7d } } }),
     prisma.auditLog.count({ where: { createdAt: { gte: sinceToday } } }),
     prisma.auditLog.count({ where: { createdAt: { gte: since7d }    } }),

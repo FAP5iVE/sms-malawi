@@ -25,6 +25,20 @@ import 'server-only'
  *   (queryByActor — reused as-is for the per-session activity drill-down,
  *   and 'auth.session_revoked' — already CRITICAL in ACTION_SEVERITY with
  *   zero callers until now).
+ *
+ * [CHANGE TYPE]: TARGETED EDIT (Sessions pagination + complete activity)
+ *   - listSessions() is now server-paginated ({ sessions, total, page,
+ *     pages, pageSize }) instead of returning up to 500 rows at once.
+ *   - getSessionActivity() is paginated too, and returns the true total, so
+ *     the session pop-up can show every action in a long session (it used
+ *     to stop at 200 with no way to see the rest).
+ *   - heartbeat() opens a session for a signed-in user who has none at all
+ *     (signed in before session tracking existed, or the login ping was
+ *     missed) so their actions are attributed to a session from then on.
+ *   Which actions belong to a session: everything the same uid audited
+ *   between loginAt and loggedOutAt (or now). The audit side of this is
+ *   made complete by server/middleware/activityLog.ts and the timestamp /
+ *   durability fixes in auditService.ts.
  */
 
 import * as admin from 'firebase-admin'
@@ -122,15 +136,31 @@ export async function recordLogout(uid: string): Promise<void> {
 }
 
 /**
- * Bump lastSeenAt on uid's open session. No-op if none is open (e.g. the
- * account predates this feature, or the open-session row was somehow
- * missed) — a heartbeat should never throw and interrupt the caller.
+ * Bump lastSeenAt on uid's open session. A heartbeat should never throw and
+ * interrupt the caller.
+ *
+ * Self-healing: if the uid has NO session row at all (account signed in
+ * before session tracking shipped, or its login ping was missed), open one
+ * now so the person — and everything they do from here on — shows up in the
+ * Sessions tab instead of being invisible. Only done when there is no row
+ * whatsoever: a uid whose last session was ended on purpose ('logout',
+ * 'forced') or superseded by another device ('new_login') is left alone, so
+ * two devices can never fight over who owns the open session.
  */
-export async function heartbeat(uid: string): Promise<void> {
-  await prisma.userSession.updateMany({
+export async function heartbeat(
+  uid: string,
+  opener?: { role: string; userAgent?: string | string[] | null; ipAddress?: string | null }
+): Promise<void> {
+  const bumped = await prisma.userSession.updateMany({
     where: { uid, loggedOutAt: null },
     data: { lastSeenAt: new Date() },
   })
+  if (bumped.count > 0 || !opener) return
+
+  const anyRow = await prisma.userSession.findFirst({ where: { uid }, select: { id: true } })
+  if (!anyRow) {
+    await recordLogin({ uid, role: opener.role, userAgent: opener.userAgent, ipAddress: opener.ipAddress })
+  }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -221,44 +251,86 @@ async function resolveDisplayInfo(uids: string[]) {
 //  QUERY — SESSION LIST
 // ─────────────────────────────────────────────────────────
 
+export const SESSION_LIST_DEFAULT_PAGE_SIZE = 15
+export const SESSION_LIST_MAX_PAGE_SIZE = 50
+
+export interface SessionListResult {
+  sessions: SessionRow[]
+  total: number
+  page: number
+  pages: number
+  pageSize: number
+}
+
+function toSessionRow(
+  r: {
+    id: string; uid: string; role: string; loginAt: Date; lastSeenAt: Date
+    loggedOutAt: Date | null; endReason: string | null
+  },
+  info: { displayName: string | null; email: string | null } | undefined,
+  employeeNo: string | null,
+  registrationNo: string | null,
+  now: Date
+): SessionRow {
+  const isActiveNow = r.loggedOutAt === null && (now.getTime() - r.lastSeenAt.getTime()) <= ACTIVE_GRACE_MS
+  const endMoment = r.loggedOutAt ?? r.lastSeenAt
+  return {
+    id: r.id,
+    uid: r.uid,
+    role: r.role,
+    displayName: info?.displayName ?? null,
+    email: info?.email ?? null,
+    employeeNo,
+    registrationNo,
+    loginAt: r.loginAt,
+    lastSeenAt: r.lastSeenAt,
+    loggedOutAt: r.loggedOutAt,
+    endReason: r.endReason,
+    isActiveNow,
+    durationMs: Math.max(0, endMoment.getTime() - r.loginAt.getTime()),
+  }
+}
+
 /**
- * List sessions with recent activity. `window` filters by lastSeenAt —
- * "who was logged in in the past 10m/30m/1h" — so it naturally includes
- * both currently-active sessions and ones that ended within the window,
- * not just ones still open right now.
+ * List sessions with recent activity, one page at a time (newest activity
+ * first). `window` filters by lastSeenAt — "who was logged in in the past
+ * 10m/30m/1h" — so it naturally includes both currently-active sessions and
+ * ones that ended within the window, not just ones still open right now.
  */
-export async function listSessions(window: SessionWindow = 'all'): Promise<SessionRow[]> {
+export async function listSessions(
+  window: SessionWindow = 'all',
+  page = 1,
+  pageSize = SESSION_LIST_DEFAULT_PAGE_SIZE
+): Promise<SessionListResult> {
   const ms = windowToMs(window)
   const now = new Date()
+  const safePageSize = Math.min(Math.max(Math.floor(pageSize) || SESSION_LIST_DEFAULT_PAGE_SIZE, 1), SESSION_LIST_MAX_PAGE_SIZE)
+  const where = ms ? { lastSeenAt: { gte: new Date(now.getTime() - ms) } } : undefined
+
+  const total = await prisma.userSession.count({ where })
+  const pages = Math.max(1, Math.ceil(total / safePageSize))
+  // Clamp so a stale page number (list shrank since the client last looked)
+  // returns the last real page instead of an empty one.
+  const safePage = Math.min(Math.max(Math.floor(page) || 1, 1), pages)
 
   const rows = await prisma.userSession.findMany({
-    where: ms ? { lastSeenAt: { gte: new Date(now.getTime() - ms) } } : undefined,
-    orderBy: { lastSeenAt: 'desc' },
-    take: 500,
+    where,
+    orderBy: [{ lastSeenAt: 'desc' }, { id: 'desc' }],
+    skip: (safePage - 1) * safePageSize,
+    take: safePageSize,
   })
 
   const { byUid, employeeNoByUid, registrationNoByUid } = await resolveDisplayInfo(rows.map((r) => r.uid))
 
-  return rows.map((r) => {
-    const info = byUid.get(r.uid)
-    const isActiveNow = r.loggedOutAt === null && (now.getTime() - r.lastSeenAt.getTime()) <= ACTIVE_GRACE_MS
-    const endMoment = r.loggedOutAt ?? r.lastSeenAt
-    return {
-      id: r.id,
-      uid: r.uid,
-      role: r.role,
-      displayName: info?.displayName ?? null,
-      email: info?.email ?? null,
-      employeeNo: employeeNoByUid.get(r.uid) ?? null,
-      registrationNo: registrationNoByUid.get(r.uid) ?? null,
-      loginAt: r.loginAt,
-      lastSeenAt: r.lastSeenAt,
-      loggedOutAt: r.loggedOutAt,
-      endReason: r.endReason,
-      isActiveNow,
-      durationMs: Math.max(0, endMoment.getTime() - r.loginAt.getTime()),
-    }
-  })
+  return {
+    sessions: rows.map((r) =>
+      toSessionRow(r, byUid.get(r.uid), employeeNoByUid.get(r.uid) ?? null, registrationNoByUid.get(r.uid) ?? null, now)
+    ),
+    total,
+    page: safePage,
+    pages,
+    pageSize: safePageSize,
+  }
 }
 
 export interface SessionSummary {
@@ -308,13 +380,21 @@ export async function getSessionSummary(): Promise<SessionSummary> {
 //  QUERY — SESSION ACTIVITY DRILL-DOWN
 // ─────────────────────────────────────────────────────────
 
+export const SESSION_ACTIVITY_DEFAULT_PAGE_SIZE = 25
+export const SESSION_ACTIVITY_MAX_PAGE_SIZE = 100
+
 export interface SessionActivity {
   session: SessionRow
   entries: AuditLogRow[]
+  total: number
+  page: number
+  pages: number
+  pageSize: number
 }
 
 /**
- * Everything a session's owner did, scoped to that session's own window.
+ * Everything a session's owner did, scoped to that session's own window,
+ * newest first, one page at a time.
  * The upper bound is always loginAt → loggedOutAt (or now, if still open).
  * The LOWER bound is loginAt itself — UNLESS this is the uid's very first
  * tracked session ever (no earlier UserSession row exists for them), in
@@ -332,7 +412,11 @@ export interface SessionActivity {
  * session's own end — every session after their second behaves exactly
  * as documented, strictly bounded on both ends.
  */
-export async function getSessionActivity(sessionId: string): Promise<SessionActivity | null> {
+export async function getSessionActivity(
+  sessionId: string,
+  page = 1,
+  pageSize = SESSION_ACTIVITY_DEFAULT_PAGE_SIZE
+): Promise<SessionActivity | null> {
   const row = await prisma.userSession.findUnique({ where: { id: sessionId } })
   if (!row) return null
 
@@ -343,32 +427,26 @@ export async function getSessionActivity(sessionId: string): Promise<SessionActi
       select: { id: true },
     }),
   ])
-  const info = byUid.get(row.uid)
   const now = new Date()
-  const isActiveNow = row.loggedOutAt === null && (now.getTime() - row.lastSeenAt.getTime()) <= ACTIVE_GRACE_MS
-  const endMoment = row.loggedOutAt ?? row.lastSeenAt
+  const session = toSessionRow(
+    row, byUid.get(row.uid), employeeNoByUid.get(row.uid) ?? null, registrationNoByUid.get(row.uid) ?? null, now
+  )
 
-  const session: SessionRow = {
-    id: row.id,
-    uid: row.uid,
-    role: row.role,
-    displayName: info?.displayName ?? null,
-    email: info?.email ?? null,
-    employeeNo: employeeNoByUid.get(row.uid) ?? null,
-    registrationNo: registrationNoByUid.get(row.uid) ?? null,
-    loginAt: row.loginAt,
-    lastSeenAt: row.lastSeenAt,
-    loggedOutAt: row.loggedOutAt,
-    endReason: row.endReason,
-    isActiveNow,
-    durationMs: Math.max(0, endMoment.getTime() - row.loginAt.getTime()),
-  }
-
-  const entries = await auditService.queryByActor(row.uid, {
+  const bounds = {
     dateFrom: earlierSession ? row.loginAt : undefined,
     dateTo: row.loggedOutAt ?? now,
-    limit: 200,
+  }
+  const safePageSize = Math.min(Math.max(Math.floor(pageSize) || SESSION_ACTIVITY_DEFAULT_PAGE_SIZE, 1), SESSION_ACTIVITY_MAX_PAGE_SIZE)
+
+  const total = await auditService.countByActor(row.uid, bounds)
+  const pages = Math.max(1, Math.ceil(total / safePageSize))
+  const safePage = Math.min(Math.max(Math.floor(page) || 1, 1), pages)
+
+  const entries = await auditService.queryByActor(row.uid, {
+    ...bounds,
+    limit: safePageSize,
+    offset: (safePage - 1) * safePageSize,
   })
 
-  return { session, entries }
+  return { session, entries, total, page: safePage, pages, pageSize: safePageSize }
 }

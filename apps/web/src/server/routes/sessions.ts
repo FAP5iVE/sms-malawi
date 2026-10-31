@@ -22,9 +22,15 @@ export const sessionsRouter = Router()
 
 const VALID_WINDOWS = new Set<SessionWindow>(['10m', '30m', '1h', 'all'])
 
+function positiveInt(raw: unknown, fallback: number): number {
+  const n = parseInt(String(raw ?? ''), 10)
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
 // ─────────────────────────────────────────────────────────
-//  GET /sessions?window=10m|30m|1h|all
-//  Session list, most recently active first. Default 'all'.
+//  GET /sessions?window=10m|30m|1h|all&page=1&pageSize=15
+//  Session list, most recently active first, one page at a time.
+//  Default window 'all'.
 // ─────────────────────────────────────────────────────────
 
 sessionsRouter.get(
@@ -35,8 +41,11 @@ sessionsRouter.get(
     const raw = req.query.window ? String(req.query.window) : 'all'
     const window = (VALID_WINDOWS.has(raw as SessionWindow) ? raw : 'all') as SessionWindow
 
-    const sessions = await sessionService.listSessions(window)
-    res.json({ sessions, window })
+    const page = positiveInt(req.query.page, 1)
+    const pageSize = positiveInt(req.query.pageSize, sessionService.SESSION_LIST_DEFAULT_PAGE_SIZE)
+
+    const result = await sessionService.listSessions(window, page, pageSize)
+    res.json({ ...result, window })
   }
 )
 
@@ -57,7 +66,7 @@ sessionsRouter.get(
 // ─────────────────────────────────────────────────────────
 //  GET /sessions/:id/activity
 //  Everything the session's owner did, scoped to that session's own
-//  loginAt → loggedOutAt (or now) window.
+//  loginAt → loggedOutAt (or now) window. Paged: ?page=1&pageSize=25
 // ─────────────────────────────────────────────────────────
 
 sessionsRouter.get(
@@ -66,7 +75,11 @@ sessionsRouter.get(
   requirePermission('userMgmt.viewActiveSessions'),
   async (req: Request, res: Response) => {
     const id = String(req.params['id'] ?? '')
-    const result = await sessionService.getSessionActivity(id)
+    const result = await sessionService.getSessionActivity(
+      id,
+      positiveInt(req.query.page, 1),
+      positiveInt(req.query.pageSize, sessionService.SESSION_ACTIVITY_DEFAULT_PAGE_SIZE)
+    )
     if (!result) {
       res.status(404).json({ error: 'Session not found.' })
       return

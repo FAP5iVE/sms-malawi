@@ -12,6 +12,7 @@ import 'server-only'
  *   3. express.json      — body parsing with tight 50kb global limit
  *   4. CORS              — explicit origin allowlist (no VERCEL_URL wildcards)
  *   5. createRateLimiter('standard') — express-rate-limit, in-memory store
+ *   5b. activityLogger   — audit-completeness recorder (Sessions / Audit fix)
  *   6. Routes            — all domain routers
  *   7. 404 handler       — catch-all for undefined routes
  *   8. globalErrorHandler — Prisma error mapping + production message sanitisation
@@ -111,6 +112,7 @@ import { promotionRouter }     from '@/server/routes/promotion'
 import { createRateLimiter }   from '@/lib/ratelimit'
 import { logger }              from '@/lib/logger'
 import { globalErrorHandler }  from '@/server/middleware/inputSanitise'
+import { activityLogger }      from '@/server/middleware/activityLog'
 import { analyticsRouter }     from '@/server/routes/analytics'
 import { reportingRouter }     from '@/server/routes/reporting'
 import { searchRouter }        from '@/server/routes/search'
@@ -208,6 +210,15 @@ export function createApiApp() {
   // Auth gates every authenticated route, and the bounded school user base
   // makes per-Lambda-instance counters acceptable. See lib/ratelimit.ts.
   app.use(createRateLimiter('standard'))
+
+  // ── 5b. Activity recorder ─────────────────────────────────────────────────
+  // [Sessions / Audit completeness] Makes sure every successful state-changing
+  // call by a signed-in user ends up in the audit log (and therefore under the
+  // right session in Reports > Sessions), even where a route/service never
+  // audited itself, and holds each response until its audit writes have
+  // settled so a frozen serverless instance can't drop them. Must sit after
+  // body parsing and before the routers. See server/middleware/activityLog.ts.
+  app.use(activityLogger)
 
   // ── 6. Domain routers ─────────────────────────────────────────────────────
   app.use('/students',        studentsRouter)

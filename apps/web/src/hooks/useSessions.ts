@@ -3,14 +3,14 @@
 /**
  * apps/web/src/hooks/useSessions.ts
  *
- * [CHANGE TYPE]: NEW FILE
+ * [CHANGE TYPE]: NEW FILE (paging added: list + activity are server-paginated)
  * [PURPOSE]: Data hooks for the Reports > Admin > Sessions tab —
  *   GET /sessions, GET /sessions/summary, GET /sessions/:id/activity,
  *   POST /sessions/:uid/force-logout.
  * [DEPENDS ON]: W/lib/api-client.ts
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import type {
   ApiSessionListResponse, ApiSessionSummary, ApiSessionActivityResponse, ApiSessionWindow,
@@ -21,11 +21,19 @@ import type {
 // convention uses for similarly live admin data.
 const SESSIONS_REFETCH_MS = 30 * 1000
 
-export function useSessions(sessionWindow: ApiSessionWindow) {
+export const SESSIONS_PAGE_SIZE = 15
+export const SESSION_ACTIVITY_PAGE_SIZE = 25
+
+// keepPreviousData: while the next page loads, the current rows stay on
+// screen (dimmed by the caller via isFetching) instead of flashing to a
+// skeleton on every Next/Prev click.
+export function useSessions(sessionWindow: ApiSessionWindow, page = 1, pageSize = SESSIONS_PAGE_SIZE) {
   return useQuery({
-    queryKey: queryKeys.sessions.list(sessionWindow),
-    queryFn: () => apiFetch<ApiSessionListResponse>(`/sessions?window=${sessionWindow}`),
+    queryKey: queryKeys.sessions.list(sessionWindow, page, pageSize),
+    queryFn: () =>
+      apiFetch<ApiSessionListResponse>(`/sessions?window=${sessionWindow}&page=${page}&pageSize=${pageSize}`),
     refetchInterval: SESSIONS_REFETCH_MS,
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -46,12 +54,14 @@ export function useSessionsSummary() {
 // data (TanStack Query v5), so this needs no separate "is it open" input
 // from the caller: a closed session's activity can't change, so once
 // isActiveNow flips false, polling stops on its own.
-export function useSessionActivity(sessionId: string | null) {
+export function useSessionActivity(sessionId: string | null, page = 1, pageSize = SESSION_ACTIVITY_PAGE_SIZE) {
   return useQuery({
-    queryKey: queryKeys.sessions.activity(sessionId ?? ''),
-    queryFn: () => apiFetch<ApiSessionActivityResponse>(`/sessions/${sessionId}/activity`),
+    queryKey: queryKeys.sessions.activity(sessionId ?? '', page, pageSize),
+    queryFn: () =>
+      apiFetch<ApiSessionActivityResponse>(`/sessions/${sessionId}/activity?page=${page}&pageSize=${pageSize}`),
     enabled: sessionId !== null,
     refetchInterval: (query) => (query.state.data?.session.isActiveNow ? SESSIONS_REFETCH_MS : false),
+    placeholderData: keepPreviousData,
   })
 }
 

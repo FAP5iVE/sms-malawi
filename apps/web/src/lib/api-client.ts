@@ -659,8 +659,8 @@ export const queryKeys = {
 
   // ── Sessions (Reports > Admin > Sessions tab)
   sessions: {
-    list: (window: string) => ['sessions', 'list', window] as const,
+    list: (window: string, page = 1, pageSize = 15) => ['sessions', 'list', window, page, pageSize] as const,
     summary: () => ['sessions', 'summary'] as const,
-    activity: (sessionId: string) => ['sessions', 'activity', sessionId] as const,
+    activity: (sessionId: string, page = 1, pageSize = 25) => ['sessions', 'activity', sessionId, page, pageSize] as const,
   },
 } as const

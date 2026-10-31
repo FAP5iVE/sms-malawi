@@ -1655,6 +1655,11 @@ export interface ApiUserSession {
 export interface ApiSessionListResponse {
   sessions: ApiUserSession[]
   window:   ApiSessionWindow
+  /** Server pagination — total sessions matching `window`, and this page's position. */
+  total:    number
+  page:     number
+  pages:    number
+  pageSize: number
 }
 
 export interface ApiSessionSummary {
@@ -1669,11 +1674,23 @@ export interface ApiSessionSummary {
 // on top of every ApiAuditLogEntry field, so this isn't quite that type.
 export interface ApiSessionAuditEntry extends ApiAuditLogEntry {
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
+  /** Before/after values, field-level changes and request context, when the action recorded any. */
+  metadata?: {
+    before?:  Record<string, unknown>
+    after?:   Record<string, unknown>
+    changes?: Array<{ field: string; oldValue: unknown; newValue: unknown }>
+    context?: Record<string, unknown>
+  } | null
 }
 
 export interface ApiSessionActivityResponse {
-  session: ApiUserSession
-  entries: ApiSessionAuditEntry[]
+  session:  ApiUserSession
+  entries:  ApiSessionAuditEntry[]
+  /** Server pagination — every action in the session's window, newest first. */
+  total:    number
+  page:     number
+  pages:    number
+  pageSize: number
 }
 // ─── PLACEMENTS (R18 — university placement & advisory, redesigned) ──────────
 // Matches the "Malawi Higher Education Placement & Advisory" reference
