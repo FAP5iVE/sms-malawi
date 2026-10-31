@@ -90,6 +90,8 @@
 import { Router }              from 'express'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission }   from '@/server/middleware/verifyPermission'
+import { rateLimit }           from '@/lib/ratelimit'
+import { idempotent }          from '@/server/middleware/idempotency'
 import { CreateExamSchema, UpdateExamSchema, BulkMarkEntrySchema, FinalizeMarksSchema, CreateManebRecordSchema } from '@shared/schemas/exam'
 import * as examService        from '@/server/services/examService'
 import { getSignedViewUrl, canReadFile } from '@/lib/storage'
@@ -416,6 +418,7 @@ examsRouter.get('/report-card/:studentId/data', verifyAuth,
 // replaces the route this same name had before R7 removed it (that one
 // called examService.ts's now-removed generateReportCard()).
 examsRouter.post('/report-card', verifyAuth, requireRole(['admin', 'exam_officer']),
+  rateLimit('export-generate'), idempotent(),
   async (req, res) => {
     const { studentId, academicYear, term } = req.body as { studentId: string; academicYear: string; term: number }
     if (!studentId || !academicYear || !term) {
@@ -434,6 +437,7 @@ examsRouter.post('/report-card', verifyAuth, requireRole(['admin', 'exam_officer
 // students previously got 403). Resolves the caller's studentId from their
 // firebaseUid and applies the same fee gate as the results view.
 examsRouter.post('/report-card/mine', verifyAuth,
+  rateLimit('export-generate'), idempotent(),
   async (req, res) => {
     const { academicYear, term } = req.body as { academicYear: string; term: number }
     if (!academicYear || !term) return res.status(400).json({ error: 'academicYear and term are required' })
@@ -504,6 +508,7 @@ examsRouter.post('/maneb', verifyAuth, requirePermission('exam.manageManebRecord
 // sole MANEB write path). Returns { created, errors } so partial success is
 // visible; a duplicate candidateNo fails only its own row.
 examsRouter.post('/maneb/bulk', verifyAuth, requirePermission('exam.manageManebRecords'),
+  rateLimit('bulk-mutation'), idempotent(),
   async (req, res) => {
     const parsed = CreateManebRecordSchema.array().min(1).max(500).safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
@@ -514,8 +519,9 @@ examsRouter.post('/maneb/bulk', verifyAuth, requirePermission('exam.manageManebR
 // from stored subjectGrades for all MANEB records in a year (one-time after
 // the GR-1 rollout; new records are computed on create/import).
 examsRouter.post('/maneb/recompute', verifyAuth, requirePermission('exam.manageManebRecords'),
+  rateLimit('bulk-mutation'), idempotent(),
   async (req, res) => {
     const academicYear = typeof req.body?.academicYear === 'string' ? req.body.academicYear : undefined
     if (!academicYear) return res.status(400).json({ error: 'academicYear is required' })
     return res.json(await examService.recomputeManebAggregates(academicYear, { uid: req.user!.uid, role: req.user!.role }))
-  })
+  })

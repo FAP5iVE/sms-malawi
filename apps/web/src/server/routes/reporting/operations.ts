@@ -24,6 +24,7 @@ import {
   ASSET_CONDITIONS, ASSET_STATUSES,
 } from '@/server/services/analytics/assetRegisterLogic'
 import { STOCKTAKE_STATUSES } from '@/server/services/analytics/stocktakeLogic'
+import { boundedInt, REQUEST_LIMITS } from '@/lib/requestLimits'
 import { resolvePeriod, positiveInt, optionalDate, optionalEnum, optionalString, optionalTerm } from './_shared'
 
 const ASSET_CATEGORIES = ['FURNITURE', 'IT_EQUIPMENT', 'LAB_EQUIPMENT', 'SPORTS_EQUIPMENT', 'KITCHEN_EQUIPMENT', 'VEHICLE', 'MAINTENANCE_TOOL', 'OTHER'] as const
@@ -53,7 +54,7 @@ export const operationsReportingRouter = Router()
 operationsReportingRouter.get('/procurement-pipeline',
   verifyAuth, requirePermission('procurement.reviewRequisition'),
   async (req, res) => {
-    res.json(await operations.getProcurementPipeline(positiveInt(req.query.days, 365)))
+    res.json(await operations.getProcurementPipeline(boundedInt(req.query.days, 365, REQUEST_LIMITS.maxDays, 'days')))
   })
 
 operationsReportingRouter.get('/stocktake-variance',

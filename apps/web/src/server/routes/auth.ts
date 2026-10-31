@@ -30,6 +30,8 @@ import { Router } from 'express'
 import { verifyAuth } from '@/lib/verifyAuth'
 import * as auditService from '@/server/services/auditService'
 import * as sessionService from '@/server/services/sessionService'
+import * as loginTelemetryService from '@/server/services/loginTelemetryService'
+import { rateLimit } from '@/lib/ratelimit'
 
 export const authRouter = Router()
 
@@ -92,18 +94,24 @@ authRouter.post('/log-logout', verifyAuth, async (req, res) => {
 })
 
 // POST /auth/log-login-failed — deliberately unauthenticated (a failed
-// sign-in has no valid token to verify). Payload is minimal by design —
-// this only ever records that an attempt failed, for the security
-// dashboard's trend graph, not who specifically attempted it beyond the
-// email they typed.
-authRouter.post('/log-login-failed', async (req, res) => {
-  const email = typeof req.body?.email === 'string' ? req.body.email.slice(0, 200) : 'unknown'
-  await auditService.log({
-    action:     'LOGIN_FAILED',
-    entityType: 'Auth',
-    entityId:   email,
-    actorUid:   email,
-    actorRole:  'unknown',
-  })
+// sign-in has no valid token to verify), so EVERYTHING in the request is
+// untrusted input. [Issue 5] Hardened:
+//   • per-IP limiter (rateLimit('login-telemetry'), Redis-backed — Issue 6) BEFORE any work is done;
+//   • strict body schema — only `email` (≤254 chars) is accepted; unknown
+//     fields such as actorUid / role / severity / timestamp are rejected;
+//   • loginTelemetryService assigns the action, actor, severity and time
+//     itself, records a masked email + fingerprint (never the raw address as
+//     an "actor"), caps writes per identifier and per instance, and never
+//     touches the account the email belongs to;
+//   • a well-formed request always gets the same 204 whether the event was
+//     stored, throttled, or failed to write — no account-existence or
+//     auth-stage signal, and no way to tell "dropped" from "recorded".
+authRouter.post('/log-login-failed', rateLimit('login-telemetry'), async (req, res) => {
+  const parsed = loginTelemetryService.FailedLoginBodySchema.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid request.' })
+    return
+  }
+  await loginTelemetryService.recordFailedLogin(parsed.data.email)
   res.status(204).end()
 })

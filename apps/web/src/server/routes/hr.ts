@@ -53,6 +53,8 @@
  */
 import 'server-only'
 import { Router } from 'express'
+import { rateLimit } from '@/lib/ratelimit'
+import { boundedInt, REQUEST_LIMITS } from '@/lib/requestLimits'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import { CreateStaffSchema, UpdateStaffSchema, LeaveRequestSchema, ReviewLeaveSchema, LoanRequestSchema, PerformanceNoteSchema, UpdateSalarySchema, CreateAllowanceSchema } from '@shared/schemas/hr'
@@ -240,6 +242,7 @@ hrRouter.post('/', verifyAuth, requireRole([...HR_ADMIN]),
 // resulting file gets no public read permission — viewing it still goes
 // through getSignedViewUrl()'s role-checked proxy, same as before.
 hrRouter.post('/:id/photo/upload-ticket', verifyAuth, requireRole([...HR_ADMIN]),
+  rateLimit('upload-ticket'),
   async (_req, res) => {
     try {
       const ticket = await createDirectUploadTicket(FILE_PREFIX.STAFF_PHOTO)
@@ -274,7 +277,7 @@ hrRouter.post('/:id/photo', verifyAuth, requireRole([...HR_ADMIN]),
 // ── CONTRACT EXPIRY ALERTS ──
 hrRouter.get('/alerts/contracts', verifyAuth, requireRole([...HR_ADMIN]),
   async (req, res) => {
-    const days = Number(req.query.days ?? 60)
+    const days = boundedInt(req.query.days, 60, REQUEST_LIMITS.maxDays, 'days')
     return res.json(await hrService.getContractExpiryAlert(days))
   })
 
@@ -284,7 +287,7 @@ hrRouter.get('/alerts/contracts', verifyAuth, requireRole([...HR_ADMIN]),
 // the wrong data source for a "what's coming up" display.
 hrRouter.get('/alerts/contracts-upcoming', verifyAuth, requireRole([...HR_ADMIN]),
   async (req, res) => {
-    const days = Number(req.query.days ?? 60)
+    const days = boundedInt(req.query.days, 60, REQUEST_LIMITS.maxDays, 'days')
     return res.json(await hrService.getUpcomingContractExpiries(days))
   })
 

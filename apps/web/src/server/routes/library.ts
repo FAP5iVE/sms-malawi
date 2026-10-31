@@ -41,6 +41,7 @@
  *   read directly from source this phase)
  */
 import { Router } from 'express'
+import { rateLimit } from '@/lib/ratelimit'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import { hasPermission } from '@shared/types/permissions'
@@ -195,6 +196,7 @@ libraryRouter.get('/digital', verifyAuth, requirePermission('library.viewDigital
 // file gets no public read permission; viewing still goes through
 // GET /digital/:id/view's role-checked signed URL, same as before.
 libraryRouter.post('/digital/upload-ticket', verifyAuth, requirePermission('library.uploadDigitalResource'),
+  rateLimit('upload-ticket'),
   async (_req, res) => {
     try {
       const ticket = await createDirectUploadTicket(FILE_PREFIX.DIGITAL_RESOURCE)

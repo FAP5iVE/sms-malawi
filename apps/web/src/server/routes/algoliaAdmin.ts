@@ -1,5 +1,6 @@
 import { Router }   from 'express'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
+import { rateLimit } from '@/lib/ratelimit'
 import { prisma }   from '@/lib/prisma'
 import {
   bulkIndexStudents,
@@ -49,6 +50,7 @@ function respondSeed(res: import('express').Response, result: BulkIndexResult) {
  */
 algoliaAdminRouter.post('/seed-students',
   verifyAuth, requireRole(['admin']),
+  rateLimit('bulk-mutation'),
   async (_req, res) => {
     const students = await prisma.student.findMany({
       where: { status: { not: 'ARCHIVED' } },
@@ -101,6 +103,7 @@ algoliaAdminRouter.post('/seed-students',
  */
 algoliaAdminRouter.post('/seed-staff',
   verifyAuth, requireRole(['admin']),
+  rateLimit('bulk-mutation'),
   async (_req, res) => {
     const staff = await prisma.staffProfile.findMany({
       where:  { status: 'ACTIVE' },
@@ -147,6 +150,7 @@ algoliaAdminRouter.post('/seed-staff',
  */
 algoliaAdminRouter.post('/seed-books',
   verifyAuth, requireRole(['admin']),
+  rateLimit('bulk-mutation'),
   async (_req, res) => {
     const books = await prisma.book.findMany({
       select: {
@@ -191,6 +195,7 @@ algoliaAdminRouter.post('/seed-books',
  */
 algoliaAdminRouter.post('/seed-user-accounts',
   verifyAuth, requireRole(['admin']),
+  rateLimit('bulk-mutation'),
   async (_req, res) => {
     respondSeed(res, await seedAllUserAccountsToAlgolia())
   },
@@ -202,6 +207,7 @@ algoliaAdminRouter.post('/seed-user-accounts',
  */
 algoliaAdminRouter.post('/seed-applications',
   verifyAuth, requireRole(['admin']),
+  rateLimit('bulk-mutation'),
   async (_req, res) => {
     respondSeed(res, await seedAllApplicationsToAlgolia())
   },
@@ -213,6 +219,7 @@ algoliaAdminRouter.post('/seed-applications',
  */
 algoliaAdminRouter.post('/seed-invoices',
   verifyAuth, requireRole(['admin']),
+  rateLimit('bulk-mutation'),
   async (_req, res) => {
     respondSeed(res, await seedAllInvoicesToAlgolia())
   },
@@ -224,6 +231,7 @@ algoliaAdminRouter.post('/seed-invoices',
  */
 algoliaAdminRouter.post('/seed-placements',
   verifyAuth, requireRole(['admin']),
+  rateLimit('bulk-mutation'),
   async (_req, res) => {
     respondSeed(res, await seedAllPlacementsToAlgolia())
   },
@@ -235,6 +243,7 @@ algoliaAdminRouter.post('/seed-placements',
  */
 algoliaAdminRouter.post('/seed-assets',
   verifyAuth, requireRole(['admin']),
+  rateLimit('bulk-mutation'),
   async (_req, res) => {
     respondSeed(res, await seedAllAssetsToAlgolia())
   },
@@ -248,6 +257,7 @@ algoliaAdminRouter.post('/seed-assets',
  */
 algoliaAdminRouter.post('/seed-announcements',
   verifyAuth, requireRole(['admin']),
+  rateLimit('bulk-mutation'),
   async (_req, res) => {
     respondSeed(res, await seedAllAnnouncementsToAlgolia())
   },
@@ -266,6 +276,7 @@ algoliaAdminRouter.post('/seed-announcements',
  */
 algoliaAdminRouter.post('/configure-indices',
   verifyAuth, requireRole(['admin']),
+  rateLimit('bulk-mutation'),
   async (_req, res) => {
     const results = await configureAllIndices()
     const failed = Object.entries(results).filter(([, r]) => !r.ok)

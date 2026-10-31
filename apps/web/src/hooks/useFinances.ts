@@ -26,7 +26,7 @@ import type {
   UpdateStudentFeeCommitmentInput, BulkGenerateInvoicesInput,
 } from '@shared/schemas/finance'
 import { toast } from 'sonner'
-import { apiFetch, ApiError, queryKeys } from '@/lib/api-client'
+import { apiFetch, ApiError, newIdempotencyKey, queryKeys } from '@/lib/api-client'
 import { openPdfPreview, PdfPreviewError } from '@/lib/pdfPreview'
 
 export function useFinanceSummary(academicYear: string, term: number) {
@@ -504,6 +504,8 @@ export function useBulkGenerateInvoices() {
     mutationFn: (data: BulkGenerateInvoicesInput) =>
       apiFetch<ApiBulkInvoiceResult>('/finances/invoices/bulk-generate', {
         method: 'POST',
+        // [Issue 6] One key per click: a retry of the same run replays the original result.
+        headers: data.dryRun ? undefined : { 'Idempotency-Key': newIdempotencyKey() },
         body: JSON.stringify(data),
       }),
     onSuccess: (_result, variables) => {

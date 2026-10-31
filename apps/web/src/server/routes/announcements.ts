@@ -47,6 +47,7 @@
 import 'server-only'
 
 import { Router } from 'express'
+import { rateLimit } from '@/lib/ratelimit'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { verifyAuth, getAdminApp } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
@@ -239,6 +240,7 @@ announcementsRouter.post(
   '/image/upload-ticket',
   verifyAuth,
   requireAnyPermission(['announcement.create', 'announcement.createWithApproval']),
+  rateLimit('upload-ticket'),
   async (_req, res) => {
     try {
       const ticket = await createDirectUploadTicket(FILE_PREFIX.ANNOUNCEMENT_IMAGE)

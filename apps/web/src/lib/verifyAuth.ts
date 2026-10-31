@@ -37,6 +37,14 @@ export function getAdminApp(): App {
 }
 
 export async function verifyAuth(req: Request, res: Response, next: NextFunction) {
+  // [Issue 6] A mount-level verifyAuth (api-app.ts runs it ahead of the
+  // per-user report-read limiter so the limiter can key on the verified uid)
+  // has already verified this request; the routers beneath repeat verifyAuth
+  // in their own gates. req.user is only ever set by this function, never
+  // from client input, so reuse it instead of paying a second Firebase
+  // verifyIdToken(checkRevoked) network round-trip.
+  if (req.user) return next()
+
   const authHeader = req.headers.authorization
   if (!authHeader?.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'No token provided' })

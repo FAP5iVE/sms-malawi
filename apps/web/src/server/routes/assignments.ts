@@ -59,6 +59,7 @@
  *   (CreateAssignmentSchema, UpdateAssignmentSchema, MarkSubmissionSchema)
  */
 import { Router, type Request, type Response, type NextFunction } from 'express'
+import { rateLimit } from '@/lib/ratelimit'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { hasAnyPermission, type Permission } from '@shared/types/permissions'
 import { prisma } from '@/lib/prisma'
@@ -204,6 +205,7 @@ for (const [kind, prefix] of [['image', FILE_PREFIX.ASSIGNMENT_IMAGE], ['file', 
     `/attachments/${kind}/upload-ticket`,
     verifyAuth,
     requireRole(['academic']),
+    rateLimit('upload-ticket'),
     async (req: Request, res: Response) => {
       try {
         await assignmentService.assertCanPostInClass(String(req.params.classId), viewerOf(req))
@@ -305,6 +307,7 @@ assignmentsRouter.post(
   '/:id/submit/upload-ticket',
   verifyAuth,
   requireAssignmentViewAccess,
+  rateLimit('upload-ticket'),
   async (req: Request, res: Response) => {
     try {
       if (req.user!.role !== 'student') {

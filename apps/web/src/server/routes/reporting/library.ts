@@ -7,6 +7,7 @@ import { Router } from 'express'
 import { verifyAuth } from '@/lib/verifyAuth'
 import { requirePermission } from '@/server/middleware/verifyPermission'
 import * as library from '@/server/services/analytics/libraryAnalytics'
+import { boundedInt, REQUEST_LIMITS } from '@/lib/requestLimits'
 import { optionalDate, optionalEnum, optionalString, positiveInt } from './_shared'
 
 export const libraryReportingRouter = Router()
@@ -22,11 +23,11 @@ libraryReportingRouter.get('/attention', ...gate, async (_req, res) => {
 })
 
 libraryReportingRouter.get('/circulation', ...gate, async (req, res) => {
-  res.json(await library.getLibraryCirculation(positiveInt(req.query.days, 90)))
+  res.json(await library.getLibraryCirculation(boundedInt(req.query.days, 90, REQUEST_LIMITS.maxDays, 'days')))
 })
 
 libraryReportingRouter.get('/fines', ...gate, async (req, res) => {
-  res.json(await library.getLibraryFines(positiveInt(req.query.months, 6)))
+  res.json(await library.getLibraryFines(boundedInt(req.query.months, 6, REQUEST_LIMITS.maxMonths, 'months')))
 })
 
 const DIGITAL_TYPES = ['EBOOK', 'PAST_PAPER', 'REFERENCE', 'STUDY_GUIDE'] as const

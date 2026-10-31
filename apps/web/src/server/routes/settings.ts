@@ -54,6 +54,7 @@
 
 import 'server-only'
 import { Router }            from 'express'
+import { rateLimit } from '@/lib/ratelimit'
 import { z }                 from 'zod'
 import { prisma }            from '@/lib/prisma'
 import { requireRole }       from '@/lib/verifyAuth'
@@ -515,6 +516,7 @@ settingsRouter
 settingsRouter.post(
   '/leadership-photo/upload-ticket',
   requireRole(['admin', 'hr', 'high_rank']),
+  rateLimit('upload-ticket'),
   async (_req, res) => {
     try {
       const ticket = await createDirectUploadTicket(FILE_PREFIX.LEADERSHIP_PHOTO)
@@ -533,6 +535,7 @@ settingsRouter.post(
 settingsRouter.post(
   '/discover-photo/upload-ticket',
   requireRole(['admin', 'hr', 'high_rank']),
+  rateLimit('upload-ticket'),
   async (_req, res) => {
     try {
       const ticket = await createDirectUploadTicket(FILE_PREFIX.DISCOVER_PHOTO)

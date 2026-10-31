@@ -61,6 +61,7 @@ import * as analytics from '@/server/services/analyticsService'
 import { resolveStudentFromUid } from '@/server/services/studentService'
 import { checkBalanceGate } from '@/server/services/feeService'
 import { resolvePeriod, optionalTerm, positiveInt } from './reporting/_shared'
+import { boundedInt, REQUEST_LIMITS } from '@/lib/requestLimits'
 
 export const analyticsRouter = Router()
 
@@ -125,7 +126,7 @@ const OWN_ATTENDANCE = ['report.viewOwnAttendance', 'report.viewAnyStudentPerfor
 analyticsRouter.get('/admin/login-trend',
   verifyAuth, requirePermission('report.viewLoginAttempts'),
   async (req, res) => {
-    res.json(await analytics.getAdminLoginTrend(positiveInt(req.query.days, 30)))
+    res.json(await analytics.getAdminLoginTrend(boundedInt(req.query.days, 30, REQUEST_LIMITS.maxDays, 'days')))
   })
 
 analyticsRouter.get('/admin/activity-heatmap',
@@ -137,19 +138,19 @@ analyticsRouter.get('/admin/activity-heatmap',
 analyticsRouter.get('/admin/entity-activity',
   verifyAuth, requirePermission('report.viewAuditLogs'),
   async (req, res) => {
-    res.json(await analytics.getAdminEntityActivityBreakdown(positiveInt(req.query.days, 30)))
+    res.json(await analytics.getAdminEntityActivityBreakdown(boundedInt(req.query.days, 30, REQUEST_LIMITS.maxDays, 'days')))
   })
 
 analyticsRouter.get('/admin/action-breakdown',
   verifyAuth, requirePermission('report.viewAuditLogs'),
   async (req, res) => {
-    res.json(await analytics.getAdminActionBreakdown(positiveInt(req.query.days, 30)))
+    res.json(await analytics.getAdminActionBreakdown(boundedInt(req.query.days, 30, REQUEST_LIMITS.maxDays, 'days')))
   })
 
 analyticsRouter.get('/admin/audit-volume',
   verifyAuth, requirePermission('report.viewAuditLogs'),
   async (req, res) => {
-    res.json(await analytics.getAdminAuditVolumeTrend(positiveInt(req.query.days, 30)))
+    res.json(await analytics.getAdminAuditVolumeTrend(boundedInt(req.query.days, 30, REQUEST_LIMITS.maxDays, 'days')))
   })
 
 // ─── SCHOOL-WIDE PERFORMANCE ─────────────────────────────────────────────────
@@ -192,7 +193,7 @@ analyticsRouter.get('/school/teacher-effectiveness',
 analyticsRouter.get('/school/enrollment-trend',
   verifyAuth, requirePermission('report.viewStudentRegistration'),
   async (req, res) => {
-    res.json(await analytics.getHighRankEnrollmentTrend(positiveInt(req.query.months, 12)))
+    res.json(await analytics.getHighRankEnrollmentTrend(boundedInt(req.query.months, 12, REQUEST_LIMITS.maxMonths, 'months')))
   })
 
 analyticsRouter.get('/school/financial-summary',
@@ -218,13 +219,13 @@ analyticsRouter.get('/school/attendance-summary',
 analyticsRouter.get('/finance/collection-by-day',
   verifyAuth, requirePermission('report.viewFeeCollection'),
   async (req, res) => {
-    res.json(await analytics.getFinanceCollectionByDay(positiveInt(req.query.days, 30)))
+    res.json(await analytics.getFinanceCollectionByDay(boundedInt(req.query.days, 30, REQUEST_LIMITS.maxDays, 'days')))
   })
 
 analyticsRouter.get('/finance/collection-by-month',
   verifyAuth, requirePermission('report.viewFeeCollection'),
   async (req, res) => {
-    res.json(await analytics.getFinanceCollectionByMonth(positiveInt(req.query.months, 12)))
+    res.json(await analytics.getFinanceCollectionByMonth(boundedInt(req.query.months, 12, REQUEST_LIMITS.maxMonths, 'months')))
   })
 
 analyticsRouter.get('/finance/outstanding-by-class',
@@ -258,7 +259,7 @@ analyticsRouter.get('/finance/cash-flow',
 analyticsRouter.get('/finance/payroll-trend',
   verifyAuth, requirePermission('report.viewPayrollSummary'),
   async (req, res) => {
-    res.json(await analytics.getFinancePayrollTrend(positiveInt(req.query.months, 12)))
+    res.json(await analytics.getFinancePayrollTrend(boundedInt(req.query.months, 12, REQUEST_LIMITS.maxMonths, 'months')))
   })
 
 // [Payroll Financial Insights & Trends tab, user-requested] Same permission
@@ -269,7 +270,7 @@ analyticsRouter.get('/finance/payroll-trend',
 analyticsRouter.get('/finance/payroll-breakdown',
   verifyAuth, requirePermission('report.viewPayrollSummary'),
   async (req, res) => {
-    res.json(await analytics.getFinancePayrollBreakdown(positiveInt(req.query.months, 12)))
+    res.json(await analytics.getFinancePayrollBreakdown(boundedInt(req.query.months, 12, REQUEST_LIMITS.maxMonths, 'months')))
   })
 
 // [R14 — NEW] report.viewScholarshipSummary is granted to high_rank and
@@ -287,7 +288,7 @@ analyticsRouter.get('/finance/scholarship-summary',
 analyticsRouter.get('/library/borrowing-trend',
   verifyAuth, requirePermission('report.viewLibraryUsage'),
   async (req, res) => {
-    res.json(await analytics.getLibraryBorrowingTrend(positiveInt(req.query.weeks, 12)))
+    res.json(await analytics.getLibraryBorrowingTrend(boundedInt(req.query.weeks, 12, REQUEST_LIMITS.maxWeeks, 'weeks')))
   })
 
 analyticsRouter.get('/library/inventory-health',
@@ -299,7 +300,7 @@ analyticsRouter.get('/library/inventory-health',
 analyticsRouter.get('/library/top-borrowed',
   verifyAuth, requirePermission('report.viewLibraryUsage'),
   async (req, res) => {
-    res.json(await analytics.getLibraryTopBorrowed(positiveInt(req.query.limit, 10)))
+    res.json(await analytics.getLibraryTopBorrowed(boundedInt(req.query.limit, 10, REQUEST_LIMITS.maxTopN, 'limit')))
   })
 
 analyticsRouter.get('/library/digital-stats',
@@ -320,7 +321,7 @@ analyticsRouter.get('/lower-rank/applications-funnel',
 analyticsRouter.get('/lower-rank/application-trend',
   verifyAuth, requirePermission('report.viewAdmissionTrends'),
   async (req, res) => {
-    res.json(await analytics.getLowerRankApplicationTrend(positiveInt(req.query.months, 12)))
+    res.json(await analytics.getLowerRankApplicationTrend(boundedInt(req.query.months, 12, REQUEST_LIMITS.maxMonths, 'months')))
   })
 
 analyticsRouter.get('/lower-rank/enrollment-by-form',
@@ -458,7 +459,7 @@ analyticsRouter.get('/hr/leave-by-type',
 analyticsRouter.get('/hr/leave-trend',
   verifyAuth, requirePermission('report.viewHRReports'),
   async (req, res) => {
-    res.json(await analytics.getHRLeaveTrend(positiveInt(req.query.months, 12)))
+    res.json(await analytics.getHRLeaveTrend(boundedInt(req.query.months, 12, REQUEST_LIMITS.maxMonths, 'months')))
   })
 
 // ─── PLACEMENT ANALYTICS (R18) ───────────────────────────────────────────────

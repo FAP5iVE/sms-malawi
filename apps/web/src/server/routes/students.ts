@@ -16,6 +16,7 @@
 import 'server-only'
 
 import { Router, type Request, type Response } from 'express'
+import { rateLimit } from '@/lib/ratelimit'
 import { verifyAuth, requireRole }              from '@/lib/verifyAuth'
 import {
   requirePermission,
@@ -339,6 +340,7 @@ studentsRouter.post(
 studentsRouter.post(
   '/:id/photo/upload-ticket',
   requirePermission('student.edit'),
+  rateLimit('upload-ticket'),
   async (_req: Request, res: Response) => {
     try {
       const ticket = await createDirectUploadTicket(FILE_PREFIX.STUDENT_PHOTO)

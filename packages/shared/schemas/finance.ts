@@ -215,7 +215,8 @@ export const BulkGenerateInvoicesSchema = z.object({
   includeEnrolledOptional: z.boolean().default(true),
   applyScholarships: z.boolean().default(true),
   consumeAdvanceCredit: z.boolean().default(true),
-  studentIds: z.array(z.string().min(1)).optional(),
+  // [Issue 6] Bounded: one request may not name an unlimited id list.
+  studentIds: z.array(z.string().min(1)).max(2000, 'A single run may name at most 2000 students.').optional(),
   // true = compute and return the roster preview (projected totals,
   // scholarship/credit/arrears figures) without creating anything --
   // the "PRE-EXECUTION DRY RUN ROSTER" step. false = actually create the

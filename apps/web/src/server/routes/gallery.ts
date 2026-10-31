@@ -12,6 +12,7 @@
  * [DEPENDS ON]: W/lib/storage.ts, P/schema.prisma's GalleryPhoto model
  */
 import { Router } from 'express'
+import { rateLimit } from '@/lib/ratelimit'
 import { prisma } from '@/lib/prisma'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { getPublicViewUrl, createDirectUploadTicket, deleteFile, FILE_PREFIX } from '@/lib/storage'
@@ -52,6 +53,7 @@ galleryRouter.post(
   '/upload-ticket',
   verifyAuth,
   requireRole(['admin', 'high_rank', 'lower_rank']),
+  rateLimit('upload-ticket'),
   async (_req, res) => {
     try {
       const ticket = await createDirectUploadTicket(FILE_PREFIX.SCHOOL_GALLERY)

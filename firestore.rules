@@ -4,12 +4,12 @@ rules_version = '2';
  * firestore.rules — SMS Malawi Firestore Security Rules
  *
  * Collections managed here:
- *   attendance/{classId}/records/{date}      — real-time attendance marking
+ *   attendance/{classId}/records/{date}      — legacy; SERVER-ONLY (deny all client access)
  *   announcements/{announcementId}           — school-wide and class announcements
- *   notifications/{userId}/items/{notifId}   — per-user in-app notification feed
+ *   notifications/{userId}/items/{notifId}   — per-user in-app feed; SERVER-ONLY (deny all client access)
  *   calendar_events/{eventId}                — school calendar events
  *   user_fcm_tokens/{uid}                    — FCM push tokens (Admin SDK only)
- *   sessions/{uid}                           — active session tracking (GAP-090)
+ *   sessions/{uid}                           — legacy; SERVER-ONLY (deny all client access)
  *   security_events/{eventId}                — failed logins / anomalous activity
  *
  * Security model:
@@ -80,15 +80,6 @@ service cloud.firestore {
       ]);
     }
 
-    /**
-     * Roles that can mark and manage attendance.
-     * academic and exam_officer are the primary teachers; admin and high_rank
-     * have supervisory write access.
-     */
-    function canWriteAttendance() {
-      return isSuper() || (isAuth() && role() in ['admin', 'high_rank', 'academic', 'exam_officer', 'lower_rank']);
-    }
-
     function isStudent() {
       return isSuper() || (isAuth() && role() == 'student');
     }
@@ -96,33 +87,32 @@ service cloud.firestore {
     // ── ATTENDANCE ────────────────────────────────────────
     // Collection path: attendance/{classId}/records/{date}
     //
-    // Document shape:
-    //   {
-    //     [studentId]: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED',
-    //     classId: string,
-    //     date: string (yyyy-MM-dd),
-    //     markedByUid: string,
-    //     markedAt: Timestamp,
-    //   }
+    // ⚠ SERVER-ONLY COLLECTION — DENY ALL CLIENT ACCESS ⚠  [Issue 2]
     //
-    // Read access:   All staff and all students (students read their own class)
-    // Write access:  Teachers, exam officers, admin, high_rank, lower_rank (for admin tasks)
+    // Attendance now lives in Postgres (Attendance model) and is read/written
+    // exclusively through the Express routes in server/routes/attendance.ts
+    // (attendanceService.ts). Nothing in the client or server reads or writes
+    // this Firestore collection any more, so it is closed to all client access.
+    //
+    // Why deny rather than patch the old rules:
+    //   • The legacy document shape stores every student's status in ONE
+    //     document, so a rule can neither redact other students' fields nor
+    //     scope a student to "their own" attendance — any read grant would
+    //     expose the whole class register.
+    //   • Class/subject assignment lives in Postgres (Class.teacherId), which
+    //     rules cannot see; a role-only claim check cannot prove the writer is
+    //     assigned to the class. Authorization stays in one place: the
+    //     requirePermission + class-ownership guards in the Express routes.
+    //   • Any legacy documents that still exist are reachable only via the
+    //     Admin SDK (which bypasses these rules). Physical deletion is
+    //     therefore no longer possible from a client; voiding/corrections go
+    //     through the audited server path.
+    //
+    // If live attendance updates are ever needed again, design a per-student
+    // document model and server-synced claims first, with Emulator tests.
 
     match /attendance/{classId}/records/{date} {
-      allow read: if isAuth();
-
-      allow create: if canWriteAttendance()
-        && request.resource.data.classId == classId
-        && request.resource.data.date is string
-        && request.resource.data.markedByUid == uid();
-
-      allow update: if canWriteAttendance()
-        && request.resource.data.classId == resource.data.classId
-        && request.resource.data.markedByUid == uid();
-
-      // Attendance records are never deleted — they form the permanent record.
-      // Admin can soft-delete by setting all statuses to a special VOIDED value.
-      allow delete: if isAdmin();
+      allow read, write: if false;
     }
 
     // ── ANNOUNCEMENTS ─────────────────────────────────────
@@ -153,38 +143,41 @@ service cloud.firestore {
     // ── NOTIFICATIONS (PER-USER FEED) ─────────────────────
     // Collection path: notifications/{userId}/items/{notifId}
     //
-    // Document shape:
+    // ⚠ SERVER-ONLY COLLECTION — DENY ALL CLIENT ACCESS ⚠  [Issue 3]
+    //
+    // Document shape (written by notificationFeedService.ts via the Admin SDK):
     //   {
     //     title:     string,
     //     body:      string,
     //     type:      'INFO' | 'WARNING' | 'SUCCESS' | 'ERROR',
-    //     category:  string (e.g. 'fee_reminder', 'result_released', 'leave_approved'),
+    //     category:  string (e.g. 'fee_reminder', 'result_release', 'assignment'),
     //     read:      boolean,
-    //     actionUrl: string | null,
+    //     actionUrl: string | null (internal path only),
     //     createdAt: Timestamp,
     //     readAt:    Timestamp | null,
     //   }
     //
-    // Users can read, update (mark as read), and delete their own notifications.
-    // Staff can create notifications for any user (to send in-app alerts).
-    // Admin can read any user's notifications for support/audit purposes.
+    // Every notification producer (fees, results, leave, placement, library,
+    // assignments, announcements, approvals) runs server-side and writes
+    // through notificationFeedService; the client reads and marks read via
+    // GET /notifications/feed, PATCH /notifications/feed/read-all and
+    // PATCH /notifications/feed/:id/read. No client code touches this
+    // collection, so all client access is denied:
+    //   • Previously `allow create: if isStaff()` let ANY staff role write a
+    //     forged "system" notification (fake fee reminder, fake result
+    //     release, phishing link) into ANY user's feed, with no schema,
+    //     recipient or source-event check.
+    //   • The Admin SDK bypasses these rules, so server-side creation,
+    //     idempotent fan-out (pushToManyFeedsOnce) and mark-read are unaffected.
+    //   • Owner read / mark-read / delete are also denied: they are served by
+    //     the API, and a direct-write path would bypass its field validation.
+    //
+    // If a future feature genuinely needs direct client writes, add a narrow
+    // rule (specific permission, target group, field allowlist, length limits,
+    // server-set timestamps) with Emulator tests rather than re-opening isStaff().
 
     match /notifications/{userId}/items/{notifId} {
-      allow read: if isAuth() && (uid() == userId || isAdmin());
-
-      // Only the owner of the notification can mark it as read or delete it.
-      allow update: if isAuth()
-        && uid() == userId
-        // Only allow flipping `read` and `readAt` — no other field changes
-        && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['read', 'readAt']);
-
-      allow delete: if isAuth() && uid() == userId;
-
-      // Staff can create notifications for users (server-side in-app alerts).
-      // Admin SDK bypasses these rules entirely, but this covers client-initiated
-      // notification creation for future peer-notification features.
-      allow create: if isStaff();
+      allow read, write: if false;
     }
 
     // ── CALENDAR EVENTS ───────────────────────────────────
@@ -246,36 +239,34 @@ service cloud.firestore {
     }
 
     // ── ACTIVE SESSIONS ───────────────────────────────────
-    // Collection path: sessions/{uid}
+    // Collection path: sessions/{sessionUid}
     //
-    // Document shape:
-    //   {
-    //     uid:          string,
-    //     deviceInfo:   string (User-Agent, max 200 chars),
-    //     ipAddress:    string | null (set server-side if available),
-    //     loginAt:      Timestamp,
-    //     lastActiveAt: Timestamp,
-    //     role:         string (UserRole),
-    //   }
+    // ⚠ SERVER-ONLY COLLECTION — DENY ALL CLIENT ACCESS ⚠  [Issue 4]
     //
-    // Written by AuthProvider.tsx on login and periodically on activity.
-    // Read by admin in the session monitoring page (GAP-090, Phase D).
-    // Admin can delete sessions to force-logout specific users.
+    // Session tracking is Postgres-backed (UserSession model), written only
+    // by the Express API through sessionService.ts:
+    //   • POST /auth/log-login-success → recordLogin()   (server-authoritative:
+    //       uid, role snapshot from the VERIFIED token, loginAt, ipAddress from
+    //       the trusted proxy hop via req.ip)
+    //   • POST /auth/heartbeat         → heartbeat()      (client heartbeat:
+    //       bumps lastSeenAt only, stamped with the SERVER clock)
+    //   • POST /auth/log-logout        → recordLogout()   (endReason 'logout')
+    //   • POST /sessions/:uid/force-logout → forceLogout() (admin only;
+    //       calls revokeRefreshTokens(uid) and verifyAuth checks revocation,
+    //       so a revoked session really fails — not just a UI record)
+    //   • GET  /sessions[...]          → admin-only monitoring reads
+    //       (userMgmt.viewActiveSessions)
+    // userAgent is client-supplied and should be treated as unverified.
     //
-    // NOTE: The full session monitoring feature (GAP-090) is planned for Phase D.
-    //       These rules are pre-declared to ensure security correctness from day one.
+    // Nothing in the client or server reads or writes this Firestore
+    // collection any more. The previous rules let any signed-in user create or
+    // overwrite their own document (including role, ipAddress and loginAt) and
+    // delete it — none of which is trustworthy evidence of a real session, and
+    // deleting a document never revoked anything. All client access is denied;
+    // the Admin SDK bypasses these rules.
 
     match /sessions/{sessionUid} {
-      // Users can read and write their own active session document.
-      // This is used by AuthProvider to track lastActiveAt for inactivity detection.
-      allow read, create, update: if isAuth() && uid() == sessionUid;
-
-      // Users can delete their own session (explicit logout cleans it up).
-      allow delete: if isAuth() && uid() == sessionUid;
-
-      // Admin can read all sessions for the session monitoring dashboard.
-      // Admin can delete any session to force-logout a user (revoke session).
-      allow read, delete: if isAdmin();
+      allow read, write: if false;
     }
 
     // ── SECURITY EVENTS ───────────────────────────────────

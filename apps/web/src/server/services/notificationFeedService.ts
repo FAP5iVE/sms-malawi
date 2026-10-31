@@ -41,6 +41,38 @@ import { COLLECTIONS } from '@shared/constants/storage'
 
 export type FeedItemType = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'
 
+/** Server-side bounds applied to every feed write (Issue 3 hardening). */
+const FEED_TYPES: readonly FeedItemType[] = ['INFO', 'SUCCESS', 'WARNING', 'ERROR']
+const MAX_TITLE_LEN    = 200
+const MAX_BODY_LEN     = 1000
+const MAX_CATEGORY_LEN = 64
+const MAX_ACTION_URL_LEN = 500
+
+/** Internal in-app paths only: must start with a single "/" — no protocol-relative
+ *  ("//host"), no absolute URLs, no "javascript:" — mirrors PageHeader's safeLink. */
+function safeActionUrl(url: string | null | undefined): string | null {
+  if (!url || url.length > MAX_ACTION_URL_LEN) return null
+  if (!url.startsWith('/') || url.startsWith('//') || url.includes('\\')) return null
+  return url
+}
+
+/**
+ * Single normalisation point for every feed write: clamps title/body/category
+ * length, restricts `type` to the allowed enum, and drops non-internal
+ * actionUrls. Content is plain text — the client renders it as text, never
+ * as markup — so nothing is HTML-escaped here (that would double-escape).
+ * Server-controlled fields (read, createdAt, readAt) are set by the writers.
+ */
+function normaliseItem(item: FeedItemInput) {
+  return {
+    title:    String(item.title ?? '').slice(0, MAX_TITLE_LEN),
+    body:     String(item.body ?? '').slice(0, MAX_BODY_LEN),
+    type:     item.type && FEED_TYPES.includes(item.type) ? item.type : ('INFO' as FeedItemType),
+    category: String(item.category ?? 'general').slice(0, MAX_CATEGORY_LEN) || 'general',
+    actionUrl: safeActionUrl(item.actionUrl),
+  }
+}
+
 export interface FeedItemInput {
   title: string
   body: string
@@ -101,12 +133,8 @@ export async function pushToFeed(uid: string, item: FeedItemInput): Promise<void
   if (!uid) return
   try {
     await itemsCollection(uid).add({
-      title: item.title,
-      body: item.body,
-      type: item.type ?? 'INFO',
-      category: item.category,
+      ...normaliseItem(item),
       read: false,
-      actionUrl: item.actionUrl ?? null,
       createdAt: Timestamp.now(),
       readAt: null,
     })
@@ -141,12 +169,8 @@ export async function pushToManyFeedsOnce(
     await Promise.all(slice.map(async (uid) => {
       try {
         await itemsCollection(uid).doc(docId).create({
-          title: item.title,
-          body: item.body,
-          type: item.type ?? 'INFO',
-          category: item.category,
+          ...normaliseItem(item),
           read: false,
-          actionUrl: item.actionUrl ?? null,
           createdAt: Timestamp.now(),
           readAt: null,
         })
@@ -178,12 +202,8 @@ export async function pushToManyFeeds(uids: string[], item: FeedItemInput): Prom
       for (const uid of slice) {
         const ref = itemsCollection(uid).doc()
         batch.set(ref, {
-          title: item.title,
-          body: item.body,
-          type: item.type ?? 'INFO',
-          category: item.category,
+          ...normaliseItem(item),
           read: false,
-          actionUrl: item.actionUrl ?? null,
           createdAt: Timestamp.now(),
           readAt: null,
         })

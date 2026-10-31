@@ -24,7 +24,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ApiExam, ApiExamMark, ApiTermResult, ApiManebRecord, ApiExamAnalytics, ApiStudentClassStanding } from '@shared/types/api'
 import type { CreateExamInput, UpdateExamInput, BulkMarkEntryInput, CreateManebRecordInput } from '@shared/schemas/exam'
 import type { ReportCardData } from '@/components/shared/PrintableReportCard'
-import { apiFetch, queryKeys } from '@/lib/api-client'
+import { apiFetch, newIdempotencyKey, queryKeys } from '@/lib/api-client'
 
 export function useExams(classId: string | undefined, academicYear: string, term: number, enabled = true) {
   return useQuery({
@@ -287,6 +287,8 @@ export function useGenerateReportCard() {
     mutationFn: ({ studentId, academicYear, term }: { studentId: string; academicYear: string; term: number }) =>
       apiFetch<ReportCardGenerationResult>('/exams/report-card', {
         method: 'POST',
+        // [Issue 6] One key per click: a retried generation replays the first result.
+        headers: { 'Idempotency-Key': newIdempotencyKey() },
         body:   JSON.stringify({ studentId, academicYear, term }),
       }),
   })
@@ -300,4 +302,4 @@ export function useReportCardData(studentId: string, academicYear: string, term:
     enabled:  !!studentId && !!academicYear && !!term,
     retry:    false, // never retry a 403 fee gate
   })
-}
+}

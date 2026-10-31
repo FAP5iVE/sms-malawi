@@ -36,6 +36,7 @@
  *   @shared/constants/malawi (COLLECTIONS.ANNOUNCEMENTS)
  */
 import { Router }          from 'express'
+import { rateLimit, emailIdentifier } from '@/lib/ratelimit'
 import { getFirestore }    from 'firebase-admin/firestore'
 import { getAdminApp }     from '@/lib/verifyAuth'
 import { prisma }          from '@/lib/prisma'
@@ -321,7 +322,10 @@ const NewsletterSchema = z.object({
   name:  z.string().min(1).max(100).optional(),
 })
 
-publicRouter.post('/newsletter/subscribe', async (req, res) => {
+// [Issue 6] Sends an e-mail to a caller-supplied address: limited per address (so one
+// victim cannot be mail-bombed from many IPs), per IP, and against a deployment-wide
+// e-mail budget. Redis-backed — see lib/ratelimit-policies.ts.
+publicRouter.post('/newsletter/subscribe', rateLimit('public-newsletter', { identifier: emailIdentifier }), async (req, res) => {
   const parsed = NewsletterSchema.safeParse(req.body)
   if (!parsed.success) {
     return res.status(400).json({ error: 'Valid email address is required.' })
@@ -402,7 +406,8 @@ const ContactMessageSchema = z.object({
   message: z.string().min(1, 'Message is required').max(5000),
 })
 
-publicRouter.post('/contact', async (req, res) => {
+// [Issue 6] Sends e-mail to the school inbox — per sender address, per IP and a global budget.
+publicRouter.post('/contact', rateLimit('public-contact', { identifier: emailIdentifier }), async (req, res) => {
   const parsed = ContactMessageSchema.safeParse(req.body)
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.errors[0]?.message ?? 'Please check the form for errors.' })

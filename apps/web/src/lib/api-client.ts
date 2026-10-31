@@ -200,10 +200,42 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as ErrorBody
-    throw new ApiError(messageFromBody(body, res.status), res.status, body)
+    throw new ApiError(
+      withRetryHint(messageFromBody(body, res.status), res),
+      res.status,
+      body,
+      retryAfterSeconds(res),
+    )
   }
 
   return res.json() as Promise<T>
+}
+
+// [Issue 6] 429 (rate limited) and 503 (a protective limiter is unavailable) carry
+// a Retry-After header. Surface it so callers can back off, and tell the person
+// how long to wait instead of leaving them to hammer the button.
+function retryAfterSeconds(res: Response): number | undefined {
+  if (res.status !== 429 && res.status !== 503) return undefined
+  const n = Number(res.headers.get('Retry-After'))
+  return Number.isFinite(n) && n > 0 ? Math.ceil(n) : undefined
+}
+
+function withRetryHint(message: string, res: Response): string {
+  const wait = retryAfterSeconds(res)
+  if (wait === undefined) return message
+  return wait >= 90
+    ? `${message} (try again in about ${Math.ceil(wait / 60)} minutes)`
+    : `${message} (try again in ${wait} seconds)`
+}
+
+/**
+ * [Issue 6] A fresh key for one user ACTION (one click on "Run payroll"). Send it as
+ * the `Idempotency-Key` header and reuse the same key if that action is retried, so
+ * a retry after a timeout returns the original result instead of repeating the work.
+ */
+export function newIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return `k-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
 }
 
 // ─── TYPED API ERROR ──────────────────────────────────────
@@ -220,6 +252,8 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly details?: unknown,
+    /** [Issue 6] Seconds from the Retry-After header on a 429 / 503, when present. */
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message)
     this.name = 'ApiError'

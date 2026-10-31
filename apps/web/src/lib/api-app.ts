@@ -11,7 +11,9 @@ import 'server-only'
  *   2. Helmet            — security headers (defence-in-depth alongside proxy.ts)
  *   3. express.json      — body parsing with tight 50kb global limit
  *   4. CORS              — explicit origin allowlist (no VERCEL_URL wildcards)
- *   5. createRateLimiter('standard') — express-rate-limit, in-memory store
+ *   5. rateLimit('global-ip')       — coarse per-instance volumetric backstop only;
+ *                                      real quotas are per-endpoint, per-user and
+ *                                      Redis-backed (lib/ratelimit-policies.ts)
  *   5b. activityLogger   — audit-completeness recorder (Sessions / Audit fix)
  *   6. Routes            — all domain routers
  *   7. 404 handler       — catch-all for undefined routes
@@ -109,7 +111,7 @@ import { pendingActionsRouter }from '@/server/routes/pendingActions'
 import { approvalsRouter }      from '@/server/routes/approvals'
 import { notificationsRouter } from '@/server/routes/notifications'
 import { promotionRouter }     from '@/server/routes/promotion'
-import { createRateLimiter }   from '@/lib/ratelimit'
+import { rateLimit }           from '@/lib/ratelimit'
 import { logger }              from '@/lib/logger'
 import { globalErrorHandler }  from '@/server/middleware/inputSanitise'
 import { activityLogger }      from '@/server/middleware/activityLog'
@@ -160,7 +162,9 @@ function buildCorsMiddleware() {
     // in sync until both are extracted to a shared constant in R16
     // (Constants Centralization) — the correct home for this class of fix.
     res.setHeader('Access-Control-Allow-Methods',  'GET,POST,PATCH,DELETE,OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers',  'Content-Type,Authorization')
+    res.setHeader('Access-Control-Allow-Headers',  'Content-Type,Authorization,Idempotency-Key')
+    // [Issue 6] Let a cross-origin client read the back-off hint on a 429 / 503.
+    res.setHeader('Access-Control-Expose-Headers', 'Retry-After,Idempotent-Replayed')
     res.setHeader('Access-Control-Max-Age',        '86400') // 24 h preflight cache
 
     if (req.method === 'OPTIONS') {
@@ -179,10 +183,11 @@ export function createApiApp() {
 
   // ── 1. Trust proxy ────────────────────────────────────────────────────────
   // Vercel's edge is a single trusted hop. Without this, req.ip resolves to
-  // the edge's own address for every request, and express-rate-limit's
-  // default keyGenerator (which reads req.ip) can never distinguish two
-  // different clients. Must be set before any middleware that reads req.ip —
-  // in particular createRateLimiter('standard') below.
+  // the edge's own address for every request, and anything reading req.ip
+  // can never distinguish two different clients. Must be set before any
+  // middleware that reads req.ip — in particular the rate limiters below
+  // (lib/ratelimit-core.ts clientIp() prefers Vercel's own forwarded-for
+  // header and falls back to req.ip).
   app.set('trust proxy', 1)
 
   // ── 2. Security headers ───────────────────────────────────────────────────
@@ -205,11 +210,13 @@ export function createApiApp() {
   app.use(buildCorsMiddleware())
 
   // ── 5. Rate limiting ──────────────────────────────────────────────────────
-  // createRateLimiter('standard') wraps express-rate-limit with a clean
-  // three-tier config. In-memory store is correct for this stack — Firebase
-  // Auth gates every authenticated route, and the bounded school user base
-  // makes per-Lambda-instance counters acceptable. See lib/ratelimit.ts.
-  app.use(createRateLimiter('standard'))
+  // [Issue 6] This global limiter is ONLY a coarse, per-instance backstop
+  // against runaway clients — in-memory counters are per serverless instance
+  // and must not be mistaken for an abuse boundary. Anything whose abuse costs
+  // something (AI provider quota, e-mail sending, search, reports/exports,
+  // bulk jobs, uploads, public writes) carries its own named, Redis-backed
+  // policy at the route — see lib/ratelimit-policies.ts for the inventory.
+  app.use(rateLimit('global-ip'))
 
   // ── 5b. Activity recorder ─────────────────────────────────────────────────
   // [Sessions / Audit completeness] Makes sure every successful state-changing
@@ -230,7 +237,9 @@ export function createApiApp() {
   app.use('/payroll',         payrollRouter)
   app.use('/exams',           examsRouter)
   app.use('/announcements',   announcementsRouter)
-  app.use('/reports',         reportsRouter)
+  // [Issue 6] Wide aggregate reads: verified per-user limit (verifyAuth is
+  // reused by the routers' own gates, not re-run — see lib/verifyAuth.ts).
+  app.use('/reports',         verifyAuth, rateLimit('report-read'), reportsRouter)
   app.use('/users',           usersRouter)
   app.use('/health',          healthRouter)
   // R15: settings.ts's own header documents this exact mount shape
@@ -253,8 +262,8 @@ export function createApiApp() {
   app.use('/assets',          assetsRouter)
   app.use('/gallery',         galleryRouter)
   app.use('/auth',            authRouter)
-  app.use('/analytics',       analyticsRouter)
-  app.use('/reporting',       reportingRouter)
+  app.use('/analytics',       verifyAuth, rateLimit('report-read'), analyticsRouter)
+  app.use('/reporting',       verifyAuth, rateLimit('report-read'), reportingRouter)
   app.use('/search',          searchRouter)
   app.use('/calendar',        calendarRouter)
   app.use('/algolia-admin',   algoliaAdminRouter)

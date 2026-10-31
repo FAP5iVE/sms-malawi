@@ -67,6 +67,9 @@
 
 import 'server-only'
 import { Router } from 'express'
+import { rateLimit } from '@/lib/ratelimit'
+import { idempotent } from '@/server/middleware/idempotency'
+import { parseDateRange, parsePageParams } from '@/lib/requestLimits'
 import multer from 'multer'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
@@ -329,8 +332,8 @@ financesRouter.get('/invoices', verifyAuth, requireRole([...FINANCE_ROLES]), asy
   // because that indexed type includes undefined which violates exactOptionalPropertyTypes
   if (status) where.status = String(status) as InvoiceStatus
 
-  const safePageSize = Math.min(Math.max(Number(pageSize) || 50, 1), 200)
-  const safePage     = Math.max(Number(page) || 1, 1)
+  // [Issue 6] An oversized pageSize is rejected (400) before the query runs, not silently clamped.
+  const { page: safePage, pageSize: safePageSize } = parsePageParams({ page, pageSize }, { defaultSize: 50, maxSize: 200 })
 
   const [invoices, total] = await Promise.all([
     prisma.invoice.findMany({
@@ -824,9 +827,9 @@ financesRouter.get(
   verifyAuth,
   requireRole([...FINANCE_ROLES]),
   async (req, res) => {
-    const { from, to } = req.query as { from?: string; to?: string }
-    if (!from || !to) return res.status(400).json({ error: 'from and to are required' })
-    const statement = await accountingService.getIncomeStatement(new Date(from), new Date(to))
+    // [Issue 6] Bounded span, validated before any ledger query is issued.
+    const range = parseDateRange(req.query)!
+    const statement = await accountingService.getIncomeStatement(range.from, range.to)
     res.json(statement)
   }
 )
@@ -845,12 +848,9 @@ financesRouter.get(
   verifyAuth,
   requireRole([...FINANCE_ROLES]),
   async (req, res) => {
-    const { from, to } = req.query as { from?: string; to?: string }
-    const lines = await accountingService.getAccountLedger(
-      String(req.params.code),
-      from ? new Date(from) : undefined,
-      to ? new Date(to) : undefined
-    )
+    // [Issue 6] A ledger with no range was an all-time scan; from/to are now required and bounded.
+    const range = parseDateRange(req.query)!
+    const lines = await accountingService.getAccountLedger(String(req.params.code), range.from, range.to)
     res.json(lines)
   }
 )
@@ -971,6 +971,12 @@ financesRouter.post(
   '/invoices/bulk-generate',
   verifyAuth,
   requireRole(['admin', 'finance']),
+  // [Issue 6] Many writes per request. Rate limited per user (dry runs too — the
+  // roster preview is itself heavy) and idempotent for REAL runs, so a client retrying
+  // after a timeout gets the original result instead of a second concurrent run whose
+  // response would report everything as EXISTING.
+  rateLimit('bulk-mutation'),
+  idempotent({ applies: (req) => (req.body as { dryRun?: unknown } | undefined)?.dryRun !== true }),
   async (req, res) => {
     const parsed = BulkGenerateInvoicesSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })

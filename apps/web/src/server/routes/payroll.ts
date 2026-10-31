@@ -60,6 +60,8 @@
 
 import { Router, type Request, type Response } from 'express'
 import { verifyAuth } from '@/lib/verifyAuth'
+import { rateLimit } from '@/lib/ratelimit'
+import { idempotent } from '@/server/middleware/idempotency'
 import { requirePermission } from '@/server/middleware/verifyPermission'
 import { hasPermission } from '@shared/types/permissions'
 import * as payrollService from '@/server/services/payrollService'
@@ -91,7 +93,10 @@ payrollRouter.get('/run-window', verifyAuth, requirePermission('finance.viewPayr
 
 // POST /payroll/run — trigger payroll for month/year
 // In production this should queue a Cloud Task instead of running inline
-payrollRouter.post('/run', verifyAuth, requirePermission('finance.runPayroll'), async (req, res) => {
+// [Issue 6] Costly + side-effecting: rate limited per user and idempotent, so a client
+// retrying after a timeout cannot start a second concurrent run (the month lock in
+// payrollService is the final backstop).
+payrollRouter.post('/run', verifyAuth, requirePermission('finance.runPayroll'), rateLimit('bulk-mutation'), idempotent(), async (req, res) => {
   const { month, year } = req.body as { month: number; year: number }
   if (!month || !year || month < 1 || month > 12) {
     return res.status(400).json({ error: 'Valid month (1-12) and year required' })
