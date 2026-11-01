@@ -19,7 +19,7 @@
  *   (runRiskAssessmentJob), apps/web/src/server/services/settingsService.ts
  */
 import { NextResponse } from 'next/server'
-import { headers } from 'next/headers'
+import { guardCron } from '@/lib/cronAuth'
 import { runRiskAssessmentJob } from '@/server/services/riskJob'
 import * as settingsService from '@/server/services/settingsService'
 import { SETTING_KEYS } from '@shared/types/settings'
@@ -28,13 +28,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  if (!process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
-  }
-  const h = await headers()
-  if (h.get('Authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const denied = await guardCron()
+  if (denied) return denied
 
   const { current_academic_year: academicYear, current_term: academicTerm } =
     await settingsService.getMany([SETTING_KEYS.CURRENT_ACADEMIC_YEAR, SETTING_KEYS.CURRENT_TERM])

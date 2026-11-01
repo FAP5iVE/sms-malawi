@@ -124,7 +124,9 @@ export async function getIdTokenFromRequest(
   if (!token) return null
   try {
     const { getAuth } = await import('firebase-admin/auth')
-    return await getAuth().verifyIdToken(token)
+    // [Issue 7] checkRevoked=true — same as verifyAuth() — so force-logout /
+    // revokeRefreshTokens also cuts off file downloads, not just API calls.
+    return await getAuth().verifyIdToken(token, true)
   } catch {
     return null
   }

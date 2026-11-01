@@ -87,7 +87,8 @@
  *     real callers); now ReportCardGenerator.tsx (this same phase) is
  *     wired into the live app as a real caller.
  */
-import { Router }              from 'express'
+import { Router, type Request, type Response } from 'express'
+import { hasPermission }       from '@shared/types/permissions'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission }   from '@/server/middleware/verifyPermission'
 import { rateLimit }           from '@/lib/ratelimit'
@@ -282,6 +283,31 @@ examsRouter.post('/:id/unlock', verifyAuth, requirePermission('exam.unlockMarks'
   })
 
 // GET /exams/results/:studentId — student views their results (FEE GATE)
+/**
+ * [Issue 7] Role/permission gate for the per-student results endpoints.
+ *   student → must hold exam.viewOwnResults (ownership is then checked on the id)
+ *   staff   → must hold exam.viewAllResults (admin / high_rank / exam_officer)
+ * Returns false after sending the 403 so the caller can simply `return`.
+ */
+function assertResultsAccess(req: Request, res: Response, message: string): boolean {
+  const user = req.user!
+  const permission = user.role === 'student' ? 'exam.viewOwnResults' : 'exam.viewAllResults'
+  if (!hasPermission(user.role, permission, user.superUser === true)) {
+    res.status(403).json({ error: message })
+    return false
+  }
+  // Period params are optional here (the service falls back), but when they ARE
+  // sent they must be well-formed — never passed raw into a query.
+  const { academicYear, term } = req.query as { academicYear?: unknown; term?: unknown }
+  const yearOk = academicYear === undefined || academicYear === '' || (typeof academicYear === 'string' && /^\d{4}\/\d{4}$/.test(academicYear))
+  const termOk = term === undefined || term === '' || (typeof term === 'string' && /^[123]$/.test(term))
+  if (!yearOk || !termOk) {
+    res.status(400).json({ error: 'academicYear must look like 2026/2027 and term must be 1, 2 or 3.' })
+    return false
+  }
+  return true
+}
+
 // R15: :studentId is a Prisma Student.id — getStudentResults() queries
 // TermResult.studentId with it. The previous student-role ownership check
 // compared req.user.uid (a Firebase UID) directly against that param, so a
@@ -294,6 +320,10 @@ examsRouter.get('/results/:studentId', verifyAuth,
   async (req, res) => {
     const { academicYear, term } = req.query as { academicYear: string; term: string }
     const sid = String(req.params.studentId)
+    // [Issue 7] Staff need exam.viewAllResults. This route used to check
+    // ownership for students only, so ANY authenticated staff role (library,
+    // hr, finance, lower_rank ...) could read any student's results by id.
+    if (!assertResultsAccess(req, res, 'You do not have permission to view student results.')) return
     if (req.user!.role === 'student') {
       const own = await prisma.student.findUnique({
         where:  { firebaseUid: req.user!.uid },
@@ -319,6 +349,7 @@ examsRouter.get('/results/:studentId/class-standing', verifyAuth,
     const { academicYear, term } = req.query as { academicYear: string; term: string }
     if (!academicYear || !term) return res.status(400).json({ error: 'academicYear and term are required' })
     const sid = String(req.params.studentId)
+    if (!assertResultsAccess(req, res, 'You do not have permission to view class standing.')) return
     if (req.user!.role === 'student') {
       const own = await prisma.student.findUnique({
         where:  { firebaseUid: req.user!.uid },

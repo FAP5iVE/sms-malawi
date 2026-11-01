@@ -16,6 +16,7 @@
  *   from change-password/page.tsx)
  */
 import { Router } from 'express'
+import { z } from 'zod'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { CreateUserSchema, UpdateUserRoleSchema, NotificationPrefSchema } from '@shared/schemas/admin'
 import * as userService from '@/server/services/userManagementService'
@@ -56,8 +57,10 @@ usersRouter.patch('/role', verifyAuth, requireRole(['admin']),
 // PATCH /users/:uid/disable
 usersRouter.patch('/:uid/disable', verifyAuth, requireRole(['admin']),
   async (req, res) => {
-    const { disabled } = req.body as { disabled: boolean }
-    await userService.toggleUserDisabled(String(req.params.uid), disabled, req.user!.uid, req.user!.superUser === true)
+    // [Issue 7] Runtime-validate the flag — a TypeScript cast lets the string "false" through as truthy.
+    const parsedBody = z.object({ disabled: z.boolean() }).strict().safeParse(req.body)
+    if (!parsedBody.success) return res.status(400).json({ error: '"disabled" must be true or false.' })
+    await userService.toggleUserDisabled(String(req.params.uid), parsedBody.data.disabled, req.user!.uid, req.user!.superUser === true)
     return res.json({ success: true })
   })
 

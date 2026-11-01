@@ -83,6 +83,10 @@ export function ReportTable<T>({
   const sorted = useMemo(() => {
     const data = rows ?? []
     if (!sort) return data
+    // Deliberate: `columns` is re-created every render, so it is read through a ref to keep
+    // `sorted` stable (see the note above). The ref is refreshed in an effect and only a
+    // column lookup by key is read here, so a one-render-stale value is harmless.
+    // eslint-disable-next-line react-hooks/refs
     const col = columnsRef.current.find((c) => c.key === sort.key)
     if (!col?.sortValue) return data
     const dir = sort.direction === 'asc' ? 1 : -1

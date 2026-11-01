@@ -60,6 +60,10 @@ notificationsRouter.patch(
   async (req, res) => {
     const uid = req.user!.uid
     const { id } = req.params as { id: string }
+    // [Issue 7] The id becomes a Firestore document path segment — only plain ids.
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) {
+      return res.status(400).json({ error: 'Invalid notification id.' })
+    }
     try {
       await notificationFeedService.markRead(uid, id)
       res.status(200).json({ ok: true })

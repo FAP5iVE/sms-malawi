@@ -65,6 +65,7 @@ import 'server-only'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import * as auditService from '@/server/services/auditService'
+import { assertNotSelfReview } from '@/server/lib/selfReview'
 import { createJournalEntry, postEntry, voidEntry } from '@/server/services/accountingService'
 import type { UserRole } from '@shared/types/roles'
 import type { PayrollRun, PayrollStatus } from '@prisma/client'
@@ -127,6 +128,8 @@ export async function approve(
 ): Promise<PayrollRun> {
   const run = await prisma.payrollRun.findUniqueOrThrow({ where: { id: runId } })
   assertStatus(run, 'PENDING_APPROVAL', 'approve')
+  // [Issue 7] The person who submitted the run may not approve it.
+  assertNotSelfReview(run.submittedByUid, actorUid, 'payroll run')
 
   const updated = await prisma.payrollRun.update({
     where: { id: runId },
@@ -161,6 +164,7 @@ export async function returnToFinance(
 ): Promise<PayrollRun> {
   const run = await prisma.payrollRun.findUniqueOrThrow({ where: { id: runId } })
   assertStatus(run, 'PENDING_APPROVAL', 'return')
+  assertNotSelfReview(run.submittedByUid, actorUid, 'payroll run')
 
   const updated = await prisma.payrollRun.update({
     where: { id: runId },

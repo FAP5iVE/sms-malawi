@@ -24,7 +24,7 @@
  *   runRiskAssessmentJob (+ settingsService for its academicYear/term args)
  */
 import { NextResponse } from 'next/server'
-import { headers } from 'next/headers'
+import { guardCron } from '@/lib/cronAuth'
 import { contractExpiryJob } from '@/server/jobs/contractExpiryJob'
 import { dailyFeeReminderJob } from '@/server/jobs/feeReminderJob'
 import { dailyInstallmentCheckJob } from '@/server/jobs/installmentCheckJob'
@@ -51,18 +51,14 @@ async function runTask(name: string, fn: () => Promise<unknown>) {
     return { name, ok: true, result: result ?? null }
   } catch (err) {
     Sentry.captureException(err, { tags: { cron: 'daily-tasks', task: name } })
-    return { name, ok: false, error: err instanceof Error ? err.message : 'Unknown error' }
+    // [Issue 7] Real error text goes to Sentry (above), never into the HTTP body.
+    return { name, ok: false, error: 'Task failed — see Sentry.' }
   }
 }
 
 export async function GET() {
-  if (!process.env.CRON_SECRET) {
-    return NextResponse.json({ error: 'Server misconfigured.' }, { status: 500 })
-  }
-  const h = await headers()
-  if (h.get('Authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const denied = await guardCron()
+  if (denied) return denied
 
    // Sentry.withMonitor wraps the WHOLE run — this is the "did the cron
   // actually fire and complete" signal (research §7). Per-task failures

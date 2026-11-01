@@ -18,7 +18,8 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test": "vitest run",
-    "test:unit": "vitest run --project unit"
+    "test:unit": "vitest run --project unit",
+    "docs:security": "tsx scripts/generate-security-docs.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

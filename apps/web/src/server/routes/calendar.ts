@@ -195,6 +195,14 @@ calendarRouter.get('/events',
 
     const rangeStart = startStr ? parseISO(startStr) : parseISO(termDates.term1.start)
     const rangeEnd   = endStr   ? parseISO(endStr)   : parseISO(termDates.term3.end)
+    // [Issue 7] Validate the client-supplied window: an unparseable date reached Prisma
+    // as an Invalid Date (500), and an unbounded window fans out into every event source.
+    if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime())) {
+      return res.status(400).json({ error: '"start" and "end" must be valid ISO dates.' })
+    }
+    if ((startStr || endStr) && (rangeEnd < rangeStart || rangeEnd.getTime() - rangeStart.getTime() > 400 * 86_400_000)) {
+      return res.status(400).json({ error: 'The calendar window must be between 0 and 400 days.' })
+    }
 
     const events: CalendarEvent[] = []
 

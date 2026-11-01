@@ -23,6 +23,7 @@ import 'server-only'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import * as auditService from '@/server/services/auditService'
+import { assertNotSelfReview } from '@/server/lib/selfReview'
 import * as algolia from '@/server/services/algoliaService'
 import type { UserRole } from '@shared/types/roles'
 import type { Decimal } from '@prisma/client/runtime/library'
@@ -374,11 +375,13 @@ export async function getRequestsByDepartment() {
 }
 
 export async function approveAssetRequest(id: string, data: ReviewAssetRequestInput, actorUid: string, actorRole: UserRole) {
-  const existing = await prisma.assetRequest.findUnique({ where: { id }, select: { id: true, status: true } })
+  const existing = await prisma.assetRequest.findUnique({ where: { id }, select: { id: true, status: true, requestedByUid: true } })
   if (!existing) throw Object.assign(new Error('Request not found.'), { status: 404 })
   if (existing.status !== 'PENDING') {
     throw Object.assign(new Error('This request has already been reviewed.'), { status: 409 })
   }
+  // [Issue 7] Requester may not approve their own asset request (Approvals Hub parity).
+  assertNotSelfReview(existing.requestedByUid, actorUid, 'asset request')
 
   const request = await prisma.assetRequest.update({
     where: { id },
@@ -398,11 +401,12 @@ export async function approveAssetRequest(id: string, data: ReviewAssetRequestIn
 }
 
 export async function rejectAssetRequest(id: string, data: RejectAssetRequestInput, actorUid: string, actorRole: UserRole) {
-  const existing = await prisma.assetRequest.findUnique({ where: { id }, select: { id: true, status: true } })
+  const existing = await prisma.assetRequest.findUnique({ where: { id }, select: { id: true, status: true, requestedByUid: true } })
   if (!existing) throw Object.assign(new Error('Request not found.'), { status: 404 })
   if (existing.status !== 'PENDING') {
     throw Object.assign(new Error('This request has already been reviewed.'), { status: 409 })
   }
+  assertNotSelfReview(existing.requestedByUid, actorUid, 'asset request')
 
   const request = await prisma.assetRequest.update({
     where: { id },

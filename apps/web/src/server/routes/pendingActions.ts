@@ -21,7 +21,9 @@
 import 'server-only'
 
 import { Router, type Request, type Response, type NextFunction } from 'express'
+import { z } from 'zod'
 import { verifyAuth, requireRole }              from '@/lib/verifyAuth'
+import { isValidCronAuthorization }          from '@/lib/cronAuth'
 import { requireAnyPermission }                 from '@/server/middleware/verifyPermission'
 import * as pendingActionService                from '@/server/services/pendingActionService'
 import type { PendingActionStatus }             from '@prisma/client'
@@ -29,6 +31,17 @@ import type { PendingActionType }               from '@/server/services/pendingA
 import { hasPermission, type Permission }      from '@shared/types/permissions'
 
 export const pendingActionsRouter = Router()
+
+const CreatePendingActionBodySchema = z.object({
+  entityType:  z.string().trim().min(1).max(64),
+  entityId:    z.string().trim().min(1).max(128),
+  action:      z.string().trim().min(1).max(64),
+  description: z.string().trim().min(1).max(1000),
+  targetState: z.record(z.string(), z.unknown())
+    .refine((v) => JSON.stringify(v).length <= 20_000, 'targetState is too large')
+    .optional(),
+  expiresAt:   z.string().max(40).refine((s) => !Number.isNaN(Date.parse(s)), 'expiresAt must be a valid date').optional(),
+})
 
 /**
  * [FIX] Approving a pending action now APPLIES its stored change
@@ -59,8 +72,8 @@ const REQUEST_PERMISSION: Readonly<Record<string, Permission>> = {
  * to the real Firebase-auth + admin-role check.
  */
 async function verifyCronOrAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const authHeader = req.headers.authorization
-  if (process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`) {
+  // [Issue 7] constant-time comparison, shared with the cron route handlers.
+  if (isValidCronAuthorization(req.headers.authorization)) {
     next()
     return
   }
@@ -156,7 +169,15 @@ const id   = String(req.params['id']   ?? '')
       return
     }
 
-    const rows = await pendingActionService.getPendingForEntity(type, id)
+    const all = await pendingActionService.getPendingForEntity(type, id)
+    // [Issue 7] This listing was open to every authenticated role: a student
+    // or library clerk could read any entity's pending changes (targetState,
+    // descriptions, requester ids). Reviewers still see everything; everyone
+    // else only sees requests they raised themselves.
+    const user = req.user!
+    const rows = pendingActionService.canReview(user.role)
+      ? all
+      : all.filter((r) => r.requestedByUid === user.uid)
     res.json({ entityType: type, entityId: id, actions: rows, count: rows.length })
   }
 )
@@ -205,22 +226,18 @@ pendingActionsRouter.post('/', async (req: Request, res: Response) => {
     return
   }
 
-  const { entityType, entityId, action, description, targetState, expiresAt } =
-    req.body as {
-      entityType?:  string
-      entityId?:    string
-      action?:      PendingActionType
-      description?: string
-      targetState?: Record<string, unknown>
-      expiresAt?:   string
-    }
-
-  if (!entityType || !entityId || !action || !description) {
+  // [Issue 7] Runtime validation — TypeScript casts are not validation. Lengths,
+  // types and the size of the stored change are bounded before anything is queued.
+  const body = CreatePendingActionBodySchema.safeParse(req.body)
+  if (!body.success) {
     res.status(400).json({
-      error: 'entityType, entityId, action, and description are required.',
+      error: 'entityType, entityId, action, and description are required and must be valid.',
+      errors: body.error.flatten(),
     })
     return
   }
+  const { entityType, entityId, description, targetState, expiresAt } = body.data
+  const action = body.data.action as PendingActionType
 
   if (!pendingActionService.PENDING_ACTION_TYPES.includes(action as PendingActionType)) {
     res.status(400).json({ error: `Unknown action type: "${action}".` })

@@ -197,21 +197,13 @@ service cloud.firestore {
     //   }
 
     match /calendar_events/{eventId} {
-      allow read: if isAuth() && (
-        resource.data.isPublic == true
-        || isStaff()
-        // Students can see events relevant to their context (public + exam dates)
-        || (isStudent() && resource.data.type in ['EXAM', 'HOLIDAY', 'TERM', 'ANNOUNCEMENT'])
-      );
-
-      allow create: if isStaff()
-        && request.resource.data.createdByUid == uid();
-
-      allow update: if isHighRankOrAdmin()
-        || (isStaff() && resource.data.createdByUid == uid());
-
-      allow delete: if isHighRankOrAdmin()
-        || (isStaff() && resource.data.createdByUid == uid());
+      // [Issue 7] SERVER-ONLY. The calendar is served by the API
+      // (/api/calendar/* -> Prisma, with per-role audience filtering and the
+      // calendar.createEvent/editEvent/deleteEvent permissions). Nothing in the app
+      // reads or writes this collection from the client, yet the previous rules let
+      // every staff role read all events and create/edit/delete them directly with the
+      // public Web API key — bypassing both the permission checks and audience scoping.
+      allow read, write: if false;
     }
 
     // ── FCM PUSH TOKENS ───────────────────────────────────

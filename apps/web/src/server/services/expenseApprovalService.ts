@@ -20,6 +20,7 @@ import { logger } from '@/lib/logger'
 import * as budgetService from '@/server/services/budgetService'
 import * as accountingService from '@/server/services/accountingService'
 import * as auditService from '@/server/services/auditService'
+import { assertNotSelfReview } from '@/server/lib/selfReview'
 
 // [R9] Maps each ExpenseCategory to the chart-of-accounts expense code
 // accountingService.seedChartOfAccounts() seeds. LIBRARY and TRANSPORT
@@ -52,6 +53,9 @@ export async function approveExpense(
   actorRole: string,
   paidImmediately = true,
 ) {
+  // [Issue 7] Whoever recorded an expense may not approve it (Approvals Hub parity).
+  const pre = await prisma.expense.findUnique({ where: { id }, select: { recordedByUid: true } })
+  if (pre) assertNotSelfReview(pre.recordedByUid, actorUid, 'expense')
   const now = new Date()
   // Conditional claim: only one caller can move PENDING → APPROVED.
   const claim = await prisma.expense.updateMany({
@@ -119,6 +123,8 @@ export async function approveExpense(
  * The reason (when given) goes to the audit trail; Expense has no notes column.
  */
 export async function rejectExpense(id: string, actorUid: string, actorRole: string, reason?: string) {
+  const pre = await prisma.expense.findUnique({ where: { id }, select: { recordedByUid: true } })
+  if (pre) assertNotSelfReview(pre.recordedByUid, actorUid, 'expense')
   const claim = await prisma.expense.updateMany({
     where: { id, status: 'PENDING' },
     data: { status: 'REJECTED' },

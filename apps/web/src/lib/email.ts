@@ -670,7 +670,9 @@ export async function verifyResendWebhook(
 
   // Reject timestamps older than 5 minutes (replay attack prevention)
   const timestampMs = parseInt(svixTimestamp, 10) * 1000
-  if (Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000) {
+  // [Issue 7] A non-numeric timestamp gives NaN, and `NaN > x` is false — the
+  // age check used to be silently skipped. Reject anything non-finite.
+  if (!Number.isFinite(timestampMs) || Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000) {
     logger.warn(
       { svixTimestamp, ageMs: Date.now() - timestampMs },
       '[email] Webhook timestamp too old — possible replay attack'

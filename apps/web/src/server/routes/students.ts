@@ -31,6 +31,14 @@ import { StudentStatusSchema }         from '@shared/schemas/student'
 import type { StudentStatus, Sex }     from '@prisma/client'
 import type { UserRole }               from '@shared/types/roles'
 import { sendError } from '@/server/lib/sendError'
+import { parsePageParams } from '@/lib/requestLimits'
+import { z } from 'zod'
+
+const StudentListQuerySchema = z.object({
+  status: StudentStatusSchema.optional(),
+  sex:    z.enum(['MALE', 'FEMALE']).optional(),
+  form:   z.coerce.number().int().min(1).max(6).optional(),
+})
 import { createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
 
 export const studentsRouter = Router()
@@ -102,17 +110,30 @@ studentsRouter.get(
     }
 
     const {
-      search, classId, status, sex, form, page, pageSize, sortBy, sortDir,
+      search, classId, status, sex, form, sortBy, sortDir,
     } = req.query
+    // [Issue 7] Server-side validation of list filters. `status` / `sex` were cast
+    // straight from the query string into the Prisma filter, and page/pageSize went
+    // through parseInt (NaN / negative / huge values reached the query).
+    const parsedFilters = StudentListQuerySchema.safeParse({
+      status: status || undefined, sex: sex || undefined, form: form || undefined,
+    })
+    if (!parsedFilters.success) {
+      res.status(400).json({ error: 'Invalid status, sex or form filter.' })
+      return
+    }
+    // Malformed values fall back; the service still clamps to its own MAX_PAGE_SIZE as before,
+    // so oversize requests are bounded rather than newly rejected.
+    const pageParams = parsePageParams(req.query, { defaultSize: 25, maxSize: 1000 })
 
     const result = await studentService.list({
       search:   search   ? String(search)                : undefined,
       classId:  classId  ? String(classId)               : undefined,
-      status:   status   ? String(status) as StudentStatus : undefined,
-      sex:      sex      ? String(sex)    as Sex           : undefined,
-      form:     form     ? parseInt(String(form), 10)    : undefined,
-      page:     page     ? parseInt(String(page), 10)    : 1,
-      pageSize: pageSize ? parseInt(String(pageSize), 10) : 25,
+      status:   parsedFilters.data.status as StudentStatus | undefined,
+      sex:      parsedFilters.data.sex as Sex | undefined,
+      form:     parsedFilters.data.form,
+      page:     pageParams.page,
+      pageSize: pageParams.pageSize,
       // R15 — server-side sort; the service allow-lists the column and
       // falls back to the default ordering for anything unrecognised.
       sortBy:   sortBy   ? String(sortBy)                : undefined,

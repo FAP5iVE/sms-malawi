@@ -70,6 +70,7 @@ import { sendEmail } from '@/lib/email'
 import { generateTempPassword } from '@/lib/tempPassword'
 import { differenceInBusinessDays, isWeekend, addDays, startOfDay, endOfDay } from 'date-fns'
 import * as auditService from '@/server/services/auditService'
+import { assertNotSelfReview } from '@/server/lib/selfReview'
 
 function getAuth() { return admin.auth() }
 import type {
@@ -496,6 +497,9 @@ export async function reviewLeave(requestId: string, data: ReviewLeaveInput, act
     include: { staff: { select: { id: true, uid: true, firstName: true, lastName: true, email: true } } },
   })
   if (req.status !== 'PENDING') throw new Error('Request is no longer pending.')
+  // [Issue 7] Same separation-of-duties rule the Approvals Hub applies — the
+  // direct /hr/leave/requests/:id/review route must not be a way around it.
+  assertNotSelfReview(req.staff.uid, actorUid, 'leave request')
 
   // [R11] Conflicts are surfaced to the caller, not blocking — the
   // approval still proceeds regardless of severity, per this phase's
@@ -679,11 +683,16 @@ export async function requestLoan(staffId: string, data: LoanRequestInput) {
 export async function approveLoan(loanId: string, actorUid: string) {
   // [FIX] No status guard before — any loan (even a REJECTED/REPAYING one)
   // could be flipped back to APPROVED and re-stamped by a stray call.
-  const loan = await prisma.staffLoan.findUnique({ where: { id: loanId }, select: { status: true } })
+  const loan = await prisma.staffLoan.findUnique({
+    where: { id: loanId },
+    select: { status: true, staff: { select: { uid: true } } },
+  })
   if (!loan) throw Object.assign(new Error('Loan not found.'), { status: 404 })
   if (loan.status !== 'PENDING') {
     throw Object.assign(new Error('Only a pending loan can be approved.'), { status: 409 })
   }
+  // [Issue 7] A borrower may not approve their own loan (Approvals Hub parity).
+  assertNotSelfReview(loan.staff.uid, actorUid, 'loan request')
   return prisma.staffLoan.update({
     where: { id: loanId },
     data: { status: 'APPROVED', approvedByUid: actorUid, approvedAt: new Date() },
@@ -697,11 +706,15 @@ export async function approveLoan(loanId: string, actorUid: string) {
  * no notes column) and shown back to the requester by the Approvals page.
  */
 export async function rejectLoan(loanId: string, actorUid: string, actorRole: string, reason: string) {
-  const loan = await prisma.staffLoan.findUnique({ where: { id: loanId }, select: { status: true } })
+  const loan = await prisma.staffLoan.findUnique({
+    where: { id: loanId },
+    select: { status: true, staff: { select: { uid: true } } },
+  })
   if (!loan) throw Object.assign(new Error('Loan not found.'), { status: 404 })
   if (loan.status !== 'PENDING') {
     throw Object.assign(new Error('Only a pending loan can be rejected.'), { status: 409 })
   }
+  assertNotSelfReview(loan.staff.uid, actorUid, 'loan request')
   const updated = await prisma.staffLoan.update({
     where: { id: loanId },
     data:  { status: 'REJECTED' },
@@ -726,9 +739,21 @@ export async function rejectLoan(loanId: string, actorUid: string, actorRole: st
 // still marked disbursed — that already happened in the real world — but
 // a warning is logged rather than fabricating a salary record.
 export async function disburseLoan(loanId: string) {
-  const loan = await prisma.staffLoan.update({
+  // [Issue 7] Money may only be released against an APPROVED loan. Without
+  // this guard, finance could disburse a PENDING / REJECTED / already
+  // disbursed loan directly, skipping the approval step and (re)setting the
+  // payroll deduction. The conditional updateMany makes the check atomic.
+  const claim = await prisma.staffLoan.updateMany({
+    where: { id: loanId, status: 'APPROVED' },
+    data:  { status: 'DISBURSED', disbursedAt: new Date() },
+  })
+  if (claim.count === 0) {
+    const existing = await prisma.staffLoan.findUnique({ where: { id: loanId }, select: { status: true } })
+    if (!existing) throw Object.assign(new Error('Loan not found.'), { status: 404 })
+    throw Object.assign(new Error('Only an approved loan can be disbursed.'), { status: 409 })
+  }
+  const loan = await prisma.staffLoan.findUniqueOrThrow({
     where:   { id: loanId },
-    data:    { status: 'DISBURSED', disbursedAt: new Date() },
     include: { staff: { select: { uid: true } } },
   })
 
@@ -753,10 +778,17 @@ export async function disburseLoan(loanId: string) {
 // exist (e.g. disburseLoan() logged a warning instead of one existing) —
 // updateMany silently matches zero rows rather than throwing.
 export async function recordLoanRepayment(loanId: string, amount: number) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+    throw Object.assign(new Error('Valid amount required.'), { status: 400 })
+  }
   const loan = await prisma.staffLoan.findUniqueOrThrow({
     where:   { id: loanId },
     include: { staff: { select: { uid: true } } },
   })
+  // [Issue 7] Repayments only make sense against a loan that has been paid out.
+  if (loan.status !== 'DISBURSED' && loan.status !== 'REPAYING') {
+    throw Object.assign(new Error('Repayments can only be recorded against a disbursed loan.'), { status: 409 })
+  }
   const newBalance = Math.max(0, Number(loan.balance) - amount)
   const newRepaid  = Number(loan.totalRepaid) + amount
   const settled    = newBalance === 0

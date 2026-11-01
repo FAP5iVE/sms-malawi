@@ -47,6 +47,7 @@
 import 'server-only'
 import { prisma }    from '@/lib/prisma'
 import { logger }    from '@/lib/logger'
+import { assertNotSelfReview } from '@/server/lib/selfReview'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RESOURCE RECOMMENDATIONS
@@ -184,6 +185,8 @@ export async function approveFineWaiver(
   if (waiver.status !== 'PENDING') {
     throw new Error(`Waiver ${waiverId} is already ${waiver.status}`)
   }
+  // [Issue 7] A waiver may not be decided by the person who requested it.
+  assertNotSelfReview(waiver.requestedByUid, actorUid, 'fine waiver request')
 
   await prisma.$transaction([
     // Waiving the fine zeroes its balance by moving it to WAIVED status —
@@ -212,6 +215,7 @@ export async function rejectFineWaiver(
   if (waiver.status !== 'PENDING') {
     throw new Error(`Waiver ${waiverId} is already ${waiver.status}`)
   }
+  assertNotSelfReview(waiver.requestedByUid, actorUid, 'fine waiver request')
 
   await prisma.fineWaiverRequest.update({
     where: { id: waiverId },

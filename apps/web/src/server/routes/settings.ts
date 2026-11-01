@@ -638,7 +638,8 @@ settingsRouter
     const body    = req.body as Record<string, boolean>
     const allowed = Object.fromEntries(
       Object.entries(body)
-        .filter(([k]) => NOTIF_KEYS.includes(k))
+        // [Issue 7] only declared keys AND real booleans — anything else is dropped
+        .filter(([k, v]) => NOTIF_KEYS.includes(k) && typeof v === 'boolean')
         .map(([k, v]) => [k, String(v)]),
     )
     await writeUserSettings(req.user!.uid, allowed, req.user!.uid)
