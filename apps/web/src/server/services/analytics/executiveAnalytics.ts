@@ -11,7 +11,8 @@
 import 'server-only'
 import { prisma } from '@/lib/prisma'
 import type { AttentionItem, ReportInsight, ReportKpi, ReportSectionData, ReportWarning } from '@shared/types/reporting'
-import type { ApiExecutiveGroup, ApiExecutiveOverview } from '@shared/types/reporting-executive'
+import type { ApiExecutiveGroup, ApiExecutiveOverview, ApiRetention, ApiRetentionFormRow } from '@shared/types/reporting-executive'
+import { getTermDatesForYear } from '@shared/constants/malawi/academic'
 import { getHighRankClassComparison } from '@/server/services/analyticsService'
 import { getFinanceAttention, getFinanceOverview } from './financeAnalytics'
 import { getHrAttention, getHrOverview } from './hrAnalytics'
@@ -185,4 +186,72 @@ export async function getExecutiveAttention(
   ]
 
   return enrichAttention(rankAttention([...own, ...admissions, ...attendance, ...finance, ...hr, ...library, ...exams])).slice(0, 12)
+}
+
+// ─── RETENTION (repetition + exits) ──────────────────────────────────────────
+
+/**
+ * Repetition rate by form (from the year outcomes written at promotion commit)
+ * and exits by reason inside the academic year's term window. The window comes
+ * from the school's own term dates, not a hard-coded calendar. Counts only: no
+ * student is named, and nothing here reads welfare data.
+ */
+export async function getRetention(academicYear: string): Promise<ApiRetention> {
+  const terms = getTermDatesForYear(academicYear)
+  const windowStart = terms[0]!.start
+  const windowEnd = terms[terms.length - 1]!.end
+  const from = new Date(`${windowStart}T00:00:00Z`)
+  const toExclusive = new Date(new Date(`${windowEnd}T00:00:00Z`).getTime() + 86_400_000)
+
+  const [outcomes, repeaterGroups, exitGroups, archivedNoRecord] = await Promise.all([
+    prisma.studentYearOutcome.groupBy({
+      by: ['form', 'outcome'],
+      where: { academicYear },
+      _count: { _all: true },
+    }),
+    prisma.studentYearOutcome.groupBy({
+      by: ['studentId'],
+      where: { outcome: 'REPEATED' },
+      _count: { _all: true },
+      having: { studentId: { _count: { gte: 2 } } },
+    }),
+    prisma.student.groupBy({
+      by: ['exitReason'],
+      where: { status: 'ARCHIVED', exitDate: { gte: from, lt: toExclusive } },
+      _count: { _all: true },
+    }),
+    prisma.student.count({ where: { status: 'ARCHIVED', OR: [{ exitReason: null }, { exitDate: null }] } }),
+  ])
+
+  const byForm = new Map<number, ApiRetentionFormRow>()
+  for (const o of outcomes) {
+    const row = byForm.get(o.form) ?? { form: o.form, students: 0, promoted: 0, repeated: 0, awaitingManeb: 0, graduated: 0, repetitionRate: null }
+    const n = o._count._all
+    row.students += n
+    if (o.outcome === 'PROMOTED') row.promoted += n
+    else if (o.outcome === 'REPEATED') row.repeated += n
+    else if (o.outcome === 'AWAITING_MANEB') row.awaitingManeb += n
+    else if (o.outcome === 'GRADUATED') row.graduated += n
+    byForm.set(o.form, row)
+  }
+  const repetitionByForm = [...byForm.values()]
+    .map((r) => ({ ...r, repetitionRate: ratioPct(r.repeated, r.students) }))
+    .sort((a, b) => a.form - b.form)
+
+  const byReason = exitGroups
+    .map((g) => ({ reason: g.exitReason ?? 'NOT_RECORDED', count: g._count._all }))
+    .sort((a, b) => b.count - a.count)
+
+  return {
+    academicYear,
+    repetitionByForm,
+    multiYearRepeaters: repeaterGroups.length,
+    exits: {
+      total: byReason.reduce((sum, r) => sum + r.count, 0),
+      byReason,
+      windowStart,
+      windowEnd,
+    },
+    archivedWithoutExitRecord: archivedNoRecord,
+  }
 }

@@ -560,15 +560,40 @@ export async function commitPromotion(
       },
     })
 
+    // One year-outcome row per student per year (repeater history, repetition
+    // rate by form). Written in the same transaction as the result and the class
+    // move, so history can never disagree with where the student now sits.
+    // ALREADY_AWAITING students keep the row from the year they were first
+    // recorded, so they are not re-written here.
+    const yearOutcome =
+      entry.outcome === 'PROMOTED' || entry.outcome === 'REPEATED' || entry.outcome === 'AWAITING_MANEB'
+        ? entry.outcome
+        : null
+    const yearOutcomeUpsert = yearOutcome
+      ? [prisma.studentYearOutcome.upsert({
+          where:  { studentId_academicYear: { studentId: entry.studentId, academicYear } },
+          create: {
+            studentId:      entry.studentId,
+            academicYear,
+            form:           entry.currentForm,
+            outcome:        yearOutcome,
+            promotionRunId: run.id,
+          },
+          update: { form: entry.currentForm, outcome: yearOutcome, promotionRunId: run.id },
+        })]
+      : []
+
     if (entry.outcome === 'AWAITING_MANEB') {
       return [
         annualResultUpsert,
+        ...yearOutcomeUpsert,
         prisma.student.update({ where: { id: entry.studentId }, data: { status: 'AWAITING_MANEB_RESULTS' } }),
       ]
     }
     if (entry.outcome === 'PROMOTED' && entry.nextClassId) {
       return [
         annualResultUpsert,
+        ...yearOutcomeUpsert,
         prisma.student.update({ where: { id: entry.studentId }, data: { classId: entry.nextClassId } }),
       ]
     }
@@ -578,10 +603,11 @@ export async function commitPromotion(
     if (entry.outcome === 'REPEATED' && entry.repeatClassId) {
       return [
         annualResultUpsert,
+        ...yearOutcomeUpsert,
         prisma.student.update({ where: { id: entry.studentId }, data: { classId: entry.repeatClassId } }),
       ]
     }
-    return [annualResultUpsert]
+    return [annualResultUpsert, ...yearOutcomeUpsert]
   })
 
   await prisma.$transaction([

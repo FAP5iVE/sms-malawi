@@ -60,6 +60,19 @@ export interface ApiStudent {
   guardianName: string
   guardianPhone: string
   guardianRelation: string
+  // Demographics (present on the detail endpoint; null/undefined when not recorded)
+  nrbNumber?: string | null
+  traditionalAuthority?: string | null
+  religion?: string | null
+  homeLanguage?: string | null
+  residenceType?: 'DAY_HOME' | 'BOARDER' | 'LODGING' | 'WITH_RELATIVE' | null
+  travelMinutes?: number | null
+  admissionType?: 'NEW_INTAKE' | 'TRANSFER_IN' | 'RETURNEE'
+  previousSchool?: string | null
+  reasonForTransfer?: string | null
+  exitReason?: 'TRANSFERRED_OUT' | 'DROPPED_OUT' | 'DISMISSED' | 'DECEASED' | 'WITHDRAWN' | 'OTHER' | null
+  exitDate?: string | null
+  yearOutcomes?: Array<{ academicYear: string; form: number; outcome: 'PROMOTED' | 'REPEATED' | 'GRADUATED' | 'AWAITING_MANEB' }>
   status: string
   classId?: string
   class?: { id: string; name: string; form: number }
@@ -763,6 +776,8 @@ export interface ApiScholarship {
   value: number
   academicYear: string
   isActive: boolean
+  sponsorType?: 'GOVERNMENT_BURSARY' | 'NGO' | 'CHURCH' | 'EMPLOYER' | 'FAMILY' | 'SCHOOL' | 'OTHER' | null
+  sponsorName?: string | null
   /** Joined from Scholarship.student — R9: replaces the raw studentId truncation the UI previously showed. */
   student?: { firstName: string; lastName: string }
 }
@@ -1008,10 +1023,92 @@ export interface ApiStaffProfile {
  * recent leave requests, active loans, and recent performance notes.
  * Backs the read-only staff profile page and StaffForm's edit mode.
  */
+export interface ApiSupportNeed {
+  id: string
+  type: 'LOW_VISION' | 'BLIND' | 'HARD_OF_HEARING' | 'DEAF' | 'PHYSICAL_IMPAIRMENT' | 'LEARNING_DIFFICULTY' | 'ALBINISM' | 'OTHER'
+  accommodation: string | null
+  assistiveDevice: string | null
+  identifiedAt: string | null
+  createdAt: string
+}
+
+/** Sensitive child data. Served only by the welfare endpoints (student.viewWelfare). */
+export interface ApiStudentWelfare {
+  studentId: string
+  orphanStatus: 'UNKNOWN' | 'NONE' | 'FATHER_DECEASED' | 'MOTHER_DECEASED' | 'BOTH_DECEASED'
+  isVulnerable: boolean
+  vulnerabilityNote: string | null
+  vulnerabilityReviewedAt: string | null
+  medicalAlert: string | null
+  /** Free-text note recorded when the student was archived. Sensitive. */
+  exitNote: string | null
+  supportNeeds: ApiSupportNeed[]
+}
+
+/** Counts only, never names (dashboards and the students list header). */
+export interface ApiWelfareSummary {
+  activeStudents: number
+  orphans: { total: number; father: number; mother: number; both: number }
+  vulnerable: number
+  withSupportNeeds: number
+  supportNeedsByType: Array<{ type: ApiSupportNeed['type']; count: number }>
+  /** Students whose orphan status has never been recorded. */
+  orphanStatusUnrecorded: number
+}
+
+export interface ApiStudentGuardian {
+  id: string
+  studentId: string
+  fullName: string
+  relation: string
+  phone: string
+  altPhone: string | null
+  email: string | null
+  address: string | null
+  nrbNumber: string | null
+  isPrimary: boolean
+  isFeePayer: boolean
+  isEmergencyContact: boolean
+  livesWithStudent: boolean | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ApiStaffDetail extends ApiStaffProfile {
   email: string
   phone?: string
   salaryStructureId?: string
+  // Identity + retirement. Returned only to roles holding hr.viewStaffSensitive
+  // (admin / hr / high_rank); absent for anyone else.
+  dateOfBirth?: string | null
+  nationality?: string | null
+  homeDistrict?: string | null
+  nrbNumber?: string | null
+  tpin?: string | null
+  nextOfKinName?: string | null
+  nextOfKinPhone?: string | null
+  nextOfKinRelation?: string | null
+  isTeaching?: boolean
+  tcmRegistrationNo?: string | null
+  tcmLicenceNo?: string | null
+  tcmLicenceExpiry?: string | null
+  employmentCategory?: 'GOVERNMENT_POSTED' | 'SCHOOL_EMPLOYED' | 'COMMUNITY_PAID' | 'VOLUNTEER' | 'OTHER' | null
+  payrollNo?: string | null
+  highestQualification?: 'MSCE' | 'DIPLOMA' | 'DEGREE' | 'POSTGRADUATE' | 'OTHER' | null
+  qualifiedInEducation?: boolean | null
+  trainingRoute?: 'UNIVERSITY_EDUCATION_DEGREE' | 'EDUCATION_DIPLOMA' | 'TEACHER_CERTIFICATE' | 'ODL' | 'UNTRAINED' | 'OTHER' | null
+  housingStatus?: 'SCHOOL_HOUSE' | 'RENT_ALLOWANCE' | 'OWN_ARRANGEMENT' | null
+  exitReason?: 'RESIGNED' | 'TRANSFERRED' | 'RETIRED' | 'CONTRACT_ENDED' | 'DISMISSED' | 'DECEASED' | 'OTHER' | null
+  exitDate?: string | null
+  qualifiedSubjects?: Array<{ subject: string }>
+  responsibilities?: Array<{ id: string; title: string; startDate: string; endDate: string | null }>
+  /** Computed server-side: date of birth + the school's retirement age. Null with no date of birth. */
+  retirement?: {
+    retirementAge: number
+    retirementDate: string
+    monthsRemaining: number
+    status: 'RETIRED' | 'DUE_WITHIN_YEAR' | 'OK'
+  } | null
   leaveBalances: {
     id: string
     leaveType: string
@@ -1518,12 +1615,20 @@ export interface ApiScholarshipSummaryRow {
   totalDiscount:  number
 }
 
+export interface ApiScholarshipSponsorRow {
+  /** SponsorType enum member, or 'NOT_SPECIFIED' when no sponsor is recorded. */
+  sponsorType:    string
+  recipientCount: number
+  totalDiscount:  number
+}
+
 export interface ApiScholarshipSummary {
   academicYear:        string
   activeScholarships:  number
   recipientCount:      number
   totalDiscountMwk:    number
   byScholarship:       ApiScholarshipSummaryRow[]
+  bySponsor:           ApiScholarshipSponsorRow[]
 }
 
 export interface ApiAttendanceSummaryRow {

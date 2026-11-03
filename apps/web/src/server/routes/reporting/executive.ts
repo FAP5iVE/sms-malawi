@@ -34,6 +34,11 @@ function accessOf(req: Request): executive.ExecutiveAccess {
   }
 }
 
+executiveReportingRouter.get('/retention', ...gate, async (req, res) => {
+  const { academicYear } = await resolvePeriod(req)
+  res.json(await executive.getRetention(academicYear))
+})
+
 executiveReportingRouter.get('/overview', ...gate, async (req, res) => {
   const { academicYear, term } = await resolvePeriod(req)
   res.json(await executive.getExecutiveOverview(academicYear, term, accessOf(req)))

@@ -268,6 +268,10 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
   // Bounds mirror the contract-alert pipeline's sensible range.
   [SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS]:
     positiveIntSchema('Contract expiry lookahead days').max(365),
+  // Bounded to a plausible working-life range so a typo (e.g. 6 or 600) can't
+  // mark every member of staff as already retired.
+  [SETTING_KEYS.HR_RETIREMENT_AGE]:
+    positiveIntSchema('Retirement age').min(50).max(75),
 
   // [PRODUCTION FIX 2026-07-27] Department name -> non-empty list of job
   // titles. Both department names and title names must be non-blank after

@@ -24,7 +24,17 @@
  * [DEPENDS ON]: none
  */
 import { z } from 'zod'
-import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
+import {
+  MALAWI_SUBJECTS,
+  RESIDENCE_TYPES,
+  ADMISSION_TYPES,
+  TRAVEL_MINUTES_MAX,
+  ORPHAN_STATUSES,
+  SUPPORT_NEED_TYPES,
+  EXIT_REASONS,
+  NRB_NUMBER_MIN,
+  NRB_NUMBER_MAX,
+} from '@shared/constants/malawi'
 
 // ─── ENUMS ───────────────────────────────────────────────
 export const StudentStatusSchema = z.enum([
@@ -35,6 +45,94 @@ export const StudentStatusSchema = z.enum([
 ])
 
 export const SexSchema = z.enum(['MALE', 'FEMALE'])
+
+// ─── DEMOGRAPHIC FIELDS (shared by student create/update) ─────────────
+// All optional. A blank string means "not recorded / clear it" - the service
+// normalises '' to null, so a form can send an empty input without a special case.
+const optionalText = (max: number) => z.string().trim().max(max).optional()
+
+// NRB number: length (and, in the DB, uniqueness) only. The real number format
+// is NOT enforced until it has been verified with NRB.
+const nrbNumberField = z
+  .string()
+  .trim()
+  .min(NRB_NUMBER_MIN, `NRB number must be at least ${NRB_NUMBER_MIN} characters`)
+  .max(NRB_NUMBER_MAX, `NRB number must be at most ${NRB_NUMBER_MAX} characters`)
+  .optional()
+  .or(z.literal(''))
+
+export const StudentDemographicsShape = {
+  nrbNumber:            nrbNumberField,
+  traditionalAuthority: optionalText(100),
+  religion:             optionalText(60),
+  homeLanguage:         optionalText(60),
+  residenceType:        z.enum(RESIDENCE_TYPES).optional(),
+  travelMinutes:        z.number().int().min(0).max(TRAVEL_MINUTES_MAX).nullable().optional(),
+  admissionType:        z.enum(ADMISSION_TYPES).optional(),
+  previousSchool:       optionalText(200),
+  reasonForTransfer:    optionalText(500),
+} as const
+
+// ─── WELFARE (sensitive — student.editWelfare) ─────────────────────────
+// Deliberately NOT part of Create/UpdateStudentSchema: welfare data travels only
+// through the welfare endpoints, which check student.editWelfare and audit every
+// write. '' on a text field clears it.
+export const UpdateWelfareSchema = z.object({
+  orphanStatus:      z.enum(ORPHAN_STATUSES).optional(),
+  isVulnerable:      z.boolean().optional(),
+  vulnerabilityNote: z.string().trim().max(1000).optional(),
+  medicalAlert:      z.string().trim().max(500).optional(),
+})
+
+export const SupportNeedInputSchema = z.object({
+  type:            z.enum(SUPPORT_NEED_TYPES),
+  accommodation:   z.string().trim().max(300).optional(),
+  assistiveDevice: z.string().trim().max(200).optional(),
+  identifiedAt:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the format YYYY-MM-DD').optional().or(z.literal('')),
+})
+
+export const UpdateSupportNeedSchema = SupportNeedInputSchema.partial()
+
+export type UpdateWelfareInput = z.infer<typeof UpdateWelfareSchema>
+export type SupportNeedInput = z.infer<typeof SupportNeedInputSchema>
+export type UpdateSupportNeedInput = z.infer<typeof UpdateSupportNeedSchema>
+
+// ─── EXIT (archiving a student) ───────────────────────────────────────
+// Reason and date are required whenever a student is archived; the note is
+// optional free text and is treated as sensitive (it is only ever returned with
+// the welfare data). The date cannot be in the future.
+export const StudentExitSchema = z.object({
+  exitReason: z.enum(EXIT_REASONS),
+  exitDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the format YYYY-MM-DD')
+    .refine((v) => new Date(`${v}T00:00:00Z`).getTime() <= Date.now() + 24 * 60 * 60 * 1000, 'Exit date cannot be in the future'),
+  exitNote: z.string().trim().max(500).optional(),
+})
+export type StudentExitInput = z.infer<typeof StudentExitSchema>
+
+// ─── GUARDIANS ────────────────────────────────────────────────────────
+// Phone length matches CreateStudentSchema.guardianPhone (min 10). The
+// relationship is a free string validated against GUARDIAN_RELATIONSHIPS by the
+// form's <select>, same as Student.guardianRelation, so legacy values stay valid.
+export const GuardianInputSchema = z.object({
+  fullName:           z.string().trim().min(1, 'Guardian name required').max(120),
+  relation:           z.string().trim().min(1, 'Relationship required').max(60),
+  phone:              z.string().trim().min(10, 'Valid phone number required').max(30),
+  altPhone:           z.string().trim().max(30).optional(),
+  email:              z.string().trim().email('Enter a valid email').optional().or(z.literal('')),
+  address:            z.string().trim().max(300).optional(),
+  nrbNumber:          nrbNumberField,
+  isPrimary:          z.boolean().optional(),
+  isFeePayer:         z.boolean().optional(),
+  isEmergencyContact: z.boolean().optional(),
+  livesWithStudent:   z.boolean().nullable().optional(),
+})
+
+export const UpdateGuardianSchema = GuardianInputSchema.partial()
+
+export type GuardianInput = z.infer<typeof GuardianInputSchema>
+export type UpdateGuardianInput = z.infer<typeof UpdateGuardianSchema>
 
 // ─── CREATE STUDENT ──────────────────────────────────────
 export const CreateStudentSchema = z.object({
@@ -57,6 +155,7 @@ export const CreateStudentSchema = z.object({
   guardianRelation: z.string().min(1, 'Relationship required'),
   classId: z.string().optional(),
   status: StudentStatusSchema.optional(),
+  ...StudentDemographicsShape,
 })
 
 export const UpdateStudentSchema = CreateStudentSchema.partial().extend({
@@ -102,7 +201,9 @@ export const ApplicationSchema = z.object({
   nationality: z.string().min(1, 'Nationality is required'),
   district: z.string().optional(),
   village: z.string().optional(),
-  religion: z.string().optional(),
+  traditionalAuthority: optionalText(100),
+  religion: optionalText(60),
+  homeLanguage: optionalText(60),
   address: z.string().min(5, 'Address is required'),
   countryCode: z.string().min(1, 'Select country code'),
   phone: z.string().min(7, 'Phone number is required'),
@@ -119,6 +220,16 @@ export const ApplicationSchema = z.object({
   guardianPhone: z.string().min(7, 'Guardian phone is required'),
   guardianEmail: z.string().email('Enter a valid email').optional().or(z.literal('')),
   guardianAddress: z.string().optional(),
+}).superRefine((v, ctx) => {
+  // The /apply form only shows the district field to Malawian applicants
+  // ("Malawi" in the country list, "Malawian" on the Student default). It used
+  // to be optional for them too and was saved as '' - a district the student
+  // record then required. A foreign applicant has no Malawian district, so only
+  // Malawians are held to it.
+  const isMalawian = v.nationality === 'Malawi' || v.nationality === 'Malawian'
+  if (isMalawian && !v.district?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['district'], message: 'District of origin is required' })
+  }
 })
 
 export type ApplicationInput = z.infer<typeof ApplicationSchema>

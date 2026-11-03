@@ -91,6 +91,11 @@ function buildApplicationCreateData(data: ApplicationInput) {
     nationality:       data.nationality,
     district:          data.district ?? '',
     village:           data.village ?? null,
+    traditionalAuthority: data.traditionalAuthority?.trim() || null,
+    // religion was validated by ApplicationSchema and shown on /apply but never
+    // saved (no column existed), so it was silently discarded.
+    religion:          data.religion?.trim() || null,
+    homeLanguage:      data.homeLanguage?.trim() || null,
     email:             data.email || null,
     phone:             data.phone,
     address:           data.address ?? null,

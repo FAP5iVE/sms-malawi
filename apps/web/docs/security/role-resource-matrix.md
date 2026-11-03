@@ -21,7 +21,7 @@ Derived from `ROLE_PERMISSIONS` in `packages/shared/types/permissions.ts` — th
 | class | 6/17 | 11/17 | 1/17 | 1/17 | 7/17 | 8/17 | 1/17 | 4/17 | 3/17 |
 | exam | 8/24 | 19/24 | · | · | 2/24 | 10/24 | · | 20/24 | 3/24 |
 | finance | 2/37 | 16/37 | 30/37 | 3/37 | 1/37 | · | 4/37 | · | 1/37 |
-| hr | 7/26 | ● | 9/26 | 8/26 | 8/26 | 9/26 | ● | 9/26 | · |
+| hr | 8/27 | ● | 9/27 | 8/27 | 8/27 | 9/27 | ● | 9/27 | · |
 | inventory | 1/7 | 1/7 | ● | · | · | 1/7 | · | · | · |
 | library | 4/23 | 5/23 | 5/23 | 22/23 | · | 7/23 | 5/23 | 5/23 | 5/23 |
 | location | 1/2 | 1/2 | ● | · | · | · | · | · | · |
@@ -31,7 +31,7 @@ Derived from `ROLE_PERMISSIONS` in `packages/shared/types/permissions.ts` — th
 | report | 7/26 | 18/26 | 8/26 | 3/26 | 4/26 | 4/26 | 3/26 | 5/26 | 4/26 |
 | search | ● | ● | ● | ● | · | ● | ● | · | · |
 | settings | 6/18 | 9/18 | 4/18 | 3/18 | 3/18 | 3/18 | 3/18 | 6/18 | 2/18 |
-| student | ● | 10/12 | 2/12 | 2/12 | 8/12 | 4/12 | 1/12 | 3/12 | 2/12 |
+| student | ● | 12/14 | 2/14 | 2/14 | 8/14 | 4/14 | 2/14 | 3/14 | 2/14 |
 | timetable | 3/6 | 5/6 | 1/6 | 1/6 | 2/6 | 2/6 | 1/6 | 3/6 | 1/6 |
 | userMgmt | ● | · | · | · | · | · | · | · | · |
 
@@ -268,7 +268,7 @@ Derived from `ROLE_PERMISSIONS` in `packages/shared/types/permissions.ts` — th
 | Operation | AD | HR | FI | LI | LR | AC | HM | EO | ST | Permissions |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|---|
 | Read own | ◐ 1/5 | ● | ◐ 4/5 | ◐ 4/5 | ◐ 4/5 | ● | ● | ● | · | `viewOwnLeaveHistory`, `viewOwnLoanStatus`, `viewOwnPayslips`, `viewOwnPerformanceNotes`, `viewOwnProfile` |
-| Read all | ◐ 2/5 | ● | ◐ 2/5 | ◐ 1/5 | ◐ 1/5 | ◐ 1/5 | ● | ◐ 1/5 | · | `viewAllLeaveRecords`, `viewAnyPayslips`, `viewAnyProfile`, `viewHRCalendar`, `viewHRReports` |
+| Read all | ◐ 3/6 | ● | ◐ 2/6 | ◐ 1/6 | ◐ 1/6 | ◐ 1/6 | ● | ◐ 1/6 | · | `viewAllLeaveRecords`, `viewAnyPayslips`, `viewAnyProfile`, `viewHRCalendar`, `viewHRReports`, `viewStaffSensitive` |
 | Create | ◐ 2/7 | ● | ◐ 2/7 | ◐ 2/7 | ◐ 2/7 | ◐ 2/7 | ● | ◐ 2/7 | · | `addPerformanceNote`, `applyLeave`, `applyLoan`, `assignRole`, `createStaff`, `defineHolidays`, `defineLoanRepaymentTerms` |
 | Update | ◐ 1/6 | ● | ◐ 1/6 | ◐ 1/6 | ◐ 1/6 | ◐ 1/6 | ● | ◐ 1/6 | · | `adjustLeaveBalance`, `editOwnLimitedFields`, `editStaff`, `manageDiscipline`, `manageSalaryStructure`, `promoteStaff` |
 | Approve / release | · | ● | · | · | · | · | ● | · | · | `approveLeave`, `approveLoan` |
@@ -304,6 +304,7 @@ Derived from `ROLE_PERMISSIONS` in `packages/shared/types/permissions.ts` — th
 | `hr.viewOwnPayslips` | Read own | `admin`, `high_rank`, `finance`, `library`, `lower_rank`, `academic`, `hr`, `exam_officer` |
 | `hr.viewOwnPerformanceNotes` | Read own | `high_rank`, `academic`, `hr`, `exam_officer` |
 | `hr.viewOwnProfile` | Read own | `high_rank`, `finance`, `library`, `lower_rank`, `academic`, `hr`, `exam_officer` |
+| `hr.viewStaffSensitive` | Read all | `admin`, `high_rank`, `hr` |
 
 </details>
 
@@ -545,9 +546,9 @@ Derived from `ROLE_PERMISSIONS` in `packages/shared/types/permissions.ts` — th
 | Operation | AD | HR | FI | LI | LR | AC | HM | EO | ST | Permissions |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|---|
 | Read own | ● | · | · | · | · | · | · | · | ● | `viewOwn` |
-| Read all | ● | ● | ◐ 2/5 | ◐ 2/5 | ◐ 4/5 | ◐ 3/5 | ◐ 1/5 | ◐ 3/5 | · | `view`, `viewAttendance`, `viewFeeStatus`, `viewLibraryStatus`, `viewRiskStatus` |
+| Read all | ● | ● | ◐ 2/6 | ◐ 2/6 | ◐ 4/6 | ◐ 3/6 | ◐ 2/6 | ◐ 3/6 | · | `view`, `viewAttendance`, `viewFeeStatus`, `viewLibraryStatus`, `viewRiskStatus`, `viewWelfare` |
 | Create | ● | ● | · | · | ● | · | · | · | · | `create` |
-| Update | ● | ● | · | · | ● | · | · | · | · | `edit` |
+| Update | ● | ● | · | · | ◐ 1/2 | · | · | · | · | `edit`, `editWelfare` |
 | Approve / release | ● | ● | · | · | · | · | · | · | · | `approvePendingAction` |
 | Delete / void | ● | ◐ 1/2 | · | · | ◐ 1/2 | · | · | · | · | `hardDelete`, `softDelete` |
 | Export | ● | ● | · | · | ● | ● | · | · | ● | `printProfile` |
@@ -559,6 +560,7 @@ Derived from `ROLE_PERMISSIONS` in `packages/shared/types/permissions.ts` — th
 | `student.approvePendingAction` | Approve / release | `admin`, `high_rank` |
 | `student.create` | Create | `admin`, `high_rank`, `lower_rank` |
 | `student.edit` | Update | `admin`, `high_rank`, `lower_rank` |
+| `student.editWelfare` | Update | `admin`, `high_rank` |
 | `student.hardDelete` | Delete / void | `admin` |
 | `student.printProfile` | Export | `admin`, `high_rank`, `lower_rank`, `academic`, `student` |
 | `student.softDelete` | Delete / void | `admin`, `high_rank`, `lower_rank` |
@@ -568,6 +570,7 @@ Derived from `ROLE_PERMISSIONS` in `packages/shared/types/permissions.ts` — th
 | `student.viewLibraryStatus` | Read all | `admin`, `high_rank`, `library`, `lower_rank` |
 | `student.viewOwn` | Read own | `admin`, `student` |
 | `student.viewRiskStatus` | Read all | `admin`, `high_rank`, `academic`, `exam_officer` |
+| `student.viewWelfare` | Read all | `admin`, `high_rank`, `hr` |
 
 </details>
 

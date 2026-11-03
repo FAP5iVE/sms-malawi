@@ -55,7 +55,7 @@
 
 import { useState }                               from 'react'
 import { Archive, Pencil, UserPlus }              from 'lucide-react'
-import { useStudents, useArchiveStudent }          from '@/hooks/useStudents'
+import { useStudents, useArchiveStudent, useWelfareSummary } from '@/hooks/useStudents'
 import { useClasses }                             from '@/hooks/useClasses'
 import { useEffectiveAcademicPeriod }                from '@/hooks/useSettings'
 import { usePermissions }                         from '@/hooks/usePermissions'
@@ -65,7 +65,9 @@ import { PermissionGuard }                        from '@/components/shared/Perm
 import { StudentForm }                            from '@/components/students/StudentForm'
 import { DataTable }                              from '@/components/shared/DataTable'
 import type { DataColumn, MobileAction }          from '@/components/shared/DataTable'
-import ConfirmDialog                              from '@/components/shared/ConfirmDialog'
+import { Modal }                                  from '@/components/shared/Modal'
+import { EXIT_REASONS, EXIT_REASON_LABELS }       from '@shared/constants/malawi'
+import { StudentExitSchema }                      from '@shared/schemas/student'
 import { StudentRiskBadge }                       from '@/components/shared/StudentRiskBadge'
 import type { ApiStudent }                        from '@shared/types/api'
 import { useRouter }                              from 'next/navigation'
@@ -235,6 +237,12 @@ function StudentsContent() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined)
   // R15 — ids awaiting bulk-archive confirmation (null = dialog closed)
   const [pendingArchiveIds, setPendingArchiveIds] = useState<string[] | null>(null)
+  // Archiving records WHY the student left (required by the server). One reason,
+  // date and note apply to every student in a bulk archive.
+  const [exitReason, setExitReason] = useState('')
+  const [exitDate, setExitDate]     = useState(() => new Date().toISOString().slice(0, 10))
+  const [exitNote, setExitNote]     = useState('')
+  const [exitError, setExitError]   = useState<string | null>(null)
   // R19 — free-text search, wired to useStudents()'s existing `search` filter
   const [search, setSearch] = useState('')
   // Class filter — useStudents + GET /students already support classId; this
@@ -261,6 +269,9 @@ function StudentsContent() {
   const archive             = useArchiveStudent()
   const [bulkArchiving, setBulkArchiving] = useState(false)
   const { can }             = usePermissions()
+  // Welfare COUNTS (never names) for roles holding student.viewWelfare.
+  const canSeeWelfare       = can('student.viewWelfare')
+  const { data: welfareSummary } = useWelfareSummary(canSeeWelfare)
 
   // [PRODUCTION FIX 2026-07-27] Fee balance and risk level were shown to
   // every role that could reach this page (including library and HR, who
@@ -376,6 +387,25 @@ function StudentsContent() {
         </PermissionGuard>
       </div>
 
+      {/* Welfare counts for admin / headteacher / HR. Counts only: no names on a
+          list page. Detail lives on each student's profile behind the same
+          permission. */}
+      {canSeeWelfare && welfareSummary && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-label="Welfare summary">
+          {[
+            ['Orphans', welfareSummary.orphans.total],
+            ['Vulnerable', welfareSummary.vulnerable],
+            ['With support needs', welfareSummary.withSupportNeeds],
+            ['Orphan status not recorded', welfareSummary.orphanStatusUnrecorded],
+          ].map(([label, value]) => (
+            <div key={label} className="bg-surface rounded-xl p-3">
+              <p className="text-xs text-muted">{label}</p>
+              <p className="text-lg font-heading font-bold text-brand-navy tabular">{value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       <ModuleSurface>
       {actionError && (
         <p
@@ -444,36 +474,101 @@ function StudentsContent() {
       )}
 
       {/* ── R15 — bulk-archive confirmation ─────────────────────────────── */}
-      <ConfirmDialog
-        open={pendingArchiveIds !== null}
-        title={
-          pendingArchiveIds && pendingArchiveIds.length === 1
-            ? 'Archive this student?'
-            : `Archive ${pendingArchiveIds?.length ?? 0} students?`
-        }
-        description={
-          pendingArchiveIds
-            ? `${pendingArchiveIds.length === 1 ? 'This student' : `These ${pendingArchiveIds.length} students`} will be archived (soft-deleted) and removed from the active list. Records are preserved and can be restored by an administrator.`
-            : ''
-        }
-        confirmLabel="Archive"
-        confirmingLabel="Archiving…"
-        confirming={bulkArchiving}
-        destructive
-        onConfirm={async () => {
-          const ids = pendingArchiveIds ?? []
-          setActionError(null)
-          setBulkArchiving(true)
-          // Wait for every request: the dialog shows a spinner meanwhile, and a
-          // partial failure is reported (individual failures are toasted too).
-          const results = await Promise.allSettled(ids.map((id) => archive.mutateAsync(id)))
-          const failed = results.filter((r) => r.status === 'rejected').length
-          if (failed > 0) setActionError(`${failed} of ${ids.length} student(s) could not be archived.`)
-          setBulkArchiving(false)
-          setPendingArchiveIds(null)
-        }}
-        onCancel={() => setPendingArchiveIds(null)}
-      />
+      {pendingArchiveIds !== null && (
+        <Modal
+          title={
+            pendingArchiveIds.length === 1
+              ? 'Archive this student?'
+              : `Archive ${pendingArchiveIds.length} students?`
+          }
+          description={`${pendingArchiveIds.length === 1 ? 'This student' : `These ${pendingArchiveIds.length} students`} will be archived (soft-deleted) and removed from the active list. Records are preserved and can be restored by an administrator. Record why they are leaving.`}
+          onClose={() => setPendingArchiveIds(null)}
+          busy={bulkArchiving}
+          bodyClassName="space-y-4"
+          onSubmit={async (e) => {
+            e.preventDefault()
+            const parsed = StudentExitSchema.safeParse({ exitReason, exitDate, exitNote })
+            if (!parsed.success) {
+              setExitError(exitReason ? (parsed.error.issues[0]?.message ?? 'Check the details.') : 'Choose the reason for leaving.')
+              return
+            }
+            setExitError(null)
+            const ids = pendingArchiveIds
+            setActionError(null)
+            setBulkArchiving(true)
+            // Wait for every request: the dialog shows a spinner meanwhile, and a
+            // partial failure is reported (individual failures are toasted too).
+            const results = await Promise.allSettled(ids.map((id) => archive.mutateAsync({ id, ...parsed.data })))
+            const failed = results.filter((r) => r.status === 'rejected').length
+            if (failed > 0) setActionError(`${failed} of ${ids.length} student(s) could not be archived.`)
+            setBulkArchiving(false)
+            setPendingArchiveIds(null)
+            setExitReason(''); setExitNote('')
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                disabled={bulkArchiving}
+                onClick={() => setPendingArchiveIds(null)}
+                className="min-h-[44px] px-4 rounded-xl border border-base text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={bulkArchiving}
+                className="min-h-[44px] px-4 rounded-xl bg-brand-coral text-white text-sm font-semibold disabled:opacity-40"
+              >
+                {bulkArchiving ? 'Archiving…' : 'Archive'}
+              </button>
+            </>
+          }
+        >
+          <div>
+            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5" htmlFor="exit-reason">
+              Reason for leaving
+            </label>
+            <select
+              id="exit-reason"
+              value={exitReason}
+              onChange={(e) => setExitReason(e.target.value)}
+              className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body"
+            >
+              <option value="">Select…</option>
+              {EXIT_REASONS.map((r) => <option key={r} value={r}>{EXIT_REASON_LABELS[r]}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5" htmlFor="exit-date">
+              Date left
+            </label>
+            <input
+              id="exit-date"
+              type="date"
+              value={exitDate}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setExitDate(e.target.value)}
+              className="w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5" htmlFor="exit-note">
+              Note (optional)
+            </label>
+            <textarea
+              id="exit-note"
+              rows={2}
+              value={exitNote}
+              maxLength={500}
+              onChange={(e) => setExitNote(e.target.value)}
+              className="w-full border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body"
+              placeholder="Visible only to admin, headteacher and HR"
+            />
+          </div>
+          {exitError && <p className="text-sm text-brand-coral" role="alert">{exitError}</p>}
+        </Modal>
+      )}
       </ModuleSurface>
     </div>
   )

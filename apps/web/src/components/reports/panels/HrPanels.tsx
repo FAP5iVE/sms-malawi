@@ -10,9 +10,9 @@ import { Chart } from '@/components/shared/chart'
 import { ChartCard } from '@/components/shared/ChartCard'
 import {
   useHrAttention, useHrContracts, useHrLeave, useHrLoans, useHrOverview, useHrPromotions, useHrReviews,
-  useHrWorkforce,
+  useHrTeaching, useHrWorkforce,
 } from '@/hooks/reporting/useHrReporting'
-import type { ApiContractRow, ApiHrCountRow } from '@shared/types/reporting-hr'
+import type { ApiContractRow, ApiHrCountRow, ApiTeachingRow, TeachingLicenceStatus } from '@shared/types/reporting-hr'
 import { formatDate, formatDays, formatMwk, formatPercent } from '@/lib/reportFormat'
 import { ReportCard } from '../ui/ReportCard'
 import { ReportTable } from '../ui/ReportTable'
@@ -208,6 +208,47 @@ export function HrReviewsTab({ academicYear }: { academicYear: string }) {
             { key: 'to', label: 'To', sortValue: (r) => r.toJobTitle },
             { key: 'date', label: 'Effective', sortValue: (r) => r.effectiveDate, cell: (r) => formatDate(r.effectiveDate), exportValue: (r) => formatDate(r.effectiveDate) },
             { key: 'status', label: 'Status', sortValue: (r) => r.status },
+          ]} />
+        </QueryState>
+      </ReportCard>
+    </PanelStack>
+  )
+}
+
+// ─── TEACHING & LICENSING ────────────────────────────────────────────────────
+// TCM licence status, timetable load and subject fit for teaching staff. Status
+// only: licence numbers are never shown in a report.
+
+const LICENCE_LABEL: Record<TeachingLicenceStatus, string> = {
+  MISSING: 'Missing', EXPIRED: 'Expired', EXPIRING: 'Expiring soon', VALID: 'Valid',
+}
+const LICENCE_ORDER: Record<TeachingLicenceStatus, number> = { EXPIRED: 0, MISSING: 1, EXPIRING: 2, VALID: 3 }
+
+export function HrTeachingTab({ academicYear }: { academicYear: string }) {
+  const q = useHrTeaching(academicYear)
+  const d = q.data
+  return (
+    <PanelStack>
+      <ReportKpiStrip
+        isLoading={q.isLoading}
+        kpis={d ? [
+          kpiTile('teachers', 'Teaching staff', d.teachingStaff, 'count', 'Active staff marked as teaching staff.'),
+          kpiTile('missing', 'Licence missing', d.licence.missing, 'count', 'Teaching staff with no TCM licence number or expiry on file.', d.licence.missing > 0 ? 'watch' : 'healthy'),
+          kpiTile('expired', 'Licence expired', d.licence.expired, 'count', 'Teaching staff whose TCM licence has already expired.', d.licence.expired > 0 ? 'critical' : 'healthy'),
+          kpiTile('expiring', 'Expiring soon', d.licence.expiring, 'count', `TCM licences expiring within ${d.warningDays} days.`, d.licence.expiring > 0 ? 'watch' : 'healthy'),
+          kpiTile('outside', 'Outside qualification', d.teachingOutsideQualification, 'count', 'Teachers assigned at least one subject that is not among their recorded qualified subjects.', d.teachingOutsideQualification > 0 ? 'watch' : 'healthy'),
+          kpiTile('unrecorded', 'Qualifications not recorded', d.qualificationsNotRecorded, 'count', 'Teachers with no qualified subjects on file, so subject fit cannot be checked.'),
+        ] : undefined}
+      />
+      <ReportCard title="Teaching staff" sub={d ? `Term ${d.term}, ${d.academicYear}` : undefined}>
+        <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
+          <ReportTable<ApiTeachingRow> rows={d?.rows} rowKey={(r) => r.staffId} exportLabel="Teaching staff" emptyMessage="No teaching staff are marked yet. Tick “Teaching staff” on a staff profile." defaultSort={{ key: 'licence', direction: 'asc' }} columns={[
+            { key: 'name', label: 'Teacher', sortValue: (r) => r.name },
+            { key: 'dept', label: 'Department', hideOnMobile: true, sortValue: (r) => r.department },
+            { key: 'licence', label: 'TCM licence', sortValue: (r) => LICENCE_ORDER[r.licenceStatus], cell: (r) => (r.licenceExpiry && r.licenceStatus !== 'MISSING' ? `${LICENCE_LABEL[r.licenceStatus]} (${formatDate(r.licenceExpiry)})` : LICENCE_LABEL[r.licenceStatus]), exportValue: (r) => LICENCE_LABEL[r.licenceStatus] },
+            { key: 'periods', label: 'Periods / week', align: 'right', sortValue: (r) => r.periodsPerWeek, cell: (r) => String(r.periodsPerWeek), exportValue: (r) => r.periodsPerWeek },
+            { key: 'subjects', label: 'Teaches', hideOnMobile: true, sortValue: (r) => r.subjectsAssigned.join(', '), cell: (r) => (r.subjectsAssigned.length ? r.subjectsAssigned.join(', ') : '—'), exportValue: (r) => r.subjectsAssigned.join(', ') },
+            { key: 'outside', label: 'Outside qualification', sortValue: (r) => r.outsideQualification.length, cell: (r) => (r.qualificationsRecorded ? (r.outsideQualification.length ? r.outsideQualification.join(', ') : 'None') : 'Not recorded'), exportValue: (r) => (r.qualificationsRecorded ? r.outsideQualification.join(', ') : 'Not recorded') },
           ]} />
         </QueryState>
       </ReportCard>

@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "fix-migration-checksum.cjs",
   ]),
   ...storybook.configs["flat/recommended"]
 ]);

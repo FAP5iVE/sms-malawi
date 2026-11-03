@@ -57,7 +57,8 @@ import { rateLimit } from '@/lib/ratelimit'
 import { boundedInt, REQUEST_LIMITS } from '@/lib/requestLimits'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
-import { CreateStaffSchema, UpdateStaffSchema, LeaveRequestSchema, ReviewLeaveSchema, LoanRequestSchema, PerformanceNoteSchema, UpdateSalarySchema, CreateAllowanceSchema } from '@shared/schemas/hr'
+import { hasPermission } from '@shared/types/permissions'
+import { CreateStaffSchema, UpdateStaffSchema, UpdateOwnDetailsSchema, TerminateStaffSchema, StaffResponsibilitySchema, LeaveRequestSchema, ReviewLeaveSchema, LoanRequestSchema, PerformanceNoteSchema, UpdateSalarySchema, CreateAllowanceSchema } from '@shared/schemas/hr'
 import * as hrService from '@/server/services/hrService'
 import { getSignedViewUrl, createDirectUploadTicket, FILE_PREFIX } from '@/lib/storage'
 import { sendError } from '@/server/lib/sendError'
@@ -142,15 +143,88 @@ hrRouter.get('/staff-picker', verifyAuth,
     return res.json(await hrService.listStaffForPicker())
   })
 
+// ── Terminate: records WHY and WHEN. Needs hr.terminateStaff. The login stays
+//    enabled until it is disabled in User Management (a separate permission).
+hrRouter.post('/:id/terminate', verifyAuth, requirePermission('hr.terminateStaff'),
+  async (req, res) => {
+    const parsed = TerminateStaffSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Exit reason and date are required.' })
+    }
+    try {
+      return res.json(await hrService.terminateStaff(String(req.params.id), parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Could not terminate this staff member.', tags: { module: 'hr' } })
+    }
+  })
+
+// ── Responsibilities (Head of Department, house master, patron ...) ──────────
+hrRouter.post('/:id/responsibilities', verifyAuth, requirePermission('hr.editStaff'),
+  async (req, res) => {
+    const parsed = StaffResponsibilitySchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid responsibility.' })
+    try {
+      return res.status(201).json(await hrService.addResponsibility(String(req.params.id), parsed.data, { uid: req.user!.uid, role: req.user!.role }))
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Could not add the responsibility.', tags: { module: 'hr' } })
+    }
+  })
+
+hrRouter.patch('/:id/responsibilities/:responsibilityId', verifyAuth, requirePermission('hr.editStaff'),
+  async (req, res) => {
+    const parsed = StaffResponsibilitySchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid responsibility.' })
+    try {
+      return res.json(await hrService.updateResponsibility(
+        String(req.params.id), String(req.params.responsibilityId), parsed.data, { uid: req.user!.uid, role: req.user!.role },
+      ))
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Could not update the responsibility.', tags: { module: 'hr' } })
+    }
+  })
+
+hrRouter.delete('/:id/responsibilities/:responsibilityId', verifyAuth, requirePermission('hr.editStaff'),
+  async (req, res) => {
+    try {
+      await hrService.deleteResponsibility(
+        String(req.params.id), String(req.params.responsibilityId), { uid: req.user!.uid, role: req.user!.role },
+      )
+      return res.json({ ok: true })
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Could not remove the responsibility.', tags: { module: 'hr' } })
+    }
+  })
+
+// Identity, next-of-kin and retirement data are returned only to roles holding
+// hr.viewStaffSensitive (admin / hr / high_rank today). The role gate above
+// already limits this route to those roles; the redaction keeps the rule in
+// force if the gate is ever widened.
+const STAFF_IDENTITY_KEYS = [
+  'dateOfBirth', 'nationality', 'homeDistrict', 'nrbNumber', 'tpin',
+  'nextOfKinName', 'nextOfKinPhone', 'nextOfKinRelation',
+  // Compliance / payroll-adjacent fields are HR-only as well.
+  'payrollNo', 'tcmRegistrationNo', 'tcmLicenceNo', 'tcmLicenceExpiry',
+  'highestQualification', 'qualifiedInEducation', 'trainingRoute',
+  'housingStatus',
+] as const
+
 hrRouter.get('/:id', verifyAuth, requireRole([...REVIEWERS]),
-  async (req, res) => {return res.json(await hrService.getStaffProfile(String(req.params.id)))})
+  async (req, res) => {
+    const profile = await hrService.getStaffProfile(String(req.params.id))
+    const canSeeSensitive = hasPermission(req.user!.role, 'hr.viewStaffSensitive', req.user!.superUser === true)
+    return res.json(canSeeSensitive ? profile : hrService.redactStaffSensitive(profile))
+  })
 
 hrRouter.patch('/:id', verifyAuth, requirePermission('hr.editStaff'),
   async (req, res) => {
     const parsed = UpdateStaffSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
+    const touchesIdentity = STAFF_IDENTITY_KEYS.some((k) => parsed.data[k] !== undefined)
+    if (touchesIdentity && !hasPermission(req.user!.role, 'hr.viewStaffSensitive', req.user!.superUser === true)) {
+      return res.status(403).json({ error: 'You do not have permission to change staff identity details.' })
+    }
     try {
-      return res.json(await hrService.updateStaff(String(req.params.id), parsed.data))
+      return res.json(await hrService.updateStaff(String(req.params.id), parsed.data, { uid: req.user!.uid, role: req.user!.role }))
     } catch (err) {
       const status = (err as { status?: number }).status ?? 500
       return res.status(status).json({ error: (err as Error).message ?? 'Failed to update staff member.' })
@@ -343,6 +417,27 @@ hrRouter.get('/loans', verifyAuth, requireRole(['admin', 'hr', 'finance', 'high_
 // "mine" segment is never captured by a later :id param route (Express
 // matches in registration order; not strictly required here since no
 // existing route is a bare GET /loans/:id, but kept for clarity).
+// ── Own details (phone, next of kin). The subject is the token's uid only.
+hrRouter.get('/me/details', verifyAuth, requirePermission('hr.editOwnLimitedFields'),
+  async (req, res) => {
+    try {
+      return res.json(await hrService.getOwnDetails(req.user!.uid))
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Could not load your details.', tags: { module: 'hr' } })
+    }
+  })
+
+hrRouter.patch('/me/details', verifyAuth, requirePermission('hr.editOwnLimitedFields'),
+  async (req, res) => {
+    const parsed = UpdateOwnDetailsSchema.safeParse(req.body)
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid details.' })
+    try {
+      return res.json(await hrService.updateOwnDetails(req.user!.uid, parsed.data, req.user!.role))
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Could not save your details.', tags: { module: 'hr' } })
+    }
+  })
+
 hrRouter.get('/loans/mine', verifyAuth,
   async (req, res) => {
     return res.json(await hrService.getMyLoans(req.user!.uid))

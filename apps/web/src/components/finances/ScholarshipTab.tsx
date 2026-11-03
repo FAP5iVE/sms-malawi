@@ -39,7 +39,7 @@ import { useStudents } from '@/hooks/useStudents'
 import { CreateScholarshipSchema } from '@shared/schemas/finance'
 import type { CreateScholarshipInput } from '@shared/schemas/finance'
 import type { ApiScholarship, ApiStudent } from '@shared/types/api'
-import { formatMWK } from '@shared/constants/malawi'
+import { formatMWK, SPONSOR_TYPES, SPONSOR_TYPE_LABELS } from '@shared/constants/malawi'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
 import { PlusCircle, GraduationCap, Loader2, X, Search } from 'lucide-react'
 import { apiFetch, queryKeys } from '@/lib/api-client'
@@ -128,6 +128,9 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
                 Student
               </th>
               <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+                Sponsor
+              </th>
+              <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
                 Type
               </th>
               <th className="text-right px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
@@ -142,7 +145,7 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
             {isLoading ? (
               Array.from({ length: 3 }).map((_, i) => (
                 <tr key={i} className="border-b border-base">
-                  {Array.from({ length: 5 }).map((__, j) => (
+                  {Array.from({ length: 6 }).map((__, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="skeleton h-4 rounded w-3/4" />
                     </td>
@@ -151,7 +154,7 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
               ))
             ) : scholarships.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted">
+                <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted">
                   No scholarships registered
                 </td>
               </tr>
@@ -160,6 +163,10 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
                 <tr key={s.id} className="border-b border-base hover:bg-page">
                   <td className="px-4 py-3 font-medium">{s.name}</td>
                   <td className="px-4 py-3 text-sm">{scholarshipStudentName(s)}</td>
+                  <td className="px-4 py-3 text-xs">
+                    {s.sponsorType ? SPONSOR_TYPE_LABELS[s.sponsorType] : <span className="text-muted">—</span>}
+                    {s.sponsorName && <span className="block text-muted">{s.sponsorName}</span>}
+                  </td>
                   <td className="px-4 py-3 text-muted text-xs">
                     {s.discountType.replace('_', ' ')}
                   </td>
@@ -318,6 +325,29 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
               min="0"
               className="input w-full"
               placeholder="50 for 50% or 50000 for MWK 50,000"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Sponsor</label>
+            <select
+              {...register('sponsorType', { setValueAs: (v) => (v === '' ? undefined : v) })}
+              className="input w-full"
+              aria-label="Sponsor type"
+            >
+              <option value="">Not specified</option>
+              {SPONSOR_TYPES.map((t) => (
+                <option key={t} value={t}>{SPONSOR_TYPE_LABELS[t]}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Sponsor name</label>
+            <input
+              {...register('sponsorName')}
+              className="input w-full"
+              placeholder="e.g. CDSS Bursary, Catholic Diocese of Mzuzu"
             />
           </div>
         </Modal>

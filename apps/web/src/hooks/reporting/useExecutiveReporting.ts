@@ -1,6 +1,6 @@
 'use client'
 
-import type { ApiExecutiveOverview } from '@shared/types/reporting-executive'
+import type { ApiExecutiveOverview, ApiRetention } from '@shared/types/reporting-executive'
 import { useReportingQuery } from '@/hooks/useReporting'
 import type { AttentionItem, HookOptions, PeriodParams } from './shared'
 
@@ -12,3 +12,6 @@ export const useExecutiveOverview = (p: PeriodParams, o?: HookOptions) =>
   useReportingQuery<ApiExecutiveOverview>(D, 'overview', q(p), { enabled: on(p, o) })
 export const useExecutiveAttention = (p: PeriodParams, o?: HookOptions) =>
   useReportingQuery<AttentionItem[]>(D, 'attention', q(p), { enabled: on(p, o) })
+
+export const useExecutiveRetention = (p: PeriodParams, o?: HookOptions) =>
+  useReportingQuery<ApiRetention>(D, 'retention', q(p), { enabled: on(p, o) })

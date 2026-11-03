@@ -101,7 +101,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ApplicationSchema } from '@shared/schemas/student'
 import type { ApplicationInput } from '@shared/schemas/student'
-import { MALAWI_DISTRICTS, FORM_LABELS } from '@shared/constants/malawi'
+import { MALAWI_DISTRICTS, FORM_LABELS, RELIGIONS, HOME_LANGUAGES } from '@shared/constants/malawi'
 import { getCountriesForForm, COUNTRY_CALLING_CODES } from '@shared/constants/countries'
 import { GUARDIAN_RELATIONSHIPS } from '@shared/constants/admissions'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
@@ -205,6 +205,7 @@ export default function ApplyPage() {
     handleSubmit,
     watch,
     trigger,
+    setError,
     formState: { errors },
     getValues,
   } = useForm<ApplicationInput>({
@@ -229,7 +230,16 @@ export default function ApplyPage() {
 
   async function goNext() {
     const valid = await trigger(STEP_FIELDS[step])
-    if (valid) setStep((s) => Math.min(s + 1, STEPS.length - 1))
+    if (!valid) return
+    // District of origin is required for Malawian applicants. The schema enforces
+    // it too, but its cross-field rule only runs once every other step is valid,
+    // so the error would surface on the review step where there is no district
+    // input. Check it here so it shows beside the field on the step that owns it.
+    if (step === 0 && isMalawian && !getValues('district')?.trim()) {
+      setError('district', { type: 'custom', message: 'District of origin is required' })
+      return
+    }
+    setStep((s) => Math.min(s + 1, STEPS.length - 1))
   }
 
   async function onSubmit(data: ApplicationInput) {
@@ -437,9 +447,24 @@ export default function ApplyPage() {
                   <Field label="Religion" error={errors.religion?.message} hint="Optional">
                     <input
                       {...register('religion')}
+                      list="apply-religions"
                       className={`${inputCls} ${inputBase}`}
                       placeholder="e.g. Christianity, Islam"
                     />
+                    <datalist id="apply-religions">
+                      {RELIGIONS.map((r) => <option key={r} value={r} />)}
+                    </datalist>
+                  </Field>
+                  <Field label="Home Language" error={errors.homeLanguage?.message} hint="Optional">
+                    <input
+                      {...register('homeLanguage')}
+                      list="apply-languages"
+                      className={`${inputCls} ${inputBase}`}
+                      placeholder="e.g. Chichewa, Chitumbuka"
+                    />
+                    <datalist id="apply-languages">
+                      {HOME_LANGUAGES.map((l) => <option key={l} value={l} />)}
+                    </datalist>
                   </Field>
                   <Field
                     label="Nationality"
@@ -459,20 +484,37 @@ export default function ApplyPage() {
                     </select>
                   </Field>
                   {isMalawian && (
-                    <Field
-                      label="District of Origin"
-                      error={errors.district?.message}
-                      hint="Malawian applicants only"
-                    >
-                      <select {...register('district')} className={`${inputCls} ${inputBase}`}>
-                        <option value="">Select district…</option>
-                        {MALAWI_DISTRICTS.map((d) => (
-                          <option key={d} value={d}>
-                            {d}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
+                    <>
+                      <Field
+                        label="District of Origin"
+                        required
+                        error={errors.district?.message}
+                        hint="Malawian applicants only"
+                      >
+                        <select
+                          {...register('district')}
+                          className={`${inputCls} ${errors.district ? inputError : inputBase}`}
+                        >
+                          <option value="">Select district…</option>
+                          {MALAWI_DISTRICTS.map((d) => (
+                            <option key={d} value={d}>
+                              {d}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field
+                        label="Traditional Authority (T/A)"
+                        error={errors.traditionalAuthority?.message}
+                        hint="Optional"
+                      >
+                        <input
+                          {...register('traditionalAuthority')}
+                          className={`${inputCls} ${inputBase}`}
+                          placeholder="e.g. T/A Kuntaja"
+                        />
+                      </Field>
+                    </>
                   )}
                 </div>
               </>
@@ -701,6 +743,15 @@ export default function ApplyPage() {
                       ['Nationality', values.nationality],
                       ...(values.district
                         ? [['District', values.district] as [string, string]]
+                        : []),
+                      ...(values.traditionalAuthority
+                        ? [['Traditional Authority', values.traditionalAuthority] as [string, string]]
+                        : []),
+                      ...(values.religion
+                        ? [['Religion', values.religion] as [string, string]]
+                        : []),
+                      ...(values.homeLanguage
+                        ? [['Home Language', values.homeLanguage] as [string, string]]
                         : []),
                     ],
                   },

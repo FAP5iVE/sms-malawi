@@ -228,6 +228,10 @@ export const SETTING_KEYS = {
 
   // ── HR — contract management
   HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS: 'hr_contract_expiry_lookahead_days',
+  // Compulsory retirement age in years. Retirement dates are COMPUTED from
+  // staff date of birth + this value, never stored per person, so changing the
+  // policy value moves every staff member's date at once.
+  HR_RETIREMENT_AGE:              'hr_retirement_age',
 
   // ── HR — department & job title taxonomy (production fix, 2026-07-27)
   HR_DEPARTMENT_TITLES:           'hr_department_titles',
@@ -365,6 +369,7 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.HR_STUDY_LEAVE_DAYS]:         number
   readonly [SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS]:     number
   readonly [SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS]: number  // days
+  readonly [SETTING_KEYS.HR_RETIREMENT_AGE]: number                   // years
   readonly [SETTING_KEYS.HR_DEPARTMENT_TITLES]: DepartmentTitles
 
   // ── Security
@@ -896,6 +901,13 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     category: SETTING_CATEGORIES.HR,
     isPublic: false,
     description: 'How many days ahead of a contract end date a staff contract counts as "expiring soon" in HR reports and alerts.',
+    defaultValue: 60,
+  },
+  [SETTING_KEYS.HR_RETIREMENT_AGE]: {
+    key: SETTING_KEYS.HR_RETIREMENT_AGE,
+    category: SETTING_CATEGORIES.HR,
+    isPublic: false,
+    description: 'Retirement age in years. Each staff member\'s retirement date is their date of birth plus this value.',
     defaultValue: 60,
   },
 

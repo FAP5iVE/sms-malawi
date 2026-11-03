@@ -23,3 +23,32 @@ export interface ApiExecutiveOverview {
   warnings: ReportWarning[]
   generatedAt: string
 }
+
+/** Repetition and exits for the leadership Enrollment tab (GET /reporting/executive/retention). */
+export interface ApiRetentionFormRow {
+  form: number
+  /** Students with a recorded promotion-run outcome for the year. */
+  students: number
+  promoted: number
+  repeated: number
+  awaitingManeb: number
+  graduated: number
+  /** repeated / students, percent; null when there are no students. */
+  repetitionRate: number | null
+}
+
+export interface ApiRetention {
+  academicYear: string
+  repetitionByForm: ApiRetentionFormRow[]
+  /** Students who have repeated in two or more recorded years. */
+  multiYearRepeaters: number
+  exits: {
+    /** Exits dated inside this academic year's terms. */
+    total: number
+    byReason: { reason: string; count: number }[]
+    windowStart: string
+    windowEnd: string
+  }
+  /** Archived students with no exit reason or date (archived before exit records were required). */
+  archivedWithoutExitRecord: number
+}

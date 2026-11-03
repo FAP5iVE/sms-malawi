@@ -78,6 +78,8 @@ import type {
   LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput, CreateAllowanceInput
 } from '@shared/schemas/hr'
 import type { LeaveType, Prisma, StaffRole } from '@prisma/client'
+import { getRetirementInfo, type RetirementInfo } from '@shared/utils/retirement'
+import type { TerminateStaffInput, StaffResponsibilityInput, UpdateOwnDetailsInput } from '@shared/schemas/hr'
 import * as algolia from '@/server/services/algoliaService'
 import { checkLeaveConflicts, type ConflictCheckResult } from '@/server/services/leaveConflictService'
 import * as notificationService from '@/server/services/notificationService'
@@ -131,16 +133,73 @@ export async function listStaffForPicker() {
   })
 }
 
+/** '' from a form means "clear it": store null. */
+function blankToNull(v: string | null | undefined): string | null {
+  if (v == null) return null
+  const t = v.trim()
+  return t === '' ? null : t
+}
+
+/** Staff NRB numbers are unique but optional; fail with a clear 409, not a raw constraint error. */
+async function assertStaffNrbAvailable(nrbNumber: string | null, excludeId?: string): Promise<void> {
+  if (!nrbNumber) return
+  const clash = await prisma.staffProfile.findFirst({
+    where:  { nrbNumber, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    select: { employeeNo: true },
+  })
+  if (clash) {
+    throw Object.assign(
+      new Error(`That NRB number is already recorded for staff member ${clash.employeeNo}.`),
+      { status: 409 },
+    )
+  }
+}
+
+/**
+ * Retirement date = date of birth + the school's retirement age (a setting,
+ * default 60). Computed on read, never stored, so changing the setting moves
+ * every staff member's date. Null when no date of birth is on file.
+ */
+async function buildRetirement(dateOfBirth: Date | null): Promise<RetirementInfo | null> {
+  if (!dateOfBirth) return null
+  const retirementAge = await settingsService.get(SETTING_KEYS.HR_RETIREMENT_AGE)
+  return getRetirementInfo(dateOfBirth, retirementAge)
+}
+
+/** The staff fields that only roles holding hr.viewStaffSensitive may see. */
+const STAFF_SENSITIVE_FIELDS = [
+  'dateOfBirth', 'nationality', 'homeDistrict', 'nrbNumber', 'tpin',
+  'nextOfKinName', 'nextOfKinPhone', 'nextOfKinRelation', 'retirement',
+  'payrollNo', 'tcmRegistrationNo', 'tcmLicenceNo', 'tcmLicenceExpiry',
+  'highestQualification', 'qualifiedInEducation', 'trainingRoute',
+  'housingStatus', 'exitReason', 'exitDate',
+] as const
+
+/**
+ * Removes identity, next-of-kin and retirement data from a staff profile for a
+ * caller without hr.viewStaffSensitive. The HR profile route is already limited
+ * to admin / hr / high_rank (all of whom hold it); this keeps the rule in the
+ * data layer too, so widening a route later can't quietly widen who sees it.
+ */
+export function redactStaffSensitive<T extends Record<string, unknown>>(profile: T): Omit<T, (typeof STAFF_SENSITIVE_FIELDS)[number]> {
+  const copy: Record<string, unknown> = { ...profile }
+  for (const field of STAFF_SENSITIVE_FIELDS) delete copy[field]
+  return copy as Omit<T, (typeof STAFF_SENSITIVE_FIELDS)[number]>
+}
+
 export async function getStaffProfile(id: string) {
-  return prisma.staffProfile.findUniqueOrThrow({
+  const profile = await prisma.staffProfile.findUniqueOrThrow({
     where: { id },
     include: {
       leaveBalances: true,
       leaveRequests: { orderBy: { createdAt: 'desc' }, take: 10 },
       loans: { where: { status: { in: ['APPROVED','DISBURSED','REPAYING'] } } },
       performanceNotes: { orderBy: { createdAt: 'desc' }, take: 5 },
+      qualifiedSubjects: { orderBy: { subject: 'asc' }, select: { subject: true } },
+      responsibilities: { orderBy: [{ endDate: { sort: 'asc', nulls: 'first' } }, { startDate: 'desc' }] },
     },
   })
+  return { ...profile, retirement: await buildRetirement(profile.dateOfBirth) }
 }
 
 // [PRODUCTION FIX] Salary was never actually settable anywhere — see this
@@ -219,7 +278,11 @@ export async function deleteAllowance(allowanceId: string, actorUid: string, act
 // employeeNo, role, or status. Role changes and status/termination changes
 // carry their own, more sensitive permissions (hr.assignRole,
 // hr.terminateStaff) and are not handled by this function.
-export async function updateStaff(id: string, input: UpdateStaffInput) {
+export async function updateStaff(
+  id: string,
+  input: UpdateStaffInput,
+  actor?: { uid: string; role: string },
+) {
   const before = await prisma.staffProfile.findUnique({ where: { id } })
   if (!before) {
     throw Object.assign(new Error('Staff member not found.'), { status: 404 })
@@ -236,10 +299,73 @@ export async function updateStaff(id: string, input: UpdateStaffInput) {
   if (input.employmentType    !== undefined) updateData.employmentType    = input.employmentType
   if (input.contractExpiry    !== undefined) updateData.contractExpiry    = new Date(input.contractExpiry)
 
+  // Identity fields ('' clears). Names of changed fields go to the audit log,
+  // never their values (NRB / TPIN / date of birth are identity data).
+  const identityChanged: string[] = []
+  if (input.dateOfBirth       !== undefined) { updateData.dateOfBirth       = input.dateOfBirth ? new Date(input.dateOfBirth) : null; identityChanged.push('dateOfBirth') }
+  if (input.nationality       !== undefined) { updateData.nationality       = blankToNull(input.nationality);       identityChanged.push('nationality') }
+  if (input.homeDistrict      !== undefined) { updateData.homeDistrict      = blankToNull(input.homeDistrict);      identityChanged.push('homeDistrict') }
+  if (input.nrbNumber         !== undefined) { updateData.nrbNumber         = blankToNull(input.nrbNumber);         identityChanged.push('nrbNumber') }
+  if (input.tpin              !== undefined) { updateData.tpin              = blankToNull(input.tpin);              identityChanged.push('tpin') }
+  if (input.nextOfKinName     !== undefined) { updateData.nextOfKinName     = blankToNull(input.nextOfKinName);     identityChanged.push('nextOfKinName') }
+  if (input.nextOfKinPhone    !== undefined) { updateData.nextOfKinPhone    = blankToNull(input.nextOfKinPhone);    identityChanged.push('nextOfKinPhone') }
+  if (input.nextOfKinRelation !== undefined) { updateData.nextOfKinRelation = blankToNull(input.nextOfKinRelation); identityChanged.push('nextOfKinRelation') }
+
+  if (updateData.nrbNumber !== undefined) {
+    await assertStaffNrbAvailable(updateData.nrbNumber as string | null, id)
+  }
+
+  // Teaching / licensing / qualifications / housing. Enum selects send '' for
+  // "not set", which clears the column.
+  const complianceChanged: string[] = []
+  const enumOrNull = <T extends string>(v: T | '' | undefined): T | null => (v ? v : null)
+  if (input.isTeaching           !== undefined) { updateData.isTeaching           = input.isTeaching;                          complianceChanged.push('isTeaching') }
+  if (input.tcmRegistrationNo    !== undefined) { updateData.tcmRegistrationNo    = blankToNull(input.tcmRegistrationNo);      complianceChanged.push('tcmRegistrationNo') }
+  if (input.tcmLicenceNo         !== undefined) { updateData.tcmLicenceNo         = blankToNull(input.tcmLicenceNo);           complianceChanged.push('tcmLicenceNo') }
+  if (input.tcmLicenceExpiry     !== undefined) { updateData.tcmLicenceExpiry     = input.tcmLicenceExpiry ? new Date(input.tcmLicenceExpiry) : null; complianceChanged.push('tcmLicenceExpiry') }
+  if (input.employmentCategory   !== undefined) { updateData.employmentCategory   = enumOrNull(input.employmentCategory);     complianceChanged.push('employmentCategory') }
+  if (input.payrollNo            !== undefined) { updateData.payrollNo            = blankToNull(input.payrollNo);              complianceChanged.push('payrollNo') }
+  if (input.highestQualification !== undefined) { updateData.highestQualification = enumOrNull(input.highestQualification);   complianceChanged.push('highestQualification') }
+  if (input.qualifiedInEducation !== undefined) { updateData.qualifiedInEducation = input.qualifiedInEducation;                complianceChanged.push('qualifiedInEducation') }
+  if (input.trainingRoute        !== undefined) { updateData.trainingRoute        = enumOrNull(input.trainingRoute);           complianceChanged.push('trainingRoute') }
+  if (input.housingStatus        !== undefined) { updateData.housingStatus        = enumOrNull(input.housingStatus);           complianceChanged.push('housingStatus') }
+
   const updated = await prisma.staffProfile.update({
     where: { id },
     data:  updateData,
   })
+
+  // Subjects the teacher is qualified to teach: replace the whole set.
+  if (input.qualifiedSubjects !== undefined) {
+    const subjects = [...new Set(input.qualifiedSubjects)]
+    await prisma.$transaction([
+      prisma.staffQualifiedSubject.deleteMany({ where: { staffId: id } }),
+      prisma.staffQualifiedSubject.createMany({ data: subjects.map((subject) => ({ staffId: id, subject })) }),
+    ])
+    complianceChanged.push('qualifiedSubjects')
+  }
+
+  if (complianceChanged.length > 0 && actor) {
+    await auditService.log({
+      action:     'hr.staff_compliance_edited',
+      entityType: 'StaffProfile',
+      entityId:   id,
+      actorUid:   actor.uid,
+      actorRole:  actor.role,
+      metadata:   { context: { fieldsChanged: complianceChanged } },
+    })
+  }
+
+  if (identityChanged.length > 0 && actor) {
+    await auditService.log({
+      action:     'hr.staff_identity_edited',
+      entityType: 'StaffProfile',
+      entityId:   id,
+      actorUid:   actor.uid,
+      actorRole:  actor.role,
+      metadata:   { context: { fieldsChanged: identityChanged } },
+    })
+  }
 
   // Keep the Firebase Auth display name in step if either name field
   // changed — createStaff sets displayName from firstName+lastName at
@@ -289,6 +415,9 @@ export async function updateStaff(id: string, input: UpdateStaffInput) {
 // successfully-created staff member (the admin/HR user still sees the temp
 // password in the create response and can relay it manually).
 export async function createStaff(data: CreateStaffInput, actorUid: string) {
+  // Reject a duplicate NRB before provisioning a login, so it can't orphan one.
+  await assertStaffNrbAvailable(blankToNull(data.nrbNumber))
+
   const tempPassword = generateTempPassword()
 
   // 1. Firebase Auth account.
@@ -363,6 +492,27 @@ export async function createStaff(data: CreateStaffInput, actorUid: string) {
         contractExpiry:    data.contractExpiry ? new Date(data.contractExpiry) : null,
         phone:             data.phone ?? null,
         salaryStructureId: data.salaryStructureId ?? null,
+        dateOfBirth:       data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+        nationality:       blankToNull(data.nationality) ?? 'Malawian',
+        homeDistrict:      blankToNull(data.homeDistrict),
+        nrbNumber:         blankToNull(data.nrbNumber),
+        tpin:              blankToNull(data.tpin),
+        nextOfKinName:     blankToNull(data.nextOfKinName),
+        nextOfKinPhone:    blankToNull(data.nextOfKinPhone),
+        nextOfKinRelation: blankToNull(data.nextOfKinRelation),
+        isTeaching:           data.isTeaching ?? false,
+        tcmRegistrationNo:    blankToNull(data.tcmRegistrationNo),
+        tcmLicenceNo:         blankToNull(data.tcmLicenceNo),
+        tcmLicenceExpiry:     data.tcmLicenceExpiry ? new Date(data.tcmLicenceExpiry) : null,
+        employmentCategory:   data.employmentCategory ? data.employmentCategory : null,
+        payrollNo:            blankToNull(data.payrollNo),
+        highestQualification: data.highestQualification ? data.highestQualification : null,
+        qualifiedInEducation: data.qualifiedInEducation ?? null,
+        trainingRoute:        data.trainingRoute ? data.trainingRoute : null,
+        housingStatus:        data.housingStatus ? data.housingStatus : null,
+        qualifiedSubjects:    data.qualifiedSubjects?.length
+          ? { create: [...new Set(data.qualifiedSubjects)].map((subject) => ({ subject })) }
+          : undefined,
       },
     })
 
@@ -827,6 +977,27 @@ export async function getContractExpiryAlert(daysAhead: number) {
 }
 
 /**
+ * TCM licences expiring exactly `daysAhead` days from today, for TEACHING staff
+ * only (isTeaching). Exact-day matching for the same reason as
+ * getContractExpiryAlert(): the job's sequential 7/30/60 calls must never email
+ * the same licence twice.
+ */
+export async function getLicenceExpiryAlert(daysAhead: number) {
+  const target = addDays(new Date(), daysAhead)
+  return prisma.staffProfile.findMany({
+    where: {
+      isTeaching: true,
+      status: 'ACTIVE',
+      tcmLicenceExpiry: { gte: startOfDay(target), lte: endOfDay(target) },
+    },
+    select: {
+      id: true, firstName: true, lastName: true, email: true, tcmLicenceExpiry: true,
+      department: true, jobTitle: true, employeeNo: true,
+    },
+  })
+}
+
+/**
  * [PRODUCTION FIX] Contracts expiring at any point in the next `daysAhead`
  * days — a genuine range query, unlike getContractExpiryAlert() above.
  * That function intentionally checks a single exact day (today + N) so
@@ -849,4 +1020,152 @@ export async function getUpcomingContractExpiries(daysAhead: number) {
     },
     orderBy: { contractExpiry: 'asc' },
   })
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TERMINATION and RESPONSIBILITIES
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Ends a staff member's employment. A reason and date are required (they feed
+ * the Ministry staffing return and, with date of birth, tell a retirement from a
+ * resignation). The login is NOT disabled here: that stays an explicit step in
+ * User Management, because disabling an account is a separate permission and
+ * HR may need to finish handover first.
+ */
+export async function terminateStaff(
+  id: string,
+  input: TerminateStaffInput,
+  actor: { uid: string; role: string },
+) {
+  const current = await prisma.staffProfile.findUnique({ where: { id }, select: { status: true } })
+  if (!current) throw Object.assign(new Error('Staff member not found.'), { status: 404 })
+  if (current.status === 'TERMINATED') {
+    throw Object.assign(new Error('This staff member has already been terminated.'), { status: 409 })
+  }
+
+  await prisma.staffProfile.update({
+    where: { id },
+    data: {
+      status:     'TERMINATED',
+      exitReason: input.exitReason,
+      exitDate:   new Date(`${input.exitDate}T00:00:00Z`),
+    },
+  })
+
+  await auditService.log({
+    action:     'hr.staff_terminated',
+    entityType: 'StaffProfile',
+    entityId:   id,
+    actorUid:   actor.uid,
+    actorRole:  actor.role,
+    metadata:   {
+      before:  { status: current.status },
+      after:   { status: 'TERMINATED', exitReason: input.exitReason, exitDate: input.exitDate },
+    },
+  })
+  return getStaffProfile(id)
+}
+
+async function auditResponsibility(id: string, actor: { uid: string; role: string }, context: Record<string, unknown>) {
+  await auditService.log({
+    action:     'hr.staff_compliance_edited',
+    entityType: 'StaffProfile',
+    entityId:   id,
+    actorUid:   actor.uid,
+    actorRole:  actor.role,
+    metadata:   { context },
+  })
+}
+
+export async function addResponsibility(
+  staffId: string,
+  input: StaffResponsibilityInput,
+  actor: { uid: string; role: string },
+) {
+  const exists = await prisma.staffProfile.findUnique({ where: { id: staffId }, select: { id: true } })
+  if (!exists) throw Object.assign(new Error('Staff member not found.'), { status: 404 })
+  const row = await prisma.staffResponsibility.create({
+    data: {
+      staffId,
+      title:     input.title,
+      startDate: new Date(`${input.startDate}T00:00:00Z`),
+      endDate:   input.endDate ? new Date(`${input.endDate}T00:00:00Z`) : null,
+    },
+  })
+  await auditResponsibility(staffId, actor, { change: 'responsibilityAdded', responsibilityId: row.id })
+  return row
+}
+
+export async function updateResponsibility(
+  staffId: string,
+  responsibilityId: string,
+  input: StaffResponsibilityInput,
+  actor: { uid: string; role: string },
+) {
+  const current = await prisma.staffResponsibility.findFirst({ where: { id: responsibilityId, staffId } })
+  if (!current) throw Object.assign(new Error('Responsibility not found.'), { status: 404 })
+  const row = await prisma.staffResponsibility.update({
+    where: { id: responsibilityId },
+    data: {
+      title:     input.title,
+      startDate: new Date(`${input.startDate}T00:00:00Z`),
+      endDate:   input.endDate ? new Date(`${input.endDate}T00:00:00Z`) : null,
+    },
+  })
+  await auditResponsibility(staffId, actor, { change: 'responsibilityUpdated', responsibilityId })
+  return row
+}
+
+export async function deleteResponsibility(
+  staffId: string,
+  responsibilityId: string,
+  actor: { uid: string; role: string },
+) {
+  const current = await prisma.staffResponsibility.findFirst({ where: { id: responsibilityId, staffId } })
+  if (!current) throw Object.assign(new Error('Responsibility not found.'), { status: 404 })
+  await prisma.staffResponsibility.delete({ where: { id: responsibilityId } })
+  await auditResponsibility(staffId, actor, { change: 'responsibilityRemoved', responsibilityId })
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SELF-SERVICE (hr.editOwnLimitedFields)
+//
+// A staff member's own phone and next of kin. The subject is ALWAYS the verified
+// uid from the token, never an id from the request, so one member of staff can't
+// read or change another's record through this path.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const OWN_DETAILS_SELECT = {
+  phone: true, nextOfKinName: true, nextOfKinPhone: true, nextOfKinRelation: true,
+} as const
+
+export async function getOwnDetails(uid: string) {
+  const row = await prisma.staffProfile.findUnique({ where: { uid }, select: OWN_DETAILS_SELECT })
+  if (!row) throw Object.assign(new Error('No staff profile is linked to this account.'), { status: 404 })
+  return row
+}
+
+export async function updateOwnDetails(uid: string, input: UpdateOwnDetailsInput, actorRole: string) {
+  const current = await prisma.staffProfile.findUnique({ where: { uid }, select: { id: true } })
+  if (!current) throw Object.assign(new Error('No staff profile is linked to this account.'), { status: 404 })
+
+  const data: Prisma.StaffProfileUncheckedUpdateInput = {}
+  const fieldsChanged: string[] = []
+  if (input.phone             !== undefined) { data.phone             = blankToNull(input.phone);             fieldsChanged.push('phone') }
+  if (input.nextOfKinName     !== undefined) { data.nextOfKinName     = blankToNull(input.nextOfKinName);     fieldsChanged.push('nextOfKinName') }
+  if (input.nextOfKinPhone    !== undefined) { data.nextOfKinPhone    = blankToNull(input.nextOfKinPhone);    fieldsChanged.push('nextOfKinPhone') }
+  if (input.nextOfKinRelation !== undefined) { data.nextOfKinRelation = blankToNull(input.nextOfKinRelation); fieldsChanged.push('nextOfKinRelation') }
+  if (fieldsChanged.length === 0) return getOwnDetails(uid)
+
+  const updated = await prisma.staffProfile.update({ where: { uid }, data, select: OWN_DETAILS_SELECT })
+  await auditService.log({
+    action:     'hr.staff_identity_edited',
+    entityType: 'StaffProfile',
+    entityId:   current.id,
+    actorUid:   uid,
+    actorRole,
+    metadata:   { context: { fieldsChanged, self: true } },
+  })
+  return updated
 }

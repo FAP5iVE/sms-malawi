@@ -8,9 +8,9 @@ Every server entry point, extracted from source by `test/security/endpointInvent
 
 | Measure | Count |
 |---|---:|
-| Express endpoints (mounted under `/api`) | 557 |
-| — mutations (non-GET) | 248 |
-| — with a role/permission gate | 472 (220 mutations) |
+| Express endpoints (mounted under `/api`) | 575 |
+| — mutations (non-GET) | 260 |
+| — with a role/permission gate | 490 (232 mutations) |
 | — signed-in only, with a declared policy | 62 |
 | — public (no identity) | 23 |
 | — declared `cron-or-admin` | 1 |
@@ -422,8 +422,12 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | ● | POST | `/api/hr/:id/allowances` | `requireAnyPermission([hr.manageSalaryStructure, finance.manageSalaryStructure])` |  | :id, body |
 | ● | POST | `/api/hr/:id/photo` | `requireRole([...HR_ADMIN])` |  | :id, body |
 | ● | POST | `/api/hr/:id/photo/upload-ticket` | `requireRole([...HR_ADMIN])` |  | :id |
+| ● | POST | `/api/hr/:id/responsibilities` | `requirePermission(hr.editStaff)` |  | :id, body |
+| ● | DELETE | `/api/hr/:id/responsibilities/:responsibilityId` | `requirePermission(hr.editStaff)` |  | :id, :responsibilityId |
+| ● | PATCH | `/api/hr/:id/responsibilities/:responsibilityId` | `requirePermission(hr.editStaff)` |  | :id, :responsibilityId, body |
 |  | GET | `/api/hr/:id/salary` | `requireAnyPermission([hr.manageSalaryStructure, finance.manageSalaryStructure])` |  | :id |
 | ● | PUT | `/api/hr/:id/salary` | `requireAnyPermission([hr.manageSalaryStructure, finance.manageSalaryStructure])` |  | :id, body |
+| ● | POST | `/api/hr/:id/terminate` | `requirePermission(hr.terminateStaff)` |  | :id, body |
 |  | GET | `/api/hr/alerts/contracts` | `requireRole([...HR_ADMIN])` |  | query |
 |  | GET | `/api/hr/alerts/contracts-upcoming` | `requireRole([...HR_ADMIN])` |  | query |
 | ● | DELETE | `/api/hr/allowances/:allowanceId` | `requireAnyPermission([hr.manageSalaryStructure, finance.manageSalaryStructure])` |  | :allowanceId |
@@ -438,6 +442,8 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | ● | PATCH | `/api/hr/loans/:id/repay` | `requireRole([admin,finance,hr])` |  | :id, body |
 |  | GET | `/api/hr/loans/mine` | signed-in user | own-data | — |
 | ● | POST | `/api/hr/loans/request` | signed-in user | own-data | body |
+|  | GET | `/api/hr/me/details` | `requirePermission(hr.editOwnLimitedFields)` |  | — |
+| ● | PATCH | `/api/hr/me/details` | `requirePermission(hr.editOwnLimitedFields)` |  | body |
 | ● | POST | `/api/hr/performance` | `requireRole([...REVIEWERS])` |  | body |
 |  | GET | `/api/hr/salary-roster` | `requireAnyPermission([hr.manageSalaryStructure, finance.manageSalaryStructure, hr.viewAnyPayslips])` |  | — |
 |  | GET | `/api/hr/staff-picker` | `requireAnyPermission([assets.allocateItem, hr.viewAnyProfile])` |  | — |
@@ -717,6 +723,7 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 |:-:|---|---|---|---|---|
 |  | GET | `/api/reporting/executive/attention` | `requireAllPermissions([report.viewSchoolPerformance, report.viewFinanceSummary])` |  | — |
 |  | GET | `/api/reporting/executive/overview` | `requireAllPermissions([report.viewSchoolPerformance, report.viewFinanceSummary])` |  | — |
+|  | GET | `/api/reporting/executive/retention` | `requireAllPermissions([report.viewSchoolPerformance, report.viewFinanceSummary])` |  | — |
 
 ### reporting/finance
 
@@ -738,6 +745,7 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 |  | GET | `/api/reporting/hr/overview` | `requirePermission(report.viewHRReports)` |  | — |
 |  | GET | `/api/reporting/hr/promotions` | `requirePermission(report.viewHRReports)` |  | — |
 |  | GET | `/api/reporting/hr/reviews` | `requirePermission(report.viewHRReports)` |  | — |
+|  | GET | `/api/reporting/hr/teaching` | `requirePermission(report.viewHRReports)` |  | — |
 |  | GET | `/api/reporting/hr/workforce` | `requirePermission(report.viewHRReports)` |  | — |
 
 ### reporting/library
@@ -853,18 +861,28 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 |:-:|---|---|---|---|---|
 |  | GET | `/api/students` | `requirePermission(student.view)` |  | query |
 | ● | POST | `/api/students` | `requirePermission(student.create)` |  | body |
-| ● | DELETE | `/api/students/:id` | `requirePermission(student.softDelete)` |  | :id |
+| ● | DELETE | `/api/students/:id` | `requirePermission(student.softDelete)` |  | :id, body |
 |  | GET | `/api/students/:id` | `requireAnyPermission([student.view, student.viewOwn])` |  | :id |
 | ● | PATCH | `/api/students/:id` | `requirePermission(student.edit)` |  | :id, body |
 |  | GET | `/api/students/:id/fee-gate` | `requireAnyPermission([student.viewFeeStatus, student.viewOwn])` |  | :id, query |
+|  | GET | `/api/students/:id/guardians` | `requirePermission(student.view)` |  | :id |
+| ● | POST | `/api/students/:id/guardians` | `requirePermission(student.edit)` |  | :id, body |
+| ● | DELETE | `/api/students/:id/guardians/:guardianId` | `requirePermission(student.edit)` |  | :id, :guardianId |
+| ● | PATCH | `/api/students/:id/guardians/:guardianId` | `requirePermission(student.edit)` |  | :id, :guardianId, body |
 | ● | POST | `/api/students/:id/link-firebase-uid` | `requireRole([admin])` |  | :id, body |
 | ● | POST | `/api/students/:id/photo` | `requirePermission(student.edit)` |  | :id, body |
 | ● | POST | `/api/students/:id/photo/upload-ticket` | `requirePermission(student.edit)` |  | :id |
 | ● | PATCH | `/api/students/:id/status` | `requirePermission(student.edit)` |  | :id, body |
+| ● | POST | `/api/students/:id/support-needs` | `requirePermission(student.editWelfare)` |  | :id, body |
+| ● | DELETE | `/api/students/:id/support-needs/:needId` | `requirePermission(student.editWelfare)` |  | :id, :needId |
+| ● | PATCH | `/api/students/:id/support-needs/:needId` | `requirePermission(student.editWelfare)` |  | :id, :needId, body |
+|  | GET | `/api/students/:id/welfare` | `requirePermission(student.viewWelfare)` |  | :id |
+| ● | PATCH | `/api/students/:id/welfare` | `requirePermission(student.editWelfare)` |  | :id, body |
 |  | GET | `/api/students/at-risk` | `requirePermission(student.viewRiskStatus)` |  | query |
 | ● | POST | `/api/students/from-application/:applicationId` | `requirePermission(application.convertToStudent)` |  | :applicationId, body |
 |  | GET | `/api/students/me` | `requirePermission(student.viewOwn)` |  | — |
 |  | GET | `/api/students/risk-summary` | `requirePermission(student.viewRiskStatus)` + `requireRole([admin, high_rank])` |  | — |
+|  | GET | `/api/students/welfare-summary` | `requirePermission(student.viewWelfare)` |  | — |
 
 ### users
 

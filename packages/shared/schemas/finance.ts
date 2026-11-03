@@ -37,6 +37,7 @@
  *   mandatory/schedule/description, StudentFeeCommitment)
  */
 import { z } from 'zod'
+import { SPONSOR_TYPES } from '../constants/malawi/demographics'
 
 export const PaymentMethodSchema = z.enum([
   'CASH',
@@ -242,6 +243,9 @@ export const CreateScholarshipSchema = z.object({
   value: z.number().positive(),
   academicYear: z.string().regex(/^\d{4}\/\d{4}$/),
   notes: z.string().optional(),
+  // Who funds it. Optional: informational only, no effect on invoice maths.
+  sponsorType: z.enum(SPONSOR_TYPES).optional(),
+  sponsorName: z.string().trim().max(150).optional(),
 })
 
 // ─── INSTALLMENT PLAN ────────────────────────────────────

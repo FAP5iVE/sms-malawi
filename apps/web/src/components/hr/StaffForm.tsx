@@ -40,6 +40,18 @@ import type { CreateStaffInput, UpdateStaffInput } from '@shared/schemas/hr'
 import type { ApiStaffDetail } from '@shared/types/api'
 type StaffFormValues = z.input<typeof CreateStaffSchema>
 import { USER_ROLES, ROLE_LABELS } from '@shared/types/roles'
+import {
+  MALAWI_DISTRICTS,
+  MALAWI_SUBJECTS,
+  EMPLOYMENT_CATEGORIES,
+  EMPLOYMENT_CATEGORY_LABELS,
+  QUALIFICATION_LEVELS,
+  QUALIFICATION_LEVEL_LABELS,
+  TRAINING_ROUTES,
+  TRAINING_ROUTE_LABELS,
+  HOUSING_STATUSES,
+  HOUSING_STATUS_LABELS,
+} from '@shared/constants/malawi'
 import { useCreateStaff, useUpdateStaff, useStaffProfile, useSalary, useUpdateSalary, useAllowances, useAddAllowance, useDeleteAllowance } from '@/hooks/useHR'
 import { useDepartmentTitles } from '@/hooks/useSettings'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -117,6 +129,7 @@ export function StaffForm({ onClose, staffId }: Props) {
   // mismatched pair.
   const { data: departmentTitles = {}, isLoading: deptLoading } = useDepartmentTitles()
   const departments = Object.keys(departmentTitles).sort()
+  const isTeaching = useWatch({ control, name: 'isTeaching' })
   const selectedDept = useWatch({ control, name: 'department' })
   const titlesForDept = selectedDept ? (departmentTitles[selectedDept] ?? []) : []
 
@@ -131,8 +144,23 @@ export function StaffForm({ onClose, staffId }: Props) {
     setSubmitError(null)
     if (isEdit) {
       const { firstName, lastName, sex, email, phone, department, jobTitle, employmentType, contractExpiry } = data
+      // Identity fields are sent only by roles that can see (and so edit) them;
+      // the server rejects them from anyone else.
+      const identity = can('hr.viewStaffSensitive')
+        ? {
+            dateOfBirth: data.dateOfBirth, nationality: data.nationality, homeDistrict: data.homeDistrict,
+            nrbNumber: data.nrbNumber, tpin: data.tpin, nextOfKinName: data.nextOfKinName,
+            nextOfKinPhone: data.nextOfKinPhone, nextOfKinRelation: data.nextOfKinRelation,
+            isTeaching: data.isTeaching, tcmRegistrationNo: data.tcmRegistrationNo,
+            tcmLicenceNo: data.tcmLicenceNo, tcmLicenceExpiry: data.tcmLicenceExpiry,
+            employmentCategory: data.employmentCategory, payrollNo: data.payrollNo,
+            highestQualification: data.highestQualification, qualifiedInEducation: data.qualifiedInEducation,
+            trainingRoute: data.trainingRoute, housingStatus: data.housingStatus,
+            qualifiedSubjects: data.qualifiedSubjects,
+          }
+        : {}
       updateStaff.mutate(
-        { id: staffId!, data: { firstName, lastName, sex, email, phone, department, jobTitle, employmentType, contractExpiry } as UpdateStaffInput },
+        { id: staffId!, data: { firstName, lastName, sex, email, phone, department, jobTitle, employmentType, contractExpiry, ...identity } as UpdateStaffInput },
         {
           onSuccess: () => onClose(),
           onError: (err) => {
@@ -358,6 +386,153 @@ export function StaffForm({ onClose, staffId }: Props) {
               {errors.contractExpiry && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.contractExpiry.message}</p>}
             </div>
           </div>
+
+          {/* Identity & next of kin. Date of birth drives the computed
+              retirement date shown on the staff profile; NRB and TPIN are
+              identity numbers. Only roles holding hr.viewStaffSensitive see this
+              section (the form itself is HR/admin/headteacher only). */}
+          {can('hr.viewStaffSensitive') && (
+            <div className="mt-6">
+              <p className="text-xs font-heading font-bold text-muted uppercase tracking-widest mb-3">
+                Identity &amp; next of kin
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={lbl} htmlFor="sf-dateOfBirth">Date of birth</label>
+                  <input id="sf-dateOfBirth" type="date" {...register('dateOfBirth')} className={ic} />
+                  {errors.dateOfBirth && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.dateOfBirth.message}</p>}
+                </div>
+                <div>
+                  <label className={lbl} htmlFor="sf-nationality">Nationality</label>
+                  <input id="sf-nationality" {...register('nationality')} className={ic} placeholder="Malawian" />
+                </div>
+                <div>
+                  <label className={lbl} htmlFor="sf-homeDistrict">Home district</label>
+                  <select id="sf-homeDistrict" {...register('homeDistrict')} className={ic} defaultValue="">
+                    <option value="">Not recorded</option>
+                    {MALAWI_DISTRICTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl} htmlFor="sf-nrbNumber">NRB national ID no.</label>
+                  <input id="sf-nrbNumber" {...register('nrbNumber')} className={ic} autoComplete="off" />
+                  {errors.nrbNumber && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.nrbNumber.message}</p>}
+                </div>
+                <div>
+                  <label className={lbl} htmlFor="sf-tpin">MRA TPIN</label>
+                  <input id="sf-tpin" {...register('tpin')} className={ic} autoComplete="off" />
+                  {errors.tpin && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.tpin.message}</p>}
+                </div>
+                <div />
+                <div>
+                  <label className={lbl} htmlFor="sf-nextOfKinName">Next of kin</label>
+                  <input id="sf-nextOfKinName" {...register('nextOfKinName')} className={ic} placeholder="Full name" />
+                </div>
+                <div>
+                  <label className={lbl} htmlFor="sf-nextOfKinRelation">Relationship</label>
+                  <input id="sf-nextOfKinRelation" {...register('nextOfKinRelation')} className={ic} placeholder="e.g. Spouse" />
+                </div>
+                <div className="col-span-2">
+                  <label className={lbl} htmlFor="sf-nextOfKinPhone">Next of kin phone</label>
+                  <input id="sf-nextOfKinPhone" type="tel" {...register('nextOfKinPhone')} className={ic} placeholder="+265…" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Teaching, licensing, qualifications, housing. HR-only data. TCM
+              details apply to teaching staff only, so they appear once
+              "Teaching staff" is ticked (isTeaching is never inferred from role). */}
+          {can('hr.viewStaffSensitive') && (
+            <div className="mt-6">
+              <p className="text-xs font-heading font-bold text-muted uppercase tracking-widest mb-3">
+                Teaching, licensing &amp; qualifications
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <label className="col-span-2 flex items-center gap-2 text-sm text-body">
+                  <input type="checkbox" {...register('isTeaching')} />
+                  Teaching staff (requires a TCM licence)
+                </label>
+
+                {isTeaching && (
+                  <>
+                    <div>
+                      <label className={lbl} htmlFor="sf-tcmReg">TCM registration no.</label>
+                      <input id="sf-tcmReg" {...register('tcmRegistrationNo')} className={ic} />
+                    </div>
+                    <div>
+                      <label className={lbl} htmlFor="sf-tcmLic">TCM licence no.</label>
+                      <input id="sf-tcmLic" {...register('tcmLicenceNo')} className={ic} />
+                      {errors.tcmLicenceNo && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.tcmLicenceNo.message}</p>}
+                    </div>
+                    <div className="col-span-2">
+                      <label className={lbl} htmlFor="sf-tcmExp">TCM licence expiry</label>
+                      <input id="sf-tcmExp" type="date" {...register('tcmLicenceExpiry')} className={ic} />
+                      {errors.tcmLicenceExpiry && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.tcmLicenceExpiry.message}</p>}
+                    </div>
+                  </>
+                )}
+
+                <div>
+                  <label className={lbl} htmlFor="sf-empCat">Employment category</label>
+                  <select id="sf-empCat" {...register('employmentCategory')} className={ic} defaultValue="">
+                    <option value="">Not recorded</option>
+                    {EMPLOYMENT_CATEGORIES.map((c) => <option key={c} value={c}>{EMPLOYMENT_CATEGORY_LABELS[c]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl} htmlFor="sf-payrollNo">Payroll / IPPE number</label>
+                  <input id="sf-payrollNo" {...register('payrollNo')} className={ic} autoComplete="off" />
+                </div>
+                <div>
+                  <label className={lbl} htmlFor="sf-qual">Highest qualification</label>
+                  <select id="sf-qual" {...register('highestQualification')} className={ic} defaultValue="">
+                    <option value="">Not recorded</option>
+                    {QUALIFICATION_LEVELS.map((q) => <option key={q} value={q}>{QUALIFICATION_LEVEL_LABELS[q]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl} htmlFor="sf-route">Training route</label>
+                  <select id="sf-route" {...register('trainingRoute')} className={ic} defaultValue="">
+                    <option value="">Not recorded</option>
+                    {TRAINING_ROUTES.map((r) => <option key={r} value={r}>{TRAINING_ROUTE_LABELS[r]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl} htmlFor="sf-qedu">Qualified in education?</label>
+                  <select
+                    id="sf-qedu"
+                    {...register('qualifiedInEducation', { setValueAs: (v) => (v === '' || v == null ? null : v === 'true' || v === true) })}
+                    className={ic}
+                    defaultValue=""
+                  >
+                    <option value="">Not recorded</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl} htmlFor="sf-housing">Housing</label>
+                  <select id="sf-housing" {...register('housingStatus')} className={ic} defaultValue="">
+                    <option value="">Not recorded</option>
+                    {HOUSING_STATUSES.map((h) => <option key={h} value={h}>{HOUSING_STATUS_LABELS[h]}</option>)}
+                  </select>
+                </div>
+
+                <fieldset className="col-span-2">
+                  <legend className={lbl}>Subjects qualified to teach</legend>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+                    {MALAWI_SUBJECTS.map((subject) => (
+                      <label key={subject} className="flex items-center gap-2 text-sm text-body">
+                        <input type="checkbox" value={subject} {...register('qualifiedSubjects')} />
+                        {subject}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              </div>
+            </div>
+          )}
           {/* [PRODUCTION FIX] Salary was never settable anywhere in the
               app — see hrService.ts's getSalaryStructure/
               upsertSalaryStructure. Only shown once a staff record
@@ -690,5 +865,24 @@ function mapStaffToFormValues(s: ApiStaffDetail): Partial<StaffFormValues> {
     jobTitle:          s.jobTitle,
     employmentType:    s.employmentType as StaffFormValues['employmentType'],
     contractExpiry:    s.contractExpiry?.slice(0, 10),
+    isTeaching:           s.isTeaching ?? false,
+    tcmRegistrationNo:    s.tcmRegistrationNo ?? '',
+    tcmLicenceNo:         s.tcmLicenceNo ?? '',
+    tcmLicenceExpiry:     s.tcmLicenceExpiry?.slice(0, 10) ?? '',
+    employmentCategory:   s.employmentCategory ?? '',
+    payrollNo:            s.payrollNo ?? '',
+    highestQualification: s.highestQualification ?? '',
+    qualifiedInEducation: s.qualifiedInEducation ?? null,
+    trainingRoute:        s.trainingRoute ?? '',
+    housingStatus:        s.housingStatus ?? '',
+    qualifiedSubjects:    (s.qualifiedSubjects ?? []).map((q) => q.subject) as StaffFormValues['qualifiedSubjects'],
+    dateOfBirth:       s.dateOfBirth?.slice(0, 10) ?? '',
+    nationality:       s.nationality ?? '',
+    homeDistrict:      s.homeDistrict ?? '',
+    nrbNumber:         s.nrbNumber ?? '',
+    tpin:              s.tpin ?? '',
+    nextOfKinName:     s.nextOfKinName ?? '',
+    nextOfKinPhone:    s.nextOfKinPhone ?? '',
+    nextOfKinRelation: s.nextOfKinRelation ?? '',
   }
 }

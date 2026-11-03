@@ -148,7 +148,7 @@ const SECTIONS: Section[] = [
   },
   {
     id:    'hr-departments',
-    label: 'Departments & Titles',
+    label: 'Departments & Retirement',
     icon:  Building2,
     roles: ['admin', 'hr', 'high_rank'],
   },

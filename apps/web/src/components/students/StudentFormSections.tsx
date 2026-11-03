@@ -44,7 +44,16 @@ import type { UseFormRegister, FieldErrors }  from 'react-hook-form'
 import { z }                                  from 'zod'
 import { CreateStudentSchema }                from '@shared/schemas/student'
 import { SexSchema, StudentStatusSchema }     from '@shared/schemas/student'
-import { MALAWI_DISTRICTS }                   from '@shared/constants/malawi'
+import {
+  MALAWI_DISTRICTS,
+  RELIGIONS,
+  HOME_LANGUAGES,
+  RESIDENCE_TYPES,
+  RESIDENCE_TYPE_LABELS,
+  ADMISSION_TYPES,
+  ADMISSION_TYPE_LABELS,
+  TRAVEL_MINUTES_MAX,
+} from '@shared/constants/malawi'
 import { GUARDIAN_RELATIONSHIPS }             from '@shared/constants/admissions'
 import { getCountriesForForm } from '@shared/constants/countries'
 import { useClasses }                         from '@/hooks/useClasses'
@@ -82,14 +91,14 @@ export const inputCls =
 
 export const STEP_FIELDS: ReadonlyArray<ReadonlyArray<keyof StudentFormValues>> = [
   // Step 1 — Personal
-  ['firstName', 'lastName', 'otherNames', 'dateOfBirth', 'sex', 'nationality', 'district'],
+  ['firstName', 'lastName', 'otherNames', 'dateOfBirth', 'sex', 'nationality', 'district', 'traditionalAuthority', 'nrbNumber', 'religion', 'homeLanguage'],
   // Step 2 — Academic
-  ['classId', 'status'],
+  ['classId', 'status', 'admissionType', 'previousSchool', 'reasonForTransfer'],
   // Step 3 — Contact + Guardian (email is the login identifier; guardian
   // fields are required by CreateStudentSchema — omitting them here was what
   // let the final submit fail silently, since handleSubmit blocked on unshown
   // required fields with no visible error).
-  ['email', 'phone', 'village', 'address', 'guardianName', 'guardianRelation', 'guardianPhone'],
+  ['email', 'phone', 'village', 'address', 'residenceType', 'travelMinutes', 'guardianName', 'guardianRelation', 'guardianPhone'],
 ] as const
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -244,6 +253,52 @@ export function PersonalSection({ register, errors }: SectionProps) {
           ))}
         </select>
       </Field>
+
+      {/* Traditional Authority — free text; sits with district of origin */}
+      <Field label="Traditional Authority (T/A)" error={errors.traditionalAuthority?.message}>
+        <input
+          {...register('traditionalAuthority')}
+          className={inputCls}
+          placeholder="e.g. T/A Kuntaja"
+        />
+      </Field>
+
+      {/* NRB number — optional: many children are not yet registered.
+          Length is checked; the national format is not enforced. */}
+      <Field label="NRB / Birth Certificate No." error={errors.nrbNumber?.message}>
+        <input
+          {...register('nrbNumber')}
+          className={inputCls}
+          placeholder="Leave blank if not registered"
+          autoComplete="off"
+        />
+      </Field>
+
+      <FieldDivider title="Background" />
+
+      <Field label="Religion" error={errors.religion?.message}>
+        <input
+          {...register('religion')}
+          list="student-religions"
+          className={inputCls}
+          placeholder="e.g. Christianity, Islam"
+        />
+        <datalist id="student-religions">
+          {RELIGIONS.map((r) => <option key={r} value={r} />)}
+        </datalist>
+      </Field>
+
+      <Field label="Home Language" error={errors.homeLanguage?.message}>
+        <input
+          {...register('homeLanguage')}
+          list="student-languages"
+          className={inputCls}
+          placeholder="e.g. Chichewa, Chitumbuka"
+        />
+        <datalist id="student-languages">
+          {HOME_LANGUAGES.map((l) => <option key={l} value={l} />)}
+        </datalist>
+      </Field>
     </div>
   )
 }
@@ -289,6 +344,38 @@ export function AcademicSection({ register, errors, selectedClassId }: SectionPr
             </option>
           ))}
         </select>
+      </Field>
+
+      <FieldDivider title="Admission" />
+
+      {/* How the learner joined. Applications convert to NEW_INTAKE (Form 1) or
+          TRANSFER_IN (Form 2+) automatically; RETURNEE is set here by staff. */}
+      <Field label="Admission Type" error={errors.admissionType?.message}>
+        <select {...register('admissionType')} className={inputCls} defaultValue="NEW_INTAKE">
+          {ADMISSION_TYPES.map((t) => (
+            <option key={t} value={t}>{ADMISSION_TYPE_LABELS[t]}</option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="Previous School" error={errors.previousSchool?.message}>
+        <input
+          {...register('previousSchool')}
+          className={inputCls}
+          placeholder="School attended before"
+        />
+      </Field>
+
+      <Field
+        label="Reason for Transfer"
+        error={errors.reasonForTransfer?.message}
+        className="col-span-full"
+      >
+        <input
+          {...register('reasonForTransfer')}
+          className={inputCls}
+          placeholder="Only if transferring in"
+        />
       </Field>
     </div>
   )
@@ -353,6 +440,31 @@ export function ContactSection({ register, errors }: SectionProps) {
           className={`${inputCls} resize-none`}
           rows={3}
           placeholder="Postal or physical address"
+        />
+      </Field>
+
+      <FieldDivider title="Home & Travel" />
+
+      <Field label="Where the Student Stays" error={errors.residenceType?.message}>
+        <select {...register('residenceType')} className={inputCls} defaultValue="">
+          <option value="">Not recorded</option>
+          {RESIDENCE_TYPES.map((t) => (
+            <option key={t} value={t}>{RESIDENCE_TYPE_LABELS[t]}</option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="Travel Time to School (minutes, one way)" error={errors.travelMinutes?.message}>
+        <input
+          {...register('travelMinutes', {
+            setValueAs: (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? null : Number(v)),
+          })}
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={TRAVEL_MINUTES_MAX}
+          className={inputCls}
+          placeholder="e.g. 45"
         />
       </Field>
 

@@ -26,6 +26,11 @@ hrReportingRouter.get('/workforce', ...gate, async (_req, res) => {
   res.json(await hr.getHrWorkforce())
 })
 
+hrReportingRouter.get('/teaching', ...gate, async (req, res) => {
+  const { academicYear, term } = await resolvePeriod(req)
+  res.json(await hr.getHrTeaching(academicYear, term))
+})
+
 hrReportingRouter.get('/contracts', ...gate, async (_req, res) => {
   res.json(await hr.getHrContracts())
 })

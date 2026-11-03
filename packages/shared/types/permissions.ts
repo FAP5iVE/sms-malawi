@@ -94,6 +94,13 @@ export type Permission =
   // reach the student list (including library and HR) saw it. Distinct
   // from viewFeeStatus since risk is broader than just money owed.
   | 'student.viewRiskStatus'         // See computed risk level on student record
+  // Welfare data (orphan status, vulnerability, special/learning-support needs).
+  // Deliberately its own permission: this is sensitive information about
+  // children, so it is NOT folded into viewRiskStatus and is NEVER an input to
+  // the risk score (that would label children). Class teachers get none of it;
+  // support needs reach them only as an aggregated count (see welfare service).
+  | 'student.viewWelfare'            // See orphan/vulnerability/special-needs records
+  | 'student.editWelfare'            // Record or change welfare data
 
   // ── CLASS ────────────────────────────────────────────
   | 'class.view'                     // View class data
@@ -310,6 +317,10 @@ export type Permission =
   | 'hr.createStaff'                 // Create a new staff record
   | 'hr.editStaff'                   // Edit any staff member's details
   | 'hr.terminateStaff'              // Terminate a staff member's employment
+  // Staff identity and compliance data (date of birth, NRB, TPIN, next of kin,
+  // TCM licence, qualifications, computed retirement date). Held by the roles
+  // that manage staff; the HR profile endpoint is already limited to them.
+  | 'hr.viewStaffSensitive'          // See staff identity/compliance/retirement data
   | 'hr.assignRole'                  // Assign / change a staff member's role
   | 'hr.promoteStaff'                // Promote or demote a staff member
   | 'hr.applyLeave'                  // Submit own leave request
@@ -442,6 +453,8 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
    'student.viewLibraryStatus',      // See library borrowing status on student record
    'student.viewAttendance',         // See attendance records for any student
    'student.viewRiskStatus',         // See computed risk level on student record
+    'student.viewWelfare',
+    'student.editWelfare',
 
     // Classes — oversight only
     'class.view',
@@ -526,6 +539,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'hr.createStaff',
     'hr.editStaff',
     'hr.terminateStaff',
+    'hr.viewStaffSensitive',
     'hr.assignRole',
 
     // Exams — view / oversight / export only; NO result-editing capability
@@ -603,6 +617,8 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'student.viewLibraryStatus',
     'student.viewAttendance',
     'student.viewRiskStatus',
+    'student.viewWelfare',
+    'student.editWelfare',
 
     // Classes — full management
     'class.view',
@@ -717,6 +733,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'hr.createStaff',
     'hr.editStaff',
     'hr.terminateStaff',
+    'hr.viewStaffSensitive',
     'hr.assignRole',
     'hr.promoteStaff',
     'hr.applyLeave',
@@ -1230,6 +1247,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
   hr: new Set<Permission>([
     // Students — view only
     'student.view',
+    'student.viewWelfare',
 
     // Classes — view only
     'class.view',
@@ -1282,6 +1300,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
     'hr.createStaff',
     'hr.editStaff',
     'hr.terminateStaff',
+    'hr.viewStaffSensitive',
     'hr.assignRole',
     'hr.promoteStaff',
     'hr.applyLeave',

@@ -28,6 +28,14 @@ const SENSITIVE_KEYS = new Set([
   'dateofbirth', 'dob', 'address', 'village', 'nationalid',
   'healthnote', 'medicalnote', 'welfarenote', 'registrationno',
   'password', 'token', 'authorization', 'cookie',
+  // Demographic fields (gap-analysis plan). Identity numbers and welfare data
+  // about children must never reach Sentry, including in request bodies.
+  'nrbnumber', 'tpin', 'traditionalauthority', 'guardianemail', 'guardianaddress',
+  'nextofkinname', 'nextofkinphone', 'nextofkinrelation',
+  'orphanstatus', 'vulnerabilitytags', 'supportneeds', 'supportneedtypes',
+  'supportnotes', 'specialneeds', 'disabilitytype', 'welfaredata',
+  'exitreason', 'exitnotes', 'exitnote',
+  'licencenumber', 'tcmlicencenumber', 'qualifications', 'qualificationlevel',
 ])
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {

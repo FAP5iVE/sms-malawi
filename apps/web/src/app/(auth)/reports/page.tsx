@@ -22,12 +22,13 @@ import { Suspense, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import type { UserRole } from '@shared/types/roles'
+import { SPONSOR_TYPE_LABELS } from '@shared/constants/malawi'
 import { SuperUserRoleSwitcher } from '@/components/shared/SuperUserRoleSwitcher'
 import { ModuleSurface } from '@/components/shared/ModuleSurface'
 import { FlatSurface, useFlatSurface } from '@/components/shared/FlatSurface'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
 import { AdminSessionsPanel } from '@/components/reports/AdminSessionsPanel'
-import { ExecutiveOverviewTab } from '@/components/reports/panels/ExecutivePanels'
+import { ExecutiveOverviewTab, RetentionPanel } from '@/components/reports/panels/ExecutivePanels'
 import {
   FinanceOverviewTab,
   FinanceAgingTab,
@@ -39,6 +40,7 @@ import {
   HrWorkforceTab,
   HrLeaveTab,
   HrContractsTab,
+  HrTeachingTab,
   HrLoansTab,
   HrReviewsTab,
 } from '@/components/reports/panels/HrPanels'
@@ -278,6 +280,7 @@ const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNo
     { id: 'workforce', label: 'HR', icon: I.users },
     { id: 'leave', label: 'Leave', icon: I.activity },
     { id: 'contracts', label: 'Contracts', icon: I.alert },
+    { id: 'teaching', label: 'Teaching', icon: I.users },
     { id: 'circulation', label: 'Library', icon: I.book },
     { id: 'placements', label: 'Placements', icon: I.grad },
     { id: 'governance', label: 'Governance', icon: I.shield },
@@ -335,6 +338,7 @@ const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNo
     { id: 'workforce', label: 'Workforce', icon: I.users },
     { id: 'leave', label: 'Leave', icon: I.activity },
     { id: 'contracts', label: 'Contracts', icon: I.alert },
+    { id: 'teaching', label: 'Teaching', icon: I.users },
     { id: 'loans', label: 'Staff Loans', icon: I.money },
     { id: 'reviews', label: 'Reviews', icon: I.doc },
   ],
@@ -2319,6 +2323,40 @@ function FinanceScholarshipsPanel({ academicYear }: { academicYear: string }) {
           </table>
         </div>
       </div>
+
+      {/* Who funds the awards: learners sponsored by each type. 'Not specified'
+          covers awards recorded before the sponsor field existed. */}
+      {data.bySponsor && data.bySponsor.length > 0 && (
+        <div className="overflow-hidden">
+          <p className="font-heading font-semibold text-sm text-brand-navy mb-2">By sponsor</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-page border-b border-base">
+                  {['Sponsor', 'Learners', 'Total Discount'].map((h) => (
+                    <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.bySponsor.map((r) => (
+                  <tr key={r.sponsorType} className="border-b border-base last:border-0">
+                    <td className="px-4 py-3 font-medium text-brand-navy">
+                      {r.sponsorType === 'NOT_SPECIFIED'
+                        ? 'Not specified'
+                        : (SPONSOR_TYPE_LABELS as Record<string, string>)[r.sponsorType] ?? r.sponsorType}
+                    </td>
+                    <td className="px-4 py-3">{r.recipientCount}</td>
+                    <td className="px-4 py-3 font-medium">MWK {r.totalDiscount.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -2988,6 +3026,7 @@ function ReportsContent() {
               <div className="space-y-5">
                 <EnrollmentTab academicYear={year} />
                 <HighRankEnrollmentPanel />
+                <RetentionPanel academicYear={year} term={term} />
               </div>
             )}
             {role === 'high_rank' && activeTab === 'admissions' && (
@@ -3020,6 +3059,7 @@ function ReportsContent() {
             )}
             {role === 'high_rank' && activeTab === 'leave' && <HrLeaveTab />}
             {role === 'high_rank' && activeTab === 'contracts' && <HrContractsTab />}
+            {role === 'high_rank' && activeTab === 'teaching' && <HrTeachingTab academicYear={year} />}
             {role === 'high_rank' && activeTab === 'circulation' && (
               <div className="space-y-5">
                 <LibraryOverviewSection />
@@ -3152,6 +3192,7 @@ function ReportsContent() {
             {role === 'hr' && activeTab === 'workforce' && <HrWorkforceTab />}
             {role === 'hr' && activeTab === 'leave' && <HrLeaveTab />}
             {role === 'hr' && activeTab === 'contracts' && <HrContractsTab />}
+            {role === 'hr' && activeTab === 'teaching' && <HrTeachingTab academicYear={year} />}
             {role === 'hr' && activeTab === 'loans' && <HrLoansTab />}
             {role === 'hr' && activeTab === 'reviews' && <HrReviewsTab academicYear={year} />}
 

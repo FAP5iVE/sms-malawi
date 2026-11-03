@@ -31,10 +31,19 @@ export function HRDepartmentsSettings() {
   const [error, setError]     = useState<string | null>(null)
   const [newDept, setNewDept] = useState('')
   const [newTitleFor, setNewTitleFor] = useState<Record<string, string>>({})
+  // Retirement age is a separate policy value with its own save, so editing it
+  // never rewrites (or fails because of) the department list.
+  const [retirementAge, setRetirementAge]   = useState('60')
+  const [ageSaving, setAgeSaving]           = useState(false)
+  const [ageSaved, setAgeSaved]             = useState(false)
+  const [ageError, setAgeError]             = useState<string | null>(null)
 
   useEffect(() => {
-    apiFetch<{ departmentTitles: DepartmentTitles }>('/settings/hr')
-      .then((d) => setData(d.departmentTitles ?? {}))
+    apiFetch<{ departmentTitles: DepartmentTitles; retirementAge?: number }>('/settings/hr')
+      .then((d) => {
+        setData(d.departmentTitles ?? {})
+        if (typeof d.retirementAge === 'number') setRetirementAge(String(d.retirementAge))
+      })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false))
   }, [])
@@ -80,6 +89,26 @@ export function HRDepartmentsSettings() {
     }
   }
 
+  async function handleSaveRetirementAge() {
+    const age = Number(retirementAge)
+    if (!Number.isInteger(age) || age < 50 || age > 75) {
+      setAgeError('Enter a whole number of years between 50 and 75.')
+      return
+    }
+    setAgeSaving(true); setAgeError(null); setAgeSaved(false)
+    try {
+      await apiFetch('/settings/hr', {
+        method: 'PATCH',
+        body:   JSON.stringify({ retirementAge: age }),
+      })
+      setAgeSaved(true); setTimeout(() => setAgeSaved(false), 3000)
+    } catch (err) {
+      setAgeError(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setAgeSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-muted text-sm">
@@ -92,6 +121,44 @@ export function HRDepartmentsSettings() {
 
   return (
     <div className="space-y-6">
+      {/* Retirement age — drives the retirement date shown on each staff profile
+          (date of birth + this value) and the "retiring soon" list for HR. */}
+      <div className="bg-surface rounded-xl p-5 space-y-3 max-w-xl">
+        <div>
+          <h2 className="font-heading font-bold text-lg text-brand-navy">Retirement Age</h2>
+          <p className="text-sm text-muted mt-0.5">
+            Each staff member&apos;s retirement date is their date of birth plus this age. Changing it
+            updates every staff profile at once. Visible to admin, HR and the headteacher only.
+          </p>
+        </div>
+        <div className="flex items-end gap-2">
+          <div className="w-32">
+            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+              Age (years)
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={50}
+              max={75}
+              value={retirementAge}
+              onChange={(e) => setRetirementAge(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveRetirementAge}
+            disabled={ageSaving}
+            className="min-h-[44px] px-4 rounded-xl bg-brand-deep text-white text-sm font-semibold disabled:opacity-40 flex items-center gap-1.5"
+          >
+            {ageSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
+          </button>
+          {ageSaved && <span className="text-sm text-brand-teal pb-3">Saved</span>}
+        </div>
+        {ageError && <p className="text-sm text-brand-coral">{ageError}</p>}
+      </div>
+
       <div>
         <h2 className="font-heading font-bold text-lg text-brand-navy">Departments &amp; Job Titles</h2>
         <p className="text-sm text-muted mt-0.5">

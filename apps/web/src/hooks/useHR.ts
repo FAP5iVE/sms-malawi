@@ -21,7 +21,7 @@
  */
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { CreateStaffInput, UpdateStaffInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput, CreateAllowanceInput } from '@shared/schemas/hr'
+import type { CreateStaffInput, UpdateStaffInput, UpdateOwnDetailsInput, TerminateStaffInput, StaffResponsibilityInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput, CreateAllowanceInput } from '@shared/schemas/hr'
 import type { ApiStaffLoan, ApiLeaveRequest, ApiContractAlert, ApiStaffProfile, ApiStaffPickerOption } from '@shared/types/api'
 import type { ConflictCheckResult } from '@/server/services/leaveConflictService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
@@ -309,5 +309,85 @@ export function useAddPerformanceNote() {
     meta: { successMessage: 'Performance note added', failureTitle: 'Could not add performance note' },
     mutationFn: (data: PerformanceNoteInput) => apiFetch('/hr/performance', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.hr.all() }),
+  })
+}
+
+// ─── TERMINATION + RESPONSIBILITIES ──────────────────────────────────────────
+
+export function useTerminateStaff(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    meta: { successMessage: 'Staff member terminated', failureTitle: 'Could not terminate staff member' },
+    mutationFn: (data: TerminateStaffInput) =>
+      apiFetch(`/hr/${id}/terminate`, { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.hr.all() })
+      qc.invalidateQueries({ queryKey: queryKeys.hr.staffDetail(id) })
+    },
+  })
+}
+
+function useResponsibilityInvalidation(id: string) {
+  const qc = useQueryClient()
+  return () => {
+    qc.invalidateQueries({ queryKey: queryKeys.hr.staffDetail(id) })
+  }
+}
+
+export function useAddResponsibility(id: string) {
+  const invalidate = useResponsibilityInvalidation(id)
+  return useMutation({
+    meta: { successMessage: 'Responsibility added', failureTitle: 'Could not add responsibility' },
+    mutationFn: (data: StaffResponsibilityInput) =>
+      apiFetch(`/hr/${id}/responsibilities`, { method: 'POST', body: JSON.stringify(data) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateResponsibility(id: string) {
+  const invalidate = useResponsibilityInvalidation(id)
+  return useMutation({
+    meta: { successMessage: 'Responsibility updated', failureTitle: 'Could not update responsibility' },
+    mutationFn: ({ responsibilityId, ...data }: { responsibilityId: string } & StaffResponsibilityInput) =>
+      apiFetch(`/hr/${id}/responsibilities/${responsibilityId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteResponsibility(id: string) {
+  const invalidate = useResponsibilityInvalidation(id)
+  return useMutation({
+    meta: { successMessage: 'Responsibility removed', failureTitle: 'Could not remove responsibility' },
+    mutationFn: (responsibilityId: string) =>
+      apiFetch(`/hr/${id}/responsibilities/${responsibilityId}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+  })
+}
+
+// ─── OWN DETAILS (self-service: phone + next of kin) ─────────────────────────
+
+export interface OwnStaffDetails {
+  phone: string | null
+  nextOfKinName: string | null
+  nextOfKinPhone: string | null
+  nextOfKinRelation: string | null
+}
+
+export function useOwnStaffDetails(enabled: boolean) {
+  return useQuery({
+    queryKey: ['hr-own-details'] as const,
+    queryFn: () => apiFetch<OwnStaffDetails>('/hr/me/details'),
+    enabled,
+    retry: false, // 404 = this account has no staff profile; show nothing, don't retry
+  })
+}
+
+export function useUpdateOwnStaffDetails() {
+  const qc = useQueryClient()
+  return useMutation({
+    meta: { successMessage: 'Your details were saved', failureTitle: 'Could not save your details' },
+    mutationFn: (data: UpdateOwnDetailsInput) =>
+      apiFetch<OwnStaffDetails>('/hr/me/details', { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['hr-own-details'] }),
   })
 }

@@ -21,7 +21,7 @@
  */
 
 import 'server-only'
-import { CreateClassSchema, UpdateClassSchema, StudentStatusSchema } from '@shared/schemas/student'
+import { CreateClassSchema, UpdateClassSchema, StudentStatusSchema, StudentExitSchema } from '@shared/schemas/student'
 import type { UserRole } from '@shared/types/roles'
 import * as studentService from '@/server/services/studentService'
 import * as classService from '@/server/services/classService'
@@ -82,13 +82,22 @@ const HANDLERS: Readonly<Record<string, Handler>> = {
   },
 
   'student.softDelete': async (pa, actor) => {
-    await studentService.softDelete(pa.entityId, actor.uid, actor.role)
+    // Archiving records why the student left. Requests queued before that rule
+    // existed carry no exit details, so they cannot be approved as they are.
+    const exit = StudentExitSchema.safeParse(requireState(pa))
+    if (!exit.success) {
+      throw badRequest('This archive request has no exit reason or date. Ask the requester to submit it again.')
+    }
+    await studentService.softDelete(pa.entityId, actor.uid, actor.role, exit.data)
   },
 
   'student.statusChange': async (pa, actor) => {
     const parsed = StudentStatusSchema.safeParse(requireState(pa)['status'])
     if (!parsed.success) throw badRequest('The requested student status is not valid.')
-    await studentService.changeStatus(pa.entityId, parsed.data, actor.uid, actor.role)
+    // Exit details are needed only when the target status is ARCHIVED;
+    // changeStatus refuses an ARCHIVED change that arrives without them.
+    const exit = StudentExitSchema.safeParse(requireState(pa))
+    await studentService.changeStatus(pa.entityId, parsed.data, actor.uid, actor.role, exit.success ? exit.data : undefined)
   },
 
   'class.create': async (pa, actor) => {

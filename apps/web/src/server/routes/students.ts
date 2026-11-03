@@ -27,7 +27,16 @@ import * as studentService             from '@/server/services/studentService'
 import * as riskService                from '@/server/services/riskService'
 import * as classService               from '@/server/services/classService'
 import * as pendingActionService       from '@/server/services/pendingActionService'
-import { StudentStatusSchema }         from '@shared/schemas/student'
+import {
+  StudentStatusSchema,
+  StudentDemographicsShape,
+  GuardianInputSchema,
+  UpdateGuardianSchema,
+  UpdateWelfareSchema,
+  SupportNeedInputSchema,
+  UpdateSupportNeedSchema,
+  StudentExitSchema,
+} from '@shared/schemas/student'
 import type { StudentStatus, Sex }     from '@prisma/client'
 import type { UserRole }               from '@shared/types/roles'
 import { sendError } from '@/server/lib/sendError'
@@ -195,6 +204,20 @@ studentsRouter.get(
 )
 
 // ─────────────────────────────────────────────────────────
+//  GET /students/welfare-summary
+//  Welfare COUNTS only (orphans, vulnerable, support needs by type) for
+//  dashboards - never names. Needs student.viewWelfare. Registered before the
+//  '/:id' routes so 'welfare-summary' is not read as a student id.
+// ─────────────────────────────────────────────────────────
+studentsRouter.get(
+  '/welfare-summary',
+  requirePermission('student.viewWelfare'),
+  async (_req: Request, res: Response) => {
+    res.json(await studentService.getWelfareSummary())
+  }
+)
+
+// ─────────────────────────────────────────────────────────
 //  GET /students/me
 //  Student-role self-lookup — derives studentId from firebaseUid.
 // ─────────────────────────────────────────────────────────
@@ -272,6 +295,9 @@ studentsRouter.get(
 //  lower_rank: routes to PendingAction workflow.
 // ─────────────────────────────────────────────────────────
 
+/** Validates only the demographic subset of a student body (NRB length, enums, travel minutes). */
+const StudentDemographicsBodySchema = z.object(StudentDemographicsShape)
+
 studentsRouter.post(
   '/',
   requirePermission('student.create'),
@@ -280,6 +306,12 @@ studentsRouter.post(
 
     if (!user) {
       res.status(401).json({ error: 'Not authenticated.' })
+      return
+    }
+
+    const demographics = StudentDemographicsBodySchema.safeParse(req.body)
+    if (!demographics.success) {
+      res.status(400).json({ error: demographics.error.issues[0]?.message ?? 'Invalid demographic details.' })
       return
     }
 
@@ -334,6 +366,7 @@ studentsRouter.post(
         district, village, address, phone, email,
         guardianName, guardianPhone, guardianRelation,
         classId, photoKey, firebaseUid,
+        ...demographics.data,
       },
       user.uid,
       user.role
@@ -414,6 +447,14 @@ studentsRouter.patch(
       return
     }
 
+    // Validate before the request can be parked as a pending action, so a bad
+    // value is rejected now rather than when an approver later runs it.
+    const demographicsCheck = StudentDemographicsBodySchema.safeParse(req.body)
+    if (!demographicsCheck.success) {
+      res.status(400).json({ error: demographicsCheck.error.issues[0]?.message ?? 'Invalid demographic details.' })
+      return
+    }
+
     // lower_rank → pending action
     if (user.role === 'lower_rank') {
       const pendingAction = await pendingActionService.create({
@@ -456,6 +497,15 @@ studentsRouter.delete(
       return
     }
 
+    // Archiving needs a reason for leaving and the date (Ministry returns
+    // count exits by reason). Validated up front, so a lower_rank request that
+    // is parked for approval already carries valid details.
+    const exit = StudentExitSchema.safeParse(req.body)
+    if (!exit.success) {
+      res.status(400).json({ error: exit.error.issues[0]?.message ?? 'Exit reason and date are required.' })
+      return
+    }
+
     if (user.role === 'lower_rank') {
       const pendingAction = await pendingActionService.create({
         entityType:     'Student',
@@ -464,7 +514,7 @@ studentsRouter.delete(
         description:    `Archive student record ${id}`,
         requestedByUid: user.uid,
         requestedByRole:user.role,
-        targetState:    { action: 'archive' },
+        targetState:    { action: 'archive', ...exit.data },
       })
 
       res.status(202).json({
@@ -474,7 +524,7 @@ studentsRouter.delete(
       return
     }
 
-    await studentService.softDelete(id, user.uid, user.role)
+    await studentService.softDelete(id, user.uid, user.role, exit.data)
     res.json({ ok: true, archived: id })
   }
 )
@@ -508,8 +558,174 @@ studentsRouter.patch(
       return
     }
 
-    const student = await studentService.changeStatus(id, status, user.uid, user.role)
+    let exit
+    if (status === 'ARCHIVED') {
+      const parsedExit = StudentExitSchema.safeParse(req.body)
+      if (!parsedExit.success) {
+        res.status(400).json({ error: parsedExit.error.issues[0]?.message ?? 'Exit reason and date are required.' })
+        return
+      }
+      exit = parsedExit.data
+    }
+    const student = await studentService.changeStatus(id, status, user.uid, user.role, exit)
     res.json(student)
+  }
+)
+
+// ─────────────────────────────────────────────────────────
+//  /students/:id/welfare  and  /students/:id/support-needs
+//  Sensitive child data: orphan status, vulnerability, medical alert, support
+//  needs. Reads need student.viewWelfare (admin, high_rank, hr); writes need
+//  student.editWelfare (admin, high_rank). Never part of the student detail
+//  payload, so a role without the permission has nothing to receive. Every
+//  write is audited by studentService.
+// ─────────────────────────────────────────────────────────
+
+studentsRouter.get(
+  '/:id/welfare',
+  requirePermission('student.viewWelfare'),
+  async (req: Request, res: Response) => {
+    res.json(await studentService.getWelfare(String(req.params['id'] ?? '')))
+  }
+)
+
+studentsRouter.patch(
+  '/:id/welfare',
+  requirePermission('student.editWelfare'),
+  async (req: Request, res: Response) => {
+    const { user } = req
+    if (!user) { res.status(401).json({ error: 'Not authenticated.' }); return }
+    const parsed = UpdateWelfareSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid welfare details.' })
+      return
+    }
+    res.json(await studentService.updateWelfare(String(req.params['id'] ?? ''), parsed.data, user.uid, user.role))
+  }
+)
+
+studentsRouter.post(
+  '/:id/support-needs',
+  requirePermission('student.editWelfare'),
+  async (req: Request, res: Response) => {
+    const { user } = req
+    if (!user) { res.status(401).json({ error: 'Not authenticated.' }); return }
+    const parsed = SupportNeedInputSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid support need.' })
+      return
+    }
+    res.status(201).json(await studentService.addSupportNeed(String(req.params['id'] ?? ''), parsed.data, user.uid, user.role))
+  }
+)
+
+studentsRouter.patch(
+  '/:id/support-needs/:needId',
+  requirePermission('student.editWelfare'),
+  async (req: Request, res: Response) => {
+    const { user } = req
+    if (!user) { res.status(401).json({ error: 'Not authenticated.' }); return }
+    const parsed = UpdateSupportNeedSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid support need.' })
+      return
+    }
+    res.json(
+      await studentService.updateSupportNeed(
+        String(req.params['id'] ?? ''), String(req.params['needId'] ?? ''), parsed.data, user.uid, user.role,
+      )
+    )
+  }
+)
+
+studentsRouter.delete(
+  '/:id/support-needs/:needId',
+  requirePermission('student.editWelfare'),
+  async (req: Request, res: Response) => {
+    const { user } = req
+    if (!user) { res.status(401).json({ error: 'Not authenticated.' }); return }
+    await studentService.deleteSupportNeed(
+      String(req.params['id'] ?? ''), String(req.params['needId'] ?? ''), user.uid, user.role,
+    )
+    res.json({ ok: true })
+  }
+)
+
+// ─────────────────────────────────────────────────────────
+//  /students/:id/guardians
+//  Additional guardians per student. The primary guardian is mirrored onto the
+//  legacy Student columns by studentService. Reading needs student.view;
+//  changing needs student.edit. lower_rank is refused: its edits normally go
+//  through the pending-action approval queue, which has no guardian action yet,
+//  so it must not write guardian rows directly.
+// ─────────────────────────────────────────────────────────
+
+function refuseLowerRank(user: NonNullable<Request['user']>, res: Response): boolean {
+  if (user.role === 'lower_rank' || user.role === 'student') {
+    res.status(403).json({ error: 'Guardian changes must be made by an administrator or the headteacher.' })
+    return true
+  }
+  return false
+}
+
+studentsRouter.get(
+  '/:id/guardians',
+  requirePermission('student.view'),
+  async (req: Request, res: Response) => {
+    res.json(await studentService.listGuardians(String(req.params['id'] ?? '')))
+  }
+)
+
+studentsRouter.post(
+  '/:id/guardians',
+  requirePermission('student.edit'),
+  async (req: Request, res: Response) => {
+    const { user } = req
+    if (!user) { res.status(401).json({ error: 'Not authenticated.' }); return }
+    if (refuseLowerRank(user, res)) return
+    const parsed = GuardianInputSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid guardian details.' })
+      return
+    }
+    res.status(201).json(
+      await studentService.addGuardian(String(req.params['id'] ?? ''), parsed.data, user.uid, user.role)
+    )
+  }
+)
+
+studentsRouter.patch(
+  '/:id/guardians/:guardianId',
+  requirePermission('student.edit'),
+  async (req: Request, res: Response) => {
+    const { user } = req
+    if (!user) { res.status(401).json({ error: 'Not authenticated.' }); return }
+    if (refuseLowerRank(user, res)) return
+    const parsed = UpdateGuardianSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message ?? 'Invalid guardian details.' })
+      return
+    }
+    res.json(
+      await studentService.updateGuardian(
+        String(req.params['id'] ?? ''), String(req.params['guardianId'] ?? ''), parsed.data, user.uid, user.role,
+      )
+    )
+  }
+)
+
+studentsRouter.delete(
+  '/:id/guardians/:guardianId',
+  requirePermission('student.edit'),
+  async (req: Request, res: Response) => {
+    const { user } = req
+    if (!user) { res.status(401).json({ error: 'Not authenticated.' }); return }
+    if (refuseLowerRank(user, res)) return
+    await studentService.deleteGuardian(
+      String(req.params['id'] ?? ''), String(req.params['guardianId'] ?? ''), user.uid, user.role,
+    )
+    // apiFetch always parses a JSON body, so reply with one rather than a bare 204.
+    res.json({ ok: true })
   }
 )
 

@@ -245,12 +245,21 @@ export interface ScholarshipSummaryRow {
   totalDiscount: number
 }
 
+export interface ScholarshipSponsorRow {
+  /** SponsorType enum member, or 'NOT_SPECIFIED' for awards with no sponsor recorded. */
+  sponsorType: string
+  recipientCount: number
+  totalDiscount: number
+}
+
 export interface ScholarshipSummary {
   academicYear: string
   activeScholarships: number
   recipientCount: number
   totalDiscountMwk: number
   byScholarship: ScholarshipSummaryRow[]
+  /** Who funds the awards. Learners sponsored by each type, and the discount involved. */
+  bySponsor: ScholarshipSponsorRow[]
 }
 
 export interface AttendanceSummaryRow {
@@ -1724,6 +1733,7 @@ export async function getFinanceScholarshipSummary(
       studentId: true,
       discountType: true,
       value: true,
+      sponsorType: true,
     },
     orderBy: { name: 'asc' },
   })
@@ -1735,6 +1745,7 @@ export async function getFinanceScholarshipSummary(
       recipientCount: 0,
       totalDiscountMwk: 0,
       byScholarship: [],
+      bySponsor: [],
     }
   }
 
@@ -1765,10 +1776,19 @@ export async function getFinanceScholarshipSummary(
   // several students, and the summary is reported per award, not per row.
   const grouped = new Map<string, ScholarshipSummaryRow>()
   const recipients = new Set<string>()
+  // Per sponsor type: distinct learners (a learner with two awards from one
+  // sponsor is counted once) and the discount those awards are worth.
+  const sponsors = new Map<string, { students: Set<string>; total: number }>()
 
   for (const sc of scholarships) {
     recipients.add(sc.studentId)
     const amount = discountValue(sc.discountType, Number(sc.value), sc.studentId)
+
+    const sponsorKey = sc.sponsorType ?? 'NOT_SPECIFIED'
+    const sponsor = sponsors.get(sponsorKey) ?? { students: new Set<string>(), total: 0 }
+    sponsor.students.add(sc.studentId)
+    sponsor.total += amount
+    sponsors.set(sponsorKey, sponsor)
 
     const existing = grouped.get(sc.name)
     if (existing) {
@@ -1794,6 +1814,9 @@ export async function getFinanceScholarshipSummary(
     recipientCount: recipients.size,
     totalDiscountMwk: byScholarship.reduce((sum, r) => sum + r.totalDiscount, 0),
     byScholarship,
+    bySponsor: [...sponsors.entries()]
+      .map(([sponsorType, s]) => ({ sponsorType, recipientCount: s.students.size, totalDiscount: Math.round(s.total) }))
+      .sort((a, b) => b.totalDiscount - a.totalDiscount),
   }
 }
 

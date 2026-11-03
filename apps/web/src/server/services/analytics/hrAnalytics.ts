@@ -15,6 +15,9 @@ import type { AttentionItem, ReportInsight, ReportSectionData } from '@shared/ty
 import type {
   ApiContractRow,
   ApiHrContracts,
+  ApiHrTeaching,
+  ApiTeachingRow,
+  TeachingLicenceStatus,
   ApiHrLeave,
   ApiHrLoans,
   ApiHrPromotions,
@@ -35,6 +38,8 @@ import {
 import { kpi, mean, ratioPct, round, daysBetween } from '@/server/services/reporting/kpi'
 import { compact, expiryInsight, sortInsights } from '@/server/services/reporting/insights'
 import { enrichAttention, rankAttention } from './executiveLogic'
+import { getRetirementInfo } from '@shared/utils/retirement'
+import { LICENCE_EXPIRY_WARNING_DAYS } from '@shared/constants/malawi'
 
 const num = (v: unknown): number => {
   const n = Number(v)
@@ -49,6 +54,139 @@ const NOT_TERMINATED = { status: { not: 'TERMINATED' as const } }
 
 async function lookahead(): Promise<number> {
   return settingsService.get(SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS)
+}
+
+/**
+ * Active staff who have reached the retirement age, and those who reach it
+ * within 12 months. Dates are computed from date of birth + HR_RETIREMENT_AGE;
+ * staff with no date of birth on file simply aren't counted (nothing is guessed).
+ */
+async function getRetirementCounts(): Promise<{ reached: number; soon: number }> {
+  const [retirementAge, rows] = await Promise.all([
+    settingsService.get(SETTING_KEYS.HR_RETIREMENT_AGE),
+    prisma.staffProfile.findMany({
+      where:  { ...NOT_TERMINATED, dateOfBirth: { not: null } },
+      select: { dateOfBirth: true },
+    }),
+  ])
+  const now = new Date()
+  let reached = 0
+  let soon = 0
+  for (const r of rows) {
+    if (!r.dateOfBirth) continue
+    const info = getRetirementInfo(r.dateOfBirth, retirementAge, now)
+    if (info.status === 'RETIRED') reached += 1
+    else if (info.status === 'DUE_WITHIN_YEAR') soon += 1
+  }
+  return { reached, soon }
+}
+
+/**
+ * TEACHING staff (isTeaching) whose TCM licence is missing, expired, or expires
+ * within LICENCE_EXPIRY_WARNING_DAYS. Non-teaching staff are never counted:
+ * a licence is only expected of someone marked as a teacher.
+ */
+async function getLicenceCounts(): Promise<{ missing: number; expired: number; expiring: number }> {
+  const now = new Date()
+  const soon = new Date(now.getTime() + LICENCE_EXPIRY_WARNING_DAYS * 86_400_000)
+  const teaching = { ...NOT_TERMINATED, isTeaching: true }
+  const [missing, expired, expiring] = await Promise.all([
+    prisma.staffProfile.count({ where: { ...teaching, OR: [{ tcmLicenceNo: null }, { tcmLicenceExpiry: null }] } }),
+    prisma.staffProfile.count({ where: { ...teaching, tcmLicenceExpiry: { lt: now } } }),
+    prisma.staffProfile.count({ where: { ...teaching, tcmLicenceExpiry: { gte: now, lte: soon } } }),
+  ])
+  return { missing, expired, expiring }
+}
+
+// ─── TEACHING & LICENSING ────────────────────────────────────────────────────
+
+/**
+ * Teaching staff with TCM licence status, timetable load and subject fit.
+ * Nothing here is stored: periods per week come from the regular timetable for
+ * the term, and the subjects a teacher actually teaches come from
+ * ClassSubjectAssignment, compared with their recorded qualified subjects.
+ * The licence number is never returned, only its status and expiry date.
+ */
+export async function getHrTeaching(academicYear: string, term: number): Promise<ApiHrTeaching> {
+  const now = new Date()
+  const warnBy = new Date(now.getTime() + LICENCE_EXPIRY_WARNING_DAYS * 86_400_000)
+
+  const teachers = await prisma.staffProfile.findMany({
+    where: { ...NOT_TERMINATED, isTeaching: true },
+    select: {
+      id: true, uid: true, employeeNo: true, firstName: true, lastName: true, department: true,
+      tcmLicenceNo: true, tcmLicenceExpiry: true,
+      qualifiedSubjects: { select: { subject: true } },
+    },
+  })
+  const uids = teachers.map((t) => t.uid)
+
+  const [slotCounts, assignments] = uids.length === 0 ? [[], []] : await Promise.all([
+    prisma.timetableSlot.groupBy({
+      by: ['teacherUid'],
+      where: { teacherUid: { in: uids }, academicYear, term, type: 'REGULAR' },
+      _count: { _all: true },
+    }),
+    prisma.classSubjectAssignment.findMany({
+      where: { teacherUid: { in: uids }, academicYear },
+      select: { teacherUid: true, subject: true },
+    }),
+  ])
+
+  const periodsByUid = new Map(slotCounts.map((s) => [s.teacherUid, s._count._all]))
+  const subjectsByUid = new Map<string, Set<string>>()
+  for (const a of assignments) {
+    const set = subjectsByUid.get(a.teacherUid) ?? new Set<string>()
+    set.add(a.subject)
+    subjectsByUid.set(a.teacherUid, set)
+  }
+
+  const licence = { missing: 0, expired: 0, expiring: 0, valid: 0 }
+  let outside = 0
+  let notRecorded = 0
+
+  const rows: ApiTeachingRow[] = teachers.map((t) => {
+    let status: TeachingLicenceStatus
+    if (!t.tcmLicenceNo || !t.tcmLicenceExpiry) status = 'MISSING'
+    else if (t.tcmLicenceExpiry.getTime() < now.getTime()) status = 'EXPIRED'
+    else if (t.tcmLicenceExpiry.getTime() <= warnBy.getTime()) status = 'EXPIRING'
+    else status = 'VALID'
+    if (status === 'MISSING') licence.missing += 1
+    else if (status === 'EXPIRED') licence.expired += 1
+    else if (status === 'EXPIRING') licence.expiring += 1
+    else licence.valid += 1
+
+    const qualified = new Set(t.qualifiedSubjects.map((q) => q.subject))
+    const assigned = [...(subjectsByUid.get(t.uid) ?? [])].sort()
+    const qualificationsRecorded = qualified.size > 0
+    const outsideQualification = qualificationsRecorded ? assigned.filter((s) => !qualified.has(s)) : []
+    if (!qualificationsRecorded) notRecorded += 1
+    if (outsideQualification.length > 0) outside += 1
+
+    return {
+      staffId: t.id,
+      employeeNo: t.employeeNo,
+      name: `${t.firstName} ${t.lastName}`,
+      department: t.department,
+      licenceStatus: status,
+      licenceExpiry: t.tcmLicenceExpiry ? t.tcmLicenceExpiry.toISOString() : null,
+      periodsPerWeek: periodsByUid.get(t.uid) ?? 0,
+      subjectsAssigned: assigned,
+      outsideQualification,
+      qualificationsRecorded,
+    }
+  })
+
+  return {
+    academicYear,
+    term,
+    warningDays: LICENCE_EXPIRY_WARNING_DAYS,
+    teachingStaff: teachers.length,
+    licence,
+    teachingOutsideQualification: outside,
+    qualificationsNotRecorded: notRecorded,
+    rows,
+  }
 }
 
 // ─── WORKFORCE ───────────────────────────────────────────────────────────────
@@ -420,12 +558,14 @@ export async function getHrOverview(academicYear: string): Promise<ReportSection
 }
 
 export async function getHrAttention(academicYear: string): Promise<AttentionItem[]> {
-  const [contracts, leave, loans, reviews, promotions] = await Promise.all([
+  const [contracts, leave, loans, reviews, promotions, retirement, licences] = await Promise.all([
     getHrContracts(),
     getHrLeave(new Date().getFullYear()),
     getHrLoans(),
     getHrReviews(academicYear),
     getHrPromotions(),
+    getRetirementCounts(),
+    getLicenceCounts(),
   ])
   const expired = contracts.windows.find((w) => w.key === 'expired')?.count ?? 0
   const soon = contracts.rows.filter((r) => r.window !== 'expired' && r.daysToExpiry <= contracts.lookaheadDays).length
@@ -434,6 +574,11 @@ export async function getHrAttention(academicYear: string): Promise<AttentionIte
   const items: AttentionItem[] = [
     { key: 'contracts-expired', severity: 'critical', label: 'Contracts already expired (staff still active)', count: expired, href: '/reports?tab=contracts' },
     { key: 'contracts-soon', severity: 'watch', label: `Contracts expiring within ${contracts.lookaheadDays} days`, count: soon, href: '/reports?tab=contracts' },
+    { key: 'licence-missing', severity: 'watch', label: 'Teaching staff with no TCM licence number or expiry on file', count: licences.missing, href: '/hr' },
+    { key: 'licence-expired', severity: 'critical', label: 'Teaching staff with an expired TCM licence', count: licences.expired, href: '/hr' },
+    { key: 'licence-expiring', severity: 'watch', label: `TCM licences expiring within ${LICENCE_EXPIRY_WARNING_DAYS} days`, count: licences.expiring, href: '/hr' },
+    { key: 'retirement-reached', severity: 'critical', label: 'Active staff at or past retirement age', count: retirement.reached, href: '/hr' },
+    { key: 'retirement-soon', severity: 'watch', label: 'Staff reaching retirement age within 12 months', count: retirement.soon, href: '/hr' },
     { key: 'leave-pending', severity: 'watch', label: 'Leave requests awaiting a decision', count: leave.pendingRequests, href: '/hr' },
     { key: 'loans-pending', severity: 'watch', label: 'Staff loans awaiting approval', count: loans.pendingApprovals, href: '/hr' },
     { key: 'promotions-pending', severity: 'info', label: 'Promotions awaiting approval', count: promotions.pending, href: '/hr' },

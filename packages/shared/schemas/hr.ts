@@ -22,9 +22,64 @@
  */
 import { z } from 'zod'
 import { USER_ROLES } from '../types/roles'
+import {
+  NRB_NUMBER_MIN,
+  NRB_NUMBER_MAX,
+  EMPLOYMENT_CATEGORIES,
+  QUALIFICATION_LEVELS,
+  TRAINING_ROUTES,
+  HOUSING_STATUSES,
+  STAFF_EXIT_REASONS,
+} from '../constants/malawi/demographics'
+import { MALAWI_SUBJECTS } from '../constants/malawi/subjects'
 
 // Same two values as the Sex enum in schema.prisma (used by Student too).
 export const STAFF_SEX = ['MALE', 'FEMALE'] as const
+
+// ── Staff identity (date of birth, NRB, TPIN, next of kin) ────────────────────
+// HR-only data (see hr.viewStaffSensitive). All optional; '' means "clear it".
+// Date of birth drives the computed retirement date, so it must be a real,
+// plausible date: not in the future, and not before 1930.
+const dateOfBirthField = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the format YYYY-MM-DD')
+  .refine((v) => {
+    const d = new Date(`${v}T00:00:00Z`)
+    return !Number.isNaN(d.getTime()) && d.getTime() <= Date.now() && d.getUTCFullYear() >= 1930
+  }, 'Enter a valid date of birth')
+  .optional()
+  .or(z.literal(''))
+
+// ── Teaching, licensing, qualifications, housing ─────────────────────────────
+// TCM = Teaching Council of Malawi. isTeaching is explicit (StaffRole does not
+// say who must hold a licence), and only teaching staff carry TCM details.
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the format YYYY-MM-DD')
+
+export const StaffComplianceShape = {
+  isTeaching:           z.boolean().optional(),
+  tcmRegistrationNo:    z.string().trim().max(40).optional(),
+  tcmLicenceNo:         z.string().trim().max(40).optional(),
+  tcmLicenceExpiry:     isoDate.optional().or(z.literal('')),
+  employmentCategory:   z.enum(EMPLOYMENT_CATEGORIES).optional().or(z.literal('')),
+  payrollNo:            z.string().trim().max(40).optional(),
+  highestQualification: z.enum(QUALIFICATION_LEVELS).optional().or(z.literal('')),
+  qualifiedInEducation: z.boolean().nullable().optional(),
+  trainingRoute:        z.enum(TRAINING_ROUTES).optional().or(z.literal('')),
+  housingStatus:        z.enum(HOUSING_STATUSES).optional().or(z.literal('')),
+  qualifiedSubjects:    z.array(z.enum(MALAWI_SUBJECTS)).max(20).optional(),
+} as const
+
+export const StaffIdentityShape = {
+  dateOfBirth:       dateOfBirthField,
+  nationality:       z.string().trim().max(60).optional(),
+  homeDistrict:      z.string().trim().max(60).optional(),
+  nrbNumber:         z.string().trim().min(NRB_NUMBER_MIN, `NRB number must be at least ${NRB_NUMBER_MIN} characters`)
+                       .max(NRB_NUMBER_MAX, `NRB number must be at most ${NRB_NUMBER_MAX} characters`).optional().or(z.literal('')),
+  tpin:              z.string().trim().max(20).optional(),
+  nextOfKinName:     z.string().trim().max(120).optional(),
+  nextOfKinPhone:    z.string().trim().max(30).optional(),
+  nextOfKinRelation: z.string().trim().max(60).optional(),
+} as const
 
 export const CreateStaffSchema = z.object({
   // NOTE: no `uid` field. A staff member's Firebase Auth UID is minted
@@ -45,6 +100,20 @@ export const CreateStaffSchema = z.object({
   dateJoined:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   contractExpiry: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   salaryStructureId: z.string().optional(),
+  ...StaffIdentityShape,
+  ...StaffComplianceShape,
+}).superRefine((v, ctx) => {
+  // A teacher must be licensed. Required on CREATE only: existing teachers who
+  // pre-date this field are flagged by the HR licence list instead of being
+  // blocked from every unrelated edit.
+  if (v.isTeaching) {
+    if (!v.tcmLicenceNo?.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['tcmLicenceNo'], message: 'TCM licence number is required for teaching staff' })
+    }
+    if (!v.tcmLicenceExpiry) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['tcmLicenceExpiry'], message: 'TCM licence expiry date is required for teaching staff' })
+    }
+  }
 })
 
 // Deliberately narrower than CreateStaffSchema: no employeeNo (immutable
@@ -63,7 +132,33 @@ export const UpdateStaffSchema = z.object({
   jobTitle:       z.string().min(1).optional(),
   employmentType: z.enum(['FULL_TIME','PART_TIME','CONTRACT','TEMPORARY']).optional(),
   contractExpiry: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  ...StaffIdentityShape,
+  ...StaffComplianceShape,
 })
+
+/**
+ * What a staff member may change about THEIR OWN record (hr.editOwnLimitedFields):
+ * contact phone and next of kin. Everything else (date of birth, NRB, TPIN,
+ * licence, payroll) stays under hr.editStaff. '' clears a field.
+ */
+export const UpdateOwnDetailsSchema = z.object({
+  phone:             z.string().trim().max(30).optional(),
+  nextOfKinName:     z.string().trim().max(120).optional(),
+  nextOfKinPhone:    z.string().trim().max(30).optional(),
+  nextOfKinRelation: z.string().trim().max(60).optional(),
+})
+
+/** HR terminates a staff member: reason and date are required (and audited). */
+export const TerminateStaffSchema = z.object({
+  exitReason: z.enum(STAFF_EXIT_REASONS),
+  exitDate:   isoDate.refine((v) => new Date(`${v}T00:00:00Z`).getTime() <= Date.now() + 24 * 60 * 60 * 1000, 'Exit date cannot be in the future'),
+})
+
+export const StaffResponsibilitySchema = z.object({
+  title:     z.string().trim().min(2, 'Title required').max(100),
+  startDate: isoDate,
+  endDate:   isoDate.optional().or(z.literal('')),
+}).refine((v) => !v.endDate || v.endDate >= v.startDate, { path: ['endDate'], message: 'End date cannot be before the start date' })
 
 // [PRODUCTION FIX] Real salary management — StaffProfile.salaryStructureId
 // (removed from UpdateStaffSchema above) was a dead plain string with no
@@ -117,6 +212,9 @@ export const CreateAllowanceSchema = z.object({
   { message: 'One-time allowances need paidMonth and paidYear.', path: ['paidMonth'] },
 )
 export type CreateStaffInput    = z.infer<typeof CreateStaffSchema>
+export type TerminateStaffInput = z.infer<typeof TerminateStaffSchema>
+export type UpdateOwnDetailsInput = z.infer<typeof UpdateOwnDetailsSchema>
+export type StaffResponsibilityInput = z.infer<typeof StaffResponsibilitySchema>
 export type UpdateStaffInput    = z.infer<typeof UpdateStaffSchema>
 export type LeaveRequestInput   = z.infer<typeof LeaveRequestSchema>
 export type ReviewLeaveInput    = z.infer<typeof ReviewLeaveSchema>

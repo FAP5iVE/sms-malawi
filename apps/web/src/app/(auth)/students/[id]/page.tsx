@@ -37,10 +37,13 @@ import { useReportCardData } from '@/hooks/useExams'
 import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { RoleGuard } from '@/components/shared/RoleGuard'
 import { PermissionGuard } from '@/components/shared/PermissionGuard'
+import { GuardiansCard } from '@/components/students/GuardiansCard'
+import { WelfareCard } from '@/components/students/WelfareCard'
+import { useAuthStore } from '@/store/authStore'
 import { StudentForm } from '@/components/students/StudentForm'
 import { StudentRiskBadge } from '@/components/shared/StudentRiskBadge'
 import { PrintableReportCard } from '@/components/shared/PrintableReportCard'
-import { formatMWK } from '@shared/constants/malawi'
+import { formatMWK, RESIDENCE_TYPE_LABELS, ADMISSION_TYPE_LABELS, EXIT_REASON_LABELS } from '@shared/constants/malawi'
 import { usePermissions } from '@/hooks/usePermissions'
 import { ArrowLeft, Pencil, Printer, FileText, Loader2, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
@@ -70,6 +73,7 @@ function ProfileContent() {
   const { data: student, isLoading } = useStudent(id)
   const [editing, setEditing] = useState(false)
   const { can } = usePermissions()
+  const role = useAuthStore((s) => s.role)
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({ contentRef: printRef })
 
@@ -160,8 +164,12 @@ function ProfileContent() {
                   ['Sex', student.sex],
                   ['Nationality', student.nationality],
                   ['District', student.district],
+                  ['Traditional Authority', student.traditionalAuthority ?? '—'],
                   ['Village', student.village ?? '—'],
                   ['Address', student.address ?? '—'],
+                  ['NRB / Birth Cert. No.', student.nrbNumber ?? '—'],
+                  ['Religion', student.religion ?? '—'],
+                  ['Home Language', student.homeLanguage ?? '—'],
                   ['Phone', student.phone ?? '—'],
                   ['Email', student.email ?? '—'],
                 ].map(([label, value]) => (
@@ -188,6 +196,62 @@ function ProfileContent() {
                   <div key={label} className="flex justify-between text-sm">
                     <span className="text-muted">{label}</span>
                     <span className="font-medium text-body">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Welfare (orphan status, vulnerability, medical alert, support needs):
+                sensitive child data. Rendered only for student.viewWelfare
+                (admin, headteacher, HR); the data is fetched from its own
+                endpoint, so a role without the permission never receives it. */}
+            {can('student.viewWelfare') && (
+              // print:hidden - the Print button prints this whole block, and
+              // sensitive welfare data must not end up on paper by default.
+              <div className="sm:col-span-2 print:hidden">
+                <WelfareCard studentId={id} canEdit={can('student.editWelfare')} />
+              </div>
+            )}
+
+            {/* Guardians: visible to anyone who can open the record; only admin,
+                the headteacher and other non-lower_rank editors can change them
+                (the server enforces this too). */}
+            {can('student.view') && (
+              <div className="sm:col-span-2">
+                <GuardiansCard
+                  studentId={id}
+                  canEdit={can('student.edit') && role !== 'lower_rank' && role !== 'student'}
+                />
+              </div>
+            )}
+
+            <div>
+              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
+                Home &amp; Admission
+              </p>
+              <div className="space-y-2.5">
+                {[
+                  ['Stays', student.residenceType ? RESIDENCE_TYPE_LABELS[student.residenceType] : '—'],
+                  ['Travel to School', student.travelMinutes != null ? `${student.travelMinutes} min` : '—'],
+                  ['Admission', ADMISSION_TYPE_LABELS[student.admissionType ?? 'NEW_INTAKE']],
+                  ['Previous School', student.previousSchool ?? '—'],
+                  ['Reason for Transfer', student.reasonForTransfer ?? '—'],
+                  ...(student.yearOutcomes && student.yearOutcomes.length > 0
+                    ? [
+                        ['Times Repeated', String(student.yearOutcomes.filter((y) => y.outcome === 'REPEATED').length)],
+                        ['Year History', student.yearOutcomes.map((y) => `${y.academicYear} F${y.form} ${y.outcome === 'REPEATED' ? 'repeated' : y.outcome === 'PROMOTED' ? 'promoted' : y.outcome === 'AWAITING_MANEB' ? 'MANEB' : 'graduated'}`).join(', ')],
+                      ]
+                    : []),
+                  ...(student.exitReason
+                    ? [
+                        ['Reason for Leaving', EXIT_REASON_LABELS[student.exitReason]],
+                        ['Date Left', student.exitDate ? new Date(student.exitDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'],
+                      ]
+                    : []),
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between text-sm gap-4">
+                    <span className="text-muted shrink-0">{label}</span>
+                    <span className="font-medium text-body text-right">{value}</span>
                   </div>
                 ))}
               </div>

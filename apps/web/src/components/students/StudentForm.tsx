@@ -275,6 +275,15 @@ function mapStudentToFormValues(s: ApiStudent): Partial<StudentFormValues> {
     guardianRelation: s.guardianRelation,
     classId:          s.classId,
     status:           s.status as CreateStudentInput['status'],
+    nrbNumber:            s.nrbNumber ?? '',
+    traditionalAuthority: s.traditionalAuthority ?? '',
+    religion:             s.religion ?? '',
+    homeLanguage:         s.homeLanguage ?? '',
+    residenceType:        s.residenceType ?? undefined,
+    travelMinutes:        s.travelMinutes ?? null,
+    admissionType:        s.admissionType ?? 'NEW_INTAKE',
+    previousSchool:       s.previousSchool ?? '',
+    reasonForTransfer:    s.reasonForTransfer ?? '',
   }
 }
 

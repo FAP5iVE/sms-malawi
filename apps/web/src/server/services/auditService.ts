@@ -77,6 +77,9 @@ export const ACTION_SEVERITY: Readonly<Record<string, Severity>> = {
   'student.create':               SEVERITY.MEDIUM,
   'student.edit':                 SEVERITY.MEDIUM,
   'student.soft_delete':          SEVERITY.HIGH,
+  'student.welfare_edited':       SEVERITY.HIGH,     // orphan / vulnerability / support needs (sensitive child data)
+  'student.guardian_changed':     SEVERITY.MEDIUM,
+  'student.exit_recorded':        SEVERITY.MEDIUM,
   'student.archive':              SEVERITY.HIGH,
   'student.status_changed':       SEVERITY.HIGH,
   'student.promoted':             SEVERITY.HIGH,
@@ -194,6 +197,8 @@ export const ACTION_SEVERITY: Readonly<Record<string, Severity>> = {
   // ── HR — staff
   'hr.staff_created':             SEVERITY.CRITICAL,
   'hr.staff_edited':              SEVERITY.MEDIUM,
+  'hr.staff_identity_edited':     SEVERITY.HIGH,     // DOB, NRB, TPIN, next of kin (field names only are logged)
+  'hr.staff_compliance_edited':   SEVERITY.MEDIUM,   // TCM licence, qualifications, employment category
   'hr.staff_terminated':          SEVERITY.CRITICAL,
   'hr.staff_promoted':            SEVERITY.CRITICAL,
   'hr.role_assigned':             SEVERITY.CRITICAL,

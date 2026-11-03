@@ -1,7 +1,7 @@
 'use client'
 
 import type {
-  ApiHrContracts, ApiHrLeave, ApiHrLoans, ApiHrPromotions, ApiHrReviews, ApiHrWorkforce,
+  ApiHrContracts, ApiHrLeave, ApiHrLoans, ApiHrPromotions, ApiHrReviews, ApiHrTeaching, ApiHrWorkforce,
 } from '@shared/types/reporting-hr'
 import { useReportingQuery } from '@/hooks/useReporting'
 import type { AttentionItem, HookOptions, ReportSectionData } from './shared'
@@ -25,3 +25,6 @@ export const useHrLeave = (year: number | undefined, o?: HookOptions) =>
 
 export const useHrReviews = (academicYear: string | undefined, o?: HookOptions) =>
   useReportingQuery<ApiHrReviews>(D, 'reviews', { academicYear }, { enabled: on(o, academicYear) })
+
+export const useHrTeaching = (academicYear: string | undefined, o?: HookOptions) =>
+  useReportingQuery<ApiHrTeaching>(D, 'teaching', { academicYear }, { enabled: on(o, academicYear) })

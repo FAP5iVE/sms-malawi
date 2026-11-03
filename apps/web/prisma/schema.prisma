@@ -26,6 +26,28 @@ model Student {
   guardianName     String
   guardianPhone    String
   guardianRelation String
+  // ── Demographics (additive, all nullable or defaulted) ───────────────────
+  // ── Welfare (sensitive child data) — see student.viewWelfare / editWelfare.
+  // NEVER an input to the risk score (that would label children) and never in
+  // the student detail payload: it is served only by the welfare endpoints.
+  orphanStatus            OrphanStatus  @default(UNKNOWN)   // UNKNOWN, not NONE: existing students are never wrongly recorded as having two living parents
+  isVulnerable            Boolean       @default(false)
+  vulnerabilityNote       String?
+  vulnerabilityReviewedAt DateTime?
+  medicalAlert            String?
+  // ── Exit (set when status moves to ARCHIVED; ARCHIVED stays the terminal status) ──
+  exitReason              ExitReason?
+  exitDate                DateTime?
+  exitNote                String?           // free text, sensitive: served only with student.viewWelfare
+  nrbNumber            String?        @unique   // National Registration Bureau / birth-certificate no. Nullable: many children are unregistered
+  traditionalAuthority String?                  // free text for now; a per-district lookup can follow
+  religion             String?
+  homeLanguage         String?
+  residenceType        ResidenceType?
+  travelMinutes        Int?                     // one-way travel time to school, minutes
+  admissionType        AdmissionType  @default(NEW_INTAKE)
+  previousSchool       String?
+  reasonForTransfer    String?
   photoKey         String?
   firebaseUid      String?   @unique   // Firebase Auth UID — set on student account creation
   status           StudentStatus @default(ACTIVE)
@@ -38,6 +60,9 @@ model Student {
   feeCommitments   StudentFeeCommitment[]
   attendanceRecords Attendance[]
   universityPlacements UniversityPlacement[]   // R18 — advisory university placements
+  guardians        StudentGuardian[]   // Student.guardianName/Phone/Relation stay as the denormalised PRIMARY guardian
+  supportNeeds     StudentSupportNeed[]
+  yearOutcomes     StudentYearOutcome[]
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -45,6 +70,115 @@ model Student {
   @@index([status])
   @@index([firebaseUid])
   @@map("students")
+}
+
+/// One row per student per academic year, written when a promotion run is
+/// committed (same transaction). Source for "times repeated", repetition rate by
+/// form and dropout analysis. GRADUATED is reserved for the MANEB-results step.
+model StudentYearOutcome {
+  id             String      @id @default(cuid())
+  studentId      String
+  student        Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicYear   String
+  form           Int
+  outcome        YearOutcome
+  promotionRunId String?
+  createdAt      DateTime    @default(now())
+
+  @@unique([studentId, academicYear])
+  @@map("student_year_outcomes")
+}
+
+/// Special / learning-support needs. Sensitive: read with student.viewWelfare,
+/// written with student.editWelfare, every change audited.
+model StudentSupportNeed {
+  id              String          @id @default(cuid())
+  studentId       String
+  student         Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  type            SupportNeedType
+  accommodation   String?         // e.g. front-row seating, large print
+  assistiveDevice String?
+  identifiedAt    DateTime?
+  recordedByUid   String
+  createdAt       DateTime        @default(now())
+
+  @@index([studentId])
+  @@map("student_support_needs")
+}
+
+/// One row per guardian. Rules enforced in studentService (not the DB): exactly
+/// one isPrimary per student, and at least one isEmergencyContact. The primary
+/// row is mirrored into Student.guardianName/guardianPhone/guardianRelation in
+/// the same transaction, because invoices, SMS, Algolia and the forms read those
+/// legacy columns.
+model StudentGuardian {
+  id                 String   @id @default(cuid())
+  studentId          String
+  student            Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fullName           String
+  relation           String   // values from GUARDIAN_RELATIONSHIPS
+  phone              String
+  altPhone           String?
+  email              String?
+  address            String?
+  nrbNumber          String?
+  isPrimary          Boolean  @default(false)
+  isFeePayer         Boolean  @default(false)
+  isEmergencyContact Boolean  @default(false)
+  livesWithStudent   Boolean?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([studentId])
+  @@map("student_guardians")
+}
+
+enum ExitReason {
+  TRANSFERRED_OUT
+  DROPPED_OUT
+  DISMISSED
+  DECEASED
+  WITHDRAWN
+  OTHER
+}
+
+enum YearOutcome {
+  PROMOTED
+  REPEATED
+  GRADUATED
+  AWAITING_MANEB
+}
+
+enum OrphanStatus {
+  UNKNOWN
+  NONE
+  FATHER_DECEASED
+  MOTHER_DECEASED
+  BOTH_DECEASED
+}
+
+enum SupportNeedType {
+  LOW_VISION
+  BLIND
+  HARD_OF_HEARING
+  DEAF
+  PHYSICAL_IMPAIRMENT
+  LEARNING_DIFFICULTY
+  ALBINISM
+  OTHER
+}
+
+enum ResidenceType {
+  DAY_HOME
+  BOARDER
+  LODGING
+  WITH_RELATIVE
+}
+
+enum AdmissionType {
+  NEW_INTAKE
+  TRANSFER_IN
+  RETURNEE
 }
 
 enum StudentStatus {
@@ -266,6 +400,9 @@ model Application {
   nationality      String
   district         String
   village          String?
+  traditionalAuthority String?
+  religion         String?
+  homeLanguage     String?
   guardianName     String
   guardianPhone    String
   email            String?
@@ -822,10 +959,22 @@ model Scholarship {
   academicYear String
   isActive     Boolean          @default(true)
   notes        String?
+  sponsorType  SponsorType?     // who pays / awards it; null for scholarships recorded before this field
+  sponsorName  String?          // e.g. "CDSS Bursary", "Catholic Diocese of Mzuzu"
   createdAt    DateTime         @default(now())
 
   @@index([studentId])
   @@map("scholarships")
+}
+
+enum SponsorType {
+  GOVERNMENT_BURSARY
+  NGO
+  CHURCH
+  EMPLOYER
+  FAMILY
+  SCHOOL
+  OTHER
 }
 
 enum DiscountType { 
@@ -1212,6 +1361,32 @@ model StaffProfile {
   status              StaffStatus    @default(ACTIVE)
   dateJoined          DateTime
   contractExpiry      DateTime?
+  // ── Identity (additive, nullable) — HR-only; see hr.viewStaffSensitive ───
+  dateOfBirth         DateTime?
+  nationality         String?        @default("Malawian")
+  homeDistrict        String?
+  nrbNumber           String?        @unique   // NRB national ID number
+  tpin                String?                  // MRA taxpayer identification number
+  nextOfKinName       String?
+  nextOfKinPhone      String?
+  nextOfKinRelation   String?
+  // ── Teaching, licensing and qualifications (additive, nullable / defaulted) ──
+  // isTeaching is explicit because StaffRole does not say who must hold a TCM
+  // licence; never infer it from the role.
+  isTeaching            Boolean             @default(false)
+  tcmRegistrationNo     String?
+  tcmLicenceNo          String?
+  tcmLicenceExpiry      DateTime?
+  employmentCategory    EmploymentCategory?
+  payrollNo             String?             // HR-only
+  highestQualification  QualificationLevel?
+  qualifiedInEducation  Boolean?
+  trainingRoute         TrainingRoute?
+  housingStatus         HousingStatus?
+  exitReason            StaffExitReason?
+  exitDate              DateTime?
+  qualifiedSubjects     StaffQualifiedSubject[]
+  responsibilities      StaffResponsibility[]
   photoKey            String?        // Appwrite file ID
   salaryStructureId   String?
   leaveBalances       LeaveBalance[]
@@ -1228,6 +1403,7 @@ model StaffProfile {
   @@index([department])
   @@index([departmentId])
   @@index([contractExpiry])
+  @@index([tcmLicenceExpiry])
   @@map("staff_profiles")
 }
 
@@ -1249,6 +1425,71 @@ enum EmploymentType {
   CONTRACT  
   TEMPORARY 
   }
+enum EmploymentCategory {
+  GOVERNMENT_POSTED
+  SCHOOL_EMPLOYED
+  COMMUNITY_PAID
+  VOLUNTEER
+  OTHER
+}
+enum QualificationLevel {
+  MSCE
+  DIPLOMA
+  DEGREE
+  POSTGRADUATE
+  OTHER
+}
+enum TrainingRoute {
+  UNIVERSITY_EDUCATION_DEGREE
+  EDUCATION_DIPLOMA
+  TEACHER_CERTIFICATE
+  ODL
+  UNTRAINED
+  OTHER
+}
+enum HousingStatus {
+  SCHOOL_HOUSE
+  RENT_ALLOWANCE
+  OWN_ARRANGEMENT
+}
+enum StaffExitReason {
+  RESIGNED
+  TRANSFERRED
+  RETIRED
+  CONTRACT_ENDED
+  DISMISSED
+  DECEASED
+  OTHER
+}
+
+/// Subjects a teacher is QUALIFIED to teach (values from MALAWI_SUBJECTS). What
+/// they actually teach is computed from ClassSubjectAssignment / TimetableSlot.
+model StaffQualifiedSubject {
+  id      String       @id @default(cuid())
+  staffId String
+  staff   StaffProfile @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  subject String
+
+  @@unique([staffId, subject])
+  @@map("staff_qualified_subjects")
+}
+
+/// Posts of responsibility (Head of Department, house master, patron, guidance
+/// counsellor ...). The source of truth for responsibilities; the free-text
+/// "Responsibility" payroll allowance type is untouched.
+model StaffResponsibility {
+  id        String       @id @default(cuid())
+  staffId   String
+  staff     StaffProfile @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  title     String
+  startDate DateTime
+  endDate   DateTime?
+  createdAt DateTime     @default(now())
+
+  @@index([staffId])
+  @@map("staff_responsibilities")
+}
+
 enum StaffStatus    { 
   ACTIVE  
   ON_LEAVE  

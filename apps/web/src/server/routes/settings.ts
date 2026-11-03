@@ -388,18 +388,40 @@ settingsRouter
 settingsRouter
   .route('/hr')
   .get(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
-    const departmentTitles = await settingsService.get(SETTING_KEYS.HR_DEPARTMENT_TITLES)
-    return res.json({ departmentTitles })
+    const [departmentTitles, retirementAge] = await Promise.all([
+      settingsService.get(SETTING_KEYS.HR_DEPARTMENT_TITLES),
+      settingsService.get(SETTING_KEYS.HR_RETIREMENT_AGE),
+    ])
+    return res.json({ departmentTitles, retirementAge })
   })
   .patch(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
-    const { departmentTitles } = req.body as { departmentTitles?: unknown }
-    if (!departmentTitles || typeof departmentTitles !== 'object') {
-      return res.status(400).json({ error: 'departmentTitles is required.' })
+    // Either field may be sent on its own (the department editor and the
+    // retirement-age card save independently), but at least one is required.
+    const { departmentTitles, retirementAge } = req.body as {
+      departmentTitles?: unknown
+      retirementAge?: unknown
+    }
+    const hasTitles = departmentTitles !== undefined
+    const hasAge    = retirementAge !== undefined
+    if (!hasTitles && !hasAge) {
+      return res.status(400).json({ error: 'departmentTitles or retirementAge is required.' })
+    }
+    if (hasTitles && (!departmentTitles || typeof departmentTitles !== 'object')) {
+      return res.status(400).json({ error: 'departmentTitles must be an object.' })
+    }
+    if (hasAge && typeof retirementAge !== 'number') {
+      return res.status(400).json({ error: 'retirementAge must be a number.' })
     }
     try {
-      await settingsService.set(SETTING_KEYS.HR_DEPARTMENT_TITLES, departmentTitles as DepartmentTitles, req.user!.uid)
+      if (hasTitles) {
+        await settingsService.set(SETTING_KEYS.HR_DEPARTMENT_TITLES, departmentTitles as DepartmentTitles, req.user!.uid)
+      }
+      // settingsService.set() validates against SETTING_VALUE_SCHEMAS (50-75, whole number).
+      if (hasAge) {
+        await settingsService.set(SETTING_KEYS.HR_RETIREMENT_AGE, retirementAge as number, req.user!.uid)
+      }
     } catch (err) {
-      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Invalid department/title data.', tags: { module: 'settings' } })
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Invalid HR settings.', tags: { module: 'settings' } })
     }
     return res.json({ ok: true })
   })

@@ -100,3 +100,36 @@ export interface ApiHrPromotions {
     status: string
   }[]
 }
+
+export type TeachingLicenceStatus = 'MISSING' | 'EXPIRED' | 'EXPIRING' | 'VALID'
+
+export interface ApiTeachingRow {
+  staffId: string
+  employeeNo: string
+  name: string
+  department: string
+  /** Status only. The licence number itself is never part of a report. */
+  licenceStatus: TeachingLicenceStatus
+  licenceExpiry: string | null
+  /** Regular timetable periods per week this term. */
+  periodsPerWeek: number
+  /** Subjects the teacher is assigned to teach this year (ClassSubjectAssignment). */
+  subjectsAssigned: string[]
+  /** Assigned subjects not among the subjects they are qualified for. */
+  outsideQualification: string[]
+  /** False when no qualified subjects are on file, so outside-qualification can't be judged. */
+  qualificationsRecorded: boolean
+}
+
+export interface ApiHrTeaching {
+  academicYear: string
+  term: number
+  warningDays: number
+  teachingStaff: number
+  licence: { missing: number; expired: number; expiring: number; valid: number }
+  /** Teachers with at least one assigned subject outside their recorded qualifications. */
+  teachingOutsideQualification: number
+  /** Teachers with no qualified subjects recorded. */
+  qualificationsNotRecorded: number
+  rows: ApiTeachingRow[]
+}
