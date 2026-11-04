@@ -81,7 +81,49 @@ const FORM_LEVEL_BY_CLASS_APPLYING: Record<ApplicationInput['classApplying'], nu
 //  divergent field-name bugs.
 // ─────────────────────────────────────────────────────────
 
+/**
+ * Normalises the special-needs list for storage: one entry per type (a repeated
+ * type is dropped), blank notes removed. Returns undefined - not null - when empty
+ * so Prisma leaves the JSON column untouched (SQL NULL) instead of writing a JSON null.
+ */
+function cleanSupportNeeds(
+  needs: ApplicationInput['supportNeeds'],
+): Array<{ type: string; accommodation?: string; assistiveDevice?: string }> | undefined {
+  if (!needs || needs.length === 0) return undefined
+  const seen = new Set<string>()
+  const out: Array<{ type: string; accommodation?: string; assistiveDevice?: string }> = []
+  for (const n of needs) {
+    if (seen.has(n.type)) continue
+    seen.add(n.type)
+    const accommodation   = n.accommodation?.trim()
+    const assistiveDevice = n.assistiveDevice?.trim()
+    out.push({
+      type: n.type,
+      ...(accommodation   ? { accommodation }   : {}),
+      ...(assistiveDevice ? { assistiveDevice } : {}),
+    })
+  }
+  return out.length > 0 ? out : undefined
+}
+
+/**
+ * Welfare, health and special-needs fields are sensitive child data: the same
+ * rule as the student record (student.viewWelfare) applies while they sit on an
+ * application. The routes call this for every role without that permission, so a
+ * reviewer who can open applications but not welfare never receives them.
+ */
+export const APPLICATION_WELFARE_FIELDS = [
+  'orphanStatus', 'isVulnerable', 'vulnerabilityNote', 'medicalAlert', 'supportNeeds',
+] as const
+
+export function withoutWelfare<T extends object>(row: T): Omit<T, (typeof APPLICATION_WELFARE_FIELDS)[number]> {
+  const copy = { ...row } as Record<string, unknown>
+  for (const key of APPLICATION_WELFARE_FIELDS) delete copy[key]
+  return copy as Omit<T, (typeof APPLICATION_WELFARE_FIELDS)[number]>
+}
+
 function buildApplicationCreateData(data: ApplicationInput) {
+  const supportNeeds = cleanSupportNeeds(data.supportNeeds)
   return {
     firstName:         data.firstName,
     lastName:          data.surname,
@@ -96,6 +138,21 @@ function buildApplicationCreateData(data: ApplicationInput) {
     // saved (no column existed), so it was silently discarded.
     religion:          data.religion?.trim() || null,
     homeLanguage:      data.homeLanguage?.trim() || null,
+    // National ID is optional; '' (an empty input) is "not provided".
+    nrbNumber:         data.nrbNumber?.trim() || null,
+    // Home & Admission. admissionType stays null unless the applicant chose one:
+    // conversion then derives it from the form applied for.
+    residenceType:     data.residenceType ?? null,
+    travelMinutes:     data.travelMinutes ?? null,
+    admissionType:     data.admissionType ?? null,
+    // Welfare / health / special needs (sensitive). orphanStatus falls back to
+    // UNKNOWN - an unanswered question is never recorded as "not an orphan".
+    orphanStatus:      data.orphanStatus ?? 'UNKNOWN',
+    isVulnerable:      data.isVulnerable ?? false,
+    vulnerabilityNote: data.vulnerabilityNote?.trim() || null,
+    medicalAlert:      data.medicalAlert?.trim() || null,
+    // Omitted (SQL NULL) when empty rather than set to undefined/JSON null.
+    ...(supportNeeds ? { supportNeeds } : {}),
     email:             data.email || null,
     phone:             data.phone,
     address:           data.address ?? null,
@@ -340,4 +397,4 @@ export async function updateApplicationStatus(
   void algolia.updateApplication({ objectID: id, status })
 
   return updated
-}
+}

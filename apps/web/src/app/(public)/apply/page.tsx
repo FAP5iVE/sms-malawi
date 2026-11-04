@@ -1,4 +1,19 @@
 /**
+ * [CHANGE TYPE]: TARGETED EDIT (2026-11-04, application form brought level with the student record)
+ * [FILE]: apps/web/src/app/(public)/apply/page.tsx
+ * [PURPOSE]: The form now collects what the student profile shows, so nothing the
+ *   applicant could tell us is lost at admission:
+ *   1. Personal: Village (after District and T/A) and an optional National ID
+ *      (NRB / birth certificate number); both Malawian-applicant fields, like District.
+ *   2. Academic step gains the full "Home & Admission" group: where the learner
+ *      stays, travel time, admission type, previous school, reason for transfer.
+ *   3. New optional "Welfare" step (before Review): orphan status, vulnerability,
+ *      health / medical alert and special needs. The labels match the student
+ *      profile ("Special needs", not "Support needs").
+ *   4. The Review step lists the new answers.
+ *   Fields that only exist once a student is registered (class, status, fees) are
+ *   deliberately not asked here.
+ *
  * [CHANGE TYPE]: TARGETED EDIT
  * [FILE]: apps/web/src/app/(public)/apply/page.tsx
  * [R-PHASE]: R5, Academics I: Admissions & Student Records
@@ -97,11 +112,25 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ApplicationSchema } from '@shared/schemas/student'
 import type { ApplicationInput } from '@shared/schemas/student'
-import { MALAWI_DISTRICTS, FORM_LABELS, RELIGIONS, HOME_LANGUAGES } from '@shared/constants/malawi'
+import {
+  MALAWI_DISTRICTS,
+  FORM_LABELS,
+  RELIGIONS,
+  HOME_LANGUAGES,
+  RESIDENCE_TYPES,
+  RESIDENCE_TYPE_LABELS,
+  ADMISSION_TYPES,
+  ADMISSION_TYPE_LABELS,
+  TRAVEL_MINUTES_MAX,
+  ORPHAN_STATUSES,
+  ORPHAN_STATUS_LABELS,
+  SUPPORT_NEED_TYPES,
+  SUPPORT_NEED_LABELS,
+} from '@shared/constants/malawi'
 import { getCountriesForForm, COUNTRY_CALLING_CODES } from '@shared/constants/countries'
 import { GUARDIAN_RELATIONSHIPS } from '@shared/constants/admissions'
 import { AcademicYearSelect } from '@/components/shared/AcademicYearSelect'
@@ -115,6 +144,7 @@ import {
   BookOpen,
   Users,
   FileText,
+  HeartPulse,
   ChevronRight,
   ChevronLeft,
 } from 'lucide-react'
@@ -184,14 +214,29 @@ function SectionHeader({
   )
 }
 
+// Small heading that splits one step into groups (e.g. "Home & Admission").
+function GroupHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="col-span-full pt-2 -mb-1 text-xs font-heading font-bold text-muted uppercase tracking-widest">
+      {children}
+    </p>
+  )
+}
+
+// A blank <select> means "not answered": send undefined, never '' (which is not a
+// valid enum value and would fail validation).
+const blankToUndefined = (v: unknown) => (v === '' || v == null ? undefined : v)
+
 // -- MULTI-STEP CONFIG ---------------------------------------------------------
 const STEPS = [
   { label: 'Personal', icon: User },
   { label: 'Contact', icon: Phone },
   { label: 'Academic', icon: BookOpen },
   { label: 'Guardian', icon: Users },
+  { label: 'Welfare', icon: HeartPulse },
   { label: 'Review', icon: FileText },
 ]
+const REVIEW_STEP = STEPS.length - 1
 
 // -- MAIN COMPONENT ------------------------------------------------------------
 export default function ApplyPage() {
@@ -206,6 +251,7 @@ export default function ApplyPage() {
     watch,
     trigger,
     setError,
+    control,
     formState: { errors },
     getValues,
   } = useForm<ApplicationInput>({
@@ -214,17 +260,22 @@ export default function ApplyPage() {
       nationality: 'Malawi',
       countryCode: '+265',
       guardianCountryCode: '+265',
+      orphanStatus: 'UNKNOWN',
+      isVulnerable: false,
+      supportNeeds: [],
     },
   })
 
   const nationality = watch('nationality')
   const isMalawian = nationality === 'Malawi'
+  const isVulnerable = watch('isVulnerable')
 
   const STEP_FIELDS: (keyof ApplicationInput)[][] = [
-    ['firstName', 'surname', 'dateOfBirth', 'sex', 'nationality'],
+    ['firstName', 'surname', 'dateOfBirth', 'sex', 'nationality', 'nrbNumber'],
     ['address', 'countryCode', 'phone', 'email'],
-    ['classApplying', 'academicYear'],
+    ['classApplying', 'academicYear', 'travelMinutes'],
     ['guardianName', 'guardianRelationship', 'guardianCountryCode', 'guardianPhone'],
+    ['vulnerabilityNote', 'medicalAlert'],
     [],
   ]
 
@@ -251,6 +302,11 @@ export default function ApplyPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...data,
+          // District, T/A, village and National ID are Malawian-applicant fields.
+          // If the applicant switched nationality after filling them in, don't send them.
+          ...(data.nationality === 'Malawi'
+            ? {}
+            : { district: undefined, traditionalAuthority: undefined, village: undefined, nrbNumber: undefined }),
           phone: `${data.countryCode}${data.phone.replace(/^0/, '')}`,
           guardianPhone: `${data.guardianCountryCode}${data.guardianPhone.replace(/^0/, '')}`,
         }),
@@ -444,28 +500,6 @@ export default function ApplyPage() {
                       <option value="FEMALE">Female</option>
                     </select>
                   </Field>
-                  <Field label="Religion" error={errors.religion?.message} hint="Optional">
-                    <input
-                      {...register('religion')}
-                      list="apply-religions"
-                      className={`${inputCls} ${inputBase}`}
-                      placeholder="e.g. Christianity, Islam"
-                    />
-                    <datalist id="apply-religions">
-                      {RELIGIONS.map((r) => <option key={r} value={r} />)}
-                    </datalist>
-                  </Field>
-                  <Field label="Home Language" error={errors.homeLanguage?.message} hint="Optional">
-                    <input
-                      {...register('homeLanguage')}
-                      list="apply-languages"
-                      className={`${inputCls} ${inputBase}`}
-                      placeholder="e.g. Chichewa, Chitumbuka"
-                    />
-                    <datalist id="apply-languages">
-                      {HOME_LANGUAGES.map((l) => <option key={l} value={l} />)}
-                    </datalist>
-                  </Field>
                   <Field
                     label="Nationality"
                     required
@@ -514,8 +548,50 @@ export default function ApplyPage() {
                           placeholder="e.g. T/A Kuntaja"
                         />
                       </Field>
+                      <Field label="Village" error={errors.village?.message} hint="Optional">
+                        <input
+                          {...register('village')}
+                          className={`${inputCls} ${inputBase}`}
+                          placeholder="Home village"
+                          autoComplete="off"
+                        />
+                      </Field>
+                      <Field
+                        label="National ID / Birth Certificate No. (NRB)"
+                        error={errors.nrbNumber?.message}
+                        hint="Optional. Leave blank if not registered"
+                      >
+                        <input
+                          {...register('nrbNumber')}
+                          className={`${inputCls} ${errors.nrbNumber ? inputError : inputBase}`}
+                          placeholder="NRB number"
+                          autoComplete="off"
+                        />
+                      </Field>
                     </>
                   )}
+                  <Field label="Religion" error={errors.religion?.message} hint="Optional">
+                    <input
+                      {...register('religion')}
+                      list="apply-religions"
+                      className={`${inputCls} ${inputBase}`}
+                      placeholder="e.g. Christianity, Islam"
+                    />
+                    <datalist id="apply-religions">
+                      {RELIGIONS.map((r) => <option key={r} value={r} />)}
+                    </datalist>
+                  </Field>
+                  <Field label="Home Language" error={errors.homeLanguage?.message} hint="Optional">
+                    <input
+                      {...register('homeLanguage')}
+                      list="apply-languages"
+                      className={`${inputCls} ${inputBase}`}
+                      placeholder="e.g. Chichewa, Chitumbuka"
+                    />
+                    <datalist id="apply-languages">
+                      {HOME_LANGUAGES.map((l) => <option key={l} value={l} />)}
+                    </datalist>
+                  </Field>
                 </div>
               </>
             )}
@@ -609,6 +685,53 @@ export default function ApplyPage() {
                       optionsConfig={{ back: 0, forward: 1 }}
                       className={`${inputCls} ${errors.academicYear ? inputError : inputBase}`}
                     />
+                  </Field>
+
+                  <GroupHeading>Home &amp; Admission</GroupHeading>
+                  <Field label="Where the Applicant Stays" error={errors.residenceType?.message} hint="Optional">
+                    <select
+                      {...register('residenceType', { setValueAs: blankToUndefined })}
+                      className={`${inputCls} ${inputBase}`}
+                      defaultValue=""
+                    >
+                      <option value="">Not stated</option>
+                      {RESIDENCE_TYPES.map((t) => (
+                        <option key={t} value={t}>{RESIDENCE_TYPE_LABELS[t]}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field
+                    label="Travel Time to School (minutes, one way)"
+                    error={errors.travelMinutes?.message}
+                    hint="Optional"
+                  >
+                    <input
+                      {...register('travelMinutes', {
+                        setValueAs: (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? null : Number(v)),
+                      })}
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={TRAVEL_MINUTES_MAX}
+                      className={`${inputCls} ${errors.travelMinutes ? inputError : inputBase}`}
+                      placeholder="e.g. 45"
+                    />
+                  </Field>
+                  <Field
+                    label="Admission Type"
+                    error={errors.admissionType?.message}
+                    hint="Leave blank and the school will decide from the form applied for"
+                  >
+                    <select
+                      {...register('admissionType', { setValueAs: blankToUndefined })}
+                      className={`${inputCls} ${inputBase}`}
+                      defaultValue=""
+                    >
+                      <option value="">Not sure</option>
+                      {ADMISSION_TYPES.map((t) => (
+                        <option key={t} value={t}>{ADMISSION_TYPE_LABELS[t]}</option>
+                      ))}
+                    </select>
                   </Field>
                   <Field
                     label="Previous School"
@@ -722,8 +845,138 @@ export default function ApplyPage() {
               </>
             )}
 
-            {/* -- STEP 4: Review & Submit -- */}
+            {/* -- STEP 4: Welfare & Health (optional, sensitive) -- */}
             {step === 4 && (
+              <>
+                <SectionHeader
+                  icon={HeartPulse}
+                  title="Welfare & Health"
+                  subtitle="Optional. Helps the school give the right support"
+                />
+                <p className="text-xs text-muted font-sans leading-relaxed mb-5">
+                  Everything on this page is optional. It is private: only the headteacher, school
+                  administrators and HR can see it.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <Field label="Orphan Status" error={errors.orphanStatus?.message} className="col-span-full sm:col-span-1">
+                    <select
+                      {...register('orphanStatus')}
+                      className={`${inputCls} ${inputBase}`}
+                    >
+                      {ORPHAN_STATUSES.map((o) => (
+                        <option key={o} value={o}>
+                          {o === 'UNKNOWN' ? 'Prefer not to say' : ORPHAN_STATUS_LABELS[o]}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <div className="col-span-full">
+                    <label className="flex items-start gap-2.5 text-sm text-body font-sans cursor-pointer">
+                      <input
+                        type="checkbox"
+                        {...register('isVulnerable')}
+                        className="mt-0.5 accent-brand-teal"
+                      />
+                      <span>
+                        The applicant needs extra support (vulnerable)
+                        <span className="block text-xs text-muted">
+                          For example a child-headed household or serious family hardship.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                  {isVulnerable && (
+                    <Field
+                      label="Tell Us More"
+                      error={errors.vulnerabilityNote?.message}
+                      hint="Optional"
+                      className="col-span-full"
+                    >
+                      <textarea
+                        {...register('vulnerabilityNote')}
+                        rows={3}
+                        maxLength={1000}
+                        className={`${inputCls} resize-none ${inputBase}`}
+                        placeholder="What kind of support would help?"
+                      />
+                    </Field>
+                  )}
+
+                  <Field
+                    label="Health / Medical Alert"
+                    error={errors.medicalAlert?.message}
+                    hint="Conditions or allergies the school should know about"
+                    className="col-span-full"
+                  >
+                    <textarea
+                      {...register('medicalAlert')}
+                      rows={2}
+                      maxLength={500}
+                      className={`${inputCls} resize-none ${errors.medicalAlert ? inputError : inputBase}`}
+                      placeholder="e.g. Asthma, carries an inhaler"
+                    />
+                  </Field>
+
+                  <div className="col-span-full">
+                    <p className="block text-sm font-heading font-medium text-body mb-1.5">Special Needs</p>
+                    <p className="text-xs text-muted font-sans mb-3">
+                      Tick anything that applies. You can say what would help for each one.
+                    </p>
+                    <Controller
+                      control={control}
+                      name="supportNeeds"
+                      render={({ field }) => {
+                        const list = field.value ?? []
+                        const has = (t: (typeof SUPPORT_NEED_TYPES)[number]) => list.some((n) => n.type === t)
+                        const toggle = (t: (typeof SUPPORT_NEED_TYPES)[number]) =>
+                          field.onChange(has(t) ? list.filter((n) => n.type !== t) : [...list, { type: t }])
+                        const setNote = (t: (typeof SUPPORT_NEED_TYPES)[number], accommodation: string) =>
+                          field.onChange(list.map((n) => (n.type === t ? { ...n, accommodation } : n)))
+                        return (
+                          <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
+                              {SUPPORT_NEED_TYPES.map((t) => (
+                                <label key={t} className="flex items-center gap-2.5 text-sm text-body font-sans cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={has(t)}
+                                    onChange={() => toggle(t)}
+                                    className="accent-brand-teal"
+                                  />
+                                  {SUPPORT_NEED_LABELS[t]}
+                                </label>
+                              ))}
+                            </div>
+                            {list.length > 0 && (
+                              <div className="mt-4 space-y-3">
+                                {list.map((n) => (
+                                  <div key={n.type}>
+                                    <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+                                      {SUPPORT_NEED_LABELS[n.type]}: what would help? (optional)
+                                    </label>
+                                    <input
+                                      value={n.accommodation ?? ''}
+                                      onChange={(e) => setNote(n.type, e.target.value)}
+                                      maxLength={300}
+                                      className={`${inputCls} ${inputBase}`}
+                                      placeholder="e.g. Front-row seating, large print, hearing aid"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )
+                      }}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* -- STEP 5: Review & Submit -- */}
+            {step === REVIEW_STEP && (
               <>
                 <SectionHeader
                   icon={FileText}
@@ -747,6 +1000,12 @@ export default function ApplyPage() {
                       ...(values.traditionalAuthority
                         ? [['Traditional Authority', values.traditionalAuthority] as [string, string]]
                         : []),
+                      ...(values.village
+                        ? [['Village', values.village] as [string, string]]
+                        : []),
+                      ...(values.nrbNumber
+                        ? [['National ID / Birth Cert.', values.nrbNumber] as [string, string]]
+                        : []),
                       ...(values.religion
                         ? [['Religion', values.religion] as [string, string]]
                         : []),
@@ -768,9 +1027,16 @@ export default function ApplyPage() {
                     rows: [
                       ['Class Applying For', values.classApplying],
                       ['Academic Year', values.academicYear],
-                      ...(values.previousSchool
-                        ? [['Previous School', values.previousSchool] as [string, string]]
-                        : []),
+                    ],
+                  },
+                  {
+                    heading: 'Home & Admission',
+                    rows: [
+                      ['Stays', values.residenceType ? RESIDENCE_TYPE_LABELS[values.residenceType] : ''],
+                      ['Travel to School', values.travelMinutes != null ? `${values.travelMinutes} min` : ''],
+                      ['Admission', values.admissionType ? ADMISSION_TYPE_LABELS[values.admissionType] : 'Decided by the school'],
+                      ['Previous School', values.previousSchool ?? ''],
+                      ['Reason for Transfer', values.reasonForTransfer ?? ''],
                     ],
                   },
                   {
@@ -782,6 +1048,25 @@ export default function ApplyPage() {
                       ...(values.guardianEmail
                         ? [['Email', values.guardianEmail] as [string, string]]
                         : []),
+                    ],
+                  },
+                  {
+                    heading: 'Welfare & Health',
+                    rows: [
+                      [
+                        'Orphan Status',
+                        values.orphanStatus && values.orphanStatus !== 'UNKNOWN'
+                          ? ORPHAN_STATUS_LABELS[values.orphanStatus]
+                          : 'Prefer not to say',
+                      ],
+                      ['Needs Extra Support', values.isVulnerable ? `Yes${values.vulnerabilityNote ? `: ${values.vulnerabilityNote}` : ''}` : 'No'],
+                      ['Health / Medical Alert', values.medicalAlert ?? ''],
+                      [
+                        'Special Needs',
+                        (values.supportNeeds ?? [])
+                          .map((n) => SUPPORT_NEED_LABELS[n.type] + (n.accommodation?.trim() ? ` (${n.accommodation.trim()})` : ''))
+                          .join(', '),
+                      ],
                     ],
                   },
                 ].map(({ heading, rows }) => (

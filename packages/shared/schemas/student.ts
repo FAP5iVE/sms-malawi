@@ -192,6 +192,15 @@ export const ApplicationStatusTransitionSchema = ApplicationStatusSchema.extract
 // service layer never re-derives `phone`/`guardianPhone` from them; the
 // client is expected to have already produced the fully-formatted number
 // before submitting. ───────────────────────────────────────
+// A special need as an applicant can state it: the type plus an optional note on what
+// helps. (Date identified and assistive device are recorded by staff on the student.)
+export const ApplicationSupportNeedSchema = SupportNeedInputSchema.pick({
+  type: true,
+  accommodation: true,
+  assistiveDevice: true,
+})
+export type ApplicationSupportNeed = z.infer<typeof ApplicationSupportNeedSchema>
+
 export const ApplicationSchema = z.object({
   firstName: z.string().min(2, 'First name is required').max(100),
   otherNames: z.string().optional(),
@@ -204,6 +213,20 @@ export const ApplicationSchema = z.object({
   traditionalAuthority: optionalText(100),
   religion: optionalText(60),
   homeLanguage: optionalText(60),
+  // National ID (NRB / birth certificate) - optional; same length rule as the student.
+  nrbNumber: nrbNumberField,
+  // Home & Admission - all optional. A blank <select> is sent as undefined by the form.
+  residenceType: z.enum(RESIDENCE_TYPES).optional(),
+  travelMinutes: z.number().int().min(0).max(TRAVEL_MINUTES_MAX).nullable().optional(),
+  admissionType: z.enum(ADMISSION_TYPES).optional(),
+  // Welfare, health and special needs - all optional and sensitive. Stored on the
+  // application, shown only to student.viewWelfare roles, copied to the student
+  // on admission (see studentService.createFromApplication).
+  orphanStatus: z.enum(ORPHAN_STATUSES).optional(),
+  isVulnerable: z.boolean().optional(),
+  vulnerabilityNote: z.string().trim().max(1000).optional(),
+  medicalAlert: z.string().trim().max(500).optional(),
+  supportNeeds: z.array(ApplicationSupportNeedSchema).max(SUPPORT_NEED_TYPES.length).optional(),
   address: z.string().min(5, 'Address is required'),
   countryCode: z.string().min(1, 'Select country code'),
   phone: z.string().min(7, 'Phone number is required'),
@@ -417,4 +440,4 @@ export type AssignmentAttachmentInput = z.infer<typeof AssignmentAttachmentInput
 export type SubmitAssignmentInput = z.infer<typeof SubmitAssignmentSchema>
 export type MarkSubmissionInput = z.infer<typeof MarkSubmissionSchema>
 export type MarkAttendanceInput = z.infer<typeof MarkAttendanceSchema>
-export type AttendanceEntryInput = z.infer<typeof AttendanceEntrySchema>
+export type AttendanceEntryInput = z.infer<typeof AttendanceEntrySchema>

@@ -18,6 +18,13 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { useApplication } from '@/hooks/useApplications'
 import { RoleGuard } from '@/components/shared/RoleGuard'
+import { usePermissions } from '@/hooks/usePermissions'
+import {
+  RESIDENCE_TYPE_LABELS,
+  ADMISSION_TYPE_LABELS,
+  ORPHAN_STATUS_LABELS,
+  SUPPORT_NEED_LABELS,
+} from '@shared/constants/malawi'
 
 export default function ApplicationDetailPage() {
   return (
@@ -56,6 +63,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function ApplicationDetailContent() {
   const { id } = useParams<{ id: string }>()
   const { data: app, isLoading, error } = useApplication(id)
+  const { can } = usePermissions()
 
   if (isLoading) {
     return (
@@ -115,8 +123,43 @@ function ApplicationDetailContent() {
         <Field label="Sex" value={app.sex} />
         <Field label="Nationality" value={app.nationality} />
         <Field label="District" value={app.district} />
+        <Field label="Traditional Authority" value={app.traditionalAuthority} />
+        <Field label="Village" value={app.village} />
+        <Field label="NRB / Birth Cert. No." value={app.nrbNumber} />
+        <Field label="Religion" value={app.religion} />
+        <Field label="Home language" value={app.homeLanguage} />
         <Field label="Applying for" value={`Form ${app.applyingForForm}`} />
       </Section>
+
+      {/* Home & Admission */}
+      <Section title="Home & Admission">
+        <Field label="Stays" value={app.residenceType ? RESIDENCE_TYPE_LABELS[app.residenceType] : null} />
+        <Field label="Travel to school" value={app.travelMinutes != null ? `${app.travelMinutes} min` : null} />
+        <Field label="Admission" value={app.admissionType ? ADMISSION_TYPE_LABELS[app.admissionType] : 'Decided at admission'} />
+        <Field label="Previous school" value={app.previousSchool} />
+        <Field label="Reason for transfer" value={app.reasonForTransfer} />
+      </Section>
+
+      {/* Welfare & health: sensitive. The API only sends these fields to roles with
+          student.viewWelfare; the check here just avoids an empty, misleading section. */}
+      {can('student.viewWelfare') && (
+        <Section title="Welfare & Health">
+          <Field label="Orphan status" value={ORPHAN_STATUS_LABELS[app.orphanStatus ?? 'UNKNOWN']} />
+          <Field label="Vulnerable" value={app.isVulnerable ? 'Yes' : 'No'} />
+          {app.vulnerabilityNote ? <Field label="Vulnerability note" value={app.vulnerabilityNote} /> : null}
+          <Field label="Health / medical alert" value={app.medicalAlert ?? 'None recorded'} />
+          <Field
+            label="Special needs"
+            value={
+              app.supportNeeds && app.supportNeeds.length > 0
+                ? app.supportNeeds
+                    .map((n) => SUPPORT_NEED_LABELS[n.type] + (n.accommodation ? ` (${n.accommodation})` : ''))
+                    .join(', ')
+                : 'None recorded'
+            }
+          />
+        </Section>
+      )}
 
       {/* Guardian */}
       <Section title="Guardian">

@@ -1,6 +1,9 @@
 'use client'
 
 /**
+ * [CHANGE TYPE]: TARGETED EDIT (2026-11-04): each guardian is a plain entry on the
+ *   profile surface, divided by a hairline, instead of a tinted rounded card.
+ *
  * [CHANGE TYPE]: NEW FILE
  * [FILE]: apps/web/src/components/students/GuardiansCard.tsx
  * [PURPOSE]: Guardians card on the student profile - lists every guardian with
@@ -153,9 +156,11 @@ export function GuardiansCard({ studentId, canEdit }: { studentId: string; canEd
       ) : !guardians || guardians.length === 0 ? (
         <p className="text-sm text-muted">No guardians recorded.</p>
       ) : (
-        <div className="space-y-3">
+        // Plain entries on the surface, separated by a hairline: no boxed/tinted
+        // card inside the profile, same as every other section of the page.
+        <div className="divide-y divide-base">
           {guardians.map((g) => (
-            <div key={g.id} className="bg-page rounded-xl p-3 space-y-1.5">
+            <div key={g.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-body truncate">{g.fullName}</p>
@@ -167,7 +172,7 @@ export function GuardiansCard({ studentId, canEdit }: { studentId: string; canEd
                       type="button"
                       onClick={() => openEdit(g)}
                       aria-label={`Edit ${g.fullName}`}
-                      className="p-2 rounded-lg hover:bg-surface text-muted"
+                      className="p-2 rounded-lg hover:bg-page text-muted"
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
@@ -176,7 +181,7 @@ export function GuardiansCard({ studentId, canEdit }: { studentId: string; canEd
                         type="button"
                         onClick={() => setDeleting(g)}
                         aria-label={`Remove ${g.fullName}`}
-                        className="p-2 rounded-lg hover:bg-surface text-brand-coral"
+                        className="p-2 rounded-lg hover:bg-page text-brand-coral"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

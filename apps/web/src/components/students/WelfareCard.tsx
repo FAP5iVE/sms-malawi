@@ -1,10 +1,15 @@
 'use client'
 
 /**
+ * [CHANGE TYPE]: TARGETED EDIT (2026-11-04): "Support needs" is "Special needs" everywhere
+ *   the user reads it (the stored enum/table names are unchanged); the medical alert,
+ *   exit note and each special need are plain rows on the profile surface instead of
+ *   tinted boxes; the health / medical-alert row is always shown ("None recorded").
+ *
  * [CHANGE TYPE]: NEW FILE
  * [FILE]: apps/web/src/components/students/WelfareCard.tsx
  * [PURPOSE]: Welfare card on the student profile: orphan status, vulnerability,
- *   medical alert and special / learning-support needs. SENSITIVE child data.
+ *   health / medical alert and special needs. SENSITIVE child data.
  *   The parent page mounts this only when the viewer holds student.viewWelfare
  *   (admin, headteacher, HR); `canEdit` is student.editWelfare (admin and the
  *   headteacher). The data comes from its own endpoint, never the student
@@ -165,31 +170,19 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
           ...(welfare.isVulnerable || welfare.vulnerabilityNote
             ? [['Vulnerability note', welfare.vulnerabilityNote ?? '—'], ['Last reviewed', formatDate(welfare.vulnerabilityReviewedAt)]]
             : []),
+          ['Health / medical alert', welfare.medicalAlert ?? 'None recorded'],
+          ...(welfare.exitNote ? [['Exit note', welfare.exitNote]] : []),
         ].map(([label, value]) => (
           <div key={label} className="flex justify-between text-sm gap-4">
             <span className="text-muted shrink-0">{label}</span>
-            <span className="font-medium text-body text-right">{value}</span>
+            <span className="font-medium text-body text-right whitespace-pre-line">{value}</span>
           </div>
         ))}
       </div>
 
-      {welfare.medicalAlert && (
-        <div className="rounded-xl bg-brand-coral/10 border border-brand-coral/30 p-3">
-          <p className="text-xs font-heading font-semibold uppercase tracking-wide text-brand-coral mb-1">Medical alert</p>
-          <p className="text-sm text-body whitespace-pre-line">{welfare.medicalAlert}</p>
-        </div>
-      )}
-
-      {welfare.exitNote && (
-        <div className="rounded-xl bg-page p-3">
-          <p className="text-xs font-heading font-semibold uppercase tracking-wide text-muted mb-1">Exit note</p>
-          <p className="text-sm text-body whitespace-pre-line">{welfare.exitNote}</p>
-        </div>
-      )}
-
       <div>
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-heading font-semibold uppercase tracking-wide text-muted">Support needs</p>
+          <p className="text-xs font-heading font-semibold uppercase tracking-wide text-muted">Special needs</p>
           {canEdit && (
             <button
               type="button"
@@ -203,9 +196,9 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
         {welfare.supportNeeds.length === 0 ? (
           <p className="text-sm text-muted">None recorded.</p>
         ) : (
-          <div className="space-y-2">
+          <div className="divide-y divide-base">
             {welfare.supportNeeds.map((n) => (
-              <div key={n.id} className="bg-page rounded-xl p-3 flex items-start justify-between gap-2">
+              <div key={n.id} className="py-2.5 first:pt-0 last:pb-0 flex items-start justify-between gap-2">
                 <div className="min-w-0 text-sm">
                   <p className="font-semibold text-body">{SUPPORT_NEED_LABELS[n.type]}</p>
                   {n.accommodation && <p className="text-xs text-muted">Accommodation: {n.accommodation}</p>}
@@ -214,10 +207,10 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
                 </div>
                 {canEdit && (
                   <div className="flex gap-1 shrink-0">
-                    <button type="button" onClick={() => openNeed(n)} aria-label="Edit support need" className="p-2 rounded-lg hover:bg-surface text-muted">
+                    <button type="button" onClick={() => openNeed(n)} aria-label="Edit special need" className="p-2 rounded-lg hover:bg-page text-muted">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <button type="button" onClick={() => setNeedDeleting(n)} aria-label="Remove support need" className="p-2 rounded-lg hover:bg-surface text-brand-coral">
+                    <button type="button" onClick={() => setNeedDeleting(n)} aria-label="Remove special need" className="p-2 rounded-lg hover:bg-page text-brand-coral">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -260,7 +253,7 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
             <textarea id="w-note" rows={3} className={fieldCls} value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} />
           </div>
           <div>
-            <label className={labelCls} htmlFor="w-medical">Medical alert</label>
+            <label className={labelCls} htmlFor="w-medical">Health / medical alert</label>
             <textarea
               id="w-medical"
               rows={2}
@@ -277,7 +270,7 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
 
       {needEditing && (
         <Modal
-          title={needEditing === 'new' ? 'Add support need' : 'Edit support need'}
+          title={needEditing === 'new' ? 'Add special need' : 'Edit special need'}
           onClose={() => setNeedEditing(null)}
           busy={needBusy}
           onSubmit={submitNeed}
@@ -316,7 +309,7 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
 
       <ConfirmDialog
         open={needDeleting !== null}
-        title="Remove support need?"
+        title="Remove special need?"
         description={needDeleting ? `${SUPPORT_NEED_LABELS[needDeleting.type]} will be removed from this student's record.` : ''}
         confirmLabel="Remove"
         destructive

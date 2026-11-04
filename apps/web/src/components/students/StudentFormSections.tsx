@@ -1,6 +1,19 @@
 'use client'
 
 /**
+ * [CHANGE TYPE]: TARGETED EDIT (2026-11-04, student form brought level with the application form)
+ *   - Personal: Village now sits after District and T/A (it was under Contact as
+ *     "Home Village"); NRB follows it.
+ *   - Academic: "Home & Admission" is one group (stays, travel time, admission type,
+ *     previous school, reason for transfer), as on the profile and the /apply form.
+ *     "Home & Travel" no longer lives under Contact.
+ *   - New WelfareSection (orphan status, vulnerability, health / medical alert,
+ *     special needs). It owns no form state: StudentForm keeps the draft and saves it
+ *     through the welfare endpoints after the student exists, so welfare data never
+ *     bypasses student.editWelfare or the audit log.
+ *   - residenceType / admissionType selects send undefined, not '', for "not recorded"
+ *     ('' is not a valid enum value and blocked the form).
+ *
  * apps/web/src/components/students/StudentFormSections.tsx — Phase C5
  * [CHANGE TYPE]: MAJOR REWRITE of three field definitions only (R5)
  * [R-PHASE]: R5 — Academics I: Admissions & Student Records
@@ -53,6 +66,12 @@ import {
   ADMISSION_TYPES,
   ADMISSION_TYPE_LABELS,
   TRAVEL_MINUTES_MAX,
+  ORPHAN_STATUSES,
+  ORPHAN_STATUS_LABELS,
+  SUPPORT_NEED_TYPES,
+  SUPPORT_NEED_LABELS,
+  type OrphanStatusValue,
+  type SupportNeedTypeValue,
 } from '@shared/constants/malawi'
 import { GUARDIAN_RELATIONSHIPS }             from '@shared/constants/admissions'
 import { getCountriesForForm } from '@shared/constants/countries'
@@ -78,6 +97,9 @@ export const inputCls =
   'focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal ' +
   'transition-all font-sans'
 
+/** A blank <select> means "not recorded": send undefined, never '' (not a valid enum value). */
+const blankToUndefined = (v: unknown) => (v === '' || v == null ? undefined : v)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // NATIONALITY OPTIONS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,14 +113,17 @@ export const inputCls =
 
 export const STEP_FIELDS: ReadonlyArray<ReadonlyArray<keyof StudentFormValues>> = [
   // Step 1 — Personal
-  ['firstName', 'lastName', 'otherNames', 'dateOfBirth', 'sex', 'nationality', 'district', 'traditionalAuthority', 'nrbNumber', 'religion', 'homeLanguage'],
-  // Step 2 — Academic
-  ['classId', 'status', 'admissionType', 'previousSchool', 'reasonForTransfer'],
+  ['firstName', 'lastName', 'otherNames', 'dateOfBirth', 'sex', 'nationality', 'district', 'traditionalAuthority', 'village', 'nrbNumber', 'religion', 'homeLanguage'],
+  // Step 2 — Academic + Home & Admission
+  ['classId', 'status', 'residenceType', 'travelMinutes', 'admissionType', 'previousSchool', 'reasonForTransfer'],
   // Step 3 — Contact + Guardian (email is the login identifier; guardian
   // fields are required by CreateStudentSchema — omitting them here was what
   // let the final submit fail silently, since handleSubmit blocked on unshown
   // required fields with no visible error).
-  ['email', 'phone', 'village', 'address', 'residenceType', 'travelMinutes', 'guardianName', 'guardianRelation', 'guardianPhone'],
+  ['email', 'phone', 'address', 'guardianName', 'guardianRelation', 'guardianPhone'],
+  // Step 4 — Welfare & Health (create mode, student.editWelfare only). Not part of
+  // CreateStudentSchema (see WelfareSection), so there is nothing to trigger().
+  [],
 ] as const
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -263,6 +288,16 @@ export function PersonalSection({ register, errors }: SectionProps) {
         />
       </Field>
 
+      {/* Village — after District and T/A, the order the profile shows them in. */}
+      <Field label="Village" error={errors.village?.message}>
+        <input
+          {...register('village')}
+          className={inputCls}
+          placeholder="Home village"
+          autoComplete="off"
+        />
+      </Field>
+
       {/* NRB number — optional: many children are not yet registered.
           Length is checked; the national format is not enforced. */}
       <Field label="NRB / Birth Certificate No." error={errors.nrbNumber?.message}>
@@ -346,10 +381,39 @@ export function AcademicSection({ register, errors, selectedClassId }: SectionPr
         </select>
       </Field>
 
-      <FieldDivider title="Admission" />
+      <FieldDivider title="Home & Admission" />
+
+      {/* Where the learner stays and how far they travel. */}
+      <Field label="Where the Student Stays" error={errors.residenceType?.message}>
+        <select
+          {...register('residenceType', { setValueAs: blankToUndefined })}
+          className={inputCls}
+          defaultValue=""
+        >
+          <option value="">Not recorded</option>
+          {RESIDENCE_TYPES.map((t) => (
+            <option key={t} value={t}>{RESIDENCE_TYPE_LABELS[t]}</option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="Travel Time to School (minutes, one way)" error={errors.travelMinutes?.message}>
+        <input
+          {...register('travelMinutes', {
+            setValueAs: (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? null : Number(v)),
+          })}
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={TRAVEL_MINUTES_MAX}
+          className={inputCls}
+          placeholder="e.g. 45"
+        />
+      </Field>
 
       {/* How the learner joined. Applications convert to NEW_INTAKE (Form 1) or
-          TRANSFER_IN (Form 2+) automatically; RETURNEE is set here by staff. */}
+          TRANSFER_IN (Form 2+) automatically unless the applicant chose; RETURNEE
+          is set here by staff. */}
       <Field label="Admission Type" error={errors.admissionType?.message}>
         <select {...register('admissionType')} className={inputCls} defaultValue="NEW_INTAKE">
           {ADMISSION_TYPES.map((t) => (
@@ -383,7 +447,7 @@ export function AcademicSection({ register, errors, selectedClassId }: SectionPr
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONTACT SECTION — Step 3
-// Fields: phone, village, address
+// Fields: email, phone, address, guardian
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function ContactSection({ register, errors }: SectionProps) {
@@ -420,15 +484,6 @@ export function ContactSection({ register, errors }: SectionProps) {
         />
       </Field>
 
-      {/* Village */}
-      <Field label="Home Village" error={errors.village?.message}>
-        <input
-          {...register('village')}
-          className={inputCls}
-          placeholder="Home village or town"
-        />
-      </Field>
-
       {/* Address — spans full width */}
       <Field
         label="Postal / Physical Address"
@@ -440,31 +495,6 @@ export function ContactSection({ register, errors }: SectionProps) {
           className={`${inputCls} resize-none`}
           rows={3}
           placeholder="Postal or physical address"
-        />
-      </Field>
-
-      <FieldDivider title="Home & Travel" />
-
-      <Field label="Where the Student Stays" error={errors.residenceType?.message}>
-        <select {...register('residenceType')} className={inputCls} defaultValue="">
-          <option value="">Not recorded</option>
-          {RESIDENCE_TYPES.map((t) => (
-            <option key={t} value={t}>{RESIDENCE_TYPE_LABELS[t]}</option>
-          ))}
-        </select>
-      </Field>
-
-      <Field label="Travel Time to School (minutes, one way)" error={errors.travelMinutes?.message}>
-        <input
-          {...register('travelMinutes', {
-            setValueAs: (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? null : Number(v)),
-          })}
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={TRAVEL_MINUTES_MAX}
-          className={inputCls}
-          placeholder="e.g. 45"
         />
       </Field>
 
@@ -502,6 +532,169 @@ export function ContactSection({ register, errors }: SectionProps) {
           autoComplete="tel"
         />
       </Field>
+    </div>
+  )
+}
+// ─────────────────────────────────────────────────────────────────────────────
+// WELFARE SECTION — Step 4 (create mode, student.editWelfare only)
+//
+// Orphan status, vulnerability, health / medical alert and special needs: the same
+// four things the profile's Welfare card shows, collected up front so a new student
+// starts with a complete record. They are deliberately NOT in CreateStudentSchema:
+// welfare data only travels through the permission-checked, audited welfare
+// endpoints, so StudentForm saves this draft through them once the student exists.
+// This component is controlled (no react-hook-form) for that reason.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface WelfareDraftNeed {
+  type: SupportNeedTypeValue
+  accommodation: string
+  assistiveDevice: string
+}
+
+export interface WelfareDraft {
+  orphanStatus: OrphanStatusValue
+  isVulnerable: boolean
+  vulnerabilityNote: string
+  medicalAlert: string
+  needs: WelfareDraftNeed[]
+}
+
+export const EMPTY_WELFARE_DRAFT: WelfareDraft = {
+  orphanStatus: 'UNKNOWN',
+  isVulnerable: false,
+  vulnerabilityNote: '',
+  medicalAlert: '',
+  needs: [],
+}
+
+/** True when the draft holds anything worth saving (so an untouched step makes no request). */
+export function welfareDraftHasData(d: WelfareDraft): boolean {
+  return (
+    d.orphanStatus !== 'UNKNOWN' ||
+    d.isVulnerable ||
+    d.vulnerabilityNote.trim() !== '' ||
+    d.medicalAlert.trim() !== '' ||
+    d.needs.length > 0
+  )
+}
+
+export function WelfareSection({
+  value,
+  onChange,
+}: {
+  value: WelfareDraft
+  onChange: (next: WelfareDraft) => void
+}) {
+  const set = <K extends keyof WelfareDraft>(key: K, v: WelfareDraft[K]) => onChange({ ...value, [key]: v })
+  const has = (t: SupportNeedTypeValue) => value.needs.some((n) => n.type === t)
+  const toggleNeed = (t: SupportNeedTypeValue) =>
+    set(
+      'needs',
+      has(t)
+        ? value.needs.filter((n) => n.type !== t)
+        : [...value.needs, { type: t, accommodation: '', assistiveDevice: '' }],
+    )
+  const patchNeed = (t: SupportNeedTypeValue, patch: Partial<WelfareDraftNeed>) =>
+    set('needs', value.needs.map((n) => (n.type === t ? { ...n, ...patch } : n)))
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
+      <p className="col-span-full text-xs text-muted font-sans -mb-1">
+        Sensitive. Visible only to the headteacher, administrators and HR. Everything here is optional.
+      </p>
+
+      <Field label="Orphan Status">
+        <select
+          className={inputCls}
+          value={value.orphanStatus}
+          onChange={(e) => set('orphanStatus', e.target.value as OrphanStatusValue)}
+        >
+          {ORPHAN_STATUSES.map((o) => (
+            <option key={o} value={o}>{ORPHAN_STATUS_LABELS[o]}</option>
+          ))}
+        </select>
+      </Field>
+
+      <div className="flex items-end pb-2.5">
+        <label className="flex items-center gap-2 text-sm text-body font-sans cursor-pointer">
+          <input
+            type="checkbox"
+            checked={value.isVulnerable}
+            onChange={(e) => set('isVulnerable', e.target.checked)}
+            className="accent-brand-teal"
+          />
+          Needs extra support (vulnerable)
+        </label>
+      </div>
+
+      {value.isVulnerable && (
+        <Field label="Vulnerability Note" className="col-span-full">
+          <textarea
+            className={`${inputCls} resize-none`}
+            rows={2}
+            maxLength={1000}
+            value={value.vulnerabilityNote}
+            onChange={(e) => set('vulnerabilityNote', e.target.value)}
+          />
+        </Field>
+      )}
+
+      <Field label="Health / Medical Alert" className="col-span-full">
+        <textarea
+          className={`${inputCls} resize-none`}
+          rows={2}
+          maxLength={500}
+          value={value.medicalAlert}
+          onChange={(e) => set('medicalAlert', e.target.value)}
+          placeholder="e.g. Asthma - inhaler kept at the school office"
+        />
+      </Field>
+
+      <div className="col-span-full">
+        <p className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">
+          Special Needs
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2.5">
+          {SUPPORT_NEED_TYPES.map((t) => (
+            <label key={t} className="flex items-center gap-2 text-sm text-body font-sans cursor-pointer">
+              <input
+                type="checkbox"
+                checked={has(t)}
+                onChange={() => toggleNeed(t)}
+                className="accent-brand-teal"
+              />
+              {SUPPORT_NEED_LABELS[t]}
+            </label>
+          ))}
+        </div>
+
+        {value.needs.length > 0 && (
+          <div className="mt-4 space-y-4">
+            {value.needs.map((n) => (
+              <div key={n.type} className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3">
+                <Field label={`${SUPPORT_NEED_LABELS[n.type]}: accommodation`}>
+                  <input
+                    className={inputCls}
+                    maxLength={300}
+                    value={n.accommodation}
+                    onChange={(e) => patchNeed(n.type, { accommodation: e.target.value })}
+                    placeholder="e.g. Front-row seating, large print"
+                  />
+                </Field>
+                <Field label={`${SUPPORT_NEED_LABELS[n.type]}: assistive device`}>
+                  <input
+                    className={inputCls}
+                    maxLength={200}
+                    value={n.assistiveDevice}
+                    onChange={(e) => patchNeed(n.type, { assistiveDevice: e.target.value })}
+                  />
+                </Field>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

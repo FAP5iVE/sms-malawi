@@ -27,7 +27,7 @@
  *   ApplicationStatusTransitionSchema), apps/web/src/lib/ratelimit.ts,
  *   apps/web/src/server/services/studentService.ts (createFromApplication)
  */
-import { Router } from 'express'
+import { Router, type Request } from 'express'
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { requirePermission, requireAnyPermission } from '@/server/middleware/verifyPermission'
 import { hasPermission } from '@shared/types/permissions'
@@ -42,6 +42,13 @@ import * as studentService from '@/server/services/studentService'
 import { sendError } from '@/server/lib/sendError'
 
 export const applicationsRouter = Router()
+
+// Welfare / health / special needs on an application are sensitive child data. They
+// are returned only to roles holding student.viewWelfare, exactly as on the student
+// record; for everyone else the fields are removed from the payload.
+function canSeeWelfare(req: Request): boolean {
+  return hasPermission(req.user!.role, 'student.viewWelfare', req.user!.superUser === true)
+}
 
 applicationsRouter.post('/public', rateLimit('public-application'), async (req, res) => {
   const parsed = ApplicationSchema.safeParse(req.body)
@@ -78,7 +85,11 @@ applicationsRouter.get(
       page,
       pageSize,
     )
-    return res.json(result)
+    return res.json(
+      canSeeWelfare(req)
+        ? result
+        : { ...result, applications: result.applications.map(appService.withoutWelfare) },
+    )
   }
 )
 
@@ -91,7 +102,7 @@ applicationsRouter.get(
   async (req, res) => {
     const app = await appService.getApplicationById(String(req.params.id))
     if (!app) return res.status(404).json({ error: 'Application not found' })
-    return res.json(app)
+    return res.json(canSeeWelfare(req) ? app : appService.withoutWelfare(app))
   }
 )
 
@@ -104,7 +115,7 @@ applicationsRouter.post(
     const parsed = ApplicationSchema.safeParse(req.body)
     if (!parsed.success) return res.status(400).json({ errors: parsed.error.flatten() })
     const app = await appService.createApplication(parsed.data)
-    return res.status(201).json(app)
+    return res.status(201).json(canSeeWelfare(req) ? app : appService.withoutWelfare(app))
   }
 )
 

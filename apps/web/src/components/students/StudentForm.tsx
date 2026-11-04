@@ -1,6 +1,17 @@
 'use client'
 
 /**
+ * [CHANGE TYPE]: TARGETED EDIT (2026-11-04, student form brought level with the application form)
+ * [PURPOSE]: Creating a student now collects the same record the profile shows and
+ *   the /apply form asks for. New "Welfare" step (create mode, roles with
+ *   student.editWelfare): orphan status, vulnerability, health / medical alert,
+ *   special needs. Welfare is not part of CreateStudentSchema by design, so after the
+ *   student is created the draft is saved through the existing welfare endpoints
+ *   (permission-checked and audited). If that save fails the student still exists,
+ *   so the form closes and a toast points at the profile's Welfare card instead of
+ *   leaving the form open to be submitted twice. Editing an existing student does not
+ *   show the step: the profile's Welfare card is where welfare is edited.
+ *
  * apps/web/src/components/students/StudentForm.tsx — Phase C5
  * [CHANGE TYPE]: MAJOR REWRITE of the edit-mode data flow only (R5)
  * [R-PHASE]: R5 — Academics I: Admissions & Student Records
@@ -57,7 +68,8 @@ import { zodResolver }              from '@hookform/resolvers/zod'
 import { AnimatePresence, motion }  from 'framer-motion'
 import { Check, ChevronLeft, ChevronRight, Loader2, User, X, AlertCircle } from 'lucide-react'
 import Image                        from 'next/image'
-import { CreateStudentSchema }      from '@shared/schemas/student'
+import { toast }                    from 'sonner'
+import { CreateStudentSchema, UpdateWelfareSchema, SupportNeedInputSchema } from '@shared/schemas/student'
 import type { CreateStudentInput }  from '@shared/schemas/student'
 
 // CreateStudentSchema has defaulted/required transforms (nationality default,
@@ -68,6 +80,8 @@ import type { CreateStudentInput }  from '@shared/schemas/student'
 type StudentFormValues = z.input<typeof CreateStudentSchema>
 import type { ApiStudent }          from '@shared/types/api'
 import { useCreateStudent, useUpdateStudent, useStudent } from '@/hooks/useStudents'
+import { usePermissions }           from '@/hooks/usePermissions'
+import { apiFetch }                 from '@/lib/api-client'
 import { StudentFeeStructure } from '@/components/students/StudentFeeStructure'
 import { uploadFileDirectly } from '@/lib/directUpload'
 import { useMotionEnabled }         from '@/store/motionStore'
@@ -83,21 +97,28 @@ import {
   PersonalSection,
   AcademicSection,
   ContactSection,
+  WelfareSection,
   FieldDivider,
   STEP_FIELDS,
+  EMPTY_WELFARE_DRAFT,
+  welfareDraftHasData,
+  type WelfareDraft,
 } from '@/components/students/StudentFormSections'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STEP CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STEPS = [
+const BASE_STEPS = [
   { label: 'Personal',  shortLabel: '1' },
   { label: 'Academic',  shortLabel: '2' },
   { label: 'Contact',   shortLabel: '3' },
 ] as const
 
-const STEP_COUNT = STEPS.length
+// Only offered when creating a student and the user may record welfare data.
+const WELFARE_STEP = { label: 'Welfare', shortLabel: '4' } as const
+
+type StepDef = { readonly label: string; readonly shortLabel: string }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DIRECTIONAL STEP VARIANTS
@@ -117,15 +138,17 @@ const STEP_TRANSITION = { duration: 0.18, ease: 'easeOut' } as const
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StepIndicator({
+  steps,
   currentStep,
   motionEnabled,
 }: {
+  steps: readonly StepDef[]
   currentStep: number
   motionEnabled: boolean
 }) {
   return (
     <div className="flex items-center gap-0 justify-center" role="list" aria-label="Form steps">
-      {STEPS.map((step, idx) => {
+      {steps.map((step, idx) => {
         const done    = idx < currentStep
         const active  = idx === currentStep
         const future  = idx > currentStep
@@ -166,7 +189,7 @@ function StepIndicator({
             </motion.div>
 
             {/* Connector line (not after last step) */}
-            {idx < STEP_COUNT - 1 && (
+            {idx < steps.length - 1 && (
               <div className="relative w-8 h-0.5 mx-0.5">
                 <div className="absolute inset-0 bg-base rounded-full" />
                 <motion.div
@@ -303,6 +326,14 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   const { mutate: updateStudent, isPending: isUpdating } = useUpdateStudent()
   const isPending = isCreating || isUpdating
   const motionEnabled = useMotionEnabled()
+  const { can } = usePermissions()
+
+  // Welfare is collected on create only, and only for roles allowed to record it
+  // (the server enforces student.editWelfare again on each welfare request).
+  const withWelfare = !isEdit && can('student.editWelfare')
+  const steps: readonly StepDef[] = withWelfare ? [...BASE_STEPS, WELFARE_STEP] : BASE_STEPS
+  const stepCount = steps.length
+  const [welfare, setWelfare] = useState<WelfareDraft>(EMPTY_WELFARE_DRAFT)
 
   // Local visible state so exit animations complete before parent unmounts
   const [visible, setVisible]         = useState(true)
@@ -352,7 +383,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     const valid  = await trigger(fields)
     if (!valid) return
     setDirection(1)
-    setCurrentStep((s) => Math.min(s + 1, STEP_COUNT - 1))
+    setCurrentStep((s) => Math.min(s + 1, stepCount - 1))
   }
 
   function handleBack() {
@@ -377,8 +408,58 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     }
   }
 
+  /** Builds the welfare requests from the draft, or returns the first validation message. */
+  function buildWelfareRequests():
+    | { error: string }
+    | { welfare: ReturnType<typeof UpdateWelfareSchema.parse> | null; needs: Array<ReturnType<typeof SupportNeedInputSchema.parse>> } {
+    if (!withWelfare || !welfareDraftHasData(welfare)) return { welfare: null, needs: [] }
+
+    const body: Record<string, unknown> = {}
+    if (welfare.orphanStatus !== 'UNKNOWN')   body.orphanStatus = welfare.orphanStatus
+    if (welfare.isVulnerable)                 body.isVulnerable = true
+    if (welfare.vulnerabilityNote.trim())     body.vulnerabilityNote = welfare.vulnerabilityNote
+    if (welfare.medicalAlert.trim())          body.medicalAlert = welfare.medicalAlert
+    const parsedWelfare = Object.keys(body).length > 0 ? UpdateWelfareSchema.safeParse(body) : null
+    if (parsedWelfare && !parsedWelfare.success) {
+      return { error: parsedWelfare.error.issues[0]?.message ?? 'Check the welfare details.' }
+    }
+
+    const needs: Array<ReturnType<typeof SupportNeedInputSchema.parse>> = []
+    for (const n of welfare.needs) {
+      const parsed = SupportNeedInputSchema.safeParse({
+        type: n.type,
+        accommodation: n.accommodation,
+        assistiveDevice: n.assistiveDevice,
+      })
+      if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Check the special needs.' }
+      needs.push(parsed.data)
+    }
+    return { welfare: parsedWelfare && parsedWelfare.success ? parsedWelfare.data : null, needs }
+  }
+
+  /** Saves the welfare draft against the new student. Never throws: the student already exists. */
+  async function saveWelfare(id: string, req: Exclude<ReturnType<typeof buildWelfareRequests>, { error: string }>) {
+    if (!req.welfare && req.needs.length === 0) return
+    try {
+      if (req.welfare) {
+        await apiFetch(`/students/${id}/welfare`, { method: 'PATCH', body: JSON.stringify(req.welfare) })
+      }
+      for (const need of req.needs) {
+        await apiFetch(`/students/${id}/support-needs`, { method: 'POST', body: JSON.stringify(need) })
+      }
+    } catch (e) {
+      console.error('Welfare save failed:', e)
+      toast.error('Student created, but the welfare details could not be saved. Add them from the student profile.')
+    }
+  }
+
   async function onSubmit(data: CreateStudentInput) {
     setSubmitError(null)
+    const welfareRequests = buildWelfareRequests()
+    if ('error' in welfareRequests) {
+      setSubmitError(welfareRequests.error)
+      return
+    }
     if (isEdit) {
       updateStudent(
         { id: studentId!, ...data },
@@ -395,6 +476,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     } else {
       createStudent(data, {
         onSuccess: async (student) => {
+          await saveWelfare(student.id, welfareRequests)
           await uploadPhotoIfNeeded(student.id)
           handleClose()
         },
@@ -453,6 +535,9 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     <PersonalSection key="personal" {...sectionProps} />,
     <AcademicSection key="academic" {...sectionProps} />,
     <ContactSection  key="contact"  {...sectionProps} />,
+    ...(withWelfare
+      ? [<WelfareSection key="welfare" value={welfare} onChange={setWelfare} />]
+      : []),
   ]
 
   // [PRODUCTION FIX] Both render paths below now portal directly under
@@ -508,12 +593,13 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                     {isEdit ? 'Edit Student' : 'Add Student'}
                   </h2>
                   <p className="text-xs text-muted mt-0.5">
-                    Step {currentStep + 1} of {STEP_COUNT} — {STEPS[currentStep]!.label}
+                    Step {currentStep + 1} of {stepCount} — {steps[currentStep]!.label}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-3">
                   <StepIndicator
+                    steps={steps}
                     currentStep={currentStep}
                     motionEnabled={motionEnabled}
                   />
@@ -571,14 +657,14 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                     same gating pattern as the submit-error message right
                     below (isEdit + last step), so it doesn't compete with
                     the personal/academic fields on earlier steps. */}
-                {isEdit && studentId && currentStep === STEP_COUNT - 1 && (
+                {isEdit && studentId && currentStep === stepCount - 1 && (
                   <div className="mx-5 mb-3">
                     <StudentFeeStructure studentId={studentId} />
                   </div>
                 )}
 
                 {/* Submit error */}
-                {submitError && currentStep === STEP_COUNT - 1 && (
+                {submitError && currentStep === stepCount - 1 && (
                   <p
                     role="alert"
                     className="mx-5 mb-3 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
@@ -605,7 +691,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                   )}
 
                   {/* Next / Submit */}
-                  {currentStep < STEP_COUNT - 1 ? (
+                  {currentStep < stepCount - 1 ? (
                     <button
                       type="button"
                       onClick={handleNext}
@@ -723,6 +809,16 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                 </div>
                 <ContactSection {...sectionProps} />
 
+                {/* Welfare & Health — create mode, student.editWelfare only */}
+                {withWelfare && (
+                  <>
+                    <div className="grid grid-cols-2 gap-x-5 gap-y-1 mt-2">
+                      <FieldDivider title="Welfare & Health" />
+                    </div>
+                    <WelfareSection value={welfare} onChange={setWelfare} />
+                  </>
+                )}
+
                 {/* [PRODUCTION FIX] Mirrors StaffForm.tsx's SalarySection
                     for students — "how staff has a salary structure,
                     student should also have a tab of all the fees
@@ -773,4 +869,4 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
     </AnimatePresence>,
     document.body,
   )
-}
+}

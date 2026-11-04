@@ -1,4 +1,13 @@
 /**
+ * [CHANGE TYPE]: TARGETED EDIT (2026-11-04, redundancy + layout)
+ * [PURPOSE]: The primary guardian was shown twice: as Guardian / Relation / Guardian
+ *   Phone under "Guardian & Status" and again in the Guardians section. The section is
+ *   the single place now (the legacy rows only appear for a viewer without
+ *   student.view, who never gets the section). The old header block is "Class & Status",
+ *   and the page is two stacks (Personal + Home & Admission | Class & Status +
+ *   Guardians + Welfare) so the removal leaves no empty hole. Welfare says "Special
+ *   needs" and the sub-lists are plain rows on the surface, not boxed cards.
+ *
  * [CHANGE TYPE]: TARGETED EDIT
  * [FILE]: apps/web/src/app/(auth)/students/[id]/page.tsx
  * [R-PHASE]: R5 — Academics I: Admissions & Student Records; further
@@ -153,108 +162,121 @@ function ProfileContent() {
             this detail page had no such gate before, showing financial and
             risk data to every role that could reach it. */}
         <div className="bg-surface rounded-xl p-5 sm:p-6 divide-y divide-base">
-          <div className="grid sm:grid-cols-2 gap-x-8 gap-y-5 pb-5">
-            <div>
-              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-                Personal Details
-              </p>
-              <div className="space-y-2.5">
-                {[
-                  ['Date of Birth', new Date(student.dateOfBirth).toLocaleDateString()],
-                  ['Sex', student.sex],
-                  ['Nationality', student.nationality],
-                  ['District', student.district],
-                  ['Traditional Authority', student.traditionalAuthority ?? '—'],
-                  ['Village', student.village ?? '—'],
-                  ['Address', student.address ?? '—'],
-                  ['NRB / Birth Cert. No.', student.nrbNumber ?? '—'],
-                  ['Religion', student.religion ?? '—'],
-                  ['Home Language', student.homeLanguage ?? '—'],
-                  ['Phone', student.phone ?? '—'],
-                  ['Email', student.email ?? '—'],
-                ].map(([label, value]) => (
-                  <div key={label} className="flex justify-between text-sm">
-                    <span className="text-muted">{label}</span>
-                    <span className="font-medium text-body">{value}</span>
-                  </div>
-                ))}
+          {/* Two stacks rather than one grid row-by-row, so a short block on one side
+              (Class & Status) doesn't leave a hole beside a tall one on the other.
+              Left: who the student is and where they come from. Right: enrolment,
+              guardians and welfare. */}
+          <div className="grid sm:grid-cols-2 gap-x-8 gap-y-6 pb-5">
+            <div className="space-y-6">
+              <div>
+                <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
+                  Personal Details
+                </p>
+                <div className="space-y-2.5">
+                  {[
+                    ['Date of Birth', new Date(student.dateOfBirth).toLocaleDateString()],
+                    ['Sex', student.sex],
+                    ['Nationality', student.nationality],
+                    ['District', student.district],
+                    ['Traditional Authority', student.traditionalAuthority ?? '—'],
+                    ['Village', student.village ?? '—'],
+                    ['Address', student.address ?? '—'],
+                    ['NRB / Birth Cert. No.', student.nrbNumber ?? '—'],
+                    ['Religion', student.religion ?? '—'],
+                    ['Home Language', student.homeLanguage ?? '—'],
+                    ['Phone', student.phone ?? '—'],
+                    ['Email', student.email ?? '—'],
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex justify-between text-sm gap-4">
+                      <span className="text-muted shrink-0">{label}</span>
+                      <span className="font-medium text-body text-right break-words min-w-0">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
+                  Home &amp; Admission
+                </p>
+                <div className="space-y-2.5">
+                  {[
+                    ['Stays', student.residenceType ? RESIDENCE_TYPE_LABELS[student.residenceType] : '—'],
+                    ['Travel to School', student.travelMinutes != null ? `${student.travelMinutes} min` : '—'],
+                    ['Admission', ADMISSION_TYPE_LABELS[student.admissionType ?? 'NEW_INTAKE']],
+                    ['Previous School', student.previousSchool ?? '—'],
+                    ['Reason for Transfer', student.reasonForTransfer ?? '—'],
+                    ...(student.yearOutcomes && student.yearOutcomes.length > 0
+                      ? [
+                          ['Times Repeated', String(student.yearOutcomes.filter((y) => y.outcome === 'REPEATED').length)],
+                          ['Year History', student.yearOutcomes.map((y) => `${y.academicYear} F${y.form} ${y.outcome === 'REPEATED' ? 'repeated' : y.outcome === 'PROMOTED' ? 'promoted' : y.outcome === 'AWAITING_MANEB' ? 'MANEB' : 'graduated'}`).join(', ')],
+                        ]
+                      : []),
+                    ...(student.exitReason
+                      ? [
+                          ['Reason for Leaving', EXIT_REASON_LABELS[student.exitReason]],
+                          ['Date Left', student.exitDate ? new Date(student.exitDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'],
+                        ]
+                      : []),
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex justify-between text-sm gap-4">
+                      <span className="text-muted shrink-0">{label}</span>
+                      <span className="font-medium text-body text-right">{value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div>
-              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-                Guardian &amp; Status
-              </p>
-              <div className="space-y-2.5">
-                {[
-                  ['Guardian', student.guardianName],
-                  ['Relation', student.guardianRelation],
-                  ['Guardian Phone', student.guardianPhone],
-                  ['Class', student.class?.name ?? '—'],
-                  ['Status', student.status],
-                ].map(([label, value]) => (
-                  <div key={label} className="flex justify-between text-sm">
-                    <span className="text-muted">{label}</span>
-                    <span className="font-medium text-body">{value}</span>
-                  </div>
-                ))}
+            <div className="space-y-6">
+              <div>
+                <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
+                  Class &amp; Status
+                </p>
+                <div className="space-y-2.5">
+                  {[
+                    ['Class', student.class?.name ?? '—'],
+                    ['Status', student.status],
+                    // The Guardians section below lists every guardian, primary included,
+                    // so repeating the primary here was a duplicate. These three rows
+                    // remain only for a viewer who can't see that section (no student.view).
+                    ...(can('student.view')
+                      ? []
+                      : [
+                          ['Guardian', student.guardianName],
+                          ['Relation', student.guardianRelation],
+                          ['Guardian Phone', student.guardianPhone],
+                        ]),
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex justify-between text-sm">
+                      <span className="text-muted">{label}</span>
+                      <span className="font-medium text-body">{value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Welfare (orphan status, vulnerability, medical alert, support needs):
-                sensitive child data. Rendered only for student.viewWelfare
-                (admin, headteacher, HR); the data is fetched from its own
-                endpoint, so a role without the permission never receives it. */}
-            {can('student.viewWelfare') && (
-              // print:hidden - the Print button prints this whole block, and
-              // sensitive welfare data must not end up on paper by default.
-              <div className="sm:col-span-2 print:hidden">
-                <WelfareCard studentId={id} canEdit={can('student.editWelfare')} />
-              </div>
-            )}
-
-            {/* Guardians: visible to anyone who can open the record; only admin,
-                the headteacher and other non-lower_rank editors can change them
-                (the server enforces this too). */}
-            {can('student.view') && (
-              <div className="sm:col-span-2">
+              {/* Guardians: visible to anyone who can open the record; only admin,
+                  the headteacher and other non-lower_rank editors can change them
+                  (the server enforces this too). */}
+              {can('student.view') && (
                 <GuardiansCard
                   studentId={id}
                   canEdit={can('student.edit') && role !== 'lower_rank' && role !== 'student'}
                 />
-              </div>
-            )}
+              )}
 
-            <div>
-              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-                Home &amp; Admission
-              </p>
-              <div className="space-y-2.5">
-                {[
-                  ['Stays', student.residenceType ? RESIDENCE_TYPE_LABELS[student.residenceType] : '—'],
-                  ['Travel to School', student.travelMinutes != null ? `${student.travelMinutes} min` : '—'],
-                  ['Admission', ADMISSION_TYPE_LABELS[student.admissionType ?? 'NEW_INTAKE']],
-                  ['Previous School', student.previousSchool ?? '—'],
-                  ['Reason for Transfer', student.reasonForTransfer ?? '—'],
-                  ...(student.yearOutcomes && student.yearOutcomes.length > 0
-                    ? [
-                        ['Times Repeated', String(student.yearOutcomes.filter((y) => y.outcome === 'REPEATED').length)],
-                        ['Year History', student.yearOutcomes.map((y) => `${y.academicYear} F${y.form} ${y.outcome === 'REPEATED' ? 'repeated' : y.outcome === 'PROMOTED' ? 'promoted' : y.outcome === 'AWAITING_MANEB' ? 'MANEB' : 'graduated'}`).join(', ')],
-                      ]
-                    : []),
-                  ...(student.exitReason
-                    ? [
-                        ['Reason for Leaving', EXIT_REASON_LABELS[student.exitReason]],
-                        ['Date Left', student.exitDate ? new Date(student.exitDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'],
-                      ]
-                    : []),
-                ].map(([label, value]) => (
-                  <div key={label} className="flex justify-between text-sm gap-4">
-                    <span className="text-muted shrink-0">{label}</span>
-                    <span className="font-medium text-body text-right">{value}</span>
-                  </div>
-                ))}
-              </div>
+              {/* Welfare (orphan status, vulnerability, health / medical alert, special needs):
+                  sensitive child data. Rendered only for student.viewWelfare
+                  (admin, headteacher, HR); the data is fetched from its own
+                  endpoint, so a role without the permission never receives it. */}
+              {can('student.viewWelfare') && (
+                // print:hidden - the Print button prints this whole block, and
+                // sensitive welfare data must not end up on paper by default.
+                <div className="print:hidden">
+                  <WelfareCard studentId={id} canEdit={can('student.editWelfare')} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -331,4 +353,4 @@ function ProfileContent() {
       )}
     </div>
   )
-}
+}

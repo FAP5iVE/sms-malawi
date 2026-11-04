@@ -403,6 +403,19 @@ model Application {
   traditionalAuthority String?
   religion         String?
   homeLanguage     String?
+  // ── Carried onto the Student when the application is converted ───────────
+  nrbNumber        String?                  // optional; NOT unique here (the Student column is)
+  residenceType    ResidenceType?
+  travelMinutes    Int?
+  admissionType    AdmissionType?           // null = derived from applyingForForm at conversion
+  // Welfare / health / special needs: sensitive child data. Served to the UI only
+  // for roles holding student.viewWelfare (the applications routes strip these
+  // fields otherwise) and copied to the Student + student_support_needs on admission.
+  orphanStatus     OrphanStatus      @default(UNKNOWN)
+  isVulnerable     Boolean           @default(false)
+  vulnerabilityNote String?
+  medicalAlert     String?
+  supportNeeds     Json?                    // [{ type, accommodation?, assistiveDevice? }]
   guardianName     String
   guardianPhone    String
   email            String?

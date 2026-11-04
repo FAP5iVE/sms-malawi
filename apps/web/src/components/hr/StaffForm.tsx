@@ -543,7 +543,7 @@ export function StaffForm({ onClose, staffId }: Props) {
               — everyone else simply doesn't see this section, same as
               every other PermissionGuard-gated panel in this app. */}
           {isEdit && staffId && (can('hr.manageSalaryStructure') || can('finance.manageSalaryStructure')) && (
-            <div className="px-6 pb-2">
+            <div className="mt-6">
               <SalarySection staffId={staffId} />
             </div>
           )}
@@ -645,10 +645,13 @@ function SalarySection({ staffId }: { staffId: string }) {
   const isLoading = salaryLoading || allowancesLoading
 
   return (
-    <div className="border border-base rounded-xl p-4 bg-page/50 space-y-4">
-      <div className="flex items-center gap-2">
-        <Wallet className="w-4 h-4 text-brand-teal" aria-hidden />
-        <h3 className="text-sm font-heading font-semibold text-body">Salary Structure</h3>
+    // [2026-11-04] Not a card of its own any more: it sits directly on the dialog
+    // surface under the subjects, with the same section heading and spacing as
+    // "Identity & next of kin" and "Teaching, licensing & qualifications" above.
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 -mb-1">
+        <Wallet className="w-3.5 h-3.5 text-muted" aria-hidden />
+        <h3 className="text-xs font-heading font-bold text-muted uppercase tracking-widest">Salary structure</h3>
       </div>
 
       {isLoading ? (
@@ -710,9 +713,9 @@ function SalarySection({ staffId }: { staffId: string }) {
             )}
 
             {allowances.length > 0 && (
-              <ul id="sf-allowance-list" className="divide-y divide-base border border-base rounded-lg overflow-hidden mb-2">
+              <ul id="sf-allowance-list" className="divide-y divide-base mb-2">
                 {allowances.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-surface">
+                  <li key={a.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0">
                     <div className="min-w-0">
                       <p className="text-sm text-body font-medium truncate">
                         {a.type} <span className="text-muted font-normal">— MWK {Number(a.amount).toLocaleString()}</span>
@@ -741,7 +744,7 @@ function SalarySection({ staffId }: { staffId: string }) {
             )}
 
             {showAddAllowance && (
-              <div className="border border-base rounded-lg p-3 bg-surface space-y-3">
+              <div className="border-t border-base pt-4 space-y-3">
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div>
                     <label className={lbl} htmlFor="sf-allow-type">Type</label>
@@ -885,4 +888,4 @@ function mapStaffToFormValues(s: ApiStaffDetail): Partial<StaffFormValues> {
     nextOfKinPhone:    s.nextOfKinPhone ?? '',
     nextOfKinRelation: s.nextOfKinRelation ?? '',
   }
-}
+}

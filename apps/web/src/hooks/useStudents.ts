@@ -287,7 +287,7 @@ export function useUpdateWelfare(studentId: string) {
 export function useAddSupportNeed(studentId: string) {
   const invalidate = useWelfareInvalidation(studentId)
   return useMutation({
-    meta: { successMessage: 'Support need added', failureTitle: 'Could not add support need' },
+    meta: { successMessage: 'Special need added', failureTitle: 'Could not add special need' },
     mutationFn: (data: SupportNeedInput) =>
       apiFetch<ApiSupportNeed>(`/students/${studentId}/support-needs`, { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: invalidate,
@@ -297,7 +297,7 @@ export function useAddSupportNeed(studentId: string) {
 export function useUpdateSupportNeed(studentId: string) {
   const invalidate = useWelfareInvalidation(studentId)
   return useMutation({
-    meta: { successMessage: 'Support need updated', failureTitle: 'Could not update support need' },
+    meta: { successMessage: 'Special need updated', failureTitle: 'Could not update special need' },
     mutationFn: ({ needId, ...data }: { needId: string } & UpdateSupportNeedInput) =>
       apiFetch<ApiSupportNeed>(`/students/${studentId}/support-needs/${needId}`, { method: 'PATCH', body: JSON.stringify(data) }),
     onSuccess: invalidate,
@@ -307,7 +307,7 @@ export function useUpdateSupportNeed(studentId: string) {
 export function useDeleteSupportNeed(studentId: string) {
   const invalidate = useWelfareInvalidation(studentId)
   return useMutation({
-    meta: { successMessage: 'Support need removed', failureTitle: 'Could not remove support need' },
+    meta: { successMessage: 'Special need removed', failureTitle: 'Could not remove special need' },
     mutationFn: (needId: string) =>
       apiFetch<{ ok: true }>(`/students/${studentId}/support-needs/${needId}`, { method: 'DELETE' }),
     onSuccess: invalidate,

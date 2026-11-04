@@ -49,6 +49,7 @@ import {
 } from '@prisma/client'
 import type { UserRole } from '@shared/types/roles'
 import type { ResidenceTypeValue, AdmissionTypeValue, ExitReasonValue } from '@shared/constants/malawi'
+import { SUPPORT_NEED_TYPES, type SupportNeedTypeValue } from '@shared/constants/malawi'
 import type { ApiStudentGuardian } from '@shared/types/api'
 import type {
   GuardianInput,
@@ -1342,6 +1343,33 @@ export async function linkFirebaseUid(
 //  CREATE FROM APPLICATION  (the canonical admission path)
 // ─────────────────────────────────────────────────────────
 
+/**
+ * Reads Application.supportNeeds (JSON written by buildApplicationCreateData) back
+ * into rows for student_support_needs. The column is untyped JSON, so every entry is
+ * re-checked here: anything that is not a known type is skipped, never trusted.
+ */
+function parseApplicationSupportNeeds(
+  raw: Prisma.JsonValue | null,
+): Array<{ type: SupportNeedTypeValue; accommodation: string | null; assistiveDevice: string | null }> {
+  if (!Array.isArray(raw)) return []
+  const seen = new Set<string>()
+  const rows: Array<{ type: SupportNeedTypeValue; accommodation: string | null; assistiveDevice: string | null }> = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+    const rec  = item as Record<string, unknown>
+    const type = rec['type']
+    if (typeof type !== 'string' || !(SUPPORT_NEED_TYPES as readonly string[]).includes(type) || seen.has(type)) continue
+    seen.add(type)
+    const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
+    rows.push({
+      type:            type as SupportNeedTypeValue,
+      accommodation:   text(rec['accommodation'], 300),
+      assistiveDevice: text(rec['assistiveDevice'], 200),
+    })
+  }
+  return rows
+}
+
 export interface ConvertApplicationInput {
   applicationId:   string
   classId?:        string
@@ -1404,6 +1432,29 @@ export async function createFromApplication(
     )
   }
 
+  // ── 2b. Data that rides along from the application.
+  // NRB number is unique on the student. It was typed by the applicant and no screen
+  // edits an application, so a clash must not block the admission: the student is
+  // created without it (staff can add the right one on the student record) and the
+  // audit entry says so.
+  let nrbNumber: string | null = blankToNull(app.nrbNumber)
+  let nrbSkipped = false
+  if (nrbNumber) {
+    const clash = await prisma.student.findFirst({ where: { nrbNumber }, select: { registrationNo: true } })
+    if (clash) {
+      logger.warn(
+        { event: 'studentService.application_nrb_clash', applicationId, clashesWith: clash.registrationNo },
+        '[studentService] Application NRB number already belongs to another student - admitting without it'
+      )
+      nrbNumber  = null
+      nrbSkipped = true
+    }
+  }
+  const supportNeedRows = parseApplicationSupportNeeds(app.supportNeeds)
+  const hasWelfare =
+    app.orphanStatus !== 'UNKNOWN' || app.isVulnerable || !!app.vulnerabilityNote ||
+    !!app.medicalAlert || supportNeedRows.length > 0
+
   // ── 3. Optional Firebase account creation (must happen before Prisma tx)
   let firebaseUid:  string | null = null
   let tempPassword: string | null = null
@@ -1464,10 +1515,23 @@ export async function createFromApplication(
             homeLanguage:         app.homeLanguage,
             previousSchool:       app.previousSchool,
             reasonForTransfer:    app.reasonForTransfer,
-            // Joining Form 2 or above means a learner moving in from elsewhere;
-            // Form 1 is the normal intake. RETURNEE is set manually by staff
-            // when a learner who left is readmitted.
-            admissionType:        app.applyingForForm >= 2 ? 'TRANSFER_IN' : 'NEW_INTAKE',
+            nrbNumber,
+            residenceType:        app.residenceType,
+            travelMinutes:        app.travelMinutes,
+            // The applicant's own answer wins. When they left it blank: joining
+            // Form 2 or above means a learner moving in from elsewhere; Form 1
+            // is the normal intake. RETURNEE is otherwise set by staff when a
+            // learner who left is readmitted.
+            admissionType:        app.admissionType ?? (app.applyingForForm >= 2 ? 'TRANSFER_IN' : 'NEW_INTAKE'),
+            // Welfare, health and special needs captured on the application.
+            orphanStatus:         app.orphanStatus,
+            isVulnerable:         app.isVulnerable,
+            vulnerabilityNote:    app.vulnerabilityNote,
+            medicalAlert:         app.medicalAlert,
+            ...(app.isVulnerable || app.vulnerabilityNote ? { vulnerabilityReviewedAt: new Date() } : {}),
+            ...(supportNeedRows.length > 0
+              ? { supportNeeds: { create: supportNeedRows.map((n) => ({ ...n, recordedByUid: actorUid })) } }
+              : {}),
             guardianName:    app.guardianName,
             guardianPhone:   app.guardianPhone,
             guardianRelation:app.guardianRelation,
@@ -1506,6 +1570,12 @@ export async function createFromApplication(
       student = createdStudent
       break
     } catch (err) {
+      // Lost a race on the NRB number after the pre-check above: report it, don't
+      // retry (the retry loop is for registration-number clashes only).
+      if (isNrbCollision(err)) {
+        if (firebaseUid) await rollbackAuthAccount(firebaseUid, { where: 'createFromApplication.nrb', email: app.email })
+        throw Object.assign(new Error('That NRB number is already recorded for another student.'), { status: 409 })
+      }
       if (!isUniqueConstraintError(err)) {
         // [PRODUCTION FIX] This branch previously rethrew without rolling
         // back the Firebase account provisioned above (create()'s equivalent
@@ -1575,6 +1645,11 @@ export async function createFromApplication(
         firebaseUid:    firebaseUid,
         classId:        classId ?? null,
         firebaseCreated:Boolean(createLoginAccount),
+        // Which application fields were carried across (values are never logged).
+        nrbRecorded:         Boolean(nrbNumber),
+        nrbSkippedAsClash:   nrbSkipped,
+        welfareCarriedOver:  hasWelfare,
+        supportNeedsCarried: supportNeedRows.length,
       },
     },
   }))

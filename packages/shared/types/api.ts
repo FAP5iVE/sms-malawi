@@ -316,14 +316,39 @@ export interface ApiApplication {
   id: string
   firstName: string
   lastName: string
+  otherNames?: string | null
   dateOfBirth: string
   sex: 'MALE' | 'FEMALE'
   nationality: string
   district: string
+  village?: string | null
+  traditionalAuthority?: string | null
+  religion?: string | null
+  homeLanguage?: string | null
+  nrbNumber?: string | null
+  address?: string | null
+  phone?: string | null
+  email?: string | null
   guardianName: string
   guardianPhone: string
   guardianRelation: string
+  guardianEmail?: string | null
+  guardianAddress?: string | null
   applyingForForm: number
+  academicYear?: string | null
+  // Home & Admission
+  residenceType?: 'DAY_HOME' | 'BOARDER' | 'LODGING' | 'WITH_RELATIVE' | null
+  travelMinutes?: number | null
+  admissionType?: 'NEW_INTAKE' | 'TRANSFER_IN' | 'RETURNEE' | null
+  previousSchool?: string | null
+  reasonForTransfer?: string | null
+  /** Welfare, health and special needs. SENSITIVE: the API omits these unless the
+   *  viewer holds student.viewWelfare, so they are absent (undefined) for other roles. */
+  orphanStatus?: ApiStudentWelfare['orphanStatus']
+  isVulnerable?: boolean
+  vulnerabilityNote?: string | null
+  medicalAlert?: string | null
+  supportNeeds?: Array<{ type: ApiSupportNeed['type']; accommodation?: string; assistiveDevice?: string }> | null
   status: string
   createdAt: string
   notes?: string

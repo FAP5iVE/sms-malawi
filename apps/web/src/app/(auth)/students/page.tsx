@@ -395,7 +395,7 @@ function StudentsContent() {
           {[
             ['Orphans', welfareSummary.orphans.total],
             ['Vulnerable', welfareSummary.vulnerable],
-            ['With support needs', welfareSummary.withSupportNeeds],
+            ['With special needs', welfareSummary.withSupportNeeds],
             ['Orphan status not recorded', welfareSummary.orphanStatusUnrecorded],
           ].map(([label, value]) => (
             <div key={label} className="bg-surface rounded-xl p-3">
