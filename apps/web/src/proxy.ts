@@ -37,7 +37,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import type { UserRole } from '@shared/types/roles'
-import { PAGE_ACCESS, getAllowedRolesForPath } from '@shared/constants/pageAccess'
+import { PAGE_ACCESS, homePathForRole, pageAccessRedirect } from '@shared/constants/pageAccess'
 
 // ─── COOKIE NAMES ─────────────────────────────────────────
 // These constants must stay in sync with AuthProvider.tsx
@@ -63,6 +63,27 @@ const SECURITY_HEADERS: Record<string, string> = {
     'camera=(), microphone=(), geolocation=(), payment=()',
   // HSTS — only meaningful over HTTPS; ignored by browsers on HTTP
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+  // [Guardian portal] Content-Security-Policy in REPORT-ONLY mode. The portal
+  // puts the app in front of members of the public on shared devices, so an XSS
+  // would now reach a much larger audience. This policy cannot block anything: it
+  // only makes the browser log what WOULD be blocked, so it can be tuned against
+  // real traffic (shadcn/Recharts inline scripts, Firebase, Appwrite) and then
+  // promoted to `Content-Security-Policy`. Do not enforce it before reviewing
+  // the console reports for /login, /parent and a staff dashboard.
+  'Content-Security-Policy-Report-Only': [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://apis.google.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
+    "media-src 'self' blob: https:",
+    "connect-src 'self' https: wss:",
+    "frame-src 'self' blob: https://*.firebaseapp.com https://accounts.google.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; '),
 }
 
 function applySecurityHeaders(response: NextResponse): NextResponse {
@@ -189,7 +210,8 @@ export function proxy(request: NextRequest): NextResponse {
   if (isPublicPath(pathname)) {
     // Authenticated user visiting login → send to dashboard
     if (pathname.startsWith('/login') && session) {
-      return buildRedirect(request, '/dashboard')
+      // Each role's own home: a parent has no /dashboard (see pageAccess.ts).
+      return buildRedirect(request, homePathForRole(roleRaw))
     }
     return applySecurityHeaders(NextResponse.next())
   }
@@ -207,16 +229,14 @@ export function proxy(request: NextRequest): NextResponse {
   // ── Layer 4: Role-based page access
   // If the page has a role restriction, check the sms_role cookie.
   // This is UX-level only — the API enforces real authorisation.
-  const allowedRoles = getAllowedRolesForPath(pathname)
-
   // alpha_admin may open every portal page regardless of the role list.
-  if (allowedRoles !== null && !isSuperUser) {
-    if (!roleRaw || !allowedRoles.includes(roleRaw)) {
-      // Authenticated but wrong role — send to dashboard (their home)
-      // Do NOT send to login (they are logged in) or a 403 page
-      // (confusing UX — the API will 403 any data requests anyway).
-      return buildRedirect(request, '/dashboard')
-    }
+  // Authenticated but wrong role: send them to THEIR OWN home (a parent's is
+  // /parent, everyone else's /dashboard) — a fixed /dashboard would loop for a
+  // role that is not allowed there. Do NOT send to login (they are logged in)
+  // or a 403 page; the API will 403 any data requests anyway.
+  const redirectTo = pageAccessRedirect(pathname, roleRaw, isSuperUser)
+  if (redirectTo !== null) {
+    return buildRedirect(request, redirectTo)
   }
 
   // ── Layer 5: Pass through with security headers

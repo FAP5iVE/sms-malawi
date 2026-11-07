@@ -59,6 +59,7 @@ import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, ArrowRight } from 'lucide
 import { apiFetch } from '@/lib/api-client'
 import { auth } from '@/lib/firebase'
 import { logout } from '@/components/providers/AuthProvider'
+import { homePathForRole } from '@shared/constants/pageAccess'
 import { AuthShell } from '@/components/shared/AuthShell'
 
 type Mode = 'checking' | 'first-login' | 'change'
@@ -139,7 +140,7 @@ export default function ChangePasswordPage() {
   const [error, setError] = useState<string | null>(null)
   // Set when flow 2 finishes; `signedIn` says whether the visitor was already
   // signed in before they got here (decides which button the success state shows).
-  const [done, setDone] = useState<{ signedIn: boolean } | null>(null)
+  const [done, setDone] = useState<{ signedIn: boolean; home: string } | null>(null)
 
   // Decide the flow ONCE from the first auth state Firebase reports.
   useEffect(() => {
@@ -197,8 +198,9 @@ export default function ChangePasswordPage() {
       await apiFetch('/users/me/clear-password-change-flag', { method: 'POST' })
       // Now this force-refresh actually reflects the server-side change
       // made by the call above.
-      await user.getIdToken(true)
-      router.replace('/dashboard')
+      const refreshed = await user.getIdTokenResult(true)
+      // Each role's own home: a parent has no /dashboard.
+      router.replace(homePathForRole(typeof refreshed.claims.role === 'string' ? refreshed.claims.role : null))
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
       setError(
@@ -253,7 +255,10 @@ export default function ChangePasswordPage() {
         await logout()
         signedInHere = false
       }
-      setDone({ signedIn: wasSignedIn })
+      setDone({
+        signedIn: wasSignedIn,
+        home: homePathForRole(typeof claims.role === 'string' ? claims.role : null),
+      })
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
       if (
@@ -298,7 +303,7 @@ export default function ChangePasswordPage() {
               : 'Your password has been changed. Sign in with your new password.'}
           </p>
           <Link
-            href={done.signedIn ? '/dashboard' : '/login'}
+            href={done.signedIn ? done.home : '/login'}
             className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
           >
             {done.signedIn ? 'Go to dashboard' : 'Go to sign in'} <ArrowRight className="w-4 h-4" aria-hidden />

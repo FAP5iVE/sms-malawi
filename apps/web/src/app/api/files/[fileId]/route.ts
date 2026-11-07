@@ -50,6 +50,7 @@ import { prisma } from '@/lib/prisma'
 import { canAccessAssignmentFile } from '@/server/services/assignmentService'
 import { isSuperUserClaim } from '@shared/constants/superUser'
 import { isInlineSafeMime } from '@shared/utils/assignment'
+import { resolveFileCaller, tokenSourceOf } from '@/lib/fileCaller'
 
 /**
  * F3 — Secure file proxy route.
@@ -70,8 +71,18 @@ export async function GET(
 
   const { fileId: rawFileId } = await params
   const fileId = decodeURIComponent(rawFileId)
-  const uid = decoded.uid
-  const role = (decoded.role as string | undefined) ?? 'student'
+  // [Guardian portal] Decide who is calling BEFORE any file-specific lookup.
+  // No role defaulting (a roleless token used to become 'student'), and a parent
+  // may only present the token in the Authorization header, never in the URL.
+  const caller = resolveFileCaller({
+    uid: decoded.uid,
+    roleClaim: decoded['role'],
+    source: tokenSourceOf(request.headers.get('authorization'), request.nextUrl.searchParams.get('token')),
+  })
+  if (!caller.ok) {
+    return NextResponse.json({ error: caller.error }, { status: caller.status })
+  }
+  const { uid, role } = caller
 
   // ── 2. Resolve file owner for __self checks ───────────────────────────────
   // For payslips and personal docs we look up the ownerUid stored in the db.
@@ -135,8 +146,13 @@ export async function GET(
       })
       ownerUid = student?.firebaseUid ?? undefined
     }
-  } catch {
-    // Non-fatal — access control still enforces role check
+  } catch (err) {
+    // FAIL CLOSED. This used to swallow the error and fall through to
+    // canReadFile with ownerUid undefined, which still admitted every staff role
+    // in READ_ROLES. A database error is not a reason to serve a file whose
+    // owner could not be established.
+    console.error('[file-proxy] owner lookup failed', fileId, err)
+    return NextResponse.json({ error: 'Temporarily unavailable' }, { status: 503 })
   }
 
   // ── 3. Server-side access control ────────────────────────────────────────
@@ -149,7 +165,7 @@ export async function GET(
   if (fileId.startsWith('assignment_')) {
     const ok = await canAccessAssignmentFile(fileId, {
       uid,
-      role: role as import('@shared/types/roles').UserRole,
+      role,
       superUser: isSuperUserClaim(decoded['superUser']),
     })
     if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

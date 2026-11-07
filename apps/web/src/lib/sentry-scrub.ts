@@ -36,6 +36,11 @@ const SENSITIVE_KEYS = new Set([
   'supportnotes', 'specialneeds', 'disabilitytype', 'welfaredata',
   'exitreason', 'exitnotes', 'exitnote',
   'licencenumber', 'tcmlicencenumber', 'qualifications', 'qualificationlevel',
+  // Guardian portal: claim codes are single-use credentials, contact values are
+  // PII, and the parent API handles id tokens and passwords during claim.
+  'invitationcode', 'claimcode', 'secret', 'secrethash', 'otp',
+  'normalizedvalue', 'contactvalue', 'normalizedname', 'altphone',
+  'idtoken', 'newpassword', 'currentpassword',
 ])
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {

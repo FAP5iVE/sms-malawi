@@ -89,6 +89,38 @@ export const ACTION_SEVERITY: Readonly<Record<string, Severity>> = {
   'student.pending_action_approved':SEVERITY.HIGH,
   'student.pending_action_rejected':SEVERITY.HIGH,
 
+  // ── Guardian portal (who may see which child). Severity follows blast radius:
+  //    anything that grants, widens or restores access to a child is HIGH or
+  //    CRITICAL; a successful claim mints an account tied to a child, so CRITICAL.
+  'guardian.profile_created':           SEVERITY.LOW,
+  'guardian.profile_suspended':         SEVERITY.HIGH,
+  'guardian.profile_reinstated':        SEVERITY.HIGH,
+  'guardian.profile_merged':            SEVERITY.CRITICAL,
+  'guardian.link_proposed':             SEVERITY.MEDIUM,
+  'guardian.link_approved':             SEVERITY.HIGH,
+  'guardian.link_rejected':             SEVERITY.MEDIUM,
+  'guardian.link_capabilities_changed': SEVERITY.HIGH,
+  'guardian.link_suspended':            SEVERITY.HIGH,
+  'guardian.link_reinstated':           SEVERITY.HIGH,
+  'guardian.link_revoked':              SEVERITY.HIGH,
+  'guardian.link_reverify_flagged':     SEVERITY.MEDIUM,
+  'guardian.link_reverified':           SEVERITY.MEDIUM,
+  'guardian.link_repointed':            SEVERITY.MEDIUM,
+  'guardian.link_reopened':             SEVERITY.HIGH,    // restarts verification of a previously ended grant
+  'guardian.evidence_recorded':         SEVERITY.MEDIUM,
+  'guardian.invitation_issued':         SEVERITY.HIGH,
+  'guardian.invitation_revoked':        SEVERITY.HIGH,
+  'guardian.invitation_locked':         SEVERITY.HIGH,    // wrong-code lockout: someone is guessing
+  'guardian.claim_succeeded':           SEVERITY.CRITICAL,
+  'guardian.claim_failed':              SEVERITY.HIGH,
+  'guardian.request_submitted':         SEVERITY.MEDIUM,
+  'guardian.request_approved':          SEVERITY.HIGH,
+  'guardian.request_rejected':          SEVERITY.MEDIUM,
+  'guardian.onboarding_dry_run':        SEVERITY.MEDIUM,
+  'guardian.onboarding_applied':        SEVERITY.HIGH,
+  'guardian.onboarding_rolled_back':    SEVERITY.HIGH,
+  'guardian.directory_synced':          SEVERITY.LOW,
+
   // ── Application
   'application.submitted':        SEVERITY.LOW,
   'application.reviewed':         SEVERITY.MEDIUM,

@@ -1,5 +1,5 @@
 // ─── USER ROLES ───────────────────────────────────────────
-// Single source of truth for all 9 roles across the project.
+// Single source of truth for all 10 roles across the project.
 // Used in:
 //   - apps/web/src/store/authStore.ts
 //   - apps/web/src/components/shared/RoleGuard.tsx
@@ -17,6 +17,10 @@ export const USER_ROLES = [
   'hr',
   'exam_officer',
   'student',
+  // Parent / guardian portal account. Created ONLY by the invitation-claim flow
+  // (never by user management), holds NO permissions, and reaches nothing but
+  // /parent/* and a short allowlist of self-service endpoints (see parentFence).
+  'parent',
 ] as const
 
 export type UserRole = (typeof USER_ROLES)[number]
@@ -33,6 +37,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   hr: 'HR Staff',
   exam_officer: 'Exam Officer',
   student: 'Student',
+  parent: 'Parent / Guardian',
 }
 
 // ─── STAFF ROLES (non-student) ────────────────────────────
@@ -50,4 +55,17 @@ export const STAFF_ROLES: UserRole[] = [
 // ─── HELPER: check if a role is a staff role ──────────────
 export function isStaffRole(role: UserRole): boolean {
   return STAFF_ROLES.includes(role)
+}
+
+// ─── HELPER: the guardian-portal role ─────────────────────
+// Prefer this (or isStaffRole) over `role !== 'student'`: a negative check treats
+// every future role as staff, which is exactly how a new role inherits access.
+export function isParentRole(role: UserRole | string | null | undefined): role is 'parent' {
+  return role === 'parent'
+}
+
+// ─── HELPER: runtime validation of a role claim ───────────
+// Custom claims are `unknown` at runtime. Never default a missing/odd role.
+export function isValidRole(role: unknown): role is UserRole {
+  return typeof role === 'string' && (USER_ROLES as readonly string[]).includes(role)
 }

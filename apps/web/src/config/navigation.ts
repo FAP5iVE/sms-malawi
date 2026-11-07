@@ -272,6 +272,17 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon:        ClipboardList,
     roles:       rolesFor('/applications'),
   },
+  // [Guardian Portal] Staff side of the parent portal: review queue, per-student guardians,
+  // bulk onboarding and the access log. Gated on guardian.view (admin, high_rank, lower_rank
+  // all hold it); the individual actions inside the page check their own permissions.
+  {
+    label:       'Guardians',
+    mobileLabel: 'Guardians',
+    href:        '/guardians',
+    icon:        Users,
+    roles:       rolesFor('/guardians'),
+    permission:  'guardian.view',
+  },
   // [PRODUCTION FIX] New nav entry — PendingActionsPanel.tsx (student/class
   // edit-request approvals) had no page and no nav entry anywhere, so
   // nothing reviewers needed to act on was ever reachable except by typing

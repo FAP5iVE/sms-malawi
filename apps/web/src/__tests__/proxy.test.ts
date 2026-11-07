@@ -28,6 +28,11 @@ function call(pathname: string) {
   return proxy(new NextRequest(`http://localhost${pathname}`))
 }
 
+function callAs(pathname: string, role?: string) {
+  const cookie = ['sms_session=uid-1', role ? `sms_role=${role}` : ''].filter(Boolean).join('; ')
+  return proxy(new NextRequest(`http://localhost${pathname}`, { headers: { cookie } }))
+}
+
 const passesThrough = (res: Response) => res.headers.get('x-middleware-next') === '1'
 const redirectsTo = (res: Response, to: string) =>
   res.status >= 300 && res.status < 400 && new URL(res.headers.get('location') ?? '', 'http://localhost').pathname === to
@@ -63,5 +68,63 @@ describe('route registry', () => {
     const publicDirs = routeFolders('(public)').map((d) => `/${d}`)
     const clash = publicDirs.filter((d) => d in PAGE_ACCESS)
     expect(clash).toEqual([])
+  })
+})
+
+describe('proxy: guardian portal (parent role)', () => {
+  it.each(['/parent', '/parent/children', '/parent/children/abc/results'])('lets a parent open %s', (p) => {
+    expect(passesThrough(callAs(p, 'parent'))).toBe(true)
+  })
+
+  it.each(['/dashboard', '/students', '/finances', '/exams', '/reports', '/user-management'])(
+    'sends a parent from %s to /parent, their own home (never /dashboard, which would loop)',
+    (p) => {
+      expect(redirectsTo(callAs(p, 'parent'), '/parent')).toBe(true)
+    },
+  )
+
+  it('sends a signed-in parent who opens /login straight to /parent', () => {
+    expect(redirectsTo(callAs('/login', 'parent'), '/parent')).toBe(true)
+  })
+
+  it('still sends a signed-in staff member who opens /login to /dashboard', () => {
+    expect(redirectsTo(callAs('/login', 'admin'), '/dashboard')).toBe(true)
+  })
+
+  it.each(['admin', 'high_rank', 'lower_rank', 'academic', 'finance', 'hr', 'library', 'exam_officer', 'student'])(
+    'keeps %s out of /parent',
+    (role) => {
+      expect(redirectsTo(callAs('/parent', role), '/dashboard')).toBe(true)
+    },
+  )
+
+  it('a missing role cookie never opens /parent', () => {
+    expect(passesThrough(callAs('/parent'))).toBe(false)
+  })
+
+  it('an anonymous visitor is sent to /login from /parent', () => {
+    expect(redirectsTo(call('/parent'), '/login')).toBe(true)
+  })
+
+  it('a forged sms_role cookie only changes which page shell loads: it cannot change an API decision (those use the verified token)', () => {
+    // The edge trusts the cookie for UX routing only. A parent forging role=admin
+    // reaches a staff page shell, but every /api call is fenced by verifyAuth.
+    expect(passesThrough(callAs('/finances', 'admin'))).toBe(true)
+  })
+})
+
+describe('proxy: security headers', () => {
+  it('sends a report-only CSP and does not enforce one yet', () => {
+    const res = call('/login')
+    expect(res.headers.get('content-security-policy-report-only')).toContain("frame-ancestors 'none'")
+    expect(res.headers.get('content-security-policy')).toBeNull()
+  })
+})
+
+describe('route registry: guardian portal', () => {
+  it('lists every app/(parent) folder in PAGE_ACCESS', () => {
+    const exists = fs.existsSync(path.join(appDir, '(parent)'))
+    const missing = (exists ? routeFolders('(parent)') : []).filter((dir) => !(`/${dir}` in PAGE_ACCESS))
+    expect(missing).toEqual([])
   })
 })

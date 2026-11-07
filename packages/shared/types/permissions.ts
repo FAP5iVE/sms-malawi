@@ -102,6 +102,21 @@ export type Permission =
   | 'student.viewWelfare'            // See orphan/vulnerability/special-needs records
   | 'student.editWelfare'            // Record or change welfare data
 
+  // ── GUARDIAN PORTAL (staff side) ─────────────────────
+  // Who may manage parent/guardian ACCESS to students. Distinct from the
+  // student.* guardian CONTACT-CARD edits (student.edit): a contact card never
+  // grants portal access, only a verified GuardianLink does. Registrar work
+  // (lower_rank) is to view, propose and hand over invitations; deciding who gets
+  // access to a child (approve / restrict / merge / backfill) is admin + high_rank.
+  | 'guardian.view'                  // See guardian profiles, links and invitation status
+  | 'guardian.propose'               // Propose a link, record verification evidence
+  | 'guardian.invite'                // Issue/reissue a claim invitation for an ACTIVE link
+  | 'guardian.approve'               // Approve or reject proposed links, reinstate access
+  | 'guardian.restrict'              // Change capabilities, suspend, revoke a link
+  | 'guardian.merge'                 // Merge two guardian profiles (also needs a second approver)
+  | 'guardian.backfill'              // Run onboarding batches over existing contact cards
+  | 'guardian.viewAccessLog'         // See what guardians opened (safeguarding audit)
+
   // ── CLASS ────────────────────────────────────────────
   | 'class.view'                     // View class data
   | 'class.create'                   // Create a new class
@@ -440,6 +455,10 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
   // payments, issuing books) — those belong to domain roles.
   // Exception: admin.unlockMarks (technical maintenance for exam module).
   admin: new Set<Permission>([
+  // Guardian portal (staff side)
+    'guardian.view', 'guardian.propose', 'guardian.invite', 'guardian.approve',
+    'guardian.restrict', 'guardian.merge', 'guardian.backfill', 'guardian.viewAccessLog',
+
     // Students — oversight only
     'student.view',                 // View any student record
    'student.viewOwn',                // Student views own record only
@@ -606,6 +625,10 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
   // Cannot do: record payments, enter marks (business operations that
   // belong strictly to the accountable domain role).
   high_rank: new Set<Permission>([
+  // Guardian portal (staff side)
+    'guardian.view', 'guardian.propose', 'guardian.invite', 'guardian.approve',
+    'guardian.restrict', 'guardian.merge', 'guardian.backfill', 'guardian.viewAccessLog',
+
     // Students — full management + approvals
     'student.view',
     'student.create',
@@ -1049,6 +1072,10 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
   // Can initiate many actions but most require approval from
   // admin or high_rank before taking effect.
   lower_rank: new Set<Permission>([
+  // Guardian portal (staff side)
+    // Registrar work: view, propose and hand over invitations. NOT approve/restrict/merge.
+    'guardian.view', 'guardian.propose', 'guardian.invite',
+
     // Students — create/edit/soft-delete with approval required
     'student.view',
     'student.create',
@@ -1441,6 +1468,13 @@ export const ROLE_PERMISSIONS: Readonly<Record<UserRole, ReadonlySet<Permission>
   // Results visibility is subject to the fee-balance gate enforced
   // at the service layer — this permission map does not capture that;
   // it only defines what the student is structurally allowed to request.
+  // Parent / guardian: deliberately EMPTY. A parent's access comes from a verified
+  // GuardianLink evaluated per request (never from this table), and the default-deny
+  // fence in verifyAuth keeps the account away from every staff and student router.
+  // Adding anything here would also widen what a parent token can do on any route
+  // that checks permissions, so it needs a security review.
+  parent: new Set<Permission>([]),
+
   student: new Set<Permission>([
     // Students — own record only
     'student.viewOwn',

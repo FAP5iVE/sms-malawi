@@ -127,7 +127,9 @@ import { signInWithEmailAndPassword } from 'firebase/auth'
 import { apiFetch } from '@/lib/api-client'
 import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/authStore'
+import { postLoginPath } from '@shared/constants/pageAccess'
 import { AuthShell } from '@/components/shared/AuthShell'
+import { GuardianClaimForm } from '@/components/guardians/GuardianClaimForm'
 import {
   Eye,
   EyeOff,
@@ -212,7 +214,9 @@ function LoginForm() {
     if (hasRedirected.current) return
     if (!initialized || !role) return
     hasRedirected.current = true
-    router.replace(safeFrom ?? '/dashboard')
+    // Each role's own home (a parent lands on /parent, never /dashboard), and a
+    // `from` target is honoured only if this role may open it.
+    router.replace(postLoginPath(role, safeFrom))
   }, [submitted, initialized, role, safeFrom, router])
 
   async function handleLogin(e: React.FormEvent) {
@@ -244,6 +248,10 @@ function LoginForm() {
       setLoading(false)
     }
   }
+
+  // The invitation e-mail links here with ?claim=1: an invited guardian turns their code into an
+  // account. Placed after every hook above so the hook order is identical in both views.
+  if (searchParams.get('claim') === '1') return <GuardianClaimForm />
 
   return (
     <AuthShell

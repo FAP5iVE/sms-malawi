@@ -71,7 +71,8 @@ interface Props {
 
 // Staff cannot be created with the student role — student accounts are
 // provisioned through application conversion (studentService), not here.
-const STAFF_ROLES = USER_ROLES.filter((r) => r !== 'student')
+// Likewise 'parent' accounts come only from the guardian invitation-claim flow.
+const STAFF_ROLES = USER_ROLES.filter((r) => r !== 'student' && r !== 'parent')
 
 const EMPLOYMENT_TYPES: { value: CreateStaffInput['employmentType']; label: string }[] = [
   { value: 'FULL_TIME', label: 'Full-time' },

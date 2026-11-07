@@ -93,7 +93,9 @@ export const CreateStaffSchema = z.object({
   sex:            z.enum(STAFF_SEX).optional(),
   email:          z.string().email(),
   phone:          z.string().optional(),
-  role:           z.enum(USER_ROLES),
+  // 'parent' is a guardian-portal role created only by the invitation-claim flow; it is not a
+  // StaffRole (Prisma), so staff creation must reject it at validation, before any login is provisioned.
+  role:           z.enum(USER_ROLES).exclude(['parent']),
   department:     z.string().min(1),
   jobTitle:       z.string().min(1),
   employmentType: z.enum(['FULL_TIME','PART_TIME','CONTRACT','TEMPORARY']).default('FULL_TIME'),

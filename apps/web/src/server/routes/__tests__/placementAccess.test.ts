@@ -1,5 +1,5 @@
 /**
- * Who may read placement data, for all nine roles.
+ * Who may read placement data, for all ten roles (the parent portal role holds none).
  *
  * The student role must reach ONLY its own placement (/placements/me and
  * /reporting/student/placement) plus the advisory calculator; the cohort registry
@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { requirePermission } from '@/server/middleware/verifyPermission'
-import { USER_ROLES } from '@shared/types/roles'
+import { USER_ROLES, STAFF_ROLES } from '@shared/types/roles'
 import type { Permission } from '@shared/types/permissions'
 
 function call(permission: Permission, role: string) {
@@ -24,10 +24,19 @@ function call(permission: Permission, role: string) {
 }
 
 const roles = [...USER_ROLES] as string[]
-const staff = roles.filter((r) => r !== 'student')
+// Positive definition: a negative filter (`!== 'student'`) would treat every future role as staff.
+const staff = [...STAFF_ROLES] as string[]
 
 describe('placement permissions by role', () => {
-  it('knows all nine roles', () => expect(roles).toHaveLength(9))
+  it('knows all ten roles', () => expect(roles).toHaveLength(10))
+
+  it('the parent role is refused every placement permission', () => {
+    for (const p of ['placement.viewAnalytics', 'placement.viewOwn', 'placement.view', 'placement.manage', 'placement.verifyOutcome', 'placement.recordOutcome'] as Permission[]) {
+      const o = call(p, 'parent')
+      expect(o.allowed, p).toBe(false)
+      expect(o.status, p).toBe(403)
+    }
+  })
 
   it('registry + cohort analytics (placement.viewAnalytics): every staff role, never the student', () => {
     for (const r of staff) expect(call('placement.viewAnalytics', r).allowed, r).toBe(true)
@@ -41,8 +50,9 @@ describe('placement permissions by role', () => {
     for (const r of staff) expect(call('placement.viewOwn', r).allowed, r).toBe(false)
   })
 
-  it('advisory calculator (placement.view) stays open to every role including the student', () => {
-    for (const r of roles) expect(call('placement.view', r).allowed, r).toBe(true)
+  it('advisory calculator (placement.view) stays open to every staff role and the student, never the parent', () => {
+    for (const r of [...staff, 'student']) expect(call('placement.view', r).allowed, r).toBe(true)
+    expect(call('placement.view', 'parent').allowed).toBe(false)
   })
 
   it('claims desk and staff entry stay with staff; a student cannot verify or record official entries', () => {

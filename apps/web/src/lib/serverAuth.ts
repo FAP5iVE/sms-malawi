@@ -140,5 +140,10 @@ export async function requireCurrentUser(idToken: unknown): Promise<CurrentUser>
   const role = claims?.['role']
   if (!isUserRole(role)) throw new AuthError('no_role')
 
+  // [Guardian portal] Server Actions back staff pages (settings, ...). A parent
+  // has no business here, so refuse the role at the door rather than rely on each
+  // action remembering to check a permission. superUser is never honoured for it.
+  if (role === 'parent') throw new AuthError('no_role')
+
   return { uid, role, superUser: isSuperUserClaim(claims?.['superUser']) }
 }

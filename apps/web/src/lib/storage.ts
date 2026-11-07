@@ -166,6 +166,11 @@ const READ_ROLES: Record<FilePrefix, string[]> = {
 // the longest match — no two current prefixes collide, but this keeps a
 // future prefix like "receipt_reversal" from being misread as "receipt".
 export function canReadFile(fileId: string, userRole: string, userUid: string, ownerUid?: string): boolean {
+  // [Guardian portal] A parent is never authorised by role or by the __self rule.
+  // Their access is decided per request from a verified guardian link (see the
+  // guardian branch in app/api/files/[fileId]/route.ts), so this role-based table
+  // must stay closed to them even if a uid were ever (wrongly) shared with an owner.
+  if (userRole === 'parent') return false
   const prefix = (Object.values(FILE_PREFIX) as string[])
     .filter((p) => fileId === p || fileId.startsWith(`${p}_`))
     .sort((a, b) => b.length - a.length)[0] as FilePrefix | undefined

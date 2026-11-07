@@ -79,6 +79,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
   hr:           'HR Staff',
   exam_officer: 'Exam Officer',
   student:      'Student',
+  parent:       'Parent / Guardian',
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

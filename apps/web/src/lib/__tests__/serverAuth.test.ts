@@ -110,6 +110,11 @@ describe('requireCurrentUser — identity comes from verified data only', () => 
     expect(await reasonOf(requireCurrentUser(TOKEN))).toBe('no_role')
   })
 
+  it('refuses the parent role (guardian portal) even with a forged superUser claim', async () => {
+    mocks.getUser.mockResolvedValue(record({ customClaims: { role: 'parent', superUser: true } }))
+    expect(await reasonOf(requireCurrentUser(TOKEN))).toBe('no_role')
+  })
+
   it('rejects an account with no custom claims at all', async () => {
     mocks.getUser.mockResolvedValue(record({ customClaims: undefined }))
     expect(await reasonOf(requireCurrentUser(TOKEN))).toBe('no_role')

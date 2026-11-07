@@ -38,6 +38,10 @@
  * | bulk-mutation       | bulk invoices, payroll run, MANEB bulk/recompute, | many writes per request                          |
  * |                     | Algolia (re)seeding                               |                                                  |
  * | upload-ticket       | every upload-ticket route                        | mints storage credentials                        |
+ * | guardian-staff      | /guardians/* writes (approve, revoke, ...)        | staff decisions; modest per-user cap             |
+ * | guardian-invite     | POST /guardians/links/:id/invitations             | mints credentials and may send e-mail            |
+ * | guardian-claim      | POST /guardian-claim (public)                     | credential guessing; fail-closed on store loss   |
+ * | parent-read         | GET /parent/* (guardian reads)                    | public-facing; per-user with a larger IP backstop|
  * | cron                | /api/cron/* supplementary guard                   | legacy tier                                      |
  */
 
@@ -75,19 +79,19 @@ export const RATE_POLICIES = {
     dimensions: [{ by: 'ip', windowMs: 10 * MIN, max: 15 }],
     store: 'shared',
     onStoreFailure: 'local-fallback',
-    message: 'Too many applications submitted from this network, please try again later.',
+    message: 'Too many applications submitted from this network — please try again later.',
   },
 
   'public-newsletter': {
     id: 'public-newsletter',
     dimensions: [
-      { by: 'identifier', windowMs: HOUR, max: 3, message: 'A confirmation e-mail was already sent to this address, please check your inbox.' },
+      { by: 'identifier', windowMs: HOUR, max: 3, message: 'A confirmation e-mail was already sent to this address — please check your inbox.' },
       { by: 'ip', windowMs: 10 * MIN, max: 10 },
-      { by: 'global', windowMs: HOUR, max: 300, alertAtRatio: 0.8, message: 'Subscriptions are busy right now, please try again later.' },
+      { by: 'global', windowMs: HOUR, max: 300, alertAtRatio: 0.8, message: 'Subscriptions are busy right now — please try again later.' },
     ],
     store: 'shared',
     onStoreFailure: 'local-fallback',
-    message: 'Too many requests, please try again later.',
+    message: 'Too many requests — please try again later.',
   },
 
   'public-contact': {
@@ -114,13 +118,13 @@ export const RATE_POLICIES = {
       { by: 'ip', windowMs: 5 * MIN, max: 60 },
       {
         by: 'global', windowMs: MIN, max: 12, alertAtRatio: 0.8,
-        message: 'The AI explanation is busy right now, please try again in a minute, or read the standard explanation above.',
+        message: 'The AI explanation is busy right now — please try again in a minute, or read the standard explanation above.',
       },
     ],
     store: 'shared',
     // Real money / provider quota at stake, and the UI has a non-AI path.
     onStoreFailure: 'fail-closed',
-    message: 'AI explanations are limited to a few per few minutes, please wait a moment, or read the standard explanation above.',
+    message: 'AI explanations are limited to a few per few minutes — please wait a moment, or read the standard explanation above.',
     slowMs: 20_000,
   },
 
@@ -132,7 +136,7 @@ export const RATE_POLICIES = {
     ],
     store: 'shared',
     onStoreFailure: 'local-fallback',
-    message: 'Too many searches, please wait a moment.',
+    message: 'Too many searches — please wait a moment.',
   },
 
   'report-read': {
@@ -143,7 +147,7 @@ export const RATE_POLICIES = {
     ],
     store: 'shared',
     onStoreFailure: 'local-fallback',
-    message: 'Too many report requests, please wait a moment.',
+    message: 'Too many report requests — please wait a moment.',
     slowMs: 10_000,
   },
 
@@ -155,7 +159,7 @@ export const RATE_POLICIES = {
     ],
     store: 'shared',
     onStoreFailure: 'local-fallback',
-    message: 'Too many documents requested, please wait a few minutes.',
+    message: 'Too many documents requested — please wait a few minutes.',
     slowMs: 30_000,
   },
 
@@ -169,7 +173,7 @@ export const RATE_POLICIES = {
     // Month-end invoicing / payroll must not stop because a cache is down;
     // both are also guarded by database constraints and idempotency.
     onStoreFailure: 'local-fallback',
-    message: 'Too many bulk operations, please wait a few minutes before running another.',
+    message: 'Too many bulk operations — please wait a few minutes before running another.',
     slowMs: 30_000,
   },
 
@@ -181,7 +185,56 @@ export const RATE_POLICIES = {
     ],
     store: 'shared',
     onStoreFailure: 'local-fallback',
-    message: 'Too many uploads started, please wait a few minutes.',
+    message: 'Too many uploads started — please wait a few minutes.',
+  },
+
+  // ── Guardian portal ────────────────────────────────────────────────────────
+  'guardian-staff': {
+    id: 'guardian-staff',
+    dimensions: [
+      { by: 'user', windowMs: 10 * MIN, max: 120 },
+      { by: 'ip', windowMs: 10 * MIN, max: 600 },
+    ],
+    store: 'shared',
+    onStoreFailure: 'local-fallback',
+    message: 'Too many guardian changes — please wait a few minutes.',
+  },
+
+  'guardian-invite': {
+    id: 'guardian-invite',
+    dimensions: [
+      { by: 'user', windowMs: 10 * MIN, max: 30 },
+      { by: 'ip', windowMs: 10 * MIN, max: 150 },
+    ],
+    store: 'shared',
+    onStoreFailure: 'local-fallback',
+    message: 'Too many invitations issued — please wait a few minutes.',
+  },
+
+  // Unauthenticated and guessable-by-design (a short code), so it is the strictest
+  // policy: a small per-IP allowance, a deployment-wide ceiling, and FAIL-CLOSED when
+  // the shared store is unreachable (never "serve anyway"). The invitation row also
+  // locks itself after a few wrong secrets; this is the layer above that.
+  'guardian-claim': {
+    id: 'guardian-claim',
+    dimensions: [
+      { by: 'ip', windowMs: 15 * MIN, max: 10 },
+      { by: 'global', windowMs: HOUR, max: 300 },
+    ],
+    store: 'shared',
+    onStoreFailure: 'fail-closed',
+    message: 'Too many attempts — please wait a while before trying again.',
+  },
+
+  'parent-read': {
+    id: 'parent-read',
+    dimensions: [
+      { by: 'user', windowMs: 10 * MIN, max: 240 },
+      { by: 'ip', windowMs: 10 * MIN, max: 1500 },
+    ],
+    store: 'shared',
+    onStoreFailure: 'local-fallback',
+    message: 'Too many requests — please slow down.',
   },
 
   cron: {

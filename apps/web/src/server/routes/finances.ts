@@ -115,6 +115,7 @@ import { logger } from '@/lib/logger'
 import * as budgetWindowService from '@/server/services/budgetWindowService'
 import { CreateBudgetWindowSchema, SetBudgetWindowStatusSchema } from '@shared/schemas/assetsInventoryProcurement'
 import { sendError } from '@/server/lib/sendError'
+import { isStaffRole } from '@shared/types/roles'
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }) // 10MB
 
@@ -443,7 +444,9 @@ financesRouter.get(
     // [FINANCE PAYMENT HISTORY] Staff may pass academicYear=all to get the
     // student's invoices + payments across every year (the full fee payment
     // history). Students are always limited to one year, as before.
-    const isStaff = req.user!.role !== 'student'
+    // Positive check: `!== 'student'` would treat any role added to the
+    // requireRole list above (or any future role) as staff.
+    const isStaff = isStaffRole(req.user!.role)
     const allYears = isStaff && req.query.academicYear === 'all'
     const result = await feeService.getStudentBalance(
       id,

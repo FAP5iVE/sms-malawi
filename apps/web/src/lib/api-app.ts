@@ -88,6 +88,9 @@ import helmet from 'helmet'
 
 import { verifyAuth, requireRole } from '@/lib/verifyAuth'
 import { studentsRouter }      from '@/server/routes/students'
+import { guardiansRouter }     from '@/server/routes/guardians'
+import { parentRouter }        from '@/server/routes/parent'
+import { guardianClaimRouter } from '@/server/routes/guardianClaim'
 import { classesRouter }       from '@/server/routes/classes'
 import { applicationsRouter }  from '@/server/routes/applications'
 import { assignmentsRouter }   from '@/server/routes/assignments'
@@ -229,6 +232,9 @@ export function createApiApp() {
 
   // ── 6. Domain routers ─────────────────────────────────────────────────────
   app.use('/students',        studentsRouter)
+  app.use('/parent',          parentRouter)       // guardian (parent) API: role 'parent' only; fenced in verifyAuth
+  app.use('/guardian-claim',  guardianClaimRouter) // PUBLIC: code -> account. See routes/guardianClaim.ts
+  app.use('/guardians',       guardiansRouter)   // guardian PORTAL access (staff). Contact cards stay under /students.
   app.use('/classes',         classesRouter)
   app.use('/applications',    applicationsRouter)
   app.use('/assignments',     assignmentsRouter)

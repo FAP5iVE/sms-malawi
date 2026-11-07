@@ -13,9 +13,10 @@
 import type { Request, Response, NextFunction } from 'express'
 import * as admin from 'firebase-admin'
 import type { App } from 'firebase-admin/app'
-import type { UserRole } from '@shared/types/roles'
+import { isValidRole, type UserRole } from '@shared/types/roles'
 import { type NextRequest } from 'next/server'
 import { isSuperUserClaim } from '@shared/constants/superUser'
+import { isParentRequestAllowedFor, PARENT_FENCE_DENY_BODY } from '@/lib/parentFence'
 
 let adminApp: App | undefined
 
@@ -63,11 +64,23 @@ export async function verifyAuth(req: Request, res: Response, next: NextFunction
     // school-sized user base and existing per-request Firestore/Neon calls
     // on most routes anyway.
     const decoded = await admin.auth(getAdminApp()).verifyIdToken(token, true)
-    const role = decoded['role'] as UserRole | undefined
-    if (!role) return res.status(403).json({ error: 'No role assigned to user' })
+    // Custom claims are `unknown` at runtime. A missing OR unrecognised role is
+    // refused here: it is never defaulted, and it never reaches a router.
+    const rawRole = decoded['role']
+    if (!isValidRole(rawRole)) return res.status(403).json({ error: 'No role assigned to user' })
+    const role: UserRole = rawRole
+    // [Guardian portal] DEFAULT-DENY FENCE. A parent token is confined to an
+    // explicit allowlist (see lib/parentFence.ts) at this single choke point, so
+    // no staff/student router can be reached by a parent whatever that router
+    // checks (or forgets to check). Evaluated on every request, including the
+    // mount-level run, before req.user is set.
+    if (role === 'parent' && !isParentRequestAllowedFor(req)) {
+      return res.status(403).json(PARENT_FENCE_DENY_BODY)
+    }
     // alpha_admin: the `superUser` custom claim (Admin-SDK-only, so it cannot
     // be self-granted) lets this request through every role/permission gate.
-    const superUser = isSuperUserClaim(decoded['superUser'])
+    // It is never honoured for the parent role, whatever the claim says.
+    const superUser = role !== 'parent' && isSuperUserClaim(decoded['superUser'])
     req.user = { uid: decoded.uid, role, email: decoded.email ?? '', ...(superUser ? { superUser: true } : {}) }
     next()
   } catch (err: unknown) {

@@ -697,4 +697,21 @@ export const queryKeys = {
     summary: () => ['sessions', 'summary'] as const,
     activity: (sessionId: string, page = 1, pageSize = 25) => ['sessions', 'activity', sessionId, page, pageSize] as const,
   },
+
+  // ── Guardian portal, STAFF side (/guardians/*). One root so any link change refreshes every view.
+  guardians: {
+    all: () => ['guardians'] as const,
+    queue: (f: { status?: string | null; reverify?: boolean; skip?: number }) => ['guardians', 'queue', f] as const,
+    student: (studentId: string) => ['guardians', 'student', studentId] as const,
+    onboarding: (batchId: string, action?: string | null, skip?: number) => ['guardians', 'onboarding', batchId, action ?? null, skip ?? 0] as const,
+    accessLog: (f: { studentId?: string | null; profileId?: string | null }) => ['guardians', 'access-log', f] as const,
+  },
+
+  // ── Guardian portal, PARENT side (/parent/*). Keyed by the link id, never the student id.
+  parent: {
+    all: () => ['parent'] as const,
+    me: () => ['parent', 'me'] as const,
+    children: () => ['parent', 'children'] as const,
+    child: (linkId: string, module: 'profile' | 'results' | 'fees' | 'attendance') => ['parent', 'child', linkId, module] as const,
+  },
 } as const

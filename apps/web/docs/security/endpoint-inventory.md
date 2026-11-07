@@ -8,15 +8,15 @@ Every server entry point, extracted from source by `test/security/endpointInvent
 
 | Measure | Count |
 |---|---:|
-| Express endpoints (mounted under `/api`) | 575 |
-| — mutations (non-GET) | 260 |
-| — with a role/permission gate | 490 (232 mutations) |
+| Express endpoints (mounted under `/api`) | 604 |
+| — mutations (non-GET) | 279 |
+| — with a role/permission gate | 518 (250 mutations) |
 | — signed-in only, with a declared policy | 62 |
-| — public (no identity) | 23 |
+| — public (no identity) | 24 |
 | — declared `cron-or-admin` | 1 |
 | — declared `object-checked` | 32 |
 | — declared `own-data` | 24 |
-| — declared `public-site` | 21 |
+| — declared `public-site` | 22 |
 | — declared `public-telemetry` | 1 |
 | — declared `reference-data` | 6 |
 | Next.js route handlers | 14 |
@@ -395,6 +395,39 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | ● | DELETE | `/api/gallery/:id` | `requireRole([admin, high_rank, lower_rank])` |  | :id |
 | ● | POST | `/api/gallery/upload-ticket` | `requireRole([admin, high_rank, lower_rank])` |  | — |
 
+### guardianClaim
+
+| M | Method | Path | Access | Declared policy | Client IDs |
+|:-:|---|---|---|---|---|
+| ● | POST | `/api/guardian-claim` | **none (public)** | public-site | body |
+
+### guardians
+
+| M | Method | Path | Access | Declared policy | Client IDs |
+|:-:|---|---|---|---|---|
+|  | GET | `/api/guardians/access-log` | `requirePermission(guardian.viewAccessLog)` |  | query |
+| ● | DELETE | `/api/guardians/invitations/:id` | `requirePermission(guardian.invite)` |  | :id |
+| ● | POST | `/api/guardians/links/:id/approve` | `requirePermission(guardian.approve)` |  | :id, body |
+| ● | PATCH | `/api/guardians/links/:id/capabilities` | `requirePermission(guardian.restrict)` |  | :id, body |
+| ● | POST | `/api/guardians/links/:id/evidence` | `requirePermission(guardian.propose)` |  | :id, body |
+| ● | POST | `/api/guardians/links/:id/invitations` | `requirePermission(guardian.invite)` |  | :id, body |
+| ● | POST | `/api/guardians/links/:id/reinstate` | `requirePermission(guardian.approve)` |  | :id, body |
+| ● | POST | `/api/guardians/links/:id/reject` | `requirePermission(guardian.approve)` |  | :id, body |
+| ● | POST | `/api/guardians/links/:id/reopen` | `requirePermission(guardian.approve)` |  | :id, body |
+| ● | POST | `/api/guardians/links/:id/repoint` | `requirePermission(guardian.propose)` |  | :id, body |
+| ● | POST | `/api/guardians/links/:id/reverified` | `requirePermission(guardian.approve)` |  | :id |
+| ● | POST | `/api/guardians/links/:id/revoke` | `requirePermission(guardian.restrict)` |  | :id, body |
+| ● | POST | `/api/guardians/links/:id/suspend` | `requirePermission(guardian.restrict)` |  | :id, body |
+|  | GET | `/api/guardians/onboarding/:id` | `requirePermission(guardian.backfill)` |  | :id, query |
+| ● | POST | `/api/guardians/onboarding/:id/apply` | `requirePermission(guardian.backfill)` |  | :id, body |
+| ● | POST | `/api/guardians/onboarding/:id/rollback` | `requirePermission(guardian.backfill)` |  | :id |
+| ● | POST | `/api/guardians/onboarding/dry-run` | `requirePermission(guardian.backfill)` |  | body |
+| ● | POST | `/api/guardians/profiles/:id/reinstate` | `requirePermission(guardian.approve)` |  | :id |
+| ● | POST | `/api/guardians/profiles/:id/suspend` | `requirePermission(guardian.restrict)` |  | :id, body |
+|  | GET | `/api/guardians/queue` | `requirePermission(guardian.view)` |  | query |
+|  | GET | `/api/guardians/students/:studentId` | `requirePermission(guardian.view)` |  | :studentId |
+| ● | POST | `/api/guardians/students/:studentId/sync` | `requirePermission(guardian.propose)` |  | :studentId |
+
 ### health
 
 | M | Method | Path | Access | Declared policy | Client IDs |
@@ -555,6 +588,17 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | ● | POST | `/api/notifications/register-token` | signed-in user | own-data | body |
 |  | GET | `/api/notifications/token-status` | signed-in user | own-data | — |
 | ● | DELETE | `/api/notifications/unregister-token` | signed-in user | own-data | body |
+
+### parent
+
+| M | Method | Path | Access | Declared policy | Client IDs |
+|:-:|---|---|---|---|---|
+|  | GET | `/api/parent/children` | `requireRole([parent])` |  | — |
+|  | GET | `/api/parent/children/:linkId` | `requireRole([parent])` |  | :linkId |
+|  | GET | `/api/parent/children/:linkId/attendance` | `requireRole([parent])` |  | :linkId |
+|  | GET | `/api/parent/children/:linkId/fees` | `requireRole([parent])` |  | :linkId |
+|  | GET | `/api/parent/children/:linkId/results` | `requireRole([parent])` |  | :linkId |
+|  | GET | `/api/parent/me` | `requireRole([parent])` |  | — |
 
 ### payroll
 

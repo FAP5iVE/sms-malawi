@@ -59,6 +59,8 @@ export const PAGE_ACCESS: Record<string, readonly UserRole[]> = {
   '/calendar': ALL_ROLES,
   '/reports': ALL_ROLES,
   '/applications': ['admin', 'high_rank', 'lower_rank'],
+  // [Guardian Portal] Staff screen for the parent portal. Mirrors the roles that hold guardian.view.
+  '/guardians': ['admin', 'high_rank', 'lower_rank'],
   // [PRODUCTION FIX] New page — PendingActionsPanel.tsx (the generic
   // student/class edit-request approval queue) was fully built against a
   // real backend (pendingActionService.ts, /pending-actions routes) but had
@@ -92,6 +94,45 @@ export const PAGE_ACCESS: Record<string, readonly UserRole[]> = {
   // error/outage data can incidentally reference internal identifiers or
   // stack traces not appropriate for broad staff visibility.
   '/monitoring': ['admin', 'high_rank'],
+  // Guardian portal: the parent role reaches ONLY this tree (plus /login and the
+  // change-password page). No staff or student role has any business here.
+  '/parent': ['parent'],
+}
+
+/**
+ * Where a signed-in user lands. The parent role never goes to /dashboard (it is
+ * not allowed there, so redirecting to it would loop). Unknown roles fall back
+ * to /dashboard, where the proxy's own role check decides.
+ */
+export function homePathForRole(role: string | null | undefined): string {
+  return role === 'parent' ? '/parent' : '/dashboard'
+}
+
+/**
+ * Where to send a user right after sign-in. Honours the `from` target only when
+ * that role may actually open it; otherwise their own home. (Without this a
+ * parent who was bounced to /login from a staff URL would be sent back to it.)
+ */
+export function postLoginPath(role: string | null | undefined, from: string | null | undefined): string {
+  if (from && pageAccessRedirect(from, role, false) === null) return from
+  return homePathForRole(role)
+}
+
+/**
+ * Edge page-access decision (UX routing only; every API call is authorised
+ * server-side). Returns null when the role may open the page, otherwise the
+ * path to send them to: THEIR OWN home, never a fixed /dashboard (a parent is
+ * not allowed on /dashboard, so a fixed target loops forever).
+ */
+export function pageAccessRedirect(
+  pathname: string,
+  role: string | null | undefined,
+  isSuperUser: boolean,
+): string | null {
+  const allowed = getAllowedRolesForPath(pathname)
+  if (allowed === null || isSuperUser) return null
+  if (role && (allowed as readonly string[]).includes(role)) return null
+  return homePathForRole(role)
 }
 
 /**

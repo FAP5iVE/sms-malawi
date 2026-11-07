@@ -61,6 +61,7 @@ model Student {
   attendanceRecords Attendance[]
   universityPlacements UniversityPlacement[]   // R18 — advisory university placements
   guardians        StudentGuardian[]   // Student.guardianName/Phone/Relation stay as the denormalised PRIMARY guardian
+  guardianLinks    GuardianLink[]      // Guardian PORTAL access grants (see GuardianLink). Not the contact cards above.
   supportNeeds     StudentSupportNeed[]
   yearOutcomes     StudentYearOutcome[]
   createdAt        DateTime  @default(now())
@@ -128,6 +129,7 @@ model StudentGuardian {
   livesWithStudent   Boolean?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  portalLinks        GuardianLink[]   // at most one portal proposal per card (provenance only, never access)
 
   @@index([studentId])
   @@map("student_guardians")
@@ -3112,4 +3114,312 @@ model LegacyMapping {
   @@index([mappingType, status])
   @@index([targetType, targetId])
   @@map("legacy_mappings")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GUARDIAN PORTAL
+//
+// Three layers, kept apart on purpose:
+//   1. ACCOUNT      Firebase Auth user with role 'parent' (GuardianProfile.firebaseUid)
+//   2. PERSON       GuardianProfile + GuardianContact: who this human is
+//   3. RELATIONSHIP GuardianLink: which child they may see, and what
+//
+// StudentGuardian (above) is the school's CONTACT CARD for a student. It is
+// edited by staff, may be wrong or stale, and NEVER grants access by itself.
+// Only an ACTIVE GuardianLink does, and only after a human verified it.
+// GuardianLink.directoryEntryId records which contact card a link was proposed
+// from; editing or deleting the card flags or suspends the link (see
+// guardianDirectorySync), it never rewrites the person.
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum GuardianProfileStatus {
+  ACTIVE
+  SUSPENDED   // staff froze the person; every link is unusable while this holds
+  MERGED      // folded into mergedIntoId; kept for audit, never used for access
+}
+
+enum GuardianContactKind {
+  PHONE
+  EMAIL
+}
+
+enum GuardianContactVerification {
+  UNVERIFIED       // copied from a contact card, nobody has checked it
+  STAFF_CONFIRMED  // staff confirmed it with the person
+  CODE_VERIFIED    // the person proved control by redeeming a one-time code
+}
+
+enum GuardianLinkStatus {
+  PENDING     // proposed (admission, staff, backfill). Grants NOTHING.
+  ACTIVE      // verified and approved. Access limited to `capabilities`.
+  SUSPENDED   // reversible stop (e.g. directory entry removed, safeguarding hold)
+  REVOKED     // ended by staff. Row kept for history.
+  REJECTED    // a PENDING proposal staff declined
+}
+
+enum GuardianLinkSource {
+  ADMISSION       // proposed when the student or guardian card was created
+  STAFF           // staff added or proposed it later
+  BACKFILL        // created by an onboarding batch from existing contact cards
+  PARENT_REQUEST  // the guardian asked for it; staff approved
+}
+
+enum GuardianEvidence {
+  NONE
+  DOCUMENT_SEEN        // staff saw an identifying or relationship document
+  IN_PERSON_VERIFIED   // staff verified the person face to face
+}
+
+enum GuardianInvitationChannel {
+  EMAIL   // code delivered to the intended email; the claim must use that email
+  SLIP    // printed slip handed to the person in the office
+}
+
+enum GuardianInvitationStatus {
+  ACTIVE
+  CLAIMED
+  REVOKED
+  EXPIRED
+  LOCKED   // too many wrong attempts; staff must reissue
+}
+
+enum GuardianRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum GuardianBatchStatus {
+  DRY_RUN       // report only; nothing but this batch's own rows were written
+  APPLYING      // apply started; call apply again to resume (large schools are applied in chunks)
+  APPLIED       // every reviewed item has been processed
+  ROLLED_BACK
+}
+
+enum GuardianBatchItemAction {
+  CREATE_NEW      // new profile + PENDING link
+  SUGGEST_MATCH   // existing profile looks like the same person: PENDING link flagged for review
+  SKIP_EXISTING   // this contact card already has a link
+  SKIP_INVALID    // unusable contact card (no name / no usable phone); reported, not created
+}
+
+/// A real person who looks after one or more students. One profile per human,
+/// however many children they have. `firebaseUid` is set only once they claim.
+model GuardianProfile {
+  id             String                @id @default(cuid())
+  fullName       String
+  normalizedName String                // lower-case, no titles/punctuation: matching only
+  status         GuardianProfileStatus @default(ACTIVE)
+  firebaseUid    String?               @unique
+  claimedAt      DateTime?
+  createdSource  GuardianLinkSource    @default(ADMISSION)
+  mergedIntoId   String?
+  mergedInto     GuardianProfile?      @relation("GuardianMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedFrom     GuardianProfile[]     @relation("GuardianMerge")
+  createdByUid   String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  contacts       GuardianContact[]
+  links          GuardianLink[]        @relation("GuardianLinkProfile")
+  suggestedFor   GuardianLink[]        @relation("GuardianLinkSuggestion")
+  requests       GuardianLinkRequest[]
+  accessLogs     GuardianAccessLog[]
+
+  @@index([normalizedName])
+  @@index([status])
+  @@map("guardian_profiles")
+}
+
+/// A phone number or email belonging to a profile. Two profiles may legitimately
+/// share a number (one family phone), so a match on `normalizedValue` is only ever
+/// a SUGGESTION for staff, never an automatic merge or grant.
+model GuardianContact {
+  id              String                      @id @default(cuid())
+  profileId       String
+  profile         GuardianProfile             @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  kind            GuardianContactKind
+  value           String                      // as the school recorded it
+  normalizedValue String                      // E.164 (+265...) for PHONE, lower-cased for EMAIL
+  verification    GuardianContactVerification @default(UNVERIFIED)
+  verifiedAt      DateTime?
+  isPreferred     Boolean                     @default(false)
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  invitations     GuardianInvitation[]
+
+  @@unique([profileId, kind, normalizedValue])
+  @@index([kind, normalizedValue])
+  @@map("guardian_contacts")
+}
+
+/// THE ACCESS GRANT: "this person may see this child, for these things".
+/// Evaluated on every parent request (never cached into a token). Restrict on
+/// delete: a student with links cannot be hard-deleted by accident.
+model GuardianLink {
+  id                  String             @id @default(cuid())
+  profileId           String
+  profile             GuardianProfile    @relation("GuardianLinkProfile", fields: [profileId], references: [id], onDelete: Restrict)
+  studentId           String
+  student             Student            @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  relationship        String             // value from GUARDIAN_RELATIONSHIPS
+  relationshipNote    String?            // original wording when it had to be mapped to 'Other'
+  status              GuardianLinkStatus @default(PENDING)
+  source              GuardianLinkSource @default(ADMISSION)
+  evidence            GuardianEvidence   @default(NONE)
+  /// Subset of: results, fees, attendance, notices, profile, documents.
+  /// Empty means nothing, even while ACTIVE. Validated in guardianCapabilities.
+  capabilities        String[]           @default([])
+  isPrimaryContact    Boolean            @default(false)
+  isFinancialResponsible Boolean         @default(false)
+
+  /// Provenance only: the contact card this was proposed from.
+  /// UNIQUE: one proposal per contact card. This is what makes concurrent syncs and
+  /// overlapping backfill runs race-safe (the loser gets a unique violation, not a duplicate).
+  directoryEntryId    String?            @unique
+  directoryEntry      StudentGuardian?   @relation(fields: [directoryEntryId], references: [id], onDelete: SetNull)
+
+  /// Staff must look at this link again before it is relied on.
+  reverifyRequired    Boolean            @default(false)
+  reverifyReason      String?
+  /// The contact-card values staff last verified ({ fullName, relation, phone,
+  /// altPhone, email }). Drift = this vs the card now (detectDirectoryDrift), so a
+  /// missed hook can never hide an edit: the reconcile pass recomputes it.
+  verifiedSnapshot    Json?
+  /// Matching found an existing profile that may be the same person.
+  suggestedProfileId  String?
+  suggestedProfile    GuardianProfile?   @relation("GuardianLinkSuggestion", fields: [suggestedProfileId], references: [id], onDelete: SetNull)
+  suggestedMethod     String?
+
+  statusReason        String?
+  createdByUid        String?
+  approvedByUid       String?
+  approvedAt          DateTime?
+  statusChangedByUid  String?
+  statusChangedAt     DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  invitations         GuardianInvitation[]
+  accessLogs          GuardianAccessLog[]
+
+  @@unique([profileId, studentId])
+  @@index([studentId, status])
+  @@index([profileId, status])
+  @@index([status, reverifyRequired])
+  @@map("guardian_links")
+}
+
+/// One-time claim code for one link. Only a keyed hash of the secret is stored.
+/// The printed/emailed code is `<ref>-<secret>`: `ref` locates this row, the secret
+/// is verified in constant time, and wrong guesses count against THIS row so an
+/// attacker cannot brute-force without locking it.
+model GuardianInvitation {
+  id            String                    @id @default(cuid())
+  ref           String                    @unique
+  secretHash    String
+  linkId        String
+  link          GuardianLink              @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  channel       GuardianInvitationChannel
+  contactId     String?
+  contact       GuardianContact?          @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  status        GuardianInvitationStatus  @default(ACTIVE)
+  expiresAt     DateTime
+  failedAttempts Int                      @default(0)
+  lockedAt      DateTime?
+  issuedByUid   String
+  issuedAt      DateTime                  @default(now())
+  sentAt        DateTime?
+  claimedAt     DateTime?
+  claimedByUid  String?
+  revokedAt     DateTime?
+  revokedByUid  String?
+
+  @@index([linkId, status])
+  @@index([status, expiresAt])
+  @@map("guardian_invitations")
+}
+
+/// A guardian asking for access to a child. Staff verify and approve; approval
+/// creates or activates the GuardianLink. Nothing here grants access.
+model GuardianLinkRequest {
+  id                String                @id @default(cuid())
+  profileId         String
+  profile           GuardianProfile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  studentId         String?
+  admissionNumber   String?
+  claimedRelationship String
+  note              String?
+  status            GuardianRequestStatus @default(PENDING)
+  reviewedByUid     String?
+  reviewedAt        DateTime?
+  reviewNote        String?
+  resultingLinkId   String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([status, createdAt])
+  @@index([profileId])
+  @@map("guardian_link_requests")
+}
+
+/// An onboarding batch over existing contact cards. DRY_RUN writes nothing but
+/// this report; APPLIED creates PENDING links only; ROLLED_BACK removes what an
+/// applied batch created while it is still untouched.
+model GuardianOnboardingBatch {
+  id            String              @id @default(cuid())
+  status        GuardianBatchStatus @default(DRY_RUN)
+  scope         Json?               // e.g. { classId, academicYear }
+  summary       Json?
+  createdByUid  String
+  createdAt     DateTime            @default(now())
+  appliedAt     DateTime?
+  appliedByUid  String?
+  rolledBackAt  DateTime?
+  rolledBackByUid String?
+
+  items         GuardianOnboardingItem[]
+
+  @@index([status, createdAt])
+  @@map("guardian_onboarding_batches")
+}
+
+model GuardianOnboardingItem {
+  id               String                  @id @default(cuid())
+  batchId          String
+  batch            GuardianOnboardingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  directoryEntryId String
+  studentId        String
+  action           GuardianBatchItemAction
+  reason           String?
+  flags            Json?
+  /// Filled when applied, so a rollback removes exactly what this batch made.
+  createdProfileId String?
+  createdLinkId    String?
+  createdContactIds String[]               @default([])
+
+  @@index([batchId, action])
+  @@index([directoryEntryId])
+  @@map("guardian_onboarding_items")
+}
+
+/// What a guardian opened or was refused. Child-safeguarding evidence: who
+/// looked at what, when. No PII beyond ids; written by the parent API.
+model GuardianAccessLog {
+  id         String           @id @default(cuid())
+  profileId  String
+  profile    GuardianProfile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  linkId     String?
+  link       GuardianLink?    @relation(fields: [linkId], references: [id], onDelete: SetNull)
+  studentId  String?
+  module     String           // children | results | fees | attendance | notices | documents | profile
+  outcome    String           // ALLOWED | DENIED
+  reason     String?
+  createdAt  DateTime         @default(now())
+
+  @@index([profileId, createdAt])
+  @@index([studentId, createdAt])
+  @@map("guardian_access_logs")
 }

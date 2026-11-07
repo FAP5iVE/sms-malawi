@@ -13,7 +13,7 @@
  *      declared in test/security/accessPolicy.ts (public / own-data / object-checked /
  *      reference-data) with a reason; stale declarations also fail.
  *   3. Behavioural matrix — the real requireRole/requirePermission* middleware is executed for
- *      all nine roles + unauthenticated + the super user for every statically resolvable gate.
+ *      all ten roles (incl. the guardian-portal `parent`) + unauthenticated + the super user for every statically resolvable gate.
  *   4. Students never reach staff mutations (except the declared self-service list).
  *   5. Route handlers (cron / webhooks / file proxy / gateway) and Server Actions.
  */
@@ -40,8 +40,8 @@ import {
   requireAnyPermission,
   requireAllPermissions,
 } from '@/server/middleware/verifyPermission'
-import { hasPermission, type Permission } from '@shared/types/permissions'
-import { USER_ROLES, type UserRole } from '@shared/types/roles'
+import { hasPermission, ROLE_PERMISSIONS, type Permission } from '@shared/types/permissions'
+import { USER_ROLES, STAFF_ROLES, isStaffRole, type UserRole } from '@shared/types/roles'
 
 const webRoot = process.cwd()
 const inventory = collectAll(webRoot)
@@ -193,7 +193,7 @@ describe('behavioural access matrix (real middleware, all roles)', () => {
     expect(offenders).toEqual([])
   })
 
-  it('for all nine roles the real middleware agrees with the role/permission definition', () => {
+  it('for all ten roles the real middleware agrees with the role/permission definition', () => {
     const mismatches: string[] = []
     for (const e of gated) {
       for (const g of gatesOf(e)) {
@@ -344,9 +344,15 @@ describe('Server Actions', () => {
 // ─── role/resource matrix is derived from source, never hand-typed ──────────
 
 describe('role model', () => {
-  it('has the nine roles the audit matrix is written for', () => {
+  it('has the ten roles the audit matrix is written for', () => {
     expect([...USER_ROLES].sort()).toEqual(
-      ['academic', 'admin', 'exam_officer', 'finance', 'high_rank', 'hr', 'library', 'lower_rank', 'student'],
+      ['academic', 'admin', 'exam_officer', 'finance', 'high_rank', 'hr', 'library', 'lower_rank', 'parent', 'student'],
     )
+  })
+
+  it('the parent role holds NO permissions and is not a staff role', () => {
+    expect(ROLE_PERMISSIONS.parent.size).toBe(0)
+    expect(STAFF_ROLES).not.toContain('parent')
+    expect(isStaffRole('parent')).toBe(false)
   })
 })

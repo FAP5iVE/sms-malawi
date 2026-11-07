@@ -21,6 +21,7 @@ Derived from `ROLE_PERMISSIONS` in `packages/shared/types/permissions.ts` — th
 | class | 6/17 | 11/17 | 1/17 | 1/17 | 7/17 | 8/17 | 1/17 | 4/17 | 3/17 |
 | exam | 8/24 | 19/24 | · | · | 2/24 | 10/24 | · | 20/24 | 3/24 |
 | finance | 2/37 | 16/37 | 30/37 | 3/37 | 1/37 | · | 4/37 | · | 1/37 |
+| guardian | ● | ● | · | · | 3/8 | · | · | · | · |
 | hr | 8/27 | ● | 9/27 | 8/27 | 8/27 | 9/27 | ● | 9/27 | · |
 | inventory | 1/7 | 1/7 | ● | · | · | 1/7 | · | · | · |
 | library | 4/23 | 5/23 | 5/23 | 22/23 | · | 7/23 | 5/23 | 5/23 | 5/23 |
@@ -260,6 +261,29 @@ Derived from `ROLE_PERMISSIONS` in `packages/shared/types/permissions.ts` — th
 | `finance.viewSummary` | Read all | `admin`, `high_rank`, `finance` |
 | `finance.viewSystemLogs` | Read all | `admin` |
 | `finance.waiveFine` | Delete / void | `library` |
+
+</details>
+
+## guardian
+
+| Operation | AD | HR | FI | LI | LR | AC | HM | EO | ST | Permissions |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|---|
+| Read all | ● | ● | · | · | ◐ 1/2 | · | · | · | · | `view`, `viewAccessLog` |
+| Update | ● | ● | · | · | ◐ 2/5 | · | · | · | · | `backfill`, `invite`, `merge`, `propose`, `restrict` |
+| Approve / release | ● | ● | · | · | · | · | · | · | · | `approve` |
+
+<details><summary>Who holds each permission</summary>
+
+| Permission | Operation | Roles |
+|---|---|---|
+| `guardian.approve` | Approve / release | `admin`, `high_rank` |
+| `guardian.backfill` | Update | `admin`, `high_rank` |
+| `guardian.invite` | Update | `admin`, `high_rank`, `lower_rank` |
+| `guardian.merge` | Update | `admin`, `high_rank` |
+| `guardian.propose` | Update | `admin`, `high_rank`, `lower_rank` |
+| `guardian.restrict` | Update | `admin`, `high_rank` |
+| `guardian.view` | Read all | `admin`, `high_rank`, `lower_rank` |
+| `guardian.viewAccessLog` | Read all | `admin`, `high_rank` |
 
 </details>
 

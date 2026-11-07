@@ -61,6 +61,7 @@ import type {
 } from '@shared/schemas/student'
 import type { ApiStudentWelfare, ApiSupportNeed, ApiWelfareSummary } from '@shared/types/api'
 import * as algolia from '@/server/services/algoliaService'
+import * as guardianDirectorySync from '@/server/services/guardian/guardianDirectorySync'
 import * as riskService from '@/server/services/riskService'
 import { sendEmail } from '@/lib/email'
 import { generateTempPassword } from '@/lib/tempPassword'
@@ -942,6 +943,10 @@ export async function create(
       : new Error('Failed to generate a unique registration number after multiple attempts.')
   }
 
+  // [Guardian portal] The primary guardian card was written in the same statement.
+  // Propose it for portal access (PENDING, grants nothing). Best effort, never throws.
+  await guardianDirectorySync.syncAfterWrite(student.id, { uid: actorUid, role: actorRole }, 'ADMISSION')
+
   // Student row committed successfully — safe to email the credentials now.
   if (provisionedUid && tempPassword && input.email) {
     await sendStudentWelcomeEmail({
@@ -1062,9 +1067,9 @@ export async function update(
     await assertNrbAvailable(updateData.nrbNumber as string | null, id)
   }
 
+  const guardianTouched =
+    input.guardianName !== undefined || input.guardianPhone !== undefined || input.guardianRelation !== undefined
   try {
-    const guardianTouched =
-      input.guardianName !== undefined || input.guardianPhone !== undefined || input.guardianRelation !== undefined
     await prisma.$transaction(async (tx) => {
       await tx.student.update({
         where: { id },
@@ -1088,6 +1093,12 @@ export async function update(
   }
 
   if (input.status === 'GRADUATED' && before.status !== 'GRADUATED') await recordGraduationOutcome(id)
+
+  // [Guardian portal] The legacy guardian columns were mirrored into the primary
+  // guardian card above; flag any portal link whose verified details no longer match.
+  if (guardianTouched) {
+    await guardianDirectorySync.syncAfterWrite(id, { uid: actorUid, role: actorRole }, 'STAFF')
+  }
 
   // Diff what was actually applied (normalised), not the raw request body. The
   // NRB number is an identity number: the audit trail records THAT it changed,
@@ -1612,6 +1623,12 @@ export async function createFromApplication(
     data:  { convertedStudentId: student.id },
   }))
 
+  // [Guardian portal] The primary guardian card (with the application's email and
+  // address) was written in the same statement as the student. Propose it for portal
+  // access: PENDING, grants nothing. Idempotent and best effort, so the retry note
+  // above does not matter and a failure never blocks the admission.
+  await guardianDirectorySync.syncAfterWrite(student.id, { uid: actorUid, role: actorRole }, 'ADMISSION')
+
   // Student row committed successfully — safe to email the credentials now.
   // [PRODUCTION FIX] Previously provisionStudentAuthAccount() sent this email
   // itself, before this transaction ran — a failed conversion could leave an
@@ -1820,6 +1837,9 @@ export async function addGuardian(
     return row
   })
 
+  // [Guardian portal] Propose the new card for portal access (PENDING). Best effort.
+  await guardianDirectorySync.syncAfterWrite(studentId, { uid: actorUid, role: actorRole }, 'STAFF')
+
   await auditService.log({
     action:     'student.guardian_changed',
     entityType: 'Student',
@@ -1858,6 +1878,10 @@ export async function updateGuardian(
     return row
   })
 
+  // [Guardian portal] Flag any portal link whose verified details no longer match this
+  // card (a changed name, number, email or relationship needs staff to look again).
+  await guardianDirectorySync.syncAfterWrite(studentId, { uid: actorUid, role: actorRole }, 'STAFF')
+
   await auditService.log({
     action:     'student.guardian_changed',
     entityType: 'Student',
@@ -1875,15 +1899,21 @@ export async function deleteGuardian(
   actorUid: string,
   actorRole: UserRole,
 ): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+  const portalAudit = await prisma.$transaction(async (tx) => {
     const current = await tx.studentGuardian.findFirst({ where: { id: guardianId, studentId } })
     if (!current) throw guardianError('Guardian not found.', 404)
     if (current.isPrimary) {
       throw guardianError('The primary guardian cannot be removed. Make another guardian primary first.')
     }
+    // [Guardian portal] FAIL CLOSED, before the delete: suspend the portal access made
+    // from this card. The foreign key clears the link's card reference the moment the
+    // row goes, so this cannot run afterwards. If it throws, the delete is aborted.
+    const audit = await guardianDirectorySync.guardRemovalInTx(tx, guardianId, { uid: actorUid, role: actorRole })
     await tx.studentGuardian.delete({ where: { id: guardianId } })
     await assertGuardianRules(tx, studentId)
+    return audit
   })
+  await guardianDirectorySync.emitAudit(portalAudit)
 
   await auditService.log({
     action:     'student.guardian_changed',

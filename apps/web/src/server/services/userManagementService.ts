@@ -52,6 +52,7 @@ import * as algolia from '@/server/services/algoliaService'
 import type { CreateUserInput, NotificationPrefInput } from '@shared/schemas/admin'
 import type { UserRole } from '@shared/types/roles'
 import { isSuperUserClaim } from '@shared/constants/superUser'
+import { assertRoleChangeAllowed } from '@/lib/roleChangePolicy'
 
 function getAuth() { return admin.auth() }
 
@@ -76,6 +77,9 @@ async function assertAccountNotProtected(targetUid: string, actorIsSuperUser: bo
 
 // ─── CREATE USER ─────────────────────────────────────────
 export async function createUser(data: CreateUserInput, actorUid: string) {
+  // [Guardian portal] the admin schema already excludes 'parent'; refuse it at
+  // runtime as well so a type-level change can never open the door.
+  assertRoleChangeAllowed(null, data.role)
   const tempPassword = generateTempPassword()
   // 1. Create Firebase Auth account
   const userRecord = await getAuth().createUser({
@@ -268,6 +272,9 @@ export async function seedAllUserAccountsToAlgolia(): Promise<algolia.BulkIndexR
 export async function updateUserRole(uid: string, role: UserRole, actorUid: string, actorIsSuperUser = false) {
   await assertAccountNotProtected(uid, actorIsSuperUser)
   const existing = await getAuth().getUser(uid)
+  // [Guardian portal] parent accounts are minted only by the claim flow and are
+  // never converted, in either direction. Applies to super-users too.
+  assertRoleChangeAllowed(existing.customClaims?.['role'], role)
   await getAuth().setCustomUserClaims(uid, { ...existing.customClaims, role })
   logger.info({ event: 'user.role_updated', uid, role, actorUid })
   void algolia.updateUserAccount({ objectID: uid, role })
