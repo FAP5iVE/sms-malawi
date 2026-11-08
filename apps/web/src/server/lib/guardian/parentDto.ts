@@ -52,12 +52,48 @@ export function toChildDto(link: Row, student: Row | null, className: string | n
   }
 }
 
+/** One released exam and this child's own mark in it. The mark's teacher comment is deliberately not sent. */
+export interface ExamDto {
+  id: string
+  title: string
+  subject: string
+  type: string
+  academicYear: string | null
+  term: number | null
+  date: string | null
+  maxMark: number | null
+  /** null when the child was absent or no mark was recorded. */
+  mark: number | null
+  percent: number | null
+  absent: boolean
+}
+
+export function toExamDto(exam: Row, mark: Row): ExamDto {
+  const max = num(exam.maxMark)
+  const absent = mark.absent === true
+  const m = absent ? null : num(mark.mark)
+  return {
+    id: String(exam.id), title: str(exam.title) ?? 'Exam', subject: str(exam.subject) ?? '', type: str(exam.type) ?? 'OTHER',
+    academicYear: str(exam.academicYear), term: num(exam.term), date: iso(exam.date),
+    maxMark: max, mark: m, percent: m !== null && max !== null && max > 0 ? round1((m / max) * 100) : null, absent,
+  }
+}
+
 export interface ResultsTermDto {
   academicYear: string | null
   term: number | null
+  /** true = held back for unpaid fees; no marks and no exams are sent at all. */
   withheld: boolean
+  /** false for a term that has released exams but no computed term result yet. */
+  hasSummary: boolean
   average: number | null
+  /** The overall grade (JCE). Empty for MSCE terms, whose overall result is aggregatePoints. */
   grade: string | null
+  gradingTrack: 'JCE' | 'MSCE' | null
+  /** MSCE only: the sum of the six best subjects (6-54, lower is better). null if fewer than six were graded. */
+  aggregatePoints: number | null
+  /** MSCE only: the subjects that made up the aggregate. */
+  aggregateSubjects: string[]
   classPosition: number | null
   classSize: number | null
   /** The term's pass/fail flag (a boolean in the database). null when it was not recorded. */
@@ -67,14 +103,24 @@ export interface ResultsTermDto {
   subjects: { subject: string; average: number | null; grade: string | null; pass: boolean | null }[]
   teacherComment: string | null
   headComment: string | null
+  /** The child's marks in the term's released exams, newest first. */
+  exams: ExamDto[]
+  /** true when a report card may be opened for this term (released, fees clear, result computed). */
+  reportCard: boolean
 }
 
-/** A term held back for unpaid fees carries NO marks at all, only the fact that it is withheld. */
-export function toResultsTermDto(row: Row, withheld: boolean): ResultsTermDto {
+const EMPTY_SUMMARY = {
+  hasSummary: false, average: null, grade: null, gradingTrack: null, aggregatePoints: null, aggregateSubjects: [],
+  classPosition: null, classSize: null, passStatus: null, attendanceDays: null, absentDays: null,
+  subjects: [], teacherComment: null, headComment: null,
+} as const
+
+interface TermExtras { exams: ExamDto[]; reportCard: boolean }
+
+/** A term held back for unpaid fees carries NO marks and NO exams, only the fact that it is withheld. */
+export function toResultsTermDto(row: Row, withheld: boolean, extras: TermExtras = { exams: [], reportCard: false }): ResultsTermDto {
   const base = { academicYear: str(row.academicYear), term: num(row.term), withheld }
-  if (withheld) {
-    return { ...base, average: null, grade: null, classPosition: null, classSize: null, passStatus: null, attendanceDays: null, absentDays: null, subjects: [], teacherComment: null, headComment: null }
-  }
+  if (withheld) return { ...base, ...EMPTY_SUMMARY, aggregateSubjects: [], subjects: [], exams: [], reportCard: false }
   const raw = row.subjectResults
   const subjects: ResultsTermDto['subjects'] = []
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
@@ -84,14 +130,24 @@ export function toResultsTermDto(row: Row, withheld: boolean): ResultsTermDto {
     }
   }
   subjects.sort((a, b) => a.subject.localeCompare(b.subject))
+  const points = num(row.aggregatePoints)
+  const track = row.gradingTrack === 'MSCE' || row.gradingTrack === 'JCE' ? row.gradingTrack : points !== null ? 'MSCE' : null
+  const counted = Array.isArray(row.aggregateSubjects) ? row.aggregateSubjects.filter((x): x is string => typeof x === 'string').slice(0, 6) : []
   return {
-    ...base,
-    average: round1(row.average), grade: str(row.grade),
+    ...base, hasSummary: true,
+    average: round1(row.average), grade: str(row.grade), gradingTrack: track,
+    aggregatePoints: track === 'MSCE' ? points : null, aggregateSubjects: track === 'MSCE' ? counted : [],
     classPosition: positive(row.classPosition), classSize: positive(row.classTotal),
     passStatus: typeof row.passStatus === 'boolean' ? row.passStatus : null,
     attendanceDays: num(row.attendanceDays), absentDays: num(row.absentDays),
     subjects, teacherComment: str(row.teacherComment), headComment: str(row.headComment),
+    exams: extras.exams, reportCard: extras.reportCard,
   }
+}
+
+/** A term with released exams but no computed term result yet (e.g. a mid-term test). */
+export function toExamOnlyTermDto(academicYear: string | null, term: number | null, exams: ExamDto[]): ResultsTermDto {
+  return { academicYear, term, withheld: false, ...EMPTY_SUMMARY, aggregateSubjects: [], subjects: [], exams, reportCard: false }
 }
 
 export interface InvoiceDto {
@@ -122,8 +178,13 @@ export function toAttendanceDto(r: Row): AttendanceDto {
   return { date: iso(r.date), status: str(r.status) }
 }
 
-export function summariseAttendance(rows: readonly Row[]): { windowSize: number; byStatus: Record<string, number> } {
-  const byStatus: Record<string, number> = {}
-  for (const r of rows) { const s = str(r.status) ?? 'UNKNOWN'; byStatus[s] = (byStatus[s] ?? 0) + 1 }
-  return { windowSize: rows.length, byStatus }
+/**
+ * The term figures a student sees on their own attendance page. The input is the student view's
+ * own summary (daysPresent / daysAbsent / daysLate / totalDays / attendanceRate), so a parent and
+ * their child can never be shown different numbers for the same term.
+ */
+export interface AttendanceSummaryDto { present: number; late: number; absent: number; recorded: number; attendanceRate: number | null }
+export function toAttendanceSummaryDto(r: Row): AttendanceSummaryDto {
+  const n = (v: unknown) => Math.max(0, Math.trunc(num(v) ?? 0))
+  return { present: n(r.daysPresent), late: n(r.daysLate), absent: n(r.daysAbsent), recorded: n(r.totalDays), attendanceRate: num(r.attendanceRate) }
 }

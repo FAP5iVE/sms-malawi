@@ -4,8 +4,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { makeDb } from './helpers/memoryDb'
 import { authorizeChild, findGuardianProfile, listChildren, recordAccess } from '../guardianAccess'
-import { getChildAttendance, getChildFees, getChildResults, type ParentDeps } from '../parentPortalService'
-import { toAttendanceDto, toChildDto, toInvoiceDto, toPaymentDto, toResultsTermDto } from '@/server/lib/guardian/parentDto'
+import { getChildAttendance, getChildFees, getChildReportCard, getChildResults, type ParentDeps } from '../parentPortalService'
+import { toAttendanceDto, toAttendanceSummaryDto, toChildDto, toExamDto, toInvoiceDto, toPaymentDto, toResultsTermDto } from '@/server/lib/guardian/parentDto'
 import { GUARDIAN_CAPABILITIES, type GuardianCapability } from '@shared/constants/guardianPortal'
 
 let mem: ReturnType<typeof makeDb>['mem']
@@ -164,14 +164,18 @@ describe('parent DTOs: explicit allowlists', () => {
 
   it('results: a withheld term carries NO marks, only the fact that it is withheld', () => {
     const row = { academicYear: '2026', term: 1, average: 71.26, grade: 'B', classPosition: 3, classTotal: 40, subjectResults: { Maths: { average: 80, grade: 'A', pass: true } }, teacherComment: 'Good', headComment: 'Fine' }
-    expect(toResultsTermDto(row, true)).toEqual({ academicYear: '2026', term: 1, withheld: true, average: null, grade: null, classPosition: null, classSize: null, passStatus: null, attendanceDays: null, absentDays: null, subjects: [], teacherComment: null, headComment: null })
+    const exam = { id: 'e', title: 'T', subject: 'S', type: 'END_TERM', academicYear: '2026', term: 1, date: null, maxMark: 100, mark: 80, percent: 80, absent: false }
+    expect(toResultsTermDto({ ...row, aggregatePoints: 14, gradingTrack: 'MSCE' }, true, { exams: [exam], reportCard: true })).toEqual({
+      academicYear: '2026', term: 1, withheld: true, hasSummary: false, average: null, grade: null, gradingTrack: null, aggregatePoints: null, aggregateSubjects: [],
+      classPosition: null, classSize: null, passStatus: null, attendanceDays: null, absentDays: null, subjects: [], teacherComment: null, headComment: null, exams: [], reportCard: false,
+    })
     expect(JSON.stringify(toResultsTermDto(row, true))).not.toMatch(/Maths|71|Good|Fine/)
   })
 
-  it('results: an open term shows rounded averages and only subject/average/grade/pass per subject', () => {
+  it('results: an open term shows rounded averages, aggregate points, and only subject/average/grade/pass per subject', () => {
     const row = {
       academicYear: '2026', term: 2, average: 71.26, grade: 'B', classPosition: 3, classTotal: 40, passStatus: true, attendanceDays: 50, absentDays: 2,
-      aggregatePoints: 9, reportCardKey: 'file_secret', totalMark: 800,
+      aggregatePoints: 9, gradingTrack: 'MSCE', aggregateSubjects: ['Maths', 'English'], reportCardKey: 'file_secret', totalMark: 800,
       subjectResults: { Maths: { average: 80.04, grade: 'A', pass: true, ca: [1, 2], exam: 77, rawNotes: 'x' }, English: { average: 55, grade: 'C', pass: false } },
     }
     const dto = toResultsTermDto(row, false)
@@ -179,7 +183,37 @@ describe('parent DTOs: explicit allowlists', () => {
     expect(dto.passStatus).toBe(true)
     expect(dto.subjects).toEqual([{ subject: 'English', average: 55, grade: 'C', pass: false }, { subject: 'Maths', average: 80, grade: 'A', pass: true }])
     const text = JSON.stringify(dto)
-    for (const leak of ['aggregatePoints', 'reportCardKey', 'file_secret', 'totalMark', 'rawNotes', '"ca"', '"exam"']) expect(text, leak).not.toContain(leak)
+    expect(dto).toMatchObject({ gradingTrack: 'MSCE', aggregatePoints: 9, aggregateSubjects: ['Maths', 'English'] })
+    for (const leak of ['reportCardKey', 'file_secret', 'totalMark', 'rawNotes', '"ca"', '"exam"']) expect(text, leak).not.toContain(leak)
+  })
+
+  it('results: aggregate points belong to the MSCE track only, capped at six subjects, and legacy rows are read sensibly', () => {
+    const base = { academicYear: '2026', term: 1, subjectResults: {} }
+    const subjects = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 1, null]
+    expect(toResultsTermDto({ ...base, gradingTrack: 'MSCE', aggregatePoints: 12, aggregateSubjects: subjects }, false)).toMatchObject({ aggregatePoints: 12, aggregateSubjects: ['a', 'b', 'c', 'd', 'e', 'f'] })
+    expect(toResultsTermDto({ ...base, gradingTrack: 'JCE', aggregatePoints: 12, aggregateSubjects: subjects }, false)).toMatchObject({ gradingTrack: 'JCE', aggregatePoints: null, aggregateSubjects: [] })
+    expect(toResultsTermDto({ ...base, gradingTrack: null, aggregatePoints: 20 }, false)).toMatchObject({ gradingTrack: 'MSCE', aggregatePoints: 20 })
+    expect(toResultsTermDto({ ...base, gradingTrack: null, aggregatePoints: null }, false)).toMatchObject({ gradingTrack: null, aggregatePoints: null })
+    expect(toResultsTermDto({ ...base, gradingTrack: 'MSCE', aggregatePoints: null }, false)).toMatchObject({ gradingTrack: 'MSCE', aggregatePoints: null })   // fewer than six graded
+    expect(toResultsTermDto({ ...base, gradingTrack: 'MSCE', aggregatePoints: 'x' }, false).aggregatePoints).toBeNull()
+  })
+
+  it('exam: only named fields, the mark’s teacher comment is never sent, and absent means no mark', () => {
+    const dto = toExamDto(
+      { id: 'e1', title: 'Test 1', subject: 'Maths', type: 'WEEKLY_TEST', academicYear: '2025/2026', term: 1, date: new Date('2026-01-10'), maxMark: { valueOf: () => '20.00' }, createdByUid: 'staff1', venue: 'Hall' },
+      { mark: { valueOf: () => '17.50' }, absent: false, comment: 'private note', enteredByUid: 'staff2', isDraft: false },
+    )
+    expect(Object.keys(dto).sort()).toEqual(['absent', 'academicYear', 'date', 'id', 'mark', 'maxMark', 'percent', 'subject', 'term', 'title', 'type'])
+    expect(dto).toMatchObject({ mark: 17.5, maxMark: 20, percent: 87.5 })
+    expect(JSON.stringify(dto)).not.toMatch(/private note|staff1|staff2|Hall/)
+    expect(toExamDto({ id: 'e', maxMark: 20 }, { mark: 12, absent: true })).toMatchObject({ mark: null, percent: null, absent: true })
+    expect(toExamDto({ id: 'e', maxMark: 0 }, { mark: 5, absent: false }).percent).toBeNull()      // never divides by zero
+  })
+
+  it('attendance summary: whole non-negative counts and a rate, whatever the input', () => {
+    expect(toAttendanceSummaryDto({ daysPresent: 30, daysLate: 5, daysAbsent: 5, totalDays: 40, attendanceRate: 87.5, byClass: [1], weekly: [1] }))
+      .toEqual({ present: 30, late: 5, absent: 5, recorded: 40, attendanceRate: 87.5 })
+    expect(toAttendanceSummaryDto({ daysPresent: -3, daysLate: 1.9, daysAbsent: 'x', totalDays: null, attendanceRate: null })).toEqual({ present: 0, late: 1, absent: 0, recorded: 0, attendanceRate: null })
   })
 
   it('results: passStatus is the real boolean (the column is a boolean, not a string), else null', () => {
@@ -230,17 +264,31 @@ describe('parentPortalService', () => {
     if (!d.allowed) throw new Error(`denied: ${d.reason}`)
     return d.ctx
   }
+  const YEAR = '2025/2026'
+  const baseDeps = {
+    getReportCardData: async (...a: unknown[]) => ({ card: a }),
+    resolvePeriod: async (i: { academicYear?: unknown; term?: unknown }) => ({ academicYear: typeof i.academicYear === 'string' ? i.academicYear : YEAR, term: Number(i.term) || 2 }),
+    getTermAttendance: async () => ({ daysPresent: 30, daysLate: 5, daysAbsent: 5, totalDays: 40, attendanceRate: 87.5 }),
+  }
   const gate = (open: (t: number, y: string) => boolean | 'throw'): ParentDeps => ({
+    ...baseDeps,
     isResultsGateOpen: async (_s, t, y) => { const r = open(t, y); if (r === 'throw') throw new Error('gate down'); return r },
   })
+  const allOpen = gate(() => true)
+  /** One end-of-term exam for a class/term, in the given release state. */
+  const endTerm = (year: string, term: number, status = 'RESULTS_RELEASED', classId = 'c1', id = `end-${classId}-${year}-${term}`) =>
+    mem.seed('exam', [{ id, classId, type: 'END_TERM', academicYear: year, term, status, subject: 'Maths', title: 'End of term', maxMark: 100, date: new Date(2026, 2, term) }])
+  const result = (id: string, term: number, extra: Record<string, unknown> = {}, studentId = 's1', year = YEAR) =>
+    ({ id, studentId, classId: 'c1', academicYear: year, term, average: 70, grade: 'B', subjectResults: {}, ...extra })
 
   it('results: shows terms whose fees are clear, withholds the rest, and fails closed if the gate errors', async () => {
     mem.seed('termResult', [
-      { id: 'r1', studentId: 's1', academicYear: '2026', term: 1, average: 70, grade: 'B', subjectResults: { Maths: { average: 70, grade: 'B', pass: true } } },
-      { id: 'r2', studentId: 's1', academicYear: '2026', term: 2, average: 60, grade: 'C', subjectResults: {} },
-      { id: 'r3', studentId: 's1', academicYear: '2026', term: 3, average: 50, grade: 'D', subjectResults: {} },
-      { id: 'rX', studentId: 's2', academicYear: '2026', term: 1, average: 99, grade: 'A', subjectResults: {} },      // someone else's child
+      result('r1', 1, { subjectResults: { Maths: { average: 70, grade: 'B', pass: true } } }),
+      result('r2', 2, { average: 60, grade: 'C' }),
+      result('r3', 3, { average: 50, grade: 'D' }),
+      result('rX', 1, { average: 99, grade: 'A' }, 's2'),                                    // someone else's child
     ])
+    for (const t of [1, 2, 3]) endTerm(YEAR, t)
     const out = await getChildResults(db, await ctxFor(), gate((t) => (t === 1 ? true : t === 2 ? false : 'throw')))
     expect(out.terms.map((t) => [t.term, t.withheld])).toEqual([[3, true], [2, true], [1, false]])
     expect(out.terms.find((t) => t.term === 1)!.average).toBe(70)
@@ -248,15 +296,130 @@ describe('parentPortalService', () => {
   })
 
   it('results: the gate is asked about THIS student, term and year (the same rule students get)', async () => {
-    mem.seed('termResult', [{ id: 'r1', studentId: 's1', academicYear: '2026', term: 2, average: 70, subjectResults: {} }])
+    mem.seed('termResult', [result('r1', 2)])
+    endTerm(YEAR, 2)
     const calls: unknown[][] = []
-    await getChildResults(db, await ctxFor(), { isResultsGateOpen: async (...a) => { calls.push(a); return true } })
-    expect(calls).toEqual([['s1', 2, '2026']])
+    await getChildResults(db, await ctxFor(), { ...baseDeps, isResultsGateOpen: async (...a) => { calls.push(a); return true } })
+    expect(calls).toEqual([['s1', 2, YEAR]])
   })
 
   it('results: reads are bounded to 12 terms', async () => {
-    mem.seed('termResult', Array.from({ length: 30 }, (_, i) => ({ id: `r${i}`, studentId: 's1', academicYear: `20${10 + i}`, term: 1, average: 1, subjectResults: {} })))
-    expect((await getChildResults(db, await ctxFor(), gate(() => true))).terms).toHaveLength(12)
+    const years = Array.from({ length: 30 }, (_, i) => `${2010 + i}/${2011 + i}`)
+    mem.seed('termResult', years.map((y, i) => result(`r${i}`, 1, { average: 1 }, 's1', y)))
+    for (const y of years) endTerm(y, 1)
+    expect((await getChildResults(db, await ctxFor(), allOpen)).terms).toHaveLength(12)
+  })
+
+  it('results: only RELEASED terms are listed; a result row whose end-of-term exam was never released, or was unlocked after release, is omitted entirely', async () => {
+    mem.seed('termResult', [result('r1', 1), result('r2', 2), result('r3', 3)])
+    endTerm(YEAR, 1)                                  // released
+    endTerm(YEAR, 2, 'MARKS_PENDING')                 // released once, then unlocked for editing: the row is stale
+    // term 3: result row but no exam at all
+    const out = await getChildResults(db, await ctxFor(), allOpen)
+    expect(out.terms.map((t) => t.term)).toEqual([1])
+  })
+
+  it('results: ONE unlocked end-of-term exam hides the whole term until it is released again', async () => {
+    mem.seed('termResult', [result('r1', 1)])
+    endTerm(YEAR, 1, 'RESULTS_RELEASED', 'c1', 'maths')
+    endTerm(YEAR, 1, 'MARKS_FINAL', 'c1', 'english')
+    expect((await getChildResults(db, await ctxFor(), allOpen)).terms).toEqual([])
+    mem.all('exam').find((e) => e.id === 'english')!.status = 'RESULTS_RELEASED'
+    expect((await getChildResults(db, await ctxFor(), allOpen)).terms.map((t) => t.term)).toEqual([1])
+  })
+
+  it('results: release is judged for the class the result was computed for, and a row with no class is never shown', async () => {
+    mem.seed('termResult', [result('r1', 1), { ...result('r2', 2), classId: undefined }])
+    endTerm(YEAR, 1, 'RESULTS_RELEASED', 'c2')        // a DIFFERENT class released term 1
+    endTerm(YEAR, 2)
+    expect((await getChildResults(db, await ctxFor(), allOpen)).terms).toEqual([])
+  })
+
+  it('results: shows aggregate points on the MSCE track and an overall grade on the JCE track', async () => {
+    mem.seed('termResult', [
+      result('r1', 1, { grade: '', gradingTrack: 'MSCE', aggregatePoints: 14, aggregateSubjects: ['Maths', 'English'] }),
+      result('r2', 2, { grade: 'B', gradingTrack: 'JCE', aggregatePoints: null }),
+    ])
+    endTerm(YEAR, 1); endTerm(YEAR, 2)
+    const t = (await getChildResults(db, await ctxFor(), allOpen)).terms
+    expect(t.find((x) => x.term === 1)).toMatchObject({ gradingTrack: 'MSCE', aggregatePoints: 14, aggregateSubjects: ['Maths', 'English'] })
+    expect(t.find((x) => x.term === 2)).toMatchObject({ gradingTrack: 'JCE', aggregatePoints: null, grade: 'B' })
+  })
+
+  describe('exam history', () => {
+    const mark = (examId: string, studentId: string, extra: Record<string, unknown> = {}) =>
+      ({ id: `m-${examId}-${studentId}`, examId, studentId, mark: 18, absent: false, isDraft: false, ...extra })
+    const exam = (id: string, extra: Record<string, unknown> = {}) =>
+      ({ id, classId: 'c1', type: 'WEEKLY_TEST', subject: 'Maths', title: `Test ${id}`, maxMark: 20, academicYear: YEAR, term: 1, status: 'RESULTS_RELEASED', date: new Date(2026, 0, 10), ...extra })
+
+    it('lists only released exams with final marks, and only this child\u2019s own marks', async () => {
+      mem.seed('exam', [exam('x1'), exam('x2', { status: 'MARKS_PENDING' }), exam('x3'), exam('x4')])
+      mem.seed('examMark', [
+        mark('x1', 's1'),                               // shown
+        mark('x2', 's1'),                               // exam not released
+        mark('x3', 's1', { isDraft: true }),            // mark not final
+        mark('x4', 's2'),                               // another child's mark
+      ])
+      const t = (await getChildResults(db, await ctxFor(), allOpen)).terms
+      expect(t).toHaveLength(1)
+      expect(t[0]!.exams.map((e) => e.id)).toEqual(['x1'])
+      expect(t[0]!.exams[0]).toMatchObject({ mark: 18, maxMark: 20, percent: 90, absent: false, type: 'WEEKLY_TEST' })
+    })
+
+    it('a term with released exams but no computed result is still listed, without a summary or report card', async () => {
+      mem.seed('exam', [exam('x1')]); mem.seed('examMark', [mark('x1', 's1')])
+      const [term] = (await getChildResults(db, await ctxFor(), allOpen)).terms
+      expect(term).toMatchObject({ term: 1, hasSummary: false, reportCard: false, withheld: false, average: null })
+      expect(term!.exams).toHaveLength(1)
+    })
+
+    it('history spans years and terms, newest first', async () => {
+      mem.seed('exam', [exam('a', { academicYear: '2024/2025', term: 3 }), exam('b'), exam('c', { term: 2 })])
+      mem.seed('examMark', ['a', 'b', 'c'].map((id) => mark(id, 's1')))
+      expect((await getChildResults(db, await ctxFor(), allOpen)).terms.map((t) => [t.academicYear, t.term])).toEqual([[YEAR, 2], [YEAR, 1], ['2024/2025', 3]])
+    })
+
+    it('an absent child shows no mark, not zero', async () => {
+      mem.seed('exam', [exam('x1')]); mem.seed('examMark', [mark('x1', 's1', { mark: null, absent: true })])
+      expect((await getChildResults(db, await ctxFor(), allOpen)).terms[0]!.exams[0]).toMatchObject({ mark: null, percent: null, absent: true })
+    })
+
+    it('a fee-gated term carries no exams at all, only that it is withheld', async () => {
+      mem.seed('exam', [exam('x1')]); mem.seed('examMark', [mark('x1', 's1')])
+      const [term] = (await getChildResults(db, await ctxFor(), gate(() => false))).terms
+      expect(term).toMatchObject({ withheld: true, exams: [], reportCard: false })
+      expect(JSON.stringify(term)).not.toMatch(/Test x1|18|90/)
+    })
+
+    it('reportCard is offered only for a released, fee-clear term with a computed result', async () => {
+      mem.seed('termResult', [result('r1', 1)]); endTerm(YEAR, 1)
+      expect((await getChildResults(db, await ctxFor(), allOpen)).terms[0]!.reportCard).toBe(true)
+      expect((await getChildResults(db, await ctxFor(), gate(() => false))).terms[0]!.reportCard).toBe(false)
+    })
+  })
+
+  describe('report card', () => {
+    const ask = async (deps: ParentDeps = allOpen, term: 1 | 2 | 3 = 1) => getChildReportCard(db, await ctxFor(), deps, { academicYear: YEAR, term })
+    it('is built by the school\u2019s own builder for THIS student, term and year', async () => {
+      mem.seed('termResult', [result('r1', 1)]); endTerm(YEAR, 1)
+      expect(await ask()).toEqual({ card: ['s1', 1, YEAR] })
+    })
+    it.each([
+      ['no computed result', () => { endTerm(YEAR, 1) }, allOpen],
+      ['the term is not released', () => { mem.seed('termResult', [result('r1', 1)]); endTerm(YEAR, 1, 'MARKS_PENDING') }, allOpen],
+      ['fees are outstanding', () => { mem.seed('termResult', [result('r1', 1)]); endTerm(YEAR, 1) }, gate(() => false)],
+      ['the fee gate cannot answer', () => { mem.seed('termResult', [result('r1', 1)]); endTerm(YEAR, 1) }, gate(() => 'throw')],
+      ['it is another child\u2019s result', () => { mem.seed('termResult', [result('r1', 1, {}, 's2')]); endTerm(YEAR, 1) }, allOpen],
+    ])('is not available when %s', async (_name, setup, deps) => {
+      ;(setup as () => void)()
+      expect(await ask(deps as ParentDeps)).toBeNull()
+    })
+    it('never calls the builder when it is refused', async () => {
+      let called = 0
+      mem.seed('termResult', [result('r1', 1)]); endTerm(YEAR, 1, 'MARKS_PENDING')
+      await ask({ ...allOpen, getReportCardData: async () => { called++; return {} } })
+      expect(called).toBe(0)
+    })
   })
 
   it('fees: totals only positive balances, exposes no payment internals, and ignores other students', async () => {
@@ -281,13 +444,21 @@ describe('parentPortalService', () => {
     expect(await getChildFees(db, await ctxFor('uidA', 'lA1', 'fees'))).toEqual({ currency: 'MWK', totalOutstanding: 0, invoices: [], payments: [] })
   })
 
-  it('attendance: a summary over the recent window and the latest 30 days, with no marker or notes', async () => {
+  it('attendance: the student\u2019s own term figures, the day records newest first, and no marker or notes', async () => {
     mem.seed('attendance', Array.from({ length: 50 }, (_, i) => ({ id: `a${i}`, studentId: 's1', date: new Date(2026, 0, i + 1), status: i % 5 === 0 ? 'ABSENT' : 'PRESENT', markedBy: 't', note: 'n' })))
     mem.seed('attendance', [{ id: 'aX', studentId: 's2', date: new Date(2026, 5, 1), status: 'ABSENT' }])
-    const out = await getChildAttendance(db, await ctxFor('uidA', 'lA1', 'attendance'))
-    expect(out.summary).toEqual({ windowSize: 50, byStatus: { ABSENT: 10, PRESENT: 40 } })
-    expect(out.recent).toHaveLength(30)
-    expect(out.recent[0]!.date! > out.recent[1]!.date!).toBe(true)         // newest first
-    expect(JSON.stringify(out)).not.toMatch(/markedBy|"t"|note/)
+    const out = await getChildAttendance(db, await ctxFor('uidA', 'lA1', 'attendance'), allOpen, { academicYear: '2024/2025', term: 3 })
+    expect(out.period).toEqual({ academicYear: '2024/2025', term: 3 })
+    expect(out.summary).toEqual({ present: 30, late: 5, absent: 5, recorded: 40, attendanceRate: 87.5 })
+    expect(out.records).toHaveLength(50)
+    expect(out.records[0]!.date! > out.records[1]!.date!).toBe(true)         // newest first
+    expect(JSON.stringify(out)).not.toMatch(/markedBy|"t"|note|aX/)
+  })
+
+  it('attendance: with no period asked for, the school\u2019s current one is used; records are bounded', async () => {
+    mem.seed('attendance', Array.from({ length: 500 }, (_, i) => ({ id: `a${i}`, studentId: 's1', date: new Date(2024, 0, 1 + i), status: 'PRESENT' })))
+    const out = await getChildAttendance(db, await ctxFor('uidA', 'lA1', 'attendance'), allOpen)
+    expect(out.period).toEqual({ academicYear: YEAR, term: 2 })
+    expect(out.records).toHaveLength(400)
   })
 })

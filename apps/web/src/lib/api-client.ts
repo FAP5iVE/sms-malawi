@@ -712,6 +712,7 @@ export const queryKeys = {
     all: () => ['parent'] as const,
     me: () => ['parent', 'me'] as const,
     children: () => ['parent', 'children'] as const,
-    child: (linkId: string, module: 'profile' | 'results' | 'fees' | 'attendance') => ['parent', 'child', linkId, module] as const,
+    // `extra` distinguishes the period-specific reads (a term's attendance, one term's report card).
+    child: (linkId: string, module: 'profile' | 'results' | 'reportCard' | 'fees' | 'attendance', extra = '') => ['parent', 'child', linkId, module, extra] as const,
   },
 } as const

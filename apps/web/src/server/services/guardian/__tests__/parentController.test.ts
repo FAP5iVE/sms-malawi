@@ -8,9 +8,15 @@ import { GUARDIAN_CAPABILITIES } from '@shared/constants/guardianPortal'
 
 let mem: ReturnType<typeof makeDb>['mem']
 let db: ReturnType<typeof makeDb>['db']
-const deps = { isResultsGateOpen: async (_s: string, term: number) => term !== 2 }
-const MODULES: ChildModule[] = ['profile', 'results', 'fees', 'attendance']
-const call = (uid: unknown, linkId: unknown, module: ChildModule | string) => getChildModule(db, deps, { uid, linkId, module: module as ChildModule })
+const deps = {
+  isResultsGateOpen: async (_s: string, term: number) => term !== 2,
+  getReportCardData: async (_s: string, term: number, year: string) => ({ card: true, term, year }),
+  resolvePeriod: async (i: { academicYear?: unknown; term?: unknown }) => ({ academicYear: typeof i.academicYear === 'string' ? i.academicYear : '2025/2026', term: Number(i.term) || 1 }),
+  getTermAttendance: async () => ({ daysPresent: 8, daysLate: 1, daysAbsent: 1, totalDays: 10, attendanceRate: 90 }),
+}
+const MODULES: ChildModule[] = ['profile', 'results', 'reportCard', 'fees', 'attendance']
+const call = (uid: unknown, linkId: unknown, module: ChildModule | string, query?: { academicYear?: unknown; term?: unknown }) =>
+  getChildModule(db, deps, { uid, linkId, module: module as ChildModule, ...(query ? { query } : {}) })
 const links = () => mem.all('guardianLink')
 
 beforeEach(() => {
@@ -29,16 +35,18 @@ beforeEach(() => {
     { id: 'lB', profileId: 'pB', studentId: 's2', relationship: 'Father', status: 'ACTIVE', capabilities: ['results'] },
   ])
   mem.seed('termResult', [
-    { id: 'r1', studentId: 's1', academicYear: '2026', term: 1, average: 70, grade: 'B', subjectResults: { Maths: { average: 70, grade: 'B', pass: true } } },
-    { id: 'r2', studentId: 's1', academicYear: '2026', term: 2, average: 60, grade: 'C', subjectResults: {} },
+    { id: 'r1', studentId: 's1', classId: 'c1', academicYear: '2025/2026', term: 1, average: 70, grade: 'B', subjectResults: { Maths: { average: 70, grade: 'B', pass: true } } },
+    { id: 'r2', studentId: 's1', classId: 'c1', academicYear: '2025/2026', term: 2, average: 60, grade: 'C', subjectResults: {} },
   ])
-  mem.seed('invoice', [{ id: 'i1', studentId: 's1', invoiceNumber: 'INV-1', academicYear: '2026', term: 1, totalAmount: 100, paidAmount: 0, balance: 100, status: 'UNPAID' }])
+  // Both terms' end-of-term exams are released; the fee gate (above) is what holds term 2 back.
+  mem.seed('exam', [1, 2].map((term) => ({ id: `e${term}`, classId: 'c1', type: 'END_TERM', academicYear: '2025/2026', term, status: 'RESULTS_RELEASED', subject: 'Maths', title: 'End of term', maxMark: 100, date: new Date('2026-03-01') })))
+  mem.seed('invoice', [{ id: 'i1', studentId: 's1', invoiceNumber: 'INV-1', academicYear: '2025/2026', term: 1, totalAmount: 100, paidAmount: 0, balance: 100, status: 'UNPAID' }])
   mem.seed('attendance', [{ id: 'a1', studentId: 's1', date: new Date('2026-03-01'), status: 'PRESENT' }])
 })
 
 describe('module -> capability table', () => {
   it('each module needs exactly its own capability', () => {
-    expect(MODULE_CAPABILITY).toEqual({ profile: 'profile', results: 'results', fees: 'fees', attendance: 'attendance' })
+    expect(MODULE_CAPABILITY).toEqual({ profile: 'profile', results: 'results', reportCard: 'results', fees: 'fees', attendance: 'attendance' })
     expect(Object.isFrozen(MODULE_CAPABILITY)).toBe(true)
   })
 })
@@ -85,9 +93,31 @@ describe('allowed reads', () => {
     const terms = (r.body as { terms: { term: number; withheld: boolean; average: number | null }[] }).terms
     expect(terms.map((t) => [t.term, t.withheld, t.average])).toEqual([[2, true, null], [1, false, 70]])
   })
-  it('fees and attendance return their DTOs', async () => {
+  it('fees and attendance return their DTOs (attendance: the student\u2019s own term figures plus the day records)', async () => {
     expect(((await call('uidA', 'lA', 'fees')).body as { totalOutstanding: number }).totalOutstanding).toBe(100)
-    expect(((await call('uidA', 'lA', 'attendance')).body as { summary: { windowSize: number } }).summary.windowSize).toBe(1)
+    const att = (await call('uidA', 'lA', 'attendance', { academicYear: '2026/2027', term: 2 })).body as { period: unknown; summary: unknown; records: unknown[] }
+    expect(att.period).toEqual({ academicYear: '2026/2027', term: 2 })
+    expect(att.summary).toEqual({ present: 8, late: 1, absent: 1, recorded: 10, attendanceRate: 90 })
+    expect(att.records).toHaveLength(1)
+  })
+  it('report card: served for a released, fee-clear term; the builder is asked about THIS student only', async () => {
+    const r = await call('uidA', 'lA', 'reportCard', { academicYear: '2025/2026', term: 1 })
+    expect(r).toEqual({ status: 200, body: { card: true, term: 1, year: '2025/2026' } })
+  })
+  it('report card: a fee-gated term is the same generic not-found (no hint that a card exists)', async () => {
+    expect(await call('uidA', 'lA', 'reportCard', { academicYear: '2025/2026', term: 2 })).toBe(NOT_FOUND)
+  })
+  it('report card: a term with no computed result is not found', async () => {
+    expect(await call('uidA', 'lA', 'reportCard', { academicYear: '2025/2026', term: 3 })).toBe(NOT_FOUND)
+  })
+  it('report card: needs the results capability, and a malformed period is only reported AFTER authorization', async () => {
+    links().find((l) => l.id === 'lA')!.capabilities = ['fees']
+    expect(await call('uidA', 'lA', 'reportCard', { academicYear: '2025/2026', term: 1 })).toBe(NOT_FOUND)
+    links().find((l) => l.id === 'lA')!.capabilities = [...GUARDIAN_CAPABILITIES]
+    expect(await call('stranger', 'lA', 'reportCard', { academicYear: 'junk', term: 9 })).toBe(NOT_FOUND)   // not 400: reveals nothing
+    for (const q of [undefined, {}, { academicYear: '2025/2026', term: 4 }, { academicYear: '26', term: 1 }, { academicYear: '2025/2026', term: 'x' }]) {
+      expect((await call('uidA', 'lA', 'reportCard', q as never)).status, JSON.stringify(q)).toBe(400)
+    }
   })
   it('each guardian sees only their own child, through the same endpoint', async () => {
     expect(JSON.stringify((await call('uidB', 'lB', 'results')).body)).not.toContain('Chisomo')
@@ -104,8 +134,8 @@ describe('access log', () => {
   it('logs allowed reads of results and fees, but not routine profile or attendance views', async () => {
     await call('uidA', 'lA', 'profile'); await call('uidA', 'lA', 'attendance')
     expect(mem.all('guardianAccessLog')).toHaveLength(0)
-    await call('uidA', 'lA', 'results'); await call('uidA', 'lA', 'fees')
-    expect(mem.all('guardianAccessLog').map((l) => [l.module, l.outcome])).toEqual([['results', 'ALLOWED'], ['fees', 'ALLOWED']])
+    await call('uidA', 'lA', 'results'); await call('uidA', 'lA', 'fees'); await call('uidA', 'lA', 'reportCard', { academicYear: '2025/2026', term: 1 })
+    expect(mem.all('guardianAccessLog').map((l) => [l.module, l.outcome])).toEqual([['results', 'ALLOWED'], ['fees', 'ALLOWED'], ['reportCard', 'ALLOWED']])
     expect(mem.all('guardianAccessLog')[0]).toMatchObject({ studentId: 's1', profileId: 'pA' })
   })
   it('a token with no profile cannot be logged against anyone, and still gets the same refusal', async () => {

@@ -60,23 +60,86 @@ const ATTENDANCE: Readonly<Record<string, string>> = { PRESENT: 'Present', ABSEN
 export function attendanceLabel(status: string | null): string {
   return status ? (ATTENDANCE[status] ?? humanize(status)) : ''
 }
-export function attendanceTone(status: string | null): StatusTone {
-  return status === 'PRESENT' ? 'success' : status === 'LATE' ? 'warning' : status === 'ABSENT' ? 'danger' : 'neutral'
+
+/** The Sun-Sat month grid the student's attendance page draws: blanks before day 1, then every day. */
+export interface MonthGrid { leadingBlanks: number; days: { day: number; key: string }[] }
+export function buildMonthGrid(year: number, monthIndex: number): MonthGrid {
+  const count = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return {
+    leadingBlanks: new Date(Date.UTC(year, monthIndex, 1)).getUTCDay(),
+    days: Array.from({ length: count }, (_, i) => ({ day: i + 1, key: `${year}-${pad(monthIndex + 1)}-${pad(i + 1)}` })),
+  }
 }
 
-export interface AttendanceFigures { present: number; late: number; absent: number; other: number; total: number; attendedPercent: number | null }
+export function monthLabel(year: number, monthIndex: number): string {
+  return new Date(Date.UTC(year, monthIndex, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+}
+
+/** yyyy-mm-dd -> status. Records are calendar days at UTC midnight, so the UTC date is the day. */
+export function attendanceByDate(records: readonly { date: string | null; status: string | null }[]): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const r of records) if (r.date && r.status && /^\d{4}-\d{2}-\d{2}/.test(r.date)) out.set(r.date.slice(0, 10), r.status)
+  return out
+}
+
+/** The next month would start in the future: the calendar's "next" button stops there. */
+export function isFutureMonth(year: number, monthIndex: number, now: Date = new Date()): boolean {
+  return Date.UTC(year, monthIndex, 1) > Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
+}
+
+export function shiftMonth(year: number, monthIndex: number, by: number): { year: number; monthIndex: number } {
+  const d = new Date(Date.UTC(year, monthIndex + by, 1))
+  return { year: d.getUTCFullYear(), monthIndex: d.getUTCMonth() }
+}
+
+const EXAM_TYPES: Readonly<Record<string, string>> = {
+  WEEKLY_TEST: 'Weekly test', ASSIGNMENT: 'Assignment', QUIZ: 'Quiz', MIDTERM: 'Mid-term',
+  END_TERM: 'End of term', MANEB_JCE: 'JCE (MANEB)', MANEB_MSCE: 'MSCE (MANEB)',
+}
+export function examTypeLabel(type: string): string { return EXAM_TYPES[type] ?? humanize(type) }
+/** End-of-term exams open as the term's report card; every other exam opens its own detail. */
+export function isEndTermExam(type: string): boolean { return type === 'END_TERM' }
 
 /**
- * Counts for the recorded window. "Attended" means present OR late: a child who arrived late
- * was at school. The rate is null when nothing is recorded, never 0% (which would read as
- * "never attends").
+ * What tapping an exam does. An end-of-term exam IS the term's report card, so it opens that card
+ * when the term has one; everything else (including an end-of-term exam whose card is not yet
+ * available) opens the exam's own detail.
  */
-export function attendanceFigures(summary: { windowSize: number; byStatus: Record<string, number> }): AttendanceFigures {
-  const n = (k: string) => Math.max(0, Math.trunc(summary.byStatus[k] ?? 0))
-  const present = n('PRESENT'), late = n('LATE'), absent = n('ABSENT')
-  const total = Math.max(0, Math.trunc(summary.windowSize))
-  const other = Math.max(0, total - present - late - absent)
-  return { present, late, absent, other, total, attendedPercent: total === 0 ? null : Math.round(((present + late) / total) * 100) }
+export function examOpens(type: string, termHasReportCard: boolean): 'reportCard' | 'detail' {
+  return isEndTermExam(type) && termHasReportCard ? 'reportCard' : 'detail'
+}
+
+/**
+ * The headline result for a term, worded exactly as the student's own results screen words it:
+ * "Points" for MSCE (Forms 3-4, the sum of the six best subjects, lower is better) and "Grade" for JCE.
+ */
+export function termHeadline(t: { gradingTrack: 'JCE' | 'MSCE' | null; aggregatePoints: number | null; grade: string | null }):
+  { label: 'Points' | 'Grade'; value: string; hint: string } {
+  if (t.gradingTrack === 'MSCE') {
+    return {
+      label: 'Points',
+      value: t.aggregatePoints !== null ? String(t.aggregatePoints) : '—',
+      hint: t.aggregatePoints !== null ? 'Aggregate of the six best subjects' : 'Needs six graded subjects',
+    }
+  }
+  return { label: 'Grade', value: gradeText(t.grade) ?? '—', hint: 'Overall grade for the term' }
+}
+
+/** One auditable sentence, in the student view's words: the verdict and what it rests on. */
+export function termVerdict(t: {
+  term: number | null; passStatus: boolean | null; gradingTrack: 'JCE' | 'MSCE' | null; aggregatePoints: number | null
+  grade: string | null; subjects: readonly { pass: boolean | null }[]
+}): { passed: boolean; headline: string; detail: string } | null {
+  if (t.passStatus === null) return null
+  const passedCount = t.subjects.filter((s) => s.pass === true).length
+  const tail = t.gradingTrack === 'MSCE' && t.aggregatePoints !== null ? `, aggregate ${t.aggregatePoints} points`
+    : t.gradingTrack !== 'MSCE' && gradeText(t.grade) ? `, overall grade ${gradeText(t.grade)}` : ''
+  return {
+    passed: t.passStatus,
+    headline: t.passStatus ? `Passed Term ${t.term ?? ''}`.trim() : 'Did not meet the pass requirement this term',
+    detail: `${passedCount} of ${t.subjects.length} subject${t.subjects.length === 1 ? '' : 's'} passed${tail}`,
+  }
 }
 
 export function percentText(value: number | null): string {

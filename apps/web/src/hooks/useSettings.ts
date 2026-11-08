@@ -48,11 +48,15 @@ export interface GradingScaleRow {
 }
 
 /** All grading scale rows, optionally filtered to one exam type client-side. */
-export function useGradingScales(examType?: GradingScaleRow['examType']) {
+/** `enabled: false` skips the request. The report card passes it when the server already embedded
+ *  the scale in the payload, which also keeps a parent (who may not read settings) from making a
+ *  request that can only be refused. */
+export function useGradingScales(examType?: GradingScaleRow['examType'], enabled = true) {
   return useQuery({
     queryKey: ['settings', 'grading-scales'],
     queryFn:  () => apiFetch<GradingScaleRow[]>('/settings/grading-scales'),
     select:   (rows) => (examType ? rows.filter((r) => r.examType === examType) : rows),
+    enabled,
   })
 }
 

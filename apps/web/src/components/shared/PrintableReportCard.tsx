@@ -396,7 +396,7 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
 
   // The scale: server-supplied with the card; a stale payload falls back to the live settings rows.
   const examTypeKey = maneb ? maneb.examType : (isMsce ? 'INTERNAL_F3F4' : 'INTERNAL_F1F2')
-  const { data: fetched = [] } = useGradingScales(examTypeKey)
+  const { data: fetched = [] } = useGradingScales(examTypeKey, !data.gradingScale?.length)
   const scale: ReportGradeScaleRow[] = data.gradingScale?.length
     ? data.gradingScale
     : [...fetched].sort((a, b) => a.displayOrder - b.displayOrder).map((r) => ({ grade: r.grade, minPercent: r.minPercent, maxPercent: r.maxPercent, pass: r.pass, label: r.label }))

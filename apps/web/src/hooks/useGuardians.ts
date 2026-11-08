@@ -141,6 +141,11 @@ export interface OnboardingBatchReport {
     reason: string | null
     flags: string[]
     createdLinkId: string | null
+    /** Names so a row can be recognised at a glance. Never a phone number or e-mail. */
+    studentName: string | null
+    registrationNo: string | null
+    guardianName: string | null
+    relation: string | null
   }>
   take: number
 }

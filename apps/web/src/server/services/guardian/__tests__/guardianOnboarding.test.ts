@@ -28,7 +28,8 @@ beforeEach(() => {
   ;({ mem, db } = makeDb())
   audits = []
   mem.seed('student', [
-    { id: 's1', status: 'ACTIVE', classId: 'c1' }, { id: 's2', status: 'ACTIVE', classId: 'c1' },
+    { id: 's1', status: 'ACTIVE', classId: 'c1', firstName: 'Chisomo', lastName: 'Zulu', registrationNo: 'R001' },
+    { id: 's2', status: 'ACTIVE', classId: 'c1', firstName: 'Tadala', lastName: 'Kondowe', registrationNo: 'R002' },
     { id: 's3', status: 'GRADUATED', classId: 'c1' }, { id: 's4', status: 'AWAITING_MANEB_RESULTS', classId: 'c2' },
   ])
   mem.seed('studentGuardian', [
@@ -245,14 +246,38 @@ describe('rollback', () => {
 })
 
 describe('getBatch (report)', () => {
-  it('shows ids, actions and flag names only: no names, numbers or emails', async () => {
+  it('names the student and the guardian so staff can recognise each row, but never a phone number or e-mail', async () => {
     const { batchId } = await dryRun(db, {}, admin())
     await apply(db, batchId, {}, admin())
-    const text = JSON.stringify(await getBatch(db, batchId, {}, admin()))
-    for (const pii of ['Banda', 'Moyo', 'Phiri', '0999', '+265', '@']) expect(text, pii).not.toContain(pii)
+    const report = await getBatch(db, batchId, {}, admin())
+    const text = JSON.stringify(report)
+    for (const pii of ['0999', '+265', '0888', '0777', '@', 'phone', 'email', 'altPhone']) expect(text, pii).not.toContain(pii)
+    const sg1 = report.items.find((i) => i.directoryEntryId === 'sg1')!
+    expect(sg1).toMatchObject({ studentName: 'Chisomo Zulu', registrationNo: 'R001', guardianName: 'Mrs Mary Banda' })
+    expect(report.items.find((i) => i.directoryEntryId === 'sg5')).toMatchObject({ studentName: 'Tadala Kondowe', guardianName: 'John Moyo', relation: 'Neighbour' })
     const rep = await getBatch(db, batchId, { action: 'SKIP_INVALID' }, admin())
     expect(rep.items.map((i) => i.directoryEntryId)).toEqual(['sg3'])
+    expect(rep.items[0]).toMatchObject({ guardianName: 'N/A', studentName: 'Chisomo Zulu' })       // the placeholder name is what staff need to see to fix it
     expect((await getBatch(db, batchId, { take: 1e6 }, admin())).take).toBe(500)
+  })
+  it('a student or card that no longer exists leaves the names null instead of failing the report', async () => {
+    const { batchId } = await dryRun(db, {}, admin())
+    mem.tables['student'] = mem.tables['student']!.filter((s) => s.id !== 's1')
+    mem.tables['studentGuardian'] = mem.tables['studentGuardian']!.filter((c) => c.id !== 'sg1')
+    const item = (await getBatch(db, batchId, {}, admin())).items.find((i) => i.directoryEntryId === 'sg1')!
+    expect(item).toMatchObject({ studentName: null, registrationNo: null, guardianName: null, relation: null })
+  })
+  it('looks names up in two bounded queries, not one per row', async () => {
+    const { batchId } = await dryRun(db, {}, admin())
+    let students = 0, cards = 0
+    const spy = new Proxy(db, { get: (t, p) => {
+      const v = Reflect.get(t, p)
+      if (p === 'student') return { ...v, findMany: (...a: unknown[]) => { students++; return v.findMany(...a) } }
+      if (p === 'studentGuardian') return { ...v, findMany: (...a: unknown[]) => { cards++; return v.findMany(...a) } }
+      return v
+    } })
+    await getBatch(spy, batchId, {}, admin())
+    expect([students, cards]).toEqual([1, 1])
   })
   it('is staff-only and 404s on an unknown batch', async () => {
     expect(await code(getBatch(db, 'ghost', {}, admin()))).toBe('NOT_FOUND')

@@ -13,8 +13,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Play, Undo2 } from 'lucide-react'
-import { GUARDIAN_ONBOARDING_ACTIONS, GUARDIAN_ONBOARDING_ACTION_LABELS } from '@shared/constants/guardianPortal'
+import { ChevronLeft, ChevronRight, Loader2, Play, Undo2 } from 'lucide-react'
+import { GUARDIAN_ONBOARDING_ACTIONS, GUARDIAN_ONBOARDING_ACTION_LABELS, type GuardianOnboardingActionValue } from '@shared/constants/guardianPortal'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { useClasses } from '@/hooks/useClasses'
 import {
@@ -43,6 +43,57 @@ const STATUS_TEXT = {
 
 const BTN =
   'inline-flex items-center justify-center gap-1.5 min-h-11 px-4 rounded-xl text-sm font-heading font-semibold transition-colors disabled:opacity-60 disabled:pointer-events-none'
+
+const ITEMS_PAGE = 100
+const CHIP = 'inline-flex items-center min-h-11 px-3.5 rounded-full text-sm font-medium border transition-colors'
+
+/** Who each row is about, with a filter by what would happen to it. Names come from the report itself. */
+function BatchItems({ batchId }: { batchId: string }) {
+  const [action, setAction] = useState<GuardianOnboardingActionValue | null>(null)
+  const [skip, setSkip] = useState(0)
+  const q = useOnboardingReport(batchId, action, skip)
+  const items = q.data?.items ?? []
+  const pick = (a: GuardianOnboardingActionValue | null) => { setAction(a); setSkip(0) }
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-medium text-body">Who is in this preview</p>
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by what will happen">
+        {[null, ...GUARDIAN_ONBOARDING_ACTIONS].map((a) => (
+          <button key={a ?? 'all'} type="button" aria-pressed={action === a} onClick={() => pick(a)}
+            className={`${CHIP} ${action === a ? 'bg-brand-teal text-white border-brand-teal' : 'border-base text-muted hover:text-body hover:bg-page'}`}>
+            {a ? GUARDIAN_ONBOARDING_ACTION_LABELS[a] : 'All'}
+          </button>
+        ))}
+      </div>
+      {q.isLoading && <p className="text-sm text-muted" role="status">Loading…</p>}
+      {q.isError && <p role="alert" className="text-sm text-body">Could not load the list. <button type="button" className="font-medium underline" onClick={() => q.refetch()}>Try again</button></p>}
+      {q.data && items.length === 0 && <p className="text-sm text-muted">{skip > 0 ? 'No more.' : 'Nobody matches this filter.'}</p>}
+      {items.length > 0 && (
+        <ul className="divide-y divide-[var(--border-base,rgba(0,0,0,0.08))]">
+          {items.map((i) => (
+            <li key={i.id} className="py-3 flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-body truncate">{i.studentName ?? 'Unknown student'}{i.registrationNo ? <span className="font-normal text-muted"> · {i.registrationNo}</span> : null}</span>
+                <span className="block text-sm text-muted truncate">{i.guardianName ?? 'Unknown guardian'}{i.relation ? ` · ${i.relation}` : ''}</span>
+              </span>
+              <span className="text-right">
+                <span className="block text-sm text-body">{GUARDIAN_ONBOARDING_ACTION_LABELS[i.action]}</span>
+                {i.flags.length > 0 && <span className="block text-xs text-muted">{i.flags.map(flagLabel).join(', ')}</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {(skip > 0 || items.length === ITEMS_PAGE) && (
+        <nav className="flex items-center justify-between" aria-label="Pages">
+          <button type="button" disabled={skip === 0} onClick={() => setSkip(Math.max(0, skip - ITEMS_PAGE))} className={`${BTN} border border-base text-body hover:bg-page`}><ChevronLeft className="w-4 h-4" aria-hidden />Previous</button>
+          <span className="text-sm text-muted">Showing {skip + 1}–{skip + items.length}</span>
+          <button type="button" disabled={items.length < ITEMS_PAGE} onClick={() => setSkip(skip + ITEMS_PAGE)} className={`${BTN} border border-base text-body hover:bg-page`}>Next<ChevronRight className="w-4 h-4" aria-hidden /></button>
+        </nav>
+      )}
+    </div>
+  )
+}
 
 export function GuardianOnboardingTab() {
   const classes = useClasses()
@@ -148,6 +199,8 @@ export function GuardianOnboardingTab() {
               </ul>
             </div>
           )}
+
+          <BatchItems batchId={summary.batchId} />
 
           {summary.truncated && (
             <p role="note" className="rounded-xl border border-status-warning/40 bg-status-warning/10 p-3 text-sm text-body">

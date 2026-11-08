@@ -19,10 +19,10 @@ const parentRoutes = inv.filter((e) => e.fullPath.startsWith('/api/parent'))
 const key = (e: { method: string; fullPath: string }) => `${e.method.toUpperCase()} ${e.fullPath.replace(/^\/api/, '')}`
 
 describe('/parent router', () => {
-  it('is exactly these six read-only routes', () => {
+  it('is exactly these seven read-only routes', () => {
     expect(parentRoutes.map(key).sort()).toEqual([
       'GET /parent/children', 'GET /parent/children/:linkId', 'GET /parent/children/:linkId/attendance',
-      'GET /parent/children/:linkId/fees', 'GET /parent/children/:linkId/results', 'GET /parent/me',
+      'GET /parent/children/:linkId/fees', 'GET /parent/children/:linkId/report-card', 'GET /parent/children/:linkId/results', 'GET /parent/me',
     ])
   })
 
@@ -42,8 +42,11 @@ describe('/parent router', () => {
     expect(src).toMatch(/Cache-Control['"], ['"]no-store/)
   })
 
-  it('takes NO owner id, body or query from the client: the only client input is the link id', () => {
-    expect(src).not.toMatch(/req\.(body|query)\b/)
+  it('takes NO owner id or body from the client: the only identifier is the link id, and the only query fields are the period', () => {
+    expect(src).not.toMatch(/req\.body\b/)
+    // A period (which year/term to show) is a filter, not an identifier. Nothing else may ever be read from the query.
+    expect([...new Set([...src.matchAll(/req\.query\.(\w+)/g)].map((m) => m[1]))].sort()).toEqual(['academicYear', 'term'])
+    expect(src).not.toMatch(/req\.query\b(?!\.(academicYear|term)\b)/)
     expect(src).not.toMatch(/req\.params\.(?!linkId\b)/)        // no other client-supplied identifier, ever
     expect(src).not.toMatch(/req\.params\b(?!\.linkId)/)
     expect(src).toMatch(/req\.params\.linkId/)

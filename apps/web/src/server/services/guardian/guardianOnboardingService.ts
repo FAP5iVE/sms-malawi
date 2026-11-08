@@ -273,16 +273,37 @@ export async function getBatch(db: GuardianDb, batchId: string, input: { take?: 
   const items = await db.guardianOnboardingItem.findMany({
     where: { batchId, ...(input.action ? { action: input.action } : {}) }, orderBy: { id: 'asc' }, take, skip: Math.max(input.skip ?? 0, 0),
   })
+  // Names so staff can recognise a row without opening each student: two bounded lookups for the
+  // page of items (never one per row), selecting only the name fields. Phones and e-mails are
+  // deliberately not part of this report.
+  const studentIds = [...new Set(items.map((i) => i.studentId as string))]
+  const entryIds = [...new Set(items.map((i) => i.directoryEntryId as string))]
+  const [students, cards] = await Promise.all([
+    studentIds.length ? db.student.findMany({ where: { id: { in: studentIds } }, select: { id: true, firstName: true, lastName: true, registrationNo: true } }) : Promise.resolve([]),
+    entryIds.length ? db.studentGuardian.findMany({ where: { id: { in: entryIds } }, select: { id: true, fullName: true, relation: true } }) : Promise.resolve([]),
+  ])
+  const studentById = new Map(students.map((s) => [s.id as string, s]))
+  const cardById = new Map(cards.map((c) => [c.id as string, c]))
+  const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null)
   return {
     batch: {
       id: batch.id, status: batch.status, scope: batch.scope, summary: batch.summary, createdAt: batch.createdAt,
       appliedAt: batch.appliedAt ?? null, rolledBackAt: batch.rolledBackAt ?? null,
     },
-    // Ids, actions and flag NAMES only: no names, phones or emails in the report.
-    items: items.map((i) => ({
-      id: i.id, directoryEntryId: i.directoryEntryId, studentId: i.studentId, action: i.action, reason: i.reason ?? null,
-      flags: Array.isArray(i.flags) ? i.flags : [], createdLinkId: i.createdLinkId ?? null,
-    })),
+    // Ids, actions, flag NAMES and the student's and guardian's names for recognition. No phone
+    // numbers or e-mail addresses.
+    items: items.map((i) => {
+      const s = studentById.get(i.studentId as string)
+      const c = cardById.get(i.directoryEntryId as string)
+      return {
+        id: i.id, directoryEntryId: i.directoryEntryId, studentId: i.studentId, action: i.action, reason: i.reason ?? null,
+        flags: Array.isArray(i.flags) ? i.flags : [], createdLinkId: i.createdLinkId ?? null,
+        studentName: s ? [text(s.firstName), text(s.lastName)].filter(Boolean).join(' ') || null : null,
+        registrationNo: s ? text(s.registrationNo) : null,
+        guardianName: c ? text(c.fullName) : null,
+        relation: c ? text(c.relation) : null,
+      }
+    }),
     take,
   }
 }

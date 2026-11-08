@@ -8,9 +8,9 @@ Every server entry point, extracted from source by `test/security/endpointInvent
 
 | Measure | Count |
 |---|---:|
-| Express endpoints (mounted under `/api`) | 604 |
+| Express endpoints (mounted under `/api`) | 605 |
 | — mutations (non-GET) | 279 |
-| — with a role/permission gate | 518 (250 mutations) |
+| — with a role/permission gate | 519 (250 mutations) |
 | — signed-in only, with a declared policy | 62 |
 | — public (no identity) | 24 |
 | — declared `cron-or-admin` | 1 |
@@ -597,6 +597,7 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 |  | GET | `/api/parent/children/:linkId` | `requireRole([parent])` |  | :linkId |
 |  | GET | `/api/parent/children/:linkId/attendance` | `requireRole([parent])` |  | :linkId |
 |  | GET | `/api/parent/children/:linkId/fees` | `requireRole([parent])` |  | :linkId |
+|  | GET | `/api/parent/children/:linkId/report-card` | `requireRole([parent])` |  | :linkId |
 |  | GET | `/api/parent/children/:linkId/results` | `requireRole([parent])` |  | :linkId |
 |  | GET | `/api/parent/me` | `requireRole([parent])` |  | — |
 

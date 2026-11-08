@@ -42,6 +42,8 @@ export interface GuardianDb {
   student: Delegate
   class: Delegate
   termResult: Delegate
+  exam: Delegate
+  examMark: Delegate
   invoice: Delegate
   payment: Delegate
   attendance: Delegate

@@ -15,22 +15,23 @@ import type { GuardianCapability } from '@shared/constants/guardianPortal'
 import { toChildDto } from '@/server/lib/guardian/parentDto'
 import type { GuardianDb } from './db'
 import { authorizeChild, findGuardianProfile, listChildren, recordAccess } from './guardianAccess'
-import { getChildAttendance, getChildFees, getChildResults, type ParentDeps } from './parentPortalService'
+import { getChildAttendance, getChildFees, getChildReportCard, getChildResults, type ParentDeps } from './parentPortalService'
 
 export interface HttpResult { status: number; body: unknown }
 
 export const NOT_FOUND: HttpResult = Object.freeze({ status: 404, body: Object.freeze({ error: 'Not found' }) }) as HttpResult
 export const FORBIDDEN: HttpResult = Object.freeze({ status: 403, body: Object.freeze({ error: 'Access denied for your role' }) }) as HttpResult
 
-export type ChildModule = 'profile' | 'results' | 'fees' | 'attendance'
+export type ChildModule = 'profile' | 'results' | 'reportCard' | 'fees' | 'attendance'
 
 /** The single source of truth for which capability each module needs. */
 export const MODULE_CAPABILITY: Readonly<Record<ChildModule, GuardianCapability>> = Object.freeze({
-  profile: 'profile', results: 'results', fees: 'fees', attendance: 'attendance',
+  // The report card is part of results: it needs the same grant and can never be opened without it.
+  profile: 'profile', results: 'results', reportCard: 'results', fees: 'fees', attendance: 'attendance',
 })
 
 /** Reads worth a "who looked at what" record even when allowed. Denials are always recorded. */
-const LOG_WHEN_ALLOWED: readonly ChildModule[] = ['results', 'fees']
+const LOG_WHEN_ALLOWED: readonly ChildModule[] = ['results', 'reportCard', 'fees']
 
 export async function getMe(db: GuardianDb, uid: unknown): Promise<HttpResult> {
   const profile = await findGuardianProfile(db, uid)
@@ -44,8 +45,13 @@ export async function getChildren(db: GuardianDb, uid: unknown): Promise<HttpRes
   return { status: 200, body: { children: r.children } }
 }
 
+/** Optional ?academicYear=YYYY/YYYY&term=1..3 on the modules that are period-specific. */
+export interface PeriodQuery { academicYear?: unknown; term?: unknown }
+
+const BAD_PERIOD: HttpResult = Object.freeze({ status: 400, body: Object.freeze({ error: 'academicYear (YYYY/YYYY) and term (1-3) are required' }) }) as HttpResult
+
 export async function getChildModule(
-  db: GuardianDb, deps: ParentDeps, input: { uid: unknown; linkId: unknown; module: ChildModule },
+  db: GuardianDb, deps: ParentDeps, input: { uid: unknown; linkId: unknown; module: ChildModule; query?: PeriodQuery },
 ): Promise<HttpResult> {
   const capability = MODULE_CAPABILITY[input.module]
   if (!capability) return NOT_FOUND                                   // unknown module name: same answer
@@ -66,7 +72,15 @@ export async function getChildModule(
       return { status: 200, body: { child: toChildDto(ctx.link, ctx.student, cls?.name ?? null) } }
     }
     case 'results': return { status: 200, body: await getChildResults(db, ctx, deps) }
+    case 'reportCard': {
+      // Validated only AFTER authorization, so a malformed request tells a stranger nothing.
+      const year = input.query?.academicYear
+      const term = Number(input.query?.term)
+      if (typeof year !== 'string' || !/^\d{4}\/\d{4}$/.test(year) || ![1, 2, 3].includes(term)) return BAD_PERIOD
+      const card = await getChildReportCard(db, ctx, deps, { academicYear: year, term: term as 1 | 2 | 3 })
+      return card === null ? NOT_FOUND : { status: 200, body: card }
+    }
     case 'fees': return { status: 200, body: await getChildFees(db, ctx) }
-    case 'attendance': return { status: 200, body: await getChildAttendance(db, ctx) }
+    case 'attendance': return { status: 200, body: await getChildAttendance(db, ctx, deps, input.query ?? {}) }
   }
 }

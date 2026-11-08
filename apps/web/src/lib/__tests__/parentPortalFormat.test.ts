@@ -6,8 +6,9 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
-  attendanceFigures, attendanceLabel, availableSections, childName, formatDay, formatMwk, gradeText,
-  humanize, invoiceStatusLabel, invoiceStatusTone, paymentMethodLabel, percentText, termLabel,
+  attendanceByDate, attendanceLabel, availableSections, buildMonthGrid, childName, examTypeLabel, formatDay, formatMwk, gradeText,
+  examOpens, humanize, invoiceStatusLabel, invoiceStatusTone, isEndTermExam, isFutureMonth, monthLabel, paymentMethodLabel, percentText,
+  shiftMonth, termHeadline, termLabel, termVerdict,
 } from '../parentPortalFormat'
 
 describe('formatMwk', () => {
@@ -58,25 +59,85 @@ describe('status wording', () => {
   })
 })
 
-describe('attendanceFigures', () => {
-  it('counts late as attended and rounds the rate', () => {
-    expect(attendanceFigures({ windowSize: 10, byStatus: { PRESENT: 7, LATE: 1, ABSENT: 2 } }))
-      .toEqual({ present: 7, late: 1, absent: 2, other: 0, total: 10, attendedPercent: 80 })
-    expect(attendanceFigures({ windowSize: 3, byStatus: { PRESENT: 2, ABSENT: 1 } }).attendedPercent).toBe(67)
+describe('attendance calendar', () => {
+  it('builds the same Sun-Sat grid the student page draws, with leading blanks and every day keyed yyyy-mm-dd', () => {
+    const g = buildMonthGrid(2026, 2)                      // March 2026 starts on a Sunday
+    expect(g.leadingBlanks).toBe(0)
+    expect(g.days).toHaveLength(31)
+    expect(g.days[0]).toEqual({ day: 1, key: '2026-03-01' })
+    expect(g.days[30]).toEqual({ day: 31, key: '2026-03-31' })
+    expect(buildMonthGrid(2026, 3).leadingBlanks).toBe(3)  // April 2026 starts on a Wednesday
   })
-  it('puts unrecognised statuses in "other" rather than inventing attendance', () => {
-    const f = attendanceFigures({ windowSize: 5, byStatus: { PRESENT: 2, UNKNOWN: 3 } })
-    expect(f.other).toBe(3)
-    expect(f.attendedPercent).toBe(40)
+  it('knows month lengths, including February in leap and non-leap years', () => {
+    expect(buildMonthGrid(2024, 1).days).toHaveLength(29)
+    expect(buildMonthGrid(2026, 1).days).toHaveLength(28)
+    expect(buildMonthGrid(2026, 11).days).toHaveLength(31)
   })
-  it('has no rate (not 0%) when nothing is recorded', () => {
-    expect(attendanceFigures({ windowSize: 0, byStatus: {} }).attendedPercent).toBeNull()
+  it('labels months in words', () => {
+    expect(monthLabel(2026, 2)).toBe('March 2026')
   })
-  it('never goes negative or non-integer on odd input', () => {
-    const f = attendanceFigures({ windowSize: 4, byStatus: { PRESENT: 9, ABSENT: -2, LATE: 1.9 } })
-    expect(f.other).toBe(0)
-    expect(f.absent).toBe(0)
-    expect(f.late).toBe(1)
+  it('steps across year boundaries in both directions', () => {
+    expect(shiftMonth(2026, 0, -1)).toEqual({ year: 2025, monthIndex: 11 })
+    expect(shiftMonth(2026, 11, 1)).toEqual({ year: 2027, monthIndex: 0 })
+  })
+  it('stops the next button at the first future month', () => {
+    const now = new Date('2026-11-08T10:00:00Z')
+    expect(isFutureMonth(2026, 10, now)).toBe(false)
+    expect(isFutureMonth(2026, 11, now)).toBe(true)
+    expect(isFutureMonth(2025, 11, now)).toBe(false)
+  })
+  it('indexes records by calendar day and ignores malformed ones', () => {
+    const m = attendanceByDate([
+      { date: '2026-03-02T00:00:00.000Z', status: 'ABSENT' }, { date: '2026-03-01T00:00:00.000Z', status: 'LATE' },
+      { date: null, status: 'PRESENT' }, { date: 'junk', status: 'PRESENT' }, { date: '2026-03-03T00:00:00.000Z', status: null },
+    ])
+    expect([...m.entries()].sort()).toEqual([['2026-03-01', 'LATE'], ['2026-03-02', 'ABSENT']])
+  })
+})
+
+describe('exam labels', () => {
+  it('words every exam type and only end-of-term exams open as a report card', () => {
+    expect(examTypeLabel('WEEKLY_TEST')).toBe('Weekly test')
+    expect(examTypeLabel('END_TERM')).toBe('End of term')
+    expect(examTypeLabel('SOMETHING_NEW')).toBe('Something New')
+    expect(isEndTermExam('END_TERM')).toBe(true)
+    for (const t of ['WEEKLY_TEST', 'ASSIGNMENT', 'QUIZ', 'MIDTERM', 'MANEB_JCE', 'MANEB_MSCE']) expect(isEndTermExam(t), t).toBe(false)
+  })
+})
+
+describe('what tapping an exam opens', () => {
+  it('an end-of-term exam opens the report card when the term has one', () => {
+    expect(examOpens('END_TERM', true)).toBe('reportCard')
+  })
+  it('an end-of-term exam with no report card available falls back to its own detail', () => {
+    expect(examOpens('END_TERM', false)).toBe('detail')
+  })
+  it('every other exam opens its own detail, even when the term has a report card', () => {
+    for (const t of ['WEEKLY_TEST', 'ASSIGNMENT', 'QUIZ', 'MIDTERM', 'MANEB_JCE', 'MANEB_MSCE', 'ANYTHING']) {
+      expect(examOpens(t, true), t).toBe('detail')
+      expect(examOpens(t, false), t).toBe('detail')
+    }
+  })
+})
+
+describe('termHeadline / termVerdict (worded as the student view words them)', () => {
+  it('MSCE shows Points, never a Grade; fewer than six graded subjects says so', () => {
+    expect(termHeadline({ gradingTrack: 'MSCE', aggregatePoints: 14, grade: '' })).toEqual({ label: 'Points', value: '14', hint: 'Aggregate of the six best subjects' })
+    expect(termHeadline({ gradingTrack: 'MSCE', aggregatePoints: null, grade: '7' })).toEqual({ label: 'Points', value: '—', hint: 'Needs six graded subjects' })
+  })
+  it('JCE (or unknown) shows the overall Grade, a dash when there is none', () => {
+    expect(termHeadline({ gradingTrack: 'JCE', aggregatePoints: null, grade: 'B' }).value).toBe('B')
+    expect(termHeadline({ gradingTrack: null, aggregatePoints: null, grade: '' })).toMatchObject({ label: 'Grade', value: '—' })
+  })
+  it('the verdict states what it rests on: subjects passed and points or grade', () => {
+    const subjects = [{ pass: true }, { pass: true }, { pass: false }]
+    expect(termVerdict({ term: 2, passStatus: true, gradingTrack: 'MSCE', aggregatePoints: 14, grade: '', subjects }))
+      .toEqual({ passed: true, headline: 'Passed Term 2', detail: '2 of 3 subjects passed, aggregate 14 points' })
+    expect(termVerdict({ term: 1, passStatus: false, gradingTrack: 'JCE', aggregatePoints: null, grade: 'D', subjects: [{ pass: false }] }))
+      .toEqual({ passed: false, headline: 'Did not meet the pass requirement this term', detail: '0 of 1 subject passed, overall grade D' })
+  })
+  it('no verdict at all when the pass flag was not recorded', () => {
+    expect(termVerdict({ term: 1, passStatus: null, gradingTrack: null, aggregatePoints: null, grade: null, subjects: [] })).toBeNull()
   })
 })
 

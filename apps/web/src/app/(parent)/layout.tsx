@@ -54,7 +54,7 @@ function ParentShell({ children }: { children: ReactNode }) {
     <div className="min-h-dvh bg-page text-body">
       <SessionManager />
       <header className="sticky top-0 z-30 border-b border-base bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-3 py-3 sm:px-6">
           <Link href="/parent" className="font-heading font-bold text-body">Parent portal</Link>
           <div className="flex items-center gap-1.5">
             {me.data?.displayName && <span className="hidden sm:inline max-w-48 truncate text-sm text-muted">{me.data.displayName}</span>}
@@ -68,7 +68,7 @@ function ParentShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-3xl px-4 py-5">
+      <main className="mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
         <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>
       </main>
     </div>

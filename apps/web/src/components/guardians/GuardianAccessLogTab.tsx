@@ -15,6 +15,9 @@ import { GUARDIAN_CAPABILITY_LABELS, denyReasonLabel, isGuardianCapability } fro
 import { useGuardianAccessLog, useGuardianStudentView } from '@/hooks/useGuardians'
 import { GuardianStudentPicker, type PickedStudent } from './GuardianStudentPicker'
 
+/** Sections that are logged on their own but are not a grantable capability. */
+const EXTRA_MODULE_LABELS: Readonly<Record<string, string>> = { reportCard: 'Report card' }
+
 function fmtWhen(iso: string): string {
   const d = new Date(iso)
   return Number.isNaN(d.getTime())
@@ -73,7 +76,7 @@ export function GuardianAccessLogTab() {
                 <tr key={r.id} className="border-b border-base last:border-0 align-top">
                   <td className="px-4 py-3 whitespace-nowrap text-muted">{fmtWhen(r.createdAt)}</td>
                   <td className="px-4 py-3 text-body">{names.get(r.profileId) ?? 'Unknown guardian'}</td>
-                  <td className="px-4 py-3 text-body">{isGuardianCapability(r.module) ? GUARDIAN_CAPABILITY_LABELS[r.module].label : r.module}</td>
+                  <td className="px-4 py-3 text-body">{isGuardianCapability(r.module) ? GUARDIAN_CAPABILITY_LABELS[r.module].label : (EXTRA_MODULE_LABELS[r.module] ?? r.module)}</td>
                   <td className="px-4 py-3">
                     {r.outcome === 'ALLOWED'
                       ? <span className="rounded-full px-2.5 py-1 text-xs font-medium bg-status-success/10 text-status-success">Viewed</span>

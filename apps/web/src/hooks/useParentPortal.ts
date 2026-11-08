@@ -10,8 +10,9 @@
  *   The response types mirror parentDto.ts (the only shapes a guardian ever receives).
  * [DEPENDS ON]: @/lib/api-client (apiFetch, queryKeys), @shared/constants/guardianPortal
  */
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { GuardianCapability } from '@shared/constants/guardianPortal'
+import type { ReportCardData } from '@/components/shared/PrintableReportCard'
 import { apiFetch, queryKeys, ApiError } from '@/lib/api-client'
 
 export interface ParentChild {
@@ -26,13 +27,33 @@ export interface ParentChild {
   capabilities: GuardianCapability[]
 }
 
+export interface ParentExam {
+  id: string
+  title: string
+  subject: string
+  type: string
+  academicYear: string | null
+  term: number | null
+  date: string | null
+  maxMark: number | null
+  /** null when the child was absent or no mark was recorded. */
+  mark: number | null
+  percent: number | null
+  absent: boolean
+}
+
 export interface ParentResultsTerm {
   academicYear: string | null
   term: number | null
-  /** true = held back; no marks are sent at all. */
+  /** true = held back for unpaid fees; no marks and no exams are sent at all. */
   withheld: boolean
+  /** false for a term that has released exams but no computed term result yet. */
+  hasSummary: boolean
   average: number | null
   grade: string | null
+  gradingTrack: 'JCE' | 'MSCE' | null
+  aggregatePoints: number | null
+  aggregateSubjects: string[]
   classPosition: number | null
   classSize: number | null
   passStatus: boolean | null
@@ -41,6 +62,9 @@ export interface ParentResultsTerm {
   subjects: Array<{ subject: string; average: number | null; grade: string | null; pass: boolean | null }>
   teacherComment: string | null
   headComment: string | null
+  exams: ParentExam[]
+  /** true when this term's report card can be opened. */
+  reportCard: boolean
 }
 
 export interface ParentInvoice {
@@ -64,8 +88,12 @@ export interface ParentFees {
 }
 
 export interface ParentAttendance {
-  summary: { windowSize: number; byStatus: Record<string, number> }
-  recent: Array<{ date: string | null; status: string | null }>
+  /** The term the summary describes (the school's current term unless one was asked for). */
+  period: { academicYear: string; term: number }
+  /** The same figures the student's own attendance page shows for that term. */
+  summary: { present: number; late: number; absent: number; recorded: number; attendanceRate: number | null }
+  /** Day records, newest first (about two school years), for the calendar. */
+  records: Array<{ date: string | null; status: string | null }>
 }
 
 /** Do not retry a refusal: a 403/404 will not become a 200 by asking again. */
@@ -105,10 +133,23 @@ export function useChildFees(linkId: string, enabled: boolean) {
   })
 }
 
-export function useChildAttendance(linkId: string, enabled: boolean) {
+export function useChildAttendance(linkId: string, enabled: boolean, period?: { academicYear: string; term: number }) {
+  const qs = period ? `?academicYear=${encodeURIComponent(period.academicYear)}&term=${period.term}` : ''
   return useQuery({
-    queryKey: queryKeys.parent.child(linkId, 'attendance'),
-    queryFn: () => apiFetch<ParentAttendance>(childPath(linkId, 'attendance')),
+    queryKey: queryKeys.parent.child(linkId, 'attendance', period ? `${period.academicYear}|${period.term}` : ''),
+    queryFn: () => apiFetch<ParentAttendance>(`${childPath(linkId, 'attendance')}${qs}`),
     enabled, retry,
+    // Switching term keeps the calendar on screen instead of flashing a loading state.
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** The school's official report card for one term, the same payload the student's own screen prints. */
+export function useChildReportCard(linkId: string, academicYear: string, term: number, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.parent.child(linkId, 'reportCard', `${academicYear}|${term}`),
+    queryFn: () => apiFetch<ReportCardData>(`${childPath(linkId, 'report-card')}?academicYear=${encodeURIComponent(academicYear)}&term=${term}`),
+    enabled: enabled && Boolean(academicYear) && term >= 1 && term <= 3,
+    retry: false,                                        // a refusal (fees, release) will not change by asking again
   })
 }
