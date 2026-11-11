@@ -114,6 +114,71 @@ for (const sky of SKIES) {
   rows.push({ sky, pair: 'on over ink (button label)', need: 4.5, got: ratio(get('on'), ink) })
 }
 
+// ── Phase 3: the sign-in card ───────────────────────────────────────────────
+// The card follows the Light/Dark THEME, not the sky: --card at 92% over the sky
+// (worst of top, middle and bottom), text in --card-foreground, accents from
+// `.hills-auth__card` (light) and `.dark .hills-auth__card` (dark). All four
+// skies are tried under both themes, because Auto can show a dusk sky on a
+// light-theme device.
+function hslTriplet(block: RegExp, name: string): RGBA {
+  const b = block.exec(css)
+  if (!b) throw new Error(`Block for ${name} not found in globals.css`)
+  const m = new RegExp(`--${name}:\\s*([\\d.]+)\\s+([\\d.]+)%\\s+([\\d.]+)%`).exec(b[0])
+  if (!m) throw new Error(`--${name} not found`)
+  const h = Number(m[1]), sat = Number(m[2]) / 100, l = Number(m[3]) / 100
+  const k = (n: number) => (n + h / 30) % 12
+  const a = sat * Math.min(l, 1 - l)
+  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))
+  return [f(0) * 255, f(8) * 255, f(4) * 255, 1]
+}
+const ROOT_BLOCK = /:root\s*\{[^}]*\}/
+const DARK_BLOCK = /\.dark\s*\{[^}]*\}/
+const cardVar = (block: RegExp) => ({
+  card: hslTriplet(block, 'card'),
+  fg: hslTriplet(block, 'card-foreground'),
+})
+function cardTokens(dark: boolean): Record<string, string> {
+  const scopes = [/\.hills-auth__card\s*\{[^}]*--c-ink[^}]*\}/, ...(dark ? [/\.dark\s+\.hills-auth__card\s*\{[^}]*\}/] : [])]
+  const out: Record<string, string> = {}
+  for (const re of scopes) {
+    const m = re.exec(css)
+    if (!m) throw new Error(`card block not found: ${re}`)
+    for (const d of m[0].matchAll(/--c-(acc2|acc|danger|warn):\s*(#[0-9a-f]{6})/gi)) out[d[1] as string] = d[2] as string
+  }
+  return out
+}
+for (const sky of SKIES) {
+  const p = palette(sky)
+  const tint = parseColor(p.tint as string)
+  const s1 = over(tint, parseColor(p['sky-1'] as string))
+  const s2 = over(tint, parseColor(p['sky-2'] as string))
+  const spots: [string, RGBA][] = [['top', s1], ['mid', mix(s1, s2, 0.5)], ['bottom', s2]]
+  for (const dark of [false, true]) {
+    const { card: cardRaw, fg } = cardVar(dark ? DARK_BLOCK : ROOT_BLOCK)
+    const tok = cardTokens(dark)
+    const theme = dark ? 'dark' : 'light'
+    for (const [where, skyBg] of spots) {
+      const card = over([cardRaw[0], cardRaw[1], cardRaw[2], 0.92], skyBg)
+      const at = `card (${theme} theme, ${where})`
+      const add = (name: string, need: number, a: RGBA, b: RGBA) =>
+        rows.push({ sky, pair: `${name} on ${at}`, need, got: ratio(a, b) })
+      const acc = parseColor(tok.acc as string)
+      const danger = parseColor(tok.danger as string)
+      const warn = parseColor(tok.warn as string)
+      add('text', 4.5, fg, card)
+      add('secondary text/placeholder (82%)', 4.5, over([fg[0], fg[1], fg[2], 0.82], card), card)
+      add('link and field focus line (accent)', 4.5, acc, card)
+      for (const [n, c] of [['danger', danger], ['warn', warn]] as const) {
+        const tinted = over([c[0], c[1], c[2], 0.09], card)
+        add(`${n} alert text on its tint`, 4.5, c, tinted)
+      }
+      add('button label on button', 4.5, card, fg)
+      add('button label under skeleton sweep', 4.5, card, mix(fg, card, 0.16))
+      add('button arrow (graphic)', 3, parseColor(tok.acc2 as string), fg)
+    }
+  }
+}
+
 const fails = rows.filter((r) => r.got < r.need)
 if (process.argv.includes('--table') || fails.length > 0) {
   for (const r of rows) {

@@ -65,16 +65,9 @@
  *   9. The header/footer "S" badge is now the real favicon.png mark
  *      (apps/web/public/favicon.png, already in the repo, was only used
  *      as a favicon before) instead of a plain letter "S" in a coloured box.
- *  10. Added a shared decorative "scribble" background, the same organic
- *      line-art language as the login page's background (ScribbleDefs +
- *      ScribbleArt below), scattered across the sections that were a single
- *      flat colour with no texture at all (Announcement Rail, Academic
- *      Advertisements, Discover, Performance, Events, Admissions CTA,
- *      Contact). The Hero is unchanged; the Footer's animated blob layer was
- *      later removed entirely (it now sits directly on its photo). Each section gets a different shape arrangement
- *      (`variant`) so it doesn't read as one stamp repeated down the page,
- *      and opacity is tuned much lower on text-dense light sections than on
- *      the solid brand-colour bands, so it never fights legibility.
+ *  10. [REMOVED in Phase 4, see the revision note below] A decorative line-art
+ *      background that had been scattered across the flat-colour sections.
+ *      The shared sky replaces it.
  *  11. [BUG FIX] Six spots in the header (both nav-link classes, the search
  *      and theme-toggle buttons, the search-close button, and search-result
  *      rows) used `hover:bg-page` / `hover:text-body`, like `text-muted/70`
@@ -96,12 +89,30 @@
  *      @shared/schemas/announcement for the companion fix that stops a new
  *      dateless EVENT from being saved in the first place.
 
+ *
+ * [REVISION, Chikangawa Hills theme, Phase 4: looks only]
+ *   - The page joins the shared sky: <PublicAmbientBackground variant="home" />
+ *     is the first child. The root wrapper no longer paints `bg-page`, so the
+ *     sky shows through the two sections that used to be plain page colour
+ *     (Academic Advertisements, Stay Connected). Their text now sits on
+ *     surface cards, never on the sky. The hero photo and overlay, the
+ *     bg-brand-deep and teal bands and the bg-surface bands stay solid.
+ *   - The page's own line-art doodles are gone (the sky replaces them): the
+ *     gradient-defs helper, the doodle component and all 7 places that used it.
+ *   - All 13 hand-written page-width blocks (header, flyouts, every section,
+ *     footer) use the shared `.hills-container`.
+ *   - The News section gained `relative` so it paints above the fixed sky.
+ *   - The theme button's tooltip names the mode (Auto, Light, Dark).
+ *   Not touched: data hooks, search, newsletter and contact handlers, scroll
+ *   logic, link targets, ids, labels and button text.
+ *
  * [DEPENDS ON]: apps/web/src/hooks/usePublic.ts, next-themes
  */
 
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { SchoolMark } from '@/components/shared/SchoolMark'
+import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 import Link from 'next/link'
 import { useTheme } from 'next-themes'
 import { useHasMounted } from '@/hooks/useHasMounted'
@@ -162,102 +173,6 @@ function formatRelativeDate(iso: string): string {
 }
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
-
-/** Gradient defs shared by every <ScribbleArt> instance on this page, SVG
- *  gradient ids are addressable anywhere in the document, so this renders
- *  once (0×0, visually hidden) and every scribble below just references
- *  these by url(#id) instead of redeclaring the same five gradients per
- *  section. Colours are the project's real brand-* tokens via CSS var(),
- *  the same approach the login page's background art uses, so both
- *  surfaces draw from one accurate source of truth for the palette. */
-function ScribbleDefs() {
-  return (
-    <svg width="0" height="0" className="absolute" aria-hidden>
-      <defs>
-        <linearGradient id="scribbleTeal" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="var(--color-brand-teal-light)" />
-          <stop offset="100%" stopColor="var(--color-brand-teal)" />
-        </linearGradient>
-        <linearGradient id="scribbleCoral" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="var(--color-brand-coral)" />
-          <stop offset="100%" stopColor="var(--color-brand-amber)" />
-        </linearGradient>
-        <linearGradient id="scribbleNavy" x1="20%" y1="0%" x2="80%" y2="100%">
-          <stop offset="0%" stopColor="var(--color-brand-navy-light)" />
-          <stop offset="55%" stopColor="var(--color-brand-navy-mid)" />
-          <stop offset="100%" stopColor="var(--color-brand-navy)" />
-        </linearGradient>
-        <linearGradient id="scribblePurple" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="var(--color-brand-navy-light)" />
-          <stop offset="100%" stopColor="var(--color-brand-navy-mid)" />
-        </linearGradient>
-        <linearGradient id="scribbleAmber" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="var(--color-brand-amber)" />
-          <stop offset="100%" stopColor="var(--color-brand-coral)" />
-        </linearGradient>
-      </defs>
-    </svg>
-  )
-}
-
-/** Decorative organic line-art, same visual language as the login page's
- *  background scribbles, scattered across this page's plain flat-colour
- *  sections. `variant` picks one of five different shape arrangements so
- *  the same motif doesn't repeat identically down the page (mirrors how
- *  the login page scatters its own shapes rather than tiling one). Always
- *  render this as an absolutely-positioned sibling BEFORE a section's real
- *  content, with the content wrapper given `relative z-10` and the
- *  section itself `relative overflow-hidden`, so it never intercepts
- *  clicks or clips real content. */
-function ScribbleArt({ variant, className = '' }: { variant: 1 | 2 | 3 | 4 | 5; className?: string }) {
-  const layouts: Record<1 | 2 | 3 | 4 | 5, React.ReactNode> = {
-    1: (
-      <>
-        <circle cx="90" cy="70" r="42" stroke="url(#scribbleTeal)" strokeWidth="15" fill="none" />
-        <path d="M 850 50 C 900 32 958 54 968 104 C 978 154 928 186 878 176" stroke="url(#scribbleCoral)" strokeWidth="17" strokeLinecap="round" fill="none" />
-        <path d="M 55 250 L 96 250 C 108 250 114 256 114 268 L 114 286 C 114 298 108 304 96 304 L 55 304" stroke="url(#scribbleNavy)" strokeWidth="13" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      </>
-    ),
-    2: (
-      <>
-        <path d="M 918 36 C 958 56 968 106 928 126 C 888 146 848 116 858 76 C 866 44 898 26 928 36" stroke="url(#scribblePurple)" strokeWidth="15" fill="none" />
-        <circle cx="66" cy="222" r="32" stroke="url(#scribbleAmber)" strokeWidth="13" fill="none" />
-        <path d="M 495 26 C 535 16 575 41 570 81 C 565 116 520 131 490 111" stroke="url(#scribbleTeal)" strokeWidth="14" strokeLinecap="round" fill="none" />
-      </>
-    ),
-    3: (
-      <>
-        <path d="M 78 36 C 38 56 28 106 68 126 C 108 146 148 116 138 76 C 130 44 98 26 68 36" stroke="url(#scribbleCoral)" strokeWidth="15" fill="none" />
-        <circle cx="928" cy="240" r="38" stroke="url(#scribbleNavy)" strokeWidth="14" fill="none" />
-        <path d="M 545 244 C 585 254 596 294 561 309 C 526 324 491 299 501 269" stroke="url(#scribblePurple)" strokeWidth="13" strokeLinecap="round" fill="none" />
-      </>
-    ),
-    4: (
-      <>
-        <path d="M 898 192 C 938 212 943 257 903 272 C 863 287 833 257 848 222" stroke="url(#scribbleAmber)" strokeWidth="15" strokeLinecap="round" fill="none" />
-        <circle cx="58" cy="54" r="28" stroke="url(#scribbleTeal)" strokeWidth="12" fill="none" />
-        <path d="M 475 252 L 515 252 C 527 252 533 258 533 270 L 533 280 C 533 292 527 298 515 298 L 475 298" stroke="url(#scribbleNavy)" strokeWidth="13" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      </>
-    ),
-    5: (
-      <>
-        <circle cx="500" cy="44" r="34" stroke="url(#scribbleCoral)" strokeWidth="14" fill="none" />
-        <path d="M 56 192 C 16 212 11 257 51 272 C 91 287 126 257 111 222" stroke="url(#scribbleTeal)" strokeWidth="15" fill="none" />
-        <path d="M 918 54 C 958 69 963 109 928 124 C 893 139 863 114 873 84" stroke="url(#scribbleAmber)" strokeWidth="13" strokeLinecap="round" fill="none" />
-      </>
-    ),
-  }
-  return (
-    <svg
-      className={`absolute inset-0 w-full h-full pointer-events-none ${className}`}
-      viewBox="0 0 1000 340"
-      preserveAspectRatio="xMidYMid slice"
-      aria-hidden
-    >
-      {layouts[variant]}
-    </svg>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -423,8 +338,8 @@ export default function LandingPage() {
         .nav-link-underline:hover::after { width:100%; }
       `}</style>
 
-      <div className="bg-page text-body font-sans">
-        <ScribbleDefs />
+      <div className="text-body font-sans">
+        <PublicAmbientBackground variant="home" />
         {/*
         ══════════════════════════════════════════════════════════════
             HEADER, fixed, transparent over hero, solid once scrolled
@@ -437,7 +352,7 @@ export default function LandingPage() {
               : 'bg-transparent border-white/15'
           }`}
         >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center gap-6">
+          <div className="hills-container h-[72px] flex items-center gap-6">
             <button onClick={() => scrollTo('top')} aria-label="Back to top" className="flex items-center gap-3 shrink-0">
               <SchoolMark kind="emblem" tone={scrolled ? 'auto' : 'onDark'} width={56} height={56} className="w-14 h-14 object-contain shrink-0" />
               <div className="text-left leading-tight hidden sm:block">
@@ -489,6 +404,7 @@ export default function LandingPage() {
               <button
                 onClick={cycleTheme}
                 aria-label={mounted ? `Theme: ${theme}. Click to change.` : 'Toggle theme'}
+                title={mounted ? (theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'Auto') : undefined}
                 className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
                   scrolled ? 'border-base text-foreground hover:bg-background' : 'border-white/25 text-white hover:bg-white/10'
                 }`}
@@ -528,7 +444,7 @@ export default function LandingPage() {
               than either a decorative no-op or new backend infrastructure. */}
           {searchOpen && (
             <div className="border-t border-base bg-surface">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+              <div className="hills-container py-5">
                 <div className="flex items-center gap-3">
                   <Search className="w-4.5 h-4.5 text-muted shrink-0" aria-hidden />
                   <input
@@ -574,7 +490,7 @@ export default function LandingPage() {
           {/* Mega menu */}
           {menuOpen && (
             <div className="border-t border-base bg-brand-deep text-white">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-9 grid grid-cols-2 md:grid-cols-4 gap-8">
+              <div className="hills-container py-9 grid grid-cols-2 md:grid-cols-4 gap-8">
                 {[
                   {
                     title: 'Academics',
@@ -651,7 +567,7 @@ export default function LandingPage() {
           />
           <div className="absolute inset-0 bg-linear-to-b from-[rgba(11,29,51,.55)] via-[rgba(11,29,51,.72)] to-[rgba(11,29,51,.96)]" />
 
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20 pt-[180px] w-full">
+          <div className="relative z-10 hills-container pb-20 pt-[180px] w-full">
             <div className="max-w-3xl fade-up">
               <h1 className="font-heading font-extrabold text-white leading-[1.04] tracking-tight text-5xl md:text-6xl lg:text-7xl mb-4">
                 {schoolInfo?.schoolName ?? 'SMS Malawi'}
@@ -686,8 +602,7 @@ export default function LandingPage() {
             usePublicAnnouncements above)
         ══════════════════════════════════════════════════════════════ */}
         <section id="announcements" className="relative overflow-hidden bg-brand-deep">
-          <ScribbleArt variant={1} className="opacity-[0.16]" />
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 grid md:grid-cols-[200px_1fr] gap-8 items-center">
+          <div className="relative z-10 hills-container py-7 grid md:grid-cols-[200px_1fr] gap-8 items-center">
             <div>
               <h2 className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal-light mb-1.5">
                 Announcements
@@ -722,8 +637,8 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════════
             LATEST NEWS
         ══════════════════════════════════════════════════════════════ */}
-        <section id="news" className="bg-surface py-20 sm:py-24">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section id="news" className="relative bg-surface py-20 sm:py-24">
+          <div className="hills-container">
             <div className="flex items-end justify-between mb-9 gap-4 flex-wrap">
               <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white">
                 Latest News
@@ -809,10 +724,9 @@ export default function LandingPage() {
             another slice of the same feed as News, and every link here
             (section "See all" and every item) pointed at /news.
         ══════════════════════════════════════════════════════════════ */}
-        <section id="ads" className="relative overflow-hidden bg-page py-16 sm:py-18 border-y border-base">
-          <ScribbleArt variant={2} className="opacity-[0.08] dark:opacity-[0.14]" />
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[300px_1fr] gap-12">
-            <div>
+        <section id="ads" className="relative py-16 sm:py-18">
+          <div className="relative z-10 hills-container grid lg:grid-cols-[300px_1fr] gap-6 lg:gap-8">
+            <div className="bg-surface border border-base rounded-3xl p-6 sm:p-8 self-start">
               <h2 className="font-heading font-extrabold text-2xl sm:text-[28px] tracking-tight text-brand-navy dark:text-white mb-3 leading-tight">
                 Academic Advertisements
               </h2>
@@ -826,10 +740,10 @@ export default function LandingPage() {
                 All Advertisements →
               </Link>
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col bg-surface border border-base rounded-3xl px-6 sm:px-8 py-2 sm:py-3">
               {advertsLoading ? (
                 <div className="space-y-5 py-2" role="status" aria-label="Loading advertisements">
-                  {[1, 2, 3].map((i) => <div key={i} className="h-10 bg-surface rounded-lg animate-pulse" />)}
+                  {[1, 2, 3].map((i) => <div key={i} className="h-10 bg-page rounded-lg animate-pulse" />)}
                 </div>
               ) : adItems.length === 0 ? (
                 <p className="text-sm text-muted py-5">No circulars published yet.</p>
@@ -853,8 +767,7 @@ export default function LandingPage() {
             DISCOVER, id="about"
         ══════════════════════════════════════════════════════════════ */}
         <section id="about" className="relative overflow-hidden bg-surface py-20 sm:py-24">
-          <ScribbleArt variant={3} className="opacity-[0.08] dark:opacity-[0.14]" />
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="relative z-10 hills-container">
             <div id="discover" className="max-w-2xl mb-10">
               <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white mb-3.5">
                 Discover
@@ -1001,8 +914,7 @@ export default function LandingPage() {
         ══════════════════════════════════════════════════════════════ */}
         <div id="academics" />
         <section id="performance" className="relative overflow-hidden bg-brand-deep py-20 sm:py-24 text-white">
-          <ScribbleArt variant={4} className="opacity-[0.16]" />
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="relative z-10 hills-container">
             <div className="flex items-end justify-between gap-8 mb-11 flex-wrap">
               <div className="max-w-xl">
                 <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal-light mb-3">
@@ -1117,8 +1029,7 @@ export default function LandingPage() {
             EVENTS, dated announcements
         ══════════════════════════════════════════════════════════════ */}
         <section id="events" className="relative overflow-hidden bg-surface py-20 sm:py-24">
-          <ScribbleArt variant={5} className="opacity-[0.08] dark:opacity-[0.14]" />
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="relative z-10 hills-container">
             <div className="flex items-end justify-between mb-9 gap-4 flex-wrap">
               <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white">
                 Events
@@ -1195,8 +1106,7 @@ export default function LandingPage() {
             ADMISSIONS CTA
         ══════════════════════════════════════════════════════════════ */}
         <section className="relative overflow-hidden bg-brand-teal py-16 sm:py-20">
-          <ScribbleArt variant={2} className="opacity-[0.14]" />
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[1fr_auto] gap-10 items-center">
+          <div className="relative z-10 hills-container grid lg:grid-cols-[1fr_auto] gap-10 items-center">
             <div>
               <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-white/70 mb-3">
                 Admissions {schoolInfo?.currentYear ?? currentYearNum + 1}
@@ -1228,16 +1138,15 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════════
             STAY CONNECTED, newsletter + contact
         ══════════════════════════════════════════════════════════════ */}
-        <section id="contact" className="relative overflow-hidden bg-page py-20 sm:py-24 border-b border-base">
-          <ScribbleArt variant={1} className="opacity-[0.08] dark:opacity-[0.14]" />
+        <section id="contact" className="relative py-20 sm:py-24">
           {/* [PRODUCTION FIX 2026-07-28] Two columns: left = Newsletter
               with Map stacked directly below it; right = the full Contact
               Us card, same height as the left column. Confirmed against
               a hand sketch before implementing (previous attempt used
               three equal columns, which wasn't what was asked for). */}
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-10 lg:gap-16">
+          <div className="relative z-10 hills-container grid lg:grid-cols-2 gap-6 lg:gap-8">
             {/* Newsletter */}
-            <div>
+            <div className="bg-surface border border-base rounded-3xl p-6 sm:p-8">
               <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal mb-2.5">
                 In your inbox
               </div>
@@ -1301,7 +1210,7 @@ export default function LandingPage() {
             </div>
 
             {/* Contact info + form */}
-            <div>
+            <div className="bg-surface border border-base rounded-3xl p-6 sm:p-8">
               <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal mb-2.5">
                 Get in touch
               </div>
@@ -1419,7 +1328,7 @@ export default function LandingPage() {
           />
           <div className="absolute inset-0 bg-linear-to-b from-[rgba(11,29,51,.82)] via-[rgba(11,29,51,.90)] to-[rgba(11,29,51,.98)]" />
 
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="relative z-10 hills-container">
             <div className="grid grid-cols-2 lg:grid-cols-[1.2fr_1fr_1fr_1fr_1fr] gap-10 pb-12 border-b border-white/10">
               <div className="col-span-2 lg:col-span-1">
                 <div className="flex items-center gap-3 mb-4">

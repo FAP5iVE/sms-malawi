@@ -52,6 +52,22 @@
     {
       "file": "src/components/shared/SchoolMark.tsx",
       "reason": "Logo step: the single component that draws the school's crest/emblem, light/dark by CSS (no script, no flash); replaces the old '5 LABS' placeholder image reads. Pure markup, no data, auth or routing code"
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "reason": "Phase 3: pure rules for the typing ripple (110ms gap, none under reduced motion or when the motion setting is off); unit-tested in tools/hills/__tests__/ripple.test.mts. No data, auth or routing code"
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "reason": "Phase 3 (decision 1, effect A): listens for bubbling input events on the page wrapper and appends/removes decorative ring spans. Reads the motion flag only; never touches a form handler, store write, API or router"
+    },
+    {
+      "file": "src/components/shared/HillsSigningScene.tsx",
+      "reason": "Phase 3 (decision 2): static dashboard-shaped skeleton markup shown by CSS while the submit button is disabled. No state, hooks or data"
+    },
+    {
+      "file": "src/components/shared/AuthShellSkeleton.tsx",
+      "reason": "Phase 3: Suspense fallback for /login redrawn as a skeleton of the new two-column layout. Static markup"
     }
   ],
   "deletedFiles": [],
@@ -293,6 +309,286 @@
       "kind": "logic",
       "pattern": "^export const DEFAULT_SCHOOL_LOGO_BASE64 = ",
       "reason": "Logo step, user-approved exception: the embedded default logo image (base64 PNG) is swapped for the new Chikangawa Hills crest. Data only; no code around it changed"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import \\{ useRef , type ReactNode \\} from 'react'",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. useRef holds the two DOM nodes the ripple hook needs"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import type \\{ ReactNode \\} from 'react'",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. type import merged into the react import"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import \\{ useTypingRipple \\} from '@/lib/hills/useTypingRipple'",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. typing ripple hook (decision 1)"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import \\{ useTheme \\} from 'next-themes'",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. the crest now swaps by CSS from the sky tokens, so the theme hook is no longer needed here"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import \\{ useHasMounted \\} from '@/hooks/useHasMounted'",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. only the old crest swap used it"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^function AuthBrand \\( \\) \\{\\}$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. old crest component replaced by markup in the shell (SchoolMark, CSS swap)"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const \\{ resolvedTheme \\} = useTheme \\( \\)$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. old crest swap by theme"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const mounted = useHasMounted \\( \\)$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. old crest swap by theme"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return \\( <JSX/> \\)$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. AuthBrand's return; the shell's own return remains"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^interface AuthShellProps \\{ children : ReactNode footer \\? : ReactNode \\}$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. props interface gains one optional look prop"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^interface AuthShellProps \\{ children : ReactNode footer \\? : ReactNode skeletonOnBusy \\? : boolean \\}$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. optional skeletonOnBusy flag (look only)"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export function AuthShell \\( \\{ children , footer \\} : AuthShellProps \\) \\{\\}$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. signature gains skeletonOnBusy"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export function AuthShell \\( \\{ children , footer , skeletonOnBusy = false \\} : AuthShellProps \\) \\{\\}$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. signature gains skeletonOnBusy"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const SKY_WORDS = ",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. the four headline phrases and supporting lines (mockup wording); decoration only"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const (mainRef|ringsRef) = useRef < HTML(Element|DivElement) > \\( null \\)$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. refs to <main> and the ripple layer for the ripple hook"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^useTypingRipple \\( mainRef , ringsRef \\)$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. typing ripple, delegated from <main>; form onChange handlers untouched"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^data-scene=\\{ skeletonOnBusy \\? '' : undefined \\}$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. marks the shell so CSS can show the busy skeleton"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ref=\\{ (ringsRef|mainRef) \\}$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. ref for the ripple hook"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^(kind|tone)=\"(logo|onLight|onDark)\"$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. SchoolMark look props: both crest colourways are drawn, CSS picks by sky"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{ skeletonOnBusy && <JSX/> \\}$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. renders the static skeleton scene (hidden until busy by CSS)"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{ SKY_WORDS \\. map \\( \\( w \\) => \\( <JSX/> \\) \\) \\}$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. renders the four headline phrases; CSS picks the one for the current sky"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^(key|data-sky-word)=\\{ w \\. sky \\}$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. key and sky tag for each phrase"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{ w \\. (lead|sub) \\}$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. phrase text"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{ footer && \\( <JSX/> \\) \\}$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. same footer slot, reformatted"
+    },
+    {
+      "file": "src/components/shared/AuthShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{ footer && <JSX/> \\}$",
+      "reason": "Phase 3 (login and claim shell): AuthShell's markup is rebuilt on the wide container. same footer slot, reformatted"
+    },
+    {
+      "file": "src/app/(public)/login/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^skeletonOnBusy=true$",
+      "reason": "Phase 3 (login and claim shell): one new look prop on <AuthShell>: show the dashboard-shaped skeleton while the page's own button is disabled (decision 2). No handler, effect or state touched"
+    },
+    {
+      "file": "src/app/(public)/login/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{ isBusy && <JSX/> \\}$",
+      "reason": "Phase 3 (login and claim shell): the spinning Loader2 ring inside the button is removed (decision 2: skeleton, not a ring). isBusy itself, disabled={isBusy} and the 'Signing in…' label are unchanged"
+    },
+    {
+      "file": "src/app/(public)/login/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{isBusy && <JSX/>\\} Signing in…\\|Sign in$",
+      "reason": "Phase 3 (login and claim shell): same button text; only the spinner conditional beside it is removed"
+    },
+    {
+      "file": "src/app/(public)/login/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Signing in…\\|Sign in$",
+      "reason": "Phase 3 (login and claim shell): same button text 'Signing in…' / 'Sign in', now wrapped in a span so the label can sit beside the arrow"
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^function ScribbleDefs \\( \\) \\{\\}$",
+      "reason": "Phase 4 (home): the page's own decorative line-art doodles are removed (the shared sky replaces them). Presentational SVG only, no data, handler or link."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^function ScribbleArt \\(",
+      "reason": "Phase 4 (home): the page's own decorative line-art doodles are removed (the shared sky replaces them). Presentational SVG only, no data, handler or link."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const layouts : Record <",
+      "reason": "Phase 4 (home): the page's own decorative line-art doodles are removed (the shared sky replaces them). Presentational SVG only, no data, handler or link."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{ layouts \\[ variant \\] \\}$",
+      "reason": "Phase 4 (home): the page's own decorative line-art doodles are removed (the shared sky replaces them). Presentational SVG only, no data, handler or link."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return \\( <JSX/> \\)$",
+      "reason": "Phase 4 (home): the page's own decorative line-art doodles are removed (the shared sky replaces them). Presentational SVG only, no data, handler or link. (the return statements of those two functions)"
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^id=\"scribbleTeal\"$",
+      "reason": "Phase 4 (home): the page's own decorative line-art doodles are removed (the shared sky replaces them). Presentational SVG only, no data, handler or link."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^id=\"scribbleCoral\"$",
+      "reason": "Phase 4 (home): the page's own decorative line-art doodles are removed (the shared sky replaces them). Presentational SVG only, no data, handler or link."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^id=\"scribbleNavy\"$",
+      "reason": "Phase 4 (home): the page's own decorative line-art doodles are removed (the shared sky replaces them). Presentational SVG only, no data, handler or link."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^id=\"scribblePurple\"$",
+      "reason": "Phase 4 (home): the page's own decorative line-art doodles are removed (the shared sky replaces them). Presentational SVG only, no data, handler or link."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^id=\"scribbleAmber\"$",
+      "reason": "Phase 4 (home): the page's own decorative line-art doodles are removed (the shared sky replaces them). Presentational SVG only, no data, handler or link."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{ mounted \\? \\( theme === 'light' \\? 'Light' : theme === 'dark' \\? 'Dark' : 'Auto' \\) : undefined \\}$",
+      "reason": "Phase 4 (home): tooltip on the existing theme button names the mode (Auto/Light/Dark, decision 7). Display only: cycleTheme, the aria-label and setTheme are unchanged."
     }
   ]
 }

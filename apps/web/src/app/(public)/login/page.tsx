@@ -117,6 +117,18 @@
  *     EmailAndPassword, the redirect effect, noRoleAssigned/isBusy and the
  *     login-log calls are untouched. The sign-in error box gained
  *     role="alert" and decorative icons gained aria-hidden.
+ *
+ * [REVISION 5, Chikangawa Hills theme, Phase 3: looks only]:
+ *   - The form now sits on a surface in the right column of the new AuthShell
+ *     (wide container; crest, time-aware headline and the authorised-access
+ *     notice on the sky at left). Fields use the mockup's underlined style on
+ *     the SAME inputs (id, type, autoComplete, required, labels unchanged), the
+ *     button is the mockup's ink bar with an arrow, links are bold accent text.
+ *   - The only non-class changes: `<AuthShell skeletonOnBusy>` (one look prop),
+ *     the spinning Loader2 inside the button is gone (skeleton sweep in CSS
+ *     instead, label unchanged), the button text sits in a <span>, and the
+ *     Suspense fallback is the new <AuthShellSkeleton/>. isBusy, the redirect
+ *     effect, handleLogin and every API call are untouched.
  */
 'use client'
 
@@ -129,11 +141,11 @@ import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/authStore'
 import { postLoginPath } from '@shared/constants/pageAccess'
 import { AuthShell } from '@/components/shared/AuthShell'
+import { AuthShellSkeleton } from '@/components/shared/AuthShellSkeleton'
 import { GuardianClaimForm } from '@/components/guardians/GuardianClaimForm'
 import {
   Eye,
   EyeOff,
-  Loader2,
   AlertCircle,
   ArrowRight,
   ShieldCheck,
@@ -158,17 +170,7 @@ function sanitizeRedirectTarget(from: string | null): string | null {
 // logic lives in LoginForm.
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex-1 w-full bg-page flex items-start justify-center p-4">
-          <div className="w-full max-w-[420px] rounded-[28px] border border-base bg-surface p-8 space-y-4">
-            <div className="mx-auto h-16 w-16 rounded-full bg-page animate-pulse" />
-            <div className="h-7 w-28 rounded-lg bg-page animate-pulse" />
-            <div className="h-40 rounded-xl bg-page animate-pulse" />
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<AuthShellSkeleton />}>
       <LoginForm />
     </Suspense>
   )
@@ -255,50 +257,37 @@ function LoginForm() {
 
   return (
     <AuthShell
+      skeletonOnBusy
       footer={
-        /* Authorisation notice, sits under the logo on desktop and after the
-           form on smaller screens (AuthShell decides where). */
-        <div className="p-3 rounded-2xl bg-black/[0.02] dark:bg-black/25 border border-base backdrop-blur-md text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1 text-body">
-            <ShieldCheck className="w-4 h-4 text-brand-teal" aria-hidden />
-            <span className="text-[11px] font-heading font-semibold tracking-wide uppercase">
-              Authorised access
-            </span>
+        /* Authorisation notice (wording unchanged). Sits under the headline on
+           desktop and after the form on smaller screens (AuthShell decides). */
+        <>
+          <ShieldCheck aria-hidden />
+          <div>
+            <p className="hills-auth__notice-title">Authorised access</p>
+            <p>This portal is for authorised students and staff only.</p>
+            <p>Contact your school administrator if you need access.</p>
           </div>
-          <p className="text-xs leading-relaxed text-muted-foreground dark:text-foreground font-sans">
-            This portal is for authorised students and staff only.
-          </p>
-          <p className="text-xs leading-relaxed text-muted-foreground dark:text-foreground font-sans mt-0.5">
-            Contact your school administrator if you need access.
-          </p>
-        </div>
+        </>
       }
     >
       {/* Form title */}
-      <div className="mb-4 text-left">
-        <h1 className="text-2xl sm:text-[26px] font-heading font-bold text-body tracking-tight">
-          Welcome back
-        </h1>
-        <p className="text-muted-foreground dark:text-foreground text-sm mt-1">Sign in to your school account</p>
+      <div className="mb-6 text-left">
+        <h1 className="hills-auth__title">Sign in</h1>
+        <p className="hills-auth__lede">Use the email your school registered for you.</p>
       </div>
 
       {/* Status alerts */}
       {error && (
-        <div
-          role="alert"
-          className="mb-4 p-3 rounded-xl bg-brand-coral/10 border border-brand-coral/30 text-brand-coral text-xs flex items-center gap-2 animate-fade-in"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0" aria-hidden />
+        <div role="alert" className="hills-alert hills-alert--danger animate-fade-in">
+          <AlertCircle aria-hidden />
           <span>{error}</span>
         </div>
       )}
 
       {noRoleAssigned && !error && (
-        <div
-          role="alert"
-          className="mb-4 p-3 rounded-xl bg-brand-amber/10 border border-brand-amber/30 text-brand-amber text-xs flex items-start gap-2 animate-fade-in"
-        >
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+        <div role="alert" className="hills-alert hills-alert--warn animate-fade-in">
+          <AlertCircle aria-hidden />
           <span>
             Your sign-in worked, but this account has no role assigned yet, so
             there is nothing it can open. An administrator needs to set the
@@ -308,36 +297,36 @@ function LoginForm() {
       )}
 
       {/* Login form */}
-      <form onSubmit={handleLogin} className="space-y-4 text-left">
-        <div>
-          <label htmlFor="email" className="block text-xs sm:text-sm font-heading font-medium text-body mb-1.5">
-            Email address
-          </label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@school.edu.mw"
-            className="w-full px-3.5 py-2.5 sm:py-3 bg-page text-body placeholder:text-muted-foreground rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
-          />
+      <form onSubmit={handleLogin} className="text-left">
+        <div className="hills-field">
+          <div className="hills-field__row">
+            <label htmlFor="email" className="hills-label">
+              Email address
+            </label>
+          </div>
+          <div className="hills-input">
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@school.edu.mw"
+            />
+          </div>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label htmlFor="password" className="text-xs sm:text-sm font-heading font-medium text-body">
+        <div className="hills-field">
+          <div className="hills-field__row">
+            <label htmlFor="password" className="hills-label">
               Password
             </label>
-            <Link
-              href="/forgot-password"
-              className="text-xs font-bold text-brand-teal-light hover:text-brand-teal transition-colors font-heading"
-            >
+            <Link href="/forgot-password" className="hills-link">
               Forgot password?
             </Link>
           </div>
-          <div className="relative">
+          <div className="hills-input">
             <input
               id="password"
               type={showPass ? 'text' : 'password'}
@@ -346,40 +335,32 @@ function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-3.5 py-2.5 sm:py-3 pr-11 bg-page text-body placeholder:text-muted-foreground rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
+              className="hills-pw"
             />
             <button
               type="button"
               onClick={() => setShowPass(!showPass)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-foreground focus:outline-none cursor-pointer transition-colors"
+              className="hills-eye"
               aria-label={showPass ? 'Hide password' : 'Show password'}
             >
-              {showPass ? <EyeOff className="w-4 h-4" aria-hidden /> : <Eye className="w-4 h-4" aria-hidden />}
+              {showPass ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
             </button>
           </div>
         </div>
 
-        <button
-          type="submit"
-          disabled={isBusy}
-          className="w-full py-3 bg-brand-deep hover:brightness-125 active:brightness-90 text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-4 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 border border-transparent dark:border-white/10 dark:hover:border-brand-teal/40"
-        >
-          {isBusy && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
-          {isBusy ? 'Signing in…' : 'Sign in'}
+        <button type="submit" disabled={isBusy} className="hills-go">
+          <span>{isBusy ? 'Signing in…' : 'Sign in'}</span>
+          <ArrowRight className="hills-go__arrow" aria-hidden />
         </button>
       </form>
 
       {/* Footer: apply link */}
-      <div className="mt-5 text-center text-xs text-muted-foreground dark:text-foreground font-sans flex items-center justify-center gap-1.5">
+      <p className="hills-alt">
         <span>Ready to apply?</span>
-        <Link
-          href="/apply"
-          className="inline-flex items-center gap-1 font-bold text-brand-teal hover:text-brand-teal-light transition-all underline-offset-4 hover:underline"
-        >
-          <span>Apply</span>
-          <ArrowRight className="w-3.5 h-3.5" aria-hidden />
+        <Link href="/apply" className="hills-link">
+          Start your application
         </Link>
-      </div>
+      </p>
     </AuthShell>
   )
 }

@@ -3,124 +3,123 @@
 /**
  * apps/web/src/components/shared/AuthShell.tsx
  *
- * [CHANGE TYPE]: NEW FILE
- * [PURPOSE]: The frosted-glass frame shared by the whole sign-in family:
- *   /login, /forgot-password, /change-password and /reset-password. Login's
- *   "wide frosted plate -> inner glass card" recipe was copy-pasted into
- *   forgot-password at a smaller size while change-password and
- *   reset-password used two further, unrelated layouts, so the four pages
- *   didn't look like one product. They now all render through this shell and
- *   therefore always share the same size, glass treatment and background.
+ * [CHANGE TYPE]: REWRITTEN MARKUP (Chikangawa Hills theme, Phase 3). Same file,
+ *   same export, same props (`children`, `footer`), plus one optional look prop.
  *
- * [SIZING DECISION]: The frame is deliberately NOT stretched to the page's
- *   edges. A sign-in form stretched across a 1920px screen would produce
- *   input fields 1,000px+ wide, which is harder to scan and to aim at, not
- *   easier. Instead the frame is wide (max-w-5xl) and the extra width is put
- *   to work as a two-pane card on desktop:
- *     left pane  = brand (logo + system name) and, optionally, a footer note;
- *     right pane = the page's own form (`children`), capped at a comfortable
- *                  reading width by the half-width column.
- *   Below `lg` it collapses to a single column (brand on top, form beneath,
- *   note last) so phones and tablets get a compact card that fits the
- *   viewport with the frame's own padding trimmed to a few pixels.
+ * [PURPOSE]: The frame shared by the whole sign-in family: /login,
+ *   /login?claim=1 (claim account), /forgot-password, /change-password and
+ *   /reset-password. Re-skinning this one file moves all five screens.
  *
- * [DARK-MODE LEGIBILITY]: In dark mode the card is the theme's own
- *   `--background` at 55% alpha rather than 7% white. The vivid artwork's big
- *   rings (bright blue/green/orange) otherwise bleed straight through a
- *   near-clear card and sit directly behind headings and links, where
- *   blue-on-blue headings and the teal "Forgot password?" link were close to
- *   unreadable. The card is still translucent and blurred, so the artwork
- *   still shows through, just dimmed to a level text can sit on.
+ *   The centred frosted plate is gone. The page uses the wide container
+ *   (.hills-container) split in two from 900px:
+ *     left   crest and school name, the time-aware headline ("Rise to the",
+ *            "Back to the", "Home to the", "Rest in the" + "hills.") with its
+ *            supporting line, then `footer` (login's authorised-access notice),
+ *            all on the sky;
+ *     right  the page's own form (`children`) on a surface, 340 to 440px wide.
+ *   Below 900px it is one column in the order headline, form, notice.
  *
- * [VERTICAL SIZE]: The frame and card stretch to fill the whole area under the
- *   header (2026-10-08), the previous top-aligned, content-height card only
- *   used the top half of a tall window and left a large empty band below it.
- *   The card still starts right under the header (no gap above, as login's
- *   revision 3 wanted); on desktop the brand sits centred in its pane with the
- *   notice pinned to the bottom, and the form is centred in its pane. On
- *   phones the content is centred in the card. A very short window simply
- *   scrolls, `flex-1` only ever grows the card, it never squeezes content.
+ * [TIME-AWARE HEADLINE]: All four phrases are in the page; CSS shows the one that
+ *   matches <html data-sky> (set before paint by the root layout's script and
+ *   kept current by HillsSkySync), crossfading when the sky changes. No clock code
+ *   lives here, and the headline is decoration (aria-hidden): the page's own <h1>
+ *   inside the card is what assistive technology reads.
  *
- * [DEPENDS ON]: PublicAmbientBackground (`vivid`), next-themes (logo variant).
- *   The header bar itself comes from (public)/layout.tsx via <PublicHeader />.
+ * [SURFACE]: Follows the Light/Dark theme, not the sky, so forms written for a
+ *   plain white or navy card stay readable on every sky (see globals.css, HILLS
+ *   AUTH). Forgot, reset and change-password keep their old field styling inside
+ *   it until Phase 7.
+ *
+ * [TYPING RIPPLE]: useTypingRipple listens for bubbling `input` events on <main>
+ *   and draws rings in the fixed layer below. It never touches a form handler.
+ *
+ * [skeletonOnBusy]: login only. Shows the dashboard-shaped skeleton in place of
+ *   the headline while the page's own submit button is disabled (its busy state).
+ *
+ * [DEPENDS ON]: PublicAmbientBackground (`vivid`), SchoolMark, HillsSigningScene,
+ *   useTypingRipple. The header bar comes from (public)/layout.tsx.
  */
 
-import Image from 'next/image'
 import Link from 'next/link'
-import { useTheme } from 'next-themes'
-import type { ReactNode } from 'react'
-import { useHasMounted } from '@/hooks/useHasMounted'
+import { useRef, type ReactNode } from 'react'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
+import { SchoolMark } from '@/components/shared/SchoolMark'
+import { HillsSigningScene } from '@/components/shared/HillsSigningScene'
+import { useTypingRipple } from '@/lib/hills/useTypingRipple'
 
-/** School crest + system name. The navy crest in light mode and the light crest
- *  in dark mode, so the mark always contrasts with the card. */
-function AuthBrand() {
-  const { resolvedTheme } = useTheme()
-  const mounted = useHasMounted()
-
-  return (
-    <div className="flex flex-col items-center text-center">
-      <Link href="/" title="Home" className="flex items-center justify-center transition-transform hover:scale-105">
-        <Image
-          src={
-            mounted && resolvedTheme === 'dark'
-              ? '/logo-dark.svg'
-              : '/logo-light.svg'
-          }
-          alt="Chikangawa Hills Academy logo"
-          width={380}
-          height={380}
-          loading="eager"
-          className="h-auto w-52 object-contain drop-shadow-lg sm:w-60 lg:w-72"
-        />
-      </Link>
-      <span className="mt-2.5 font-heading text-sm font-bold tracking-tight text-body sm:text-base">
-        SMS Malawi
-      </span>
-    </div>
-  )
-}
+/** Phrase and supporting line for each sky (mockup wording). */
+const SKY_WORDS = [
+  { sky: 'dawn', lead: 'Rise to the', sub: 'A new school day begins. Your timetable and notices are ready.' },
+  { sky: 'day', lead: 'Back to the', sub: 'Results, fees, timetables and notices for your school day, in one place.' },
+  { sky: 'dusk', lead: 'Home to the', sub: 'The day is winding down. Check results, fees and notices before you go.' },
+  { sky: 'night', lead: 'Rest in the', sub: 'Quiet hours. Results, fees and notices will be here when you need them.' },
+] as const
 
 interface AuthShellProps {
-  /** The page's own content, rendered in the form pane (right on desktop). */
+  /** The page's own content, rendered in the form card (right on desktop). */
   children: ReactNode
-  /** Optional note placed under the brand on desktop and after the form on
-   *  smaller screens (e.g. login's "Authorised access" notice). */
+  /** Optional note under the headline on desktop and after the form on smaller
+   *  screens (e.g. login's "Authorised access" notice). */
   footer?: ReactNode
+  /** Show the dashboard-shaped skeleton while a submit button is disabled. */
+  skeletonOnBusy?: boolean
 }
 
-export function AuthShell({ children, footer }: AuthShellProps) {
+export function AuthShell({ children, footer, skeletonOnBusy = false }: AuthShellProps) {
+  const mainRef = useRef<HTMLElement>(null)
+  const ringsRef = useRef<HTMLDivElement>(null)
+  useTypingRipple(mainRef, ringsRef)
+
   return (
-    <div className="relative flex flex-1 flex-col font-sans">
+    <div className="hills hills-auth relative flex flex-1 flex-col font-sans" data-scene={skeletonOnBusy ? '' : undefined}>
       <PublicAmbientBackground vivid />
 
-      <main className="relative z-10 flex flex-1 items-stretch justify-center px-3 pb-6 pt-4 sm:px-6 sm:pb-10 sm:pt-6">
-        {/* Wide frosted plate */}
-        <div className="flex w-full max-w-md flex-col rounded-[28px] border border-black/5 bg-black/[0.02] p-2.5 shadow-xl backdrop-blur-md dark:border-white/10 dark:bg-white/[0.03] sm:max-w-2xl sm:rounded-[36px] sm:p-4 lg:max-w-5xl">
-          {/* Glass card, translucent + blurred in BOTH themes. Single column
-              by default; from lg it is a 2-column grid whose left column is
-              brand (row 1) + footer (row 2) and whose right column spans both
-              rows for the form. Source order is brand, form, footer so the
-              mobile stack reads in the right order without duplicating any
-              markup. */}
-          <div className="relative grid flex-1 content-center gap-y-5 overflow-hidden rounded-[24px] border border-black/5 bg-white/80 p-6 shadow-2xl backdrop-blur-2xl dark:border-white/15 dark:bg-[hsl(var(--background)/0.55)] sm:rounded-[30px] sm:p-8 lg:grid-cols-2 lg:grid-rows-[1fr_auto] lg:content-normal lg:gap-y-0 lg:p-0">
-            {/* Tinted backing for the desktop brand pane */}
-            <div
-              className="pointer-events-none absolute inset-y-0 left-0 hidden w-1/2 border-r border-black/5 bg-black/[0.03] dark:border-white/10 dark:bg-black/25 lg:block"
-              aria-hidden
-            />
+      {/* Typing ripple layer (decorative): behind the content, above the sky. */}
+      <div className="hills-ripple" aria-hidden="true">
+        <div ref={ringsRef} className="hills-ripple__cover" />
+      </div>
 
-            <div className="relative lg:col-start-1 lg:row-start-1 lg:flex lg:items-center lg:justify-center lg:px-10 lg:pt-10">
-              <AuthBrand />
+      <main ref={mainRef} className="hills-auth__main">
+        <div className="hills-container">
+          <div className="hills-split hills-auth__grid">
+            <div className="hills-auth__statement">
+              {skeletonOnBusy && <HillsSigningScene />}
+              <div className="hills-auth__statement-copy">
+                {/* Room for the sun's arc above the headline on phones. */}
+                <div className="hills-auth__skyspace" aria-hidden="true" />
+
+                <div className="hills-auth__brand">
+                  <Link href="/" title="Home" className="hills-auth__crest">
+                    <SchoolMark kind="logo" tone="onLight" alt="Chikangawa Hills Academy logo" width={176} height={176} priority className="hills-auth__crest-navy" />
+                    <SchoolMark kind="logo" tone="onDark" alt="" width={176} height={176} priority className="hills-auth__crest-light" />
+                  </Link>
+                  <div>
+                    <span className="hills-auth__brand-name">SMS Malawi</span>
+                    <span className="hills-auth__brand-sub">Chikangawa Hills Academy</span>
+                  </div>
+                </div>
+
+                <div aria-hidden="true">
+                  <p className="hills-auth__hd">
+                    <span className="hills-words">
+                      {SKY_WORDS.map((w) => (
+                        <span key={w.sky} data-sky-word={w.sky}>{w.lead}</span>
+                      ))}
+                    </span>
+                    <span className="hills-auth__acc">hills.</span>
+                  </p>
+                  <p className="hills-auth__sub hills-words">
+                    {SKY_WORDS.map((w) => (
+                      <span key={w.sky} data-sky-word={w.sky}>{w.sub}</span>
+                    ))}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="relative lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:flex lg:flex-col lg:justify-center lg:p-10">
-              {children}
-            </div>
+            <div className="hills-auth__card">{children}</div>
 
-            {footer && (
-              <div className="relative lg:col-start-1 lg:row-start-2 lg:px-10 lg:pb-10">{footer}</div>
-            )}
+            {footer && <div className="hills-auth__notice">{footer}</div>}
           </div>
         </div>
       </main>

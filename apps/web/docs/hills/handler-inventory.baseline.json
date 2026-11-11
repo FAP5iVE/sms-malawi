@@ -2814,7 +2814,7 @@
   "items": []
  },
  "src/app/(public)/login/page.tsx": {
-  "digest": "11d1e4bc52b21ab98e31a7763933f239203ca89b",
+  "digest": "9075fc6439ff4072c419d26bf8edfa7010bb6a04",
   "tokens": 91,
   "items": [
    {
@@ -2932,8 +2932,8 @@
   ]
  },
  "src/app/(public)/page.tsx": {
-  "digest": "3de07db13c7fd4aba74388a2d3b577184aceb486",
-  "tokens": 362,
+  "digest": "535a22e95703f9de2023ca11f1393e020c6855c4",
+  "tokens": 352,
   "items": [
    {
     "k": "effect",
@@ -10103,8 +10103,13 @@
   ]
  },
  "src/components/shared/AuthShell.tsx": {
-  "digest": "15bfdd0c248a902b3a0cdc036b11a6eaf0c0a6a3",
-  "tokens": 17,
+  "digest": "586dc14a1f1b45b3ca0cbb95277f1a78d35b3f77",
+  "tokens": 32,
+  "items": []
+ },
+ "src/components/shared/AuthShellSkeleton.tsx": {
+  "digest": "ac65530e16cb62b4385ededb7e9c26c6b3e3cb52",
+  "tokens": 5,
   "items": []
  },
  "src/components/shared/ChartCard.tsx": {
@@ -10454,6 +10459,11 @@
     "h": "0c5772df"
    }
   ]
+ },
+ "src/components/shared/HillsSigningScene.tsx": {
+  "digest": "811500916975b92bc556e299a72e798a4bab63f2",
+  "tokens": 8,
+  "items": []
  },
  "src/components/shared/HillsSkySync.tsx": {
   "digest": "b079e57b4cd961ac66c1655195fe7ce19b27d3ff",
