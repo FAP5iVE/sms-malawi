@@ -64,7 +64,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import Image                            from 'next/image'
+import { SchoolMark } from '@/components/shared/SchoolMark'
 import { usePathname, useRouter }       from 'next/navigation'
 import { AnimatePresence, motion }       from 'framer-motion'
 import {
@@ -574,7 +574,7 @@ export function PageHeader() {
         <div className="flex items-center h-14 px-4 gap-2 md:hidden">
 
           {/* Left: school logo — taps navigate to dashboard.
-              Same live mark the desktop Sidebar renders (/favicon.png), with
+              Same school mark the desktop Sidebar renders (SchoolMark), with
               no tinted placeholder behind it, so the two shells stay in sync.
               44×44 hit area (touch-target minimum) around a 40px mark. */}
           <button
@@ -583,14 +583,7 @@ export function PageHeader() {
             className="shrink-0 w-11 h-11 -ml-1.5 flex items-center justify-center rounded-xl active:bg-page transition-colors"
             aria-label="Go to Dashboard"
           >
-            <Image
-              src="/favicon.png"
-              alt=""
-              width={40}
-              height={40}
-              priority
-              className="w-10 h-10 object-contain"
-            />
+            <SchoolMark kind="emblem" width={40} height={40} priority className="w-10 h-10 object-contain" />
           </button>
 
           {/* Center: Animated page title — fills remaining space */}

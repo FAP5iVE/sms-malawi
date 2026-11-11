@@ -24,7 +24,7 @@ const THEME_OPTIONS: Array<{
 }> = [
   { value: 'light',  label: 'Light',  icon: Sun     },
   { value: 'dark',   label: 'Dark',   icon: Moon    },
-  { value: 'system', label: 'System', icon: Monitor },
+  { value: 'system', label: 'Auto',   icon: Monitor },
 ]
 
 // ─────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ export function ModeToggle({ showLabel = false, className }: ModeToggleProps) {
           <ActiveIcon resolvedTheme={resolvedTheme} />
           {showLabel && (
             <span className="text-sm font-medium capitalize">
-              {theme === 'system' ? 'System' : (theme ?? 'System')}
+              {theme === 'system' ? 'Auto' : (theme ?? 'Auto')}
             </span>
           )}
           <span className="sr-only">Toggle theme</span>

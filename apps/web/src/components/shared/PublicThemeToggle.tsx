@@ -45,7 +45,7 @@ import {
 const THEME_OPTIONS = [
   { value: 'light',  label: 'Light',  icon: Sun     },
   { value: 'dark',   label: 'Dark',   icon: Moon    },
-  { value: 'system', label: 'System', icon: Monitor },
+  { value: 'system', label: 'Auto',   icon: Monitor },
 ] as const
 
 const THEME_ICONS = {

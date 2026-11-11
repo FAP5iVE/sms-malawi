@@ -13,6 +13,8 @@ import { AuthProvider }         from '@/components/providers/AuthProvider'
 import { QueryProvider }        from '@/components/providers/QueryProvider'
 import { ThemeProvider }        from '@/components/providers/ThemeProvider'
 import { Toaster }              from '@/components/ui/sonner'
+import { HillsSkySync }         from '@/components/shared/HillsSkySync'
+import { HILLS_SKY_SCRIPT }     from '@/lib/hills/sky'
 
 // Per-page titles and descriptions live in each route segment's layout.tsx
 // (the public pages are client components and cannot export metadata
@@ -28,6 +30,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-adaptive.svg', type: 'image/svg+xml' },
       { url: '/icon-192.png', type: 'image/png', sizes: '192x192' },
       { url: '/icon-512.png', type: 'image/png', sizes: '512x512' },
     ],
@@ -80,8 +83,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       // `scroll-behavior: smooth` so Next.js does not warn about
       // scroll restoration during route transitions.
     >
+      <head>
+        {/* Hills theme: sets <html data-sky> from the stored theme and the
+            Malawi clock before first paint, so there is no flash of the wrong
+            sky. Only elements inside a `.hills` scope read it. */}
+        <script dangerouslySetInnerHTML={{ __html: HILLS_SKY_SCRIPT }} />
+      </head>
       <body>
         <ThemeProvider>
+          <HillsSkySync />
           <QueryProvider>
             {/*
               AuthProvider must wrap BOTH the (public) and (auth) route

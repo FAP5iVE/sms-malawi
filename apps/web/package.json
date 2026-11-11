@@ -19,7 +19,15 @@
     "build-storybook": "storybook build",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
-    "docs:security": "tsx scripts/generate-security-docs.mts"
+    "docs:security": "tsx scripts/generate-security-docs.mts",
+    "hills:test": "tsx --test tools/hills/__tests__/fingerprint.test.mts tools/hills/__tests__/sky.test.mts tools/hills/__tests__/celestial.test.mts",
+    "hills:logic-diff": "tsx tools/hills/logic-diff.mts",
+    "hills:inventory": "tsx tools/hills/handler-inventory.mts --write",
+    "hills:inventory:check": "tsx tools/hills/handler-inventory.mts --check",
+    "hills:inventory:print": "tsx tools/hills/handler-inventory.mts --print",
+    "hills:baseline": "tsx tools/hills/capture-baseline.mts",
+    "hills:contrast": "tsx tools/hills/check-contrast.mts",
+    "hills:assets": "tsx tools/hills/generate-assets.mts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

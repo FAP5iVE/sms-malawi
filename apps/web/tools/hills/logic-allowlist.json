@@ -1,0 +1,298 @@
+{
+  "$comment": "Chikangawa Hills theme guardrails. Every logic-bearing change a phase makes on purpose must be declared here with a reason, so the user can review them in one place. The phase checklist is: `pnpm hills:logic-diff` must exit 0.",
+  "base": "main",
+  "frozen": [
+    "src/proxy.ts",
+    "src/components/providers/AuthProvider.tsx",
+    "src/app/api/**",
+    "src/server/**",
+    "src/actions/**",
+    "src/store/**",
+    "src/lib/**",
+    "!src/lib/hills/**",
+    "prisma/**",
+    "packages/**",
+    "firestore.rules",
+    "firestore.indexes.json",
+    "firebase.json",
+    "!src/lib/schoolLogoData.ts"
+  ],
+  "ignore": [
+    "**/*.css",
+    "**/*.md",
+    "**/*.mdx",
+    "**/*.stories.tsx",
+    "**/__tests__/**",
+    "docs/**",
+    "tools/hills/**",
+    "public/**",
+    "e2e/**",
+    ".storybook/**",
+    "package.json",
+    "pnpm-lock.yaml"
+  ],
+  "presentationalAttrs": [],
+  "newFiles": [
+    {
+      "file": "src/lib/hills/sky.ts",
+      "reason": "Phase 1: pure sky rules (Light=day, Dark=night, Auto=Malawi clock) and the pre-paint script text; tested against each other in tools/hills/__tests__/sky.test.mts"
+    },
+    {
+      "file": "src/components/shared/HillsSkySync.tsx",
+      "reason": "Phase 1: renders nothing; keeps <html data-sky> in step with the theme setting and the clock. Touches no auth, routing or data code"
+    },
+    {
+      "file": "src/lib/hills/celestial.ts",
+      "reason": "Phase 2: pure sun/moon placement for the vivid and home backgrounds (Auto = Malawi clock, Light = fixed sun, Dark = fixed moon); tested in tools/hills/__tests__/celestial.test.mts"
+    },
+    {
+      "file": "src/components/shared/HillsCelestial.tsx",
+      "reason": "Phase 2: client island that writes sun/moon CSS variables onto the background wrapper; renders one hidden span and touches no auth, routing or data code"
+    },
+    {
+      "file": "src/components/shared/SchoolMark.tsx",
+      "reason": "Logo step: the single component that draws the school's crest/emblem, light/dark by CSS (no script, no flash); replaces the old '5 LABS' placeholder image reads. Pure markup, no data, auth or routing code"
+    }
+  ],
+  "deletedFiles": [],
+  "entries": [
+    {
+      "file": "src/app/layout.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import \\{ HILLS_SKY_SCRIPT \\}",
+      "reason": "Phase 1: inline pre-paint script that sets <html data-sky>; no flash of the wrong sky (Next 16 'preventing flash before hydration' pattern). CSP already allows inline scripts"
+    },
+    {
+      "file": "src/app/layout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^dangerouslySetInnerHTML=\\{ \\{ __html : HILLS_SKY_SCRIPT \\} \\}$",
+      "reason": "Phase 1: inline pre-paint script that sets <html data-sky>; no flash of the wrong sky (Next 16 'preventing flash before hydration' pattern). CSP already allows inline scripts"
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const THEME_OPTIONS = ",
+      "reason": "Phase 1 (decision 7): the third theme option is relabelled 'Auto' (was 'System'); value stays 'system', behaviour unchanged"
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const THEME_OPTIONS = .*label : 'Auto'",
+      "reason": "Phase 1 (decision 7): the third theme option is relabelled 'Auto' (was 'System'); value stays 'system', behaviour unchanged"
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const THEME_OPTIONS : ",
+      "reason": "Phase 1 (decision 7): the third theme option is relabelled 'Auto' (was 'System'); value stays 'system', behaviour unchanged"
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const THEME_OPTIONS : .*label : 'Auto'",
+      "reason": "Phase 1 (decision 7): the third theme option is relabelled 'Auto' (was 'System'); value stays 'system', behaviour unchanged"
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{ theme === 'system' \\? 'System' : \\( theme \\?\\? 'System' \\) \\}$",
+      "reason": "Phase 1 (decision 7): the third theme option is relabelled 'Auto' (was 'System'); value stays 'system', behaviour unchanged"
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{ theme === 'system' \\? 'Auto' : \\( theme \\?\\? 'Auto' \\) \\}$",
+      "reason": "Phase 1 (decision 7): the third theme option is relabelled 'Auto' (was 'System'); value stays 'system', behaviour unchanged"
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=system\\|System\\|System Toggle theme$",
+      "reason": "Phase 1 (decision 7): the third theme option is relabelled 'Auto' (was 'System'); value stays 'system', behaviour unchanged"
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=system\\|Auto\\|Auto Toggle theme$",
+      "reason": "Phase 1 (decision 7): the third theme option is relabelled 'Auto' (was 'System'); value stays 'system', behaviour unchanged"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^'use client'$",
+      "reason": "Phase 2: the backdrop is rebuilt as the Hills sky. It no longer needs client code itself (plain markup, rendered on the server); the only client part is HillsCelestial"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export function PublicAmbientBackground \\( \\{ vivid = false \\} ",
+      "reason": "Phase 2: new optional `variant` prop (default | vivid | home | calm); the existing boolean `vivid` still works and maps to variant=vivid, so no call site changes"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export function PublicAmbientBackground \\( \\{ vivid = false , variant , \\} ",
+      "reason": "Phase 2: new optional `variant` prop (default | vivid | home | calm); the existing boolean `vivid` still works and maps to variant=vivid, so no call site changes"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export type AmbientVariant = ",
+      "reason": "Phase 2: new optional `variant` prop (default | vivid | home | calm); the existing boolean `vivid` still works and maps to variant=vivid, so no call site changes"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const kind : AmbientVariant = variant \\?\\? \\( vivid \\? 'vivid' : 'default' \\)$",
+      "reason": "Phase 2: new optional `variant` prop (default | vivid | home | calm); the existing boolean `vivid` still works and maps to variant=vivid, so no call site changes"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if \\( kind === 'calm' \\) \\{\\}$",
+      "reason": "Phase 2: variant branching that only chooses which decorative layers to draw (no data, auth or routing)"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const moves = kind === 'vivid' \\|\\| kind === 'home'$",
+      "reason": "Phase 2: variant branching that only chooses which decorative layers to draw (no data, auth or routing)"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{ kind === 'default' && <JSX/> \\}$",
+      "reason": "Phase 2: variant branching that only chooses which decorative layers to draw (no data, auth or routing)"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{ moves && <JSX/> \\}$",
+      "reason": "Phase 2: variant branching that only chooses which decorative layers to draw (no data, auth or routing)"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{ ! vivid && \\( <JSX/> \\) \\}$",
+      "reason": "Phase 2: variant branching that only chooses which decorative layers to draw (no data, auth or routing)"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^data-sky=\\\"(day|night)\\\"$",
+      "reason": "Phase 2: the calm variant pins its two layers to a fixed day or night palette so signed-in pages never follow the clock"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function (MoonDisc|Contours) \\( \\) \\{\\}$",
+      "reason": "Phase 2: small presentational sub-components (moon artwork, contour layers)"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return \\( <JSX/> \\)$",
+      "reason": "Phase 2: markup of the new background layers"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return \\( <JSX/> \\)$",
+      "reason": "Phase 2: the old orb, line-art gradient and shadow-filter defs are removed with the old artwork"
+    },
+    {
+      "file": "src/components/shared/PublicAmbientBackground.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^id=\\\"pageAmbient(Teal|Coral|Navy|Purple|Amber|SoftShadow)\\\"$",
+      "reason": "Phase 2: the old orb, line-art gradient and shadow-filter defs are removed with the old artwork"
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^kind=\"emblem\"$",
+      "reason": "Logo step: the old /favicon.png placeholder image is replaced by <SchoolMark> (the school's own emblem, light/dark aware); size, position and surrounding markup are unchanged"
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^kind=\"emblem\"$",
+      "reason": "Logo step: the old /favicon.png placeholder image is replaced by <SchoolMark> (the school's own emblem, light/dark aware); size, position and surrounding markup are unchanged"
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^kind=\"emblem\"$",
+      "reason": "Logo step: the old /favicon.png placeholder image is replaced by <SchoolMark> (the school's own emblem, light/dark aware); size, position and surrounding markup are unchanged"
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\\{ scrolled \\? 'auto' : 'onDark' \\}$",
+      "reason": "Logo step: over the dark hero photo the header mark uses the light artwork until the bar turns solid, then follows the theme (same swap the white header text already does)"
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\"onDark\"$",
+      "reason": "Logo step: the landing footer is dark in both themes, so it always uses the light artwork"
+    },
+    {
+      "file": "src/app/layout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export const metadata : Metadata = ",
+      "reason": "Logo step: the browser-tab icon list gains the adaptive SVG favicon (follows the visitor's OS theme); the .ico, 192/512 and apple-touch entries keep their paths"
+    },
+    {
+      "file": "src/app/layout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export const metadata : Metadata = .*favicon-adaptive\\.svg",
+      "reason": "Logo step: the browser-tab icon list gains the adaptive SVG favicon (follows the visitor's OS theme); the .ico, 192/512 and apple-touch entries keep their paths"
+    },
+    {
+      "file": "src/lib/schoolLogoData.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export const DEFAULT_SCHOOL_LOGO_BASE64 = ",
+      "reason": "Logo step, user-approved exception: the embedded default logo image (base64 PNG) is swapped for the new Chikangawa Hills crest. Data only; no code around it changed"
+    },
+    {
+      "file": "src/lib/schoolLogoData.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export const DEFAULT_SCHOOL_LOGO_BASE64 = ",
+      "reason": "Logo step, user-approved exception: the embedded default logo image (base64 PNG) is swapped for the new Chikangawa Hills crest. Data only; no code around it changed"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1208 1208" width="1208" height="1208" role="img" aria-labelledby="t">
+  <title id="t">Chikangawa Hills Academy</title>
+  <style>@media (prefers-color-scheme:dark){[fill="#03235A"]{fill:#EEF4F9}[stroke="#03235A"]{stroke:#EEF4F9}[stop-color="#03235A"]{stop-color:#EEF4F9}[fill="#217D96"]{fill:#3FAFCB}[stroke="#217D96"]{stroke:#3FAFCB}[stop-color="#217D96"]{stop-color:#3FAFCB}[fill="#77A9B5"]{fill:#8DBFCC}[stroke="#77A9B5"]{stroke:#8DBFCC}[stop-color="#77A9B5"]{stop-color:#8DBFCC}[fill="#F7811F"]{fill:#FF9A3D}[stroke="#F7811F"]{stroke:#FF9A3D}[stop-color="#F7811F"]{stop-color:#FF9A3D}[fill="#FFFFFF"]{fill:#0B2A57}[stroke="#FFFFFF"]{stroke:#0B2A57}[stop-color="#FFFFFF"]{stop-color:#0B2A57}}</style>
+  <defs>
+    <linearGradient id="tealFade" gradientUnits="userSpaceOnUse" x1="205" y1="0" x2="300" y2="0">
+      <stop offset="0" stop-color="#217D96"/>
+      <stop offset="0.45" stop-color="#217D96"/>
+      <stop offset="1" stop-color="#217D96" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="band2clip"><path fill-rule="evenodd" d="M244,624 C320,609 435,610 500,644 C522,655 543,659 560,662 L573,677 L604,677 L604,697 L582,697 C568,696 560,692 556,687 C553,682 552,679 550,677 C520,674 470,668 400,658 C350,652 290,654 250,664 C235,668 218,670 205,671 L205,655 L222,652 Z M282,642 C330,629 420,626 474,638 C478,641 476,643 470,642 C420,637 335,637 288,647 C280,647 279,644 282,642 Z"/></clipPath>
+    <g id="bookHalf">
+      <path d="M254,595 L282,569 C350,563 440,578 500,611 C525,625 548,637 567,643 C530,641 470,622 400,598 C350,586 300,590 254,595 Z" fill="#03235A"/>
+      <path fill-rule="evenodd" d="M244,624 C320,609 435,610 500,644 C522,655 543,659 560,662 L573,677 L604,677 L604,697 L582,697 C568,696 560,692 556,687 C553,682 552,679 550,677 C520,674 470,668 400,658 C350,652 290,654 250,664 C235,668 218,670 205,671 L205,655 L222,652 Z M282,642 C330,629 420,626 474,638 C478,641 476,643 470,642 C420,637 335,637 288,647 C280,647 279,644 282,642 Z" fill="#03235A"/>
+      <rect x="200" y="640" width="110" height="40" fill="url(#tealFade)" clip-path="url(#band2clip)"/>
+    </g>
+  </defs>
+  <circle cx="604" cy="604" r="583.0" fill="none" stroke="#03235A" stroke-width="38"/>
+  <g transform="translate(-126.8 18.3) scale(1.21)">
+  <!-- star + rays -->
+  <path d="M604.0,279.5 L615.8,306.8 L645.4,309.6 L623.0,329.2 L629.6,358.2 L604.0,343.0 L578.4,358.2 L585.0,329.2 L562.6,309.6 L592.2,306.8 Z" fill="#F7811F" stroke="#F7811F" stroke-width="14" stroke-linejoin="round"/>
+
+  <!-- mountains -->
+  <path d="M650,520 L727,436 L748,453 L792,441 L895,537 L795,548 Z" fill="#77A9B5"/>
+  <path d="M604,365 L795,548 C765,550 722,560 690,578 L673,590 L520,452 Z" fill="#217D96"/>
+  <path d="M310,538 L360,480 L372,486 L415,435 L448,462 L492,427 L518,452 L673,590 C655,598 635,612 620,627 L604,643 L590,626 L580,611 C535,550 450,510 362,512 Z" fill="#03235A"/>
+  <g fill="#FFFFFF">
+    <path d="M418,452 L428,462 L438,475 L446,493 L435,488 L425,475 L420,462 Z"/><path d="M500,448 L508,455 L518,468 L526,482 L515,478 L508,468 L503,458 Z"/><path d="M608,402 L622,411 L637,431 L651,454 L665,471 L681,480 L697,478 L688,490 L662,492 L646,488 L632,471 L618,447 L610,423 Z"/><path d="M722,452 L731,456 L739,467 L745,481 L735,475 L728,465 Z"/><path d="M781,457 L791,461 L797,475 L800,489 L789,483 L783,470 Z"/>
+  </g>
+
+  <!-- open book -->
+  <path d="M309,539 L325,527 C430,525 525,565 581,611 C510,572 400,545 309,539 Z" fill="#03235A"/>
+  <use href="#bookHalf"/>
+  <use href="#bookHalf" transform="translate(1208 0) scale(-1 1)"/>
+
+  </g>
+</svg>

@@ -101,6 +101,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
+import { SchoolMark } from '@/components/shared/SchoolMark'
 import Link from 'next/link'
 import { useTheme } from 'next-themes'
 import { useHasMounted } from '@/hooks/useHasMounted'
@@ -438,13 +439,7 @@ export default function LandingPage() {
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[72px] flex items-center gap-6">
             <button onClick={() => scrollTo('top')} aria-label="Back to top" className="flex items-center gap-3 shrink-0">
-              <Image
-                src="/favicon.png"
-                alt=""
-                width={56}
-                height={56}
-                className="w-14 h-14 object-contain shrink-0"
-              />
+              <SchoolMark kind="emblem" tone={scrolled ? 'auto' : 'onDark'} width={56} height={56} className="w-14 h-14 object-contain shrink-0" />
               <div className="text-left leading-tight hidden sm:block">
                 <div className={`font-heading font-extrabold text-sm tracking-tight transition-colors ${scrolled ? 'text-brand-navy dark:text-white' : 'text-white'}`}>
                   {schoolInfo?.schoolName?.toUpperCase() ?? 'SMS MALAWI'}
@@ -1429,7 +1424,7 @@ export default function LandingPage() {
               <div className="col-span-2 lg:col-span-1">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10.5 h-10.5 rounded-xl bg-white/10 flex items-center justify-center p-2">
-                    <Image src="/favicon.png" alt="" width={42} height={42} className="w-full h-full object-contain" />
+                    <SchoolMark kind="emblem" tone="onDark" width={42} height={42} className="w-full h-full object-contain" />
                   </div>
                   <div className="font-heading font-extrabold text-[15px] tracking-tight">{schoolInfo?.schoolName?.toUpperCase() ?? 'SMS MALAWI'}</div>
                 </div>

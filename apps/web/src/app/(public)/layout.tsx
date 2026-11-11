@@ -32,7 +32,7 @@ export const revalidate = 3600
 // themselves any more or they would overflow the viewport by the bar's height.
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen flex-col bg-page">
+    <div className="hills-type flex min-h-screen flex-col bg-page">
       <SchoolJsonLd />
       <PublicHeader />
       <div className="flex flex-1 flex-col">

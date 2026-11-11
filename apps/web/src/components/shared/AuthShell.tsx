@@ -52,8 +52,8 @@ import type { ReactNode } from 'react'
 import { useHasMounted } from '@/hooks/useHasMounted'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 
-/** 5iveStack Labs mark + system name. BVO (dark-on-light) in light mode, WVO
- *  (light-on-dark) in dark mode, so the mark always contrasts with the card. */
+/** School crest + system name. The navy crest in light mode and the light crest
+ *  in dark mode, so the mark always contrasts with the card. */
 function AuthBrand() {
   const { resolvedTheme } = useTheme()
   const mounted = useHasMounted()
@@ -64,12 +64,12 @@ function AuthBrand() {
         <Image
           src={
             mounted && resolvedTheme === 'dark'
-              ? '/images/5ivestacks-labs-logo-wvo.svg'
-              : '/images/5ivestacks-labs-logo-bvo.svg'
+              ? '/logo-dark.svg'
+              : '/logo-light.svg'
           }
-          alt="5iveStack Labs logo"
+          alt="Chikangawa Hills Academy logo"
           width={380}
-          height={150}
+          height={380}
           loading="eager"
           className="h-auto w-52 object-contain drop-shadow-lg sm:w-60 lg:w-72"
         />

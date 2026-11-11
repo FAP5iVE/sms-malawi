@@ -49,7 +49,7 @@
  *   - Role badge footer, item tooltips in collapsed mode
  */
 
-import Image                    from 'next/image'
+import { SchoolMark } from '@/components/shared/SchoolMark'
 import Link                     from 'next/link'
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -219,13 +219,7 @@ export function Sidebar() {
               damping: 40,
             })}
           >
-            <Image
-              src="/favicon.png"
-              alt=""
-              width={40}
-              height={40}
-              className="w-14 h-14 object-contain"
-            />
+            <SchoolMark kind="emblem" width={40} height={40} className="w-14 h-14 object-contain" />
           </motion.div>
 
           {/* Brand name + collapse button — animated out when collapsing */}

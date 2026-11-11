@@ -175,7 +175,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             every authenticated page inherits it with no per-page changes.
             `fixed inset-0` + `pointer-events-none` means it costs nothing
             in this flex layout and never intercepts clicks/touches. */}
-        <PublicAmbientBackground />
+        <PublicAmbientBackground variant="calm" />
 
         {/* ── Sidebar wrapper ─────────────────────────────────────────────
           `hidden`    → display:none below md (Sidebar not rendered visually)

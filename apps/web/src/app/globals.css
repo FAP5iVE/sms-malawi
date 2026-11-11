@@ -73,6 +73,18 @@
   src: url('/fonts/dmsans-bold.woff2') format('woff2');
 }
 
+/* Hanken Grotesk, variable (weights 100-900). Used ONLY inside a .hills scope
+   (the public site and sign-in family); the signed-in app keeps DM Sans and
+   Inter. Browsers fetch this file lazily, only when a .hills element renders
+   text, so signed-in pages never download it. SIL Open Font License 1.1. */
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/hanken-grotesk-variable.woff2') format('woff2');
+}
+
 /* ─────────────────────────────────────────────────────────
    TAILWIND v4 THEME
    Maps design token names to Tailwind utility classes.
@@ -1112,4 +1124,511 @@ span[data-math]:not([data-display="block"]) {
 }
 span[data-math] .katex-display {
   margin: 0;
+}
+
+
+/* ═════════════════════════════════════════════════════════════════════════
+   HILLS THEME  (Chikangawa Hills, Phase 1: tokens, font, containers)
+
+   Everything here is scoped to a `.hills` element, so nothing in the signed-in
+   app changes until a page opts in. Class names and tokens:
+
+   Sky palettes   four of them (dawn, day, dusk, night), chosen by
+                  <html data-sky="..."> (set by the inline script in
+                  app/layout.tsx and kept current by HillsSkySync), or locally
+                  by `<div class="hills" data-sky="dusk">` (Storybook uses this
+                  to show all four side by side).
+   Surface tokens reuse the app's own --background / --card / --border, so
+                  cards and inputs follow light and dark exactly as before.
+   Layout         .hills-container, .hills-split, .hills-measure
+   Glass          .hills-glass (opaque on small screens and when the visitor
+                  asks for reduced transparency)
+   Type scale     .hills-display, .hills-title, .hills-lede, .hills-body,
+                  .hills-small
+
+   Ink on each sky is checked by `pnpm hills:contrast` (4.5:1 body text, 3:1
+   large text and graphics); keep that passing when editing a palette.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* Registered so a change of sky eases instead of snapping. */
+@property --hills-sky-1  { syntax: '<color>'; inherits: true; initial-value: #5aa9d6; }
+@property --hills-sky-2  { syntax: '<color>'; inherits: true; initial-value: #d9f0f1; }
+@property --hills-ink    { syntax: '<color>'; inherits: true; initial-value: #0c2634; }
+@property --hills-accent { syntax: '<color>'; inherits: true; initial-value: #932e09; }
+@property --hills-accent-2 { syntax: '<color>'; inherits: true; initial-value: #ffb27a; }
+@property --hills-tint   { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0); }
+@property --hills-on     { syntax: '<color>'; inherits: true; initial-value: #f4fafc; }
+@property --hills-danger { syntax: '<color>'; inherits: true; initial-value: #6c160d; }
+@property --hills-warn   { syntax: '<color>'; inherits: true; initial-value: #552f00; }
+@property --hills-ok     { syntax: '<color>'; inherits: true; initial-value: #0c3f31; }
+@property --hills-sunline { syntax: '<color>'; inherits: true; initial-value: #fff0b8; }
+@property --hills-star   { syntax: '<number>'; inherits: true; initial-value: 0; }
+@property --hills-moon   { syntax: '<number>'; inherits: true; initial-value: 0; }
+
+.hills {
+  /* Default sky is day. */
+  --hills-sky-1:    #5aa9d6;
+  --hills-sky-2:    #d9f0f1;
+  --hills-ink:      #0c2634;
+  --hills-accent:   #932e09;
+  --hills-accent-2: #ffb27a;
+  --hills-tint:     rgba(255, 255, 255, 0);
+  --hills-on:       #f4fafc;
+  --hills-danger:   #6c160d;
+  --hills-warn:     #552f00;
+  --hills-ok:       #0c3f31;
+  --hills-sunline:  #fff0b8;
+  --hills-star:     0;
+  --hills-moon:     0;
+
+  --hills-ink-2: color-mix(in srgb, var(--hills-ink) 93%, transparent);
+  --hills-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --hills-ease-time: 1.8s;
+
+  /* Surfaces reuse the app's own light/dark values (HSL triplets). */
+  --hills-page:       hsl(var(--background));
+  --hills-surface:    hsl(var(--card));
+  --hills-surface-fg: hsl(var(--card-foreground));
+  --hills-line:       hsl(var(--border));
+
+  --font-hills: 'Hanken Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--font-hills);
+  color: var(--hills-ink);
+  -webkit-font-smoothing: antialiased;
+
+  transition:
+    --hills-sky-1 var(--hills-ease-time) var(--hills-ease),
+    --hills-sky-2 var(--hills-ease-time) var(--hills-ease),
+    --hills-ink var(--hills-ease-time) var(--hills-ease),
+    --hills-accent var(--hills-ease-time) var(--hills-ease),
+    --hills-accent-2 var(--hills-ease-time) var(--hills-ease),
+    --hills-tint var(--hills-ease-time) var(--hills-ease),
+    --hills-on var(--hills-ease-time) var(--hills-ease),
+    --hills-danger var(--hills-ease-time) var(--hills-ease),
+    --hills-warn var(--hills-ease-time) var(--hills-ease),
+    --hills-ok var(--hills-ease-time) var(--hills-ease),
+    --hills-sunline var(--hills-ease-time) var(--hills-ease),
+    --hills-star var(--hills-ease-time) var(--hills-ease),
+    --hills-moon var(--hills-ease-time) var(--hills-ease);
+}
+
+/* The page-wide sky (html[data-sky]) is wrapped in :where() so its specificity
+   is zero and a local `.hills[data-sky]` always wins. */
+:where(:root[data-sky='dawn']) .hills,
+.hills[data-sky='dawn'] {
+  --hills-sky-1: #86a7c5;
+  --hills-sky-2: #f7c38e;
+  --hills-ink: #0c2232;
+  --hills-accent: #87290a;
+  --hills-accent-2: #ffb27a;
+  --hills-tint: rgba(255, 170, 100, 0.1);
+  --hills-on: #f6fafb;
+  --hills-danger: #661309;
+  --hills-warn: #4f2d00;
+  --hills-ok: #0c4133;
+  --hills-sunline: #b4480f;
+  --hills-star: 0.2;
+  --hills-moon: 0;
+}
+
+:where(:root[data-sky='day']) .hills,
+.hills[data-sky='day'] {
+  --hills-sky-1: #5aa9d6;
+  --hills-sky-2: #d9f0f1;
+  --hills-ink: #0c2634;
+  --hills-accent: #932e09;
+  --hills-accent-2: #ffb27a;
+  --hills-tint: rgba(255, 255, 255, 0);
+  --hills-on: #f4fafc;
+  --hills-danger: #6c160d;
+  --hills-warn: #552f00;
+  --hills-ok: #0c3f31;
+  --hills-sunline: #fff0b8;
+  --hills-star: 0;
+  --hills-moon: 0;
+}
+
+:where(:root[data-sky='dusk']) .hills,
+.hills[data-sky='dusk'] {
+  --hills-sky-1: #1f3a58;
+  --hills-sky-2: #8a3d26;
+  --hills-ink: #fff4e8;
+  --hills-accent: #ffb35e;
+  --hills-accent-2: #a8350b;
+  --hills-tint: rgba(255, 110, 60, 0.08);
+  --hills-on: #1a1a22;
+  --hills-danger: #ffc9bd;
+  --hills-warn: #ffd88a;
+  --hills-ok: #8fe3bf;
+  --hills-sunline: #ffd08a;
+  --hills-star: 0.2;
+  --hills-moon: 0;
+}
+
+:where(:root[data-sky='night']) .hills,
+.hills[data-sky='night'] {
+  --hills-sky-1: #050d18;
+  --hills-sky-2: #17364a;
+  --hills-ink: #e9f1f4;
+  --hills-accent: #f2a650;
+  --hills-accent-2: #a8350b;
+  --hills-tint: rgba(0, 8, 24, 0);
+  --hills-on: #06121b;
+  --hills-danger: #ff9c8f;
+  --hills-warn: #ffd27a;
+  --hills-ok: #8fe3bf;
+  --hills-sunline: #cfe3f3;
+  --hills-star: 1;
+  --hills-moon: 1;
+}
+
+/* The sky itself, for any page that wants the gradient behind its content. */
+.hills-sky {
+  position: relative;
+  min-height: 100svh;
+  overflow: clip;
+  color: var(--hills-ink);
+  background: linear-gradient(180deg, var(--hills-sky-1), var(--hills-sky-2));
+}
+.hills-sky::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--hills-tint);
+}
+
+.font-hills {
+  font-family: var(--font-hills, 'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif);
+}
+
+/* Hanken Grotesk for everything inside a public page. The app's font-sans and
+   font-heading utilities read these two variables, so re-pointing them on one
+   wrapper switches every descendant with no per-page edits. The signed-in app
+   never has this class and keeps DM Sans and Inter. */
+.hills-type {
+  --font-sans: 'Hanken Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-heading: 'Hanken Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--font-sans);
+}
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+
+/* Full width, 5vw side padding, never wider than 1500px. */
+.hills-container {
+  width: 100%;
+  max-width: 1500px;
+  margin-inline: auto;
+  padding-inline: 5vw;
+}
+
+/* One column on phones; two from 900px. A page can set --hills-split-cols for
+   an uneven split, e.g. minmax(0, 1fr) clamp(340px, 34vw, 440px) on sign-in. */
+.hills-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  align-items: center;
+}
+@media (min-width: 900px) {
+  .hills-split {
+    grid-template-columns: var(--hills-split-cols, minmax(0, 1fr) minmax(0, 1fr));
+  }
+}
+
+/* Comfortable reading width for long text. */
+.hills-measure {
+  max-width: 760px;
+}
+
+/* ── Glass ──────────────────────────────────────────────────────────────── */
+
+.hills-glass {
+  background: color-mix(in srgb, var(--hills-on) 34%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hills-ink) 22%, transparent);
+  border-radius: 16px;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+/* No blur, fully opaque: phones (cheaper to paint, easier to read) and
+   anyone who asked the system for less transparency. */
+@media (max-width: 767px) {
+  .hills-glass {
+    background: color-mix(in srgb, var(--hills-on) 92%, var(--hills-sky-2));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .hills-glass {
+    background: color-mix(in srgb, var(--hills-on) 92%, var(--hills-sky-2));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* The app's base layer gives every h1-h6 its own font and colour, which would
+   beat what a heading inherits from the sky. Inside .hills, headings inherit. */
+.hills :where(h1, h2, h3, h4, h5, h6) {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* ── Type scale (Hanken Grotesk) ────────────────────────────────────────── */
+
+.hills-display {
+  font-weight: 300;
+  font-size: clamp(48px, 7vw, 124px);
+  line-height: 0.96;
+  letter-spacing: -0.05em;
+}
+.hills-title {
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+.hills-lede {
+  font-size: clamp(17px, 1.35vw, 20px);
+  line-height: 1.45;
+  color: var(--hills-ink-2);
+}
+.hills-body {
+  font-size: 17px;
+  line-height: 1.55;
+}
+.hills-small {
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--hills-ink-2);
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS BACKGROUND (Phase 2), used by PublicAmbientBackground
+   Layers, bottom to top: sky gradient, interim scrim (default only), stars,
+   sun, moon, contour lines. Everything is aria-hidden and ignores the pointer.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.hills-bg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: layout paint style;
+  container-type: size;
+
+  /* Sun and moon: wider screens get a bigger disc. */
+  --hills-cel: clamp(72px, 9vw, 130px);
+  /* How much of the contour lines show over the middle of the screen. */
+  --hills-fade-core: 0.6;
+  --hills-lines: 0.3;
+  --sunc: #fff3bf;
+  --sun-glow: rgba(255, 246, 200, 0.5);
+}
+:where(:root[data-sky='dawn'], :root[data-sky='dusk']) .hills-bg {
+  --sunc: #ffbd78;
+  --sun-glow: rgba(255, 189, 120, 0.5);
+}
+
+.hills-bg__sky {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(var(--hills-tint), var(--hills-tint)),
+    linear-gradient(180deg, var(--hills-sky-1) 0%, var(--hills-sky-1) 18%, var(--hills-sky-2) 100%);
+}
+
+/* A box that covers the screen at the artwork's 3:2 shape, centred. A position
+   inside it is the same percentage position at any window size. */
+.hills-bg__cover {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100vw, 150vh);
+  height: max(66.667vw, 100vh);
+  width: max(100cqw, 150cqh);
+  height: max(66.667cqw, 100cqh);
+  transform: translate(-50%, -50%);
+}
+
+/* Interim readability scrim: the page's own background colour over the sky.
+   Existing pages colour their text for a plain page (muted text is only 4.37:1
+   there in light mode), so ANY sky showing under the text would make it harder
+   to read. The scrim is therefore fully opaque across the content column
+   (about 1120px) and relaxes to 80% only in the side margins of wide screens.
+   On phones and narrow windows pages read exactly as they do today.
+   Removed page by page in Phase 6. */
+.hills-bg__scrim {
+  position: absolute;
+  inset: 0;
+  background: hsl(var(--background));
+  -webkit-mask-image: linear-gradient(90deg, rgb(0 0 0 / 0.8) 0, #000 calc(50% - 560px), #000 calc(50% + 560px), rgb(0 0 0 / 0.8) 100%);
+  mask-image: linear-gradient(90deg, rgb(0 0 0 / 0.8) 0, #000 calc(50% - 560px), #000 calc(50% + 560px), rgb(0 0 0 / 0.8) 100%);
+}
+
+/* Stars: two layers that twinkle out of step. Visible in proportion to --hills-star. */
+.hills-bg__stars {
+  position: absolute;
+  inset: 0;
+  opacity: var(--hills-star);
+}
+.hills-bg__stars-a,
+.hills-bg__stars-b {
+  background: url('/hills/stars-a.svg') center / 100% 100% no-repeat;
+  animation: hills-twinkle 5s ease-in-out infinite;
+}
+.hills-bg__stars-b {
+  background-image: url('/hills/stars-b.svg');
+  animation-duration: 7s;
+  animation-delay: -2.5s;
+}
+@keyframes hills-twinkle {
+  50% { opacity: 0.3; }
+}
+
+/* Sun and moon. By default the sky decides which one shows (night = moon). The
+   client island overrides --sun-o/--moon-o and the positions for vivid and home. */
+.hills-bg__sun,
+.hills-bg__moon {
+  position: absolute;
+  width: var(--hills-cel);
+  height: var(--hills-cel);
+}
+.hills-bg__sun {
+  left: var(--sun-x, 86%);
+  top: var(--sun-y, 15%);
+  opacity: var(--sun-o, calc(1 - var(--hills-moon)));
+  transform: translate(-50%, -50%) scale(var(--sun-scale, 1));
+}
+.hills-bg__moon {
+  left: var(--moon-x, 86%);
+  top: var(--moon-y, 15%);
+  width: calc(var(--hills-cel) * 0.72);
+  height: calc(var(--hills-cel) * 0.72);
+  opacity: var(--moon-o, var(--hills-moon));
+  transform: translate(-50%, -50%) scale(var(--moon-scale, 1));
+}
+.hills-bg__sun::before,
+.hills-bg__moon::before {
+  content: '';
+  position: absolute;
+  inset: -100%;
+  border-radius: 50%;
+}
+.hills-bg__sun::before {
+  background: radial-gradient(circle, var(--sun-glow) 0%, transparent 62%);
+}
+.hills-bg__moon::before {
+  background: radial-gradient(circle, rgba(180, 205, 230, 0.3) 0%, transparent 62%);
+}
+.hills-bg__sun i {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--sunc);
+}
+.hills-bg__moon svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Contour lines: the ink colour painted through the SVG, so they follow the sky.
+   The fade lowers them over the middle of the screen, where text usually sits. */
+.hills-bg__fade {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-image: radial-gradient(ellipse 60% 70% at 50% 50%, rgb(0 0 0 / var(--hills-fade-core)) 0%, #000 100%);
+  mask-image: radial-gradient(ellipse 60% 70% at 50% 50%, rgb(0 0 0 / var(--hills-fade-core)) 0%, #000 100%);
+}
+.hills-bg__map,
+.hills-bg__glow {
+  -webkit-mask: url('/hills/contours.svg') center / 100% 100% no-repeat;
+  mask: url('/hills/contours.svg') center / 100% 100% no-repeat;
+}
+.hills-bg__map {
+  background: var(--hills-ink);
+  opacity: var(--hills-lines);
+}
+/* The sunlit rings around the peak (the peak is at 71.7% / 36.3% of the artwork). */
+.hills-bg__glow {
+  background: radial-gradient(
+    ellipse 30% 45% at 71.7% 36.3%,
+    color-mix(in srgb, var(--hills-sunline) 85%, transparent) 0%,
+    color-mix(in srgb, var(--hills-sunline) 42%, transparent) 50%,
+    transparent 100%
+  );
+  opacity: 0.9;
+}
+
+/* ── Variants ───────────────────────────────────────────────────────────── */
+
+/* default: small sun and moon, only on wide screens where the margin is free. */
+.hills-bg--default {
+  --hills-cel: 56px;
+  --hills-fade-core: 0.35;
+  --hills-lines: 0.18;
+}
+.hills-bg--default .hills-bg__sun,
+.hills-bg--default .hills-bg__moon {
+  display: none;
+}
+@media (min-width: 1100px) {
+  .hills-bg--default .hills-bg__sun,
+  .hills-bg--default .hills-bg__moon {
+    display: block;
+  }
+}
+
+/* vivid and home: placed by the client island. Hidden until it has run, then eased. */
+.hills-bg--vivid:not([data-ready]) .hills-bg__sun,
+.hills-bg--vivid:not([data-ready]) .hills-bg__moon,
+.hills-bg--home:not([data-ready]) .hills-bg__sun,
+.hills-bg--home:not([data-ready]) .hills-bg__moon {
+  opacity: 0;
+}
+.hills-bg--vivid[data-ready] .hills-bg__sun,
+.hills-bg--vivid[data-ready] .hills-bg__moon,
+.hills-bg--home[data-ready] .hills-bg__sun,
+.hills-bg--home[data-ready] .hills-bg__moon {
+  transition:
+    left 1.2s var(--hills-ease),
+    top 1.2s var(--hills-ease),
+    opacity 1.2s var(--hills-ease);
+}
+
+/* calm: static, softened, contours only. */
+.hills-bg--calm {
+  --hills-fade-core: 0.25;
+  --hills-lines: 0.14;
+}
+.hills-bg--calm .hills-bg__sky {
+  /* A horizon glow only: plain at the top where headings and text sit, easing
+     into the sky's lower colour. Dashboards never pick up the full public look. */
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    transparent 35%,
+    color-mix(in srgb, var(--hills-sky-2) 55%, transparent) 100%
+  );
+}
+.hills-bg--calm .hills-bg__glow {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hills-bg__stars-a,
+  .hills-bg__stars-b {
+    animation: none;
+  }
+  .hills-bg--vivid[data-ready] .hills-bg__sun,
+  .hills-bg--vivid[data-ready] .hills-bg__moon,
+  .hills-bg--home[data-ready] .hills-bg__sun,
+  .hills-bg--home[data-ready] .hills-bg__moon {
+    transition: none;
+  }
 }

@@ -20,7 +20,7 @@ const LINKS = [
 
 export default function NotFound() {
   return (
-    <div className="relative flex min-h-screen flex-col bg-page">
+    <div className="hills-type relative flex min-h-screen flex-col bg-page">
       <PublicAmbientBackground />
 
       {/* Outside the (public) route group, so it doesn't get the layout's
