@@ -707,6 +707,76 @@
       "kind": "import",
       "pattern": "^import \\{ staggerDelay \\} from '@/lib/hills/motion'$",
       "reason": "Phase 4b: stagger delay for list reveals (pure function, tested)."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const inputCls = 'w-full border rounded-xl",
+      "reason": "Phase 5: the field style strings are class names only; the underlined style now lives in globals.css (.hills-ctl). Same constants, same use sites."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const inputError = 'border-brand-coral",
+      "reason": "Phase 5: the field style strings are class names only; the underlined style now lives in globals.css (.hills-ctl). Same constants, same use sites."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const inputBase = 'border-base'$",
+      "reason": "Phase 5: the field style strings are class names only; the underlined style now lives in globals.css (.hills-ctl). Same constants, same use sites."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const phoneCodeSelectCls = 'w-24",
+      "reason": "Phase 5: the field style strings are class names only; the underlined style now lives in globals.css (.hills-ctl). Same constants, same use sites."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const inputCls = 'hills-ctl'$",
+      "reason": "Phase 5: the field style strings are class names only; the underlined style now lives in globals.css (.hills-ctl). Same constants, same use sites."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const inputError = 'hills-ctl--err'$",
+      "reason": "Phase 5: the field style strings are class names only; the underlined style now lives in globals.css (.hills-ctl). Same constants, same use sites."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const inputBase = ''$",
+      "reason": "Phase 5: the field style strings are class names only; the underlined style now lives in globals.css (.hills-ctl). Same constants, same use sites."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const phoneCodeSelectCls = 'hills-ctl hills-ctl--code'$",
+      "reason": "Phase 5: the field style strings are class names only; the underlined style now lives in globals.css (.hills-ctl). Same constants, same use sites."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria-current=\\{ active \\? 'step' : undefined \\}$",
+      "reason": "Phase 5: marks the current step for screen readers (the step list is now an <ol>). Reads the existing `active` value; no handler or state change."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{ i < STEPS \\. length - 1 && \\( <JSX/> \\) \\}$",
+      "reason": "Phase 5: the line between two step circles was a conditional <div>; it is now drawn by CSS (li:not(:last-child)::after), so the same lines appear with no JSX condition."
     }
   ]
 }

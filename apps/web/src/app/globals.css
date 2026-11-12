@@ -2325,3 +2325,429 @@ a.hills-studio__credit-name:hover { text-decoration: underline; text-underline-o
 .hills-container--nav {
   padding-inline: min(5vw, max(16px, calc((100vw - 1260px) / 2)));
 }
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS APPLY (Phase 5): /apply, the student application
+   Two columns from 900px, one below. Left: the title, the required-field note
+   and the step list, all on the sky (the interim scrim is switched off with
+   `hills-open`). Right: the form on ONE opaque surface that follows the
+   Light/Dark THEME, like the sign-in card (white or navy), never the sky.
+   Below 900px the step list becomes a strip of numbered circles.
+   Class names only; the page logic is untouched. Contrast: `pnpm hills:contrast`.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.hills-open .hills-bg__scrim { display: none; }
+
+.hills-apply {
+  --hills-split-cols: clamp(240px, 26vw, 340px) minmax(0, 760px);
+}
+.hills-apply__wrap { padding-block: clamp(28px, 5vw, 72px); }
+@media (min-width: 900px) {
+  .hills-apply .hills-split { justify-content: center; }
+}
+.hills-apply__grid--form { align-items: start; }
+
+/* ── Left column, on the sky ────────────────────────────────────────────── */
+
+.hills-apply__side { min-width: 0; animation: hills-rise 0.9s 0.08s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+@media (min-width: 900px) and (min-height: 640px) {
+  .hills-apply__side--sticky { position: sticky; top: 96px; }
+}
+.hills-apply__title {
+  margin: 0 0 14px;
+  font-size: clamp(36px, 3.6vw, 54px);
+  font-weight: 300;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  color: var(--hills-ink);
+  text-wrap: balance;
+}
+.hills-apply__note {
+  margin: 0;
+  max-width: 36ch;
+  font-size: clamp(17px, 1.3vw, 19px);
+  line-height: 1.5;
+  /* Full-strength ink, not ink-2: measured on the real day sky the 93% ink-2 fell
+     to 4.2:1 behind this paragraph (the token model said 4.5). */
+  color: var(--hills-ink);
+}
+.hills-apply__req { color: var(--hills-ink); font-weight: 800; }
+
+/* Step list. Phones: a strip of circles joined by lines (labels are visually
+   hidden but stay in the DOM, so every button has a name). 900px+: a vertical list. */
+.hills-apply__steps {
+  display: flex;
+  align-items: center;
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.hills-apply__step { position: relative; display: flex; align-items: center; flex: none; }
+.hills-apply__step:not(:last-child) { flex: 1; }
+.hills-apply__step:not(:last-child)::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  margin-inline: 6px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--hills-ink) 38%, transparent);
+}
+.hills-apply__step.is-done:not(:last-child)::after { background: var(--hills-ink); }
+.hills-apply__stepbtn {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 44px;
+  padding: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--hills-ink-2);
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.hills-apply__step.is-done .hills-apply__stepbtn { cursor: pointer; color: var(--hills-ink); }
+.hills-apply__step.is-active .hills-apply__stepbtn { color: var(--hills-ink); }
+.hills-apply__stepbtn:focus-visible { outline: 2px solid var(--hills-ink); outline-offset: 3px; }
+.hills-apply__chip {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 1.5px solid var(--hills-ink-2);
+  border-radius: 50%;
+  color: var(--hills-ink-2);
+  transition: background 0.25s, color 0.25s;
+}
+.hills-apply__step.is-done .hills-apply__chip {
+  border-color: var(--hills-ink);
+  background: color-mix(in srgb, var(--hills-ink) 14%, transparent);
+  color: var(--hills-ink);
+}
+.hills-apply__step.is-active .hills-apply__chip {
+  border-color: var(--hills-ink);
+  background: var(--hills-ink);
+  color: var(--hills-on);
+}
+.hills-apply__step.is-done .hills-apply__stepbtn:hover .hills-apply__steplabel { text-decoration: underline; text-underline-offset: 4px; }
+.hills-apply__steplabel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.hills-apply__step.is-active .hills-apply__steplabel { font-weight: 700; }
+
+@media (min-width: 900px) {
+  .hills-apply__steps { display: block; margin-top: 40px; }
+  .hills-apply__step { display: block; }
+  .hills-apply__step:not(:last-child) { margin-bottom: 20px; }
+  .hills-apply__step:not(:last-child)::after {
+    position: absolute;
+    left: 19px;
+    top: 46px;
+    bottom: -18px;
+    width: 2px;
+    height: auto;
+    margin: 0;
+  }
+  .hills-apply__chip { width: 40px; height: 40px; }
+  .hills-apply__steplabel {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+}
+
+/* ── The form surface ───────────────────────────────────────────────────── */
+
+.hills-apply__form { min-width: 0; }
+.hills-apply__surface {
+  container-type: inline-size;
+  min-width: 0;
+  padding: clamp(20px, 3vw, 40px);
+  border: 1px solid color-mix(in srgb, var(--hills-line) 80%, transparent);
+  border-radius: 20px;
+  background: var(--hills-surface);
+  color: var(--hills-surface-fg);
+  box-shadow: 0 24px 60px -28px rgb(0 0 0 / 0.45);
+  animation: hills-rise 0.9s 0.16s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  color-scheme: light;
+
+  /* Same colours as the sign-in card (day palette in the light theme, night
+     palette in the dark theme). */
+  --c-ink: var(--hills-surface-fg);
+  --c-ink2: color-mix(in srgb, var(--hills-surface-fg) 82%, transparent);
+  --c-ph: color-mix(in srgb, var(--hills-surface-fg) 62%, transparent);
+  --c-line: color-mix(in srgb, var(--hills-surface-fg) 18%, transparent);
+  --c-acc: #932e09;
+  --c-acc2: #ffb27a;
+  --c-danger: #6c160d;
+  --c-warn: #552f00;
+}
+.dark .hills-apply__surface {
+  color-scheme: dark;
+  --c-acc: #f2a650;
+  --c-acc2: #a8350b;
+  --c-danger: #ff9c8f;
+  --c-warn: #ffd27a;
+}
+
+.hills-apply__sec {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 28px;
+  padding: 0 0 22px;
+  border-bottom: 1px solid var(--c-line);
+}
+.hills-apply__sec-ico {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c-ink) 8%, transparent);
+  color: var(--c-ink);
+}
+.hills-apply__sec-title { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; color: var(--c-ink); }
+.hills-apply__sec-sub { margin: 2px 0 0; font-size: 15px; line-height: 1.4; color: var(--c-ink2); }
+
+/* Field grid: two columns when the surface is wide enough, otherwise one. */
+.hills-apply__fields,
+.hills-apply__checks { display: grid; grid-template-columns: minmax(0, 1fr); gap: 26px 28px; }
+.hills-apply__checks { gap: 6px 24px; }
+@container (min-width: 560px) {
+  .hills-apply__fields,
+  .hills-apply__checks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.hills-apply__phone { display: flex; gap: 12px; }
+.hills-apply__lead { margin: 0 0 22px; font-size: 16px; line-height: 1.55; color: var(--c-ink2); }
+.hills-apply__needs { display: grid; gap: 18px; margin-top: 18px; }
+
+.hills-fld__label {
+  display: block;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--c-ink);
+}
+.hills-fld__label--sm { font-size: 14px; }
+.hills-fld__req { margin-left: 4px; color: var(--c-danger); }
+.hills-fld__hint { margin: 6px 0 0; font-size: 14px; line-height: 1.4; color: var(--c-ink2); }
+.hills-fld__hint--lead { margin: 0 0 12px; }
+.hills-fld__err { margin: 6px 0 0; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--c-danger); }
+.hills-fld__group {
+  grid-column: 1 / -1;
+  margin: 8px 0 -6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-ink2);
+}
+
+/* Underlined controls: inputs, selects, the date field and the textarea. */
+.hills-apply__surface .hills-ctl {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 0 8px;
+  border: 0;
+  border-bottom: 1.5px solid var(--c-ink);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--c-ink);
+  outline: 0;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+.hills-apply__surface .hills-ctl::placeholder { color: var(--c-ph); font-weight: 400; opacity: 1; }
+.hills-apply__surface .hills-ctl:focus {
+  border-bottom-color: var(--c-acc);
+  box-shadow: 0 2px 0 0 var(--c-acc);
+  background-color: color-mix(in srgb, var(--c-acc) 7%, transparent);
+}
+.hills-apply__surface textarea.hills-ctl { min-height: 96px; line-height: 1.45; }
+.hills-apply__surface .hills-ctl option { background: var(--hills-surface); color: var(--hills-surface-fg); }
+.hills-apply__surface .hills-ctl:-webkit-autofill {
+  -webkit-text-fill-color: var(--c-ink);
+  box-shadow: 0 0 0 1000px hsl(var(--card)) inset;
+  caret-color: var(--c-ink);
+}
+.hills-apply__surface .hills-ctl--err {
+  border-bottom-color: var(--c-danger);
+  box-shadow: 0 1px 0 0 var(--c-danger);
+  background-color: color-mix(in srgb, var(--c-danger) 6%, transparent);
+}
+.hills-apply__surface .hills-ctl--err:focus { border-bottom-color: var(--c-danger); box-shadow: 0 2px 0 0 var(--c-danger); }
+/* Calling-code select next to the phone number: fixed, compact width. */
+.hills-apply__surface .hills-ctl--code { flex: none; width: 6.25rem; text-overflow: ellipsis; }
+
+.hills-chkrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--c-ink);
+  cursor: pointer;
+}
+.hills-chkrow--top { align-items: flex-start; }
+.hills-chkrow__sub { display: block; margin-top: 2px; font-size: 14px; font-weight: 400; color: var(--c-ink2); }
+.hills-chk { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--c-acc); }
+.hills-chkrow--top .hills-chk { margin-top: 2px; }
+.hills-chk:focus-visible { outline: 2px solid var(--c-acc); outline-offset: 2px; }
+
+/* ── Review step ────────────────────────────────────────────────────────── */
+
+.hills-apply__rsec { margin: 0 0 30px; }
+.hills-apply__rh {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--c-acc);
+}
+.hills-apply__dl { margin: 0; }
+.hills-apply__row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 11.5rem) minmax(0, 1fr);
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--c-line);
+  font-size: 16px;
+  line-height: 1.45;
+}
+.hills-apply__dt { margin: 0; font-weight: 500; color: var(--c-ink2); }
+.hills-apply__dd { margin: 0; font-weight: 600; color: var(--c-ink); overflow-wrap: anywhere; }
+.hills-apply__confirm {
+  margin: 8px 0 0;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--c-warn) 40%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c-warn) 9%, transparent);
+  color: var(--c-warn);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+.hills-apply__err { margin: 16px 0 0; }
+
+/* ── Previous / Step x of y / Next ──────────────────────────────────────── */
+
+.hills-apply__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid var(--c-line);
+}
+.hills-apply__nav--end { justify-content: flex-end; }
+.hills-apply__prev {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  margin-left: -8px;
+  padding: 0 14px 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--c-ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.hills-apply__prev:hover:not(:disabled) { background: color-mix(in srgb, var(--c-ink) 8%, transparent); }
+.hills-apply__prev:focus-visible { outline: 3px solid var(--c-acc); outline-offset: 2px; }
+.hills-apply__prev:disabled { opacity: 0.4; cursor: not-allowed; }
+.hills-apply__count { font-size: 15px; font-weight: 500; color: var(--c-ink2); text-align: center; }
+@media (max-width: 479px) {
+  .hills-apply__nav { flex-wrap: wrap; }
+  .hills-apply__count { order: -1; flex-basis: 100%; }
+}
+.hills-go--inline {
+  display: inline-flex;
+  justify-content: center;
+  gap: 12px;
+  width: auto;
+  height: 52px;
+  margin: 0;
+  padding: 0 24px;
+  font-size: 17px;
+  text-decoration: none;
+}
+.hills-go--inline .hills-go__arrow { width: 18px; height: 18px; }
+.hills-go--solid { background: var(--c-acc); }
+.hills-go--solid:hover:not(:disabled) { background: color-mix(in srgb, var(--c-acc) 86%, var(--c-ink)); }
+
+/* ── Submitted screen ───────────────────────────────────────────────────── */
+
+.hills-apply__tick {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin: 0 0 24px;
+  border: 2px solid var(--hills-ok);
+  border-radius: 50%;
+  color: var(--hills-ok);
+}
+.hills-apply__next-title { margin: 0 0 6px; }
+.hills-apply__next { margin: 0; padding: 0; list-style: none; }
+.hills-apply__next li {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--c-line);
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--c-ink);
+}
+.hills-apply__next li:last-child { border-bottom: 0; }
+.hills-apply__next-n {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c-acc) 14%, transparent);
+  color: var(--c-acc);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hills-apply__side,
+  .hills-apply__surface { animation: none; }
+  .hills-apply__chip,
+  .hills-apply__surface .hills-ctl { transition: none; }
+}

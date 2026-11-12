@@ -179,6 +179,74 @@ for (const sky of SKIES) {
   }
 }
 
+// ── Phase 5: /apply ─────────────────────────────────────────────────────────
+// (a) The form surface is OPAQUE --card in the Light/Dark THEME (no sky behind
+//     it), with the same accents as the sign-in card, read from
+//     `.hills-apply__surface` / `.dark .hills-apply__surface`.
+// (b) The left column is plain text on the sky: step labels, the title, the
+//     required-field note (all checked above as ink / ink-2 / danger on sky)
+//     plus the step circles, checked here: outline (graphic, 3:1) and the
+//     "done" circle, ink on ink at 14% over the sky.
+function applyTokens(dark: boolean): Record<string, string> {
+  const scopes = [
+    /\.hills-apply__surface\s*\{[^}]*--c-ink[^}]*\}/,
+    ...(dark ? [/\.dark\s+\.hills-apply__surface\s*\{[^}]*\}/] : []),
+  ]
+  const out: Record<string, string> = {}
+  for (const re of scopes) {
+    const m = re.exec(css)
+    if (!m) throw new Error(`apply surface block not found: ${re}`)
+    for (const d of m[0].matchAll(/--c-(acc2|acc|danger|warn):\s*(#[0-9a-f]{6})/gi)) out[d[1] as string] = d[2] as string
+  }
+  return out
+}
+for (const dark of [false, true]) {
+  const { card, fg } = cardVar(dark ? DARK_BLOCK : ROOT_BLOCK)
+  const tok = applyTokens(dark)
+  const theme = dark ? 'dark' : 'light'
+  const at = `apply surface (${theme})`
+  const add = (name: string, need: number, a: RGBA, b: RGBA) =>
+    rows.push({ sky: 'surf', pair: `${name} on ${at}`, need, got: ratio(a, b) })
+  const tint = (c: RGBA, a: number, base: RGBA = card) => over([c[0], c[1], c[2], a], base)
+  const acc = parseColor(tok.acc as string)
+  const acc2 = parseColor(tok.acc2 as string)
+  const danger = parseColor(tok.danger as string)
+  const warn = parseColor(tok.warn as string)
+  add('text, labels, typed values', 4.5, fg, card)
+  add('secondary text, hints (82%)', 4.5, tint(fg, 0.82), card)
+  add('placeholder (62%)', 4.5, tint(fg, 0.62), card)
+  add('typed text on focus tint (accent 7%)', 4.5, fg, tint(acc, 0.07))
+  add('typed text on error tint (danger 6%)', 4.5, fg, tint(danger, 0.06))
+  add('error message (danger)', 4.5, danger, card)
+  add('required asterisk (danger)', 4.5, danger, card)
+  add('review heading (accent)', 4.5, acc, card)
+  add('step number on its badge (accent 14%)', 4.5, acc, tint(acc, 0.14))
+  add('focus line and checkbox (accent)', 3, acc, card)
+  add('field underline (ink)', 3, fg, card)
+  add('section icon on its tint (ink 8%)', 3, fg, tint(fg, 0.08))
+  add('warning text on its tint (9%)', 4.5, warn, tint(warn, 0.09))
+  add('server error text on its tint (9%)', 4.5, danger, tint(danger, 0.09))
+  add('Next label on ink button', 4.5, card, fg)
+  add('Next arrow (graphic)', 3, acc2, fg)
+  add('Submit label on accent button', 4.5, card, acc)
+  add('Submit label under skeleton sweep', 4.5, card, mix(acc, card, 0.16))
+  add('Next label under skeleton sweep', 4.5, card, mix(fg, card, 0.16))
+}
+for (const sky of SKIES) {
+  const p = palette(sky)
+  const tintC = parseColor(p.tint as string)
+  const s1 = over(tintC, parseColor(p['sky-1'] as string))
+  const s2 = over(tintC, parseColor(p['sky-2'] as string))
+  const ink = parseColor(p.ink as string)
+  for (const [where, bg] of [['top', s1], ['mid', mix(s1, s2, 0.5)], ['bottom', s2]] as [string, RGBA][]) {
+    const ink2 = over([ink[0], ink[1], ink[2], 0.93], bg)
+    rows.push({ sky, pair: `step circle outline (ink-2) on sky (${where})`, need: 3, got: ratio(ink2, bg) })
+    const done = over([ink[0], ink[1], ink[2], 0.14], bg)
+    rows.push({ sky, pair: `done circle icon on its fill (${where})`, need: 4.5, got: ratio(ink, done) })
+    rows.push({ sky, pair: `submitted tick (ok) on sky (${where})`, need: 3, got: ratio(parseColor(p.ok as string), bg) })
+  }
+}
+
 const fails = rows.filter((r) => r.got < r.need)
 if (process.argv.includes('--table') || fails.length > 0) {
   for (const r of rows) {

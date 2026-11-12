@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-12 (after Phase 4b, home polish). Read this first when resuming.
+Last updated: 2026-11-12 (after Phase 5, /apply). Read this first when resuming.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -17,7 +17,7 @@ stable selectors: `id`, `name`, `type`, `role`, `autoComplete`, label and button
 Repo: `/home/claude/sms-malawi-src/sms-malawi` (monorepo; the app is `apps/web`). Branches, each a
 cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-baseline` <
 `hills/phase-1-tokens` < `hills/phase-2-sky` < `hills/phase-2c-font-logos` < `hills/phase-3-login` < `hills/phase-4-home` <
-`hills/phase-4b-home-polish` (current head). NOTE: the history bundle was not in the zip received for Phase 3, so in the sandbox repo
+`hills/phase-4b-home-polish` < `hills/phase-5-apply` (current head). NOTE: the history bundle was not in the zip received for Phase 3, so in the sandbox repo
 `main` and `hills/phase-2c-font-logos` are one reconstructed baseline commit (the delivered 2c state);
 `pnpm hills:logic-diff --base main` therefore only proves Phase 3 here. Run it on the real repo.
 
@@ -31,11 +31,12 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | Phase 3 Login and claim account (`hills/phase-3-login`, incl. follow-up commit) | done, reviewed | review pack 3 |
 | Phase 4 Home (`hills/phase-4-home`) | done, AT REVIEW GATE | review pack 4 |
 | Phase 4b Home polish (`hills/phase-4b-home-polish`) | done, AT REVIEW GATE | review pack 4b |
-| **5 /apply** | **NEXT** (after the 4b review) | |
-| 6 Other public pages, 7 Password and claim pages, 8 Logged-in app, 9 Cleanup | pending | |
+| Phase 5 /apply (`hills/phase-5-apply`) | done, AT REVIEW GATE | review pack 5 |
+| **6 Other public pages** | **NEXT** (after the Phase 5 review) | |
+| 7 Password and claim pages, 8 Logged-in app, 9 Cleanup | pending | |
 
 The user asked for Phases 0 to the logo step to be reviewed as ONE package. Phases 3 and 4 were each reviewed on their own. Next review gate is
-after Phase 5 unless the user says otherwise.
+after Phase 6 unless the user says otherwise.
 
 ## 3. Decisions the user has made (do not re-ask)
 - Readability beats looks. On `default` pages the sky shows only in the side margins of wide
@@ -159,6 +160,41 @@ after Phase 5 unless the user says otherwise.
    - Not tested: Firefox and Safari, real data (mocked), a production build.
    - Weight (dev render, same mocked data): DOM nodes 881 to 841, HTML 187.5 to 183.2 KB light (168.9 to 164.5 KB dark); not a production transfer measurement.
 
+10. **Phase 5 (`(public)/apply/page.tsx`, 1,141 lines).** Looks only; the logic fingerprint is clean with 10 declared tokens.
+   - NOTE: the plan says five steps; the code has SIX (Personal, Contact, Academic, Guardian, Welfare, Review). Built for six.
+   - Layout: `.hills-container` > `.hills-split` with `--hills-split-cols: clamp(240px, 26vw, 340px) minmax(0, 760px)`,
+     centred. From 900px the left column (title, required-field note, step list; sticky at `top: 96px` when the
+     viewport is 640px+ tall) sits on the sky; the right column is the form on ONE opaque surface
+     (`.hills-apply__surface`, follows the Light/Dark THEME like the sign-in card, same `--c-*` tokens). Below 900px:
+     one column and the step list becomes a strip of numbered circles (labels visually hidden but in the DOM, so every
+     step button has a name; before, they had none on phones). The same `<ol>` serves both layouts.
+   - `hills-open` on the page root hides the interim scrim (`.hills-open .hills-bg__scrim { display: none }`), so
+     the left-column text is on bare sky. Phase 6 should reuse this for the other pages instead of a prop.
+   - Fields: underlined `.hills-ctl` (CSS scoped to the surface). The two-column field grid is a CONTAINER query
+     (`@container (min-width: 560px)` on the surface), so it follows the surface width, not the viewport.
+     `inputCls`/`inputError`/`inputBase`/`phoneCodeSelectCls` keep their names; only the strings changed.
+     `.hills-go--inline` (Next) and `.hills-go--solid` (Submit, accent fill) reuse the sign-in button.
+   - Success screen: same two columns (tick, title, thank-you on the sky; "What happens next?" on the surface).
+   - Measured on real pixels (hide the text, sample behind each line; `measure.mjs` + `measure.py` in the pack):
+     4 skies x 360/390/768/1280/1920, 68 groups, 216 text lines, worst 4.58:1. The first run FAILED two things the
+     token model had passed (93% ink-2 note on the day sky, 4.2:1; danger-red asterisk, 4.15:1); both now use full ink.
+     LESSON: the sky gradient model in `check-contrast.mts` is about 0.2 to 0.35 optimistic on the day sky (contour
+     lines, glow). For text on bare sky use full `--hills-ink`, and always measure real pixels.
+   - Contrast gate extended (268 to 342 pairs): the apply surface per theme (text, hints, placeholder, focus/error
+     tints, error, review headings, badges, warning, both buttons incl. sweep) and, per sky, step circles.
+   - Walkthrough (`walk.mjs`): every step with valid data, validation errors, Previous, click a completed step, click a
+     future step (does nothing), server 409 error, submit, success; 5 widths x light/dark; no overflow at
+     360/390/768/1280/1920. Form behaviour identical before and after.
+   - Seen but NOT changed (logic or out of scope): the Sex error reads "Invalid enum value. Expected 'MALE' | 'FEMALE',
+     received ''" (zod default message, `packages/shared`, frozen); labels are not tied to inputs (no `htmlFor`/`id`);
+     section titles are `<h3>` under the `<h1>` with no `<h2>`; the server error box has no `role="alert"`; the
+     header is still the Phase 2 `PublicHeader` (Phase 6).
+   - Not done: Storybook story (the layout is page-specific markup, not a reusable component; the real-page captures
+     of every step, theme and width replace it); scroll-performance trace; Firefox and Safari (container queries and
+     `:has` are not used; container queries need Safari 16+, Firefox 110+).
+   - Allowlist: 10 entries (8 class-string constants, `aria-current`, the removed connector condition). Handler inventory
+     regenerated: only the page's digest changed (390 tokens, same handlers).
+
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database, so signed-in pages cannot be
   rendered or screenshotted. Do not retry or work around. tsc errors from missing Prisma types are
@@ -175,6 +211,12 @@ after Phase 5 unless the user says otherwise.
   `https://claude.ai/code/session_01MVwwVD34eP3fyoyqZFXXR4`).
 - Turbopack refuses a symlinked `node_modules` in a git worktree ("points out of the filesystem root").
   For a before-capture, `git stash`, run the capture in the same dir, `git stash pop`.
+- The zip received for Phase 5 again had NO git history: `main` = delivered 4b state (one reconstructed commit);
+  `hills/phase-4b-home-polish` and `hills/phase-5-apply` branch from it. `hills:logic-diff --base main` therefore proves only
+  Phase 5 here. Run it against `hills/phase-4b-home-polish` AND the original baseline on the real repo.
+- Capture scripts for Phase 5 live in the review pack (`tools-capture/`: `run.sh`, `walk.mjs`, `measure.mjs`, `measure.py`);
+  the Playwright import must go through `createRequire` (global install, ESM import fails).
+- `.env` and `service-account.json` are in the zip: never print or commit them.
 - Mock the home page data with `page.route('**/public/**')` (shapes in `hooks/usePublic.ts`); the
   sandbox has no backend.
 - Playwright `waitForSelector('[role=alert]')` also matches Next's route announcer (it pierces shadow

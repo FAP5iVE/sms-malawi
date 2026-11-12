@@ -108,6 +108,27 @@
  *     Guardian) are no longer wrapped in their own bordered cards inside the
  *     Review panel; they sit directly on the panel, separated by their
  *     headings and spacing.
+ *
+ * [CHANGE TYPE]: LOOKS ONLY (Chikangawa Hills theme, Phase 5, 2026-11-12).
+ * [PURPOSE]: The form moves to the two-column Hills layout. Only class names,
+ *   wrappers and JSX text changed; the logic is exactly as before.
+ *     - `max-w-3xl mx-auto` is gone. `.hills-container` holds a `.hills-split`:
+ *       from 900px the left column (title, required-field note, the step list,
+ *       sticky) sits on the sky and the right column is the form on ONE opaque
+ *       surface. Below 900px it is one column and the step list becomes a
+ *       compact strip of numbered circles above the form.
+ *     - The step list is the same STEPS array, the same `step` state and the same
+ *       "click only a completed step" rule (`onClick={() => i < step && setStep(i)}`),
+ *       drawn as an <ol>. Labels stay in the DOM on phones (visually hidden), so
+ *       every step button now has an accessible name there; before they did not.
+ *     - Fields use the underlined style (`.hills-ctl`); the field grid is two
+ *       columns when the surface is 560px or wider (container query), otherwise one.
+ *     - Previous / Step x of y / Next now sit at the foot of the surface.
+ *     - The success screen uses the same two columns.
+ *   Not touched: react-hook-form, zodResolver, trigger, STEP_FIELDS, goNext,
+ *   onSubmit, the Review-step `handleSubmit(onSubmit)` button, every register()
+ *   call, name, placeholder, option, label text and error message.
+ *   The page no longer shows the interim readability scrim (`hills-open`).
  */
 'use client'
 import { useState } from 'react'
@@ -150,19 +171,17 @@ import {
 } from 'lucide-react'
 
 // -- HELPERS -------------------------------------------------------------------
-const inputCls =
-  'w-full border rounded-xl px-4 py-3 text-sm bg-surface text-body placeholder:text-muted ' +
-  'focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal transition-all'
-const inputError =
-  'border-brand-coral focus:ring-brand-coral/25 focus:border-brand-coral bg-brand-coral/5'
-const inputBase = 'border-base'
-// Deliberately has no `w-full` (unlike inputCls), this sits next to the phone
-// number input in a flex row, so it needs a fixed, compact width instead of
-// stretching. Sized to fit the longest calling code in COUNTRY_CALLING_CODES
-// (4 characters, e.g. '+265') plus the browser's native dropdown arrow.
-const phoneCodeSelectCls =
-  'w-24 shrink-0 truncate border rounded-xl pl-3 pr-1 py-3 text-sm bg-surface text-body ' +
-  'focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal transition-all'
+// Hills look (Phase 5): the underlined field style lives in globals.css
+// (`.hills-ctl`, scoped to `.hills-apply__surface`). These strings are class
+// names only.
+const inputCls = 'hills-ctl'
+const inputError = 'hills-ctl--err'
+const inputBase = ''
+// Sits next to the phone number input in a flex row, so it has a fixed, compact
+// width (`.hills-ctl--code`) instead of stretching. Sized to fit the longest
+// calling code in COUNTRY_CALLING_CODES (4 characters, e.g. '+265') plus the
+// browser's native dropdown arrow.
+const phoneCodeSelectCls = 'hills-ctl hills-ctl--code'
 
 function Field({
   label,
@@ -181,13 +200,13 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <label className="block text-sm font-heading font-medium text-body mb-1.5">
+      <label className="hills-fld__label">
         {label}
-        {required && <span className="text-brand-coral ml-1">*</span>}
+        {required && <span className="hills-fld__req">*</span>}
       </label>
       {children}
-      {hint && !error && <p className="text-xs text-muted mt-1 font-sans">{hint}</p>}
-      {error && <p className="text-xs text-brand-coral mt-1 font-sans">{error}</p>}
+      {hint && !error && <p className="hills-fld__hint">{hint}</p>}
+      {error && <p className="hills-fld__err">{error}</p>}
     </div>
   )
 }
@@ -202,13 +221,13 @@ function SectionHeader({
   subtitle: string
 }) {
   return (
-    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-base">
-      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-        <Icon className="w-5 h-5 text-primary" />
+    <div className="hills-apply__sec">
+      <div className="hills-apply__sec-ico">
+        <Icon className="w-5 h-5" />
       </div>
       <div>
-        <h3 className="font-heading font-bold text-base text-primary">{title}</h3>
-        <p className="text-xs text-muted font-sans">{subtitle}</p>
+        <h3 className="hills-apply__sec-title">{title}</h3>
+        <p className="hills-apply__sec-sub">{subtitle}</p>
       </div>
     </div>
   )
@@ -217,7 +236,7 @@ function SectionHeader({
 // Small heading that splits one step into groups (e.g. "Home & Admission").
 function GroupHeading({ children }: { children: React.ReactNode }) {
   return (
-    <p className="col-span-full pt-2 -mb-1 text-xs font-heading font-bold text-muted uppercase tracking-widest">
+    <p className="col-span-full hills-fld__group">
       {children}
     </p>
   )
@@ -335,45 +354,42 @@ export default function ApplyPage() {
   // -- SUCCESS STATE ----------------------------------------------------------
   if (submitted) {
     return (
-      <div className="relative flex-1 bg-page flex items-center justify-center px-4 py-10">
+      <div className="hills hills-apply hills-open relative flex-1">
         <PublicAmbientBackground />
-        <div className="relative z-10 text-center max-w-md">
-          <div className="w-20 h-20 rounded-full bg-brand-teal/15 flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 className="w-10 h-10 text-brand-teal" />
+        <div className="relative z-10 hills-container hills-apply__wrap">
+          <div className="hills-split hills-apply__grid">
+            <div className="hills-apply__side">
+              <div className="hills-apply__tick">
+                <CheckCircle2 className="w-9 h-9" />
+              </div>
+              <h1 className="hills-apply__title">Application Submitted!</h1>
+              <p className="hills-apply__note">
+                Thank you for applying. Your application has been received and is pending review. You
+                will be contacted by the school admissions office with further instructions.
+              </p>
+            </div>
+            <div className="hills-apply__surface">
+              <p className="hills-fld__group hills-apply__next-title">What happens next?</p>
+              <ul className="hills-apply__next">
+                {[
+                  'Your application is reviewed by the admissions team',
+                  'You will receive an email or phone call within 5–7 working days',
+                  'If approved, you will be asked to report for admission',
+                  'Bring original school certificates and guardian ID on admission day',
+                ].map((item, i) => (
+                  <li key={i}>
+                    <span className="hills-apply__next-n">{i + 1}</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <div className="hills-apply__nav hills-apply__nav--end">
+                <Link href="/" className="hills-go hills-go--inline">
+                  <ArrowLeft className="w-4 h-4" /> Back to Homepage
+                </Link>
+              </div>
+            </div>
           </div>
-          <h1 className="font-heading font-bold text-2xl text-primary mb-3">
-            Application Submitted!
-          </h1>
-          <p className="text-muted font-sans leading-relaxed mb-8">
-            Thank you for applying. Your application has been received and is pending review. You
-            will be contacted by the school admissions office with further instructions.
-          </p>
-          <div className="bg-surface border border-base rounded-2xl p-5 text-left mb-8">
-            <p className="text-xs font-heading font-semibold text-muted uppercase tracking-widest mb-3">
-              What happens next?
-            </p>
-            <ul className="space-y-2">
-              {[
-                'Your application is reviewed by the admissions team',
-                'You will receive an email or phone call within 5–7 working days',
-                'If approved, you will be asked to report for admission',
-                'Bring original school certificates and guardian ID on admission day',
-              ].map((item, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-body font-sans">
-                  <span className="w-5 h-5 rounded-full bg-brand-teal/15 text-brand-teal text-xs font-heading font-bold flex items-center justify-center shrink-0 mt-0.5">
-                    {i + 1}
-                  </span>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to Homepage
-          </Link>
         </div>
       </div>
     )
@@ -382,76 +398,58 @@ export default function ApplyPage() {
   const values = getValues()
 
   return (
-    <div className="relative flex-1 bg-page">
+    <div className="hills hills-apply hills-open relative flex-1">
       <PublicAmbientBackground />
 
       {/* The top bar (Home, "Student Application" title, theme toggle) is the
           shared <PublicHeader />, rendered by (public)/layout.tsx. */}
 
-      <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 py-10">
-        {/* Title */}
-        <div className="mb-8 text-center">
-          <h1 className="font-heading font-bold text-3xl text-primary mb-2">
-            Apply for Admission
-          </h1>
-          <p className="text-muted font-sans">
-            Complete all sections below. Fields marked with{' '}
-            <span className="text-brand-coral font-semibold">*</span> are required.
-          </p>
-        </div>
+      <div className="relative z-10 hills-container hills-apply__wrap">
+        <div className="hills-split hills-apply__grid hills-apply__grid--form">
+          {/* Left (from 900px) / top: title, note and the step list, on the sky. */}
+          <div className="hills-apply__side hills-apply__side--sticky">
+            <h1 className="hills-apply__title">Apply for Admission</h1>
+            <p className="hills-apply__note">
+              Complete all sections below. Fields marked with{' '}
+              <span className="hills-apply__req">*</span> are required.
+            </p>
 
-        {/* Progress stepper */}
-        <div className="flex items-center gap-0 mb-10">
-          {STEPS.map((s, i) => {
-            const Icon = s.icon
-            const done = i < step
-            const active = i === step
-            return (
-              <div key={s.label} className="flex items-center flex-1 last:flex-none">
-                <button
-                  type="button"
-                  onClick={() => i < step && setStep(i)}
-                  className={[
-                    'flex flex-col items-center gap-1 flex-shrink-0',
-                    i < step ? 'cursor-pointer' : 'cursor-default',
-                  ].join(' ')}
-                >
-                  <div
-                    className={[
-                      'w-9 h-9 rounded-full flex items-center justify-center border-2 transition-all',
-                      done
-                        ? 'bg-brand-teal border-brand-teal text-white'
-                        : active
-                          ? 'bg-brand-deep border-brand-navy text-white'
-                          : 'bg-surface border-base text-muted',
-                    ].join(' ')}
+            {/* Progress: vertical list from 900px, a strip of circles below. */}
+            <ol className="hills-apply__steps">
+              {STEPS.map((s, i) => {
+                const Icon = s.icon
+                const done = i < step
+                const active = i === step
+                return (
+                  <li
+                    key={s.label}
+                    className={`hills-apply__step ${done ? 'is-done' : active ? 'is-active' : ''}`}
                   >
-                    {done ? <CheckCircle2 className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
-                  </div>
-                  <span
-                    className={`text-[10px] font-heading font-semibold hidden sm:block ${active ? 'text-primary' : 'text-muted'}`}
-                  >
-                    {s.label}
-                  </span>
-                </button>
-                {i < STEPS.length - 1 && (
-                  <div
-                    className={`flex-1 h-0.5 mx-1 transition-colors ${i < step ? 'bg-brand-teal' : 'bg-base'}`}
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
+                    <button
+                      type="button"
+                      onClick={() => i < step && setStep(i)}
+                      className="hills-apply__stepbtn"
+                      aria-current={active ? 'step' : undefined}
+                    >
+                      <span className="hills-apply__chip">
+                        {done ? <CheckCircle2 className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
+                      </span>
+                      <span className="hills-apply__steplabel">{s.label}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ol>
+          </div>
 
-        {/* Form card */}
-        {/* [PRODUCTION FIX 2026-08-27] Never rely on native <form> submission,
-            see this file's header comment for the full auto-submit defect this
-            closes. onSubmit here only ever prevents the browser's default
-            action; the Review step's button below calls handleSubmit(onSubmit)
-            explicitly, and every other step's button is type="button". */}
-        <form onSubmit={(e) => e.preventDefault()}>
-          <div className="bg-surface border border-base rounded-3xl p-6 sm:p-8 mb-6">
+          {/* Form surface */}
+          {/* [PRODUCTION FIX 2026-08-27] Never rely on native <form> submission,
+              see this file's header comment for the full auto-submit defect this
+              closes. onSubmit here only ever prevents the browser's default
+              action; the Review step's button below calls handleSubmit(onSubmit)
+              explicitly, and every other step's button is type="button". */}
+          <form onSubmit={(e) => e.preventDefault()} className="hills-apply__form">
+            <div className="hills-apply__surface">
 
             {/* -- STEP 0: Personal Details -- */}
             {step === 0 && (
@@ -461,7 +459,7 @@ export default function ApplyPage() {
                   title="Personal Details"
                   subtitle="Legal name and demographic information"
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="hills-apply__fields">
                   <Field label="First Name" required error={errors.firstName?.message}>
                     <input
                       {...register('firstName')}
@@ -604,7 +602,7 @@ export default function ApplyPage() {
                   title="Contact Details"
                   subtitle="How we can reach the applicant"
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="hills-apply__fields">
                   <Field
                     label="Physical / Postal Address"
                     required
@@ -619,7 +617,7 @@ export default function ApplyPage() {
                     />
                   </Field>
                   <Field label="Phone Number" required error={errors.phone?.message} className="col-span-full">
-                    <div className="flex gap-2">
+                    <div className="hills-apply__phone">
                       <select
                         {...register('countryCode')}
                         aria-label="Country calling code"
@@ -664,7 +662,7 @@ export default function ApplyPage() {
                   title="Academic Details"
                   subtitle="Class applied for and school background"
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="hills-apply__fields">
                   <Field label="Class Applying For" required error={errors.classApplying?.message}>
                     <select
                       {...register('classApplying')}
@@ -769,7 +767,7 @@ export default function ApplyPage() {
                   title="Guardian / Parent Details"
                   subtitle="Emergency contact and responsible adult"
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="hills-apply__fields">
                   <Field label="Guardian Full Name" required error={errors.guardianName?.message}>
                     <input
                       {...register('guardianName')}
@@ -795,7 +793,7 @@ export default function ApplyPage() {
                     </select>
                   </Field>
                   <Field label="Guardian Phone" required error={errors.guardianPhone?.message} className="col-span-full">
-                    <div className="flex gap-2">
+                    <div className="hills-apply__phone">
                       <select
                         {...register('guardianCountryCode')}
                         aria-label="Country calling code"
@@ -853,11 +851,11 @@ export default function ApplyPage() {
                   title="Welfare & Health"
                   subtitle="Optional. Helps the school give the right support"
                 />
-                <p className="text-xs text-muted font-sans leading-relaxed mb-5">
+                <p className="hills-apply__lead">
                   Everything on this page is optional. It is private: only the headteacher, school
                   administrators and HR can see it.
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="hills-apply__fields">
                   <Field label="Orphan Status" error={errors.orphanStatus?.message} className="col-span-full sm:col-span-1">
                     <select
                       {...register('orphanStatus')}
@@ -872,15 +870,15 @@ export default function ApplyPage() {
                   </Field>
 
                   <div className="col-span-full">
-                    <label className="flex items-start gap-2.5 text-sm text-body font-sans cursor-pointer">
+                    <label className="hills-chkrow hills-chkrow--top">
                       <input
                         type="checkbox"
                         {...register('isVulnerable')}
-                        className="mt-0.5 accent-brand-teal"
+                        className="hills-chk"
                       />
                       <span>
                         The applicant needs extra support (vulnerable)
-                        <span className="block text-xs text-muted">
+                        <span className="hills-chkrow__sub">
                           For example a child-headed household or serious family hardship.
                         </span>
                       </span>
@@ -919,8 +917,8 @@ export default function ApplyPage() {
                   </Field>
 
                   <div className="col-span-full">
-                    <p className="block text-sm font-heading font-medium text-body mb-1.5">Special Needs</p>
-                    <p className="text-xs text-muted font-sans mb-3">
+                    <p className="hills-fld__label">Special Needs</p>
+                    <p className="hills-fld__hint hills-fld__hint--lead">
                       Tick anything that applies. You can say what would help for each one.
                     </p>
                     <Controller
@@ -935,24 +933,24 @@ export default function ApplyPage() {
                           field.onChange(list.map((n) => (n.type === t ? { ...n, accommodation } : n)))
                         return (
                           <>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
+                            <div className="hills-apply__checks">
                               {SUPPORT_NEED_TYPES.map((t) => (
-                                <label key={t} className="flex items-center gap-2.5 text-sm text-body font-sans cursor-pointer">
+                                <label key={t} className="hills-chkrow">
                                   <input
                                     type="checkbox"
                                     checked={has(t)}
                                     onChange={() => toggle(t)}
-                                    className="accent-brand-teal"
+                                    className="hills-chk"
                                   />
                                   {SUPPORT_NEED_LABELS[t]}
                                 </label>
                               ))}
                             </div>
                             {list.length > 0 && (
-                              <div className="mt-4 space-y-3">
+                              <div className="hills-apply__needs">
                                 {list.map((n) => (
                                   <div key={n.type}>
-                                    <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+                                    <label className="hills-fld__label hills-fld__label--sm">
                                       {SUPPORT_NEED_LABELS[n.type]}: what would help? (optional)
                                     </label>
                                     <input
@@ -1072,70 +1070,71 @@ export default function ApplyPage() {
                 ].map(({ heading, rows }) => (
                   // No inner card: each group sits directly on the Review
                   // panel and is told apart by its own heading, not a box.
-                  <section key={heading} className="mb-7">
-                    <h4 className="font-heading font-semibold text-sm text-primary mb-3">
+                  <section key={heading} className="hills-apply__rsec">
+                    <h4 className="hills-apply__rh">
                       {heading}
                     </h4>
-                    <dl className="space-y-2">
+                    <dl className="hills-apply__dl">
                       {rows.map(([label, value]) => (
-                        <div key={label} className="flex gap-4 text-sm">
-                          <dt className="text-muted font-sans w-36 shrink-0">{label}</dt>
-                          <dd className="text-body font-sans font-medium min-w-0 break-words">{value || 'Not provided'}</dd>
+                        <div key={label} className="hills-apply__row">
+                          <dt className="hills-apply__dt">{label}</dt>
+                          <dd className="hills-apply__dd">{value || 'Not provided'}</dd>
                         </div>
                       ))}
                     </dl>
                   </section>
                 ))}
-                <p className="text-xs text-muted font-sans leading-relaxed bg-brand-amber/8 border border-brand-amber/20 rounded-xl px-4 py-3 mt-4">
+                <p className="hills-apply__confirm">
                   By submitting this application you confirm that all information provided is
                   accurate and complete. Providing false information may result in rejection or
                   cancellation of admission.
                 </p>
                 {serverError && (
-                  <div className="mt-4 text-sm text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
+                  <div className="hills-alert hills-alert--danger hills-apply__err">
                     {serverError}
                   </div>
                 )}
               </>
             )}
-          </div>
 
-          {/* Navigation buttons */}
-          <div className="flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setStep((s) => Math.max(s - 1, 0))}
-              disabled={step === 0}
-              className="flex items-center gap-2 text-sm font-heading font-semibold text-muted hover:text-body disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" /> Previous
-            </button>
-            <div className="text-xs text-muted font-sans">
-              Step {step + 1} of {STEPS.length}
+              {/* Navigation buttons */}
+              <div className="hills-apply__nav">
+                <button
+                  type="button"
+                  onClick={() => setStep((s) => Math.max(s - 1, 0))}
+                  disabled={step === 0}
+                  className="hills-apply__prev"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Previous
+                </button>
+                <div className="hills-apply__count">
+                  Step {step + 1} of {STEPS.length}
+                </div>
+                {step < STEPS.length - 1 ? (
+                  <button
+                    key="next-btn"
+                    type="button"
+                    onClick={goNext}
+                    className="hills-go hills-go--inline"
+                  >
+                    Next <ChevronRight className="hills-go__arrow" />
+                  </button>
+                ) : (
+                  <button
+                    key="submit-btn"
+                    type="button"
+                    onClick={handleSubmit(onSubmit)}
+                    disabled={submitting}
+                    className="hills-go hills-go--inline hills-go--solid"
+                  >
+                    {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {submitting ? 'Submitting…' : 'Submit Application'}
+                  </button>
+                )}
+              </div>
             </div>
-            {step < STEPS.length - 1 ? (
-              <button
-                key="next-btn"
-                type="button"
-                onClick={goNext}
-                className="flex items-center gap-2 bg-brand-deep text-white px-6 py-2.5 rounded-xl text-sm font-heading font-semibold hover:brightness-125 transition-colors"
-              >
-                Next <ChevronRight className="w-4 h-4" />
-              </button>
-            ) : (
-              <button
-                key="submit-btn"
-                type="button"
-                onClick={handleSubmit(onSubmit)}
-                disabled={submitting}
-                className="flex items-center gap-2 bg-brand-teal text-white px-8 py-2.5 rounded-xl text-sm font-heading font-semibold hover:bg-brand-teal-light transition-colors disabled:opacity-60 shadow-sm"
-              >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                {submitting ? 'Submitting…' : 'Submit Application'}
-              </button>
-            )}
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   )
