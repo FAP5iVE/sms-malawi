@@ -2186,3 +2186,142 @@ span[data-math] .katex-display {
    coloured bands cover it. A larger disc than the other pages.
    ════════════════════════════════════════════════════════════════════════════ */
 .hills-bg--home { --hills-cel: clamp(104px, 13vw, 190px); }
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS MOTION (Phase 4b): the landing page's scroll motion
+   Transform and opacity only. Content is visible by default: Reveal.tsx hides an
+   element only after hydration, only below the fold, and never under reduced
+   motion or when the app's motion setting is off. Keep the numbers in step with
+   src/lib/hills/motion.ts.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+[data-reveal='hidden'] {
+  opacity: 0;
+  transform: translateY(20px);
+}
+/* An animation (not a transition) so the element's own hover transform keeps
+   working once it has arrived: fill-mode `backwards` lets go at the end. */
+[data-reveal='shown'] {
+  animation: hills-reveal 0.6s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms) backwards;
+}
+@keyframes hills-reveal {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Hero photo settles from a slight zoom, once. */
+.hills-hero-img { animation: hills-hero-in 1s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+@keyframes hills-hero-in {
+  from { transform: scale(1.04); }
+  to { transform: none; }
+}
+
+/* Reading progress along the top of the page. Shown only where CSS scroll-driven
+   animation exists; elsewhere it is simply absent. */
+.hills-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  display: none;
+  height: 3px;
+  background: hsl(var(--brand-teal));
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+@supports (animation-timeline: scroll()) {
+  .hills-progress {
+    display: block;
+    animation: hills-grow linear both;
+    animation-timeline: scroll(root block);
+  }
+  @keyframes hills-grow { to { transform: scaleX(1); } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal='hidden'] { opacity: 1; transform: none; }
+  [data-reveal='shown'] { animation: none; }
+  .hills-hero-img { animation: none; }
+  .hills-progress { display: none; }
+}
+
+/* Photo stand-in for a news or event item with no picture yet: the contour lines
+   of the sky, in the page's own colours, instead of an icon on a gradient. */
+.hills-ph {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-brand-teal) 9%, hsl(var(--background)));
+}
+.hills-ph::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--color-brand-teal);
+  opacity: 0.3;
+  -webkit-mask: url('/hills/contours.svg') center / cover no-repeat;
+  mask: url('/hills/contours.svg') center / cover no-repeat;
+}
+.hills-ph > * { position: relative; }
+.hills-ph--deep { background: hsl(var(--brand-deep)); }
+.hills-ph--deep::before { background: #fff; opacity: 0.16; }
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS STUDIO (Phase 4b): the 5iveStack Labs signature in the landing footer
+   A large wordmark that rises into place above the bottom bar (CSS scroll-driven,
+   in place where unsupported), and the credit line's name in the studio orange.
+   The footer is always dark, so one orange works in light and dark themes.
+   Hanken Grotesk has no old-style figures: the 5 is drawn smaller by hand so it
+   sits at x-height and the name reads "five-stack".
+   ════════════════════════════════════════════════════════════════════════════ */
+
+:root { --hills-studio: #ff8a3d; }
+
+.hills-studio {
+  container-type: inline-size;
+  overflow: hidden; /* clips the name while it rises from behind the bottom bar */
+  padding-block: 1.5rem 0.25rem;
+}
+.hills-studio__mark {
+  --studio-size: clamp(2.75rem, 16.2cqi, 15rem);
+  display: flex;
+  flex-wrap: wrap; /* on a phone "Labs" drops under "5iveStack" */
+  align-items: baseline;
+  column-gap: 0.22em;
+  margin: 0;
+  font-size: var(--studio-size);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 0.92;
+  color: var(--hills-studio);
+  white-space: nowrap;
+}
+.hills-studio__name { display: inline-block; }
+.hills-studio__five { font-size: 0.72em; font-weight: 800; }
+.hills-studio__labs { font-weight: 500; }
+.hills-studio__credit-name { color: var(--hills-studio); font-weight: 700; }
+a.hills-studio__credit-name:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+@supports (animation-timeline: view()) {
+  .hills-studio__mark {
+    animation: hills-studio-rise linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 100%;
+  }
+  @keyframes hills-studio-rise {
+    from { transform: translateY(35%); }
+    to { transform: none; }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hills-studio__mark { animation: none; }
+}
+
+/* The landing page header (logo, eight links, three buttons) is about 1243px wide.
+   With the standard 5vw side padding it overflows on 1280 and 1366px screens (the
+   Menu button was clipped). This shrinks the padding just enough, and equals 5vw
+   again from about 1400px, so the header lines up with the sections. */
+.hills-container--nav {
+  padding-inline: min(5vw, max(16px, calc((100vw - 1260px) / 2)));
+}

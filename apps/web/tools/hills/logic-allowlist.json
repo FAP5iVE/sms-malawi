@@ -68,6 +68,26 @@
     {
       "file": "src/components/shared/AuthShellSkeleton.tsx",
       "reason": "Phase 3: Suspense fallback for /login redrawn as a skeleton of the new two-column layout. Static markup"
+    },
+    {
+      "file": "src/components/motion/Reveal.tsx",
+      "reason": "Phase 4b: scroll reveal for the landing page (fade up once, only below the fold, never under reduced motion or the app motion setting off). Touches no data, handler or route."
+    },
+    {
+      "file": "src/components/motion/ScrollProgress.tsx",
+      "reason": "Phase 4b: decorative CSS-only reading-progress bar (aria-hidden)."
+    },
+    {
+      "file": "src/components/brand/StudioWordmark.tsx",
+      "reason": "Phase 4b: the 5iveStack Labs footer signature (decorative wordmark and the credit line)."
+    },
+    {
+      "file": "src/lib/hills/motion.ts",
+      "reason": "Phase 4b: pure reveal and stagger rules, tested in tools/hills/__tests__/motion.test.mts"
+    },
+    {
+      "file": "src/lib/hills/studio.ts",
+      "reason": "Phase 4b: studio name, optional url and display switch for the footer signature."
     }
   ],
   "deletedFiles": [],
@@ -589,6 +609,104 @@
       "kind": "logic",
       "pattern": "^title=\\{ mounted \\? \\( theme === 'light' \\? 'Light' : theme === 'dark' \\? 'Dark' : 'Auto' \\) : undefined \\}$",
       "reason": "Phase 4 (home): tooltip on the existing theme button names the mode (Auto/Light/Dark, decision 7). Display only: cycleTheme, the aria-label and setTheme are unchanged."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{ ` @keyframes fadeUp",
+      "reason": "Phase 4b (home polish): the page's own style block; only the hover lift of .card-hover changed (4px to 2px). CSS text, no behaviour."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{ ` @keyframes fadeUp",
+      "reason": "Phase 4b (home polish): the page's own style block; only the hover lift of .card-hover changed (4px to 2px). CSS text, no behaviour."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{ newsItems \\. slice \\( 1 , 4 \\) \\. map \\( \\( a \\) =>",
+      "reason": "Phase 4b: list items are wrapped in <Reveal> and map() gains an index parameter for the stagger delay. Same items, same keys, same links."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{ newsItems \\. slice \\( 1 , 4 \\) \\. map \\( \\( a , i \\) =>",
+      "reason": "Phase 4b: list items are wrapped in <Reveal> and map() gains an index parameter for the stagger delay. Same items, same keys, same links."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{ eventItems \\. map \\( \\( ev \\) =>",
+      "reason": "Phase 4b: list items are wrapped in <Reveal> and map() gains an index parameter for the stagger delay. Same items, same keys, same links."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{ eventItems \\. map \\( \\( ev , evIndex \\) =>",
+      "reason": "Phase 4b: list items are wrapped in <Reveal> and map() gains an index parameter for the stagger delay. Same items, same keys, same links."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{ \\[ \\{ title : 'Leadership'",
+      "reason": "Phase 4b: the four About cards keep their keys, hrefs and photo lookup; only their one-line descriptions changed (plainer words, no new claims) and the data array lost its unused gradient tint values."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{ \\[ \\{ title : 'Leadership'",
+      "reason": "Phase 4b: the four About cards keep their keys, hrefs and photo lookup; only their one-line descriptions changed (plainer words, no new claims) and the data array lost its unused gradient tint values."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{ \\[ \\{ value : msce",
+      "reason": "Phase 4b: only the label of the fourth stat changed (\"Years of excellence\" to \"Years since founding\"). Values and rules are unchanged."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{ \\[ \\{ value : msce",
+      "reason": "Phase 4b: only the label of the fourth stat changed (\"Years of excellence\" to \"Years since founding\"). Values and rules are unchanged."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^as=\"article\"$",
+      "reason": "Phase 4b: <Reveal> takes the element it replaces (as=\"article\", as={Link}) and an optional delay. Display only; the wrapped element keeps its key, className and href."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^as=\\{ Link \\}$",
+      "reason": "Phase 4b: <Reveal> takes the element it replaces (as=\"article\", as={Link}) and an optional delay. Display only; the wrapped element keeps its key, className and href."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^delay=\\{ staggerDelay \\(",
+      "reason": "Phase 4b: <Reveal> takes the element it replaces (as=\"article\", as={Link}) and an optional delay. Display only; the wrapped element keeps its key, className and href."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import \\{ staggerDelay \\} from '@/lib/hills/motion'$",
+      "reason": "Phase 4b: stagger delay for list reveals (pure function, tested)."
     }
   ]
 }

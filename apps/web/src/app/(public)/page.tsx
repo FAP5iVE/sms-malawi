@@ -101,8 +101,28 @@
  *     gradient-defs helper, the doodle component and all 7 places that used it.
  *   - All 13 hand-written page-width blocks (header, flyouts, every section,
  *     footer) use the shared `.hills-container`.
+ *   - The header and its two flyouts use `.hills-container--nav`: the same container
+ *     with side padding that shrinks just enough for the 1243px header (logo, 8
+ *     links, 3 buttons) to fit between 1024 and 1400px wide.
  *   - The News section gained `relative` so it paints above the fixed sky.
  *   - The theme button's tooltip names the mode (Auto, Light, Dark).
+ *
+ * [REVISION, Phase 4b: home polish, looks only]
+ *   - Plainer words: "Discover" is "About the school" with a one-line intro,
+ *     the four card lines, "Stay Connected" is "School news by email", "Contact
+ *     Us" is "Contact the school office", section headings are sentence case,
+ *     "Years of excellence" is "Years since founding". The small uppercase
+ *     eyebrows that only repeated their heading are gone. Every link and button
+ *     text, id and target is unchanged; no new claims were added.
+ *   - Fewer template shapes: the four "About" cards are one tall, two square and
+ *     one wide; Mission, Vision and Core values lose their icons and the purple;
+ *     the no-photo stand-in is the sky's contour lines, not an icon on a gradient.
+ *   - Motion: <Reveal> fades section headings and lists up once as they scroll
+ *     in (staggered, nothing hidden above the fold, none under reduced motion or
+ *     the app motion setting off), the hero photo settles from a 4% zoom, a thin
+ *     progress bar runs along the top (<ScrollProgress/>, CSS only).
+ *   - Footer: the 5iveStack Labs wordmark rises above the bottom bar and the
+ *     credit line names the studio in its orange (<StudioWordmark/>, <StudioCredit/>).
  *   Not touched: data hooks, search, newsletter and contact handlers, scroll
  *   logic, link targets, ids, labels and button text.
  *
@@ -113,6 +133,10 @@ import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { SchoolMark } from '@/components/shared/SchoolMark'
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
+import { Reveal } from '@/components/motion/Reveal'
+import { ScrollProgress } from '@/components/motion/ScrollProgress'
+import { StudioCredit, StudioWordmark } from '@/components/brand/StudioWordmark'
+import { staggerDelay } from '@/lib/hills/motion'
 import Link from 'next/link'
 import { useTheme } from 'next-themes'
 import { useHasMounted } from '@/hooks/useHasMounted'
@@ -120,7 +144,7 @@ import { FaFacebook, FaTwitter, FaInstagram, FaYoutube, FaLinkedin } from 'react
 import {
   Sun, Moon, Monitor, Search, ArrowRight, Menu, X,
   ExternalLink, Send, Loader2, CheckCircle2,
-  ImageIcon, Target, Compass, Sparkles, CalendarDays, LogIn,
+  CalendarDays, LogIn,
 } from 'lucide-react'
 import {
   usePublicSchoolInfo,
@@ -152,10 +176,9 @@ import { stripHtml } from '@/components/shared/PublicArchive'
 function ImagePlaceholder({ label, className = '' }: { label?: string; className?: string }) {
   return (
     <div
-      className={`bg-linear-to-br from-brand-navy-light/20 to-brand-teal/10 border border-base flex flex-col items-center justify-center gap-2 ${className}`}
+      className={`hills-ph border border-base flex flex-col items-center justify-center gap-2 ${className}`}
     >
-      <ImageIcon className="w-6 h-6 text-brand-navy/25" aria-hidden />
-      {label && <span className="text-[10px] font-heading tracking-wide text-muted/70 uppercase">{label}</span>}
+      {label && <span className="text-[11px] font-heading tracking-wide text-muted">{label}</span>}
     </div>
   )
 }
@@ -332,7 +355,7 @@ export default function LandingPage() {
         @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
         .fade-up { animation: fadeUp 0.7s ease both; }
         .card-hover { transition: transform 0.25s ease, box-shadow 0.25s ease; }
-        .card-hover:hover { transform: translateY(-4px); }
+        .card-hover:hover { transform: translateY(-2px); }
         .nav-link-underline { position:relative; }
         .nav-link-underline::after { content:''; position:absolute; bottom:-3px; left:0; width:0; height:2px; background:currentColor; border-radius:1px; transition:width .2s ease; }
         .nav-link-underline:hover::after { width:100%; }
@@ -340,6 +363,7 @@ export default function LandingPage() {
 
       <div className="text-body font-sans">
         <PublicAmbientBackground variant="home" />
+        <ScrollProgress />
         {/*
         ══════════════════════════════════════════════════════════════
             HEADER, fixed, transparent over hero, solid once scrolled
@@ -352,7 +376,7 @@ export default function LandingPage() {
               : 'bg-transparent border-white/15'
           }`}
         >
-          <div className="hills-container h-[72px] flex items-center gap-6">
+          <div className="hills-container hills-container--nav h-[72px] flex items-center gap-6">
             <button onClick={() => scrollTo('top')} aria-label="Back to top" className="flex items-center gap-3 shrink-0">
               <SchoolMark kind="emblem" tone={scrolled ? 'auto' : 'onDark'} width={56} height={56} className="w-14 h-14 object-contain shrink-0" />
               <div className="text-left leading-tight hidden sm:block">
@@ -444,7 +468,7 @@ export default function LandingPage() {
               than either a decorative no-op or new backend infrastructure. */}
           {searchOpen && (
             <div className="border-t border-base bg-surface">
-              <div className="hills-container py-5">
+              <div className="hills-container hills-container--nav py-5">
                 <div className="flex items-center gap-3">
                   <Search className="w-4.5 h-4.5 text-muted shrink-0" aria-hidden />
                   <input
@@ -490,7 +514,7 @@ export default function LandingPage() {
           {/* Mega menu */}
           {menuOpen && (
             <div className="border-t border-base bg-brand-deep text-white">
-              <div className="hills-container py-9 grid grid-cols-2 md:grid-cols-4 gap-8">
+              <div className="hills-container hills-container--nav py-9 grid grid-cols-2 md:grid-cols-4 gap-8">
                 {[
                   {
                     title: 'Academics',
@@ -563,7 +587,7 @@ export default function LandingPage() {
             fill
             priority
             sizes="100vw"
-            className="object-cover object-center"
+            className="object-cover object-center hills-hero-img"
           />
           <div className="absolute inset-0 bg-linear-to-b from-[rgba(11,29,51,.55)] via-[rgba(11,29,51,.72)] to-[rgba(11,29,51,.96)]" />
 
@@ -639,9 +663,9 @@ export default function LandingPage() {
         ══════════════════════════════════════════════════════════════ */}
         <section id="news" className="relative bg-surface py-20 sm:py-24">
           <div className="hills-container">
-            <div className="flex items-end justify-between mb-9 gap-4 flex-wrap">
+            <Reveal className="flex items-end justify-between mb-9 gap-4 flex-wrap">
               <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white">
-                Latest News
+                Latest news
               </h2>
               <Link
                 href="/news"
@@ -649,7 +673,7 @@ export default function LandingPage() {
               >
                 All News →
               </Link>
-            </div>
+            </Reveal>
 
             {newsLoading ? (
               <div className="grid lg:grid-cols-2 gap-10" role="status" aria-label="Loading news">
@@ -663,7 +687,7 @@ export default function LandingPage() {
             ) : (
               <div className="grid lg:grid-cols-[1.15fr_1fr] gap-10">
                 {/* Featured */}
-                <article>
+                <Reveal as="article">
                   {/* [FIX] Was hardcoded to ImagePlaceholder regardless of
                       whether the article actually had a cover photo, the
                       real photo already resolves correctly on the detail
@@ -687,12 +711,12 @@ export default function LandingPage() {
                   <Link href={`/news/${newsItems[0]!.id}`} className="font-heading font-bold text-[13.5px] text-brand-teal hover:underline">
                     Read more →
                   </Link>
-                </article>
+                </Reveal>
 
                 {/* Secondary list */}
                 <div className="flex flex-col gap-5">
-                  {newsItems.slice(1, 4).map((a) => (
-                    <article key={a.id} className="grid grid-cols-[110px_1fr] sm:grid-cols-[132px_1fr] gap-4.5 pb-5 border-b border-base last:border-0 last:pb-0">
+                  {newsItems.slice(1, 4).map((a, i) => (
+                    <Reveal as="article" key={a.id} delay={staggerDelay(i + 1)} className="grid grid-cols-[110px_1fr] sm:grid-cols-[132px_1fr] gap-4.5 pb-5 border-b border-base last:border-0 last:pb-0">
                       {a.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
                         <img src={a.imageUrl} alt="" className="h-24 rounded-lg object-cover" />
@@ -708,7 +732,7 @@ export default function LandingPage() {
                           Read more →
                         </Link>
                       </div>
-                    </article>
+                    </Reveal>
                   ))}
                 </div>
               </div>
@@ -725,10 +749,10 @@ export default function LandingPage() {
             (section "See all" and every item) pointed at /news.
         ══════════════════════════════════════════════════════════════ */}
         <section id="ads" className="relative py-16 sm:py-18">
-          <div className="relative z-10 hills-container grid lg:grid-cols-[300px_1fr] gap-6 lg:gap-8">
-            <div className="bg-surface border border-base rounded-3xl p-6 sm:p-8 self-start">
+          <div className="relative z-10 hills-container grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 lg:gap-8">
+            <Reveal className="bg-surface border border-base rounded-3xl p-6 sm:p-8 self-start">
               <h2 className="font-heading font-extrabold text-2xl sm:text-[28px] tracking-tight text-brand-navy dark:text-white mb-3 leading-tight">
-                Academic Advertisements
+                Academic advertisements
               </h2>
               <p className="text-[14.5px] text-muted leading-relaxed mb-5">
                 Calls for applications, intake notices and examination circulars, published as they are issued.
@@ -739,8 +763,8 @@ export default function LandingPage() {
               >
                 All Advertisements →
               </Link>
-            </div>
-            <div className="flex flex-col bg-surface border border-base rounded-3xl px-6 sm:px-8 py-2 sm:py-3">
+            </Reveal>
+            <Reveal delay={staggerDelay(1)} className="flex flex-col bg-surface border border-base rounded-3xl px-6 sm:px-8 py-2 sm:py-3">
               {advertsLoading ? (
                 <div className="space-y-5 py-2" role="status" aria-label="Loading advertisements">
                   {[1, 2, 3].map((i) => <div key={i} className="h-10 bg-page rounded-lg animate-pulse" />)}
@@ -759,7 +783,7 @@ export default function LandingPage() {
                   </Link>
                 ))
               )}
-            </div>
+            </Reveal>
           </div>
         </section>
 
@@ -768,16 +792,18 @@ export default function LandingPage() {
         ══════════════════════════════════════════════════════════════ */}
         <section id="about" className="relative overflow-hidden bg-surface py-20 sm:py-24">
           <div className="relative z-10 hills-container">
-            <div id="discover" className="max-w-2xl mb-10">
+            <Reveal id="discover" className="max-w-2xl mb-10">
               <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white mb-3.5">
-                Discover
+                About the school
               </h2>
               <p className="text-[16.5px] leading-relaxed text-muted">
-                Our school is a place where potential is discovered, developed and directed. Explore the people, programmes and daily life that make it more than a set of classrooms.
+                Who leads the school, what is taught, what the day looks like and how to join.
               </p>
-            </div>
+            </Reveal>
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* Leadership is the tall card, Admissions the wide one: four equal
+                tiles in a row read as a template. */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {/* [PRODUCTION FIX] Preview photo now comes from Settings ->
                   School Identity -> Discover Cards (SETTING_KEYS.SCHOOL_DISCOVER_CARDS,
                   same upload-first/photoKey workflow as leadership team
@@ -785,28 +811,30 @@ export default function LandingPage() {
                   card that hasn't had a photo set yet, rather than leaving
                   it blank. */}
               {[
-                { title: 'Leadership', cardKey: 'leadership' as const, desc: 'A head teacher and board committed to transparent, forward-thinking school governance.', href: '/leadership', tint: 'from-brand-navy-light/40 to-brand-navy' },
-                { title: 'Academics', cardKey: 'academics' as const, desc: 'A rigorous curriculum aligned to MANEB standards for both JCE and MSCE candidates.', href: '/academics', tint: 'from-brand-teal/70 to-brand-navy' },
-                { title: 'Student Life', cardKey: 'student_life' as const, desc: 'Sport, drama, choir, debate and community service alongside a full boarding programme.', href: '/student-life', tint: 'from-brand-navy-light/70 to-brand-navy' },
-                { title: 'Admissions', cardKey: 'admissions' as const, desc: 'Everything a prospective family needs, entry requirements, fees and application steps.', href: '/admissions', tint: 'from-brand-amber/70 to-brand-navy' },
-              ].map((card) => {
+                { title: 'Leadership', cardKey: 'leadership' as const, desc: 'The head teacher and the school board.', href: '/leadership', tint: '' },
+                { title: 'Academics', cardKey: 'academics' as const, desc: 'Subjects and exams, for JCE and MSCE candidates.', href: '/academics', tint: '' },
+                { title: 'Student Life', cardKey: 'student_life' as const, desc: 'Sport, drama, choir, debate, community service and boarding.', href: '/student-life', tint: '' },
+                { title: 'Admissions', cardKey: 'admissions' as const, desc: 'Entry requirements, fees and how to apply.', href: '/admissions', tint: '' },
+              ].map((card, cardIndex) => {
                 const photoUrl = schoolInfo?.discoverCards?.find((d) => d.cardKey === card.cardKey)?.photoUrl ?? null
                 return (
-                  <Link
+                  <Reveal
+                    as={Link}
                     key={card.title}
                     href={card.href}
-                    className={`block text-left rounded-2xl overflow-hidden relative min-h-[290px] card-hover ${photoUrl ? '' : `bg-linear-to-b ${card.tint}`}`}
+                    delay={staggerDelay(cardIndex)}
+                    className={`block text-left rounded-2xl overflow-hidden relative min-h-[290px] card-hover ${cardIndex === 0 ? 'lg:row-span-2' : ''} ${cardIndex === 3 ? 'lg:col-span-2' : ''} ${photoUrl ? '' : 'hills-ph hills-ph--deep'}`}
                   >
                     {photoUrl && (
                       // eslint-disable-next-line @next/next/no-img-element -- Appwrite-hosted photo, not a local Next asset
                       <img src={photoUrl} alt={card.title} className="absolute inset-0 h-full w-full object-cover" />
                     )}
                     <div className="absolute inset-0 bg-linear-to-b from-black/5 to-black/70" />
-                    <div className="relative p-6 flex flex-col justify-end h-[290px] box-border">
+                    <div className={`relative p-6 flex flex-col justify-end box-border ${cardIndex === 0 ? 'h-[290px] lg:h-full lg:min-h-[600px]' : 'h-[290px]'}`}>
                       <h3 className="font-heading font-bold text-lg text-white mb-2">{card.title}</h3>
-                      <p className="text-[13.5px] leading-relaxed text-white/65">{card.desc}</p>
+                      <p className="text-[13.5px] leading-relaxed text-white/80">{card.desc}</p>
                     </div>
-                  </Link>
+                  </Reveal>
                 )
               })}
             </div>
@@ -816,31 +844,22 @@ export default function LandingPage() {
                 (was three separate cards); core values render as a plain
                 list, not pills. */}
             {(schoolInfo?.mission || schoolInfo?.vision || (schoolInfo?.coreValues?.length ?? 0) > 0) && (
-              <div className="mt-14 bg-page border border-base rounded-2xl p-8 sm:p-10 grid sm:grid-cols-2 gap-8">
+              <Reveal className="mt-14 bg-page border border-base rounded-2xl p-8 sm:p-10 grid sm:grid-cols-2 gap-8">
                 {schoolInfo?.mission && (
                   <div>
-                    <div className="flex items-center gap-2.5 mb-3">
-                      <Target className="w-5 h-5 text-brand-teal shrink-0" />
-                      <h3 className="font-heading font-bold text-lg text-brand-teal">Our Mission</h3>
-                    </div>
+                    <h3 className="font-heading font-bold text-lg text-brand-navy dark:text-white mb-3 pl-3 border-l-[3px] border-brand-teal">Mission</h3>
                     <p className="text-sm text-muted leading-relaxed">{schoolInfo.mission}</p>
                   </div>
                 )}
                 {schoolInfo?.vision && (
                   <div>
-                    <div className="flex items-center gap-2.5 mb-3">
-                      <Compass className="w-5 h-5 text-brand-purple shrink-0" />
-                      <h3 className="font-heading font-bold text-lg text-brand-purple">Our Vision</h3>
-                    </div>
+                    <h3 className="font-heading font-bold text-lg text-brand-navy dark:text-white mb-3 pl-3 border-l-[3px] border-brand-teal">Vision</h3>
                     <p className="text-sm text-muted leading-relaxed">{schoolInfo.vision}</p>
                   </div>
                 )}
                 {schoolInfo?.coreValues && schoolInfo.coreValues.length > 0 && (
                   <div className="sm:col-span-2 pt-2 border-t border-base">
-                    <div className="flex items-center gap-2.5 mb-3 mt-6">
-                      <Sparkles className="w-5 h-5 text-brand-amber shrink-0" />
-                      <h3 className="font-heading font-bold text-lg text-brand-navy dark:text-white">Our Core Values</h3>
-                    </div>
+                    <h3 className="font-heading font-bold text-lg text-brand-navy dark:text-white mb-3 mt-6 pl-3 border-l-[3px] border-brand-teal">Core values</h3>
                     <ul className="grid sm:grid-cols-2 gap-x-8 gap-y-2">
                       {schoolInfo.coreValues.map((v) => (
                         <li key={v} className="text-sm text-body flex items-center gap-2">
@@ -851,7 +870,7 @@ export default function LandingPage() {
                     </ul>
                   </div>
                 )}
-              </div>
+              </Reveal>
             )}
 
             {/* [PRODUCTION FIX 2026-07-28] Gallery strip now fetches real
@@ -915,13 +934,10 @@ export default function LandingPage() {
         <div id="academics" />
         <section id="performance" className="relative overflow-hidden bg-brand-deep py-20 sm:py-24 text-white">
           <div className="relative z-10 hills-container">
-            <div className="flex items-end justify-between gap-8 mb-11 flex-wrap">
+            <Reveal className="flex items-end justify-between gap-8 mb-11 flex-wrap">
               <div className="max-w-xl">
-                <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal-light mb-3">
-                  Academic Performance
-                </div>
                 <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight mb-3">
-                  MANEB Examination Results
+                  MANEB examination results
                 </h2>
                 <p className="text-white/80 text-base leading-relaxed">
                   Our latest MANEB examination results, published from the school records system as they become available.
@@ -935,7 +951,7 @@ export default function LandingPage() {
               >
                 MANEB Portal <ExternalLink className="w-3.5 h-3.5" />
               </a>
-            </div>
+            </Reveal>
 
             {/* [PRODUCTION FIX 2026-07-28] Fixed 4-slot grid, MSCE pass
                 rate / JCE pass rate / Learners enrolled / Years of
@@ -953,12 +969,12 @@ export default function LandingPage() {
               const jce  = manebStats?.stats.find((s) => s.examType === 'JCE')
               return (
                 <>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/15 border border-white/15 rounded-2xl overflow-hidden mb-6">
+                  <Reveal className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/15 border border-white/15 rounded-2xl overflow-hidden mb-6">
                     {[
                       { value: msce ? `${msce.passRate}%` : null, label: 'MSCE pass rate' },
                       { value: jce ? `${jce.passRate}%` : null, label: 'JCE pass rate' },
                       { value: manebStats ? manebStats.enrolledStudents.toLocaleString() : null, label: 'Learners enrolled' },
-                      { value: yearsOfExcellence != null ? `${yearsOfExcellence}+` : null, label: 'Years of excellence' },
+                      { value: yearsOfExcellence != null ? `${yearsOfExcellence}+` : null, label: 'Years since founding' },
                     ].map((s) => (
                       <div key={s.label} className="bg-brand-deep p-7">
                         {s.value != null ? (
@@ -969,12 +985,12 @@ export default function LandingPage() {
                         <div className="text-[13.5px] text-white/75 mt-2">{s.label}</div>
                       </div>
                     ))}
-                  </div>
+                  </Reveal>
 
                   {/* [PRODUCTION FIX 2026-07-28] Was three separate
                       side-by-side cards; now one unified card with MSCE,
                       JCE, and University Placement as internal rows. */}
-                  <div className="bg-white/[0.07] border border-white/15 rounded-2xl grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/15">
+                  <Reveal delay={staggerDelay(1)} className="bg-white/[0.07] border border-white/15 rounded-2xl grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-white/15">
                     {[
                       { key: 'MSCE', stat: msce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: msce ? `${msce.passed} passed / ${msce.total} total` : null, rate: msce?.passRate, year: manebStats?.year },
                       { key: 'JCE', stat: jce, rateLabel: 'Pass rate', totalLabel: 'Candidates', totalText: jce ? `${jce.passed} passed / ${jce.total} total` : null, rate: jce?.passRate, year: manebStats?.year },
@@ -1018,7 +1034,7 @@ export default function LandingPage() {
                         )}
                       </div>
                     ))}
-                  </div>
+                  </Reveal>
                 </>
               )
             })()}
@@ -1030,7 +1046,7 @@ export default function LandingPage() {
         ══════════════════════════════════════════════════════════════ */}
         <section id="events" className="relative overflow-hidden bg-surface py-20 sm:py-24">
           <div className="relative z-10 hills-container">
-            <div className="flex items-end justify-between mb-9 gap-4 flex-wrap">
+            <Reveal className="flex items-end justify-between mb-9 gap-4 flex-wrap">
               <h2 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white">
                 Events
               </h2>
@@ -1040,7 +1056,7 @@ export default function LandingPage() {
               >
                 All events →
               </Link>
-            </div>
+            </Reveal>
 
             {eventsLoading ? (
               <div className="grid md:grid-cols-3 gap-6" role="status" aria-label="Loading events">
@@ -1053,7 +1069,7 @@ export default function LandingPage() {
               </div>
             ) : (
               <div className="grid md:grid-cols-3 gap-6">
-                {eventItems.map((ev) => {
+                {eventItems.map((ev, evIndex) => {
                   // [FIX] Root cause of the "NaN" date badge: an EVENT
                   // published (or seeded) before the eventDate-required
                   // schema refine could have eventDate as "" or missing,
@@ -1066,7 +1082,7 @@ export default function LandingPage() {
                   const parsedDate = ev.eventDate ? new Date(ev.eventDate) : null
                   const d = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null
                   return (
-                    <article key={ev.id} className="border border-base rounded-2xl overflow-hidden bg-page relative card-hover">
+                    <Reveal as="article" key={ev.id} delay={staggerDelay(evIndex)} className="border border-base rounded-2xl overflow-hidden bg-page relative card-hover">
                       {/* [FIX] Was hardcoded to ImagePlaceholder regardless
                           of whether the event actually had a cover photo. */}
                       {ev.imageUrl ? (
@@ -1094,7 +1110,7 @@ export default function LandingPage() {
                           Read more →
                         </Link>
                       </div>
-                    </article>
+                    </Reveal>
                   )
                 })}
               </div>
@@ -1144,17 +1160,14 @@ export default function LandingPage() {
               Us card, same height as the left column. Confirmed against
               a hand sketch before implementing (previous attempt used
               three equal columns, which wasn't what was asked for). */}
-          <div className="relative z-10 hills-container grid lg:grid-cols-2 gap-6 lg:gap-8">
+          <div className="relative z-10 hills-container grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             {/* Newsletter */}
-            <div className="bg-surface border border-base rounded-3xl p-6 sm:p-8">
-              <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal mb-2.5">
-                In your inbox
-              </div>
+            <Reveal className="bg-surface border border-base rounded-3xl p-6 sm:p-8">
               <h2 className="font-heading font-extrabold text-[34px] tracking-tight text-brand-navy dark:text-white mb-3.5">
-                Stay Connected
+                School news by email
               </h2>
               <p className="text-[15.5px] text-muted leading-relaxed mb-6">
-                Admissions notices, examination results and school news are delivered straight to your inbox.
+                Admissions notices, results and school news, sent to your email.
               </p>
               <form onSubmit={handleNewsletterSubmit} className="flex gap-2.5 max-w-md flex-col sm:flex-row">
                 <label htmlFor="newsletter-email" className="sr-only">Email address</label>
@@ -1189,11 +1202,8 @@ export default function LandingPage() {
               {/* Map, stacked directly below Newsletter in the same
                   left-hand column, per the confirmed sketch. */}
               <div className="mt-10">
-                <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal mb-2.5">
-                  Find us
-                </div>
                 <h3 className="font-heading font-extrabold text-2xl tracking-tight text-brand-navy dark:text-white mb-4">
-                  Map &amp; Directions
+                  Find the school
                 </h3>
                 <div id="map" className="rounded-2xl overflow-hidden border border-base h-[300px] scroll-mt-24">
                   <iframe
@@ -1207,15 +1217,12 @@ export default function LandingPage() {
                   />
                 </div>
               </div>
-            </div>
+            </Reveal>
 
             {/* Contact info + form */}
-            <div className="bg-surface border border-base rounded-3xl p-6 sm:p-8">
-              <div className="font-heading text-[11px] font-bold tracking-widest uppercase text-brand-teal mb-2.5">
-                Get in touch
-              </div>
+            <Reveal delay={staggerDelay(1)} className="bg-surface border border-base rounded-3xl p-6 sm:p-8">
               <h2 className="font-heading font-extrabold text-[34px] tracking-tight text-brand-navy dark:text-white mb-5.5">
-                Contact Us
+                Contact the school office
               </h2>
 
               {/* [PRODUCTION FIX 2026-07-28] Address/Phone/Email combined
@@ -1300,7 +1307,7 @@ export default function LandingPage() {
                   )}
                 </form>
               </div>
-            </div>
+            </Reveal>
           </div>
         </section>
 
@@ -1449,12 +1456,14 @@ export default function LandingPage() {
               </div>
             </div>
 
+            <StudioWordmark />
+
             <div className="py-5.5 flex flex-col sm:flex-row items-center justify-between gap-4">
               <p className="text-[12.5px] text-white/60">
                 © {currentYearNum} {schoolInfo?.schoolName ?? 'SMS Malawi'}. All rights reserved.
               </p>
               <div className="flex items-center gap-5">
-                <p className="text-[12.5px] text-white/55">The system designed by 5iveStack Labs</p>
+                <StudioCredit className="text-[12.5px] text-white/60" />
                 <div className="flex gap-4.5 text-[12.5px]">
                   <Link href="/privacy" className="text-white/60 hover:text-white transition-colors">Privacy Policy</Link>
                   <Link href="/terms" className="text-white/60 hover:text-white transition-colors">Terms of Use</Link>

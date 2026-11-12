@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-12 (after Phase 4, Home). Read this first when resuming.
+Last updated: 2026-11-12 (after Phase 4b, home polish). Read this first when resuming.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -16,8 +16,8 @@ stable selectors: `id`, `name`, `type`, `role`, `autoComplete`, label and button
 ## 2. Where things are
 Repo: `/home/claude/sms-malawi-src/sms-malawi` (monorepo; the app is `apps/web`). Branches, each a
 cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-baseline` <
-`hills/phase-1-tokens` < `hills/phase-2-sky` < `hills/phase-2c-font-logos` < `hills/phase-3-login` < `hills/phase-4-home`
-(current head). NOTE: the history bundle was not in the zip received for Phase 3, so in the sandbox repo
+`hills/phase-1-tokens` < `hills/phase-2-sky` < `hills/phase-2c-font-logos` < `hills/phase-3-login` < `hills/phase-4-home` <
+`hills/phase-4b-home-polish` (current head). NOTE: the history bundle was not in the zip received for Phase 3, so in the sandbox repo
 `main` and `hills/phase-2c-font-logos` are one reconstructed baseline commit (the delivered 2c state);
 `pnpm hills:logic-diff --base main` therefore only proves Phase 3 here. Run it on the real repo.
 
@@ -30,7 +30,8 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | Logo step: school's own logos, `SchoolMark`, icons, OG image | done | combined package |
 | Phase 3 Login and claim account (`hills/phase-3-login`, incl. follow-up commit) | done, reviewed | review pack 3 |
 | Phase 4 Home (`hills/phase-4-home`) | done, AT REVIEW GATE | review pack 4 |
-| **5 /apply** | **NEXT** | |
+| Phase 4b Home polish (`hills/phase-4b-home-polish`) | done, AT REVIEW GATE | review pack 4b |
+| **5 /apply** | **NEXT** (after the 4b review) | |
 | 6 Other public pages, 7 Password and claim pages, 8 Logged-in app, 9 Cleanup | pending | |
 
 The user asked for Phases 0 to the logo step to be reviewed as ONE package. Phases 3 and 4 were each reviewed on their own. Next review gate is
@@ -127,6 +128,37 @@ after Phase 5 unless the user says otherwise.
    - Handler inventory baseline regenerated: only page.tsx's digest and token count changed (362 to 352);
      the 2128 handler items are identical.
 
+9. **Phase 4b (home polish, same `(public)/page.tsx`).** The user asked for: a decision on two open items,
+   "AI clues" removed, animation, and the studio name in the footer. Kit used: `agent-kit-school-nextjs.zip`
+   (for this app only; NOT in the repo; only its AI-tells scan may be reused in Phases 5 and 6).
+   - Decisions (user asked for the best option): sky stays in two sections and the hero stays solid (it is
+     the one real photo; text over a see-through hero fails the readability rule); the home page keeps its own
+     nav (search, anchors, mega menu).
+   - AI tells fixed by eye (the kit scan is only a net): generic copy and "excellence" wording, eyebrow labels,
+     equal card grids, the icon trio, purple, the gradient placeholder. Existing facts were NOT extended; the
+     claim "Applications for the new intake are open." was already there and is unverified (ask the school).
+   - Animation (all in `globals.css` HILLS MOTION; `src/components/motion/*`, rules in `lib/hills/motion.ts`,
+     unit-tested): `Reveal` (server HTML is visible; only below-fold elements are hidden after hydration; none under
+     reduced motion or when the motion store is off; 70 ms stagger, max 6 items, CSS animation with `backwards`
+     fill so hover transforms still work), hero settle, `ScrollProgress` (CSS-only bar via
+     `animation-timeline: scroll()`; absent in Firefox, no loss). Skipped on purpose: the kit's global
+     `template.tsx` route fade (affects every route) and count-up numbers (the figures are text the user owns).
+   - Footer: large `StudioWordmark` plus `StudioCredit` in orange `#ff8a3d` (`--hills-studio`; about 6:1 on the
+     always-dark footer, so one orange works in both themes). Name, link and style live in ONE file,
+     `src/lib/hills/studio.ts` (`name: '5iveStack Labs'`, `url: undefined`). Setting `url` turns the credit into a
+     link. The URL was not given: ask the user.
+   - Regression found and fixed: Phase 4 moved the header to `.hills-container` (5vw side padding) and the 1243px
+     header overflowed at 1280px (Menu button clipped). Fix: `.hills-container--nav` (padding shrinks to fit,
+     equals 5vw from about 1400px), used on the header and both flyouts. Measured at 390, 768, 1024, 1100, 1280,
+     1366, 1440, 1920: nothing clipped. LESSON: when swapping a container class on a header, measure the last
+     control's right edge at 1024 to 1440.
+   - Also fixed: 21px horizontal overflow at 320px from Phase 4 cards (`grid-cols-1` on the ads and contact grids).
+   - Checked: no text on bare sky (4 skies x light/dark x 1280/390), no horizontal scroll, reveal with JS off
+     (0 hidden), reduced motion (0 hidden), normal (14 hidden below the fold, 0 after scrolling), contrast gate
+     (292 pairs pass), 38 tests, logic gate clean vs `hills/phase-4-home`, inventory baseline regenerated.
+   - Not tested: Firefox and Safari, real data (mocked), a production build.
+   - Weight (dev render, same mocked data): DOM nodes 881 to 841, HTML 187.5 to 183.2 KB light (168.9 to 164.5 KB dark); not a production transfer measurement.
+
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database, so signed-in pages cannot be
   rendered or screenshotted. Do not retry or work around. tsc errors from missing Prisma types are
@@ -165,4 +197,5 @@ after Phase 5 unless the user says otherwise.
      fades in once, not twice. Only visible in production builds on a slow first load.
   Still untested: Firebase success and "no role assigned" paths (Firebase is unreachable from the sandbox).
 - Phase 3 left the interim pages on their old field styling inside the new card (Phase 7 redoes them).
+- Phase 4b open question for the user: the 5iveStack Labs website address (see `lib/hills/studio.ts`).
 - Phase 9 (cleanup) is optional and last.

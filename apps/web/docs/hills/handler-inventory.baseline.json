@@ -2932,8 +2932,8 @@
   ]
  },
  "src/app/(public)/page.tsx": {
-  "digest": "535a22e95703f9de2023ca11f1393e020c6855c4",
-  "tokens": 352,
+  "digest": "a30d61a15182e97168679f98f371be95ed32114a",
+  "tokens": 363,
   "items": [
    {
     "k": "effect",
@@ -3868,6 +3868,11 @@
     "h": "214bf6bd"
    }
   ]
+ },
+ "src/components/brand/StudioWordmark.tsx": {
+  "digest": "e905b47c7688481343185c30698defcb3e5220fd",
+  "tokens": 13,
+  "items": []
  },
  "src/components/calendar/CalendarEventFormDialog.tsx": {
   "digest": "8ace05a33c4c7ce77824f3d5a919edc8322ac880",
@@ -7855,6 +7860,22 @@
     "h": "35d490b8"
    }
   ]
+ },
+ "src/components/motion/Reveal.tsx": {
+  "digest": "98d5e493a64327ea4c11bfc2b274870d6b411c64",
+  "tokens": 27,
+  "items": [
+   {
+    "k": "effect",
+    "n": "useEffect",
+    "h": "4105ea39"
+   }
+  ]
+ },
+ "src/components/motion/ScrollProgress.tsx": {
+  "digest": "f5c8a357bc9df8f7e7897ea0f2780d47fcf95340",
+  "tokens": 2,
+  "items": []
  },
  "src/components/parent/ParentPanels.tsx": {
   "digest": "de1960bca43ba89a1778354bf5c672cccfbd7df4",
