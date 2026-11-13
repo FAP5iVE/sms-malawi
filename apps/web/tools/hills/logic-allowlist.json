@@ -88,6 +88,10 @@
     {
       "file": "src/lib/hills/studio.ts",
       "reason": "Phase 4b: studio name, optional url and display switch for the footer signature."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "reason": "Phase 6a: presentational frame for the public content pages (title, intro, 'On this page' list built from the page's own h2 headings, one content surface). Reads and writes nothing but its own DOM ids and a scroll-spy highlight; no data, routing or form handling."
     }
   ],
   "deletedFiles": [],
@@ -777,6 +781,104 @@
       "kind": "logic",
       "pattern": "^\\{ i < STEPS \\. length - 1 && \\( <JSX/> \\) \\}$",
       "reason": "Phase 5: the line between two step circles was a conditional <div>; it is now drawn by CSS (li:not(:last-child)::after), so the same lines appear with no JSX condition."
+    },
+    {
+      "file": "src/app/(public)/academics/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Academics\"$",
+      "reason": "Phase 6a: the page heading moves from an <h1> in the page into the PublicPageLayout title prop; same words."
+    },
+    {
+      "file": "src/app/(public)/academics/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^intro=\\{ <JSX/> \\}$",
+      "reason": "Phase 6a: the intro paragraph moves into the PublicPageLayout intro prop; same words (a JSX fragment)."
+    },
+    {
+      "file": "src/app/(public)/admissions/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Admissions\"$",
+      "reason": "Phase 6a: the page heading moves from an <h1> in the page into the PublicPageLayout title prop; same words."
+    },
+    {
+      "file": "src/app/(public)/admissions/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^intro=\\{ <JSX/> \\}$",
+      "reason": "Phase 6a: the intro paragraph moves into the PublicPageLayout intro prop; same words (a JSX fragment)."
+    },
+    {
+      "file": "src/app/(public)/leadership/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"School\\ Leadership\"$",
+      "reason": "Phase 6a: the page heading moves from an <h1> in the page into the PublicPageLayout title prop; same words."
+    },
+    {
+      "file": "src/app/(public)/leadership/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^intro=\"The team responsible for the day-to-day running and long-term direction of the school\\.\"$",
+      "reason": "Phase 6a: the intro paragraph moves into the PublicPageLayout intro prop; same words."
+    },
+    {
+      "file": "src/app/(public)/leadership/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^wide=true$",
+      "reason": "Phase 6a: layout prop, the card grid takes the wider column."
+    },
+    {
+      "file": "src/app/(public)/leadership/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^surface=\\{ false \\}$",
+      "reason": "Phase 6a: layout prop, the member cards keep their own frames instead of sitting on a shared surface."
+    },
+    {
+      "file": "src/app/(public)/privacy/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Privacy\\ Policy\"$",
+      "reason": "Phase 6a: the page heading moves from an <h1> in the page into the PublicPageLayout title prop; same words."
+    },
+    {
+      "file": "src/app/(public)/privacy/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^intro=\\{ <JSX/> \\}$",
+      "reason": "Phase 6a: the intro paragraph moves into the PublicPageLayout intro prop; same words (a JSX fragment)."
+    },
+    {
+      "file": "src/app/(public)/student-life/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Student\\ Life\"$",
+      "reason": "Phase 6a: the page heading moves from an <h1> in the page into the PublicPageLayout title prop; same words."
+    },
+    {
+      "file": "src/app/(public)/student-life/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^intro=\\{ <JSX/> \\}$",
+      "reason": "Phase 6a: the intro paragraph moves into the PublicPageLayout intro prop; same words (a JSX fragment)."
+    },
+    {
+      "file": "src/app/(public)/terms/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Terms\\ of\\ Use\"$",
+      "reason": "Phase 6a: the page heading moves from an <h1> in the page into the PublicPageLayout title prop; same words."
+    },
+    {
+      "file": "src/app/(public)/terms/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^intro=\\{ <JSX/> \\}$",
+      "reason": "Phase 6a: the intro paragraph moves into the PublicPageLayout intro prop; same words (a JSX fragment)."
     }
   ]
 }

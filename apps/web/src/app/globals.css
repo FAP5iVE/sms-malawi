@@ -2751,3 +2751,204 @@ a.hills-studio__credit-name:hover { text-decoration: underline; text-underline-o
   .hills-apply__chip,
   .hills-apply__surface .hills-ctl { transition: none; }
 }
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS PAGE (Phase 6a): the frame for the public content pages
+   (admissions, academics, student life, leadership, privacy, terms).
+   Two columns from 900px, one below. Left (sticky): title, intro and an "On
+   this page" list, all on the sky (the interim scrim is off via `hills-open`).
+   Right: the content on ONE opaque surface that follows the Light/Dark THEME,
+   like the sign-in card. Leadership (`--wide`, no surface) lets its own cards
+   fill the wider column. Below 900px the contents list is a row of pills that
+   scrolls sideways inside itself. Class names only; no page logic changes.
+   Contrast: `pnpm hills:contrast` (surface pairs) and real-pixel measurement.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.hills-page {
+  --hills-split-cols: clamp(240px, 26vw, 340px) minmax(0, 860px);
+
+  /* Same palette as the sign-in card and the apply surface. */
+  --c-ink: var(--hills-surface-fg);
+  --c-ink2: color-mix(in srgb, var(--hills-surface-fg) 82%, transparent);
+  --c-line: color-mix(in srgb, var(--hills-surface-fg) 18%, transparent);
+  --c-acc: #932e09;
+  --c-acc2: #ffb27a;
+}
+.dark .hills-page {
+  --c-acc: #f2a650;
+  --c-acc2: #a8350b;
+}
+.hills-page--wide { --hills-split-cols: clamp(240px, 26vw, 340px) minmax(0, 1fr); }
+.hills-page__wrap { padding-block: clamp(28px, 5vw, 72px); }
+.hills-page__grid { align-items: start; }
+@media (min-width: 900px) {
+  .hills-page:not(.hills-page--wide) .hills-split { justify-content: center; }
+}
+
+/* ── Left column, on the sky ────────────────────────────────────────────── */
+
+.hills-page__side { min-width: 0; animation: hills-rise 0.9s 0.08s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+@media (min-width: 900px) and (min-height: 640px) {
+  .hills-page__side { position: sticky; top: 96px; }
+}
+.hills-page__title {
+  margin: 0 0 14px;
+  font-size: clamp(36px, 3.6vw, 54px);
+  font-weight: 300;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  color: var(--hills-ink);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+.hills-page__intro {
+  margin: 0;
+  max-width: 40ch;
+  font-size: clamp(17px, 1.3vw, 19px);
+  line-height: 1.5;
+  /* Full-strength ink: the 93% ink-2 measured under 4.5:1 on the real day sky. */
+  color: var(--hills-ink);
+}
+
+.hills-page__toc { margin-top: 28px; }
+.hills-page__toc-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hills-ink);
+}
+.hills-page__toc ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-left: 2px solid color-mix(in srgb, var(--hills-ink) 38%, transparent);
+}
+@media (min-width: 900px) {
+  /* Long lists (privacy has 14) scroll inside the sticky column. */
+  .hills-page__toc ol { max-height: max(160px, calc(100svh - 380px)); overflow-y: auto; overscroll-behavior: contain; }
+}
+.hills-page__toc a {
+  display: block;
+  margin-left: -2px;
+  padding: 6px 0 6px 14px;
+  border-left: 2px solid transparent;
+  color: var(--hills-ink);
+  font-size: 15px;
+  line-height: 1.35;
+  text-decoration: none;
+}
+.hills-page__toc a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.hills-page__toc a.is-active { border-left-color: var(--hills-ink); font-weight: 700; }
+.hills-page__toc a:focus-visible { outline: 2px solid var(--hills-ink); outline-offset: 2px; border-radius: 2px; }
+
+@media (max-width: 899.98px) {
+  .hills-page__toc { margin-top: 20px; }
+  .hills-page__toc-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .hills-page__toc ol {
+    display: flex;
+    gap: 8px;
+    margin-inline: -5vw;
+    padding: 2px 5vw 8px;
+    border-left: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: 5vw;
+  }
+  .hills-page__toc li { flex: none; }
+  .hills-page__toc a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    margin: 0;
+    padding: 0 16px;
+    border: 1px solid var(--hills-line);
+    border-radius: 999px;
+    background: var(--hills-surface);
+    color: var(--hills-surface-fg);
+    white-space: nowrap;
+  }
+  .hills-page__toc a.is-active {
+    border-color: var(--hills-surface-fg);
+    background: var(--hills-surface-fg);
+    color: var(--hills-surface);
+  }
+  .hills-page__toc a:focus-visible { outline-color: var(--hills-ink); }
+}
+
+/* ── The content surface ────────────────────────────────────────────────── */
+
+.hills-page__main { min-width: 0; }
+.hills-page__surface {
+  min-width: 0;
+  padding: clamp(20px, 3.4vw, 48px);
+  border: 1px solid color-mix(in srgb, var(--hills-line) 80%, transparent);
+  border-radius: 20px;
+  background: var(--hills-surface);
+  color: var(--hills-surface-fg);
+  box-shadow: 0 24px 60px -28px rgb(0 0 0 / 0.45);
+  animation: hills-rise 0.9s 0.16s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+/* Headings written with text-brand-navy (no dark variant) follow the surface. */
+.hills-page__surface :is(h2, h3, th) { color: var(--c-ink); }
+/* Long text never runs wider than a comfortable line. */
+.hills-page__main :is(p, ul, ol) { max-width: 760px; }
+
+.hills-page__link,
+.hills-page__accent { color: var(--c-acc); }
+.hills-page__link { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.hills-page__link:hover { text-decoration-thickness: 2px; }
+.hills-page__link:focus-visible { outline: 2px solid var(--c-acc); outline-offset: 2px; border-radius: 2px; }
+
+/* "Ready to apply?" band: inverted, so it reads in both themes. */
+.hills-page__cta {
+  padding: 28px;
+  border-radius: 16px;
+  background: var(--hills-surface-fg);
+  color: var(--hills-surface);
+}
+.hills-page__surface .hills-page__cta h2 { color: inherit; }
+.hills-page__cta p { max-width: none; color: color-mix(in srgb, var(--hills-surface) 90%, transparent); }
+.hills-page__cta-btn { background: var(--hills-surface); color: var(--hills-surface-fg); }
+.hills-page__cta-btn:hover { background: color-mix(in srgb, var(--hills-surface) 86%, var(--c-acc)); }
+.hills-page__cta-btn:focus-visible { outline: 3px solid var(--hills-surface); outline-offset: 3px; }
+
+/* Admissions office: three small cards that wrap by width (the surface is
+   narrower than the old max-w-4xl page, so a fixed 3-up grid cut the email). */
+.hills-page__contacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 16px;
+}
+.hills-page__contacts > * { min-width: 0; overflow-wrap: anywhere; }
+
+/* Leadership: cards fill the wider column; each keeps its own opaque frame. */
+.hills-page__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+  gap: 24px;
+  animation: hills-rise 0.9s 0.16s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+.hills-page__cards > * { box-shadow: 0 24px 60px -28px rgb(0 0 0 / 0.45); }
+.hills-page__empty {
+  border: 1px solid color-mix(in srgb, var(--hills-line) 80%, transparent);
+  border-radius: 20px;
+  background: var(--hills-surface);
+  box-shadow: 0 24px 60px -28px rgb(0 0 0 / 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hills-page__side,
+  .hills-page__surface,
+  .hills-page__cards { animation: none; }
+}

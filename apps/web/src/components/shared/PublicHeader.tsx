@@ -31,6 +31,10 @@
  *     opaque enough to read, but in the same visual language as the cards.
  *
  * [DEPENDS ON]: PublicThemeToggle (the theme dropdown)
+ *
+ * [CHANGE TYPE]: LOOKS ONLY (Chikangawa Hills theme, Phase 6a, 2026-11-12).
+ *   The bar's inner row moves from `max-w-6xl` to `.hills-container`, so the
+ *   Home link and the theme toggle line up with the page content below.
  */
 
 import Link from 'next/link'
@@ -91,7 +95,7 @@ export function PublicHeader({ title }: PublicHeaderProps) {
           : 'border-base bg-surface',
       ].join(' ')}
     >
-      <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2 sm:gap-4 sm:px-6">
+      <div className="hills-container flex items-center gap-3 py-2 sm:gap-4">
         <Link
           href="/"
           className="inline-flex min-h-12 shrink-0 items-center gap-2 rounded-xl px-2 -ml-2 text-base text-muted transition-colors hover:bg-black/5 hover:text-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/50 dark:hover:bg-white/10"

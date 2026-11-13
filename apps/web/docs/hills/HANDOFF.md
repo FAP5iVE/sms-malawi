@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-12 (after Phase 5, /apply). Read this first when resuming.
+Last updated: 2026-11-13 (after Phase 6a, the text pages). Read this first when resuming.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -31,12 +31,13 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | Phase 3 Login and claim account (`hills/phase-3-login`, incl. follow-up commit) | done, reviewed | review pack 3 |
 | Phase 4 Home (`hills/phase-4-home`) | done, AT REVIEW GATE | review pack 4 |
 | Phase 4b Home polish (`hills/phase-4b-home-polish`) | done, AT REVIEW GATE | review pack 4b |
-| Phase 5 /apply (`hills/phase-5-apply`) | done, AT REVIEW GATE | review pack 5 |
-| **6 Other public pages** | **NEXT** (after the Phase 5 review) | |
+| Phase 5 /apply (`hills/phase-5-apply`) | done, reviewed (user moved on to 6) | review pack 5 |
+| Phase 6a Text pages (`hills/phase-6-public-pages`) | done, AT REVIEW GATE | review pack 6a |
+| **6b Lists, details, gallery, placement results, 404, `PublicArchive`, `PublicPostSeoLayout`** | **NEXT** (after the 6a review) | |
 | 7 Password and claim pages, 8 Logged-in app, 9 Cleanup | pending | |
 
-The user asked for Phases 0 to the logo step to be reviewed as ONE package. Phases 3 and 4 were each reviewed on their own. Next review gate is
-after Phase 6 unless the user says otherwise.
+The user asked for Phases 0 to the logo step to be reviewed as ONE package. Phases 3 and 4 were each reviewed on their own. Phase 6 is split in two review drops (6a, then 6b). Next review gate is
+after 6a.
 
 ## 3. Decisions the user has made (do not re-ask)
 - Readability beats looks. On `default` pages the sky shows only in the side margins of wide
@@ -195,6 +196,35 @@ after Phase 6 unless the user says otherwise.
    - Allowlist: 10 entries (8 class-string constants, `aria-current`, the removed connector condition). Handler inventory
      regenerated: only the page's digest changed (390 tokens, same handlers).
 
+11. **Phase 6a (privacy, terms, admissions, academics, student life, leadership + `PublicHeader`).** Looks only; logic fingerprint clean
+    against `hills/phase-5-apply` (67 declared) and against `main`.
+   - NEW `components/shared/PublicPageLayout.tsx` (client; declared in `newFiles`). Props: `title`, `intro`, `wide`, `surface`
+     (default true), `contents` (default true), `children`. It renders `<PublicAmbientBackground />` itself and the root has
+     `hills hills-open hills-page`, so pages must NOT import the background or keep their own `max-w-*`/`<h1>`/`<main>`.
+     Grid: `.hills-split` with `--hills-split-cols: clamp(240px,26vw,340px) minmax(0,860px)` (`--wide`: `minmax(0,1fr)`), centred.
+   - "On this page" list: built on the client from every `<h2>` inside a `<section>` of the content; a section with no id gets one
+     from its heading (de-duplicated slug), so the footer anchors that already exist (`#curriculum`, `#facilities`, `#how-to-apply`,
+     `#fees`, ...) are untouched. Fewer than two headings = no list. Scroll-spy via IntersectionObserver. Desktop: left, sticky,
+     scrolls inside itself for long lists (privacy has 14). Below 900px: a row of 44px pills that scrolls sideways inside itself.
+     CAVEAT: ids it creates exist only after hydration; an external link to such a section works only if the section already had an id.
+   - Content surface `.hills-page__surface` = opaque `--card` (follows the Light/Dark theme, like sign-in/apply). `h2/h3/th` follow
+     the surface (privacy/terms headings were `text-brand-navy` with no dark variant = near-invisible on a dark surface before);
+     `p/ul/ol` max 760px (measured 760 at 1920). Links use `.hills-page__link` (accent `--c-acc`, underlined, 7.97 / 8.77:1).
+   - `admissions`: the teal "Ready to apply?" band is now `.hills-page__cta` (inverted: card colour on foreground) because white on
+     brand-teal is weak and unreadable in dark; contact cards are `.hills-page__contacts` (auto-fit, min 230px) since the narrower
+     surface cut the email. `leadership`: `wide` + `surface={false}`; cards in `.hills-page__cards` (auto-fill, min 230px) replace the
+     `sm/lg/xl` breakpoints; the empty state has its own opaque panel (`.hills-page__empty`); member title uses `.hills-page__accent`.
+   - `PublicHeader` inner row now `.hills-container` (was `max-w-6xl px-4 sm:px-6`).
+   - Contrast gate 342 to 366 pairs (page surface per theme: body, muted, link, CTA band, pills, brand icons as graphics).
+     Real pixels (`measure6.mjs` + `measure.py`): 4 skies x 5 widths x 6 pages, 320 groups, 912 lines, 0 fail, worst 4.58:1 (day, intro).
+   - Checked: no sideways overflow at 360/390/768/1280/1920 on all six pages, light and dark; one `<h1>` and one `<main>` per page.
+   - Width search (`max-w-3xl..7xl`) over `(public)` + shared public components: none left in the six 6a pages. LEFT for 6b:
+     `placement-results` (5xl), `events` (4xl), `gallery` (7xl), `PublicArchive` (5xl list, 3xl detail). Also `(public)/page.tsx:595`
+     `max-w-3xl fade-up` (home hero text block from Phase 4): needs a decision (swap to `.hills-measure`?).
+   - Seen, NOT changed: privacy/terms still contain "[School's full legal name]" placeholders and terms print `new Date().getFullYear()`
+     as "Last updated"; section numbers are typed into the privacy headings, so the contents list shows "1. Who we are" etc.
+   - Not done: Storybook story (page frame, covered by real-page captures); Firefox/Safari; production build.
+
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database, so signed-in pages cannot be
   rendered or screenshotted. Do not retry or work around. tsc errors from missing Prisma types are
@@ -214,6 +244,8 @@ after Phase 6 unless the user says otherwise.
 - The zip received for Phase 5 again had NO git history: `main` = delivered 4b state (one reconstructed commit);
   `hills/phase-4b-home-polish` and `hills/phase-5-apply` branch from it. `hills:logic-diff --base main` therefore proves only
   Phase 5 here. Run it against `hills/phase-4b-home-polish` AND the original baseline on the real repo.
+- Capture scripts for Phase 6a: `pages.mjs`, `cap.sh`, `multi.sh`, `measure6.mjs`, `mrun.sh` in the pack (`tools-capture/`); mock `/public/maneb-stats` with a `stats` array
+  (academics crashes on a mock without it).
 - Capture scripts for Phase 5 live in the review pack (`tools-capture/`: `run.sh`, `walk.mjs`, `measure.mjs`, `measure.py`);
   the Playwright import must go through `createRequire` (global install, ESM import fails).
 - `.env` and `service-account.json` are in the zip: never print or commit them.

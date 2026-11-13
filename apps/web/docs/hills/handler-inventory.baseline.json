@@ -2529,8 +2529,8 @@
   "items": []
  },
  "src/app/(public)/academics/page.tsx": {
-  "digest": "8a7e933f0be2ac2c316420ecdc1247947058435a",
-  "tokens": 32,
+  "digest": "4082c6cf0a56a23e1781523bba0105de5cc37114",
+  "tokens": 34,
   "items": []
  },
  "src/app/(public)/admissions/layout.tsx": {
@@ -2539,8 +2539,8 @@
   "items": []
  },
  "src/app/(public)/admissions/page.tsx": {
-  "digest": "7caf0912b338898e0e2f4fc71a336703e0fed274",
-  "tokens": 31,
+  "digest": "f7872442e437c191108f42a97e067ffab6570aad",
+  "tokens": 33,
   "items": []
  },
  "src/app/(public)/apply/layout.tsx": {
@@ -2804,8 +2804,8 @@
   "items": []
  },
  "src/app/(public)/leadership/page.tsx": {
-  "digest": "6b5650850a440edaff9cfd0cabebac2cc5388a43",
-  "tokens": 16,
+  "digest": "007ae4192e71cfdb04a5d1bf356abf55a1b95bbd",
+  "tokens": 20,
   "items": []
  },
  "src/app/(public)/login/layout.tsx": {
@@ -3074,8 +3074,8 @@
   "items": []
  },
  "src/app/(public)/privacy/page.tsx": {
-  "digest": "85c5110d54076d63859bf68ad3cd48d5fa4e69b6",
-  "tokens": 37,
+  "digest": "168e130c34ed6c67a69180372b2ee5e39562e625",
+  "tokens": 39,
   "items": []
  },
  "src/app/(public)/reset-password/layout.tsx": {
@@ -3130,8 +3130,8 @@
   "items": []
  },
  "src/app/(public)/student-life/page.tsx": {
-  "digest": "12f82aaf99967eba75b3c45f04ec67514c55c417",
-  "tokens": 5,
+  "digest": "c3f0cf529b63f73857bf7e82a1f8c9563bc0fa60",
+  "tokens": 7,
   "items": []
  },
  "src/app/(public)/terms/layout.tsx": {
@@ -3140,8 +3140,8 @@
   "items": []
  },
  "src/app/(public)/terms/page.tsx": {
-  "digest": "fb32fbe89c0e4349931f60faaf8e0bd3762dbd60",
-  "tokens": 8,
+  "digest": "b81e45dc8f111bfefa151d8dbf9af48884d070be",
+  "tokens": 10,
   "items": []
  },
  "src/app/global-error.tsx": {
@@ -10964,6 +10964,17 @@
   "digest": "37c460f9ef360bff1174106b7cc8d2318cc55b35",
   "tokens": 16,
   "items": []
+ },
+ "src/components/shared/PublicPageLayout.tsx": {
+  "digest": "6183af9b17e86aef6e251a29130e1b3e3064affd",
+  "tokens": 53,
+  "items": [
+   {
+    "k": "effect",
+    "n": "useEffect",
+    "h": "08b9458a"
+   }
+  ]
  },
  "src/components/shared/PublicPostSeoLayout.tsx": {
   "digest": "a2cf149a196f9db7873e64d3b8b8016a1cc8b75b",

@@ -247,6 +247,53 @@ for (const sky of SKIES) {
   }
 }
 
+// ── Phase 6a: the public content pages (.hills-page) ────────────────────────
+// (a) The content surface is OPAQUE --card in the Light/Dark THEME. Text is
+//     --card-foreground, muted text is --muted-foreground (the existing
+//     `.text-muted`), links and accents come from `.hills-page` /
+//     `.dark .hills-page` (--c-acc). Brand icons keep their Tailwind colours and
+//     are checked as graphics (3:1).
+// (b) The "Ready to apply?" band is inverted: --card on --card-foreground.
+// (c) Mobile "On this page" pills: --card-foreground on --card, and the active
+//     pill reversed.
+// (d) Title, intro and the desktop contents list are full-strength ink on the
+//     sky (already checked above as `ink on sky`). The thin rule beside the
+//     contents list is decoration only (the text carries the information).
+function pageAccent(dark: boolean): { acc: string; acc2: string } {
+  const m = (dark ? /\.dark\s+\.hills-page\s*\{[^}]*\}/ : /\.hills-page\s*\{[^}]*--c-acc[^}]*\}/).exec(css)
+  if (!m) throw new Error('.hills-page accent block not found')
+  const acc = /--c-acc:\s*(#[0-9a-f]{6})/i.exec(m[0])?.[1]
+  const acc2 = /--c-acc2:\s*(#[0-9a-f]{6})/i.exec(m[0])?.[1]
+  if (!acc || !acc2) throw new Error('.hills-page accent tokens missing')
+  return { acc, acc2 }
+}
+function hslVar(block: RegExp, name: string): RGBA {
+  return hslTriplet(block, name)
+}
+for (const dark of [false, true]) {
+  const { card, fg } = cardVar(dark ? DARK_BLOCK : ROOT_BLOCK)
+  const theme = dark ? 'dark' : 'light'
+  const at = `page surface (${theme})`
+  const add = (name: string, need: number, a: RGBA, b: RGBA) =>
+    rows.push({ sky: 'page', pair: `${name} on ${at}`, need, got: ratio(a, b) })
+  const block = dark ? DARK_BLOCK : ROOT_BLOCK
+  const brand = (n: string): RGBA => hslVar(block, n)
+  const muted = brand('muted-foreground')
+  const { acc } = pageAccent(dark)
+  const accC = parseColor(acc)
+  add('body text', 4.5, fg, card)
+  add('muted text (.text-muted)', 4.5, muted, card)
+  add('link and accent text (--c-acc)', 4.5, accC, card)
+  add('CTA band text (card on foreground)', 4.5, card, fg)
+  add('CTA band text, 90%', 4.5, over([card[0], card[1], card[2], 0.9], fg), fg)
+  add('CTA button label (foreground on card)', 4.5, fg, card)
+  add('mobile pill label (foreground on card)', 4.5, fg, card)
+  add('active pill label (card on foreground)', 4.5, card, fg)
+  for (const b of ['brand-teal', 'brand-purple', 'brand-amber', 'brand-coral']) {
+    add(`icon ${b} (graphic)`, 3, brand(b), card)
+  }
+}
+
 const fails = rows.filter((r) => r.got < r.need)
 if (process.argv.includes('--table') || fails.length > 0) {
   for (const r of rows) {
