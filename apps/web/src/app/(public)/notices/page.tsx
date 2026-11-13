@@ -18,13 +18,16 @@
  *   The underlying API path (GET /public/announcements) is unaffected,
  *   that's a separate Express router, not a Next.js page route.
  * [DEPENDS ON]: usePublicAnnouncements (GET /public/announcements)
+ *
+ * [CHANGE TYPE]: LOOKS ONLY (Chikangawa Hills theme, Phase 6b, 2026-11-13).
+ *   The sky background is now drawn by <PublicPageLayout> inside the shared
+ *   PublicArchive view, so this page no longer renders its own.
  */
 
 import { useState } from 'react'
 import { Bell } from 'lucide-react'
 import { usePublicAnnouncements } from '@/hooks/usePublic'
 import { PublicArchiveList } from '@/components/shared/PublicArchive'
-import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 
 const PAGE_SIZE = 12
 
@@ -35,20 +38,17 @@ export default function AnnouncementsArchivePage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1
 
   return (
-    <>
-      <PublicAmbientBackground />
-      <PublicArchiveList
-        title="Announcements"
-        subtitle="General notices from the school, separate from News and Academic Advertisements."
-        basePath="/notices"
-        items={items}
-        isLoading={isLoading}
-        emptyIcon={Bell}
-        emptyText="No announcements have been published yet."
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
-    </>
+    <PublicArchiveList
+      title="Announcements"
+      subtitle="General notices from the school, separate from News and Academic Advertisements."
+      basePath="/notices"
+      items={items}
+      isLoading={isLoading}
+      emptyIcon={Bell}
+      emptyText="No announcements have been published yet."
+      page={page}
+      totalPages={totalPages}
+      onPageChange={setPage}
+    />
   )
 }

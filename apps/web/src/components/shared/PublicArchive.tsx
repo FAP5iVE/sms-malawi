@@ -21,12 +21,21 @@
  *   every public page. The detail view keeps its "Back to <list>" link, that
  *   goes to the list, not home, so it is not redundant with the header.
  *   Roots use `flex-1` (not `min-h-screen`) to fill the space below the header.
+ *
+ * [CHANGE TYPE]: LOOKS ONLY (Chikangawa Hills theme, Phase 6b, 2026-11-13).
+ *   Both views now sit in <PublicPageLayout> (changed once, covers /news,
+ *   /notices, /academic-advertisements and /events details): lists get the title,
+ *   subtitle and links to the sibling lists on the sky and the cards on one
+ *   surface; details get a back link, the date and byline on the sky and the
+ *   image and body on the surface. The pages that render these no longer draw
+ *   their own sky background.
  */
 
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { PublicAnnouncement } from '@/hooks/usePublic'
+import { PublicPageLayout, PublicSiblingNav } from '@/components/shared/PublicPageLayout'
 
 export function formatArchiveDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -71,72 +80,65 @@ export function PublicArchiveList({
   page, totalPages, onPageChange,
 }: ListProps) {
   return (
-    <div className="flex-1 bg-page">
-      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <h1 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white mb-2">
-          {title}
-        </h1>
-        <p className="text-muted mb-8">{subtitle}</p>
+    <PublicPageLayout title={title} intro={subtitle} below={<PublicSiblingNav current={basePath} />}>
+      {isLoading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => <div key={i} className="h-32 rounded-xl bg-surface animate-pulse" />)}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="text-center py-20 text-muted flex flex-col items-center gap-3">
+          <EmptyIcon className="w-10 h-10 text-muted/40" aria-hidden />
+          {emptyText}
+        </div>
+      ) : (
+        <>
+          <div className="space-y-5">
+            {items.map((a) => (
+              <article key={a.id} className="border border-base rounded-2xl overflow-hidden bg-surface sm:flex">
+                {a.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
+                  <img src={a.imageUrl} alt="" className="sm:w-56 h-40 sm:h-auto object-cover shrink-0" />
+                ) : null}
+                <div className="p-6 min-w-0">
+                  <div className="font-mono text-xs text-muted mb-2">{formatArchiveDate(a.createdAt)}</div>
+                  <h2 className="font-heading font-bold text-xl text-brand-navy dark:text-white mb-2">{a.title}</h2>
+                  {/* [PRODUCTION FIX] Collapsed with a 3-line clamp, the
+                      full body only ever shows on the detail page below,
+                      never inline in the list. */}
+                  <p className="text-sm text-muted leading-relaxed line-clamp-3">{stripHtml(a.body)}</p>
+                  <Link
+                    href={`${basePath}/${a.id}`}
+                    className="hills-page__link inline-block mt-3 text-sm font-heading font-bold"
+                  >
+                    Read more →
+                  </Link>
+                </div>
+              </article>
+            ))}
+          </div>
 
-        {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => <div key={i} className="h-32 rounded-xl bg-surface animate-pulse" />)}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="text-center py-20 text-muted flex flex-col items-center gap-3">
-            <EmptyIcon className="w-10 h-10 text-muted/40" aria-hidden />
-            {emptyText}
-          </div>
-        ) : (
-          <>
-            <div className="space-y-5">
-              {items.map((a) => (
-                <article key={a.id} className="border border-base rounded-2xl overflow-hidden bg-surface sm:flex">
-                  {a.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
-                    <img src={a.imageUrl} alt="" className="sm:w-56 h-40 sm:h-auto object-cover shrink-0" />
-                  ) : null}
-                  <div className="p-6 min-w-0">
-                    <div className="font-mono text-xs text-muted mb-2">{formatArchiveDate(a.createdAt)}</div>
-                    <h2 className="font-heading font-bold text-xl text-brand-navy dark:text-white mb-2">{a.title}</h2>
-                    {/* [PRODUCTION FIX] Collapsed with a 3-line clamp, the
-                        full body only ever shows on the detail page below,
-                        never inline in the list. */}
-                    <p className="text-sm text-muted leading-relaxed line-clamp-3">{stripHtml(a.body)}</p>
-                    <Link
-                      href={`${basePath}/${a.id}`}
-                      className="inline-block mt-3 text-sm font-heading font-bold text-brand-teal hover:underline"
-                    >
-                      Read more →
-                    </Link>
-                  </div>
-                </article>
-              ))}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 mt-10">
+              <button
+                onClick={() => onPageChange(Math.max(1, page - 1))}
+                disabled={page <= 1}
+                className="px-4 py-2 rounded-lg border border-base text-sm font-semibold disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-muted">Page {page} of {totalPages}</span>
+              <button
+                onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+                disabled={page >= totalPages}
+                className="px-4 py-2 rounded-lg border border-base text-sm font-semibold disabled:opacity-40"
+              >
+                Next
+              </button>
             </div>
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-3 mt-10">
-                <button
-                  onClick={() => onPageChange(Math.max(1, page - 1))}
-                  disabled={page <= 1}
-                  className="px-4 py-2 rounded-lg border border-base text-sm font-semibold disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <span className="text-sm text-muted">Page {page} of {totalPages}</span>
-                <button
-                  onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-                  disabled={page >= totalPages}
-                  className="px-4 py-2 rounded-lg border border-base text-sm font-semibold disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+          )}
+        </>
+      )}
+    </PublicPageLayout>
   )
 }
 
@@ -152,54 +154,56 @@ interface DetailProps {
  *  link. Back always returns to that same list. */
 export function PublicArchiveDetail({ post, isLoading, notFoundText, backHref, backLabel }: DetailProps) {
   return (
-    <div className="flex-1 bg-page">
-      <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <Link href={backHref} className="inline-flex items-center gap-2 text-sm text-brand-teal hover:underline mb-6">
+    <PublicPageLayout
+      compact
+      contents={false}
+      title={post ? post.title : isLoading ? 'Loading…' : 'Not available'}
+      above={
+        <Link href={backHref} className="hills-page__back">
           <ArrowLeft className="w-4 h-4" /> {backLabel}
         </Link>
-
-        {isLoading ? (
-          <div className="space-y-4">
-            <div className="h-8 w-2/3 rounded bg-surface animate-pulse" />
-            <div className="h-56 rounded-xl bg-surface animate-pulse" />
-            <div className="h-4 rounded bg-surface animate-pulse" />
-            <div className="h-4 rounded bg-surface animate-pulse" />
-          </div>
-        ) : !post ? (
-          <div className="text-center py-20 text-muted">{notFoundText}</div>
-        ) : (
-          <article>
-            {/* [NEW] Byline, bold, same line as the date, only rendered
-                when the author filled it in. */}
-            <div className="font-mono text-xs text-muted mb-3 flex flex-wrap items-center gap-x-2">
-              <span>{formatArchiveDate(post.createdAt)}</span>
-              {post.authorName && (
-                <>
-                  <span aria-hidden>·</span>
-                  <span className="font-sans font-bold text-body">Written by: {post.authorName}</span>
-                </>
-              )}
-            </div>
-            <h1 className="font-heading font-extrabold text-2xl sm:text-3xl tracking-tight text-brand-navy dark:text-white mb-6">
-              {post.title}
-            </h1>
-            {post.imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
-              <img src={post.imageUrl} alt={post.title} className="w-full h-auto rounded-2xl border border-base mb-6" />
+      }
+      intro={
+        post ? (
+          <>
+            <span>{formatArchiveDate(post.createdAt)}</span>
+            {post.authorName && (
+              <>
+                <span aria-hidden> · </span>
+                <strong>Written by: {post.authorName}</strong>
+              </>
             )}
-            {/* [FIX] post.body is HTML now (written via RichTextEditor.tsx),
-                sanitized server-side on every write path in
-                announcementService.ts / the editOwn route before it ever
-                reaches Firestore, safe to render directly here. A
-                plain-text body (every article written before this change)
-                has no tags to interpret and renders exactly as before. */}
-            <div
-              className="text-body leading-relaxed whitespace-pre-wrap [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_mark]:bg-amber-200/70 [&_mark]:rounded-sm [&_mark]:px-0.5 [&_p]:my-2 [&_blockquote]:border-l-4 [&_blockquote]:border-brand-teal/40 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted [&_blockquote]:my-3 [&_a]:text-brand-teal [&_a]:underline [&_a]:underline-offset-2 [&_img]:rounded-xl [&_img]:border [&_img]:border-base [&_h2]:font-heading [&_h2]:font-bold [&_h2]:text-xl [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:font-heading [&_h3]:font-bold [&_h3]:text-lg [&_h3]:mt-4 [&_h3]:mb-2 [&_h4]:font-heading [&_h4]:font-bold [&_h4]:text-base [&_h4]:mt-3 [&_h4]:mb-1.5 after:content-[''] after:table after:clear-both"
-              dangerouslySetInnerHTML={{ __html: post.body }}
-            />
-          </article>
-        )}
-      </div>
-    </div>
+          </>
+        ) : undefined
+      }
+    >
+      {isLoading ? (
+        <div className="space-y-4">
+          <div className="h-8 w-2/3 rounded bg-surface animate-pulse" />
+          <div className="h-56 rounded-xl bg-surface animate-pulse" />
+          <div className="h-4 rounded bg-surface animate-pulse" />
+          <div className="h-4 rounded bg-surface animate-pulse" />
+        </div>
+      ) : !post ? (
+        <div className="text-center py-20 text-muted">{notFoundText}</div>
+      ) : (
+        <article>
+          {post.imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element -- external Appwrite view URL
+            <img src={post.imageUrl} alt={post.title} className="w-full h-auto rounded-2xl border border-base mb-6" />
+          )}
+          {/* [FIX] post.body is HTML now (written via RichTextEditor.tsx),
+              sanitized server-side on every write path in
+              announcementService.ts / the editOwn route before it ever
+              reaches Firestore, safe to render directly here. A
+              plain-text body (every article written before this change)
+              has no tags to interpret and renders exactly as before. */}
+          <div
+            className="hills-prose text-body leading-relaxed whitespace-pre-wrap [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_mark]:bg-amber-200/70 [&_mark]:rounded-sm [&_mark]:px-0.5 [&_p]:my-2 [&_blockquote]:border-l-4 [&_blockquote]:border-brand-teal/40 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted [&_blockquote]:my-3 [&_a]:text-brand-teal [&_a]:underline [&_a]:underline-offset-2 [&_img]:rounded-xl [&_img]:border [&_img]:border-base [&_h2]:font-heading [&_h2]:font-bold [&_h2]:text-xl [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:font-heading [&_h3]:font-bold [&_h3]:text-lg [&_h3]:mt-4 [&_h3]:mb-2 [&_h4]:font-heading [&_h4]:font-bold [&_h4]:text-base [&_h4]:mt-3 [&_h4]:mb-1.5 after:content-[''] after:table after:clear-both"
+            dangerouslySetInnerHTML={{ __html: post.body }}
+          />
+        </article>
+      )}
+    </PublicPageLayout>
   )
 }

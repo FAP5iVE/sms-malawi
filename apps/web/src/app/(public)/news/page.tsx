@@ -13,13 +13,16 @@
  *   components/shared/PublicArchive.tsx, shared with the /announcements and
  *   /academic-advertisements archives.
  * [DEPENDS ON]: usePublicNews (GET /public/news)
+ *
+ * [CHANGE TYPE]: LOOKS ONLY (Chikangawa Hills theme, Phase 6b, 2026-11-13).
+ *   The sky background is now drawn by <PublicPageLayout> inside the shared
+ *   PublicArchive view, so this page no longer renders its own.
  */
 
 import { useState } from 'react'
 import { Newspaper } from 'lucide-react'
 import { usePublicNews } from '@/hooks/usePublic'
 import { PublicArchiveList } from '@/components/shared/PublicArchive'
-import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 
 const PAGE_SIZE = 12
 
@@ -30,20 +33,17 @@ export default function NewsPage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1
 
   return (
-    <>
-      <PublicAmbientBackground />
-      <PublicArchiveList
-        title="Latest News"
-        subtitle="News and stories from around the school."
-        basePath="/news"
-        items={items}
-        isLoading={isLoading}
-        emptyIcon={Newspaper}
-        emptyText="No news articles have been published yet."
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
-    </>
+    <PublicArchiveList
+      title="Latest News"
+      subtitle="News and stories from around the school."
+      basePath="/news"
+      items={items}
+      isLoading={isLoading}
+      emptyIcon={Newspaper}
+      emptyText="No news articles have been published yet."
+      page={page}
+      totalPages={totalPages}
+      onPageChange={setPage}
+    />
   )
 }

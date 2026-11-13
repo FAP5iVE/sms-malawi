@@ -129,9 +129,15 @@
  *   onSubmit, the Review-step `handleSubmit(onSubmit)` button, every register()
  *   call, name, placeholder, option, label text and error message.
  *   The page no longer shows the interim readability scrim (`hills-open`).
+ *
+ * [CHANGE (2026-11-13), requested by the user, the one behaviour addition in the
+ *   theme work]: the left column is pinned at any window height and scrolls inside
+ *   itself when taller than the window; a small effect on `step` scrolls that column
+ *   (never the page) so the current step is in view after Next / Previous. It reads
+ *   the DOM only; no form, validation or submit logic is touched.
  */
 'use client'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -260,6 +266,18 @@ const REVIEW_STEP = STEPS.length - 1
 // -- MAIN COMPONENT ------------------------------------------------------------
 export default function ApplyPage() {
   const [step, setStep] = useState(0)
+  // The left column is pinned and scrolls inside itself on short windows: when
+  // the step changes, bring the current step into view (without moving the page).
+  const sideRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const side = sideRef.current
+    const el = side?.querySelector<HTMLElement>('[aria-current="step"]')
+    if (!side || !el || side.scrollHeight <= side.clientHeight) return
+    const s = side.getBoundingClientRect()
+    const e = el.getBoundingClientRect()
+    if (e.bottom > s.bottom) side.scrollTop += e.bottom - s.bottom + 16
+    else if (e.top < s.top) side.scrollTop -= s.top - e.top + 16
+  }, [step])
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -407,7 +425,7 @@ export default function ApplyPage() {
       <div className="relative z-10 hills-container hills-apply__wrap">
         <div className="hills-split hills-apply__grid hills-apply__grid--form">
           {/* Left (from 900px) / top: title, note and the step list, on the sky. */}
-          <div className="hills-apply__side hills-apply__side--sticky">
+          <div ref={sideRef} className="hills-apply__side hills-apply__side--sticky">
             <h1 className="hills-apply__title">Apply for Admission</h1>
             <p className="hills-apply__note">
               Complete all sections below. Fields marked with{' '}

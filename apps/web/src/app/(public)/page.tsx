@@ -592,7 +592,7 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-linear-to-b from-[rgba(11,29,51,.55)] via-[rgba(11,29,51,.72)] to-[rgba(11,29,51,.96)]" />
 
           <div className="relative z-10 hills-container pb-20 pt-[180px] w-full">
-            <div className="max-w-3xl fade-up">
+            <div className="hills-measure fade-up">
               <h1 className="font-heading font-extrabold text-white leading-[1.04] tracking-tight text-5xl md:text-6xl lg:text-7xl mb-4">
                 {schoolInfo?.schoolName ?? 'SMS Malawi'}
               </h1>

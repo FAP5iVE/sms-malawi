@@ -2351,8 +2351,21 @@ a.hills-studio__credit-name:hover { text-decoration: underline; text-underline-o
 /* ── Left column, on the sky ────────────────────────────────────────────── */
 
 .hills-apply__side { min-width: 0; animation: hills-rise 0.9s 0.08s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
-@media (min-width: 900px) and (min-height: 640px) {
-  .hills-apply__side--sticky { position: sticky; top: 96px; }
+/* Pinned from 900px wide at ANY window height. If the column is taller than the
+   window (short laptop screens, long step list) it scrolls inside itself, and the
+   page script brings the current step into view when the step changes. */
+@media (min-width: 900px) {
+  .hills-apply__side--sticky {
+    position: sticky;
+    top: 96px;
+    max-height: calc(100svh - 112px);
+    margin: -4px;
+    padding: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
 }
 .hills-apply__title {
   margin: 0 0 14px;
@@ -2789,8 +2802,21 @@ a.hills-studio__credit-name:hover { text-decoration: underline; text-underline-o
 /* ── Left column, on the sky ────────────────────────────────────────────── */
 
 .hills-page__side { min-width: 0; animation: hills-rise 0.9s 0.08s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
-@media (min-width: 900px) and (min-height: 640px) {
-  .hills-page__side { position: sticky; top: 96px; }
+/* Pinned from 900px wide at ANY window height: the left column stays put while
+   the content scrolls. A column taller than the window scrolls inside itself, and
+   the current contents entry is kept in view. */
+@media (min-width: 900px) {
+  .hills-page__side {
+    position: sticky;
+    top: 96px;
+    max-height: calc(100svh - 112px);
+    margin: -4px;
+    padding: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
 }
 .hills-page__title {
   margin: 0 0 14px;
@@ -2825,10 +2851,6 @@ a.hills-studio__credit-name:hover { text-decoration: underline; text-underline-o
   padding: 0;
   list-style: none;
   border-left: 2px solid color-mix(in srgb, var(--hills-ink) 38%, transparent);
-}
-@media (min-width: 900px) {
-  /* Long lists (privacy has 14) scroll inside the sticky column. */
-  .hills-page__toc ol { max-height: max(160px, calc(100svh - 380px)); overflow-y: auto; overscroll-behavior: contain; }
 }
 .hills-page__toc a {
   display: block;
@@ -2951,4 +2973,121 @@ a.hills-studio__credit-name:hover { text-decoration: underline; text-underline-o
   .hills-page__side,
   .hills-page__surface,
   .hills-page__cards { animation: none; }
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS PAGE, Phase 6b additions: list pages, details, gallery, placements, 404
+   Same frame as 6a. New pieces: a smaller title for post headlines, a back link
+   and an eyebrow on the sky, an inverted button, quick links, a pager panel,
+   accent links inside post bodies and a visible focus ring for form controls.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.hills-page--compact .hills-page__title {
+  font-size: clamp(28px, 2.6vw, 38px);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+/* Detail pages: the date and byline sit in an opaque chip. With a four-line headline the
+   line lands low on a phone, where the dawn and dusk horizon glow measured 3.5 to 4.2:1
+   behind bare ink; the chip is foreground on card (17:1) on every sky. */
+.hills-page--compact .hills-page__intro {
+  display: inline-block;
+  max-width: none;
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--hills-line) 80%, transparent);
+  border-radius: 14px;
+  background: var(--hills-surface);
+  color: var(--hills-surface-fg);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.hills-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-bottom: 10px;
+  color: var(--hills-ink);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.hills-page__back:hover { text-decoration: underline; text-underline-offset: 3px; }
+.hills-page__back:focus-visible { outline: 2px solid var(--hills-ink); outline-offset: 2px; border-radius: 4px; }
+
+.hills-page__eyebrow {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hills-ink);
+}
+
+/* Inverted button (card colour on foreground), outlined in ink so its edge
+   reads on every sky. */
+.hills-page__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-top: 26px;
+  padding: 0 24px;
+  border: 1.5px solid var(--hills-ink);
+  border-radius: 12px;
+  background: var(--hills-surface-fg);
+  color: var(--hills-surface);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+.hills-page__btn:hover { background: color-mix(in srgb, var(--hills-surface-fg) 86%, var(--c-acc)); }
+.hills-page__btn:focus-visible { outline: 3px solid var(--hills-ink); outline-offset: 3px; }
+
+.hills-page__quick { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 22px; }
+.hills-page__quick a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  color: var(--hills-ink);
+  font-size: 15px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.hills-page__quick a:hover { text-decoration-thickness: 2px; }
+.hills-page__quick a:focus-visible { outline: 2px solid var(--hills-ink); outline-offset: 2px; border-radius: 2px; }
+
+/* Pager that sits on the bare sky (gallery): its own opaque panel. */
+.hills-page__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 10px 16px;
+  border: 1px solid color-mix(in srgb, var(--hills-line) 80%, transparent);
+  border-radius: 999px;
+  background: var(--hills-surface);
+  color: var(--hills-surface-fg);
+  box-shadow: 0 16px 40px -24px rgb(0 0 0 / 0.45);
+}
+
+/* Links inside a post body (author-written HTML): accent colour, 4.5:1+. */
+.hills-prose a { color: var(--c-acc); text-decoration: underline; text-underline-offset: 3px; }
+/* The blockquote colour set by the post-body classes (`text-muted` as a variant) resolved to a
+   near-invisible tint on both themes; give quotes a readable, slightly softer ink. */
+.hills-prose blockquote { color: var(--c-ink2); }
+
+/* Form controls on the surface: a visible keyboard focus ring. */
+.hills-page__surface :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--c-acc);
+  outline-offset: 2px;
 }

@@ -879,6 +879,580 @@
       "kind": "logic",
       "pattern": "^intro=\\{ <JSX/> \\}$",
       "reason": "Phase 6a: the intro paragraph moves into the PublicPageLayout intro prop; same words (a JSX fragment)."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useState\\ \\}\\ from\\ 'react'$",
+      "reason": "Phase 6b, REQUESTED BY THE USER: the pinned left column scrolls inside itself and a small effect on `step` brings the current step into view after Next/Previous. Reads the DOM and sets one scrollTop; no form, validation or submit logic."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useEffect\\ ,\\ useRef\\ ,\\ useState\\ \\}\\ from\\ 'react'$",
+      "reason": "Phase 6b, REQUESTED BY THE USER: the pinned left column scrolls inside itself and a small effect on `step` brings the current step into view after Next/Previous. Reads the DOM and sets one scrollTop; no form, validation or submit logic."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ sideRef\\ =\\ useRef\\ <\\ HTMLDivElement\\ >\\ \\(\\ null\\ \\)$",
+      "reason": "Phase 6b, REQUESTED BY THE USER: the pinned left column scrolls inside itself and a small effect on `step` brings the current step into view after Next/Previous. Reads the DOM and sets one scrollTop; no form, validation or submit logic."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^useEffect\\ \\(\\ \\(\\ \\)\\ =>\\ \\{\\}\\ ,\\ \\[\\ step\\ \\]\\ \\)$",
+      "reason": "Phase 6b, REQUESTED BY THE USER: the pinned left column scrolls inside itself and a small effect on `step` brings the current step into view after Next/Previous. Reads the DOM and sets one scrollTop; no form, validation or submit logic."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ side\\ =\\ sideRef\\ \\.\\ current$",
+      "reason": "Phase 6b, REQUESTED BY THE USER: the pinned left column scrolls inside itself and a small effect on `step` brings the current step into view after Next/Previous. Reads the DOM and sets one scrollTop; no form, validation or submit logic."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ el\\ =\\ side\\ \\?\\.\\ querySelector\\ <\\ HTMLElement\\ >\\ \\(\\ '\\[aria\\-current=\"step\"\\]'\\ \\)$",
+      "reason": "Phase 6b, REQUESTED BY THE USER: the pinned left column scrolls inside itself and a small effect on `step` brings the current step into view after Next/Previous. Reads the DOM and sets one scrollTop; no form, validation or submit logic."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ !\\ side\\ \\|\\|\\ !\\ el\\ \\|\\|\\ side\\ \\.\\ scrollHeight\\ <=\\ side\\ \\.\\ clientHeight\\ \\)\\ return$",
+      "reason": "Phase 6b, REQUESTED BY THE USER: the pinned left column scrolls inside itself and a small effect on `step` brings the current step into view after Next/Previous. Reads the DOM and sets one scrollTop; no form, validation or submit logic."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ s\\ =\\ side\\ \\.\\ getBoundingClientRect\\ \\(\\ \\)$",
+      "reason": "Phase 6b, REQUESTED BY THE USER: the pinned left column scrolls inside itself and a small effect on `step` brings the current step into view after Next/Previous. Reads the DOM and sets one scrollTop; no form, validation or submit logic."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ e\\ =\\ el\\ \\.\\ getBoundingClientRect\\ \\(\\ \\)$",
+      "reason": "Phase 6b, REQUESTED BY THE USER: the pinned left column scrolls inside itself and a small effect on `step` brings the current step into view after Next/Previous. Reads the DOM and sets one scrollTop; no form, validation or submit logic."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ e\\ \\.\\ bottom\\ >\\ s\\ \\.\\ bottom\\ \\)\\ side\\ \\.\\ scrollTop\\ \\+=\\ e\\ \\.\\ bottom\\ \\-\\ s\\ \\.\\ bottom\\ \\+\\ 16\\ else\\ if\\ \\(\\ e\\ \\.\\ top\\ <\\ s\\ \\.\\ top\\ \\)\\ side\\ \\.\\ scrollTop\\ \\-=\\ s\\ \\.\\ top\\ \\-\\ e\\ \\.\\ top\\ \\+\\ 16$",
+      "reason": "Phase 6b, REQUESTED BY THE USER: the pinned left column scrolls inside itself and a small effect on `step` brings the current step into view after Next/Previous. Reads the DOM and sets one scrollTop; no form, validation or submit logic."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ref=\\{\\ sideRef\\ \\}$",
+      "reason": "Phase 6b, REQUESTED BY THE USER: the pinned left column scrolls inside itself and a small effect on `step` brings the current step into view after Next/Previous. Reads the DOM and sets one scrollTop; no form, validation or submit logic."
+    },
+    {
+      "file": "src/app/(public)/events/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"School\\ Events\"$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/(public)/events/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^intro=\"Upcoming\\ dates\\ and\\ events\\ at\\ our\\ school\\.\"$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/(public)/events/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^below=\\{\\ <JSX/>\\ \\}$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/(public)/events/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^current=\"/events\"$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/(public)/gallery/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^wide=true$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/(public)/gallery/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^surface=\\{\\ false\\ \\}$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/(public)/gallery/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"School\\ Gallery\"$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/(public)/gallery/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^intro=\"Moments\\ from\\ life\\ at\\ our\\ school\\.\"$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/(public)/gallery/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^below=\\{\\ <JSX/>\\ \\}$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/(public)/gallery/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^current=\"/gallery\"$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/(public)/placement-results/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"University\\ Placements\"$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/(public)/placement-results/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^intro=\\{\\ <JSX/>\\ \\}$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/not-found.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^contents=\\{\\ false\\ \\}$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/not-found.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"We\\ can\\&apos;t\\ find\\ that\\ page\"$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/not-found.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^above=\\{\\ <JSX/>\\ \\}$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/not-found.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^intro=\"The\\ link\\ may\\ be\\ out\\ of\\ date,\\ or\\ the\\ page\\ may\\ have\\ been\\ removed\\.\\ Try\\ one\\ of\\ these\\ instead\\.\"$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/app/not-found.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^below=\\{\\ <JSX/>\\ \\}$",
+      "reason": "Phase 6b: the page heading, intro and sibling links move into PublicPageLayout props (title, intro, below, wide, surface, above, contents). Same words and links."
+    },
+    {
+      "file": "src/components/shared/PublicArchive.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ title\\ \\}$",
+      "reason": "Phase 6b: the list/detail heading, subtitle, back link, date and byline move into PublicPageLayout props (title, intro, above, below). Same words, same data."
+    },
+    {
+      "file": "src/components/shared/PublicArchive.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ subtitle\\ \\}$",
+      "reason": "Phase 6b: the list/detail heading, subtitle, back link, date and byline move into PublicPageLayout props (title, intro, above, below). Same words, same data."
+    },
+    {
+      "file": "src/components/shared/PublicArchive.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ post\\ \\.\\ title\\ \\}$",
+      "reason": "Phase 6b: the list/detail heading, subtitle, back link, date and byline move into PublicPageLayout props (title, intro, above, below). Same words, same data."
+    },
+    {
+      "file": "src/components/shared/PublicArchive.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ title\\ \\}$",
+      "reason": "Phase 6b: the list/detail heading, subtitle, back link, date and byline move into PublicPageLayout props (title, intro, above, below). Same words, same data."
+    },
+    {
+      "file": "src/components/shared/PublicArchive.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^intro=\\{\\ subtitle\\ \\}$",
+      "reason": "Phase 6b: the list/detail heading, subtitle, back link, date and byline move into PublicPageLayout props (title, intro, above, below). Same words, same data."
+    },
+    {
+      "file": "src/components/shared/PublicArchive.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^below=\\{\\ <JSX/>\\ \\}$",
+      "reason": "Phase 6b: the list/detail heading, subtitle, back link, date and byline move into PublicPageLayout props (title, intro, above, below). Same words, same data."
+    },
+    {
+      "file": "src/components/shared/PublicArchive.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^current=\\{\\ basePath\\ \\}$",
+      "reason": "Phase 6b: the list/detail heading, subtitle, back link, date and byline move into PublicPageLayout props (title, intro, above, below). Same words, same data."
+    },
+    {
+      "file": "src/components/shared/PublicArchive.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^compact=true$",
+      "reason": "Phase 6b: the list/detail heading, subtitle, back link, date and byline move into PublicPageLayout props (title, intro, above, below). Same words, same data."
+    },
+    {
+      "file": "src/components/shared/PublicArchive.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^contents=\\{\\ false\\ \\}$",
+      "reason": "Phase 6b: the list/detail heading, subtitle, back link, date and byline move into PublicPageLayout props (title, intro, above, below). Same words, same data."
+    },
+    {
+      "file": "src/components/shared/PublicArchive.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ post\\ \\?\\ post\\ \\.\\ title\\ :\\ isLoading\\ \\?\\ 'Loading…'\\ :\\ 'Not\\ available'\\ \\}$",
+      "reason": "Phase 6b: the list/detail heading, subtitle, back link, date and byline move into PublicPageLayout props (title, intro, above, below). Same words, same data."
+    },
+    {
+      "file": "src/components/shared/PublicArchive.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^above=\\{\\ <JSX/>\\ \\}$",
+      "reason": "Phase 6b: the list/detail heading, subtitle, back link, date and byline move into PublicPageLayout props (title, intro, above, below). Same words, same data."
+    },
+    {
+      "file": "src/components/shared/PublicArchive.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^intro=\\{\\ post\\ \\?\\ \\(\\ <JSX/>\\ \\)\\ :\\ undefined\\ \\}$",
+      "reason": "Phase 6b: the list/detail heading, subtitle, back link, date and byline move into PublicPageLayout props (title, intro, above, below). Same words, same data."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^interface\\ PublicPageLayoutProps\\ \\{\\ title\\ :\\ string\\ intro\\ \\?\\ :\\ ReactNode\\ wide\\ \\?\\ :\\ boolean\\ surface\\ \\?\\ :\\ boolean\\ contents\\ \\?\\ :\\ boolean\\ children\\ :\\ ReactNode\\ \\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ PublicPageLayout\\ \\(\\ \\{\\ title\\ ,\\ intro\\ ,\\ wide\\ =\\ false\\ ,\\ surface\\ =\\ true\\ ,\\ contents\\ =\\ true\\ ,\\ children\\ ,\\ \\}\\ :\\ PublicPageLayoutProps\\ \\)\\ \\{\\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ observer\\ =\\ new\\ IntersectionObserver\\ \\(\\ \\(\\ entries\\ \\)\\ =>\\ \\{\\}\\ ,\\ \\{\\ rootMargin\\ :\\ '\\-96px\\ 0px\\ \\-55%\\ 0px'\\ \\}\\ ,\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^sections\\ \\.\\ forEach\\ \\(\\ \\(\\ section\\ \\)\\ =>\\ observer\\ \\.\\ observe\\ \\(\\ section\\ \\)\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return\\ \\(\\ \\)\\ =>\\ observer\\ \\.\\ disconnect\\ \\(\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^interface\\ PublicPageLayoutProps\\ \\{\\ title\\ :\\ string\\ intro\\ \\?\\ :\\ ReactNode\\ wide\\ \\?\\ :\\ boolean\\ surface\\ \\?\\ :\\ boolean\\ contents\\ \\?\\ :\\ boolean\\ compact\\ \\?\\ :\\ boolean\\ above\\ \\?\\ :\\ ReactNode\\ below\\ \\?\\ :\\ ReactNode\\ children\\ :\\ ReactNode\\ \\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ SIBLINGS\\ =\\ \\[\\ \\{\\ href\\ :\\ '/news'\\ ,\\ label\\ :\\ 'Latest\\ News'\\ \\}\\ ,\\ \\{\\ href\\ :\\ '/notices'\\ ,\\ label\\ :\\ 'Announcements'\\ \\}\\ ,\\ \\{\\ href\\ :\\ '/academic\\-advertisements'\\ ,\\ label\\ :\\ 'Academic\\ Advertisements'\\ \\}\\ ,\\ \\{\\ href\\ :\\ '/events'\\ ,\\ label\\ :\\ 'School\\ Events'\\ \\}\\ ,\\ \\{\\ href\\ :\\ '/gallery'\\ ,\\ label\\ :\\ 'School\\ Gallery'\\ \\}\\ ,\\ \\{\\ href\\ :\\ '/placement\\-results'\\ ,\\ label\\ :\\ 'University\\ Placements'\\ \\}\\ ,\\ \\]$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ PublicSiblingNav\\ \\(\\ \\{\\ current\\ \\}\\ :\\ \\{\\ current\\ :\\ string\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"More\\ from\\ the\\ school\"$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ SIBLINGS\\ \\.\\ map\\ \\(\\ \\(\\ s\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ s\\ \\.\\ href\\ \\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^href=\\{\\ s\\ \\.\\ href\\ \\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria\\-current=\\{\\ s\\ \\.\\ href\\ ===\\ current\\ \\?\\ 'page'\\ :\\ undefined\\ \\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ s\\ \\.\\ label\\ \\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ PublicPageLayout\\ \\(\\ \\{\\ title\\ ,\\ intro\\ ,\\ wide\\ =\\ false\\ ,\\ surface\\ =\\ true\\ ,\\ contents\\ =\\ true\\ ,\\ compact\\ =\\ false\\ ,\\ above\\ ,\\ below\\ ,\\ children\\ ,\\ \\}\\ :\\ PublicPageLayoutProps\\ \\)\\ \\{\\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ sideRef\\ =\\ useRef\\ <\\ HTMLDivElement\\ >\\ \\(\\ null\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^let\\ signature\\ =\\ ''$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^let\\ observer\\ :\\ IntersectionObserver\\ \\|\\ null\\ =\\ null$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ scan\\ =\\ \\(\\ \\)\\ =>\\ \\{\\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ next\\ =\\ items\\ \\.\\ map\\ \\(\\ \\(\\ item\\ \\)\\ =>\\ `\\$\\{\\ item\\ \\.\\ id\\ \\}\\|\\$\\{\\ item\\ \\.\\ label\\ \\}`\\ \\)\\ \\.\\ join\\ \\(\\ '\\\\n'\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ next\\ ===\\ signature\\ \\)\\ return$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^signature\\ =\\ next$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^observer\\ \\?\\.\\ disconnect\\ \\(\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^visible\\ \\.\\ clear\\ \\(\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^observer\\ =\\ new\\ IntersectionObserver\\ \\(\\ \\(\\ entries\\ \\)\\ =>\\ \\{\\}\\ ,\\ \\{\\ rootMargin\\ :\\ '\\-96px\\ 0px\\ \\-55%\\ 0px'\\ \\}\\ ,\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^sections\\ \\.\\ forEach\\ \\(\\ \\(\\ section\\ \\)\\ =>\\ observer\\ \\?\\.\\ observe\\ \\(\\ section\\ \\)\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^scan\\ \\(\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ mutations\\ =\\ new\\ MutationObserver\\ \\(\\ scan\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^mutations\\ \\.\\ observe\\ \\(\\ root\\ ,\\ \\{\\ childList\\ :\\ true\\ ,\\ subtree\\ :\\ true\\ \\}\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ \\(\\ \\)\\ =>\\ \\{\\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^mutations\\ \\.\\ disconnect\\ \\(\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^useEffect\\ \\(\\ \\(\\ \\)\\ =>\\ \\{\\}\\ ,\\ \\[\\ active\\ \\]\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ side\\ =\\ sideRef\\ \\.\\ current$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ el\\ =\\ side\\ \\?\\.\\ querySelector\\ <\\ HTMLElement\\ >\\ \\(\\ '\\.hills\\-page__toc\\ a\\.is\\-active'\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ !\\ side\\ \\|\\|\\ !\\ el\\ \\|\\|\\ side\\ \\.\\ scrollHeight\\ <=\\ side\\ \\.\\ clientHeight\\ \\)\\ return$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ s\\ =\\ side\\ \\.\\ getBoundingClientRect\\ \\(\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ e\\ =\\ el\\ \\.\\ getBoundingClientRect\\ \\(\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ e\\ \\.\\ bottom\\ >\\ s\\ \\.\\ bottom\\ \\)\\ side\\ \\.\\ scrollTop\\ \\+=\\ e\\ \\.\\ bottom\\ \\-\\ s\\ \\.\\ bottom\\ \\+\\ 16\\ else\\ if\\ \\(\\ e\\ \\.\\ top\\ <\\ s\\ \\.\\ top\\ \\)\\ side\\ \\.\\ scrollTop\\ \\-=\\ s\\ \\.\\ top\\ \\-\\ e\\ \\.\\ top\\ \\+\\ 16$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ \\(\\ <JSX/>\\ \\)$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ref=\\{\\ sideRef\\ \\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ above\\ \\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/components/shared/PublicPageLayout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ below\\ \\}$",
+      "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
     }
   ]
 }

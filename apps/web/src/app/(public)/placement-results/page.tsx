@@ -12,12 +12,19 @@
  *   up here, and no grades or internal ids are exposed.
  * [DEPENDS ON]: usePublicPlacements (GET /public/placements, no auth),
  *   usePublicPlacementStats (GET /public/placement-stats, already public)
+ *
+ * [CHANGE TYPE]: LOOKS ONLY (Chikangawa Hills theme, Phase 6b, 2026-11-13).
+ *   The page now sits in <PublicPageLayout>: title and intro on the sky with an
+ *   "On this page" list of the universities (built from the section headings),
+ *   stats, search and results on one surface. The graduation-cap icon beside the
+ *   title is gone (the title is now a plain string prop). Filters, search and
+ *   data are unchanged.
  */
 
 import { useMemo, useState } from 'react'
-import { GraduationCap, Search, School, TrendingUp } from 'lucide-react'
+import { Search, School, TrendingUp } from 'lucide-react'
 import { usePublicPlacements, usePublicPlacementStats } from '@/hooks/usePublic'
-import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
+import { PublicPageLayout } from '@/components/shared/PublicPageLayout'
 
 export default function PublicPlacementsPage() {
   const [year, setYear] = useState<string>('')
@@ -55,104 +62,99 @@ export default function PublicPlacementsPage() {
   }, [filtered])
 
   return (
-    <div className="flex-1 bg-page">
-      <PublicAmbientBackground />
-      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-
-        <h1 className="font-heading font-extrabold text-3xl sm:text-4xl tracking-tight text-brand-navy dark:text-white mb-3 flex items-center gap-3">
-          <GraduationCap className="w-8 h-8 text-brand-teal" aria-hidden />
-          University Placements
-        </h1>
-        <p className="text-muted leading-relaxed mb-8 max-w-2xl">
+    <PublicPageLayout
+      title="University Placements"
+      intro={
+        <>
           Public university placement results for our MSCE graduates, as selected through the National Council for
           Higher Education (NCHE) placement process. This list reflects confirmed selections only.
-        </p>
-
-        {/* Stats summary */}
-        {stats && (
-          <div className="grid grid-cols-3 gap-3 mb-8">
-            <div className="border border-base rounded-2xl bg-surface p-4 text-center">
-              <p className="text-2xl font-heading font-extrabold text-brand-navy dark:text-white">{stats.qualified}</p>
-              <p className="text-xs text-muted mt-1">Qualified</p>
-            </div>
-            <div className="border border-base rounded-2xl bg-surface p-4 text-center">
-              <p className="text-2xl font-heading font-extrabold text-brand-navy dark:text-white">{stats.selected}</p>
-              <p className="text-xs text-muted mt-1">Selected by NCHE</p>
-            </div>
-            <div className="border border-base rounded-2xl bg-surface p-4 text-center">
-              <p className="text-2xl font-heading font-extrabold text-brand-teal flex items-center justify-center gap-1">
-                <TrendingUp className="w-4 h-4" aria-hidden /> {stats.selectionRate}%
-              </p>
-              <p className="text-xs text-muted mt-1">Selection rate</p>
-            </div>
+        </>
+      }
+    >
+      {/* Stats summary */}
+      {stats && (
+        <div className="grid grid-cols-3 gap-3 mb-8">
+          <div className="border border-base rounded-2xl bg-surface p-4 text-center">
+            <p className="text-2xl font-heading font-extrabold text-brand-navy dark:text-white">{stats.qualified}</p>
+            <p className="text-xs text-muted mt-1">Qualified</p>
           </div>
-        )}
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-8">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, registration number, university or programme…"
-              className="w-full pl-10 pr-3 py-2.5 border border-base rounded-xl text-sm bg-surface focus:outline-none"
-              aria-label="Search placements"
-            />
+          <div className="border border-base rounded-2xl bg-surface p-4 text-center">
+            <p className="text-2xl font-heading font-extrabold text-brand-navy dark:text-white">{stats.selected}</p>
+            <p className="text-xs text-muted mt-1">Selected by NCHE</p>
           </div>
-          {years.length > 1 && (
-            <select
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              aria-label="Filter by academic year"
-              className="border border-base rounded-xl px-3 py-2.5 text-sm bg-surface focus:outline-none"
-            >
-              <option value="">All years</option>
-              {years.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          )}
-        </div>
-
-        {/* Results */}
-        {isLoading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-16 rounded-xl bg-surface animate-pulse" />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16 border border-dashed border-base rounded-2xl">
-            <School className="w-8 h-8 mx-auto text-muted mb-3" aria-hidden />
-            <p className="text-sm text-muted">
-              {query ? 'No placements match your search.' : 'No published placements yet for this year.'}
+          <div className="border border-base rounded-2xl bg-surface p-4 text-center">
+            <p className="text-2xl font-heading font-extrabold text-brand-teal flex items-center justify-center gap-1">
+              <TrendingUp className="w-4 h-4" aria-hidden /> {stats.selectionRate}%
             </p>
+            <p className="text-xs text-muted mt-1">Selection rate</p>
           </div>
-        ) : (
-          <div className="space-y-8">
-            {byUniversity.map(([university, rows]) => (
-              <section key={university}>
-                <h2 className="font-heading font-bold text-lg text-brand-navy dark:text-white mb-3 flex items-center gap-2">
-                  <School className="w-5 h-5 text-brand-teal shrink-0" aria-hidden />
-                  {university}
-                  <span className="text-sm font-normal text-muted">({rows.length})</span>
-                </h2>
-                <div className="border border-base rounded-2xl bg-surface overflow-hidden divide-y divide-base">
-                  {rows.map((p, i) => (
-                    <div key={`${p.registrationNo}-${i}`} className="flex items-center justify-between gap-3 px-5 py-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-body truncate">{p.studentName}</p>
-                        <p className="text-xs text-muted font-mono">{p.registrationNo} · {p.academicYear}</p>
-                      </div>
-                      <span className="text-sm text-brand-navy dark:text-white text-right shrink-0">{p.programme}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-8">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name, registration number, university or programme…"
+            className="w-full pl-10 pr-3 py-2.5 border border-base rounded-xl text-sm bg-surface focus:outline-none"
+            aria-label="Search placements"
+          />
+        </div>
+        {years.length > 1 && (
+          <select
+            value={year}
+            onChange={(e) => setYear(e.target.value)}
+            aria-label="Filter by academic year"
+            className="border border-base rounded-xl px-3 py-2.5 text-sm bg-surface focus:outline-none"
+          >
+            <option value="">All years</option>
+            {years.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
         )}
       </div>
-    </div>
+
+      {/* Results */}
+      {isLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-16 rounded-xl bg-surface animate-pulse" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16 border border-dashed border-base rounded-2xl">
+          <School className="w-8 h-8 mx-auto text-muted mb-3" aria-hidden />
+          <p className="text-sm text-muted">
+            {query ? 'No placements match your search.' : 'No published placements yet for this year.'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {byUniversity.map(([university, rows]) => (
+            <section key={university}>
+              <h2 className="font-heading font-bold text-lg text-brand-navy dark:text-white mb-3 flex items-center gap-2">
+                <School className="w-5 h-5 text-brand-teal shrink-0" aria-hidden />
+                {university}
+                <span className="text-sm font-normal text-muted">({rows.length})</span>
+              </h2>
+              <div className="border border-base rounded-2xl bg-surface overflow-hidden divide-y divide-base">
+                {rows.map((p, i) => (
+                  <div key={`${p.registrationNo}-${i}`} className="flex items-center justify-between gap-3 px-5 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-body truncate">{p.studentName}</p>
+                      <p className="text-xs text-muted font-mono">{p.registrationNo} · {p.academicYear}</p>
+                    </div>
+                    <span className="text-sm text-brand-navy dark:text-white text-right shrink-0">{p.programme}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+    </PublicPageLayout>
   )
 }

@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-13 (after Phase 6a, the text pages). Read this first when resuming.
+Last updated: 2026-11-13 (after Phase 6b, the list, detail, gallery, placement and 404 pages). Read this first when resuming.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -33,7 +33,8 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | Phase 4b Home polish (`hills/phase-4b-home-polish`) | done, AT REVIEW GATE | review pack 4b |
 | Phase 5 /apply (`hills/phase-5-apply`) | done, reviewed (user moved on to 6) | review pack 5 |
 | Phase 6a Text pages (`hills/phase-6-public-pages`) | done, AT REVIEW GATE | review pack 6a |
-| **6b Lists, details, gallery, placement results, 404, `PublicArchive`, `PublicPostSeoLayout`** | **NEXT** (after the 6a review) | |
+| Phase 6b Lists, details, gallery, placement results, 404, `PublicArchive` (same branch) | done, AT REVIEW GATE | review pack 6b |
+| **7 Password and claim pages** | **NEXT** (after the 6b review) | |
 | 7 Password and claim pages, 8 Logged-in app, 9 Cleanup | pending | |
 
 The user asked for Phases 0 to the logo step to be reviewed as ONE package. Phases 3 and 4 were each reviewed on their own. Phase 6 is split in two review drops (6a, then 6b). Next review gate is
@@ -224,6 +225,37 @@ after 6a.
    - Seen, NOT changed: privacy/terms still contain "[School's full legal name]" placeholders and terms print `new Date().getFullYear()`
      as "Last updated"; section numbers are typed into the privacy headings, so the contents list shows "1. Who we are" etc.
    - Not done: Storybook story (page frame, covered by real-page captures); Firefox/Safari; production build.
+
+12. **Phase 6b (lists, details, gallery, placements, 404) + three requests from the user.** Looks only except item (c); logic fingerprint clean
+    against `hills/phase-6-public-pages`, `hills/phase-5-apply` and `main`; contrast gate 376 pairs.
+   - `PublicPageLayout` gained `above` (back link / eyebrow), `below` (sibling links, quick links, button), `compact` (smaller title for
+     post headlines) and an exported `PublicSiblingNav current="/news"` ("More from the school": News, Announcements, Academic
+     Advertisements, Events, Gallery, University Placements). The contents scan now re-runs on markup changes (MutationObserver), so content that
+     loads later (placement universities) is included; before this, `/placement-results` had no list.
+   - `PublicArchive.tsx` (changed once, covers /news, /notices, /academic-advertisements, /events lists and details): lists = title and subtitle +
+     sibling links on the sky, cards on one surface; details = back link, headline (`compact`) and an opaque date/byline chip on the sky,
+     image and body on the surface. `PublicPostSeoLayout` is JSON-LD and metadata only (no visual markup), so it needed no change.
+     The eight route files and `events/page.tsx`, `gallery`, `placement-results` no longer import `PublicAmbientBackground` (the layout draws it).
+   - `not-found.tsx`: eyebrow "Error 404", title, sentence, `.hills-page__btn` and quick links on the sky; the two illustrations on the surface.
+   - Fixes found on the way: events date-badge month text `text-brand-teal-light` measured 4.15:1 in light, now `text-white/90`; post-body blockquote
+     colour (`[&_blockquote]:text-muted`) was near-invisible in both themes, now `.hills-prose blockquote` (ink 82%); post-body links use the accent;
+     form controls on the surface get a visible focus ring; detail date/byline measured 3.5 to 4.2:1 on the dawn and dusk sky on a phone
+     (a four-line headline pushes it low), so it is now an opaque chip (`.hills-page--compact .hills-page__intro`).
+   - Home hero text block `max-w-3xl` became `.hills-measure`. The width search over `(public)`, shared Public* components and `not-found` now
+     finds only comments.
+   - USER REQUESTS (2026-11-13): (a) "default theme always Auto": it already is (`defaultTheme="system"`, nothing is stored until the person chooses; the
+     menu marks Auto on a fresh visit, verified). A visitor who chose Light or Dark earlier keeps that choice until they pick Auto; no code change.
+     (b) Left columns stay pinned on privacy, terms and apply: the old rule only pinned when the window was at least 640px tall. Now
+     `position: sticky; top: 96px; max-height: calc(100svh - 112px); overflow-y: auto` from 900px wide at any height, so a column taller than the window
+     scrolls inside itself (`.hills-page__side`, `.hills-apply__side--sticky`). At the very end of a page the column leaves with the content
+     (inherent to sticky). (c) /apply: after Next/Previous the pinned column scrolls itself so the current step is in view. This is a small effect on
+     `step` in `apply/page.tsx` (reads the DOM, sets `scrollTop` of the column only; the page does not move). It is the one behaviour addition in the theme
+     work and is declared in the allowlist with the reason "requested by the user". The contents list does the same for the current heading.
+   - Real pixels (`measure6b.mjs`): lists + 404 = 4 skies x 5 widths x 5 pages, 288 groups, 632 lines, 0 fail, worst 4.70:1; detail = 4 skies x 390/1280,
+     16 groups, 0 fail (after the chip). Overflow clean at 360/390/768/1280/1920 on every 6b list page and the 404, light and dark.
+   - Environment: the detail pages (`/news/p1` etc.) take about 47s per request in this sandbox (server-side metadata lookup hits Firestore, blocked). The
+     capture script allows 2 minutes; capture only two detail routes per set.
+   - Not done: no Storybook story (frame covered by real-page captures); no empty-state screenshots for the gallery and placements (mock returned data); Firefox/Safari.
 
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database, so signed-in pages cannot be

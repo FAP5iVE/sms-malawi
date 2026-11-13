@@ -9,27 +9,27 @@
  *   URL can never resolve an announcement or an ad even if the id is
  *   guessed.
  * [DEPENDS ON]: usePublicPost('news', id)
+ *
+ * [CHANGE TYPE]: LOOKS ONLY (Chikangawa Hills theme, Phase 6b, 2026-11-13).
+ *   The sky background is now drawn by <PublicPageLayout> inside the shared
+ *   PublicArchive view, so this page no longer renders its own.
  */
 
 import { useParams } from 'next/navigation'
 import { usePublicPost } from '@/hooks/usePublic'
 import { PublicArchiveDetail } from '@/components/shared/PublicArchive'
-import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 
 export default function NewsDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { data, isLoading } = usePublicPost('news', id)
 
   return (
-    <>
-      <PublicAmbientBackground />
-      <PublicArchiveDetail
-        post={data}
-        isLoading={isLoading}
-        notFoundText="This article is unavailable or has been unpublished."
-        backHref="/news"
-        backLabel="Back to News"
-      />
-    </>
+    <PublicArchiveDetail
+      post={data}
+      isLoading={isLoading}
+      notFoundText="This article is unavailable or has been unpublished."
+      backHref="/news"
+      backLabel="Back to News"
+    />
   )
 }

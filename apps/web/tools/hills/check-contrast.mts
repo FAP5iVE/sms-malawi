@@ -285,6 +285,14 @@ for (const dark of [false, true]) {
   add('muted text (.text-muted)', 4.5, muted, card)
   add('link and accent text (--c-acc)', 4.5, accC, card)
   add('CTA band text (card on foreground)', 4.5, card, fg)
+  // Phase 6b: events list date badge (brand-deep with white day number and
+  // white 90% month text; brand-teal-light measured 4.15:1 in light and was replaced) and the inverted 404 / CTA button label.
+  const deep = brand('brand-deep')
+  add('event badge month (white 90% on brand-deep)', 4.5, over([255, 255, 255, 0.9], deep), deep)
+  add('event badge day (white on brand-deep)', 4.5, [255, 255, 255, 1], deep)
+  add('404 button label (card on foreground)', 4.5, card, fg)
+  add('detail date/byline chip (foreground on card)', 4.5, fg, card)
+  add('post blockquote (ink 82% on card)', 4.5, over([fg[0], fg[1], fg[2], 0.82], card), card)
   add('CTA band text, 90%', 4.5, over([card[0], card[1], card[2], 0.9], fg), fg)
   add('CTA button label (foreground on card)', 4.5, fg, card)
   add('mobile pill label (foreground on card)', 4.5, fg, card)

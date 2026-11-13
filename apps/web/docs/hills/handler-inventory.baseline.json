@@ -2549,8 +2549,8 @@
   "items": []
  },
  "src/app/(public)/apply/page.tsx": {
-  "digest": "6a302395274cd7b305936dadf5868f403e95dcfe",
-  "tokens": 390,
+  "digest": "e8e790a8bdcd84bfbe9c4bf26d215cb1792d4a97",
+  "tokens": 399,
   "items": [
    {
     "k": "api",
@@ -2566,6 +2566,11 @@
     "k": "call",
     "n": "handleSubmit",
     "h": "c4ac17ce"
+   },
+   {
+    "k": "effect",
+    "n": "useEffect",
+    "h": "77dc1a39"
    },
    {
     "k": "handler",
@@ -2716,8 +2721,8 @@
   "items": []
  },
  "src/app/(public)/events/page.tsx": {
-  "digest": "ccfee5c70fe39941d887fedb36ea6f7771513ef4",
-  "tokens": 36,
+  "digest": "9c6d38eef53dd3bed5308836d6e5f5792b49d64b",
+  "tokens": 40,
   "items": [
    {
     "k": "handler",
@@ -2768,8 +2773,8 @@
   "items": []
  },
  "src/app/(public)/gallery/page.tsx": {
-  "digest": "21b71b4b109538d8034b13f17414d06b347a1e04",
-  "tokens": 33,
+  "digest": "df1377f36e08bccb3c2d0c33c4bea71b2163d269",
+  "tokens": 39,
   "items": [
    {
     "k": "handler",
@@ -3053,8 +3058,8 @@
   "items": []
  },
  "src/app/(public)/placement-results/page.tsx": {
-  "digest": "198ed91479e9a0cbd9c5d00eae81ac380d6b5f9b",
-  "tokens": 56,
+  "digest": "dff79320c92325cd3d19b9f7433878c63d046534",
+  "tokens": 58,
   "items": [
    {
     "k": "handler",
@@ -3171,8 +3176,8 @@
   "items": []
  },
  "src/app/not-found.tsx": {
-  "digest": "3b44a345cc7e4997f2815ed9b3ee6af4931f0999",
-  "tokens": 12,
+  "digest": "6ecc79fbf1c84b0347868b50836dbfa9b3d98928",
+  "tokens": 17,
   "items": []
  },
  "src/app/robots.ts": {
@@ -10945,8 +10950,8 @@
   "items": []
  },
  "src/components/shared/PublicArchive.tsx": {
-  "digest": "01449a0e34b10986b497c01f8fcec808f185f65e",
-  "tokens": 44,
+  "digest": "44061d79ebf3d08a1ce0949cb74e67c75de1908e",
+  "tokens": 50,
   "items": [
    {
     "k": "handler",
@@ -10966,13 +10971,18 @@
   "items": []
  },
  "src/components/shared/PublicPageLayout.tsx": {
-  "digest": "6183af9b17e86aef6e251a29130e1b3e3064affd",
-  "tokens": 53,
+  "digest": "e8aa5fcce66f760c8f7980bc4b23cb1491652e87",
+  "tokens": 86,
   "items": [
    {
     "k": "effect",
     "n": "useEffect",
     "h": "08b9458a"
+   },
+   {
+    "k": "effect",
+    "n": "useEffect",
+    "h": "71793f5f"
    }
   ]
  },

@@ -9,27 +9,27 @@
  *   postType-scoped server-side, so this URL can never resolve a News
  *   article or an Ad.
  * [DEPENDS ON]: usePublicPost('announcements', id)
+ *
+ * [CHANGE TYPE]: LOOKS ONLY (Chikangawa Hills theme, Phase 6b, 2026-11-13).
+ *   The sky background is now drawn by <PublicPageLayout> inside the shared
+ *   PublicArchive view, so this page no longer renders its own.
  */
 
 import { useParams } from 'next/navigation'
 import { usePublicPost } from '@/hooks/usePublic'
 import { PublicArchiveDetail } from '@/components/shared/PublicArchive'
-import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 
 export default function AnnouncementDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { data, isLoading } = usePublicPost('announcements', id)
 
   return (
-    <>
-      <PublicAmbientBackground />
-      <PublicArchiveDetail
-        post={data}
-        isLoading={isLoading}
-        notFoundText="This announcement is unavailable or has been unpublished."
-        backHref="/notices"
-        backLabel="Back to Notices"
-      />
-    </>
+    <PublicArchiveDetail
+      post={data}
+      isLoading={isLoading}
+      notFoundText="This announcement is unavailable or has been unpublished."
+      backHref="/notices"
+      backLabel="Back to Notices"
+    />
   )
 }

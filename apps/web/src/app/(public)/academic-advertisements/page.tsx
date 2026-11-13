@@ -12,13 +12,16 @@
  *   /news, there was no real ads system at all. Same collapsed-card +
  *   "Read more" + detail-page pattern as /news and /announcements.
  * [DEPENDS ON]: usePublicAdverts (GET /public/academic-advertisements)
+ *
+ * [CHANGE TYPE]: LOOKS ONLY (Chikangawa Hills theme, Phase 6b, 2026-11-13).
+ *   The sky background is now drawn by <PublicPageLayout> inside the shared
+ *   PublicArchive view, so this page no longer renders its own.
  */
 
 import { useState } from 'react'
 import { Landmark } from 'lucide-react'
 import { usePublicAdverts } from '@/hooks/usePublic'
 import { PublicArchiveList } from '@/components/shared/PublicArchive'
-import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 
 const PAGE_SIZE = 12
 
@@ -29,20 +32,17 @@ export default function AcademicAdvertisementsPage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1
 
   return (
-    <>
-      <PublicAmbientBackground />
-      <PublicArchiveList
-        title="Academic Advertisements"
-        subtitle="Calls for applications, intake notices and examination circulars, published as they are issued."
-        basePath="/academic-advertisements"
-        items={items}
-        isLoading={isLoading}
-        emptyIcon={Landmark}
-        emptyText="No academic advertisements have been published yet."
-        page={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-      />
-    </>
+    <PublicArchiveList
+      title="Academic Advertisements"
+      subtitle="Calls for applications, intake notices and examination circulars, published as they are issued."
+      basePath="/academic-advertisements"
+      items={items}
+      isLoading={isLoading}
+      emptyIcon={Landmark}
+      emptyText="No academic advertisements have been published yet."
+      page={page}
+      totalPages={totalPages}
+      onPageChange={setPage}
+    />
   )
 }
