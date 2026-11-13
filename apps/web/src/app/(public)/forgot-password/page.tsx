@@ -35,6 +35,12 @@
  *   guaranteeing forgot-password is exactly the same size and glass treatment
  *   as /login (wide two-pane card on desktop, compact single column on
  *   phones). Auth logic unchanged.
+ *
+ * [REVISION 3, Hills theme Phase 7]: Class names and markup only. The page uses the sign-in card's
+ *   own pieces (.hills-field, .hills-input, .hills-go, .hills-alert) plus .hills-back and
+ *   .hills-status from globals.css "HILLS AUTH FAMILY". The icon tile, the inline loading
+ *   spinner and the old field classes are gone (the button shows the same busy sweep as sign-in).
+ *   Ids, types, autocomplete, labels, button text and links are unchanged.
  */
 'use client'
 
@@ -42,7 +48,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { sendPasswordResetEmail, type ActionCodeSettings } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
-import { ArrowLeft, Mail, CheckCircle2, Loader2 } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { AuthShell } from '@/components/shared/AuthShell'
 
 export default function ForgotPasswordPage() {
@@ -81,77 +87,61 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthShell>
-      <Link
-        href="/login"
-        className="inline-flex min-h-11 items-center gap-1.5 text-muted-foreground dark:text-foreground text-sm mb-3 hover:text-body transition-colors w-fit"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" aria-hidden /> Back to login
+      <Link href="/login" className="hills-back">
+        <ArrowLeft aria-hidden /> Back to login
       </Link>
 
       {sent ? (
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-full bg-brand-teal/15 flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 className="w-8 h-8 text-brand-teal" aria-hidden />
+        <div className="hills-status">
+          <div className="hills-status__icon hills-status__icon--ok">
+            <CheckCircle2 aria-hidden />
           </div>
-          <h1 className="font-heading font-bold text-2xl text-body mb-2">Check your email</h1>
-          <p className="text-muted-foreground dark:text-foreground text-sm font-sans leading-relaxed mb-8">
-            If <strong className="text-body">{email}</strong> is registered, you will receive a
+          <h1 className="hills-auth__title">Check your email</h1>
+          <p className="hills-auth__lede">
+            If <strong>{email}</strong> is registered, you will receive a
             password reset link shortly. Check your spam folder if you don&apos;t see it.
           </p>
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" aria-hidden /> Return to login
+          <Link href="/login" className="hills-go hills-go--link">
+            <ArrowLeft className="hills-go__arrow" aria-hidden /> Return to login
           </Link>
         </div>
       ) : (
         <>
-          <div className="flex flex-col items-center text-center mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-brand-deep flex items-center justify-center mb-4 shadow-md">
-              <Mail className="w-7 h-7 text-white" aria-hidden />
-            </div>
-            <h1 className="font-heading text-2xl sm:text-[26px] font-bold text-body tracking-tight">
-              Forgot password?
-            </h1>
-            <p className="text-muted-foreground dark:text-foreground text-sm font-sans mt-1">
-              Enter your school account email to receive a reset link.
-            </p>
+          <div className="mb-6 text-left">
+            <h1 className="hills-auth__title">Forgot password?</h1>
+            <p className="hills-auth__lede">Enter your school account email to receive a reset link.</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 text-left">
-            <div>
-              <label htmlFor="email" className="block text-xs sm:text-sm font-heading font-medium text-body mb-1.5">
-                Email address
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@school.edu.mw"
-                className="w-full px-3.5 py-2.5 sm:py-3 bg-page text-body placeholder:text-muted-foreground rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
-              />
+          {error && (
+            <div role="alert" className="hills-alert hills-alert--danger animate-fade-in">
+              <AlertCircle aria-hidden />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="text-left">
+            <div className="hills-field">
+              <div className="hills-field__row">
+                <label htmlFor="email" className="hills-label">
+                  Email address
+                </label>
+              </div>
+              <div className="hills-input">
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@school.edu.mw"
+                />
+              </div>
             </div>
 
-            {error && (
-              <div
-                role="alert"
-                className="p-3 rounded-xl bg-brand-coral/10 border border-brand-coral/30 text-brand-coral text-xs flex items-center gap-2 animate-fade-in"
-              >
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-brand-deep hover:brightness-125 active:brightness-90 text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-2 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 border border-transparent dark:border-white/10 dark:hover:border-brand-teal/40"
-            >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
-              {loading ? 'Sending…' : 'Send Reset Link'}
+            <button type="submit" disabled={loading} className="hills-go">
+              <span>{loading ? 'Sending…' : 'Send Reset Link'}</span>
+              <ArrowRight className="hills-go__arrow" aria-hidden />
             </button>
           </form>
         </>

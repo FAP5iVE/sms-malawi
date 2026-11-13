@@ -2615,8 +2615,8 @@
   "items": []
  },
  "src/app/(public)/change-password/page.tsx": {
-  "digest": "50ced29c04489a7ead6c18e9f591872ef4254c6e",
-  "tokens": 189,
+  "digest": "4cd8734e16629f356401e46fbd34b19a91a38cf7",
+  "tokens": 185,
   "items": [
    {
     "k": "call",
@@ -2742,8 +2742,8 @@
   "items": []
  },
  "src/app/(public)/forgot-password/page.tsx": {
-  "digest": "87f195bd534d12cd150ac4629e3c777ff6b2a0eb",
-  "tokens": 47,
+  "digest": "f8dea08b7e6b83e526ea8ee0ec1e808321bb3288",
+  "tokens": 46,
   "items": [
    {
     "k": "call",
@@ -3089,8 +3089,8 @@
   "items": []
  },
  "src/app/(public)/reset-password/page.tsx": {
-  "digest": "ba212cb6919964be2f08e07a119ac64e6cdeceea",
-  "tokens": 72,
+  "digest": "c4fe3272a672b9cb1219e6784ce7a63833995335",
+  "tokens": 71,
   "items": [
    {
     "k": "call",
@@ -6937,8 +6937,8 @@
   ]
  },
  "src/components/guardians/GuardianClaimForm.tsx": {
-  "digest": "1a834015d922798def6c6399106822eb28d01627",
-  "tokens": 106,
+  "digest": "564e38e055b93c0e9af3a918f41d61622c5a8b6d",
+  "tokens": 102,
   "items": [
    {
     "k": "handler",

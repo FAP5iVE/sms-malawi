@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-13 (after Phase 6b, the list, detail, gallery, placement and 404 pages). Read this first when resuming.
+Last updated: 2026-11-13 (after Phase 7, the password and claim pages). Read this first when resuming.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -32,10 +32,11 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | Phase 4 Home (`hills/phase-4-home`) | done, AT REVIEW GATE | review pack 4 |
 | Phase 4b Home polish (`hills/phase-4b-home-polish`) | done, AT REVIEW GATE | review pack 4b |
 | Phase 5 /apply (`hills/phase-5-apply`) | done, reviewed (user moved on to 6) | review pack 5 |
-| Phase 6a Text pages (`hills/phase-6-public-pages`) | done, AT REVIEW GATE | review pack 6a |
-| Phase 6b Lists, details, gallery, placement results, 404, `PublicArchive` (same branch) | done, AT REVIEW GATE | review pack 6b |
-| **7 Password and claim pages** | **NEXT** (after the 6b review) | |
-| 7 Password and claim pages, 8 Logged-in app, 9 Cleanup | pending | |
+| Phase 6a Text pages (`hills/phase-6-public-pages`) | done, reviewed | review pack 6a |
+| Phase 6b Lists, details, gallery, placement results, 404, `PublicArchive` (same branch) | done (user said "start the next", so treated as reviewed) | review pack 6b |
+| Phase 7 Password and claim pages (`hills/phase-7-password-claim`) | done, AT REVIEW GATE | review pack 7 |
+| **8 Logged-in app** | **NEXT** (after the 7 review; see the plan, needs a scoping question first) | |
+| 9 Cleanup | pending | |
 
 The user asked for Phases 0 to the logo step to be reviewed as ONE package. Phases 3 and 4 were each reviewed on their own. Phase 6 is split in two review drops (6a, then 6b). Next review gate is
 after 6a.
@@ -257,6 +258,28 @@ after 6a.
      capture script allows 2 minutes; capture only two detail routes per set.
    - Not done: no Storybook story (frame covered by real-page captures); no empty-state screenshots for the gallery and placements (mock returned data); Firefox/Safari.
 
+13. **Phase 7 (forgot, reset, change password and the parent claim form).** Branch `hills/phase-7-password-claim` off 6b. Looks only; logic
+    fingerprint clean against 6b (20 declared), Phase 5 (160) and `main` (170); contrast gate 386 pairs.
+   - These four screens already sat in the sign-in card (`AuthShell`) but kept their pre-Hills field styling. They now use login's own pieces
+     (`.hills-field`, `.hills-input`, `.hills-label`, `.hills-pw`/`.hills-eye`, `.hills-go`, `.hills-alert`, `.hills-link`, `.hills-alt`,
+     `.hills-auth__title/lede`). New in globals.css (section "HILLS AUTH FAMILY"): `.hills-back` (back link), `.hills-hint`,
+     `.hills-field-err` (+ red underline via `aria-invalid`), `.hills-mono` (invitation code), read-only field, `.hills-status` (+ `__icon--ok/danger`;
+     centred-left status screens: link sent, link expired, password updated, account ready), `.hills-checking` (verify / loading), `a.hills-go`,
+     `.hills-go--link`, and the card token `--c-ok` (light #0c3f31, dark #8fe3bf).
+   - Files: `forgot-password/page.tsx`, `reset-password/page.tsx` (its Suspense fallback is now the sign-in `AuthShellSkeleton`; its hidden text still
+     says "Loading the sign-in page"), `change-password/page.tsx` (PasswordField and both flows; the first-login flow could not be rendered here),
+     `GuardianClaimForm.tsx` (the claim form behind `/login?claim=1`). There is no separate claim route.
+   - Visible changes besides the look: the key / mail / lock icon tiles and the coloured status circles are gone (a ring icon instead), the inline
+     spinner on submit buttons is gone (the busy sweep on `.hills-go:disabled` shows it, as on login), and on change-password the error now shows above
+     the form (as on login). All declared in the allowlist with reasons. Ids, types, autocomplete, labels, button text, hint wording, link
+     targets and every auth/API call are unchanged.
+   - Real pixels (`measure7.mjs`, `analyze7.py`): 14 states x 4 skies x light/dark x 390/1280 = 224 captures, 1952 text boxes, 0 fail, worst 4.93:1.
+     Text colours that CSS gives as `color(srgb ...)` need the 0..1 scale converted; hide fixed bubbles (the 5iveStack badge) and scroll to top before
+     capturing or they pollute the sample. No sideways scroll at 360/390/768/1280/1920 on any state.
+   - States captured with mocks (Firebase REST `accounts:*` routes and `**/guardian-claim` via `page.route`): form, error, sent, expired, missing code,
+     updated, short password (reset), wrong current password (change), empty submit, server error and done (claim). Not rendered: change-password
+     "first login" (needs a signed-in user with the claim), and the real Firebase round trip.
+
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database, so signed-in pages cannot be
   rendered or screenshotted. Do not retry or work around. tsc errors from missing Prisma types are
@@ -278,6 +301,7 @@ after 6a.
   Phase 5 here. Run it against `hills/phase-4b-home-polish` AND the original baseline on the real repo.
 - Capture scripts for Phase 6a: `pages.mjs`, `cap.sh`, `multi.sh`, `measure6.mjs`, `mrun.sh` in the pack (`tools-capture/`); mock `/public/maneb-stats` with a `stats` array
   (academics crashes on a mock without it).
+- Capture scripts for Phase 7: `pages7.mjs`, `cap7.sh`, `measure7.mjs`, `mcap7.sh`, `analyze7.py` in the pack (`tools-capture/`); the states list is in `pages7.mjs`.
 - Capture scripts for Phase 5 live in the review pack (`tools-capture/`: `run.sh`, `walk.mjs`, `measure.mjs`, `measure.py`);
   the Playwright import must go through `createRequire` (global install, ESM import fails).
 - `.env` and `service-account.json` are in the zip: never print or commit them.
@@ -302,6 +326,6 @@ after 6a.
   5. The Suspense fallback shows the sky WITHOUT the sun or moon (CSS on `[aria-busy]`), so the disc
      fades in once, not twice. Only visible in production builds on a slow first load.
   Still untested: Firebase success and "no role assigned" paths (Firebase is unreachable from the sandbox).
-- Phase 3 left the interim pages on their old field styling inside the new card (Phase 7 redoes them).
+- Phase 3 left the interim pages on their old field styling inside the new card; Phase 7 redid them.
 - Phase 4b open question for the user: the 5iveStack Labs website address (see `lib/hills/studio.ts`).
 - Phase 9 (cleanup) is optional and last.

@@ -302,6 +302,27 @@ for (const dark of [false, true]) {
   }
 }
 
+// ── Phase 7: forgot / reset / change password and the claim form ───────────
+// Same card as the sign-in family (opaque --card here is the lightest case for
+// the translucent card). New pieces: the success tick (--c-ok), the invalid
+// field underline and field error text (--c-danger), the read-only field and
+// back link (ink 82%), the hint text (ink 82%).
+for (const dark of [false, true]) {
+  const { card, fg } = cardVar(dark ? DARK_BLOCK : ROOT_BLOCK)
+  const theme = dark ? 'dark' : 'light'
+  const at = `auth card (${theme})`
+  const add = (name: string, need: number, a: RGBA, b: RGBA) =>
+    rows.push({ sky: 'auth7', pair: `${name} on ${at}`, need, got: ratio(a, b) })
+  const ok = new RegExp(dark ? '\\.dark\\s+\\.hills-auth__card\\s*\\{[^}]*--c-ok:\\s*(#[0-9a-f]{6})' : '\\.hills-auth__card\\s*\\{\\s*--c-ok:\\s*(#[0-9a-f]{6})', 'i').exec(css)?.[1]
+  if (!ok) throw new Error('--c-ok not found for .hills-auth__card')
+  const danger = parseColor(cardTokens(dark).danger as string)
+  add('success tick and ring (--c-ok, graphic)', 3, parseColor(ok), card)
+  add('invalid field underline (--c-danger, graphic)', 3, danger, card)
+  add('field error text (--c-danger)', 4.5, danger, card)
+  add('hint, read-only value, back link (ink 82%)', 4.5, over([fg[0], fg[1], fg[2], 0.82], card), card)
+  add('small label note (ink 82%)', 4.5, over([fg[0], fg[1], fg[2], 0.82], card), card)
+}
+
 const fails = rows.filter((r) => r.got < r.need)
 if (process.argv.includes('--table') || fails.length > 0) {
   for (const r of rows) {

@@ -1453,6 +1453,139 @@
       "kind": "logic",
       "pattern": "^\\{\\ below\\ \\}$",
       "reason": "Phase 6b: extends the new PublicPageLayout (above/below/compact props, sibling-links nav, contents list that follows late-loading content, current contents entry kept in view in the pinned column). Presentational; reads and writes only its own DOM."
+    },
+    {
+      "file": "src/app/(public)/change-password/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ inputCls\\ =\\ 'w\\-full\\ px\\-3\\.5\\ py\\-2\\.5\\ sm:py\\-3\\ bg\\-page\\ text\\-body\\ placeholder:text\\-muted\\-foreground\\ rounded\\-xl\\ text\\-sm\\ font\\-sans\\ border\\ border\\-base\\ focus:outline\\-none\\ focus:ring\\-2\\ focus:ring\\-brand\\-teal/30\\ focus:border\\-brand\\-teal\\ transition\\-all'$",
+      "reason": "Phase 7: the old field/button class-string constant is removed; the fields and buttons use the sign-in card classes (.hills-field, .hills-input, .hills-go) in globals.css. Class names only."
+    },
+    {
+      "file": "src/app/(public)/change-password/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ primaryBtnCls\\ =\\ 'w\\-full\\ py\\-3\\ bg\\-brand\\-deep\\ hover:brightness\\-125\\ active:brightness\\-90\\ text\\-white\\ font\\-heading\\ font\\-semibold\\ text\\-sm\\ rounded\\-xl\\ transition\\-all\\ shadow\\-md\\ mt\\-2\\ flex\\ items\\-center\\ justify\\-center\\ gap\\-2\\ cursor\\-pointer\\ disabled:opacity\\-60\\ border\\ border\\-transparent\\ dark:border\\-white/10\\ dark:hover:border\\-brand\\-teal/40'$",
+      "reason": "Phase 7: the old field/button class-string constant is removed; the fields and buttons use the sign-in card classes (.hills-field, .hills-input, .hills-go) in globals.css. Class names only."
+    },
+    {
+      "file": "src/app/(public)/change-password/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{loading\\ \\&\\&\\ <JSX/>\\}\\ Saving…\\|Set\\ Password\\ \\&\\ Continue$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
+    },
+    {
+      "file": "src/app/(public)/change-password/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ loading\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
+    },
+    {
+      "file": "src/app/(public)/change-password/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{loading\\ \\&\\&\\ <JSX/>\\}\\ Updating…\\|Update\\ Password$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
+    },
+    {
+      "file": "src/app/(public)/change-password/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Saving…\\|Set\\ Password\\ \\&\\ Continue$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
+    },
+    {
+      "file": "src/app/(public)/change-password/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Updating…\\|Update\\ Password$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
+    },
+    {
+      "file": "src/app/(public)/forgot-password/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{loading\\ \\&\\&\\ <JSX/>\\}\\ Sending…\\|Send\\ Reset\\ Link$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
+    },
+    {
+      "file": "src/app/(public)/forgot-password/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ loading\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
+    },
+    {
+      "file": "src/app/(public)/forgot-password/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Sending…\\|Send\\ Reset\\ Link$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
+    },
+    {
+      "file": "src/app/(public)/reset-password/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{loading\\ \\&\\&\\ <JSX/>\\}\\ Saving…\\|Save\\ New\\ Password$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
+    },
+    {
+      "file": "src/app/(public)/reset-password/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ loading\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
+    },
+    {
+      "file": "src/app/(public)/reset-password/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Saving…\\|Save\\ New\\ Password$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
+    },
+    {
+      "file": "src/components/guardians/GuardianClaimForm.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ FIELD\\ =\\ 'w\\-full\\ px\\-3\\.5\\ py\\-2\\.5\\ sm:py\\-3\\ bg\\-page\\ text\\-body\\ placeholder:text\\-muted\\-foreground\\ rounded\\-xl\\ text\\-sm\\ font\\-sans\\ border\\ border\\-base\\ '\\ \\+\\ 'focus:outline\\-none\\ focus:ring\\-2\\ focus:ring\\-brand\\-teal/30\\ focus:border\\-brand\\-teal\\ transition\\-all'$",
+      "reason": "Phase 7: the old field/button class-string constant is removed; the fields and buttons use the sign-in card classes (.hills-field, .hills-input, .hills-go) in globals.css. Class names only."
+    },
+    {
+      "file": "src/components/guardians/GuardianClaimForm.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ LABEL\\ =\\ 'block\\ text\\-xs\\ sm:text\\-sm\\ font\\-heading\\ font\\-medium\\ text\\-body\\ mb\\-1\\.5'$",
+      "reason": "Phase 7: the old field/button class-string constant is removed; the fields and buttons use the sign-in card classes (.hills-field, .hills-input, .hills-go) in globals.css. Class names only."
+    },
+    {
+      "file": "src/components/guardians/GuardianClaimForm.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{busy\\ \\&\\&\\ <JSX/>\\}\\ Creating\\ your\\ account…\\|Create\\ account$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
+    },
+    {
+      "file": "src/components/guardians/GuardianClaimForm.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ busy\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
+    },
+    {
+      "file": "src/components/guardians/GuardianClaimForm.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ '\\ '\\ \\}$",
+      "reason": "Phase 7: a JSX spacer {' '} between \"Already set up?\" and the link is no longer needed (the line is now a flex row like login's .hills-alt). Text and link target unchanged."
+    },
+    {
+      "file": "src/components/guardians/GuardianClaimForm.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Creating\\ your\\ account…\\|Create\\ account$",
+      "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
     }
   ]
 }

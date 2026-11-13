@@ -3091,3 +3091,89 @@ a.hills-studio__credit-name:hover { text-decoration: underline; text-underline-o
   outline: 2px solid var(--c-acc);
   outline-offset: 2px;
 }
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS AUTH FAMILY (Phase 7): forgot, reset and change password, and the
+   parent claim form. They now use the same pieces as the sign-in card
+   (.hills-field, .hills-input, .hills-go, .hills-alert); this block adds the
+   few parts login does not have: back link, hint and field error text, a
+   monospace code field, a read-only field, and the centred status screens
+   (checking, sent, link expired, password updated, account ready).
+   Colours come from the card's own tokens (--c-*), so contrast follows the
+   sign-in proof in `pnpm hills:contrast`. Class names only.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Success colour for the card (follows the theme, like the other card colours). */
+.hills-auth__card { --c-ok: #0c3f31; }
+.dark .hills-auth__card { --c-ok: #8fe3bf; }
+
+.hills-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin: -6px 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-ink2);
+  text-decoration: none;
+}
+.hills-back svg { width: 16px; height: 16px; }
+.hills-back:hover,
+.hills-back:focus-visible { color: var(--c-ink); text-decoration: underline; text-underline-offset: 4px; }
+.hills-back:focus-visible { outline: 2px solid var(--c-acc); outline-offset: 2px; border-radius: 2px; }
+
+.hills-hint { margin: 8px 0 0; font-size: 15px; line-height: 1.4; color: var(--c-ink2); }
+.hills-label small { font-size: 14px; font-weight: 400; color: var(--c-ink2); }
+.hills-field-err {
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--c-danger);
+}
+.hills-input > input[aria-invalid='true'] { border-bottom-color: var(--c-danger); }
+.hills-input > input.hills-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 18px;
+  letter-spacing: 0.06em;
+}
+.hills-input > input[readonly] { color: var(--c-ink2); cursor: not-allowed; }
+.hills-input > input[readonly]:focus { border-color: var(--c-ink); }
+.hills-input > input[type='date'] { min-width: 0; }
+
+/* Link styled as the card's main button. */
+a.hills-go { text-decoration: none; }
+.hills-go--link { justify-content: center; gap: 12px; }
+
+/* Centred status screens. */
+.hills-status { text-align: left; }
+.hills-status__icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 0 20px;
+  border: 2px solid var(--c-x, var(--c-ink));
+  border-radius: 50%;
+  color: var(--c-x, var(--c-ink));
+}
+.hills-status__icon svg { width: 30px; height: 30px; }
+.hills-status__icon--ok { --c-x: var(--c-ok); }
+.hills-status__icon--danger { --c-x: var(--c-danger); }
+.hills-status__icon--key { --c-x: var(--c-ink); }
+.hills-status .hills-auth__lede { margin-bottom: 28px; }
+.hills-status .hills-auth__lede strong { color: var(--c-ink); }
+.hills-status .hills-go { margin-top: 0; }
+.hills-checking {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 28px 0;
+  font-size: 17px;
+  color: var(--c-ink2);
+}
+.hills-checking svg { flex: none; width: 24px; height: 24px; color: var(--c-ink); animation: hills-spin 1s linear infinite; }
+@keyframes hills-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .hills-checking svg { animation: none; } }

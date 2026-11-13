@@ -29,30 +29,30 @@
  * every error branch) is unchanged.
  */
 
+/*
+ * [CHANGE (2026-11-13), Hills theme Phase 7]: Class names and markup only. Uses the sign-in card's
+ * own pieces (.hills-field, .hills-input, .hills-go, .hills-alert) plus .hills-back, .hills-status and
+ * .hills-checking (globals.css "HILLS AUTH FAMILY"). The Suspense fallback is now the sign-in page's
+ * <AuthShellSkeleton/> (it was a small grey card). The icon tile and the inline spinner on the button
+ * are gone (same busy sweep as sign-in). Ids, types, autocomplete, labels, button text, links and the
+ * verify/confirm calls are unchanged.
+ */
+
 import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
-import { ArrowLeft, Lock, CheckCircle2, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react'
+import { AlertCircle, AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { AuthShell } from '@/components/shared/AuthShell'
+import { AuthShellSkeleton } from '@/components/shared/AuthShellSkeleton'
 
 // `useSearchParams()` requires a Suspense boundary or `next build` fails its
 // static-generation bailout check, same convention as (public)/login/page.tsx
 // and (auth)/library/page.tsx.
 export default function ResetPasswordPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex-1 w-full bg-page flex items-start justify-center p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-base bg-surface p-8 space-y-4">
-            <div className="mx-auto h-16 w-16 rounded-full bg-page animate-pulse" />
-            <div className="h-7 w-40 mx-auto rounded-lg bg-page animate-pulse" />
-            <div className="h-32 rounded-xl bg-page animate-pulse" />
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<AuthShellSkeleton />}>
       <ResetPasswordForm />
     </Suspense>
   )
@@ -114,69 +114,64 @@ function ResetPasswordForm() {
   return (
     <AuthShell>
       {verifying && !missingCode ? (
-        <div className="text-center py-8" role="status" aria-live="polite">
-          <Loader2 className="w-8 h-8 text-brand-teal animate-spin mx-auto mb-4" aria-hidden />
-          <p className="text-muted-foreground dark:text-foreground text-sm">Verifying your reset link…</p>
+        <div className="hills-checking" role="status" aria-live="polite">
+          <Loader2 aria-hidden />
+          <p>Verifying your reset link…</p>
         </div>
       ) : invalidCode || missingCode ? (
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-full bg-brand-coral/15 flex items-center justify-center mx-auto mb-5">
-            <AlertTriangle className="w-8 h-8 text-brand-coral" aria-hidden />
+        <div className="hills-status">
+          <div className="hills-status__icon hills-status__icon--danger">
+            <AlertTriangle aria-hidden />
           </div>
-          <h1 className="font-heading font-bold text-2xl text-body mb-2">Link expired</h1>
-          <p className="text-muted-foreground dark:text-foreground text-sm font-sans leading-relaxed mb-8">
+          <h1 className="hills-auth__title">Link expired</h1>
+          <p className="hills-auth__lede">
             This password reset link has expired or has already been used. Request a new one to continue.
           </p>
-          <Link
-            href="/forgot-password"
-            className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
-          >
+          <Link href="/forgot-password" className="hills-go hills-go--link">
             Request a new link
           </Link>
         </div>
       ) : done ? (
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-full bg-brand-teal/15 flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 className="w-8 h-8 text-brand-teal" aria-hidden />
+        <div className="hills-status">
+          <div className="hills-status__icon hills-status__icon--ok">
+            <CheckCircle2 aria-hidden />
           </div>
-          <h1 className="font-heading font-bold text-2xl text-body mb-2">Password updated</h1>
-          <p className="text-muted-foreground dark:text-foreground text-sm font-sans leading-relaxed mb-8">
+          <h1 className="hills-auth__title">Password updated</h1>
+          <p className="hills-auth__lede">
             Your password has been changed. You can now sign in with your new password.
           </p>
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" aria-hidden /> Return to login
+          <Link href="/login" className="hills-go hills-go--link">
+            <ArrowLeft className="hills-go__arrow" aria-hidden /> Return to login
           </Link>
         </div>
       ) : (
         <>
-          <Link
-            href="/login"
-            className="inline-flex min-h-11 items-center gap-1.5 text-muted-foreground dark:text-foreground text-sm mb-3 hover:text-body transition-colors w-fit"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" aria-hidden /> Back to login
+          <Link href="/login" className="hills-back">
+            <ArrowLeft aria-hidden /> Back to login
           </Link>
 
-          <div className="flex flex-col items-center text-center mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-brand-deep flex items-center justify-center mb-4 shadow-md">
-              <Lock className="w-7 h-7 text-white" aria-hidden />
-            </div>
-            <h1 className="font-heading text-2xl sm:text-[26px] font-bold text-body tracking-tight">
-              Set a new password
-            </h1>
-            <p className="text-muted-foreground dark:text-foreground text-sm font-sans mt-1">
-              {email ? <>for <strong className="text-body">{email}</strong></> : 'Choose a new password for your account.'}
+          <div className="mb-6 text-left">
+            <h1 className="hills-auth__title">Set a new password</h1>
+            <p className="hills-auth__lede">
+              {email ? <>for <strong>{email}</strong></> : 'Choose a new password for your account.'}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 text-left">
-            <div>
-              <label htmlFor="password" className="block text-xs sm:text-sm font-heading font-medium text-body mb-1.5">
-                New password
-              </label>
-              <div className="relative">
+          {error && (
+            <div role="alert" className="hills-alert hills-alert--danger">
+              <AlertCircle aria-hidden />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="text-left">
+            <div className="hills-field">
+              <div className="hills-field__row">
+                <label htmlFor="password" className="hills-label">
+                  New password
+                </label>
+              </div>
+              <div className="hills-input">
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -185,35 +180,22 @@ function ResetPasswordForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="At least 6 characters"
-                  className="w-full px-3.5 py-2.5 sm:py-3 pr-11 bg-page text-body placeholder:text-muted-foreground rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all"
+                  className="hills-pw"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-foreground focus:outline-none cursor-pointer transition-colors"
+                  className="hills-eye"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" aria-hidden /> : <Eye className="w-4 h-4" aria-hidden />}
+                  {showPassword ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
                 </button>
               </div>
             </div>
 
-            {error && (
-              <div
-                role="alert"
-                className="p-3 rounded-xl bg-brand-coral/10 border border-brand-coral/30 text-brand-coral text-xs"
-              >
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-brand-deep hover:brightness-125 active:brightness-90 text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-2 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 border border-transparent dark:border-white/10 dark:hover:border-brand-teal/40"
-            >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
-              {loading ? 'Saving…' : 'Save New Password'}
+            <button type="submit" disabled={loading} className="hills-go">
+              <span>{loading ? 'Saving…' : 'Save New Password'}</span>
+              <ArrowRight className="hills-go__arrow" aria-hidden />
             </button>
           </form>
         </>

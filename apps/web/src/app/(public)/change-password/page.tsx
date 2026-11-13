@@ -43,6 +43,13 @@
  *   listener, which would otherwise flip the page mid-submit.
  * [LAYOUT]: Renders through <AuthShell> so it matches /login's size and glass
  *   styling; the top bar comes from (public)/layout.tsx.
+ *
+ * [REVISION (2026-11-13), Hills theme Phase 7]: Class names and markup only. Fields, buttons,
+ *   alerts and status screens use the sign-in card's pieces (.hills-field, .hills-input, .hills-go,
+ *   .hills-alert, .hills-status, .hills-checking). The key icon tile and the inline spinner on the
+ *   button are gone (same busy sweep as sign-in). Errors now show above the form, as on /login.
+ *   Ids, types, autocomplete, minLength, readOnly, labels, button text, links and every auth call
+ *   are unchanged.
  */
 'use client'
 import { useEffect, useState } from 'react'
@@ -55,7 +62,7 @@ import {
   signInWithEmailAndPassword,
   updatePassword,
 } from 'firebase/auth'
-import { CheckCircle2, Eye, EyeOff, KeyRound, Loader2, ArrowRight } from 'lucide-react'
+import { AlertCircle, ArrowRight, CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { auth } from '@/lib/firebase'
 import { logout } from '@/components/providers/AuthProvider'
@@ -65,12 +72,6 @@ import { AuthShell } from '@/components/shared/AuthShell'
 type Mode = 'checking' | 'first-login' | 'change'
 
 const MIN_LENGTH = 8
-
-const inputCls =
-  'w-full px-3.5 py-2.5 sm:py-3 bg-page text-body placeholder:text-muted-foreground rounded-xl text-sm font-sans border border-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all'
-
-const primaryBtnCls =
-  'w-full py-3 bg-brand-deep hover:brightness-125 active:brightness-90 text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-2 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 border border-transparent dark:border-white/10 dark:hover:border-brand-teal/40'
 
 function PasswordField({
   id,
@@ -93,14 +94,14 @@ function PasswordField({
 }) {
   const [show, setShow] = useState(false)
   return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <label htmlFor={id} className="text-xs sm:text-sm font-heading font-medium text-body">
+    <div className="hills-field">
+      <div className="hills-field__row">
+        <label htmlFor={id} className="hills-label">
           {label}
         </label>
         {labelAside}
       </div>
-      <div className="relative">
+      <div className="hills-input">
         <input
           id={id}
           type={show ? 'text' : 'password'}
@@ -110,15 +111,15 @@ function PasswordField({
           placeholder={placeholder}
           minLength={minLength}
           required
-          className={`${inputCls} pr-11`}
+          className="hills-pw"
         />
         <button
           type="button"
           onClick={() => setShow((v) => !v)}
           aria-label={show ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
-          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-foreground focus:outline-none cursor-pointer transition-colors"
+          className="hills-eye"
         >
-          {show ? <EyeOff className="w-4 h-4" aria-hidden /> : <Eye className="w-4 h-4" aria-hidden />}
+          {show ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
         </button>
       </div>
     </div>
@@ -287,39 +288,40 @@ export default function ChangePasswordPage() {
   return (
     <AuthShell>
       {mode === 'checking' ? (
-        <div className="py-10 text-center" role="status" aria-live="polite">
-          <Loader2 className="w-7 h-7 text-brand-teal animate-spin mx-auto mb-3" aria-hidden />
-          <p className="text-muted-foreground dark:text-foreground text-sm">Loading…</p>
+        <div className="hills-checking" role="status" aria-live="polite">
+          <Loader2 aria-hidden />
+          <p>Loading…</p>
         </div>
       ) : done ? (
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-full bg-brand-teal/15 flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 className="w-8 h-8 text-brand-teal" aria-hidden />
+        <div className="hills-status">
+          <div className="hills-status__icon hills-status__icon--ok">
+            <CheckCircle2 aria-hidden />
           </div>
-          <h1 className="font-heading font-bold text-2xl text-body mb-2">Password updated</h1>
-          <p className="text-muted-foreground dark:text-foreground text-sm font-sans leading-relaxed mb-8">
+          <h1 className="hills-auth__title">Password updated</h1>
+          <p className="hills-auth__lede">
             {done.signedIn
               ? 'Your password has been changed.'
               : 'Your password has been changed. Sign in with your new password.'}
           </p>
-          <Link
-            href={done.signedIn ? done.home : '/login'}
-            className="inline-flex items-center gap-2 bg-brand-deep text-white px-6 py-3 rounded-xl font-heading font-semibold text-sm hover:brightness-125 transition-colors"
-          >
-            {done.signedIn ? 'Go to dashboard' : 'Go to sign in'} <ArrowRight className="w-4 h-4" aria-hidden />
+          <Link href={done.signedIn ? done.home : '/login'} className="hills-go hills-go--link">
+            {done.signedIn ? 'Go to dashboard' : 'Go to sign in'} <ArrowRight className="hills-go__arrow" aria-hidden />
           </Link>
         </div>
       ) : mode === 'first-login' ? (
         <>
-          <div className="mb-5">
-            <h1 className="font-heading text-2xl sm:text-[26px] font-bold text-body tracking-tight mb-1">
-              Set your password
-            </h1>
-            <p className="text-muted-foreground dark:text-foreground text-sm">
+          <div className="mb-6 text-left">
+            <h1 className="hills-auth__title">Set your password</h1>
+            <p className="hills-auth__lede">
               This is your first login. Please create a new password before continuing.
             </p>
           </div>
-          <form onSubmit={handleFirstLogin} className="space-y-4 text-left">
+          {error && (
+            <p role="alert" className="hills-alert hills-alert--danger">
+              <AlertCircle aria-hidden />
+              <span>{error}</span>
+            </p>
+          )}
+          <form onSubmit={handleFirstLogin} className="text-left">
             <PasswordField
               id="new-password"
               label="New password"
@@ -337,49 +339,49 @@ export default function ChangePasswordPage() {
               autoComplete="new-password"
               placeholder="Confirm password"
             />
-            {error && (
-              <p role="alert" className="p-3 rounded-xl bg-brand-coral/10 border border-brand-coral/30 text-brand-coral text-xs">
-                {error}
-              </p>
-            )}
-            <button type="submit" disabled={loading} className={primaryBtnCls}>
-              {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
-              {loading ? 'Saving…' : 'Set Password & Continue'}
+            <button type="submit" disabled={loading} className="hills-go">
+              <span>{loading ? 'Saving…' : 'Set Password & Continue'}</span>
+              <ArrowRight className="hills-go__arrow" aria-hidden />
             </button>
           </form>
         </>
       ) : (
         <>
-          <div className="flex flex-col items-center text-center mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-brand-deep flex items-center justify-center mb-4 shadow-md">
-              <KeyRound className="w-7 h-7 text-white" aria-hidden />
-            </div>
-            <h1 className="font-heading text-2xl sm:text-[26px] font-bold text-body tracking-tight">
-              Change your password
-            </h1>
-            <p className="text-muted-foreground dark:text-foreground text-sm font-sans mt-1">
+          <div className="mb-6 text-left">
+            <h1 className="hills-auth__title">Change your password</h1>
+            <p className="hills-auth__lede">
               {signedInEmail
                 ? 'Confirm your current password, then choose a new one.'
                 : 'Enter your account email and current password, then choose a new one.'}
             </p>
           </div>
 
-          <form onSubmit={handleChange} className="space-y-4 text-left">
-            <div>
-              <label htmlFor="account-email" className="block text-xs sm:text-sm font-heading font-medium text-body mb-1.5">
-                Email address
-              </label>
-              <input
-                id="account-email"
-                type="email"
-                autoComplete="email"
-                required
-                readOnly={signedInEmail !== null}
-                value={signedInEmail ?? email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@school.edu.mw"
-                className={`${inputCls} ${signedInEmail ? 'opacity-70 cursor-not-allowed' : ''}`}
-              />
+          {error && (
+            <p role="alert" className="hills-alert hills-alert--danger">
+              <AlertCircle aria-hidden />
+              <span>{error}</span>
+            </p>
+          )}
+
+          <form onSubmit={handleChange} className="text-left">
+            <div className="hills-field">
+              <div className="hills-field__row">
+                <label htmlFor="account-email" className="hills-label">
+                  Email address
+                </label>
+              </div>
+              <div className="hills-input">
+                <input
+                  id="account-email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  readOnly={signedInEmail !== null}
+                  value={signedInEmail ?? email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@school.edu.mw"
+                />
+              </div>
             </div>
 
             <PasswordField
@@ -390,10 +392,7 @@ export default function ChangePasswordPage() {
               autoComplete="current-password"
               placeholder="Current password"
               labelAside={
-                <Link
-                  href="/forgot-password"
-                  className="text-xs font-bold text-brand-teal-light hover:text-brand-teal transition-colors font-heading"
-                >
+                <Link href="/forgot-password" className="hills-link">
                   Forgot password?
                 </Link>
               }
@@ -416,15 +415,9 @@ export default function ChangePasswordPage() {
               placeholder="Confirm new password"
             />
 
-            {error && (
-              <p role="alert" className="p-3 rounded-xl bg-brand-coral/10 border border-brand-coral/30 text-brand-coral text-xs">
-                {error}
-              </p>
-            )}
-
-            <button type="submit" disabled={loading} className={primaryBtnCls}>
-              {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
-              {loading ? 'Updating…' : 'Update Password'}
+            <button type="submit" disabled={loading} className="hills-go">
+              <span>{loading ? 'Updating…' : 'Update Password'}</span>
+              <ArrowRight className="hills-go__arrow" aria-hidden />
             </button>
           </form>
         </>

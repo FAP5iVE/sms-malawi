@@ -13,20 +13,21 @@
  *   Success does not sign the guardian in. They sign in on the normal page, which routes a
  *   parent to /parent like any other role.
  * [DEPENDS ON]: @/lib/api-client (apiFetch), @shared/constants/guardianPortal (validateClaimForm)
+ *
+ * [REVISION (2026-11-13), Hills theme Phase 7]: Class names and markup only. Fields, hints, errors,
+ *   the alert, the button and the success screen use the sign-in card's pieces (.hills-field,
+ *   .hills-input, .hills-go, .hills-alert, .hills-hint, .hills-field-err, .hills-status). The inline
+ *   spinner is gone (same busy sweep as sign-in). Ids, aria-invalid / aria-describedby wiring, types,
+ *   autocomplete, labels, hint wording, button text, links and the submit logic are unchanged.
  */
 'use client'
 
 import { useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { AlertCircle, ArrowRight, CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { AlertCircle, ArrowRight, CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { validateClaimForm, type ClaimFormErrors, type ClaimFormValues } from '@shared/constants/guardianPortal'
 import { apiFetch } from '@/lib/api-client'
 import { AuthShell } from '@/components/shared/AuthShell'
-
-const FIELD =
-  'w-full px-3.5 py-2.5 sm:py-3 bg-page text-body placeholder:text-muted-foreground rounded-xl text-sm font-sans border border-base ' +
-  'focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-all'
-const LABEL = 'block text-xs sm:text-sm font-heading font-medium text-body mb-1.5'
 
 const EMPTY: ClaimFormValues = { code: '', email: '', password: '', confirm: '', childDateOfBirth: '' }
 
@@ -73,17 +74,16 @@ export function GuardianClaimForm() {
   if (done) {
     return (
       <AuthShell>
-        <div className="text-left space-y-4" role="status">
-          <CheckCircle2 className="w-10 h-10 text-status-success" aria-hidden />
-          <h1 className="text-2xl font-heading font-bold text-body tracking-tight">Your account is ready</h1>
-          <p className="text-sm text-muted-foreground dark:text-foreground">
+        <div className="hills-status" role="status">
+          <div className="hills-status__icon hills-status__icon--ok">
+            <CheckCircle2 aria-hidden />
+          </div>
+          <h1 className="hills-auth__title">Your account is ready</h1>
+          <p className="hills-auth__lede">
             Sign in with the email address and password you just chose to see your child’s information.
           </p>
-          <Link
-            href="/login"
-            className="w-full py-3 bg-brand-deep hover:brightness-125 text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-2"
-          >
-            Go to sign in<ArrowRight className="w-4 h-4" aria-hidden />
+          <Link href="/login" className="hills-go hills-go--link">
+            Go to sign in<ArrowRight className="hills-go__arrow" aria-hidden />
           </Link>
         </div>
       </AuthShell>
@@ -95,94 +95,109 @@ export function GuardianClaimForm() {
     'aria-describedby': errors[id] ? `claim-${id}-err` : undefined,
   })
   const fieldError = (id: keyof ClaimFormValues) =>
-    errors[id] ? <p id={`claim-${id}-err`} role="alert" className="text-xs text-brand-coral mt-1">{errors[id]}</p> : null
+    errors[id] ? <p id={`claim-${id}-err`} role="alert" className="hills-field-err">{errors[id]}</p> : null
 
   return (
     <AuthShell>
-      <div className="mb-4 text-left">
-        <h1 className="text-2xl sm:text-[26px] font-heading font-bold text-body tracking-tight">Set up your parent account</h1>
-        <p className="text-muted-foreground dark:text-foreground text-sm mt-1">
+      <div className="mb-6 text-left">
+        <h1 className="hills-auth__title">Set up your parent account</h1>
+        <p className="hills-auth__lede">
           Enter the code the school gave you, then choose how you will sign in.
         </p>
       </div>
 
       {serverError && (
-        <div role="alert" className="mb-4 p-3 rounded-xl bg-brand-coral/10 border border-brand-coral/30 text-brand-coral text-xs flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+        <div role="alert" className="hills-alert hills-alert--danger">
+          <AlertCircle aria-hidden />
           <span>{serverError}</span>
         </div>
       )}
 
-      <form onSubmit={submit} noValidate className="space-y-4 text-left">
-        <div>
-          <label htmlFor="claim-code" className={LABEL}>Invitation code</label>
-          <input
-            id="claim-code" value={values.code} onChange={(e) => set('code')(e.target.value)} {...field('code')}
-            autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="ABCDEF-GHJKMN-PQRSTU"
-            className={`${FIELD} font-mono tracking-wider`}
-          />
+      <form onSubmit={submit} noValidate className="text-left">
+        <div className="hills-field">
+          <div className="hills-field__row">
+            <label htmlFor="claim-code" className="hills-label">Invitation code</label>
+          </div>
+          <div className="hills-input">
+            <input
+              id="claim-code" value={values.code} onChange={(e) => set('code')(e.target.value)} {...field('code')}
+              autoComplete="off" autoCapitalize="characters" spellCheck={false} placeholder="ABCDEF-GHJKMN-PQRSTU"
+              className="hills-mono"
+            />
+          </div>
           {fieldError('code')}
         </div>
 
-        <div>
-          <label htmlFor="claim-email" className={LABEL}>Email address</label>
-          <input
-            id="claim-email" type="email" autoComplete="email" value={values.email} onChange={(e) => set('email')(e.target.value)} {...field('email')}
-            placeholder="you@example.com" className={FIELD}
-          />
-          <p className="text-xs text-muted mt-1">If the code came by email, use that same address.</p>
+        <div className="hills-field">
+          <div className="hills-field__row">
+            <label htmlFor="claim-email" className="hills-label">Email address</label>
+          </div>
+          <div className="hills-input">
+            <input
+              id="claim-email" type="email" autoComplete="email" value={values.email} onChange={(e) => set('email')(e.target.value)} {...field('email')}
+              placeholder="you@example.com"
+            />
+          </div>
+          <p className="hills-hint">If the code came by email, use that same address.</p>
           {fieldError('email')}
         </div>
 
-        <div>
-          <label htmlFor="claim-password" className={LABEL}>Choose a password</label>
-          <div className="relative">
+        <div className="hills-field">
+          <div className="hills-field__row">
+            <label htmlFor="claim-password" className="hills-label">Choose a password</label>
+          </div>
+          <div className="hills-input">
             <input
               id="claim-password" type={showPass ? 'text' : 'password'} autoComplete="new-password"
               value={values.password} onChange={(e) => set('password')(e.target.value)} {...field('password')}
-              className={`${FIELD} pr-11`}
+              className="hills-pw"
             />
             <button
               type="button" onClick={() => setShowPass((v) => !v)} aria-label={showPass ? 'Hide password' : 'Show password'}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-foreground focus:outline-none cursor-pointer"
+              className="hills-eye"
             >
-              {showPass ? <EyeOff className="w-4 h-4" aria-hidden /> : <Eye className="w-4 h-4" aria-hidden />}
+              {showPass ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
             </button>
           </div>
           {fieldError('password')}
         </div>
 
-        <div>
-          <label htmlFor="claim-confirm" className={LABEL}>Type the password again</label>
-          <input
-            id="claim-confirm" type={showPass ? 'text' : 'password'} autoComplete="new-password"
-            value={values.confirm} onChange={(e) => set('confirm')(e.target.value)} {...field('confirm')} className={FIELD}
-          />
+        <div className="hills-field">
+          <div className="hills-field__row">
+            <label htmlFor="claim-confirm" className="hills-label">Type the password again</label>
+          </div>
+          <div className="hills-input">
+            <input
+              id="claim-confirm" type={showPass ? 'text' : 'password'} autoComplete="new-password"
+              value={values.confirm} onChange={(e) => set('confirm')(e.target.value)} {...field('confirm')}
+            />
+          </div>
           {fieldError('confirm')}
         </div>
 
-        <div>
-          <label htmlFor="claim-dob" className={LABEL}>Your child’s date of birth <span className="font-normal text-muted">(printed slip only)</span></label>
-          <input
-            id="claim-dob" type="date" max={today()} value={values.childDateOfBirth} onChange={(e) => set('childDateOfBirth')(e.target.value)}
-            {...field('childDateOfBirth')} className={FIELD}
-          />
-          <p className="text-xs text-muted mt-1">Only needed if you were handed a printed slip. Leave it empty if the code came by email.</p>
+        <div className="hills-field">
+          <div className="hills-field__row">
+            <label htmlFor="claim-dob" className="hills-label">Your child’s date of birth <small>(printed slip only)</small></label>
+          </div>
+          <div className="hills-input">
+            <input
+              id="claim-dob" type="date" max={today()} value={values.childDateOfBirth} onChange={(e) => set('childDateOfBirth')(e.target.value)}
+              {...field('childDateOfBirth')}
+            />
+          </div>
+          <p className="hills-hint">Only needed if you were handed a printed slip. Leave it empty if the code came by email.</p>
           {fieldError('childDateOfBirth')}
         </div>
 
-        <button
-          type="submit" disabled={busy}
-          className="w-full py-3 bg-brand-deep hover:brightness-125 active:brightness-90 text-white font-heading font-semibold text-sm rounded-xl transition-all shadow-md mt-2 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-        >
-          {busy && <Loader2 className="w-4 h-4 animate-spin" aria-hidden />}
-          {busy ? 'Creating your account…' : 'Create account'}
+        <button type="submit" disabled={busy} className="hills-go">
+          <span>{busy ? 'Creating your account…' : 'Create account'}</span>
+          <ArrowRight className="hills-go__arrow" aria-hidden />
         </button>
       </form>
 
-      <p className="mt-5 text-center text-xs text-muted-foreground dark:text-foreground">
-        Already set up?{' '}
-        <Link href="/login" className="font-bold text-brand-teal hover:text-brand-teal-light underline-offset-4 hover:underline">Sign in</Link>
+      <p className="hills-alt">
+        <span>Already set up?</span>
+        <Link href="/login" className="hills-link">Sign in</Link>
       </p>
     </AuthShell>
   )
