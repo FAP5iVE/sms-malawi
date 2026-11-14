@@ -41,6 +41,12 @@ interface Entry {
 interface Config {
   base: string
   frozen: string[]
+  /**
+   * Frozen files the USER has explicitly allowed to change (one-time, in writing). The frozen
+   * stop is lifted for these files only: every token must still be declared in `entries` /
+   * `newFiles`, and the files are listed in the report as approved exceptions.
+   */
+  approvedFrozen?: { file: string; reason: string; approvedOn: string }[]
   ignore: string[]
   presentationalAttrs: string[]
   newFiles: { file: string; reason: string }[]
@@ -105,6 +111,7 @@ for (const f of git(['ls-files', '--others', '--exclude-standard'], repo).split(
 const problems: string[] = []
 const findings: Finding[] = []
 const frozenTouched: string[] = []
+const approvedFrozenSeen: string[] = []
 const nonCode: string[] = []
 const newFilesSeen: string[] = []
 const deletedFilesSeen: string[] = []
@@ -115,8 +122,12 @@ for (const [repoRel, status] of [...changes].sort(([a], [b]) => a.localeCompare(
   const rel = toWeb(repoRel)
 
   if (matchesAny(rel, config.frozen)) {
-    frozenTouched.push(`${status} ${rel}`)
-    continue
+    const approved = (config.approvedFrozen ?? []).find((a) => a.file === rel)
+    if (!approved) {
+      frozenTouched.push(`${status} ${rel}`)
+      continue
+    }
+    approvedFrozenSeen.push(`${status} ${rel}   <= approved ${approved.approvedOn}: ${approved.reason}`)
   }
   if (matchesAny(rel, config.ignore) || !isCode(rel)) {
     nonCode.push(`${status} ${rel}`)
@@ -180,6 +191,11 @@ if (frozenTouched.length > 0) {
   for (const f of frozenTouched) out.push(`  ${f}`)
   out.push('')
 }
+if (approvedFrozenSeen.length > 0) {
+  out.push(`APPROVED exceptions to the frozen list (${approvedFrozenSeen.length}), user-approved, every token still declared below:`)
+  for (const f of approvedFrozenSeen) out.push(`  ${f}`)
+  out.push('')
+}
 if (problems.length > 0) {
   out.push('UNDECLARED structure changes:')
   for (const p of problems) out.push(`  ${p}`)
@@ -216,7 +232,7 @@ if (args.verbose && allowed.length > 0) {
 out.push(
   `Summary: frozen touched=${frozenTouched.length}, undeclared structure=${problems.length}, ` +
     `undeclared logic/selector tokens=${unexplained.length}, declared=${allowed.length}, ` +
-    `new files=${newFilesSeen.length}, deleted=${deletedFilesSeen.length}, non-code/ignored=${nonCode.length}`,
+    `new files=${newFilesSeen.length}, deleted=${deletedFilesSeen.length}, non-code/ignored=${nonCode.length}, approved frozen exceptions=${approvedFrozenSeen.length}`,
 )
 const ok = frozenTouched.length === 0 && problems.length === 0 && unexplained.length === 0
 out.push(ok ? 'RESULT: clean. Only looks changed.' : 'RESULT: needs review.')
@@ -225,7 +241,7 @@ console.log(out.join('\n'))
 if (args.json) {
   writeFileSync(
     args.json,
-    JSON.stringify({ base, ok, frozenTouched, problems, unexplained, allowed, newFilesSeen, deletedFilesSeen, nonCode }, null, 2),
+    JSON.stringify({ base, ok, frozenTouched, approvedFrozenSeen, problems, unexplained, allowed, newFilesSeen, deletedFilesSeen, nonCode }, null, 2),
   )
 }
 process.exit(ok ? 0 : 1)

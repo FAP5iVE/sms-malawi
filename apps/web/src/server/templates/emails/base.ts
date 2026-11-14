@@ -23,7 +23,10 @@ const TOKEN = {
   BORDER:       '#d1d5db',   // Divider colour
   // Typography
   FONT_STACK:   'Arial, Helvetica, sans-serif',
-  FONT_HEADING: 'Georgia, "Times New Roman", serif',
+  // Single quotes on purpose: this value is placed inside style="..." attributes, where a double
+  // quote ends the attribute early and drops the rest of the style (white-on-navy school name
+  // rendered black). Fixed 2026-11-14.
+  FONT_HEADING: "Georgia, 'Times New Roman', serif",
 } as const
 
 // ─────────────────────────────────────────────────────────

@@ -59,7 +59,7 @@ describe('RATE_POLICIES', () => {
   })
 
   it('public e-mail-sending policies limit per address, per IP and against a global e-mail budget', () => {
-    for (const id of ['public-newsletter', 'public-contact'] as const) {
+    for (const id of ['public-newsletter', 'public-contact', 'public-password-reset'] as const) {
       const scopes = (RATE_POLICIES[id] as RatePolicy).dimensions.map((d) => d.by)
       expect(scopes).toContain('identifier')
       expect(scopes).toContain('ip')

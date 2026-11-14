@@ -48,6 +48,7 @@ import { prisma } from '@/lib/prisma'
 import { clearTokensForUser } from '@/lib/push'
 import { generateTempPassword } from '@/lib/tempPassword'
 import { sendEmail } from '@/lib/email'
+import { sendResetEmail } from '@/server/services/passwordResetService'
 import * as algolia from '@/server/services/algoliaService'
 import type { CreateUserInput, NotificationPrefInput } from '@shared/schemas/admin'
 import type { UserRole } from '@shared/types/roles'
@@ -322,22 +323,15 @@ export async function sendPasswordReset(uid: string, actorIsSuperUser = false) {
   await assertAccountNotProtected(uid, actorIsSuperUser)
   const user = await getAuth().getUser(uid)
   if (!user.email) throw new Error('User has no email address.')
-  const link = await getAuth().generatePasswordResetLink(user.email)
-  // `from` deliberately omitted — see createUser() above; the email.ts
-  // singleton supplies it from EMAIL_FROM_ADDRESS/EMAIL_FROM_NAME.
-  const emailResult = await sendEmail({
-    to:      user.email,
-    subject: 'Password Reset — SMS Malawi',
-    html:    `<p>Click <a href="${link}">here</a> to reset your password. This link expires in 1 hour.</p>`,
-    tags: [{ name: 'type', value: 'password-reset' }],
-  })
-  if (!emailResult.ok) {
-    logger.warn(
-      { uid, email: user.email, reason: emailResult.error },
-      '[userManagementService.sendPasswordReset] reset email failed to send',
-    )
-    throw new Error('Failed to send password reset email.')
+  // The link opens the app's own /reset-password page (passwordResetService.ts), not
+  // Firebase's plain hosted page. `from` is supplied by the email.ts singleton.
+  let sent = false
+  try {
+    sent = await sendResetEmail(user.email, user.displayName)
+  } catch (err) {
+    logger.warn({ uid, email: user.email, err }, '[userManagementService.sendPasswordReset] could not build the reset link')
   }
+  if (!sent) throw new Error('Failed to send password reset email.')
 }
 
 // ─── OWN PROFILE PICTURE ─────────────────────────────────

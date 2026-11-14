@@ -6,11 +6,13 @@
  *   drawn as grey sweeping blocks, so the first paint already has the sky, the
  *   column split and the card, and nothing jumps when the real form arrives.
  *   Static markup, no state. Uses the app's existing `.skeleton` sweep.
+ *   `label` is the hidden screen-reader text (default: the sign-in page; the
+ *   reset-password page passes its own so it does not announce the wrong page).
  */
 
 import { PublicAmbientBackground } from '@/components/shared/PublicAmbientBackground'
 
-export function AuthShellSkeleton() {
+export function AuthShellSkeleton({ label = 'Loading the sign-in page…' }: { label?: string } = {}) {
   return (
     <div className="hills hills-auth relative flex flex-1 flex-col font-sans" aria-busy="true">
       <PublicAmbientBackground vivid />
@@ -36,7 +38,7 @@ export function AuthShellSkeleton() {
           </div>
         </div>
       </main>
-      <span className="sr-only" role="status">Loading the sign-in page…</span>
+      <span className="sr-only" role="status">{label}</span>
     </div>
   )
 }

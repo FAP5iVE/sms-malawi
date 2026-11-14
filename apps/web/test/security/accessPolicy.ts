@@ -118,6 +118,7 @@ export const ENDPOINT_POLICY: Readonly<Record<string, EndpointPolicy>> = {
   "POST /api/public/newsletter/subscribe": { category: 'public-site', reason: "Public form (newsletter / contact); per-identifier rate limit, Zod-validated, no data returned beyond an acknowledgement." },
   "GET /api/public/newsletter/confirm": { category: 'public-site', reason: "Public marketing-site read; returns only content explicitly published for the public (no personal data)." },
   "GET /api/public/newsletter/unsubscribe": { category: 'public-site', reason: "Public marketing-site read; returns only content explicitly published for the public (no personal data)." },
+  "POST /api/public/password-reset": { category: 'public-site', reason: "Public form (forgot password); per-address, per-IP and global rate limits, Zod-validated; the answer never says whether the address has an account." },
   "POST /api/public/contact": { category: 'public-site', reason: "Public form (newsletter / contact); per-identifier rate limit, Zod-validated, no data returned beyond an acknowledgement." },
   "GET /api/public/placements": { category: 'public-site', reason: "Public marketing-site read; returns only content explicitly published for the public (no personal data)." },
   "GET /api/public/placement-stats": { category: 'public-site', reason: "Public marketing-site read; returns only content explicitly published for the public (no personal data)." },

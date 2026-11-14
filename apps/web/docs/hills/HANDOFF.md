@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-13 (after Phase 7, the password and claim pages). Read this first when resuming.
+Last updated: 2026-11-14 (after Phase 7 and the one-time reset-link exception 7b). Read this first when resuming.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -35,6 +35,7 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | Phase 6a Text pages (`hills/phase-6-public-pages`) | done, reviewed | review pack 6a |
 | Phase 6b Lists, details, gallery, placement results, 404, `PublicArchive` (same branch) | done (user said "start the next", so treated as reviewed) | review pack 6b |
 | Phase 7 Password and claim pages (`hills/phase-7-password-claim`) | done, AT REVIEW GATE | review pack 7 |
+| Phase 7b Reset link opens the in-app page (`hills/phase-7b-reset-link`, off phase 7) - USER-APPROVED LOGIC EXCEPTION | done, AT REVIEW GATE | review pack 7b |
 | **8 Logged-in app** | **NEXT** (after the 7 review; see the plan, needs a scoping question first) | |
 | 9 Cleanup | pending | |
 
@@ -279,6 +280,33 @@ after 6a.
    - States captured with mocks (Firebase REST `accounts:*` routes and `**/guardian-claim` via `page.route`): form, error, sent, expired, missing code,
      updated, short password (reset), wrong current password (change), empty submit, server error and done (claim). Not rendered: change-password
      "first login" (needs a signed-in user with the claim), and the real Firebase round trip.
+
+14. **Phase 7b: one-time, user-approved logic exception (2026-11-14): the reset email must open the app's own page.** Branch
+    `hills/phase-7b-reset-link` off Phase 7. NOT a looks-only change; kept off the Phase 7 branch on purpose. The user said in writing: "a one time
+    exception ... to change the logic". It does NOT lift the rules for later phases.
+   - Cause: Firebase's own reset email (client `sendPasswordResetEmail`, and the raw output of Admin `generatePasswordResetLink`) always links to
+     Firebase's hosted action page (`*.firebaseapp.com/__/auth/action`). `url` / `handleCodeInApp` do not change that. The in-app `/reset-password`
+     page never received the code.
+   - Fix (no Firebase console setting needed): `passwordResetService.ts` asks the Admin SDK for the link, keeps only the `oobCode`, and emails
+     `${NEXT_PUBLIC_APP_URL}/reset-password?oobCode=...` through Resend with a new school-branded template (`templates/emails/password-reset.ts`).
+     New public route `POST /public/password-reset` (rate policy `public-password-reset`: per address 3/h, per IP, global budget; declared in
+     `test/security/accessPolicy.ts`; `docs/security/endpoint-inventory.md` regenerated). Same answer for known, unknown and disabled addresses;
+     `delivered:false` only when a real account exists and sending failed. Callers: `/forgot-password`, Settings > Profile (both through
+     `lib/passwordResetRequest.ts`, which falls back to Firebase's own email only on `delivered:false`), and the admin "send reset" in
+     `userManagementService.sendPasswordReset`.
+   - Needs in production: `NEXT_PUBLIC_APP_URL` = the real site origin, `RESEND_API_KEY`, and a Resend-verified `EMAIL_FROM_ADDRESS`. If email is not
+     configured the fallback sends Firebase's plain email, so reset never breaks.
+   - Also fixed (found while rendering the email): `TOKEN.FONT_HEADING` in `templates/emails/base.ts` had double quotes inside `style="..."`, which cut the
+     header's white colour off (school name rendered black on navy in EVERY email). Now single quotes; test added.
+   - Small: `AuthShellSkeleton` takes an optional `label` (hidden text); reset-password passes "Loading your reset link…".
+   - Gate: `logic-allowlist.json` has a new `approvedFrozen` list (file, reason, approvedOn). It lifts the frozen stop for those 9 files only; every
+     token still has to be declared, and the report prints an "APPROVED exceptions" block. Any other frozen file still fails.
+   - Tests: `passwordResetService.test.ts` (12) + policy test; route-contract and security-doc tests pass. The repo's own vitest config needs
+     `@testing-library/jest-dom`, which is not installed in this sandbox; run with a config without that setup file (see scratchpad
+     `vitest.sandbox.config.mts`). 8 other tests fail here with and without this change (settings.actions x7, assignmentService x1) plus riskService
+     failing to load; they are environment, not this change.
+   - Not done / cannot be tested here: a real email through Resend and a real Firebase code (no keys, no network). The route runs only through unit
+     tests (service) and mocked browser tests (page); the Express route itself was not exercised against Firebase.
 
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database, so signed-in pages cannot be

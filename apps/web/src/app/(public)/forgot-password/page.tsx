@@ -46,8 +46,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { sendPasswordResetEmail, type ActionCodeSettings } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { ApiError } from '@/lib/api-client'
+import { requestPasswordResetEmail } from '@/lib/passwordResetRequest'
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { AuthShell } from '@/components/shared/AuthShell'
 
@@ -59,24 +59,19 @@ export default function ForgotPasswordPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!auth) return // auth is only null during SSR; never reached in browser
     setError(null)
     setLoading(true)
     try {
-      const actionCodeSettings: ActionCodeSettings = {
-        url: `${window.location.origin}/reset-password`,
-        handleCodeInApp: true,
-      }
-      await sendPasswordResetEmail(auth, email, actionCodeSettings)
+      // The server emails a link to this app's own /reset-password page. It never says
+      // whether the address has an account, so the "sent" state is the same either way.
+      await requestPasswordResetEmail(email)
       setSent(true)
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? ''
-      if (code === 'auth/user-not-found') {
-        // Deliberately still show the "sent" state, never reveal whether
-        // an email address is registered.
-        setSent(true)
-      } else if (code === 'auth/invalid-email') {
+      if (code === 'auth/invalid-email' || (err instanceof ApiError && err.status === 400)) {
         setError('Please enter a valid email address.')
+      } else if (err instanceof ApiError && (err.status === 429 || err.status === 0)) {
+        setError(err.message)
       } else {
         setError('Something went wrong. Please try again.')
       }

@@ -52,6 +52,7 @@ import { renderNewsletterConfirm } from '@/server/templates/emails/newsletter-co
 import { getPublicViewUrl } from '@/lib/storage'
 import * as placementService from '@/server/services/placementService'
 import { getManebCandidateList } from '@/server/services/analyticsService'
+import { requestPasswordReset } from '@/server/services/passwordResetService'
 
 export const publicRouter = Router()
 
@@ -388,6 +389,23 @@ publicRouter.get('/newsletter/unsubscribe', async (req, res) => {
   })
 
   res.json({ message: 'You have been unsubscribed from the SMS Malawi newsletter.' })
+})
+
+// ─── PASSWORD RESET (public "forgot password") ────────────────────────────────
+// POST /public/password-reset  { email }
+// Emails a link to the app's own /reset-password page (see passwordResetService.ts for why
+// Firebase's own reset email is not used). The answer never says whether the address has an
+// account. `delivered: false` means the e-mail service could not send, so the page may fall
+// back to Firebase's own reset email. Limited per address, per IP and against an e-mail budget.
+const PasswordResetSchema = z.object({ email: z.string().trim().email().max(254) })
+
+publicRouter.post('/password-reset', rateLimit('public-password-reset', { identifier: emailIdentifier }), async (req, res) => {
+  const parsed = PasswordResetSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Please enter a valid email address.' })
+  }
+  const { delivered } = await requestPasswordReset(parsed.data.email)
+  res.json({ ok: true, delivered })
 })
 
 // ─── PUBLIC CONTACT FORM ──────────────────────────────────────────────────────

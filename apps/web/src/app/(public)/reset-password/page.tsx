@@ -52,7 +52,7 @@ import { AuthShellSkeleton } from '@/components/shared/AuthShellSkeleton'
 // and (auth)/library/page.tsx.
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<AuthShellSkeleton />}>
+    <Suspense fallback={<AuthShellSkeleton label="Loading your reset link…" />}>
       <ResetPasswordForm />
     </Suspense>
   )

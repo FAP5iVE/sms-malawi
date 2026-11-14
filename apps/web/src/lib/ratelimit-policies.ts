@@ -31,6 +31,7 @@
  * | public-application  | POST /applications/public                         | DB write, unauthenticated; shared-network friendly|
  * | public-newsletter   | POST /public/newsletter/subscribe                 | sends e-mail → per-address + provider budget     |
  * | public-contact      | POST /public/contact                              | sends e-mail to the school inbox                 |
+ * | public-password-reset | POST /public/password-reset                     | sends e-mail → per-address + provider budget     |
  * | ai-explain          | POST /placements/advisory/explain                 | Gemini quota; fail-closed (UI has a non-AI path) |
  * | search              | GET /search/fallback                              | Algolia / Postgres `contains` per keystroke      |
  * | report-read         | /reports/*, /reporting/*, /analytics/*            | wide aggregate queries                           |
@@ -88,6 +89,18 @@ export const RATE_POLICIES = {
       { by: 'identifier', windowMs: HOUR, max: 3, message: 'A confirmation e-mail was already sent to this address — please check your inbox.' },
       { by: 'ip', windowMs: 10 * MIN, max: 10 },
       { by: 'global', windowMs: HOUR, max: 300, alertAtRatio: 0.8, message: 'Subscriptions are busy right now — please try again later.' },
+    ],
+    store: 'shared',
+    onStoreFailure: 'local-fallback',
+    message: 'Too many requests — please try again later.',
+  },
+
+  'public-password-reset': {
+    id: 'public-password-reset',
+    dimensions: [
+      { by: 'identifier', windowMs: HOUR, max: 3, message: 'A reset link was already sent to this address — please check your inbox (and spam folder).' },
+      { by: 'ip', windowMs: 10 * MIN, max: 10 },
+      { by: 'global', windowMs: HOUR, max: 300, alertAtRatio: 0.8, message: 'Password reset is busy right now — please try again later.' },
     ],
     store: 'shared',
     onStoreFailure: 'local-fallback',

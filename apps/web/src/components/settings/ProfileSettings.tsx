@@ -6,7 +6,8 @@
  */
 
 import { useState } from 'react'
-import { updateProfile, sendPasswordResetEmail, getAuth } from 'firebase/auth'
+import { updateProfile, getAuth } from 'firebase/auth'
+import { requestPasswordResetEmail } from '@/lib/passwordResetRequest'
 import { Loader2, Save, KeyRound } from 'lucide-react'
 import { useAuthStore }        from '@/store/authStore'
 import { usePermissions }     from '@/hooks/usePermissions'
@@ -115,7 +116,7 @@ export function ProfileSettings() {
   async function handlePasswordReset() {
     if (!user?.email) return
     try {
-      await sendPasswordResetEmail(getAuth(), user.email)
+      await requestPasswordResetEmail(user.email)
       setResetSent(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send reset email')
