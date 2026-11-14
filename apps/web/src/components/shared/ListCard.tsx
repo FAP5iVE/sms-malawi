@@ -25,6 +25,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { useFlatSurface } from '@/components/shared/FlatSurface'
 
 interface ListCardProps {
   title: string
@@ -50,8 +51,10 @@ export function ListCard({
   children,
   className = '',
 }: ListCardProps) {
+  // Inside a ModuleSurface the list sits flat on the panel, no card of its own.
+  const flat = useFlatSurface()
   return (
-    <div className={`bg-surface border border-base rounded-xl p-3 sm:p-5 min-h-[8rem] md:min-h-[10rem] ${className}`}>
+    <div className={`${flat ? 'min-h-[6rem]' : 'bg-surface border border-base rounded-xl p-3 sm:p-5 min-h-[8rem] md:min-h-[10rem]'} ${className}`}>
       <div className="mb-3 sm:mb-4">
         <p className="font-heading font-semibold text-sm text-brand-navy">{title}</p>
         {sub ? <p className="text-xs text-muted mt-1">{sub}</p> : null}

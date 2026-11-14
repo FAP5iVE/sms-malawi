@@ -37,6 +37,7 @@ import {
   reducedMotionTransition,
 } from '@/lib/motion'
 import { cn } from '@/lib/utils'
+import { useFlatSurface } from '@/components/shared/FlatSurface'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // STAT VALUE FORMATTER (R15)
@@ -148,6 +149,9 @@ export function StatCard({
   href,
 }: StatCardProps) {
   const motionEnabled = useMotionEnabled()
+  // On a ModuleSurface a plain stat is a tint tile, not a second bordered card.
+  // A clickable one (href) keeps its border, so it still reads as a button.
+  const flat = useFlatSurface() && !href
 
   const TrendIcon =
     trend === 'up'
@@ -190,7 +194,7 @@ export function StatCard({
       }
 
   // ── Hover elevation transition ────────────────────────────────────────────
-  const hoverProps = motionEnabled
+  const hoverProps = motionEnabled && !flat
     ? {
         whileHover: {
           y: -3,
@@ -211,7 +215,8 @@ export function StatCard({
       initial="hidden"
       animate="visible"
       className={cn(
-        'bg-surface border border-base rounded-xl p-3 sm:p-5 flex flex-col gap-2 sm:gap-3',
+        flat ? 'app-tint rounded-xl p-3 sm:p-4' : 'bg-surface border border-base rounded-xl p-3 sm:p-5',
+        'flex flex-col gap-2 sm:gap-3',
         href ? 'cursor-pointer hover:border-brand-teal/40 transition-colors' : 'cursor-default',
         className
       )}

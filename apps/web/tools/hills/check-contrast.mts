@@ -323,6 +323,33 @@ for (const dark of [false, true]) {
   add('small label note (ink 82%)', 4.5, over([fg[0], fg[1], fg[2], 0.82], card), card)
 }
 
+// ── Phase 8a: the logged-in surface and its one tint ───────────────────────
+// Tint tiles (stat tiles, welfare counts, quiet mobile rows, table header row)
+// carry body text, muted text (.text-muted) and the navy/title text. The tint
+// is chosen so muted text keeps 4.5:1 on it. The surface itself is --card.
+for (const dark of [false, true]) {
+  const theme = dark ? 'dark' : 'light'
+  const block = dark ? DARK_BLOCK : ROOT_BLOCK
+  const tint = hslTriplet(dark ? /\.dark\s*\{\s*--app-tint[^}]*\}/ : /:root\s*\{\s*--app-tint[^}]*\}/, 'app-tint')
+  const g = (n: string): RGBA => hslTriplet(block, n)
+  const add = (name: string, need: number, a: RGBA, b: RGBA) =>
+    rows.push({ sky: 'app8', pair: `${name} on tint (${theme})`, need, got: ratio(a, b) })
+  add('body text', 4.5, g('foreground'), tint)
+  add('muted text (.text-muted)', 4.5, g('muted-foreground'), tint)
+  add('title / value (brand-navy)', 4.5, g('brand-navy'), tint)
+  add('brand-teal icon (graphic)', 3, g('brand-teal'), tint)
+  // Text straight on the page sky: idle tab labels and the line under a title
+  // (78% of the body ink, .app-sky-idle), the active tab label (brand-navy).
+  const page = g('background'), fg = g('foreground')
+  const idle = over([fg[0], fg[1], fg[2], 0.78], page)
+  rows.push({ sky: 'app8', pair: `idle tab label / title line (.app-sky-idle) on page (${theme})`, need: 4.5, got: ratio(idle, page) })
+  rows.push({ sky: 'app8', pair: `active tab label (brand-navy) on page (${theme})`, need: 4.5, got: ratio(g('brand-navy'), page) })
+  rows.push({ sky: 'app8', pair: `active tab underline (brand-teal, graphic) on page (${theme})`, need: 3, got: ratio(g('brand-teal'), page) })
+  const card = g('card')
+  rows.push({ sky: 'app8', pair: `tint against surface, light divider (${theme})`, need: 1.0, got: ratio(tint, card) })
+  rows.push({ sky: 'app8', pair: `surface border against page (${theme})`, need: 1.0, got: ratio(g('border'), g('background')) })
+}
+
 const fails = rows.filter((r) => r.got < r.need)
 if (process.argv.includes('--table') || fails.length > 0) {
   for (const r of rows) {

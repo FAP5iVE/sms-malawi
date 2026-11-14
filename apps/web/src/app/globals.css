@@ -3177,3 +3177,46 @@ a.hills-go { text-decoration: none; }
 .hills-checking svg { flex: none; width: 24px; height: 24px; color: var(--c-ink); animation: hills-spin 1s linear infinite; }
 @keyframes hills-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .hills-checking svg { animation: none; } }
+
+/* ─────────────────────────────────────────────────────────
+   PHASE 8a: LOGGED-IN SURFACE
+   One bordered surface per module page (ModuleSurface), one light
+   tint for sub-blocks inside it (stat tiles, mobile rows), and thin
+   dividers. Unlayered on purpose, like .main-scroll-pad: it must beat
+   Tailwind's layered utilities. Looks only: no logic reads these.
+
+   Gutters of the page (layout <main>): 16px on phones, 24px from 768px,
+   32px from 1024px. Surface padding: 16 / 20 / 24px.
+   Phones (< 768px): the surface runs edge to edge. Its negative margin
+   equals the 16px gutter, and the side border and the corners go.
+   The tint is chosen so .text-muted keeps 4.5:1 on it in both themes
+   (measured by tools/hills/check-contrast.mts).
+   ───────────────────────────────────────────────────────── */
+:root { --app-tint: 210 25% 98.5%; }
+.dark { --app-tint: 224 30% 14%; }
+
+.app-tint { background-color: hsl(var(--app-tint)); }
+
+.app-surface {
+  position: relative;
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 14px;
+  padding: 20px;
+}
+@media (min-width: 1024px) {
+  .app-surface { padding: 24px; }
+}
+@media (max-width: 767.98px) {
+  .app-surface {
+    margin-inline: -1rem;
+    border-inline-width: 0;
+    border-radius: 0;
+    padding: 16px;
+  }
+}
+/* Text that sits directly on the page sky (tab labels, the line under a page
+   title). The faint contour lines run behind it, so it uses 78% of the body
+   ink instead of .text-muted (measured on real pixels in the Phase 8a pack). */
+.app-sky-idle { color: color-mix(in srgb, hsl(var(--foreground)) 78%, transparent); }
+.app-sky-idle:hover { color: hsl(var(--foreground)); }

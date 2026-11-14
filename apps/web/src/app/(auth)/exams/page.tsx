@@ -406,7 +406,7 @@ function ExamsPageInner() {
              uses (see ModuleSurface.tsx). This page was the visual
              reference for that standard, so wrapping it here formalises
              what it already implied rather than changing its look. */}
-          <ModuleSurface>
+          {/* Phase 8a: the tab strip now sits above the surface, on the sky. */}
           {/* Mobile-scrollable pill tab navigation — C7 */}
             {/* [PRODUCTION FIX] Was variant="pill" — the filled navy chip
                that (see ModuleTabs.tsx) rendered with its background
@@ -420,8 +420,10 @@ function ExamsPageInner() {
               active={tab}
               onChange={setTab}
               id="exams-tabs"
+              onSky
             />
 
+          <ModuleSurface>
           {/* ── EXAMS TAB ── */}
           {tab === 'exams' && (
             <div className="space-y-5">
@@ -569,7 +571,7 @@ function ExamsPageInner() {
                 <div className="hidden md:block table-scroll">
                   <table className="w-full text-sm border-collapse min-w-160">
                     <thead>
-                      <tr className="bg-page border-b border-base">
+                      <tr className="app-tint border-b border-base">
                         {['Title', 'Subject', 'Date', 'Status', 'Actions'].map((h) => (
                           <th
                             key={h}

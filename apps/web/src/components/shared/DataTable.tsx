@@ -79,6 +79,7 @@ import {
   X,
 } from 'lucide-react'
 import { useMotionEnabled } from '@/store/motionStore'
+import { useFlatSurface } from '@/components/shared/FlatSurface'
 import {
   LIST_CONTAINER_VARIANTS,
   LIST_ITEM_VARIANTS,
@@ -472,6 +473,8 @@ function MobileCardList<T extends object>({
   onRowClick,
 }: MobileCardListProps<T>) {
   const [activeRow, setActiveRow] = useState<T | null>(null)
+  // On a ModuleSurface a row that does nothing on tap is a tint tile; a tappable one keeps its border.
+  const flat = useFlatSurface()
 
   const criticalCol  = columns.find((c) => c.priority === 'critical') ?? columns[0]
   const restCols     = columns.filter((c) => c !== criticalCol)
@@ -545,7 +548,7 @@ function MobileCardList<T extends object>({
               tabIndex={onRowClick ? 0 : undefined}
               aria-label={onRowClick ? `View details for ${id}` : undefined}
               className={[
-                'bg-surface border border-base rounded-xl px-4 py-3',
+                flat && !onRowClick ? 'app-tint rounded-xl px-4 py-3' : 'bg-surface border border-base rounded-xl px-4 py-3',
                 'flex items-start justify-between gap-3',
                 'hover:shadow-sm transition-shadow',
                 onRowClick
@@ -662,9 +665,12 @@ export function DataTable<T extends object>({
   onColumnVisibilityChange,
   onSort,
   onRowClick,
-  bordered = true,
+  bordered: borderedProp,
 }: DataTableProps<T>) {
   const motionEnabled = useMotionEnabled()
+  // Not told otherwise, the table draws its own card only when it is NOT on a ModuleSurface.
+  const flatSurface = useFlatSurface()
+  const bordered = borderedProp ?? !flatSurface
 
   const [sortKey,    setSortKey]    = useState<string | null>(null)
   const [sortDir,    setSortDir]    = useState<SortDir>(null)
@@ -892,7 +898,7 @@ export function DataTable<T extends object>({
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="border-b border-base bg-page">
+                <tr className={`border-b border-base ${flatSurface ? 'app-tint' : 'bg-page'}`}>
                   <th scope="col" className="px-4 py-3 w-10">
                     <input
                       type="checkbox"

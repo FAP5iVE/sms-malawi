@@ -1920,6 +1920,118 @@
       "kind": "logic",
       "pattern": "^const\\ TOKEN\\ =\\ \\{\\ PRIMARY\\ :\\ '\\#1e3a5f'\\ ,\\ PRIMARY_DARK\\ :\\ '\\#162d4a'\\ ,\\ ACCENT_BLUE\\ :\\ '\\#2e86ab'\\ ,\\ ACCENT_GREEN\\ :\\ '\\#2d6a4f'\\ ,\\ ACCENT_ORANGE\\ :\\ '\\#e76f51'\\ ,\\ ACCENT_RED\\ :\\ '\\#c0392b'\\ ,\\ ACCENT_AMBER\\ :\\ '\\#d4a017'\\ ,\\ WHITE\\ :\\ '\\#ffffff'\\ ,\\ BG_PAGE\\ :\\ '\\#f4f7f9'\\ ,\\ BG_CONTENT\\ :\\ '\\#ffffff'\\ ,\\ BG_FOOTER\\ :\\ '\\#eef1f4'\\ ,\\ TEXT_DARK\\ :\\ '\\#1a1a2e'\\ ,\\ TEXT_BODY\\ :\\ '\\#374151'\\ ,\\ TEXT_MUTED\\ :\\ '\\#6b7280'\\ ,\\ BORDER\\ :\\ '\\#d1d5db'\\ ,\\ FONT_STACK\\ :\\ 'Arial,\\ Helvetica,\\ sans\\-serif'\\ ,\\ FONT_HEADING\\ :\\ \"Georgia,\\ 'Times\\ New\\ Roman',\\ serif\"\\ ,\\ \\}\\ as\\ const$",
       "reason": "Approved exception 2026-11-14: the shared email font token uses single quotes inside the font list (a double quote ended the style attribute early, dropping the header colour). Value-only change."
+    },
+    {
+      "file": "src/components/shared/DataTable.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ DataTable\\ <\\ T\\ extends\\ object\\ >\\ \\(\\ \\{\\ data\\ ,\\ isLoading\\ ,\\ columns\\ ,\\ quickFilters\\ ,\\ activeQuickFilter\\ ,\\ onQuickFilter\\ ,\\ rowKey\\ ,\\ onBulkArchive\\ ,\\ onBulkAction\\ ,\\ filterPanel\\ ,\\ pagination\\ ,\\ emptyMessage\\ =\\ 'No\\ records\\ found\\.'\\ ,\\ mobileActions\\ ,\\ activeFilters\\ ,\\ onFilterRemove\\ ,\\ onFilterClearAll\\ ,\\ columnVisibility\\ ,\\ onColumnVisibilityChange\\ ,\\ onSort\\ ,\\ onRowClick\\ ,\\ bordered\\ =\\ true\\ ,\\ \\}\\ :\\ DataTableProps\\ <\\ T\\ >\\ \\)\\ \\{\\}$",
+      "reason": "Phase 8a: the `bordered` prop default (true) became \"not on a ModuleSurface\" (see the declared `bordered = borderedProp ?? !flatSurface`); an explicit true/false from a caller still wins. Same signature and props."
+    },
+    {
+      "file": "src/components/shared/DataTable.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ flat\\ =\\ useFlatSurface\\ \\(\\ \\)$",
+      "reason": "Phase 8a: reads the FlatSurface context (presentation only) so the component draws flat on a ModuleSurface; no data, no handler, no request."
+    },
+    {
+      "file": "src/components/shared/DataTable.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ DataTable\\ <\\ T\\ extends\\ object\\ >\\ \\(\\ \\{\\ data\\ ,\\ isLoading\\ ,\\ columns\\ ,\\ quickFilters\\ ,\\ activeQuickFilter\\ ,\\ onQuickFilter\\ ,\\ rowKey\\ ,\\ onBulkArchive\\ ,\\ onBulkAction\\ ,\\ filterPanel\\ ,\\ pagination\\ ,\\ emptyMessage\\ =\\ 'No\\ records\\ found\\.'\\ ,\\ mobileActions\\ ,\\ activeFilters\\ ,\\ onFilterRemove\\ ,\\ onFilterClearAll\\ ,\\ columnVisibility\\ ,\\ onColumnVisibilityChange\\ ,\\ onSort\\ ,\\ onRowClick\\ ,\\ bordered\\ :\\ borderedProp\\ ,\\ \\}\\ :\\ DataTableProps\\ <\\ T\\ >\\ \\)\\ \\{\\}$",
+      "reason": "Phase 8a: the `bordered` prop default (true) became \"not on a ModuleSurface\" (see the declared `bordered = borderedProp ?? !flatSurface`); an explicit true/false from a caller still wins. Same signature and props."
+    },
+    {
+      "file": "src/components/shared/DataTable.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ flatSurface\\ =\\ useFlatSurface\\ \\(\\ \\)$",
+      "reason": "Phase 8a: reads the FlatSurface context (presentation only) so the component draws flat on a ModuleSurface; no data, no handler, no request."
+    },
+    {
+      "file": "src/components/shared/DataTable.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ bordered\\ =\\ borderedProp\\ \\?\\?\\ !\\ flatSurface$",
+      "reason": "Phase 8a: look only."
+    },
+    {
+      "file": "src/components/shared/ListCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ flat\\ =\\ useFlatSurface\\ \\(\\ \\)$",
+      "reason": "Phase 8a: reads the FlatSurface context (presentation only) so the component draws flat on a ModuleSurface; no data, no handler, no request."
+    },
+    {
+      "file": "src/components/shared/StatCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ hoverProps\\ =\\ motionEnabled\\ \\?\\ \\{\\ whileHover\\ :\\ \\{\\ y\\ :\\ \\-\\ 3\\ ,\\ boxShadow\\ :\\ '0\\ 6px\\ 24px\\ \\-4px\\ rgba\\(0,\\ 0,\\ 0,\\ 0\\.10\\)'\\ ,\\ transition\\ :\\ reducedMotionTransition\\ \\(\\ motionEnabled\\ ,\\ SPRING\\ \\.\\ tight\\ \\)\\ ,\\ \\}\\ ,\\ whileTap\\ :\\ \\{\\ y\\ :\\ \\-\\ 1\\ ,\\ scale\\ :\\ 0\\.99\\ ,\\ transition\\ :\\ reducedMotionTransition\\ \\(\\ motionEnabled\\ ,\\ SPRING\\ \\.\\ tight\\ \\)\\ ,\\ \\}\\ ,\\ \\}\\ :\\ \\{\\ \\}$",
+      "reason": "Phase 8a: a flat stat tile does not lift on hover; the card keeps its hover when it is a link. Presentation only."
+    },
+    {
+      "file": "src/components/shared/StatCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ flat\\ =\\ useFlatSurface\\ \\(\\ \\)\\ \\&\\&\\ !\\ href$",
+      "reason": "Phase 8a: reads the FlatSurface context (presentation only) so the component draws flat on a ModuleSurface; no data, no handler, no request."
+    },
+    {
+      "file": "src/components/shared/StatCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ hoverProps\\ =\\ motionEnabled\\ \\&\\&\\ !\\ flat\\ \\?\\ \\{\\ whileHover\\ :\\ \\{\\ y\\ :\\ \\-\\ 3\\ ,\\ boxShadow\\ :\\ '0\\ 6px\\ 24px\\ \\-4px\\ rgba\\(0,\\ 0,\\ 0,\\ 0\\.10\\)'\\ ,\\ transition\\ :\\ reducedMotionTransition\\ \\(\\ motionEnabled\\ ,\\ SPRING\\ \\.\\ tight\\ \\)\\ ,\\ \\}\\ ,\\ whileTap\\ :\\ \\{\\ y\\ :\\ \\-\\ 1\\ ,\\ scale\\ :\\ 0\\.99\\ ,\\ transition\\ :\\ reducedMotionTransition\\ \\(\\ motionEnabled\\ ,\\ SPRING\\ \\.\\ tight\\ \\)\\ ,\\ \\}\\ ,\\ \\}\\ :\\ \\{\\ \\}$",
+      "reason": "Phase 8a: a flat stat tile does not lift on hover; the card keeps its hover when it is a link. Presentation only."
+    },
+    {
+      "file": "src/app/(auth)/exams/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onSky=true$",
+      "reason": "Phase 8a: passes the new optional `onSky` presentation prop (tab ink on the page sky). Selects class names only; onChange/active/tabs untouched."
+    },
+    {
+      "file": "src/app/(auth)/finances/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onSky=true$",
+      "reason": "Phase 8a: passes the new optional `onSky` presentation prop (tab ink on the page sky). Selects class names only; onChange/active/tabs untouched."
+    },
+    {
+      "file": "src/app/(auth)/finances/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onSky=true$",
+      "reason": "Phase 8a: passes the new optional `onSky` presentation prop (tab ink on the page sky). Selects class names only; onChange/active/tabs untouched."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^interface\\ ModuleTabsProps\\ <\\ T\\ extends\\ string\\ >\\ \\{\\ tabs\\ :\\ TabItem\\ <\\ T\\ >\\ \\[\\ \\]\\ active\\ :\\ T\\ onChange\\ :\\ \\(\\ id\\ :\\ T\\ \\)\\ =>\\ void\\ variant\\ \\?\\ :\\ 'underline'\\ \\|\\ 'pill'\\ id\\ \\?\\ :\\ string\\ size\\ \\?\\ :\\ 'default'\\ \\|\\ 'compact'\\ \\}$",
+      "reason": "Phase 8a: ModuleTabs gains the optional `onSky` prop (default false = unchanged look for every other page). Same tabs, active and onChange contract."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ ModuleTabs\\ <\\ T\\ extends\\ string\\ >\\ \\(\\ \\{\\ tabs\\ ,\\ active\\ ,\\ onChange\\ ,\\ variant\\ =\\ 'underline'\\ ,\\ id\\ =\\ 'tabs'\\ ,\\ size\\ =\\ 'default'\\ ,\\ \\}\\ :\\ ModuleTabsProps\\ <\\ T\\ >\\ \\)\\ \\{\\}$",
+      "reason": "Phase 8a: ModuleTabs gains the optional `onSky` prop (default false = unchanged look for every other page). Same tabs, active and onChange contract."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^interface\\ ModuleTabsProps\\ <\\ T\\ extends\\ string\\ >\\ \\{\\ tabs\\ :\\ TabItem\\ <\\ T\\ >\\ \\[\\ \\]\\ active\\ :\\ T\\ onChange\\ :\\ \\(\\ id\\ :\\ T\\ \\)\\ =>\\ void\\ variant\\ \\?\\ :\\ 'underline'\\ \\|\\ 'pill'\\ id\\ \\?\\ :\\ string\\ size\\ \\?\\ :\\ 'default'\\ \\|\\ 'compact'\\ onSky\\ \\?\\ :\\ boolean\\ \\}$",
+      "reason": "Phase 8a: ModuleTabs gains the optional `onSky` prop (default false = unchanged look for every other page). Same tabs, active and onChange contract."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ ModuleTabs\\ <\\ T\\ extends\\ string\\ >\\ \\(\\ \\{\\ tabs\\ ,\\ active\\ ,\\ onChange\\ ,\\ variant\\ =\\ 'underline'\\ ,\\ id\\ =\\ 'tabs'\\ ,\\ size\\ =\\ 'default'\\ ,\\ onSky\\ =\\ false\\ ,\\ \\}\\ :\\ ModuleTabsProps\\ <\\ T\\ >\\ \\)\\ \\{\\}$",
+      "reason": "Phase 8a: ModuleTabs gains the optional `onSky` prop (default false = unchanged look for every other page). Same tabs, active and onChange contract."
     }
   ],
   "approvedFrozen": [

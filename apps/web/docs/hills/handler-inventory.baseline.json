@@ -808,8 +808,8 @@
   ]
  },
  "src/app/(auth)/exams/page.tsx": {
-  "digest": "3b6cd63cbdc6c9144206b7bd40c00147b886cf2c",
-  "tokens": 267,
+  "digest": "556df232fdc5a67842cca743eeba16d1f7a25fcb",
+  "tokens": 268,
   "items": [
    {
     "k": "effect",
@@ -925,12 +925,17 @@
     "k": "handler",
     "n": "onConfirm",
     "h": "a79d88e2"
+   },
+   {
+    "k": "handler",
+    "n": "onSky",
+    "h": "c1b27167"
    }
   ]
  },
  "src/app/(auth)/finances/page.tsx": {
-  "digest": "6d77813684d71aebe2e8cdd2cb7eacc16bda53ca",
-  "tokens": 122,
+  "digest": "99306ecd44b73032873e7a1138d2d311a53b8342",
+  "tokens": 124,
   "items": [
    {
     "k": "handler",
@@ -941,6 +946,16 @@
     "k": "handler",
     "n": "onChange",
     "h": "f6d000c2"
+   },
+   {
+    "k": "handler",
+    "n": "onSky",
+    "h": "c1b27167"
+   },
+   {
+    "k": "handler",
+    "n": "onSky",
+    "h": "c1b27167"
    }
   ]
  },
@@ -2742,18 +2757,13 @@
   "items": []
  },
  "src/app/(public)/forgot-password/page.tsx": {
-  "digest": "f8dea08b7e6b83e526ea8ee0ec1e808321bb3288",
-  "tokens": 46,
+  "digest": "4d63c6c1033d8b1a1d399a6cee28dda6dc47e10e",
+  "tokens": 44,
   "items": [
    {
     "k": "call",
     "n": "handleSubmit",
     "h": "4765f779"
-   },
-   {
-    "k": "call",
-    "n": "sendPasswordResetEmail",
-    "h": "fe8c26b6"
    },
    {
     "k": "handler",
@@ -3089,8 +3099,8 @@
   "items": []
  },
  "src/app/(public)/reset-password/page.tsx": {
-  "digest": "c4fe3272a672b9cb1219e6784ce7a63833995335",
-  "tokens": 71,
+  "digest": "3a7cea72138856db924c85240c6818562dc9f6aa",
+  "tokens": 72,
   "items": [
    {
     "k": "call",
@@ -9754,14 +9764,9 @@
   ]
  },
  "src/components/settings/ProfileSettings.tsx": {
-  "digest": "6021cd0b739221dea818a85df1d3a44cda9b0605",
-  "tokens": 103,
+  "digest": "26c74f647bc92e5cd40b8d9aa14819929b0e6ab2",
+  "tokens": 104,
   "items": [
-   {
-    "k": "call",
-    "n": "sendPasswordResetEmail",
-    "h": "5c9c49aa"
-   },
    {
     "k": "handler",
     "n": "onChange",
@@ -10134,8 +10139,8 @@
   "items": []
  },
  "src/components/shared/AuthShellSkeleton.tsx": {
-  "digest": "ac65530e16cb62b4385ededb7e9c26c6b3e3cb52",
-  "tokens": 5,
+  "digest": "0c5d3855e16187ea99f7309897e32f3ba52cbf87",
+  "tokens": 6,
   "items": []
  },
  "src/components/shared/ChartCard.tsx": {
@@ -10197,8 +10202,8 @@
   ]
  },
  "src/components/shared/DataTable.tsx": {
-  "digest": "262d075a77ba2aacfaf3833e33652502e81fd219",
-  "tokens": 326,
+  "digest": "f0363f9461bba55403dbfb93de7aff05c520ed82",
+  "tokens": 329,
   "items": [
    {
     "k": "effect",
@@ -10534,8 +10539,8 @@
   ]
  },
  "src/components/shared/ListCard.tsx": {
-  "digest": "946f6698463edef23caba159955eb05b28be787b",
-  "tokens": 19,
+  "digest": "233d53ddf5a3c044028e094e6ee5ce4a678050b1",
+  "tokens": 20,
   "items": [
    {
     "k": "handler",
@@ -10643,7 +10648,7 @@
   "items": []
  },
  "src/components/shared/ModuleTabs.tsx": {
-  "digest": "4aebd603c116eb6951424f8efc2008ece736ad45",
+  "digest": "455a8969db5824810bbf0328b6b7adb6f490c72b",
   "tokens": 69,
   "items": [
    {
@@ -11399,8 +11404,8 @@
   ]
  },
  "src/components/shared/StatCard.tsx": {
-  "digest": "8617794b8d1d6524ebe9a70aeda9d70329566edd",
-  "tokens": 44,
+  "digest": "0b4abf8aec27f69a6abc8f02a03011608882ebe2",
+  "tokens": 45,
   "items": []
  },
  "src/components/shared/StudentRiskBadge.tsx": {

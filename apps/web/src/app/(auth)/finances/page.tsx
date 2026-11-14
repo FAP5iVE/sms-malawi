@@ -280,15 +280,38 @@ function FinancesContent() {
         <h1 className="font-heading text-2xl font-bold text-brand-navy">
           {isStudent ? 'My Fees & Payments' : isHRPayrollViewer ? 'Payroll' : 'Finances'}
         </h1>
-        <p className="text-sm text-muted mt-0.5">
+        <p className="text-sm app-sky-idle mt-0.5">
           {isHRPayrollViewer ? 'Payroll run history (view only)' : `Academic Year ${YEAR} · Term ${TERM}`}
         </p>
       </div>
 
+      {/* Phase 8a: both tab levels sit above the surface, on the sky. */}
+      {/* Level 1: the 7 grouped tabs */}
+      <ModuleTabs<GroupId>
+        tabs={GROUPS.map(({ id, label }) => ({ id, label }))}
+        active={activeGroup?.id ?? 'billing'}
+        onChange={selectGroup}
+        variant="underline"
+        id="finance-tabs"
+        onSky
+      />
+
+      {/* Level 2: sub-tabs, only when the group actually has more than one screen */}
+      {activeGroup && activeGroup.leaves.length > 1 && (
+        <ModuleTabs<Tab>
+          tabs={activeGroup.leaves.map(({ id, label }) => ({ id, label }))}
+          active={currentLeaf ?? activeGroup.leaves[0]?.id ?? activeTab}
+          onChange={setActiveTab}
+          variant="underline"
+          id={`finance-subtabs-${activeGroup.id}`}
+          onSky
+        />
+      )}
+
       <ModuleSurface>
       {/* Summary stats — finance staff only (not students, not HR payroll viewers) */}
       {!isStudent && !isHRPayrollViewer && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
           <SummaryCard
             label="Total Collected"
             value={summaryLoading ? '…' : formatMWK(summary?.totalCollected ?? 0)}
@@ -318,26 +341,6 @@ function FinancesContent() {
             bg="bg-brand-teal/10"
           />
         </div>
-      )}
-
-      {/* Level 1: the 7 grouped tabs */}
-      <ModuleTabs<GroupId>
-        tabs={GROUPS.map(({ id, label }) => ({ id, label }))}
-        active={activeGroup?.id ?? 'billing'}
-        onChange={selectGroup}
-        variant="underline"
-        id="finance-tabs"
-      />
-
-      {/* Level 2: sub-tabs, only when the group actually has more than one screen */}
-      {activeGroup && activeGroup.leaves.length > 1 && (
-        <ModuleTabs<Tab>
-          tabs={activeGroup.leaves.map(({ id, label }) => ({ id, label }))}
-          active={currentLeaf ?? activeGroup.leaves[0]?.id ?? activeTab}
-          onChange={setActiveTab}
-          variant="underline"
-          id={`finance-subtabs-${activeGroup.id}`}
-        />
       )}
 
       {/* Tab content */}
@@ -391,14 +394,14 @@ function SummaryCard({
   bg: string
 }) {
   return (
-    <div className="bg-surface border border-base rounded-xl p-4 flex items-start gap-3 min-w-0">
+    <div className="app-tint rounded-xl p-4 flex flex-col gap-2 min-w-0">
       <div
         className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${bg}`}
       >
         <Icon className={`w-5 h-5 ${color}`} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-lg sm:text-xl font-bold font-heading text-brand-navy tabular wrap-break-word">
+        <p className="text-sm sm:text-base font-bold font-heading text-brand-navy tabular wrap-break-word">
           {value}
         </p>
         <p className="text-xs text-muted mt-0.5">{label}</p>

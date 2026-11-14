@@ -264,7 +264,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
               over-wide child (a table, a long unbroken string) must never make
               the whole page pan sideways; wide data scrolls inside its own
               `.table-scroll` region instead. */}
-          <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-3 px-4 main-scroll-pad md:p-6 relative">
+          <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-3 px-4 main-scroll-pad md:px-6 md:pt-6 lg:px-8 relative">
             <ErrorBoundary resetKey={pathname}>
               <PageTransitionWrapper>{children}</PageTransitionWrapper>
             </ErrorBoundary>

@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-14 (after Phase 7 and the one-time reset-link exception 7b). Read this first when resuming.
+Last updated: 2026-11-14 (after Phase 7, the one-time reset-link exception 7b, and Phase 8a shell + pilot). Read this first when resuming.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -36,7 +36,8 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | Phase 6b Lists, details, gallery, placement results, 404, `PublicArchive` (same branch) | done (user said "start the next", so treated as reviewed) | review pack 6b |
 | Phase 7 Password and claim pages (`hills/phase-7-password-claim`) | done, AT REVIEW GATE | review pack 7 |
 | Phase 7b Reset link opens the in-app page (`hills/phase-7b-reset-link`, off phase 7) - USER-APPROVED LOGIC EXCEPTION | done, AT REVIEW GATE | review pack 7b |
-| **8 Logged-in app** | **NEXT** (after the 7 review; see the plan, needs a scoping question first) | |
+| Phase 8a Logged-in shell + pilot: Exams, Students, Finances (`hills/phase-8a-shell-pilot`, off 7b) | done, AT REVIEW GATE | review pack 8a |
+| **8b Rollout** (3 batches) / **8c** dashboards + parent portal | **NEXT** (after the 8a review decides the pilot look) | |
 | 9 Cleanup | pending | |
 
 The user asked for Phases 0 to the logo step to be reviewed as ONE package. Phases 3 and 4 were each reviewed on their own. Phase 6 is split in two review drops (6a, then 6b). Next review gate is
@@ -308,10 +309,34 @@ after 6a.
    - Not done / cannot be tested here: a real email through Resend and a real Firebase code (no keys, no network). The route runs only through unit
      tests (service) and mocked browser tests (page); the Express route itself was not exercised against Firebase.
 
+15. **Phase 8a: logged-in shell and pilot (Exams, Students, Finances).** Branch `hills/phase-8a-shell-pilot` off 7b. Looks only; logic gate clean
+    against 7b AND `main` (16 new declared tokens, all `useFlatSurface()` reads, the `bordered` default and the `onSky` prop).
+    - `(auth)/layout.tsx`: gutters 16 / 24 / 32px (`px-4 md:px-6 lg:px-8`, `md:pt-6`); `main-scroll-pad` bottom clearance untouched.
+    - `ModuleSurface` rewritten: ONE border, 14px radius, one padding (20px, 24px from 1024), no line-art, nothing clipped. Phones (<768px) edge to
+      edge (`margin-inline:-1rem`, no side border, no corners). It provides `<FlatSurface>`. CSS is `.app-surface`, `.app-tint`, `.app-sky-idle`
+      at the end of `globals.css` (unlayered on purpose, like `.main-scroll-pad`). Tint token `--app-tint` (light 210 25% 98.5%, dark 224 30% 14%).
+    - Flat by default on a surface: `StatCard` (tint tile; a card with `href` keeps its border and hover), `ListCard`, `DataTable` (own card only when
+      NOT on a surface; an explicit `bordered` prop still wins; header row on the tint; non-tappable mobile rows are tint tiles, tappable ones keep
+      their border), `ChartCard`/`ReportCard`/`ReportFilters` already did. `ModuleTabs` has an optional `onSky` prop (idle label = 78% body ink via
+      `.app-sky-idle`, active label = brand-navy; the teal underline stays) so tabs sitting on the sky keep 4.5:1.
+    - Pilot pages: title + tabs moved ABOVE the surface (Exams; Finances both tab levels); Students/Finances stat tiles moved INSIDE it as tint tiles;
+      Finances tiles stack icon over value (numbers no longer break mid-figure) and go 4-up from 1280px.
+    - Measured on real pixels (`measure8.mjs` + `analyze8.py`, text hidden): all text on the sky and in the new tint passes 4.5:1. What still fails is
+      OLD brand colour use on white, not changed here: white on brand-teal buttons in dark mode (1.91:1, "Add Student", "Schedule Exam"), emerald status
+      text 4.38, teal links 4.38, coral 4.19, amber "Medium Risk" 3.19. These are shared tokens; a fix needs the user's decision.
+    - Other ModuleSurface pages (attendance, library, hr, announcements, reports, classes, calendar, settings) render without errors or sideways overflow
+      under the new surface; their own inner bordered tiles are left for 8b.
+    - Clock check: 09:00 vs 16:00 Malawi screenshots of all five pilot views are pixel-identical (no sky switching in the app).
+    - Harness (new, in the pack `tools-capture/`): `session.mjs` (fake Firebase user in IndexedDB + unsigned JWT claims + mocked token endpoints),
+      `fixtures.mjs` (sample API data), `cap8.mjs` (screenshots; env BASE OUT PAGES WIDTHS THEMES CLOCK; CLOCK must be an ISO date), `measure8.mjs`,
+      `analyze8.py`, `run8.sh`/`runmulti.sh`/`runclock.sh`/`runm.sh`, `combo.py`, `vitest.dom.config.mts`.
+    - Tests: `FlatSurface.test.tsx` now 8 tests (surface, StatCard, ListCard, DataTable, ModuleTabs). Contrast: 404 pairs (18 new `app8` pairs).
+    - Open for the user: does the pilot look right (tint tiles, tabs on the sky)? If yes, 8b rolls it out in three batches.
+
 ## 5. Environment gotchas (this sandbox)
-- Prisma engine download is blocked: no Prisma client, no database, so signed-in pages cannot be
-  rendered or screenshotted. Do not retry or work around. tsc errors from missing Prisma types are
-  environmental; filter tsc output to the changed files.
+- Prisma engine download is blocked: no Prisma client, no database. Do not retry or work around. tsc errors from missing
+  Prisma types are environmental; filter tsc output to the changed files. Signed-in pages CAN be rendered since Phase 8a with a
+  fake session plus mocked API (see item 15 and `tools-capture/session.mjs`, `fixtures.mjs`).
 - Vitest suites fail before and after (`@testing-library/jest-dom` is not a dependency). Pre-existing.
 - Background processes are killed between calls: run `next dev` and the capture in ONE wrapper
   script (see the `run-capture*.sh` pattern), and use `HILLS_CHROMIUM_PATH` for the browser.

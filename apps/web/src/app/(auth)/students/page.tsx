@@ -316,7 +316,7 @@ function StudentsContent() {
           <h1 className="font-heading text-xl font-bold text-brand-navy">
             Students
           </h1>
-          <p className="text-sm text-muted mt-0.5">
+          <p className="text-sm app-sky-idle mt-0.5">
             {data?.total ?? '—'} students enrolled
           </p>
         </div>
@@ -387,9 +387,10 @@ function StudentsContent() {
         </PermissionGuard>
       </div>
 
+      <ModuleSurface>
       {/* Welfare counts for admin / headteacher / HR. Counts only: no names on a
           list page. Detail lives on each student's profile behind the same
-          permission. */}
+          permission. Phase 8a: tint tiles on the surface. */}
       {canSeeWelfare && welfareSummary && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-label="Welfare summary">
           {[
@@ -398,7 +399,7 @@ function StudentsContent() {
             ['With special needs', welfareSummary.withSupportNeeds],
             ['Orphan status not recorded', welfareSummary.orphanStatusUnrecorded],
           ].map(([label, value]) => (
-            <div key={label} className="bg-surface rounded-xl p-3">
+            <div key={label} className="app-tint rounded-xl p-3">
               <p className="text-xs text-muted">{label}</p>
               <p className="text-lg font-heading font-bold text-brand-navy tabular">{value}</p>
             </div>
@@ -406,7 +407,6 @@ function StudentsContent() {
         </div>
       )}
 
-      <ModuleSurface>
       {actionError && (
         <p
           role="alert"

@@ -88,6 +88,13 @@ interface ModuleTabsProps<T extends string> {
    * whole control lines up at 44px total instead of 52px.
    */
   size?: 'default' | 'compact'
+  /**
+   * Phase 8a: the strip sits on the page sky (above a ModuleSurface), not on a
+   * card. Idle labels then use the stronger sky ink and the active label the
+   * navy title ink, so both keep 4.5:1 on the sky (measured, see HANDOFF).
+   * Underline variant only. Default false: nothing changes for other pages.
+   */
+  onSky?: boolean
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -150,6 +157,7 @@ export function ModuleTabs<T extends string>({
   variant = 'underline',
   id      = 'tabs',
   size    = 'default',
+  onSky   = false,
 }: ModuleTabsProps<T>) {
   const motionEnabled = useMotionEnabled()
 
@@ -206,7 +214,9 @@ export function ModuleTabs<T extends string>({
                   'transition-colors duration-150',
                   // Touch target: min-h-[44px] meets WCAG 2.5.5
                   'min-h-[44px]',
-                  isActive ? 'text-brand-teal' : 'text-muted hover:text-body',
+                  isActive
+                    ? (onSky ? 'text-brand-navy' : 'text-brand-teal')
+                    : (onSky ? 'app-sky-idle' : 'text-muted hover:text-body'),
                 ].join(' ')}
               >
                 {Icon && (
