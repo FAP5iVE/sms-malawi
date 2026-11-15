@@ -446,13 +446,13 @@ export default function LandingPage() {
               </Link>
               <Link
                 href="/login"
-                className="hidden sm:flex items-center gap-2 bg-brand-teal text-white px-4 py-2.5 rounded-lg font-heading font-bold text-[13px] hover:bg-brand-teal-light transition-colors"
+                className="hidden sm:flex items-center gap-2 bg-btn-brand text-btn-brand-fg px-4 py-2.5 rounded-lg font-heading font-bold text-[13px] hover:bg-btn-brand-hover transition-colors"
               >
                 Login Portal <ArrowRight className="w-3.5 h-3.5" />
               </Link>
               <button
                 onClick={() => { setMenuOpen((v) => !v); setSearchOpen(false) }}
-                className="flex items-center gap-2 bg-brand-teal text-white px-3.5 py-2.5 rounded-lg font-heading font-bold text-[13px] hover:bg-brand-teal-light transition-colors"
+                className="flex items-center gap-2 bg-btn-brand text-btn-brand-fg px-3.5 py-2.5 rounded-lg font-heading font-bold text-[13px] hover:bg-btn-brand-hover transition-colors"
               >
                 {menuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
                 <span className="hidden sm:inline">Menu</span>
@@ -605,7 +605,7 @@ export default function LandingPage() {
               <div className="flex gap-3 flex-wrap">
                 <button
                   onClick={() => scrollTo('about')}
-                  className="inline-flex items-center gap-2 bg-brand-teal text-white px-6 py-4 rounded-xl font-heading font-bold text-sm hover:bg-brand-teal-light transition-colors"
+                  className="inline-flex items-center gap-2 bg-btn-brand text-btn-brand-fg px-6 py-4 rounded-xl font-heading font-bold text-sm hover:bg-btn-brand-hover transition-colors"
                 >
                   All about us <ArrowRight className="w-4 h-4" />
                 </button>

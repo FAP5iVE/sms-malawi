@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-15 (after Phase 8b-0 foundations, AT REVIEW GATE; before 8d). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
+Last updated: 2026-11-15 (after Phase 8d shell, AT REVIEW GATE; before 8b-1). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -39,8 +39,8 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | Phase 8a Logged-in shell + pilot: Exams, Students, Finances (`hills/phase-8a-shell-pilot`, off 7b) | done, AT REVIEW GATE | review pack 8a |
 | Plan extension 8b to 9 (`hills/phase-8-plan`, docs and tools only) | done, OWNER APPROVED 15 Nov 06:05 | `RULEBOOK.md`, `research/` |
 | 8b-0 foundations (text tones, StatusText, AttentionBadge, motion tokens, dialog sizes, paging, Button) (`hills/phase-8b0-foundations`, off `hills/phase-8-plan`) | done, AT REVIEW GATE | review pack 8b-0 |
-| **8d** header + sidebar + phone bottom bar | **NEXT** (after the 8b-0 gate) | |
-| **8b-1, 8b-2, 8b-3** page rollout in three batches | after 8d | |
+| 8d header + sidebar + phone bottom bar (`hills/phase-8d-shell`, off `hills/phase-8b0-foundations`) | done, AT REVIEW GATE | review pack 8d |
+| **8b-1, 8b-2, 8b-3** page rollout in three batches | **NEXT** (after the 8d gate) | |
 | **8c** dashboards, greeting, parent portal; **8e** calendar; **8f** emails; **8g** report cards + exports | after 8b; 8f and 8g exception APPROVED (presentation only) | |
 | **9** cleanup, ratchets (pills = 0, AI-tell count only down, contrast 100%) | last | |
 
@@ -367,8 +367,7 @@ after 6a.
       row before; 5.27 / 4.78 now) and `--status-warning` 37% to 33% (4.27 on a muted row before). Both are small global changes; tell the owner.
     - **Safety net for legacy buttons.** 63 places write `bg-brand-teal text-white` (a few `bg-brand-coral text-white`). Four unlayered rules fix exactly that class pair
       with the new pairs, EXCEPT inside `.hills-type` (public pages and the sign-in family, approved as they are). Verified in a real browser on both sides of the guard.
-      Phase 9 deletes the block when a grep finds no pair left. Open for the owner: 3 buttons on the public home page (`(public)/page.tsx` lines 449, 455, 608: nav Apply and
-      hero Apply) keep white on teal: 4.38:1 in light, 1.91:1 in dark.
+      Phase 9 deletes the block when a grep finds no pair left. RESOLVED in item 18: the 3 public home buttons were fixed after the owner said YES.
     - **`StatusText`** (`components/shared/StatusText.tsx`): coloured word plus an 8px shape (circle success, ring info, triangle warning, diamond danger, bar neutral). No pill.
       Uses the `text-status-*` tokens. Text 25 characters or fewer is a convention, not enforced.
     - **`AttentionBadge`** (`components/shared/AttentionBadge.tsx`) + pure rules and the source map in `lib/hills/attention.ts`: count (`99+`) or dot, hidden for 0, NaN,
@@ -400,6 +399,23 @@ after 6a.
     - **Missing from the zip received for this phase:** `apps/web/tools/hills/ai-tells/` (23 detectors, baseline 235 hits in 89 files), `docs/hills/research/A..G`, the git history,
       and node_modules. The RULEBOOK section 4 lists the detector rules, so ai-tells can be rebuilt; ask the owner for the originals first. `main` here = the delivered 8a state;
       `hills/phase-8-plan` = main + the two docs. Run the gate against the real history on the real repo.
+18. **8b-0 follow-ups (15 Nov 2026, after owner review).**
+    - Owner said YES to: darker muted/warning text, the home page button fix, and the unsaved-changes warning (RULEBOOK section 12, items 8 to 10).
+    - Home page: the "Apply" buttons the review pack mentioned are really "Login Portal" (nav, desktop and phone) and "All about us" (hero) plus "Menu"; classes only changed to `bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover`.
+    - Unsaved guard: `Modal.tsx` + `src/lib/hills/unsaved.ts` + tests. Only counts real user input (`isTrusted`), so a script that fills a field does not make the dialog "dirty". Custom pickers that do not fire an `input` event are not tracked (acceptable; they sit beside a text field in practice). The footer Cancel button is the caller's own and still closes at once.
+    - Story lesson: synthetic events are ignored by the guard, so stories for it must be driven by real typing (see the scratchpad guard_test.mjs approach), not by dispatching events.
+    - Pilot pixel check after 8b-0 colours: 51 of 1,206 text boxes on Exams, Students, Finances still under 4.5:1 (worst 3.19:1, "Medium Risk"). All are legacy status pills and old `text-brand-teal` links; the page batches replace them with StatusText and the text tones.
+    - Capture harness: the owner's tools-capture.zip (8a) works; run it from a scratch folder with Playwright, one wrapper script that starts `next dev -p 3100`, captures, and kills it.
+    - Missing from the zip (not blocking): `tools/hills/ai-tells/`, `docs/hills/research/`, git history. Rebuild the ai-tells list from RULEBOOK section 4 when the word sweeps start and set a new baseline (the old 235 hits in 89 files cannot be reproduced). History only matters for running the gate on the real repo; here the gate runs against local branches.
+
+19. **Phase 8d: shell (header, sidebar, phone bottom bar).** Branch `hills/phase-8d-shell` off `hills/phase-8b0-foundations`. Looks only; logic gate clean against the 8b-0 branch (65 declared tokens) and `main` (344 declared, 8 new files); contrast 502 pairs; tests 74; inventory regenerated (shell files only).
+    - **Phone bottom bar (R5.1, R5.2).** Height 64px plus safe area (measured 65 with the 1px divider), labels 12px (were 10px), active item = icon on the light tint pill (`app-tint`) plus teal text tone plus semibold label (the old top bar is gone), no shadow (measured `none`), whole slot is the tap target (78 x 64 at 390). Badge from the shared `AttentionBadge` on the same `item.badgeCount`. The "More" sheet rows use the same badge and the teal text tone for the active row.
+    - **Sidebar (R5, owner decision 4).** Same items in runs under headings Learning / People / School / Admin (`lib/hills/navGroups.ts`, pure, tested; Dashboard first with no heading; unknown pages land in "More"; empty groups dropped; every href in `config/navigation.ts` has a group, tested). Icon rail shows a thin divider between groups. The phone bar and "More" sheet do NOT use this and keep the order from `useNavigation` (R5.1). Active row uses `text-tone-teal` (5.01:1 light on the 8% wash). "Signed in as" is 12px, no capitals.
+    - **Sidebar colour (correction to 8b-0).** The real sidebar is `bg-surface` (light in light mode), NOT the navy `--sidebar-background`, so its badges use the normal `AttentionBadge` pair, never `onDark`. The `onDark` pair stays in the toolbox but is unused.
+    - **Header.** Bell badge (desktop and phone) is the shared `AttentionBadge` on the same `unreadCount`; the phone cap changes from "9+" to "99+" (R6.2). Sign out uses `text-tone-coral`, "View all" uses `text-tone-teal`, notification times are 12px. Order of the right-hand tools was already search, bell, theme, user (R5.4).
+    - **Not done, needs the owner:** (a) R5.4 asks for crest + school name in the HEADER on desktop; today they live in the sidebar's brand row, and moving them is a layout rebuild with a collapse-state side effect. (b) R5.4 asks for an avatar on the phone header; the avatar and sign-out live in the "More" sheet today and a header avatar would have to open that sheet (shared state = logic). (c) Phone "Period" switcher squeezes the page title ("Stude..."); R5.4 says phones keep crest, search, bell, avatar only. Each needs a decision before the work.
+    - **Checked in the real app** (Students, admin, fake session, approvals badge mocked to 7): 390 / 768 / 1280, light and dark, no sideways overflow, 21 sidebar links identical to before, bar items and hrefs unchanged, overlay opens at 768. Pilot pages re-captured under the new shell: 30 of 30 views no overflow, no error screens. Bell badge could not be driven in the harness (Firestore feed), so it is checked only through the shared component's story and tests.
+    - **Capture script:** `p8/shell8.mjs` (scratchpad) hides the React Query devtools button (`.tsqd-parent-container`) or it intercepts clicks on the phone bar.
 
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database. Do not retry or work around. tsc errors from missing

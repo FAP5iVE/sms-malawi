@@ -280,6 +280,49 @@ function Dialog({ size, form, dark }: { size: ModalSize; form: boolean; dark: bo
   )
 }
 
+/** Unsaved-changes guard: type in a field, then press Escape or click outside. */
+function GuardDialog({ dark }: { dark: boolean }) {
+  const [open, setOpen] = useState(true)
+  const [closedCount, setClosedCount] = useState(0)
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark)
+    return () => document.documentElement.classList.remove('dark')
+  }, [dark])
+  if (!open)
+    return (
+      <div style={{ padding: 20 }}>
+        <p>Dialog closed {closedCount} time(s).</p>
+        <button onClick={() => setOpen(true)}>Open</button>
+      </div>
+    )
+  return (
+    <Modal
+      title="Add student"
+      size="m"
+      onClose={() => {
+        setClosedCount((n) => n + 1)
+        setOpen(false)
+      }}
+      onSubmit={(e) => e.preventDefault()}
+      footer={
+        <>
+          <button type="button" className={MODAL_BTN_SECONDARY} onClick={() => setOpen(false)}>
+            Cancel
+          </button>
+          <button type="submit" className={MODAL_BTN_PRIMARY}>
+            Add student
+          </button>
+        </>
+      }
+    >
+      <label className="block text-sm">
+        <span className="text-muted">First name</span>
+        <input className="mt-1 block min-h-11 w-full rounded-lg border border-base bg-surface px-3" />
+      </label>
+    </Modal>
+  )
+}
+
 export const TonesLight: Story = { render: () => <Tones dark={false} /> }
 export const TonesDark: Story = { render: () => <Tones dark /> }
 export const StatusLight: Story = { render: () => <Status dark={false} /> }
@@ -298,3 +341,5 @@ export const DialogSmallConfirmDark: Story = { render: () => <Dialog size="s" fo
 export const DialogMediumFormLight: Story = { render: () => <Dialog size="m" form dark={false} /> }
 export const DialogMediumFormDark: Story = { render: () => <Dialog size="m" form dark /> }
 export const DialogLargeFormLight: Story = { render: () => <Dialog size="l" form dark={false} /> }
+export const DialogUnsavedTryItLight: Story = { render: () => <GuardDialog dark={false} /> }
+export const DialogUnsavedTryItDark: Story = { render: () => <GuardDialog dark /> }

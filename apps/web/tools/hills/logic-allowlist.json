@@ -128,6 +128,14 @@
     {
       "file": "src/lib/hills/usePagedRows.ts",
       "reason": "Phase 8b-0: client side paging hook over rows a page already holds. Owner decision 3. Not used by any page yet."
+    },
+    {
+      "file": "src/lib/hills/unsaved.ts",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/lib/hills/navGroups.ts",
+      "reason": "Phase 8d: pure grouping rule for the sidebar (R5, owner decision 4). Never adds, drops or re-links an item; unknown pages fall into a last 'More' group. Tested in tools/hills/__tests__/navGroups.test.mts."
     }
   ],
   "deletedFiles": [],
@@ -2336,6 +2344,489 @@
       "kind": "logic",
       "pattern": "^export\\ const\\ WAIT_MIN_VISIBLE_MS\\ =\\ 500$",
       "reason": "Phase 8b-0: constants only (easing curves and durations from RULEBOOK R9) mirrored from the CSS tokens and checked against globals.css by motion.test.mts."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useEffect\\ ,\\ useId\\ ,\\ useRef\\ ,\\ type\\ FormEvent\\ ,\\ type\\ ReactNode\\ ,\\ \\}\\ from\\ 'react'$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^onCloseRef\\ \\.\\ current\\ \\(\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ !\\ busy\\ \\)\\ onClose\\ \\(\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useCallback\\ ,\\ useEffect\\ ,\\ useId\\ ,\\ useRef\\ ,\\ useState\\ ,\\ type\\ FormEvent\\ ,\\ type\\ ReactNode\\ ,\\ \\}\\ from\\ 'react'$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ UNSAVED_BODY\\ ,\\ UNSAVED_DISCARD\\ ,\\ UNSAVED_KEEP\\ ,\\ UNSAVED_TITLE\\ ,\\ decideClose\\ ,\\ isGuardedDialog\\ ,\\ isUserEdit\\ ,\\ \\}\\ from\\ '@/lib/hills/unsaved'$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ guarded\\ =\\ isGuardedDialog\\ \\(\\ size\\ ,\\ !\\ !\\ onSubmit\\ ,\\ bare\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\[\\ dirty\\ ,\\ setDirty\\ \\]\\ =\\ useState\\ \\(\\ false\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\[\\ asking\\ ,\\ setAsking\\ \\]\\ =\\ useState\\ \\(\\ false\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ stateRef\\ =\\ useRef\\ \\(\\ \\{\\ guarded\\ ,\\ dirty\\ ,\\ asking\\ \\}\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^useEffect\\ \\(\\ \\(\\ \\)\\ =>\\ \\{\\}\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^stateRef\\ \\.\\ current\\ =\\ \\{\\ guarded\\ ,\\ dirty\\ ,\\ asking\\ \\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ attemptClose\\ =\\ useCallback\\ \\(\\ \\(\\ \\)\\ =>\\ \\{\\}\\ ,\\ \\[\\ \\]\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ decision\\ =\\ decideClose\\ \\(\\ \\{\\ busy\\ :\\ busyRef\\ \\.\\ current\\ ,\\ \\.\\.\\.\\ stateRef\\ \\.\\ current\\ \\}\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ decision\\ ===\\ 'close'\\ \\)\\ onCloseRef\\ \\.\\ current\\ \\(\\ \\)\\ else\\ if\\ \\(\\ decision\\ ===\\ 'ask'\\ \\)\\ setAsking\\ \\(\\ true\\ \\)\\ else\\ if\\ \\(\\ decision\\ ===\\ 'keep\\-editing'\\ \\)\\ setAsking\\ \\(\\ false\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ attemptCloseRef\\ =\\ useRef\\ \\(\\ attemptClose\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^attemptCloseRef\\ \\.\\ current\\ =\\ attemptClose$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^attemptCloseRef\\ \\.\\ current\\ \\(\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^attemptClose\\ \\(\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onInput=\\{\\ guarded\\ \\?\\ \\(\\ e\\ \\)\\ =>\\ \\{\\}\\ :\\ undefined\\ \\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ isUserEdit\\ \\(\\ e\\ \\.\\ nativeEvent\\ \\)\\ \\)\\ setDirty\\ \\(\\ true\\ \\)$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ asking\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^role=\"alertdialog\"$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria\\-modal=\"true\"$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-labelledby=\\{\\ `\\$\\{\\ titleId\\ \\}\\-unsaved`\\ \\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-describedby=\\{\\ `\\$\\{\\ descId\\ \\}\\-unsaved`\\ \\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^id=\\{\\ `\\$\\{\\ titleId\\ \\}\\-unsaved`\\ \\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ UNSAVED_TITLE\\ \\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^id=\\{\\ `\\$\\{\\ descId\\ \\}\\-unsaved`\\ \\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ UNSAVED_BODY\\ \\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^type=\"button\"$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onClick=\\{\\ \\(\\ \\)\\ =>\\ onCloseRef\\ \\.\\ current\\ \\(\\ \\)\\ \\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{UNSAVED_DISCARD\\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ UNSAVED_DISCARD\\ \\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^autoFocus=true$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onClick=\\{\\ \\(\\ \\)\\ =>\\ setAsking\\ \\(\\ false\\ \\)\\ \\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{UNSAVED_KEEP\\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ UNSAVED_KEEP\\ \\}$",
+      "reason": "Owner-approved logic exception, 15 Nov 2026 16:16 (RULEBOOK R8.4): a Hills form dialog (size s/m/l with onSubmit) that has been typed in asks 'Keep editing' or 'Discard changes' before an outside click, the X button or Escape closes it. Untouched dialogs, the old sizes, the footer's own Cancel and Save, and every caller callback behave as before. Rule in src/lib/hills/unsaved.ts (tested)."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ item\\ \\.\\ active\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5.1, R5.2, R6): the bar's badge is drawn by the shared AttentionBadge from the SAME item.badgeCount (no new data; hidden when 0, 99+ above 99, a full sentence for screen readers instead of 'N pending'). The active top bar becomes a tint pill behind the icon and labels grow to 12px, so the active/More markup is rearranged. Same links, same slots, same handlers, same 'More' button label."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ `\\$\\{\\ item\\ \\.\\ badgeCount\\ \\}\\ pending`\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5.1, R5.2, R6): the bar's badge is drawn by the shared AttentionBadge from the SAME item.badgeCount (no new data; hidden when 0, 99+ above 99, a full sentence for screen readers instead of 'N pending'). The active top bar becomes a tint pill behind the icon and labels grow to 12px, so the active/More markup is rearranged. Same links, same slots, same handlers, same 'More' button label."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ item\\ \\.\\ badgeCount\\ >\\ 99\\ \\?\\ '99\\+'\\ :\\ item\\ \\.\\ badgeCount\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5.1, R5.2, R6): the bar's badge is drawn by the shared AttentionBadge from the SAME item.badgeCount (no new data; hidden when 0, 99+ above 99, a full sentence for screen readers instead of 'N pending'). The active top bar becomes a tint pill behind the icon and labels grow to 12px, so the active/More markup is rearranged. Same links, same slots, same handlers, same 'More' button label."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{moreOpen\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\}\\ More$",
+      "reason": "Phase 8d (RULEBOOK R5.1, R5.2, R6): the bar's badge is drawn by the shared AttentionBadge from the SAME item.badgeCount (no new data; hidden when 0, 99+ above 99, a full sentence for screen readers instead of 'N pending'). The active top bar becomes a tint pill behind the icon and labels grow to 12px, so the active/More markup is rearranged. Same links, same slots, same handlers, same 'More' button label."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ moreOpen\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5.1, R5.2, R6): the bar's badge is drawn by the shared AttentionBadge from the SAME item.badgeCount (no new data; hidden when 0, 99+ above 99, a full sentence for screen readers instead of 'N pending'). The active top bar becomes a tint pill behind the icon and labels grow to 12px, so the active/More markup is rearranged. Same links, same slots, same handlers, same 'More' button label."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ attentionNoun\\ \\}\\ from\\ '@/lib/hills/attention'$",
+      "reason": "Phase 8d (RULEBOOK R5.1, R5.2, R6): the bar's badge is drawn by the shared AttentionBadge from the SAME item.badgeCount (no new data; hidden when 0, 99+ above 99, a full sentence for screen readers instead of 'N pending'). The active top bar becomes a tint pill behind the icon and labels grow to 12px, so the active/More markup is rearranged. Same links, same slots, same handlers, same 'More' button label."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^count=\\{\\ item\\ \\.\\ badgeCount\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5.1, R5.2, R6): the bar's badge is drawn by the shared AttentionBadge from the SAME item.badgeCount (no new data; hidden when 0, 99+ above 99, a full sentence for screen readers instead of 'N pending'). The active top bar becomes a tint pill behind the icon and labels grow to 12px, so the active/More markup is rearranged. Same links, same slots, same handlers, same 'More' button label."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^noun=\\{\\ attentionNoun\\ \\(\\ 'approvalsAwaitingMe'\\ \\)\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5.1, R5.2, R6): the bar's badge is drawn by the shared AttentionBadge from the SAME item.badgeCount (no new data; hidden when 0, 99+ above 99, a full sentence for screen readers instead of 'N pending'). The active top bar becomes a tint pill behind the icon and labels grow to 12px, so the active/More markup is rearranged. Same links, same slots, same handlers, same 'More' button label."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=More$",
+      "reason": "Phase 8d (RULEBOOK R5.1, R5.2, R6): the bar's badge is drawn by the shared AttentionBadge from the SAME item.badgeCount (no new data; hidden when 0, 99+ above 99, a full sentence for screen readers instead of 'N pending'). The active top bar becomes a tint pill behind the icon and labels grow to 12px, so the active/More markup is rearranged. Same links, same slots, same handlers, same 'More' button label."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=9\\+$",
+      "reason": "Phase 8d (RULEBOOK R5, R6): the bell badge is drawn by the shared AttentionBadge from the SAME unreadCount (no new data; phone cap changes from '9+' to '99+' per R6.2; screen readers hear the sentence). The bell button keeps its own aria-label, click handlers and open/close state."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ unreadCount\\ >\\ 9\\ \\?\\ '9\\+'\\ :\\ unreadCount\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6): the bell badge is drawn by the shared AttentionBadge from the SAME unreadCount (no new data; phone cap changes from '9+' to '99+' per R6.2; screen readers hear the sentence). The bell button keeps its own aria-label, click handlers and open/close state."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=99\\+$",
+      "reason": "Phase 8d (RULEBOOK R5, R6): the bell badge is drawn by the shared AttentionBadge from the SAME unreadCount (no new data; phone cap changes from '9+' to '99+' per R6.2; screen readers hear the sentence). The bell button keeps its own aria-label, click handlers and open/close state."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ unreadCount\\ >\\ 99\\ \\?\\ '99\\+'\\ :\\ unreadCount\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6): the bell badge is drawn by the shared AttentionBadge from the SAME unreadCount (no new data; phone cap changes from '9+' to '99+' per R6.2; screen readers hear the sentence). The bell button keeps its own aria-label, click handlers and open/close state."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ attentionNoun\\ \\}\\ from\\ '@/lib/hills/attention'$",
+      "reason": "Phase 8d (RULEBOOK R5, R6): the bell badge is drawn by the shared AttentionBadge from the SAME unreadCount (no new data; phone cap changes from '9+' to '99+' per R6.2; screen readers hear the sentence). The bell button keeps its own aria-label, click handlers and open/close state."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{unreadCount\\ >\\ 0\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6): the bell badge is drawn by the shared AttentionBadge from the SAME unreadCount (no new data; phone cap changes from '9+' to '99+' per R6.2; screen readers hear the sentence). The bell button keeps its own aria-label, click handlers and open/close state."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^count=\\{\\ unreadCount\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6): the bell badge is drawn by the shared AttentionBadge from the SAME unreadCount (no new data; phone cap changes from '9+' to '99+' per R6.2; screen readers hear the sentence). The bell button keeps its own aria-label, click handlers and open/close state."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^noun=\\{\\ attentionNoun\\ \\(\\ 'notificationsUnread'\\ \\)\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6): the bell badge is drawn by the shared AttentionBadge from the SAME unreadCount (no new data; phone cap changes from '9+' to '99+' per R6.2; screen readers hear the sentence). The bell button keeps its own aria-label, click handlers and open/close state."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ items\\ \\.\\ map\\ \\(\\ \\(\\ item\\ ,\\ index\\ \\)\\ =>\\ \\{\\}\\ \\)\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ `\\$\\{\\ item\\ \\.\\ badgeCount\\ \\}\\ pending`\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ item\\ \\.\\ badgeCount\\ >\\ 99\\ \\?\\ '99\\+'\\ :\\ item\\ \\.\\ badgeCount\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ attentionNoun\\ \\}\\ from\\ '@/lib/hills/attention'$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ groupNavItems\\ \\}\\ from\\ '@/lib/hills/navGroups'$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ groupNavItems\\ \\(\\ items\\ \\)\\ \\.\\ map\\ \\(\\ \\(\\ group\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ group\\ \\.\\ label\\ \\?\\?\\ 'top'\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^role=\\{\\ group\\ \\.\\ label\\ \\?\\ 'group'\\ :\\ undefined\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ group\\ \\.\\ label\\ \\?\\?\\ undefined\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ group\\ \\.\\ label\\ !==\\ null\\ \\&\\&\\ \\(\\ collapsed\\ \\?\\ \\(\\ <JSX/>\\ \\)\\ :\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ group\\ \\.\\ label\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ group\\ \\.\\ items\\ \\.\\ map\\ \\(\\ \\(\\ item\\ \\)\\ =>\\ \\{\\}\\ \\)\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ index\\ =\\ items\\ \\.\\ indexOf\\ \\(\\ item\\ \\)$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^count=\\{\\ item\\ \\.\\ badgeCount\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/Sidebar.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^noun=\\{\\ attentionNoun\\ \\(\\ 'approvalsAwaitingMe'\\ \\)\\ \\}$",
+      "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
     }
   ],
   "approvedFrozen": [

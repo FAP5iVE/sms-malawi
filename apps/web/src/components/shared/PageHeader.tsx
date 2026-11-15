@@ -96,6 +96,8 @@ import {
 import { ROLE_LABELS }   from '@shared/types/roles'
 import { GlobalSearch }  from '@/components/shared/GlobalSearch'
 import { ReportProblemModal } from '@/components/shared/ReportProblemModal'
+import { AttentionBadge } from '@/components/shared/AttentionBadge'
+import { attentionNoun } from '@/lib/hills/attention'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED PANEL MOTION (R15 — de-duplicates the identical variant/transition
@@ -250,7 +252,7 @@ function NotificationList({
                   {n.body}
                 </p>
                 {n.time && (
-                  <p className="text-[10px] text-muted mt-1 font-sans">{n.time}</p>
+                  <p className="text-xs text-muted mt-1 font-sans">{n.time}</p>
                 )}
               </div>
             </div>
@@ -266,7 +268,7 @@ function NotificationList({
             onClose()
             onViewAll()
           }}
-          className="text-xs text-brand-teal font-heading font-semibold hover:underline"
+          className="text-xs text-tone-teal font-heading font-semibold hover:underline"
         >
           View all announcements
         </button>
@@ -617,18 +619,11 @@ export function PageHeader() {
             >
               <Bell className="w-[18px] h-[18px]" aria-hidden />
               {unreadCount > 0 && (
-                <span
-                  className="
-                    absolute top-2 right-2
-                    min-w-[14px] h-3.5
-                    bg-brand-coral rounded-full
-                    text-white text-[8px] font-heading font-bold
-                    flex items-center justify-center px-0.5 leading-none
-                  "
-                  aria-hidden
-                >
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
+                <AttentionBadge
+                  count={unreadCount}
+                  noun={attentionNoun('notificationsUnread')}
+                  className="absolute right-0.5 top-1"
+                />
               )}
             </button>
           </div>
@@ -665,18 +660,11 @@ export function PageHeader() {
               >
                 <Bell className="w-5 h-5" aria-hidden />
                 {unreadCount > 0 && (
-                  <span
-                    className="
-                      absolute top-1 right-1
-                      min-w-[16px] h-4
-                      bg-brand-coral rounded-full
-                      text-white text-[9px] font-heading font-bold
-                      flex items-center justify-center px-1 leading-none
-                    "
-                    aria-hidden
-                  >
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
+                  <AttentionBadge
+                    count={unreadCount}
+                    noun={attentionNoun('notificationsUnread')}
+                    className="absolute -right-1 -top-1"
+                  />
                 )}
               </button>
 
@@ -839,7 +827,7 @@ export function PageHeader() {
                         type="button"
                         role="menuitem"
                         onClick={handleSignOut}
-                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-brand-coral hover:bg-brand-coral/5 transition-colors"
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-tone-coral hover:bg-brand-coral/5 transition-colors"
                       >
                         <LogOut className="w-4 h-4 shrink-0" aria-hidden />
                         Sign out

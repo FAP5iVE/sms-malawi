@@ -60,9 +60,11 @@
  */
 
 import {
+  useCallback,
   useEffect,
   useId,
   useRef,
+  useState,
   type FormEvent,
   type ReactNode,
 } from 'react'
@@ -71,6 +73,15 @@ import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useMotionEnabled } from '@/store/motionStore'
 import { DIALOG_ENTER_S, DIALOG_EASE_ENTER } from '@/lib/hills/motion'
+import {
+  UNSAVED_BODY,
+  UNSAVED_DISCARD,
+  UNSAVED_KEEP,
+  UNSAVED_TITLE,
+  decideClose,
+  isGuardedDialog,
+  isUserEdit,
+} from '@/lib/hills/unsaved'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED BUTTON STYLES — so every dialog's actions look the same.
@@ -194,6 +205,30 @@ export function Modal({
     busyRef.current = busy
   })
 
+  // ── Unsaved-changes guard (owner-approved, RULEBOOK R8.4) ─────────────────
+  // Only Hills form dialogs (size s / m / l with onSubmit) ask before an outside
+  // click, the X button or Escape closes them AFTER the person has typed. Every
+  // other dialog, and the footer's own Cancel / Save, behave exactly as before.
+  const guarded = isGuardedDialog(size, !!onSubmit, bare)
+  const [dirty, setDirty] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const stateRef = useRef({ guarded, dirty, asking })
+  useEffect(() => {
+    stateRef.current = { guarded, dirty, asking }
+  })
+
+  /** Close request from the X, the backdrop or Escape. */
+  const attemptClose = useCallback(() => {
+    const decision = decideClose({ busy: busyRef.current, ...stateRef.current })
+    if (decision === 'close') onCloseRef.current()
+    else if (decision === 'ask') setAsking(true)
+    else if (decision === 'keep-editing') setAsking(false)
+  }, [])
+  const attemptCloseRef = useRef(attemptClose)
+  useEffect(() => {
+    attemptCloseRef.current = attemptClose
+  })
+
   // ── Stack, scroll lock, Escape ─────────────────────────────────────────────
   useEffect(() => {
     const token = Symbol('modal')
@@ -207,7 +242,7 @@ export function Modal({
       if (modalStack[modalStack.length - 1] !== token) return
       if (busyRef.current) return
       e.preventDefault()
-      onCloseRef.current()
+      attemptCloseRef.current()
     }
     document.addEventListener('keydown', onKeyDown)
 
@@ -262,7 +297,7 @@ export function Modal({
   const hasHeader = !bare && (title != null || description != null)
 
   function requestClose() {
-    if (!busy) onClose()
+    attemptClose()
   }
 
   const chrome = bare ? (
@@ -318,7 +353,11 @@ export function Modal({
 
   const content =
     onSubmit && !bare ? (
-      <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+      <form
+        onSubmit={onSubmit}
+        onInput={guarded ? (e) => { if (isUserEdit(e.nativeEvent)) setDirty(true) } : undefined}
+        className="flex min-h-0 flex-1 flex-col"
+      >
         {chrome}
       </form>
     ) : (
@@ -361,6 +400,42 @@ export function Modal({
         ].join(' ')}
       >
         {content}
+
+        {asking && (
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby={`${titleId}-unsaved`}
+            aria-describedby={`${descId}-unsaved`}
+            className="app-unsaved absolute inset-0 z-10 flex items-end justify-center bg-brand-navy/40 p-4 sm:items-center"
+          >
+            <div className="w-full max-w-sm rounded-[14px] border border-base bg-surface p-5 shadow-xl">
+              <h3 id={`${titleId}-unsaved`} className="font-heading text-base font-bold text-brand-navy">
+                {UNSAVED_TITLE}
+              </h3>
+              <p id={`${descId}-unsaved`} className="mt-1 text-sm text-muted">
+                {UNSAVED_BODY}
+              </p>
+              <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => onCloseRef.current()}
+                  className={`${BTN_BASE} border border-base text-tone-coral hover:bg-page`}
+                >
+                  {UNSAVED_DISCARD}
+                </button>
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setAsking(false)}
+                  className={`${BTN_BASE} bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover`}
+                >
+                  {UNSAVED_KEEP}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </motion.div>
     </div>,
     document.body,

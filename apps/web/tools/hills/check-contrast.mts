@@ -400,6 +400,26 @@ for (const dark of [false, true]) {
   add('attention dot on dark chrome (graphic)', 3, onDarkFill, g('sidebar-background'), 'sidebar')
 }
 
+// ── Phase 8d: shell (sidebar, phone bottom bar, header) ─────────────────────
+// The active sidebar row and the "More" sheet row use the teal text tone on the
+// card with a faint teal wash (8% expanded, 10% icon rail). Group headings and
+// the bottom bar labels are muted text on the card (covered above); the active
+// bottom bar icon sits on the tint pill (tone-teal on tint, covered above).
+for (const dark of [false, true]) {
+  const theme = dark ? 'dark' : 'light'
+  const block = dark ? DARK_BLOCK : ROOT_BLOCK
+  const found = new RegExp(dark ? '\\.dark\\s*\\{\\s*--tone-teal[^}]*\\}' : ':root\\s*\\{\\s*--tone-teal[^}]*\\}').exec(css)
+  if (!found) throw new Error('8d tone block not found for ' + theme)
+  const tone = hslTriplet(new RegExp(found[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'tone-teal')
+  const card = hslTriplet(block, 'card')
+  const teal = hslTriplet(block, 'brand-teal')
+  for (const [pct, where] of [[0.08, 'active row wash 8%'], [0.1, 'active rail wash 10%']] as const) {
+    const wash = over([teal[0], teal[1], teal[2], pct], card)
+    rows.push({ sky: 'shell8', pair: `tone-teal on ${where} (${theme})`, need: 4.5, got: ratio(tone, wash) })
+    rows.push({ sky: 'shell8', pair: `muted-foreground on ${where} (${theme})`, need: 4.5, got: ratio(hslTriplet(block, 'muted-foreground'), wash) })
+  }
+}
+
 const fails = rows.filter((r) => r.got < r.need)
 if (process.argv.includes('--table') || fails.length > 0) {
   for (const r of rows) {
