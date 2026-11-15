@@ -50,6 +50,7 @@
 import { useEffect, useRef }     from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMotionEnabled }       from '@/store/motionStore'
+import { AttentionBadge }        from '@/components/shared/AttentionBadge'
 import { reducedMotionTransition, SPRING } from '@/lib/motion'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,6 +64,8 @@ export interface TabItem<T extends string = string> {
   icon?: React.ElementType
   /** Number shown as a coral badge dot; omit or pass 0 to hide */
   badge?: number
+  /** Finishes the screen reader sentence for the badge: "waiting for approval". Default "items". */
+  badgeNoun?: string
 }
 
 interface ModuleTabsProps<T extends string> {
@@ -101,22 +104,10 @@ interface ModuleTabsProps<T extends string> {
 // BADGE COUNT — small coral pill shown alongside tab label
 // ─────────────────────────────────────────────────────────────────────────────
 
-function BadgeCount({ count }: { count: number }) {
-  if (!count) return null
-  return (
-    <span
-      className="
-        inline-flex items-center justify-center
-        ml-1.5 min-w-[16px] h-4 px-1
-        bg-brand-coral text-white
-        text-[9px] font-heading font-bold
-        rounded-full leading-none
-      "
-      aria-label={`${count} items`}
-    >
-      {count > 99 ? '99+' : count}
-    </span>
-  )
+function BadgeCount({ count, noun = 'items' }: { count: number; noun?: string }) {
+  // One shared badge (RULEBOOK section 6): 18px, 11px bold text, "99+", readable
+  // sentence for screen readers. Draws nothing for 0 or a bad number.
+  return <AttentionBadge count={count} noun={noun} className="ml-1.5" />
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -223,7 +214,7 @@ export function ModuleTabs<T extends string>({
                   <Icon className="w-4 h-4 shrink-0" aria-hidden />
                 )}
                 {tab.label}
-                {!!tab.badge && <BadgeCount count={tab.badge} />}
+                {!!tab.badge && <BadgeCount count={tab.badge} noun={tab.badgeNoun} />}
 
                 {/*
                   Animated active indicator — slides under the active tab.
@@ -313,7 +304,7 @@ export function ModuleTabs<T extends string>({
 
               {Icon && <Icon className="w-4 h-4 shrink-0" aria-hidden />}
               {tab.label}
-              {!!tab.badge && <BadgeCount count={tab.badge} />}
+              {!!tab.badge && <BadgeCount count={tab.badge} noun={tab.badgeNoun} />}
             </button>
           )
         })}

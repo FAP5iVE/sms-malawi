@@ -70,6 +70,7 @@ import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useMotionEnabled } from '@/store/motionStore'
+import { DIALOG_ENTER_S, DIALOG_EASE_ENTER } from '@/lib/hills/motion'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED BUTTON STYLES — so every dialog's actions look the same.
@@ -90,11 +91,16 @@ export const MODAL_BTN_DANGER = `${BTN_BASE} bg-brand-coral text-white hover:bg-
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'screen'
+// 's' | 'm' | 'l' are the three Hills sizes (RULEBOOK R8.2): 400, 560 and 720px.
+// The older 'sm' to '2xl' stay as they were until each page is converted.
+export type ModalSize = 's' | 'm' | 'l' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'screen'
 
 // Widths apply from `sm` (640px) up; the panel is also bounded by the overlay's
 // 1.5rem side padding, so on a small tablet it can never overflow the screen.
 const SIZE_CLASS: Record<ModalSize, string> = {
+  s: 'sm:max-w-[25rem]',    // 400px  (Hills)
+  m: 'sm:max-w-[35rem]',    // 560px  (Hills)
+  l: 'sm:max-w-[45rem]',    // 720px  (Hills)
   sm: 'sm:max-w-[28rem]',   // 448px  (was 384)
   md: 'sm:max-w-[34rem]',   // 544px  (was 448)
   lg: 'sm:max-w-[40rem]',   // 640px  (was 512)
@@ -249,6 +255,10 @@ export function Modal({
   if (typeof document === 'undefined') return null
 
   const isScreen = size === 'screen'
+  // Hills dialogs: a form fills the phone screen with a sticky footer; a dialog
+  // without input stays a bottom sheet (R8.2).
+  const isHills = size === 's' || size === 'm' || size === 'l'
+  const isHillsForm = isHills && !!onSubmit && !bare
   const hasHeader = !bare && (title != null || description != null)
 
   function requestClose() {
@@ -260,7 +270,7 @@ export function Modal({
   ) : (
     <>
       {/* Mobile grab-handle — purely decorative cue that this is a sheet. */}
-      {!isScreen && (
+      {!isScreen && !isHillsForm && (
         <div className="sm:hidden flex justify-center pt-2 shrink-0" aria-hidden>
           <span className="h-1 w-10 rounded-full bg-base" />
         </div>
@@ -338,12 +348,14 @@ export function Modal({
         tabIndex={-1}
         initial={motionEnabled ? { opacity: 0, y: 24 } : false}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: DIALOG_ENTER_S, ease: DIALOG_EASE_ENTER }}
         className={[
           'app-modal-panel relative flex w-full flex-col bg-surface shadow-2xl overflow-hidden outline-none',
           isScreen
             ? 'app-modal-panel--screen'
-            : `rounded-t-3xl sm:rounded-3xl app-modal-panel--${size}`,
+            : isHills
+              ? `app-dialog${isHillsForm ? ' app-dialog--form' : ''}`
+              : `rounded-t-3xl sm:rounded-3xl app-modal-panel--${size}`,
           SIZE_CLASS[size],
           panelClassName,
         ].join(' ')}

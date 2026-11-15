@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-14 (after Phase 7, the one-time reset-link exception 7b, and Phase 8a shell + pilot). Read this first when resuming.
+Last updated: 2026-11-15 (after Phase 8b-0 foundations, AT REVIEW GATE; before 8d). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -17,7 +17,7 @@ stable selectors: `id`, `name`, `type`, `role`, `autoComplete`, label and button
 Repo: `/home/claude/sms-malawi-src/sms-malawi` (monorepo; the app is `apps/web`). Branches, each a
 cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-baseline` <
 `hills/phase-1-tokens` < `hills/phase-2-sky` < `hills/phase-2c-font-logos` < `hills/phase-3-login` < `hills/phase-4-home` <
-`hills/phase-4b-home-polish` < `hills/phase-5-apply` (current head). NOTE: the history bundle was not in the zip received for Phase 3, so in the sandbox repo
+`hills/phase-4b-home-polish` < `hills/phase-5-apply` < ... < `hills/phase-8a-shell-pilot` < `hills/phase-8-plan` < `hills/phase-8b0-foundations` (current head). NOTE: the history bundle was not in the zip received for Phase 3, so in the sandbox repo
 `main` and `hills/phase-2c-font-logos` are one reconstructed baseline commit (the delivered 2c state);
 `pnpm hills:logic-diff --base main` therefore only proves Phase 3 here. Run it on the real repo.
 
@@ -37,8 +37,12 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | Phase 7 Password and claim pages (`hills/phase-7-password-claim`) | done, AT REVIEW GATE | review pack 7 |
 | Phase 7b Reset link opens the in-app page (`hills/phase-7b-reset-link`, off phase 7) - USER-APPROVED LOGIC EXCEPTION | done, AT REVIEW GATE | review pack 7b |
 | Phase 8a Logged-in shell + pilot: Exams, Students, Finances (`hills/phase-8a-shell-pilot`, off 7b) | done, AT REVIEW GATE | review pack 8a |
-| **8b Rollout** (3 batches) / **8c** dashboards + parent portal | **NEXT** (after the 8a review decides the pilot look) | |
-| 9 Cleanup | pending | |
+| Plan extension 8b to 9 (`hills/phase-8-plan`, docs and tools only) | done, OWNER APPROVED 15 Nov 06:05 | `RULEBOOK.md`, `research/` |
+| 8b-0 foundations (text tones, StatusText, AttentionBadge, motion tokens, dialog sizes, paging, Button) (`hills/phase-8b0-foundations`, off `hills/phase-8-plan`) | done, AT REVIEW GATE | review pack 8b-0 |
+| **8d** header + sidebar + phone bottom bar | **NEXT** (after the 8b-0 gate) | |
+| **8b-1, 8b-2, 8b-3** page rollout in three batches | after 8d | |
+| **8c** dashboards, greeting, parent portal; **8e** calendar; **8f** emails; **8g** report cards + exports | after 8b; 8f and 8g exception APPROVED (presentation only) | |
+| **9** cleanup, ratchets (pills = 0, AI-tell count only down, contrast 100%) | last | |
 
 The user asked for Phases 0 to the logo step to be reviewed as ONE package. Phases 3 and 4 were each reviewed on their own. Phase 6 is split in two review drops (6a, then 6b). Next review gate is
 after 6a.
@@ -333,6 +337,70 @@ after 6a.
     - Tests: `FlatSurface.test.tsx` now 8 tests (surface, StatCard, ListCard, DataTable, ModuleTabs). Contrast: 404 pairs (18 new `app8` pairs).
     - Open for the user: does the pilot look right (tint tiles, tabs on the sky)? If yes, 8b rolls it out in three batches.
 
+16. **Plan extension for the signed-in overhaul (15 Nov 2026).** Branch `hills/phase-8-plan` off 8a. No UI code changed. The owner approved the pilot and asked
+    for research first, then an extended plan. Read `docs/hills/RULEBOOK.md` before any 8b+ work: it is the single rule list (numbered R1 to R12)
+    with the source status of each rule ([read] / [ours] / [unverified]). Research logs are in `docs/hills/research/A` to `G`.
+    - Order of work: 8b-0 foundations, 8d shell (header, sidebar, phone bar), 8b-1/2/3 page rollout, 8c dashboards + parent portal, 8e calendar,
+      8f emails, 8g report cards + exports, 9 cleanup. Each ends at a review gate with a pack.
+    - Batch suggestion: 8b-1 attendance, timetable, guardians, classes, placements, applications; 8b-2 library, HR, announcements, approvals,
+      settings, monitoring, reports; 8b-3 the rest of Exams/Students/Finances inner tabs and any page not yet reached. Finance tabs regrouped to one row.
+    - New tooling: `apps/web/tools/hills/ai-tells/` (`tells.json`, 23 detectors; `scan_tells.py`, run from `apps/web/src`). Baseline 235 hits in 89 files.
+      Rule: the count may only go down; a person still reads every page.
+    - Frozen server paths for 8f and 8g (emails, PDFs, exports) need an explicit `approvedFrozen` entry for presentation only, like 7b. Do not start them
+      without the owner's written OK.
+    - Research gaps (do not present as standards): A4 PDF margins and page numbering, payslip and report-card document norms, Excel/CSV norms, Malawi
+      receipt rules, three dialog widths (400/560/720), reduced-motion source, Monday week start.
+    - Old colour failures are now in scope (owner said CHANGE AND FIX): add text tones in 8b-0, prove with `pnpm hills:contrast`.
+
+    - **Owner decisions, 15 Nov 2026 06:05 (all recorded in RULEBOOK section 12):** emails and exports frozen-path exception YES (presentation only; add each
+      file to `approvedFrozen` with a reason); attention badges where the page does not already load the count = no badge, no new query (Claude's call, owner
+      delegated); server side paging NO (client side only); header/sidebar/bottom bar redesign YES; colour text tones YES; greeting and role line wording YES;
+      export-ready notice and undo-instead-of-confirm not planned. The plan gate is passed: start 8b-0.
+
+17. **Phase 8b-0: foundations for the signed-in overhaul.** Branch `hills/phase-8b0-foundations` off `hills/phase-8-plan`. Looks only; logic gate clean against
+    `hills/phase-8-plan` and `main` (226 declared tokens with reasons, 6 new files); contrast gate 494 pairs (90 new `tone8` pairs); 57 node tests (19 new);
+    inventory regenerated (only the three new components added; no existing handler changed). No page was converted yet: these are the parts the batches use.
+    - **Text tones (R3).** New tokens in the section "HILLS APP FOUNDATIONS" at the end of `globals.css`, with Tailwind names `text-tone-teal|coral|amber`
+      (light darker, dark = the old brand values), button pairs `bg-btn-brand text-btn-brand-fg` and `bg-btn-danger text-btn-danger-fg` (hover variants too).
+      Light values: teal `163 79% 26%` (5.55 on white), coral `8 68% 44%`, amber `32 93% 32%`. Dark: white label on light teal measured 1.91, so the label is
+      navy `224 44% 7%`. TWO existing light tokens were also failing and were darkened: `--muted-foreground` 47% to 42% lightness (4.40 on the page and 3.99 on a muted
+      row before; 5.27 / 4.78 now) and `--status-warning` 37% to 33% (4.27 on a muted row before). Both are small global changes; tell the owner.
+    - **Safety net for legacy buttons.** 63 places write `bg-brand-teal text-white` (a few `bg-brand-coral text-white`). Four unlayered rules fix exactly that class pair
+      with the new pairs, EXCEPT inside `.hills-type` (public pages and the sign-in family, approved as they are). Verified in a real browser on both sides of the guard.
+      Phase 9 deletes the block when a grep finds no pair left. Open for the owner: 3 buttons on the public home page (`(public)/page.tsx` lines 449, 455, 608: nav Apply and
+      hero Apply) keep white on teal: 4.38:1 in light, 1.91:1 in dark.
+    - **`StatusText`** (`components/shared/StatusText.tsx`): coloured word plus an 8px shape (circle success, ring info, triangle warning, diamond danger, bar neutral). No pill.
+      Uses the `text-status-*` tokens. Text 25 characters or fewer is a convention, not enforced.
+    - **`AttentionBadge`** (`components/shared/AttentionBadge.tsx`) + pure rules and the source map in `lib/hills/attention.ts`: count (`99+`) or dot, hidden for 0, NaN,
+      negative, decimal, null; sentence for screen readers ("5 waiting for your review"); `onDark` pair for the sidebar (dark in both themes). `ATTENTION_SOURCES` lists
+      every count the app already loads (approvals awaiting me, notifications unread, HR leave and contracts, placements, announcements, monitoring, student assignments)
+      and three that would need a NEW query (fees unpaid, library overdue, attendance not marked): those may NOT draw (`mayShowBadge`). `INFORMATIONAL_TAB_COUNTS` lists tab
+      numbers that are totals, not attention (library fines/catalog/borrowings, announcements published/drafts, class assignments for staff, class list, approvals
+      "Approved (12)" labels): each batch removes those numbers. `ModuleTabs` now draws its count through `AttentionBadge` (optional `badgeNoun` on a tab). Sidebar,
+      bottom bar and header adopt it in 8d.
+    - **Paging parts (R7, client side only).** `lib/hills/paging.ts` (pure; sizes 10/25/50, default 25, phones 20 + "Show 20 more", cards 5), `usePagedRows` (reads rows a
+      page already has; stored size via `useSyncExternalStore`, phone via `matchMedia`, `resetKey` returns to page 1), `ListPager` (desktop range + rows per page + Previous/Next;
+      phone full-width "Show 20 more"). Not used by any page yet; adopt per list in the batches and tag keep / page / show-more in each page's notes.
+    - **Motion (R9).** `--ease-*` and `--dur-*` tokens, `lib/hills/motion.ts` constants (test checks CSS and TS agree), `.app-hover` (120ms tint), `.app-wait` (hidden for the first
+      second), `.app-btn-busy`, reduced-motion rules. EVERY dialog (legacy too) now enters in 250ms with the enter easing (was 220ms, another curve). Not built: the 0.5 s minimum
+      visible time of a spinner (needs state); constants exist.
+    - **Dialogs (R8).** `Modal` gains sizes `s` 400, `m` 560, `l` 720 as OPT-IN (legacy `sm..2xl` untouched). A Hills size with `onSubmit` fills the phone screen with a sticky
+      footer and safe-area padding; without input it stays a bottom sheet. Pages are converted in their batch (45 files). NOT done (needs logic, owner decision pending):
+      "backdrop click closes unless there are unsaved changes" (R8.4) and destructive confirms should use the danger button (`MODAL_BTN_DANGER` exists, batches use it).
+    - **`Button`** (`ui/button.tsx`, used in only 2 files): variants `brand` and `danger`, 44px high on phones (`max-md:h-11`), quiet `destructive` text now `text-tone-coral`
+      (was 4.19 on its tint), opt-in `loading` (aria-busy, no clicks, sweep; caller changes the label).
+    - **Story** `src/stories/HillsAppFoundations.stories.tsx`: Tones, Status, Badges, Buttons, Tabs, Pager (each Light and Dark) and Dialog s/m/l. LESSON: the app puts `.dark` on
+      `<html>` and Tailwind colour utilities (`bg-muted`, `text-status-*`) resolve at `:root`; a nested `.dark` wrapper in a story shows LIGHT values. Stories set the class on
+      `<html>`. My first side-by-side panels were wrong because of this and were rebuilt.
+    - **Seen, not changed (for the batches):** dark-mode ACTIVE PILL tab shows a white label on light blue (looks about 2.7:1; not measured); dialog titles in dark use the light
+      blue `brand-navy` token; dark input borders are very faint; the existing Storybook stories (DataTable etc.) render unstyled because the preview loads no stylesheet
+      (pre-existing).
+    - **NOT tested here:** no signed-in page was rendered. The 8a harness (`session.mjs`, `fixtures.mjs`, `cap8.mjs`, `measure8.mjs`, `analyze8.py`) is in the 8a review pack, not in the
+      repo or the zip. The pilot pages (Exams, Students, Finances) were therefore NOT re-captured after the global token changes. Do this first in 8d or with the owner's pack.
+    - **Missing from the zip received for this phase:** `apps/web/tools/hills/ai-tells/` (23 detectors, baseline 235 hits in 89 files), `docs/hills/research/A..G`, the git history,
+      and node_modules. The RULEBOOK section 4 lists the detector rules, so ai-tells can be rebuilt; ask the owner for the originals first. `main` here = the delivered 8a state;
+      `hills/phase-8-plan` = main + the two docs. Run the gate against the real history on the real repo.
+
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database. Do not retry or work around. tsc errors from missing
   Prisma types are environmental; filter tsc output to the changed files. Signed-in pages CAN be rendered since Phase 8a with a
@@ -358,6 +426,11 @@ after 6a.
 - Capture scripts for Phase 5 live in the review pack (`tools-capture/`: `run.sh`, `walk.mjs`, `measure.mjs`, `measure.py`);
   the Playwright import must go through `createRequire` (global install, ESM import fails).
 - `.env` and `service-account.json` are in the zip: never print or commit them.
+- Install: `pnpm install --ignore-scripts --frozen-lockfile` works (registry allowed; Prisma engine download is the thing that is blocked).
+- Storybook for screenshots: `npx storybook build -o <dir> --quiet`, then in ONE wrapper script serve it (`python3 -m http.server`) and screenshot
+  `iframe.html?id=<story-id>&viewMode=story` with Playwright (import through `createRequire`).
+- Never use an UNQUOTED heredoc (`<<EOF`) for text that contains backticks: the shell runs them. Use `<<'EOF'`.
+- Gate helper: `pnpm hills:logic-diff --base <branch> --json <file>` writes the unexplained tokens as JSON; generate allowlist entries from it and write the reasons yourself.
 - Mock the home page data with `page.route('**/public/**')` (shapes in `hooks/usePublic.ts`); the
   sandbox has no backend.
 - Playwright `waitForSelector('[role=alert]')` also matches Next's route announcer (it pierces shadow

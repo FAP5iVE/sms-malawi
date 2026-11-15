@@ -10052,6 +10052,11 @@
    }
   ]
  },
+ "src/components/shared/AttentionBadge.tsx": {
+  "digest": "94430dcd85e6d383dc8d519855443b69791444a2",
+  "tokens": 14,
+  "items": []
+ },
  "src/components/shared/AuditLogViewer.tsx": {
   "digest": "45bdf8244e4c3fb323c401aeab3e438a98f7d8db",
   "tokens": 212,
@@ -10549,6 +10554,32 @@
    }
   ]
  },
+ "src/components/shared/ListPager.tsx": {
+  "digest": "f3a47c59e85c0d54296e96e6c19813fd878f25b9",
+  "tokens": 43,
+  "items": [
+   {
+    "k": "handler",
+    "n": "onChange",
+    "h": "44ec903b"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "052dd52b"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "5fc47235"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "aec1b74f"
+   }
+  ]
+ },
  "src/components/shared/MobileBottomNav.tsx": {
   "digest": "8ab1ad13882e204324ade6aa903aec292abf18bd",
   "tokens": 104,
@@ -10591,8 +10622,8 @@
   ]
  },
  "src/components/shared/Modal.tsx": {
-  "digest": "c3acb4a89c51fa3bcecc3dcb19ffdcb97ce3a20f",
-  "tokens": 106,
+  "digest": "7096f9d6edf322d08edf2779e9fcf50b89c3a72e",
+  "tokens": 109,
   "items": [
    {
     "k": "effect",
@@ -10648,8 +10679,8 @@
   "items": []
  },
  "src/components/shared/ModuleTabs.tsx": {
-  "digest": "455a8969db5824810bbf0328b6b7adb6f490c72b",
-  "tokens": 69,
+  "digest": "9d2dc580d795ca5f224c47fd3d8cb983b18d7653",
+  "tokens": 70,
   "items": [
    {
     "k": "effect",
@@ -11408,6 +11439,11 @@
   "tokens": 45,
   "items": []
  },
+ "src/components/shared/StatusText.tsx": {
+  "digest": "dc1fcb5b1f072f91fb9989e937df528141f8c55a",
+  "tokens": 24,
+  "items": []
+ },
  "src/components/shared/StudentRiskBadge.tsx": {
   "digest": "11e8f77d80a809dcbe1db200da8192e675f058b7",
   "tokens": 68,
@@ -11901,8 +11937,8 @@
   "items": []
  },
  "src/components/ui/button.tsx": {
-  "digest": "ac65365dcceecf59c42739c6effd7c5f912375b1",
-  "tokens": 11,
+  "digest": "a0d1b723bcb20dd78586cf61f24c890ab4f160e7",
+  "tokens": 12,
   "items": []
  },
  "src/components/ui/calendar.tsx": {

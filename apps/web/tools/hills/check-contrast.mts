@@ -350,6 +350,56 @@ for (const dark of [false, true]) {
   rows.push({ sky: 'app8', pair: `surface border against page (${theme})`, need: 1.0, got: ratio(g('border'), g('background')) })
 }
 
+// ── Phase 8b-0: text tones, status words, button fills, attention badge ────
+// Every tone a person reads as TEXT must reach 4.5:1 on every surface it can
+// sit on: the white card, the tint tile, the page, and a muted row (hover rows,
+// table headers). Filled buttons: label on fill, and on the hover fill.
+// The attention badge: label on its fill (text) and the dot against the
+// sidebar and the page (graphic, 3:1).
+for (const dark of [false, true]) {
+  const theme = dark ? 'dark' : 'light'
+  const block = dark ? DARK_BLOCK : ROOT_BLOCK
+  const found = new RegExp(dark ? '\\.dark\\s*\\{\\s*--tone-teal[^}]*\\}' : ':root\\s*\\{\\s*--tone-teal[^}]*\\}').exec(css)
+  if (!found) throw new Error('8b-0 tone block not found for ' + theme)
+  const tone = new RegExp(found[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const t = (n: string): RGBA => hslTriplet(tone, n)
+  const g = (n: string): RGBA => hslTriplet(block, n)
+  const surfaces: [string, RGBA][] = [
+    ['card', g('card')],
+    ['tint', hslTriplet(dark ? /\.dark\s*\{\s*--app-tint[^}]*\}/ : /:root\s*\{\s*--app-tint[^}]*\}/, 'app-tint')],
+    ['page', g('background')],
+    ['muted row', g('muted')],
+  ]
+  const add = (name: string, need: number, a: RGBA, b: RGBA, where: string) =>
+    rows.push({ sky: 'tone8', pair: `${name} on ${where} (${theme})`, need, got: ratio(a, b) })
+  const text: [string, RGBA][] = [
+    ['tone-teal (links)', t('tone-teal')],
+    ['tone-coral', t('tone-coral')],
+    ['tone-amber', t('tone-amber')],
+    ['status-success', g('status-success')],
+    ['status-warning', g('status-warning')],
+    ['status-danger', g('status-danger')],
+    ['status-info', g('status-info')],
+    ['status-neutral', g('status-neutral')],
+    ['muted-foreground', g('muted-foreground')],
+  ]
+  for (const [name, fg] of text) for (const [where, bg] of surfaces) add(name, 4.5, fg, bg, where)
+  for (const [fill, hover, label] of [['btn-brand', 'btn-brand-hover', 'brand button'], ['btn-danger', 'btn-danger-hover', 'danger button']] as const) {
+    add(`${label} label on fill`, 4.5, t(`${fill}-fg`), t(fill), 'fill')
+    add(`${label} label on hover fill`, 4.5, t(`${fill}-fg`), t(hover), 'hover fill')
+  }
+  // Attention badge: count text on its fill, and the dot against its surroundings.
+  add('attention count on its fill', 4.5, t('btn-danger-fg'), t('btn-danger'), 'badge')
+  for (const [where, bg] of [['page', g('background')], ['card', g('card')]] as [string, RGBA][]) {
+    add('attention dot (graphic)', 3, t('btn-danger'), bg, where)
+  }
+  // On the sidebar (dark navy in both themes) the badge uses the bright pair.
+  const onDarkFill = hslTriplet(/:root\s*\{\s*--tone-teal[^}]*\}/, 'attn-fill-on-dark')
+  const onDarkFg = hslTriplet(/:root\s*\{\s*--tone-teal[^}]*\}/, 'attn-fg-on-dark')
+  add('attention count on its fill (on dark chrome)', 4.5, onDarkFg, onDarkFill, 'badge')
+  add('attention dot on dark chrome (graphic)', 3, onDarkFill, g('sidebar-background'), 'sidebar')
+}
+
 const fails = rows.filter((r) => r.got < r.need)
 if (process.argv.includes('--table') || fails.length > 0) {
   for (const r of rows) {

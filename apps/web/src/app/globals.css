@@ -181,6 +181,21 @@
   --color-status-cyan:      hsl(var(--status-cyan));
   --color-status-neutral:   hsl(var(--status-neutral));
 
+  /* ── Text-use tones and button fills (Phase 8b-0, RULEBOOK R3).
+        The brand teal / coral / amber are fine as FILLS, icons and bars, but too
+        light to read as TEXT on white (4.38 / 4.19 / 3.19 : 1). Use
+        `text-tone-teal`, `text-tone-coral`, `text-tone-amber` for words and links;
+        `bg-btn-brand text-btn-brand-fg` for filled buttons. */
+  --color-tone-teal:        hsl(var(--tone-teal));
+  --color-tone-coral:       hsl(var(--tone-coral));
+  --color-tone-amber:       hsl(var(--tone-amber));
+  --color-btn-brand:        hsl(var(--btn-brand));
+  --color-btn-brand-hover:  hsl(var(--btn-brand-hover));
+  --color-btn-brand-fg:     hsl(var(--btn-brand-fg));
+  --color-btn-danger:       hsl(var(--btn-danger));
+  --color-btn-danger-hover: hsl(var(--btn-danger-hover));
+  --color-btn-danger-fg:    hsl(var(--btn-danger-fg));
+
   /* ── Radius tokens */
   --radius-sm: 0.25rem;
   --radius:    0.5rem;
@@ -236,7 +251,7 @@
 
     /* Muted areas */
     --muted:                215 25% 93%;
-    --muted-foreground:     215 16% 47%;   /* #64748b — muted text */
+    --muted-foreground:     215 16% 42%;   /* was 47% (#64748b): 4.40:1 on the page and 3.99:1 on muted rows; now 5.27 / 4.78 */
 
     /* Accent (used for hover states) */
     --accent:               215 25% 93%;
@@ -282,7 +297,7 @@
     --color-page:    215 25% 97%;  /* same as --background */
     --color-surface: 0 0% 100%;   /* same as --card */
     --color-text:    222 47% 11%; /* same as --foreground */
-    --color-muted-val: 215 16% 47%;
+    --color-muted-val: 215 16% 42%;
 
     /* ── Brand palette [PRODUCTION FIX] — light-mode values, HSL
        equivalents of the previous static hex, so light mode is visually
@@ -299,7 +314,7 @@
 
     /* Status text colours — light surfaces (≥ 4.5:1 on white) */
     --status-success:    162 93% 24%;  /* #047857 */
-    --status-warning:    26  90% 37%;  /* #b45309 */
+    --status-warning:    26  90% 33%;  /* was 37% (#b45309): 4.27:1 on muted rows; now 5.11 */
     --status-danger:     0   74% 42%;  /* #b91c1c */
     --status-info:       224 76% 48%;  /* #1d4ed8 */
     --status-accent:     272 72% 47%;  /* #7e22ce */
@@ -3220,3 +3235,139 @@ a.hills-go { text-decoration: none; }
    ink instead of .text-muted (measured on real pixels in the Phase 8a pack). */
 .app-sky-idle { color: color-mix(in srgb, hsl(var(--foreground)) 78%, transparent); }
 .app-sky-idle:hover { color: hsl(var(--foreground)); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HILLS APP FOUNDATIONS (Phase 8b-0): tones, button fills, motion, dialogs
+   Unlayered on purpose, like .app-surface above: these must beat Tailwind's
+   layered utilities. Looks only. Every colour pair below is proven by
+   tools/hills/check-contrast.mts (section "Phase 8b-0").
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Text-use tones: the brand colours darkened (light) so words and links reach
+   4.5:1 on white, the page, the tint and muted rows. Dark mode keeps the
+   existing bright brand values, which already pass. */
+:root {
+  --tone-teal:  163 79% 26%;
+  --tone-coral: 8 68% 44%;
+  --tone-amber: 32 93% 32%;
+
+  /* Filled buttons: one label colour per fill, 4.5:1 or better.
+     Light: white on a darker teal / coral. Dark: the old white label on the
+     light teal measured 1.91:1, so the label is the page's dark navy instead. */
+  --btn-brand:        163 79% 26%;
+  --btn-brand-hover:  163 79% 22%;
+  --btn-brand-fg:     0 0% 100%;
+  --btn-danger:       8 68% 44%;
+  --btn-danger-hover: 8 68% 38%;
+  --btn-danger-fg:    0 0% 100%;
+
+  /* Attention badge (count or dot) on a sidebar, bottom bar or tab. */
+  --attn-fill: var(--btn-danger);
+  --attn-fg:   var(--btn-danger-fg);
+  /* The sidebar is dark navy in BOTH themes, so a badge there uses the bright
+     pair (the dark-theme values) whatever the theme is. */
+  --attn-fill-on-dark: 8 85% 68%;
+  --attn-fg-on-dark:   224 44% 7%;
+
+  /* Motion (RULEBOOK R9). Keep in step with src/lib/hills/motion.ts. */
+  --ease-enter:    cubic-bezier(0, 0, 0.2, 1);
+  --ease-leave:    cubic-bezier(0.4, 0, 1, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-hover:      120ms;
+  --dur-dialog-in:  250ms;
+  --dur-dialog-out: 200ms;
+  --dur-page:       400ms;
+}
+.dark {
+  --tone-teal:  163 60% 55%;
+  --tone-coral: 8 85% 68%;
+  --tone-amber: 38 92% 60%;
+
+  --btn-brand:        163 60% 55%;
+  --btn-brand-hover:  162 65% 62%;
+  --btn-brand-fg:     224 44% 7%;
+  --btn-danger:       8 85% 68%;
+  --btn-danger-hover: 8 85% 74%;
+  --btn-danger-fg:    224 44% 7%;
+}
+
+/* Legacy filled buttons. 63 places in the app write `bg-brand-teal text-white`
+   (and a few `bg-brand-coral text-white`). Until each page is converted to
+   `bg-btn-brand` / the Button `brand` variant, this keeps them readable in both
+   themes. Only the exact pair of classes is matched, so tinted fills such as
+   `bg-brand-teal/10` are untouched. NOT applied inside `.hills-type` (the public
+   pages and the sign-in family): those were reviewed and approved with their
+   current colours, and a few buttons there (home page Apply) keep the old pair
+   until the owner decides. Phase 9 removes this block once a grep finds no
+   such pair left. */
+.bg-brand-teal.text-white:not(:where(.hills-type *)) {
+  background-color: hsl(var(--btn-brand));
+  color: hsl(var(--btn-brand-fg));
+}
+button.bg-brand-teal.text-white:hover:not(:disabled):not(:where(.hills-type *)),
+a.bg-brand-teal.text-white:hover:not(:where(.hills-type *)),
+[role='button'].bg-brand-teal.text-white:hover:not(:where(.hills-type *)) {
+  background-color: hsl(var(--btn-brand-hover));
+}
+.bg-brand-coral.text-white:not(:where(.hills-type *)) {
+  background-color: hsl(var(--btn-danger));
+  color: hsl(var(--btn-danger-fg));
+}
+button.bg-brand-coral.text-white:hover:not(:disabled):not(:where(.hills-type *)),
+a.bg-brand-coral.text-white:hover:not(:where(.hills-type *)),
+[role='button'].bg-brand-coral.text-white:hover:not(:where(.hills-type *)) {
+  background-color: hsl(var(--btn-danger-hover));
+}
+
+/* One hover rule (R9.5): a tint or a text colour change in 120ms, no lift, no
+   scaling. Opt in with .app-hover on rows, links and quiet buttons. */
+.app-hover {
+  transition: background-color var(--dur-hover) var(--ease-standard),
+              color var(--dur-hover) var(--ease-standard);
+}
+.app-hover:hover { background-color: hsl(var(--app-tint)); }
+
+/* A waiting indicator that stays hidden for the first second (R9.6: nothing for
+   waits under 1 second). Put it on a spinner or skeleton; it fades in after. */
+.app-wait {
+  opacity: 0;
+  animation: app-wait-in 160ms var(--ease-enter) 1000ms forwards;
+}
+@keyframes app-wait-in { to { opacity: 1; } }
+
+/* A button that is doing its work (R9.7): same width, no clicks, a soft sweep.
+   Set by <Button loading>; the label text is changed by the caller. */
+.app-btn-busy { position: relative; overflow: hidden; pointer-events: none; }
+.app-btn-busy::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, currentColor 18%, transparent), transparent);
+  transform: translateX(-100%);
+  animation: skeleton-sweep 1.5s var(--ease-standard) infinite;
+}
+
+/* Dialogs (R8). New sizes: s 400px, m 560px, l 720px. Legacy sm to 2xl are
+   unchanged until their pages are converted. A dialog that holds a form fills
+   the screen on phones (sticky footer, no bottom-sheet gap); a dialog without
+   input stays a bottom sheet. */
+.app-dialog { border-radius: 14px; }
+.app-dialog .app-modal-footer { padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+@media (max-width: 639.98px) {
+  .app-dialog { border-radius: 14px 14px 0 0; }
+  .app-dialog--form {
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .app-dialog--form .app-modal-footer { flex-direction: column-reverse; }
+}
+
+/* Reduced motion: no transforms, colour and opacity only (R9.4). */
+@media (prefers-reduced-motion: reduce) {
+  .app-btn-busy::after { animation: none; transform: none; opacity: 0.5; }
+  .app-wait { animation-duration: 0.01ms; }
+  .app-dialog { transform: none !important; }
+}
+

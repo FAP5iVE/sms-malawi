@@ -104,6 +104,30 @@
     {
       "file": "src/server/templates/emails/password-reset.ts",
       "reason": "Password-reset email template (school-branded, same shell as the other templates). Approved exception 2026-11-14."
+    },
+    {
+      "file": "src/components/shared/AttentionBadge.tsx",
+      "reason": "Phase 8b-0: one attention badge (count or dot, \"99+\", readable sentence). Fetches nothing; draws only what the caller passes."
+    },
+    {
+      "file": "src/components/shared/StatusText.tsx",
+      "reason": "Phase 8b-0: one status/role word component (coloured text plus a shape; no pill). Presentation only."
+    },
+    {
+      "file": "src/components/shared/ListPager.tsx",
+      "reason": "Phase 8b-0: pager controls for client side paging (rows per page, previous/next, show more). Parts for the 8b batches; not used by any page yet."
+    },
+    {
+      "file": "src/lib/hills/attention.ts",
+      "reason": "Phase 8b-0: pure badge rules and the map of which already-loaded counts may be shown. Under src/lib/hills (allowed)."
+    },
+    {
+      "file": "src/lib/hills/paging.ts",
+      "reason": "Phase 8b-0: pure client side paging rules (owner decision 3: client side only, no new query)."
+    },
+    {
+      "file": "src/lib/hills/usePagedRows.ts",
+      "reason": "Phase 8b-0: client side paging hook over rows a page already holds. Owner decision 3. Not used by any page yet."
     }
   ],
   "deletedFiles": [],
@@ -533,21 +557,21 @@
       "side": "removed",
       "kind": "logic",
       "pattern": "^\\{ isBusy && <JSX/> \\}$",
-      "reason": "Phase 3 (login and claim shell): the spinning Loader2 ring inside the button is removed (decision 2: skeleton, not a ring). isBusy itself, disabled={isBusy} and the 'Signing in…' label are unchanged"
+      "reason": "Phase 3 (login and claim shell): the spinning Loader2 ring inside the button is removed (decision 2: skeleton, not a ring). isBusy itself, disabled={isBusy} and the 'Signing in\u2026' label are unchanged"
     },
     {
       "file": "src/app/(public)/login/page.tsx",
       "side": "removed",
       "kind": "selector",
-      "pattern": "^text\\(button\\)=\\{isBusy && <JSX/>\\} Signing in…\\|Sign in$",
+      "pattern": "^text\\(button\\)=\\{isBusy && <JSX/>\\} Signing in\u2026\\|Sign in$",
       "reason": "Phase 3 (login and claim shell): same button text; only the spinner conditional beside it is removed"
     },
     {
       "file": "src/app/(public)/login/page.tsx",
       "side": "added",
       "kind": "selector",
-      "pattern": "^text\\(button\\)=Signing in…\\|Sign in$",
-      "reason": "Phase 3 (login and claim shell): same button text 'Signing in…' / 'Sign in', now wrapped in a span so the label can sit beside the arrow"
+      "pattern": "^text\\(button\\)=Signing in\u2026\\|Sign in$",
+      "reason": "Phase 3 (login and claim shell): same button text 'Signing in\u2026' / 'Sign in', now wrapped in a span so the label can sit beside the arrow"
     },
     {
       "file": "src/app/(public)/page.tsx",
@@ -1155,7 +1179,7 @@
       "file": "src/components/shared/PublicArchive.tsx",
       "side": "added",
       "kind": "logic",
-      "pattern": "^title=\\{\\ post\\ \\?\\ post\\ \\.\\ title\\ :\\ isLoading\\ \\?\\ 'Loading…'\\ :\\ 'Not\\ available'\\ \\}$",
+      "pattern": "^title=\\{\\ post\\ \\?\\ post\\ \\.\\ title\\ :\\ isLoading\\ \\?\\ 'Loading\u2026'\\ :\\ 'Not\\ available'\\ \\}$",
       "reason": "Phase 6b: the list/detail heading, subtitle, back link, date and byline move into PublicPageLayout props (title, intro, above, below). Same words, same data."
     },
     {
@@ -1484,7 +1508,7 @@
       "file": "src/app/(public)/change-password/page.tsx",
       "side": "removed",
       "kind": "selector",
-      "pattern": "^text\\(button\\)=\\{loading\\ \\&\\&\\ <JSX/>\\}\\ Saving…\\|Set\\ Password\\ \\&\\ Continue$",
+      "pattern": "^text\\(button\\)=\\{loading\\ \\&\\&\\ <JSX/>\\}\\ Saving\u2026\\|Set\\ Password\\ \\&\\ Continue$",
       "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
     },
     {
@@ -1498,28 +1522,28 @@
       "file": "src/app/(public)/change-password/page.tsx",
       "side": "removed",
       "kind": "selector",
-      "pattern": "^text\\(button\\)=\\{loading\\ \\&\\&\\ <JSX/>\\}\\ Updating…\\|Update\\ Password$",
+      "pattern": "^text\\(button\\)=\\{loading\\ \\&\\&\\ <JSX/>\\}\\ Updating\u2026\\|Update\\ Password$",
       "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
     },
     {
       "file": "src/app/(public)/change-password/page.tsx",
       "side": "added",
       "kind": "selector",
-      "pattern": "^text\\(button\\)=Saving…\\|Set\\ Password\\ \\&\\ Continue$",
+      "pattern": "^text\\(button\\)=Saving\u2026\\|Set\\ Password\\ \\&\\ Continue$",
       "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
     },
     {
       "file": "src/app/(public)/change-password/page.tsx",
       "side": "added",
       "kind": "selector",
-      "pattern": "^text\\(button\\)=Updating…\\|Update\\ Password$",
+      "pattern": "^text\\(button\\)=Updating\u2026\\|Update\\ Password$",
       "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
     },
     {
       "file": "src/app/(public)/forgot-password/page.tsx",
       "side": "removed",
       "kind": "selector",
-      "pattern": "^text\\(button\\)=\\{loading\\ \\&\\&\\ <JSX/>\\}\\ Sending…\\|Send\\ Reset\\ Link$",
+      "pattern": "^text\\(button\\)=\\{loading\\ \\&\\&\\ <JSX/>\\}\\ Sending\u2026\\|Send\\ Reset\\ Link$",
       "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
     },
     {
@@ -1533,14 +1557,14 @@
       "file": "src/app/(public)/forgot-password/page.tsx",
       "side": "added",
       "kind": "selector",
-      "pattern": "^text\\(button\\)=Sending…\\|Send\\ Reset\\ Link$",
+      "pattern": "^text\\(button\\)=Sending\u2026\\|Send\\ Reset\\ Link$",
       "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
     },
     {
       "file": "src/app/(public)/reset-password/page.tsx",
       "side": "removed",
       "kind": "selector",
-      "pattern": "^text\\(button\\)=\\{loading\\ \\&\\&\\ <JSX/>\\}\\ Saving…\\|Save\\ New\\ Password$",
+      "pattern": "^text\\(button\\)=\\{loading\\ \\&\\&\\ <JSX/>\\}\\ Saving\u2026\\|Save\\ New\\ Password$",
       "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
     },
     {
@@ -1554,7 +1578,7 @@
       "file": "src/app/(public)/reset-password/page.tsx",
       "side": "added",
       "kind": "selector",
-      "pattern": "^text\\(button\\)=Saving…\\|Save\\ New\\ Password$",
+      "pattern": "^text\\(button\\)=Saving\u2026\\|Save\\ New\\ Password$",
       "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
     },
     {
@@ -1575,7 +1599,7 @@
       "file": "src/components/guardians/GuardianClaimForm.tsx",
       "side": "removed",
       "kind": "selector",
-      "pattern": "^text\\(button\\)=\\{busy\\ \\&\\&\\ <JSX/>\\}\\ Creating\\ your\\ account…\\|Create\\ account$",
+      "pattern": "^text\\(button\\)=\\{busy\\ \\&\\&\\ <JSX/>\\}\\ Creating\\ your\\ account\u2026\\|Create\\ account$",
       "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
     },
     {
@@ -1596,7 +1620,7 @@
       "file": "src/components/guardians/GuardianClaimForm.tsx",
       "side": "added",
       "kind": "selector",
-      "pattern": "^text\\(button\\)=Creating\\ your\\ account…\\|Create\\ account$",
+      "pattern": "^text\\(button\\)=Creating\\ your\\ account\u2026\\|Create\\ account$",
       "reason": "Phase 7: the inline spinner on the submit button is removed; the button shows the same busy sweep as sign-in (.hills-go:disabled). The button label text and disabled={loading/busy} are unchanged. Looks only."
     },
     {
@@ -1687,7 +1711,7 @@
       "file": "src/app/(public)/reset-password/page.tsx",
       "side": "added",
       "kind": "logic",
-      "pattern": "^label=\"Loading\\ your\\ reset\\ link…\"$",
+      "pattern": "^label=\"Loading\\ your\\ reset\\ link\u2026\"$",
       "reason": "Approved exception 2026-11-14: only the hidden loading text of the skeleton is now specific to this page."
     },
     {
@@ -1736,7 +1760,7 @@
       "file": "src/components/shared/AuthShellSkeleton.tsx",
       "side": "added",
       "kind": "logic",
-      "pattern": "^export\\ function\\ AuthShellSkeleton\\ \\(\\ \\{\\ label\\ =\\ 'Loading\\ the\\ sign\\-in\\ page…'\\ \\}\\ :\\ \\{\\ label\\ \\?\\ :\\ string\\ \\}\\ =\\ \\{\\ \\}\\ \\)\\ \\{\\}$",
+      "pattern": "^export\\ function\\ AuthShellSkeleton\\ \\(\\ \\{\\ label\\ =\\ 'Loading\\ the\\ sign\\-in\\ page\u2026'\\ \\}\\ :\\ \\{\\ label\\ \\?\\ :\\ string\\ \\}\\ =\\ \\{\\ \\}\\ \\)\\ \\{\\}$",
       "reason": "Approved exception 2026-11-14: optional `label` prop for the hidden screen-reader text (default unchanged: sign-in page)."
     },
     {
@@ -1750,14 +1774,14 @@
       "file": "src/lib/ratelimit-policies.ts",
       "side": "removed",
       "kind": "logic",
-      "pattern": "^export\\ const\\ RATE_POLICIES\\ =\\ \\{\\ 'global\\-ip'\\ :\\ \\{\\ id\\ :\\ 'global\\-ip'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 15\\ \\*\\ MIN\\ ,\\ max\\ :\\ 3000\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'memory'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ —\\ please\\ slow\\ down\\.'\\ ,\\ \\}\\ ,\\ 'login\\-telemetry'\\ :\\ \\{\\ id\\ :\\ 'login\\-telemetry'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ attempts\\ —\\ please\\ wait\\ a\\ moment\\.'\\ ,\\ \\}\\ ,\\ 'public\\-application'\\ :\\ \\{\\ id\\ :\\ 'public\\-application'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 15\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ applications\\ submitted\\ from\\ this\\ network\\ —\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'public\\-newsletter'\\ :\\ \\{\\ id\\ :\\ 'public\\-newsletter'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'identifier'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 3\\ ,\\ message\\ :\\ 'A\\ confirmation\\ e\\-mail\\ was\\ already\\ sent\\ to\\ this\\ address\\ —\\ please\\ check\\ your\\ inbox\\.'\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 300\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'Subscriptions\\ are\\ busy\\ right\\ now\\ —\\ please\\ try\\ again\\ later\\.'\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ —\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'public\\-contact'\\ :\\ \\{\\ id\\ :\\ 'public\\-contact'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'identifier'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 5\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 5\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 200\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'The\\ contact\\ form\\ is\\ busy\\ right\\ now\\ —\\ please\\ try\\ again\\ later\\ or\\ contact\\ us\\ by\\ phone\\.'\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ messages\\ sent\\ —\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'ai\\-explain'\\ :\\ \\{\\ id\\ :\\ 'ai\\-explain'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 5\\ \\*\\ MIN\\ ,\\ max\\ :\\ 6\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 5\\ \\*\\ MIN\\ ,\\ max\\ :\\ 60\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 12\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'The\\ AI\\ explanation\\ is\\ busy\\ right\\ now\\ —\\ please\\ try\\ again\\ in\\ a\\ minute,\\ or\\ read\\ the\\ standard\\ explanation\\ above\\.'\\ ,\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'fail\\-closed'\\ ,\\ message\\ :\\ 'AI\\ explanations\\ are\\ limited\\ to\\ a\\ few\\ per\\ few\\ minutes\\ —\\ please\\ wait\\ a\\ moment,\\ or\\ read\\ the\\ standard\\ explanation\\ above\\.'\\ ,\\ slowMs\\ :\\ 20_000\\ ,\\ \\}\\ ,\\ search\\ :\\ \\{\\ id\\ :\\ 'search'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 90\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 900\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ searches\\ —\\ please\\ wait\\ a\\ moment\\.'\\ ,\\ \\}\\ ,\\ 'report\\-read'\\ :\\ \\{\\ id\\ :\\ 'report\\-read'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 90\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 900\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ report\\ requests\\ —\\ please\\ wait\\ a\\ moment\\.'\\ ,\\ slowMs\\ :\\ 10_000\\ ,\\ \\}\\ ,\\ 'export\\-generate'\\ :\\ \\{\\ id\\ :\\ 'export\\-generate'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 60\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 400\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ documents\\ requested\\ —\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ slowMs\\ :\\ 30_000\\ ,\\ \\}\\ ,\\ 'bulk\\-mutation'\\ :\\ \\{\\ id\\ :\\ 'bulk\\-mutation'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 60\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ bulk\\ operations\\ —\\ please\\ wait\\ a\\ few\\ minutes\\ before\\ running\\ another\\.'\\ ,\\ slowMs\\ :\\ 30_000\\ ,\\ \\}\\ ,\\ 'upload\\-ticket'\\ :\\ \\{\\ id\\ :\\ 'upload\\-ticket'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 40\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 300\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ uploads\\ started\\ —\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ \\}\\ ,\\ 'guardian\\-staff'\\ :\\ \\{\\ id\\ :\\ 'guardian\\-staff'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 120\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 600\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ guardian\\ changes\\ —\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ \\}\\ ,\\ 'guardian\\-invite'\\ :\\ \\{\\ id\\ :\\ 'guardian\\-invite'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 30\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 150\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ invitations\\ issued\\ —\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ \\}\\ ,\\ 'guardian\\-claim'\\ :\\ \\{\\ id\\ :\\ 'guardian\\-claim'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 15\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 300\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'fail\\-closed'\\ ,\\ message\\ :\\ 'Too\\ many\\ attempts\\ —\\ please\\ wait\\ a\\ while\\ before\\ trying\\ again\\.'\\ ,\\ \\}\\ ,\\ 'parent\\-read'\\ :\\ \\{\\ id\\ :\\ 'parent\\-read'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 240\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 1500\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ —\\ please\\ slow\\ down\\.'\\ ,\\ \\}\\ ,\\ cron\\ :\\ \\{\\ id\\ :\\ 'cron'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 3\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'memory'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Cron\\ rate\\ limit\\ exceeded\\.'\\ ,\\ \\}\\ ,\\ \\}\\ as\\ const\\ satisfies\\ Record\\ <\\ string\\ ,\\ RatePolicy\\ >$",
+      "pattern": "^export\\ const\\ RATE_POLICIES\\ =\\ \\{\\ 'global\\-ip'\\ :\\ \\{\\ id\\ :\\ 'global\\-ip'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 15\\ \\*\\ MIN\\ ,\\ max\\ :\\ 3000\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'memory'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ \u2014\\ please\\ slow\\ down\\.'\\ ,\\ \\}\\ ,\\ 'login\\-telemetry'\\ :\\ \\{\\ id\\ :\\ 'login\\-telemetry'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ attempts\\ \u2014\\ please\\ wait\\ a\\ moment\\.'\\ ,\\ \\}\\ ,\\ 'public\\-application'\\ :\\ \\{\\ id\\ :\\ 'public\\-application'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 15\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ applications\\ submitted\\ from\\ this\\ network\\ \u2014\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'public\\-newsletter'\\ :\\ \\{\\ id\\ :\\ 'public\\-newsletter'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'identifier'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 3\\ ,\\ message\\ :\\ 'A\\ confirmation\\ e\\-mail\\ was\\ already\\ sent\\ to\\ this\\ address\\ \u2014\\ please\\ check\\ your\\ inbox\\.'\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 300\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'Subscriptions\\ are\\ busy\\ right\\ now\\ \u2014\\ please\\ try\\ again\\ later\\.'\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ \u2014\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'public\\-contact'\\ :\\ \\{\\ id\\ :\\ 'public\\-contact'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'identifier'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 5\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 5\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 200\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'The\\ contact\\ form\\ is\\ busy\\ right\\ now\\ \u2014\\ please\\ try\\ again\\ later\\ or\\ contact\\ us\\ by\\ phone\\.'\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ messages\\ sent\\ \u2014\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'ai\\-explain'\\ :\\ \\{\\ id\\ :\\ 'ai\\-explain'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 5\\ \\*\\ MIN\\ ,\\ max\\ :\\ 6\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 5\\ \\*\\ MIN\\ ,\\ max\\ :\\ 60\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 12\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'The\\ AI\\ explanation\\ is\\ busy\\ right\\ now\\ \u2014\\ please\\ try\\ again\\ in\\ a\\ minute,\\ or\\ read\\ the\\ standard\\ explanation\\ above\\.'\\ ,\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'fail\\-closed'\\ ,\\ message\\ :\\ 'AI\\ explanations\\ are\\ limited\\ to\\ a\\ few\\ per\\ few\\ minutes\\ \u2014\\ please\\ wait\\ a\\ moment,\\ or\\ read\\ the\\ standard\\ explanation\\ above\\.'\\ ,\\ slowMs\\ :\\ 20_000\\ ,\\ \\}\\ ,\\ search\\ :\\ \\{\\ id\\ :\\ 'search'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 90\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 900\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ searches\\ \u2014\\ please\\ wait\\ a\\ moment\\.'\\ ,\\ \\}\\ ,\\ 'report\\-read'\\ :\\ \\{\\ id\\ :\\ 'report\\-read'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 90\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 900\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ report\\ requests\\ \u2014\\ please\\ wait\\ a\\ moment\\.'\\ ,\\ slowMs\\ :\\ 10_000\\ ,\\ \\}\\ ,\\ 'export\\-generate'\\ :\\ \\{\\ id\\ :\\ 'export\\-generate'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 60\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 400\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ documents\\ requested\\ \u2014\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ slowMs\\ :\\ 30_000\\ ,\\ \\}\\ ,\\ 'bulk\\-mutation'\\ :\\ \\{\\ id\\ :\\ 'bulk\\-mutation'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 60\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ bulk\\ operations\\ \u2014\\ please\\ wait\\ a\\ few\\ minutes\\ before\\ running\\ another\\.'\\ ,\\ slowMs\\ :\\ 30_000\\ ,\\ \\}\\ ,\\ 'upload\\-ticket'\\ :\\ \\{\\ id\\ :\\ 'upload\\-ticket'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 40\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 300\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ uploads\\ started\\ \u2014\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ \\}\\ ,\\ 'guardian\\-staff'\\ :\\ \\{\\ id\\ :\\ 'guardian\\-staff'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 120\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 600\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ guardian\\ changes\\ \u2014\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ \\}\\ ,\\ 'guardian\\-invite'\\ :\\ \\{\\ id\\ :\\ 'guardian\\-invite'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 30\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 150\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ invitations\\ issued\\ \u2014\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ \\}\\ ,\\ 'guardian\\-claim'\\ :\\ \\{\\ id\\ :\\ 'guardian\\-claim'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 15\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 300\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'fail\\-closed'\\ ,\\ message\\ :\\ 'Too\\ many\\ attempts\\ \u2014\\ please\\ wait\\ a\\ while\\ before\\ trying\\ again\\.'\\ ,\\ \\}\\ ,\\ 'parent\\-read'\\ :\\ \\{\\ id\\ :\\ 'parent\\-read'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 240\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 1500\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ \u2014\\ please\\ slow\\ down\\.'\\ ,\\ \\}\\ ,\\ cron\\ :\\ \\{\\ id\\ :\\ 'cron'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 3\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'memory'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Cron\\ rate\\ limit\\ exceeded\\.'\\ ,\\ \\}\\ ,\\ \\}\\ as\\ const\\ satisfies\\ Record\\ <\\ string\\ ,\\ RatePolicy\\ >$",
       "reason": "Approved exception 2026-11-14: rate-limit policy for the new public password-reset route (per address, per IP, global email budget)."
     },
     {
       "file": "src/lib/ratelimit-policies.ts",
       "side": "added",
       "kind": "logic",
-      "pattern": "^export\\ const\\ RATE_POLICIES\\ =\\ \\{\\ 'global\\-ip'\\ :\\ \\{\\ id\\ :\\ 'global\\-ip'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 15\\ \\*\\ MIN\\ ,\\ max\\ :\\ 3000\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'memory'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ —\\ please\\ slow\\ down\\.'\\ ,\\ \\}\\ ,\\ 'login\\-telemetry'\\ :\\ \\{\\ id\\ :\\ 'login\\-telemetry'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ attempts\\ —\\ please\\ wait\\ a\\ moment\\.'\\ ,\\ \\}\\ ,\\ 'public\\-application'\\ :\\ \\{\\ id\\ :\\ 'public\\-application'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 15\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ applications\\ submitted\\ from\\ this\\ network\\ —\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'public\\-newsletter'\\ :\\ \\{\\ id\\ :\\ 'public\\-newsletter'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'identifier'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 3\\ ,\\ message\\ :\\ 'A\\ confirmation\\ e\\-mail\\ was\\ already\\ sent\\ to\\ this\\ address\\ —\\ please\\ check\\ your\\ inbox\\.'\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 300\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'Subscriptions\\ are\\ busy\\ right\\ now\\ —\\ please\\ try\\ again\\ later\\.'\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ —\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'public\\-password\\-reset'\\ :\\ \\{\\ id\\ :\\ 'public\\-password\\-reset'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'identifier'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 3\\ ,\\ message\\ :\\ 'A\\ reset\\ link\\ was\\ already\\ sent\\ to\\ this\\ address\\ —\\ please\\ check\\ your\\ inbox\\ \\(and\\ spam\\ folder\\)\\.'\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 300\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'Password\\ reset\\ is\\ busy\\ right\\ now\\ —\\ please\\ try\\ again\\ later\\.'\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ —\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'public\\-contact'\\ :\\ \\{\\ id\\ :\\ 'public\\-contact'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'identifier'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 5\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 5\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 200\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'The\\ contact\\ form\\ is\\ busy\\ right\\ now\\ —\\ please\\ try\\ again\\ later\\ or\\ contact\\ us\\ by\\ phone\\.'\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ messages\\ sent\\ —\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'ai\\-explain'\\ :\\ \\{\\ id\\ :\\ 'ai\\-explain'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 5\\ \\*\\ MIN\\ ,\\ max\\ :\\ 6\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 5\\ \\*\\ MIN\\ ,\\ max\\ :\\ 60\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 12\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'The\\ AI\\ explanation\\ is\\ busy\\ right\\ now\\ —\\ please\\ try\\ again\\ in\\ a\\ minute,\\ or\\ read\\ the\\ standard\\ explanation\\ above\\.'\\ ,\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'fail\\-closed'\\ ,\\ message\\ :\\ 'AI\\ explanations\\ are\\ limited\\ to\\ a\\ few\\ per\\ few\\ minutes\\ —\\ please\\ wait\\ a\\ moment,\\ or\\ read\\ the\\ standard\\ explanation\\ above\\.'\\ ,\\ slowMs\\ :\\ 20_000\\ ,\\ \\}\\ ,\\ search\\ :\\ \\{\\ id\\ :\\ 'search'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 90\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 900\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ searches\\ —\\ please\\ wait\\ a\\ moment\\.'\\ ,\\ \\}\\ ,\\ 'report\\-read'\\ :\\ \\{\\ id\\ :\\ 'report\\-read'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 90\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 900\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ report\\ requests\\ —\\ please\\ wait\\ a\\ moment\\.'\\ ,\\ slowMs\\ :\\ 10_000\\ ,\\ \\}\\ ,\\ 'export\\-generate'\\ :\\ \\{\\ id\\ :\\ 'export\\-generate'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 60\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 400\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ documents\\ requested\\ —\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ slowMs\\ :\\ 30_000\\ ,\\ \\}\\ ,\\ 'bulk\\-mutation'\\ :\\ \\{\\ id\\ :\\ 'bulk\\-mutation'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 60\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ bulk\\ operations\\ —\\ please\\ wait\\ a\\ few\\ minutes\\ before\\ running\\ another\\.'\\ ,\\ slowMs\\ :\\ 30_000\\ ,\\ \\}\\ ,\\ 'upload\\-ticket'\\ :\\ \\{\\ id\\ :\\ 'upload\\-ticket'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 40\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 300\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ uploads\\ started\\ —\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ \\}\\ ,\\ 'guardian\\-staff'\\ :\\ \\{\\ id\\ :\\ 'guardian\\-staff'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 120\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 600\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ guardian\\ changes\\ —\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ \\}\\ ,\\ 'guardian\\-invite'\\ :\\ \\{\\ id\\ :\\ 'guardian\\-invite'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 30\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 150\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ invitations\\ issued\\ —\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ \\}\\ ,\\ 'guardian\\-claim'\\ :\\ \\{\\ id\\ :\\ 'guardian\\-claim'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 15\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 300\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'fail\\-closed'\\ ,\\ message\\ :\\ 'Too\\ many\\ attempts\\ —\\ please\\ wait\\ a\\ while\\ before\\ trying\\ again\\.'\\ ,\\ \\}\\ ,\\ 'parent\\-read'\\ :\\ \\{\\ id\\ :\\ 'parent\\-read'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 240\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 1500\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ —\\ please\\ slow\\ down\\.'\\ ,\\ \\}\\ ,\\ cron\\ :\\ \\{\\ id\\ :\\ 'cron'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 3\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'memory'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Cron\\ rate\\ limit\\ exceeded\\.'\\ ,\\ \\}\\ ,\\ \\}\\ as\\ const\\ satisfies\\ Record\\ <\\ string\\ ,\\ RatePolicy\\ >$",
+      "pattern": "^export\\ const\\ RATE_POLICIES\\ =\\ \\{\\ 'global\\-ip'\\ :\\ \\{\\ id\\ :\\ 'global\\-ip'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 15\\ \\*\\ MIN\\ ,\\ max\\ :\\ 3000\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'memory'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ \u2014\\ please\\ slow\\ down\\.'\\ ,\\ \\}\\ ,\\ 'login\\-telemetry'\\ :\\ \\{\\ id\\ :\\ 'login\\-telemetry'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ attempts\\ \u2014\\ please\\ wait\\ a\\ moment\\.'\\ ,\\ \\}\\ ,\\ 'public\\-application'\\ :\\ \\{\\ id\\ :\\ 'public\\-application'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 15\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ applications\\ submitted\\ from\\ this\\ network\\ \u2014\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'public\\-newsletter'\\ :\\ \\{\\ id\\ :\\ 'public\\-newsletter'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'identifier'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 3\\ ,\\ message\\ :\\ 'A\\ confirmation\\ e\\-mail\\ was\\ already\\ sent\\ to\\ this\\ address\\ \u2014\\ please\\ check\\ your\\ inbox\\.'\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 300\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'Subscriptions\\ are\\ busy\\ right\\ now\\ \u2014\\ please\\ try\\ again\\ later\\.'\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ \u2014\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'public\\-password\\-reset'\\ :\\ \\{\\ id\\ :\\ 'public\\-password\\-reset'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'identifier'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 3\\ ,\\ message\\ :\\ 'A\\ reset\\ link\\ was\\ already\\ sent\\ to\\ this\\ address\\ \u2014\\ please\\ check\\ your\\ inbox\\ \\(and\\ spam\\ folder\\)\\.'\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 300\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'Password\\ reset\\ is\\ busy\\ right\\ now\\ \u2014\\ please\\ try\\ again\\ later\\.'\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ \u2014\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'public\\-contact'\\ :\\ \\{\\ id\\ :\\ 'public\\-contact'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'identifier'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 5\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 5\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 200\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'The\\ contact\\ form\\ is\\ busy\\ right\\ now\\ \u2014\\ please\\ try\\ again\\ later\\ or\\ contact\\ us\\ by\\ phone\\.'\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ messages\\ sent\\ \u2014\\ please\\ try\\ again\\ later\\.'\\ ,\\ \\}\\ ,\\ 'ai\\-explain'\\ :\\ \\{\\ id\\ :\\ 'ai\\-explain'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 5\\ \\*\\ MIN\\ ,\\ max\\ :\\ 6\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 5\\ \\*\\ MIN\\ ,\\ max\\ :\\ 60\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 12\\ ,\\ alertAtRatio\\ :\\ 0\\.8\\ ,\\ message\\ :\\ 'The\\ AI\\ explanation\\ is\\ busy\\ right\\ now\\ \u2014\\ please\\ try\\ again\\ in\\ a\\ minute,\\ or\\ read\\ the\\ standard\\ explanation\\ above\\.'\\ ,\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'fail\\-closed'\\ ,\\ message\\ :\\ 'AI\\ explanations\\ are\\ limited\\ to\\ a\\ few\\ per\\ few\\ minutes\\ \u2014\\ please\\ wait\\ a\\ moment,\\ or\\ read\\ the\\ standard\\ explanation\\ above\\.'\\ ,\\ slowMs\\ :\\ 20_000\\ ,\\ \\}\\ ,\\ search\\ :\\ \\{\\ id\\ :\\ 'search'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 90\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 900\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ searches\\ \u2014\\ please\\ wait\\ a\\ moment\\.'\\ ,\\ \\}\\ ,\\ 'report\\-read'\\ :\\ \\{\\ id\\ :\\ 'report\\-read'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 90\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ MIN\\ ,\\ max\\ :\\ 900\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ report\\ requests\\ \u2014\\ please\\ wait\\ a\\ moment\\.'\\ ,\\ slowMs\\ :\\ 10_000\\ ,\\ \\}\\ ,\\ 'export\\-generate'\\ :\\ \\{\\ id\\ :\\ 'export\\-generate'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 60\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 400\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ documents\\ requested\\ \u2014\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ slowMs\\ :\\ 30_000\\ ,\\ \\}\\ ,\\ 'bulk\\-mutation'\\ :\\ \\{\\ id\\ :\\ 'bulk\\-mutation'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 60\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ bulk\\ operations\\ \u2014\\ please\\ wait\\ a\\ few\\ minutes\\ before\\ running\\ another\\.'\\ ,\\ slowMs\\ :\\ 30_000\\ ,\\ \\}\\ ,\\ 'upload\\-ticket'\\ :\\ \\{\\ id\\ :\\ 'upload\\-ticket'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 40\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 300\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ uploads\\ started\\ \u2014\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ \\}\\ ,\\ 'guardian\\-staff'\\ :\\ \\{\\ id\\ :\\ 'guardian\\-staff'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 120\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 600\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ guardian\\ changes\\ \u2014\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ \\}\\ ,\\ 'guardian\\-invite'\\ :\\ \\{\\ id\\ :\\ 'guardian\\-invite'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 30\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 150\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ invitations\\ issued\\ \u2014\\ please\\ wait\\ a\\ few\\ minutes\\.'\\ ,\\ \\}\\ ,\\ 'guardian\\-claim'\\ :\\ \\{\\ id\\ :\\ 'guardian\\-claim'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 15\\ \\*\\ MIN\\ ,\\ max\\ :\\ 10\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ HOUR\\ ,\\ max\\ :\\ 300\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'fail\\-closed'\\ ,\\ message\\ :\\ 'Too\\ many\\ attempts\\ \u2014\\ please\\ wait\\ a\\ while\\ before\\ trying\\ again\\.'\\ ,\\ \\}\\ ,\\ 'parent\\-read'\\ :\\ \\{\\ id\\ :\\ 'parent\\-read'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'user'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 240\\ \\}\\ ,\\ \\{\\ by\\ :\\ 'ip'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 1500\\ \\}\\ ,\\ \\]\\ ,\\ store\\ :\\ 'shared'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Too\\ many\\ requests\\ \u2014\\ please\\ slow\\ down\\.'\\ ,\\ \\}\\ ,\\ cron\\ :\\ \\{\\ id\\ :\\ 'cron'\\ ,\\ dimensions\\ :\\ \\[\\ \\{\\ by\\ :\\ 'global'\\ ,\\ windowMs\\ :\\ 10\\ \\*\\ MIN\\ ,\\ max\\ :\\ 3\\ \\}\\ \\]\\ ,\\ store\\ :\\ 'memory'\\ ,\\ onStoreFailure\\ :\\ 'local\\-fallback'\\ ,\\ message\\ :\\ 'Cron\\ rate\\ limit\\ exceeded\\.'\\ ,\\ \\}\\ ,\\ \\}\\ as\\ const\\ satisfies\\ Record\\ <\\ string\\ ,\\ RatePolicy\\ >$",
       "reason": "Approved exception 2026-11-14: rate-limit policy for the new public password-reset route (per address, per IP, global email budget)."
     },
     {
@@ -1834,7 +1858,7 @@
       "file": "src/server/services/userManagementService.ts",
       "side": "removed",
       "kind": "logic",
-      "pattern": "^const\\ emailResult\\ =\\ await\\ sendEmail\\ \\(\\ \\{\\ to\\ :\\ user\\ \\.\\ email\\ ,\\ subject\\ :\\ 'Password\\ Reset\\ —\\ SMS\\ Malawi'\\ ,\\ html\\ :\\ `<p>Click\\ <a\\ href=\"\\$\\{\\ link\\ \\}\">here</a>\\ to\\ reset\\ your\\ password\\.\\ This\\ link\\ expires\\ in\\ 1\\ hour\\.</p>`\\ ,\\ tags\\ :\\ \\[\\ \\{\\ name\\ :\\ 'type'\\ ,\\ value\\ :\\ 'password\\-reset'\\ \\}\\ \\]\\ ,\\ \\}\\ \\)$",
+      "pattern": "^const\\ emailResult\\ =\\ await\\ sendEmail\\ \\(\\ \\{\\ to\\ :\\ user\\ \\.\\ email\\ ,\\ subject\\ :\\ 'Password\\ Reset\\ \u2014\\ SMS\\ Malawi'\\ ,\\ html\\ :\\ `<p>Click\\ <a\\ href=\"\\$\\{\\ link\\ \\}\">here</a>\\ to\\ reset\\ your\\ password\\.\\ This\\ link\\ expires\\ in\\ 1\\ hour\\.</p>`\\ ,\\ tags\\ :\\ \\[\\ \\{\\ name\\ :\\ 'type'\\ ,\\ value\\ :\\ 'password\\-reset'\\ \\}\\ \\]\\ ,\\ \\}\\ \\)$",
       "reason": "Approved exception 2026-11-14: admin \"send password reset\" now emails the in-app link via passwordResetService instead of Firebase's hosted-page link."
     },
     {
@@ -2032,6 +2056,286 @@
       "kind": "logic",
       "pattern": "^export\\ function\\ ModuleTabs\\ <\\ T\\ extends\\ string\\ >\\ \\(\\ \\{\\ tabs\\ ,\\ active\\ ,\\ onChange\\ ,\\ variant\\ =\\ 'underline'\\ ,\\ id\\ =\\ 'tabs'\\ ,\\ size\\ =\\ 'default'\\ ,\\ onSky\\ =\\ false\\ ,\\ \\}\\ :\\ ModuleTabsProps\\ <\\ T\\ >\\ \\)\\ \\{\\}$",
       "reason": "Phase 8a: ModuleTabs gains the optional `onSky` prop (default false = unchanged look for every other page). Same tabs, active and onChange contract."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ type\\ ModalSize\\ =\\ 'sm'\\ \\|\\ 'md'\\ \\|\\ 'lg'\\ \\|\\ 'xl'\\ \\|\\ '2xl'\\ \\|\\ 'screen'$",
+      "reason": "Phase 8b-0: Modal gains the three Hills sizes s/m/l (400/560/720px, RULEBOOK R8.2) as opt-in values. A form dialog of these sizes fills the phone screen (class only). EVERY dialog, legacy sizes included, now enters in 250ms with the R9 enter easing (was 220ms with another curve); a look-only timing change. Legacy sizes, props, focus trap, Escape and backdrop behaviour are unchanged."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ SIZE_CLASS\\ :\\ Record\\ <\\ ModalSize\\ ,\\ string\\ >\\ =\\ \\{\\ sm\\ :\\ 'sm:max\\-w\\-\\[28rem\\]'\\ ,\\ md\\ :\\ 'sm:max\\-w\\-\\[34rem\\]'\\ ,\\ lg\\ :\\ 'sm:max\\-w\\-\\[40rem\\]'\\ ,\\ xl\\ :\\ 'sm:max\\-w\\-3xl'\\ ,\\ '2xl'\\ :\\ 'sm:max\\-w\\-\\[60rem\\]'\\ ,\\ screen\\ :\\ ''\\ ,\\ \\}$",
+      "reason": "Phase 8b-0: Modal gains the three Hills sizes s/m/l (400/560/720px, RULEBOOK R8.2) as opt-in values. A form dialog of these sizes fills the phone screen (class only). EVERY dialog, legacy sizes included, now enters in 250ms with the R9 enter easing (was 220ms with another curve); a look-only timing change. Legacy sizes, props, focus trap, Escape and backdrop behaviour are unchanged."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ !\\ isScreen\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Phase 8b-0: Modal gains the three Hills sizes s/m/l (400/560/720px, RULEBOOK R8.2) as opt-in values. A form dialog of these sizes fills the phone screen (class only). EVERY dialog, legacy sizes included, now enters in 250ms with the R9 enter easing (was 220ms with another curve); a look-only timing change. Legacy sizes, props, focus trap, Escape and backdrop behaviour are unchanged."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^transition=\\{\\ \\{\\ duration\\ :\\ 0\\.22\\ ,\\ ease\\ :\\ \\[\\ 0\\.16\\ ,\\ 1\\ ,\\ 0\\.3\\ ,\\ 1\\ \\]\\ \\}\\ \\}$",
+      "reason": "Phase 8b-0: Modal gains the three Hills sizes s/m/l (400/560/720px, RULEBOOK R8.2) as opt-in values. A form dialog of these sizes fills the phone screen (class only). EVERY dialog, legacy sizes included, now enters in 250ms with the R9 enter easing (was 220ms with another curve); a look-only timing change. Legacy sizes, props, focus trap, Escape and backdrop behaviour are unchanged."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ DIALOG_ENTER_S\\ ,\\ DIALOG_EASE_ENTER\\ \\}\\ from\\ '@/lib/hills/motion'$",
+      "reason": "Phase 8b-0: Modal gains the three Hills sizes s/m/l (400/560/720px, RULEBOOK R8.2) as opt-in values. A form dialog of these sizes fills the phone screen (class only). EVERY dialog, legacy sizes included, now enters in 250ms with the R9 enter easing (was 220ms with another curve); a look-only timing change. Legacy sizes, props, focus trap, Escape and backdrop behaviour are unchanged."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ type\\ ModalSize\\ =\\ 's'\\ \\|\\ 'm'\\ \\|\\ 'l'\\ \\|\\ 'sm'\\ \\|\\ 'md'\\ \\|\\ 'lg'\\ \\|\\ 'xl'\\ \\|\\ '2xl'\\ \\|\\ 'screen'$",
+      "reason": "Phase 8b-0: Modal gains the three Hills sizes s/m/l (400/560/720px, RULEBOOK R8.2) as opt-in values. A form dialog of these sizes fills the phone screen (class only). EVERY dialog, legacy sizes included, now enters in 250ms with the R9 enter easing (was 220ms with another curve); a look-only timing change. Legacy sizes, props, focus trap, Escape and backdrop behaviour are unchanged."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ SIZE_CLASS\\ :\\ Record\\ <\\ ModalSize\\ ,\\ string\\ >\\ =\\ \\{\\ s\\ :\\ 'sm:max\\-w\\-\\[25rem\\]'\\ ,\\ m\\ :\\ 'sm:max\\-w\\-\\[35rem\\]'\\ ,\\ l\\ :\\ 'sm:max\\-w\\-\\[45rem\\]'\\ ,\\ sm\\ :\\ 'sm:max\\-w\\-\\[28rem\\]'\\ ,\\ md\\ :\\ 'sm:max\\-w\\-\\[34rem\\]'\\ ,\\ lg\\ :\\ 'sm:max\\-w\\-\\[40rem\\]'\\ ,\\ xl\\ :\\ 'sm:max\\-w\\-3xl'\\ ,\\ '2xl'\\ :\\ 'sm:max\\-w\\-\\[60rem\\]'\\ ,\\ screen\\ :\\ ''\\ ,\\ \\}$",
+      "reason": "Phase 8b-0: Modal gains the three Hills sizes s/m/l (400/560/720px, RULEBOOK R8.2) as opt-in values. A form dialog of these sizes fills the phone screen (class only). EVERY dialog, legacy sizes included, now enters in 250ms with the R9 enter easing (was 220ms with another curve); a look-only timing change. Legacy sizes, props, focus trap, Escape and backdrop behaviour are unchanged."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ isHills\\ =\\ size\\ ===\\ 's'\\ \\|\\|\\ size\\ ===\\ 'm'\\ \\|\\|\\ size\\ ===\\ 'l'$",
+      "reason": "Phase 8b-0: Modal gains the three Hills sizes s/m/l (400/560/720px, RULEBOOK R8.2) as opt-in values. A form dialog of these sizes fills the phone screen (class only). EVERY dialog, legacy sizes included, now enters in 250ms with the R9 enter easing (was 220ms with another curve); a look-only timing change. Legacy sizes, props, focus trap, Escape and backdrop behaviour are unchanged."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ isHillsForm\\ =\\ isHills\\ \\&\\&\\ !\\ !\\ onSubmit\\ \\&\\&\\ !\\ bare$",
+      "reason": "Phase 8b-0: Modal gains the three Hills sizes s/m/l (400/560/720px, RULEBOOK R8.2) as opt-in values. A form dialog of these sizes fills the phone screen (class only). EVERY dialog, legacy sizes included, now enters in 250ms with the R9 enter easing (was 220ms with another curve); a look-only timing change. Legacy sizes, props, focus trap, Escape and backdrop behaviour are unchanged."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ !\\ isScreen\\ \\&\\&\\ !\\ isHillsForm\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Phase 8b-0: Modal gains the three Hills sizes s/m/l (400/560/720px, RULEBOOK R8.2) as opt-in values. A form dialog of these sizes fills the phone screen (class only). EVERY dialog, legacy sizes included, now enters in 250ms with the R9 enter easing (was 220ms with another curve); a look-only timing change. Legacy sizes, props, focus trap, Escape and backdrop behaviour are unchanged."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^transition=\\{\\ \\{\\ duration\\ :\\ DIALOG_ENTER_S\\ ,\\ ease\\ :\\ DIALOG_EASE_ENTER\\ \\}\\ \\}$",
+      "reason": "Phase 8b-0: Modal gains the three Hills sizes s/m/l (400/560/720px, RULEBOOK R8.2) as opt-in values. A form dialog of these sizes fills the phone screen (class only). EVERY dialog, legacy sizes included, now enters in 250ms with the R9 enter easing (was 220ms with another curve); a look-only timing change. Legacy sizes, props, focus trap, Escape and backdrop behaviour are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ interface\\ TabItem\\ <\\ T\\ extends\\ string\\ =\\ string\\ >\\ \\{\\ id\\ :\\ T\\ label\\ :\\ string\\ icon\\ \\?\\ :\\ React\\ \\.\\ ElementType\\ badge\\ \\?\\ :\\ number\\ \\}$",
+      "reason": "Phase 8b-0: the tab count now renders through the shared AttentionBadge (18px, 99+, readable sentence). Same guard at the call site (!!tab.badge); optional new `badgeNoun` only finishes the screen reader sentence. No change to tabs, active or onChange."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^function\\ BadgeCount\\ \\(\\ \\{\\ count\\ \\}\\ :\\ \\{\\ count\\ :\\ number\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 8b-0: the tab count now renders through the shared AttentionBadge (18px, 99+, readable sentence). Same guard at the call site (!!tab.badge); optional new `badgeNoun` only finishes the screen reader sentence. No change to tabs, active or onChange."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ !\\ count\\ \\)\\ return\\ null$",
+      "reason": "Phase 8b-0: the tab count now renders through the shared AttentionBadge (18px, 99+, readable sentence). Same guard at the call site (!!tab.badge); optional new `badgeNoun` only finishes the screen reader sentence. No change to tabs, active or onChange."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return\\ \\(\\ <JSX/>\\ \\)$",
+      "reason": "Phase 8b-0: the tab count now renders through the shared AttentionBadge (18px, 99+, readable sentence). Same guard at the call site (!!tab.badge); optional new `badgeNoun` only finishes the screen reader sentence. No change to tabs, active or onChange."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ `\\$\\{\\ count\\ \\}\\ items`\\ \\}$",
+      "reason": "Phase 8b-0: the tab count now renders through the shared AttentionBadge (18px, 99+, readable sentence). Same guard at the call site (!!tab.badge); optional new `badgeNoun` only finishes the screen reader sentence. No change to tabs, active or onChange."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ count\\ >\\ 99\\ \\?\\ '99\\+'\\ :\\ count\\ \\}$",
+      "reason": "Phase 8b-0: the tab count now renders through the shared AttentionBadge (18px, 99+, readable sentence). Same guard at the call site (!!tab.badge); optional new `badgeNoun` only finishes the screen reader sentence. No change to tabs, active or onChange."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ interface\\ TabItem\\ <\\ T\\ extends\\ string\\ =\\ string\\ >\\ \\{\\ id\\ :\\ T\\ label\\ :\\ string\\ icon\\ \\?\\ :\\ React\\ \\.\\ ElementType\\ badge\\ \\?\\ :\\ number\\ badgeNoun\\ \\?\\ :\\ string\\ \\}$",
+      "reason": "Phase 8b-0: the tab count now renders through the shared AttentionBadge (18px, 99+, readable sentence). Same guard at the call site (!!tab.badge); optional new `badgeNoun` only finishes the screen reader sentence. No change to tabs, active or onChange."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ BadgeCount\\ \\(\\ \\{\\ count\\ ,\\ noun\\ =\\ 'items'\\ \\}\\ :\\ \\{\\ count\\ :\\ number\\ ;\\ noun\\ \\?\\ :\\ string\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 8b-0: the tab count now renders through the shared AttentionBadge (18px, 99+, readable sentence). Same guard at the call site (!!tab.badge); optional new `badgeNoun` only finishes the screen reader sentence. No change to tabs, active or onChange."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ <JSX/>$",
+      "reason": "Phase 8b-0: the tab count now renders through the shared AttentionBadge (18px, 99+, readable sentence). Same guard at the call site (!!tab.badge); optional new `badgeNoun` only finishes the screen reader sentence. No change to tabs, active or onChange."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^count=\\{\\ count\\ \\}$",
+      "reason": "Phase 8b-0: the tab count now renders through the shared AttentionBadge (18px, 99+, readable sentence). Same guard at the call site (!!tab.badge); optional new `badgeNoun` only finishes the screen reader sentence. No change to tabs, active or onChange."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^noun=\\{\\ noun\\ \\}$",
+      "reason": "Phase 8b-0: the tab count now renders through the shared AttentionBadge (18px, 99+, readable sentence). Same guard at the call site (!!tab.badge); optional new `badgeNoun` only finishes the screen reader sentence. No change to tabs, active or onChange."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^noun=\\{\\ tab\\ \\.\\ badgeNoun\\ \\}$",
+      "reason": "Phase 8b-0: the tab count now renders through the shared AttentionBadge (18px, 99+, readable sentence). Same guard at the call site (!!tab.badge); optional new `badgeNoun` only finishes the screen reader sentence. No change to tabs, active or onChange."
+    },
+    {
+      "file": "src/components/shared/ModuleTabs.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^noun=\\{\\ tab\\ \\.\\ badgeNoun\\ \\}$",
+      "reason": "Phase 8b-0: the tab count now renders through the shared AttentionBadge (18px, 99+, readable sentence). Same guard at the call site (!!tab.badge); optional new `badgeNoun` only finishes the screen reader sentence. No change to tabs, active or onChange."
+    },
+    {
+      "file": "src/components/ui/button.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ buttonVariants\\ =\\ cva\\ \\(\\ \"group/button\\ inline\\-flex\\ shrink\\-0\\ items\\-center\\ justify\\-center\\ rounded\\-lg\\ border\\ border\\-transparent\\ bg\\-clip\\-padding\\ text\\-sm\\ font\\-medium\\ whitespace\\-nowrap\\ transition\\-all\\ outline\\-none\\ select\\-none\\ focus\\-visible:border\\-ring\\ focus\\-visible:ring\\-3\\ focus\\-visible:ring\\-ring/50\\ active:not\\-aria\\-\\[haspopup\\]:translate\\-y\\-px\\ disabled:pointer\\-events\\-none\\ disabled:opacity\\-50\\ aria\\-invalid:border\\-destructive\\ aria\\-invalid:ring\\-3\\ aria\\-invalid:ring\\-destructive/20\\ dark:aria\\-invalid:border\\-destructive/50\\ dark:aria\\-invalid:ring\\-destructive/40\\ \\[\\&_svg\\]:pointer\\-events\\-none\\ \\[\\&_svg\\]:shrink\\-0\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-4\"\\ ,\\ \\{\\ variants\\ :\\ \\{\\ variant\\ :\\ \\{\\ default\\ :\\ \"bg\\-primary\\ text\\-primary\\-foreground\\ \\[a\\]:hover:bg\\-primary/80\"\\ ,\\ outline\\ :\\ \"border\\-border\\ bg\\-background\\ hover:bg\\-muted\\ hover:text\\-foreground\\ aria\\-expanded:bg\\-muted\\ aria\\-expanded:text\\-foreground\\ dark:border\\-input\\ dark:bg\\-input/30\\ dark:hover:bg\\-input/50\"\\ ,\\ secondary\\ :\\ \"bg\\-secondary\\ text\\-secondary\\-foreground\\ hover:bg\\-secondary/80\\ aria\\-expanded:bg\\-secondary\\ aria\\-expanded:text\\-secondary\\-foreground\"\\ ,\\ ghost\\ :\\ \"hover:bg\\-muted\\ hover:text\\-foreground\\ aria\\-expanded:bg\\-muted\\ aria\\-expanded:text\\-foreground\\ dark:hover:bg\\-muted/50\"\\ ,\\ destructive\\ :\\ \"bg\\-destructive/10\\ text\\-destructive\\ hover:bg\\-destructive/20\\ focus\\-visible:border\\-destructive/40\\ focus\\-visible:ring\\-destructive/20\\ dark:bg\\-destructive/20\\ dark:hover:bg\\-destructive/30\\ dark:focus\\-visible:ring\\-destructive/40\"\\ ,\\ link\\ :\\ \"text\\-primary\\ underline\\-offset\\-4\\ hover:underline\"\\ ,\\ \\}\\ ,\\ size\\ :\\ \\{\\ default\\ :\\ \"h\\-8\\ gap\\-1\\.5\\ px\\-2\\.5\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-2\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-2\"\\ ,\\ xs\\ :\\ \"h\\-6\\ gap\\-1\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),10px\\)\\]\\ px\\-2\\ text\\-xs\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-1\\.5\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-1\\.5\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-3\"\\ ,\\ sm\\ :\\ \"h\\-7\\ gap\\-1\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),12px\\)\\]\\ px\\-2\\.5\\ text\\-\\[0\\.8rem\\]\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-1\\.5\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-1\\.5\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-3\\.5\"\\ ,\\ lg\\ :\\ \"h\\-9\\ gap\\-1\\.5\\ px\\-2\\.5\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-2\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-2\"\\ ,\\ icon\\ :\\ \"size\\-8\"\\ ,\\ \"icon\\-xs\"\\ :\\ \"size\\-6\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),10px\\)\\]\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-3\"\\ ,\\ \"icon\\-sm\"\\ :\\ \"size\\-7\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),12px\\)\\]\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\"\\ ,\\ \"icon\\-lg\"\\ :\\ \"size\\-9\"\\ ,\\ \\}\\ ,\\ \\}\\ ,\\ defaultVariants\\ :\\ \\{\\ variant\\ :\\ \"default\"\\ ,\\ size\\ :\\ \"default\"\\ ,\\ \\}\\ ,\\ \\}\\ \\)$",
+      "reason": "Phase 8b-0: Button gains `brand` and `danger` variants (proven colour pairs), 44px height on phones, and an opt-in `loading` prop that sets aria-busy and a sweep class. Default off: existing buttons behave the same."
+    },
+    {
+      "file": "src/components/ui/button.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^function\\ Button\\ \\(\\ \\{\\ className\\ ,\\ variant\\ =\\ \"default\"\\ ,\\ size\\ =\\ \"default\"\\ ,\\ asChild\\ =\\ false\\ ,\\ \\.\\.\\.\\ props\\ \\}\\ :\\ React\\ \\.\\ ComponentProps\\ <\\ \"button\"\\ >\\ \\&\\ VariantProps\\ <\\ typeof\\ buttonVariants\\ >\\ \\&\\ \\{\\ asChild\\ \\?\\ :\\ boolean\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 8b-0: Button gains `brand` and `danger` variants (proven colour pairs), 44px height on phones, and an opt-in `loading` prop that sets aria-busy and a sweep class. Default off: existing buttons behave the same."
+    },
+    {
+      "file": "src/components/ui/button.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ buttonVariants\\ =\\ cva\\ \\(\\ \"group/button\\ inline\\-flex\\ shrink\\-0\\ items\\-center\\ justify\\-center\\ rounded\\-lg\\ border\\ border\\-transparent\\ bg\\-clip\\-padding\\ text\\-sm\\ font\\-medium\\ whitespace\\-nowrap\\ transition\\-all\\ outline\\-none\\ select\\-none\\ focus\\-visible:border\\-ring\\ focus\\-visible:ring\\-3\\ focus\\-visible:ring\\-ring/50\\ active:not\\-aria\\-\\[haspopup\\]:translate\\-y\\-px\\ disabled:pointer\\-events\\-none\\ disabled:opacity\\-50\\ aria\\-invalid:border\\-destructive\\ aria\\-invalid:ring\\-3\\ aria\\-invalid:ring\\-destructive/20\\ dark:aria\\-invalid:border\\-destructive/50\\ dark:aria\\-invalid:ring\\-destructive/40\\ \\[\\&_svg\\]:pointer\\-events\\-none\\ \\[\\&_svg\\]:shrink\\-0\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-4\"\\ ,\\ \\{\\ variants\\ :\\ \\{\\ variant\\ :\\ \\{\\ default\\ :\\ \"bg\\-primary\\ text\\-primary\\-foreground\\ \\[a\\]:hover:bg\\-primary/80\"\\ ,\\ outline\\ :\\ \"border\\-border\\ bg\\-background\\ hover:bg\\-muted\\ hover:text\\-foreground\\ aria\\-expanded:bg\\-muted\\ aria\\-expanded:text\\-foreground\\ dark:border\\-input\\ dark:bg\\-input/30\\ dark:hover:bg\\-input/50\"\\ ,\\ secondary\\ :\\ \"bg\\-secondary\\ text\\-secondary\\-foreground\\ hover:bg\\-secondary/80\\ aria\\-expanded:bg\\-secondary\\ aria\\-expanded:text\\-secondary\\-foreground\"\\ ,\\ ghost\\ :\\ \"hover:bg\\-muted\\ hover:text\\-foreground\\ aria\\-expanded:bg\\-muted\\ aria\\-expanded:text\\-foreground\\ dark:hover:bg\\-muted/50\"\\ ,\\ destructive\\ :\\ \"bg\\-destructive/10\\ text\\-tone\\-coral\\ hover:bg\\-destructive/20\\ focus\\-visible:border\\-destructive/40\\ focus\\-visible:ring\\-destructive/20\\ dark:bg\\-destructive/20\\ dark:hover:bg\\-destructive/30\\ dark:focus\\-visible:ring\\-destructive/40\"\\ ,\\ brand\\ :\\ \"bg\\-btn\\-brand\\ text\\-btn\\-brand\\-fg\\ hover:bg\\-btn\\-brand\\-hover\"\\ ,\\ danger\\ :\\ \"bg\\-btn\\-danger\\ text\\-btn\\-danger\\-fg\\ hover:bg\\-btn\\-danger\\-hover\"\\ ,\\ link\\ :\\ \"text\\-primary\\ underline\\-offset\\-4\\ hover:underline\"\\ ,\\ \\}\\ ,\\ size\\ :\\ \\{\\ default\\ :\\ \"h\\-8\\ max\\-md:h\\-11\\ gap\\-1\\.5\\ px\\-2\\.5\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-2\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-2\"\\ ,\\ xs\\ :\\ \"h\\-6\\ gap\\-1\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),10px\\)\\]\\ px\\-2\\ text\\-xs\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-1\\.5\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-1\\.5\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-3\"\\ ,\\ sm\\ :\\ \"h\\-7\\ gap\\-1\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),12px\\)\\]\\ px\\-2\\.5\\ text\\-\\[0\\.8rem\\]\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-1\\.5\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-1\\.5\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-3\\.5\"\\ ,\\ lg\\ :\\ \"h\\-9\\ max\\-md:h\\-11\\ gap\\-1\\.5\\ px\\-2\\.5\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-2\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-2\"\\ ,\\ icon\\ :\\ \"size\\-8\"\\ ,\\ \"icon\\-xs\"\\ :\\ \"size\\-6\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),10px\\)\\]\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-3\"\\ ,\\ \"icon\\-sm\"\\ :\\ \"size\\-7\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),12px\\)\\]\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\"\\ ,\\ \"icon\\-lg\"\\ :\\ \"size\\-9\"\\ ,\\ \\}\\ ,\\ \\}\\ ,\\ defaultVariants\\ :\\ \\{\\ variant\\ :\\ \"default\"\\ ,\\ size\\ :\\ \"default\"\\ ,\\ \\}\\ ,\\ \\}\\ \\)$",
+      "reason": "Phase 8b-0: Button gains `brand` and `danger` variants (proven colour pairs), 44px height on phones, and an opt-in `loading` prop that sets aria-busy and a sweep class. Default off: existing buttons behave the same."
+    },
+    {
+      "file": "src/components/ui/button.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ Button\\ \\(\\ \\{\\ className\\ ,\\ variant\\ =\\ \"default\"\\ ,\\ size\\ =\\ \"default\"\\ ,\\ asChild\\ =\\ false\\ ,\\ loading\\ =\\ false\\ ,\\ \\.\\.\\.\\ props\\ \\}\\ :\\ React\\ \\.\\ ComponentProps\\ <\\ \"button\"\\ >\\ \\&\\ VariantProps\\ <\\ typeof\\ buttonVariants\\ >\\ \\&\\ \\{\\ asChild\\ \\?\\ :\\ boolean\\ loading\\ \\?\\ :\\ boolean\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 8b-0: Button gains `brand` and `danger` variants (proven colour pairs), 44px height on phones, and an opt-in `loading` prop that sets aria-busy and a sweep class. Default off: existing buttons behave the same."
+    },
+    {
+      "file": "src/components/ui/button.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria\\-busy=\\{\\ loading\\ \\|\\|\\ undefined\\ \\}$",
+      "reason": "Phase 8b-0: Button gains `brand` and `danger` variants (proven colour pairs), 44px height on phones, and an opt-in `loading` prop that sets aria-busy and a sweep class. Default off: existing buttons behave the same."
+    },
+    {
+      "file": "src/lib/hills/motion.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ EASE_ENTER\\ =\\ \\[\\ 0\\ ,\\ 0\\ ,\\ 0\\.2\\ ,\\ 1\\ \\]\\ as\\ const$",
+      "reason": "Phase 8b-0: constants only (easing curves and durations from RULEBOOK R9) mirrored from the CSS tokens and checked against globals.css by motion.test.mts."
+    },
+    {
+      "file": "src/lib/hills/motion.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ EASE_LEAVE\\ =\\ \\[\\ 0\\.4\\ ,\\ 0\\ ,\\ 1\\ ,\\ 1\\ \\]\\ as\\ const$",
+      "reason": "Phase 8b-0: constants only (easing curves and durations from RULEBOOK R9) mirrored from the CSS tokens and checked against globals.css by motion.test.mts."
+    },
+    {
+      "file": "src/lib/hills/motion.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ EASE_STANDARD\\ =\\ \\[\\ 0\\.4\\ ,\\ 0\\ ,\\ 0\\.2\\ ,\\ 1\\ \\]\\ as\\ const$",
+      "reason": "Phase 8b-0: constants only (easing curves and durations from RULEBOOK R9) mirrored from the CSS tokens and checked against globals.css by motion.test.mts."
+    },
+    {
+      "file": "src/lib/hills/motion.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ HOVER_MS\\ =\\ 120$",
+      "reason": "Phase 8b-0: constants only (easing curves and durations from RULEBOOK R9) mirrored from the CSS tokens and checked against globals.css by motion.test.mts."
+    },
+    {
+      "file": "src/lib/hills/motion.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ DIALOG_IN_MS\\ =\\ 250$",
+      "reason": "Phase 8b-0: constants only (easing curves and durations from RULEBOOK R9) mirrored from the CSS tokens and checked against globals.css by motion.test.mts."
+    },
+    {
+      "file": "src/lib/hills/motion.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ DIALOG_OUT_MS\\ =\\ 200$",
+      "reason": "Phase 8b-0: constants only (easing curves and durations from RULEBOOK R9) mirrored from the CSS tokens and checked against globals.css by motion.test.mts."
+    },
+    {
+      "file": "src/lib/hills/motion.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ PAGE_MS\\ =\\ 400$",
+      "reason": "Phase 8b-0: constants only (easing curves and durations from RULEBOOK R9) mirrored from the CSS tokens and checked against globals.css by motion.test.mts."
+    },
+    {
+      "file": "src/lib/hills/motion.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ DIALOG_ENTER_S\\ =\\ DIALOG_IN_MS\\ /\\ 1000$",
+      "reason": "Phase 8b-0: constants only (easing curves and durations from RULEBOOK R9) mirrored from the CSS tokens and checked against globals.css by motion.test.mts."
+    },
+    {
+      "file": "src/lib/hills/motion.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ DIALOG_EASE_ENTER\\ :\\ \\[\\ number\\ ,\\ number\\ ,\\ number\\ ,\\ number\\ \\]\\ =\\ \\[\\ \\.\\.\\.\\ EASE_ENTER\\ \\]$",
+      "reason": "Phase 8b-0: constants only (easing curves and durations from RULEBOOK R9) mirrored from the CSS tokens and checked against globals.css by motion.test.mts."
+    },
+    {
+      "file": "src/lib/hills/motion.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ WAIT_SHOW_AFTER_MS\\ =\\ 1000$",
+      "reason": "Phase 8b-0: constants only (easing curves and durations from RULEBOOK R9) mirrored from the CSS tokens and checked against globals.css by motion.test.mts."
+    },
+    {
+      "file": "src/lib/hills/motion.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ WAIT_MIN_VISIBLE_MS\\ =\\ 500$",
+      "reason": "Phase 8b-0: constants only (easing curves and durations from RULEBOOK R9) mirrored from the CSS tokens and checked against globals.css by motion.test.mts."
     }
   ],
   "approvedFrozen": [
