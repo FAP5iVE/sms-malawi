@@ -146,13 +146,13 @@
   ]
  },
  "src/app/(auth)/applications/[id]/page.tsx": {
-  "digest": "d859625852dc261e3eafd6d5cc166c30aa73504f",
-  "tokens": 97,
+  "digest": "8b7e334a26398336ee91299008e87ef5cbb18f11",
+  "tokens": 101,
   "items": []
  },
  "src/app/(auth)/applications/page.tsx": {
-  "digest": "c5184cf04a01e45a1b699e2f25d4531eaeb436d6",
-  "tokens": 74,
+  "digest": "6f9e62dd9fb7e0220cdbfa15c6341d8f944f90a9",
+  "tokens": 77,
   "items": [
    {
     "k": "handler",
@@ -543,7 +543,7 @@
   ]
  },
  "src/app/(auth)/attendance/page.tsx": {
-  "digest": "ceaa3a02ff176d8c3cfcd2dce10e9a7c33f1e4de",
+  "digest": "eb991b48cf576de1876f391369c7a97e39b369f3",
   "tokens": 63,
   "items": [
    {
@@ -695,7 +695,7 @@
   ]
  },
  "src/app/(auth)/classes/[id]/page.tsx": {
-  "digest": "d803ddabf9cb317a44441843dd4e875ad44aa361",
+  "digest": "17cbda27239a3f8b3ba5d862ecd1dc8d9f58c1bc",
   "tokens": 108,
   "items": [
    {
@@ -721,7 +721,7 @@
   ]
  },
  "src/app/(auth)/classes/page.tsx": {
-  "digest": "02f8c37c57dd57249cb03f668dce42ef8c09d706",
+  "digest": "586886b5bda8d35bf9837042053fdd0b98b513e4",
   "tokens": 172,
   "items": [
    {
@@ -2072,7 +2072,7 @@
   ]
  },
  "src/app/(auth)/placements/page.tsx": {
-  "digest": "60a549b362f11ee90ba000c50a7a6527de88ec14",
+  "digest": "3cbb97ccf82e06b0cc81cd306028ef8392695214",
   "tokens": 46,
   "items": [
    {
@@ -6926,8 +6926,8 @@
   "items": []
  },
  "src/components/guardians/GuardianAccessLogTab.tsx": {
-  "digest": "5ebebf0fd6470ecf6629a6c39326842287005129",
-  "tokens": 46,
+  "digest": "b244d173478d3af2ad705e454bceb283e831b262",
+  "tokens": 51,
   "items": [
    {
     "k": "handler",
@@ -6988,8 +6988,8 @@
   ]
  },
  "src/components/guardians/GuardianLinkCard.tsx": {
-  "digest": "bf331ff417536f81d1734afd9bb84429de12bfba",
-  "tokens": 184,
+  "digest": "1d579ca7d516de73a298f6b322c7481ad3e789ea",
+  "tokens": 189,
   "items": [
    {
     "k": "handler",
@@ -7341,7 +7341,7 @@
   ]
  },
  "src/components/guardians/GuardianQueueTab.tsx": {
-  "digest": "cec6a29c9cb6dcb7e338c666fa437357ecccb0b4",
+  "digest": "4f81fbeb59dd0dd2d1522db597c16b45768327cc",
   "tokens": 68,
   "items": [
    {
@@ -7984,8 +7984,8 @@
   ]
  },
  "src/components/placements/ClaimsVerificationPanel.tsx": {
-  "digest": "12afd0d95b091950de9f769f85a84d189c9df4f8",
-  "tokens": 98,
+  "digest": "4bd547ab3d32921bf1b5e4f1e0678a8a3625316d",
+  "tokens": 99,
   "items": [
    {
     "k": "handler",
@@ -8040,7 +8040,7 @@
   ]
  },
  "src/components/placements/PlacementAdvisoryChecker.tsx": {
-  "digest": "b39573b2c1c6fc324411fc2ba6677acac4530f37",
+  "digest": "ef499c3776518c1f0c3171aafa9f6bdb65d292a3",
   "tokens": 159,
   "items": [
    {
@@ -8111,7 +8111,7 @@
   ]
  },
  "src/components/placements/PlacementAnalyticsPanel.tsx": {
-  "digest": "03d7f6040e9c7cb02f8e850d76f48c4f6e62b696",
+  "digest": "b124bbfbedc87cf3dc803e4d768fa679c6a9b8bc",
   "tokens": 50,
   "items": []
  },
@@ -8152,7 +8152,7 @@
   ]
  },
  "src/components/placements/PlacementRecommendationCard.tsx": {
-  "digest": "32308b11b5169dedd9c49c6d132c172a04332a2d",
+  "digest": "949066a3617f5cd4483aa8f360c1c5ee8724dc61",
   "tokens": 79,
   "items": [
    {
@@ -8178,8 +8178,8 @@
   ]
  },
  "src/components/placements/PlacementRegistryPanel.tsx": {
-  "digest": "eadde6a0929e88a06351dc8dd9e988128f17b93d",
-  "tokens": 69,
+  "digest": "cac94c22273d62bfc865ddc59b133c774fe40509",
+  "tokens": 72,
   "items": [
    {
     "k": "handler",
@@ -8199,12 +8199,12 @@
   ]
  },
  "src/components/placements/PlacementStatusBadge.tsx": {
-  "digest": "1c11556f09c47de98aac774adccec1031e12838c",
+  "digest": "fd09e3dfd6077b52176f61760503f7edefeb44c5",
   "tokens": 7,
   "items": []
  },
  "src/components/placements/StaffPlacementEntryPanel.tsx": {
-  "digest": "5a5988df33ea59ecbbeefc217362d75d42f9f8cf",
+  "digest": "0621dccbfd30b3343fe49966c1572448a7d87400",
   "tokens": 183,
   "items": [
    {
@@ -8280,8 +8280,8 @@
   ]
  },
  "src/components/placements/StudentClaimPanel.tsx": {
-  "digest": "8e871361f2e781467eec271faa648aa3a8f5a398",
-  "tokens": 135,
+  "digest": "8766e84e5ff99995d355642acaec4bf4fd6e2d50",
+  "tokens": 134,
   "items": [
    {
     "k": "call",
@@ -10581,8 +10581,8 @@
   ]
  },
  "src/components/shared/MobileBottomNav.tsx": {
-  "digest": "5c0423261a148913424da79a2f70f250179f95e3",
-  "tokens": 103,
+  "digest": "5bdee34022d4a31a0990db80fd114684d6193819",
+  "tokens": 105,
   "items": [
    {
     "k": "handler",
@@ -10776,8 +10776,8 @@
   ]
  },
  "src/components/shared/PageHeader.tsx": {
-  "digest": "e19aa6de6f6c659a72fed0bf8f44d1c6b4b831c0",
-  "tokens": 280,
+  "digest": "b69e11be2e0e649c73c1c8c38572cc66e5bdb932",
+  "tokens": 290,
   "items": [
    {
     "k": "effect",
@@ -10838,6 +10838,11 @@
     "k": "handler",
     "n": "onClick",
     "h": "49d90d2b"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "50f00072"
    },
    {
     "k": "handler",
@@ -10913,8 +10918,8 @@
   ]
  },
  "src/components/shared/PeriodSwitcher.tsx": {
-  "digest": "84e94b8932999e41a5cc352726d488b0f4150067",
-  "tokens": 104,
+  "digest": "9ec1d121c807a1464e47f77fb536712023025858",
+  "tokens": 106,
   "items": [
    {
     "k": "effect",

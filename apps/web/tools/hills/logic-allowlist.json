@@ -136,6 +136,10 @@
     {
       "file": "src/lib/hills/navGroups.ts",
       "reason": "Phase 8d: pure grouping rule for the sidebar (R5, owner decision 4). Never adds, drops or re-links an item; unknown pages fall into a last 'More' group. Tested in tools/hills/__tests__/navGroups.test.mts."
+    },
+    {
+      "file": "src/lib/hills/moreSheet.ts",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). One shared 'More sheet is open' flag (tested) so the phone header avatar and the bottom bar's More slot open the SAME sheet. Replaces MobileBottomNav's own useState; nothing the sheet does changes."
     }
   ],
   "deletedFiles": [],
@@ -2827,6 +2831,1399 @@
       "kind": "logic",
       "pattern": "^noun=\\{\\ attentionNoun\\ \\(\\ 'approvalsAwaitingMe'\\ \\)\\ \\}$",
       "reason": "Phase 8d (RULEBOOK R5, R6; owner decision 4, layout and grouping): the same items are drawn in small runs under headings (lib/hills/navGroups.ts, tested: same items in, same items out, same link objects, order inside a group unchanged; `items.indexOf(item)` only keeps the entry animation delay the same). The badge is drawn by the shared AttentionBadge from the SAME item.badgeCount. No link target, click handler, collapse logic or role filter changes."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useState\\ \\}\\ from\\ 'react'$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). The More sheet's open flag now comes from the shared flag (lib/hills/moreSheet.ts) instead of local state; same open/close calls. The sheet gains a 'Viewing period' row (PeriodSwitcher variant 'sheet') because the phone header no longer carries the period chip."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ \\[\\ moreOpen\\ ,\\ setMoreOpen\\ \\]\\ =\\ useState\\ \\(\\ false\\ \\)$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). The More sheet's open flag now comes from the shared flag (lib/hills/moreSheet.ts) instead of local state; same open/close calls. The sheet gains a 'Viewing period' row (PeriodSwitcher variant 'sheet') because the phone header no longer carries the period chip."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useState\\ ,\\ useSyncExternalStore\\ \\}\\ from\\ 'react'$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). The More sheet's open flag now comes from the shared flag (lib/hills/moreSheet.ts) instead of local state; same open/close calls. The sheet gains a 'Viewing period' row (PeriodSwitcher variant 'sheet') because the phone header no longer carries the period chip."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ getMoreSheetOpen\\ ,\\ setMoreSheetOpen\\ ,\\ subscribeMoreSheet\\ \\}\\ from\\ '@/lib/hills/moreSheet'$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). The More sheet's open flag now comes from the shared flag (lib/hills/moreSheet.ts) instead of local state; same open/close calls. The sheet gains a 'Viewing period' row (PeriodSwitcher variant 'sheet') because the phone header no longer carries the period chip."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ moreOpen\\ =\\ useSyncExternalStore\\ \\(\\ subscribeMoreSheet\\ ,\\ getMoreSheetOpen\\ ,\\ \\(\\ \\)\\ =>\\ false\\ \\)$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). The More sheet's open flag now comes from the shared flag (lib/hills/moreSheet.ts) instead of local state; same open/close calls. The sheet gains a 'Viewing period' row (PeriodSwitcher variant 'sheet') because the phone header no longer carries the period chip."
+    },
+    {
+      "file": "src/components/shared/MobileBottomNav.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ setMoreOpen\\ =\\ setMoreSheetOpen$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). The More sheet's open flag now comes from the shared flag (lib/hills/moreSheet.ts) instead of local state; same open/close calls. The sheet gains a 'Viewing period' row (PeriodSwitcher variant 'sheet') because the phone header no longer carries the period chip."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useEffect\\ ,\\ useRef\\ ,\\ useState\\ \\}\\ from\\ 'react'$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). Phone header becomes crest, title, search, bell, avatar. The new avatar button only opens the existing More sheet through the shared flag (aria-expanded reflects it). The period chip is removed from the phone header (it moved into More); the strip under the header still shows when the viewing period is not the live one. Desktop header unchanged."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useEffect\\ ,\\ useRef\\ ,\\ useState\\ ,\\ useSyncExternalStore\\ \\}\\ from\\ 'react'$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). Phone header becomes crest, title, search, bell, avatar. The new avatar button only opens the existing More sheet through the shared flag (aria-expanded reflects it). The period chip is removed from the phone header (it moved into More); the strip under the header still shows when the viewing period is not the live one. Desktop header unchanged."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ getMoreSheetOpen\\ ,\\ setMoreSheetOpen\\ ,\\ subscribeMoreSheet\\ \\}\\ from\\ '@/lib/hills/moreSheet'$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). Phone header becomes crest, title, search, bell, avatar. The new avatar button only opens the existing More sheet through the shared flag (aria-expanded reflects it). The period chip is removed from the phone header (it moved into More); the strip under the header still shows when the viewing period is not the live one. Desktop header unchanged."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ moreSheetOpen\\ =\\ useSyncExternalStore\\ \\(\\ subscribeMoreSheet\\ ,\\ getMoreSheetOpen\\ ,\\ \\(\\ \\)\\ =>\\ false\\ \\)$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). Phone header becomes crest, title, search, bell, avatar. The new avatar button only opens the existing More sheet through the shared flag (aria-expanded reflects it). The period chip is removed from the phone header (it moved into More); the strip under the header still shows when the viewing period is not the live one. Desktop header unchanged."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onClick=\\{\\ \\(\\ \\)\\ =>\\ setMoreSheetOpen\\ \\(\\ true\\ \\)\\ \\}$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). Phone header becomes crest, title, search, bell, avatar. The new avatar button only opens the existing More sheet through the shared flag (aria-expanded reflects it). The period chip is removed from the phone header (it moved into More); the strip under the header still shows when the viewing period is not the live one. Desktop header unchanged."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"Account\\ and\\ menu\"$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). Phone header becomes crest, title, search, bell, avatar. The new avatar button only opens the existing More sheet through the shared flag (aria-expanded reflects it). The period chip is removed from the phone header (it moved into More); the strip under the header still shows when the viewing period is not the live one. Desktop header unchanged."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria\\-haspopup=\"dialog\"$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). Phone header becomes crest, title, search, bell, avatar. The new avatar button only opens the existing More sheet through the shared flag (aria-expanded reflects it). The period chip is removed from the phone header (it moved into More); the strip under the header still shows when the viewing period is not the live one. Desktop header unchanged."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria\\-expanded=\\{\\ moreSheetOpen\\ \\}$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). Phone header becomes crest, title, search, bell, avatar. The new avatar button only opens the existing More sheet through the shared flag (aria-expanded reflects it). The period chip is removed from the phone header (it moved into More); the strip under the header still shows when the viewing period is not the live one. Desktop header unchanged."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria\\-controls=\"mobile\\-more\\-sheet\"$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). Phone header becomes crest, title, search, bell, avatar. The new avatar button only opens the existing More sheet through the shared flag (aria-expanded reflects it). The period chip is removed from the phone header (it moved into More); the strip under the header still shows when the viewing period is not the live one. Desktop header unchanged."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{initials\\}$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). Phone header becomes crest, title, search, bell, avatar. The new avatar button only opens the existing More sheet through the shared flag (aria-expanded reflects it). The period chip is removed from the phone header (it moved into More); the strip under the header still shows when the viewing period is not the live one. Desktop header unchanged."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ initials\\ \\}$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). Phone header becomes crest, title, search, bell, avatar. The new avatar button only opens the existing More sheet through the shared flag (aria-expanded reflects it). The period chip is removed from the phone header (it moved into More); the strip under the header still shows when the viewing period is not the live one. Desktop header unchanged."
+    },
+    {
+      "file": "src/components/shared/PageHeader.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^type=\"button\"$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). Phone header becomes crest, title, search, bell, avatar. The new avatar button only opens the existing More sheet through the shared flag (aria-expanded reflects it). The period chip is removed from the phone header (it moved into More); the strip under the header still shows when the viewing period is not the live one. Desktop header unchanged."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ PeriodSwitcher\\ \\(\\ \\{\\ variant\\ =\\ 'desktop'\\ \\}\\ :\\ \\{\\ variant\\ \\?\\ :\\ 'desktop'\\ \\|\\ 'compact'\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ triggerClass\\ =\\ \\[\\ 'inline\\-flex\\ items\\-center\\ gap\\-2\\ rounded\\-lg\\ border\\ px\\-2\\.5\\ py\\-1\\.5\\ text\\-sm\\ font\\-semibold\\ font\\-heading\\ transition\\-colors'\\ ,\\ away\\ \\?\\ 'border\\-brand\\-amber/50\\ bg\\-brand\\-amber/10\\ text\\-body\\ hover:bg\\-brand\\-amber/15'\\ :\\ 'border\\-transparent\\ text\\-body\\ hover:bg\\-page'\\ ,\\ \\]\\ \\.\\ join\\ \\(\\ '\\ '\\ \\)$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ panelClass\\ =\\ variant\\ ===\\ 'compact'\\ \\?\\ 'fixed\\ left\\-3\\ right\\-3\\ top\\-14\\ z\\-50\\ rounded\\-2xl\\ border\\ border\\-base\\ bg\\-surface\\ shadow\\-lg\\ p\\-4\\ md:hidden'\\ :\\ 'absolute\\ left\\-0\\ top\\-full\\ mt\\-2\\ z\\-50\\ w\\-72\\ rounded\\-2xl\\ border\\ border\\-base\\ bg\\-surface\\ shadow\\-lg\\ p\\-4'$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=compact\\|T\\ \\{term\\}\\ \u00b7\\ \\{academicYear\\ \\.\\ slice\\ \\(\\ 2\\ ,\\ 4\\ \\)\\}\\ /\\ \\{academicYear\\ \\.\\ slice\\ \\(\\ 7\\ \\)\\}\\|Term\\ \\{term\\}\\ \u2014\\ \\{academicYear\\}\\ \\{tag\\}$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ variant\\ ===\\ 'compact'\\ \\?\\ \\(\\ <JSX/>\\ \\)\\ :\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^role=\"dialog\"$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ PeriodSwitcher\\ \\(\\ \\{\\ variant\\ =\\ 'desktop'\\ \\}\\ :\\ \\{\\ variant\\ \\?\\ :\\ 'desktop'\\ \\|\\ 'compact'\\ \\|\\ 'sheet'\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ triggerClass\\ =\\ variant\\ ===\\ 'sheet'\\ \\?\\ \\[\\ 'flex\\ w\\-full\\ items\\-center\\ gap\\-3\\.5\\ px\\-5\\ py\\-3\\ text\\-left\\ text\\-sm\\ font\\-semibold\\ font\\-heading\\ transition\\-colors\\ min\\-h\\-12'\\ ,\\ away\\ \\?\\ 'bg\\-brand\\-amber/10\\ text\\-body\\ hover:bg\\-brand\\-amber/15'\\ :\\ 'text\\-body\\ hover:bg\\-page'\\ ,\\ \\]\\ \\.\\ join\\ \\(\\ '\\ '\\ \\)\\ :\\ \\[\\ 'inline\\-flex\\ items\\-center\\ gap\\-2\\ rounded\\-lg\\ border\\ px\\-2\\.5\\ py\\-1\\.5\\ text\\-sm\\ font\\-semibold\\ font\\-heading\\ transition\\-colors'\\ ,\\ away\\ \\?\\ 'border\\-brand\\-amber/50\\ bg\\-brand\\-amber/10\\ text\\-body\\ hover:bg\\-brand\\-amber/15'\\ :\\ 'border\\-transparent\\ text\\-body\\ hover:bg\\-page'\\ ,\\ \\]\\ \\.\\ join\\ \\(\\ '\\ '\\ \\)$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ panelClass\\ =\\ variant\\ ===\\ 'sheet'\\ \\?\\ 'border\\-t\\ border\\-base\\ bg\\-surface\\ px\\-5\\ py\\-4'\\ :\\ variant\\ ===\\ 'compact'\\ \\?\\ 'fixed\\ left\\-3\\ right\\-3\\ top\\-14\\ z\\-50\\ rounded\\-2xl\\ border\\ border\\-base\\ bg\\-surface\\ shadow\\-lg\\ p\\-4\\ md:hidden'\\ :\\ 'absolute\\ left\\-0\\ top\\-full\\ mt\\-2\\ z\\-50\\ w\\-72\\ rounded\\-2xl\\ border\\ border\\-base\\ bg\\-surface\\ shadow\\-lg\\ p\\-4'$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=sheet\\|Viewing\\ period\\ Term\\ \\{term\\}\\ ,\\ \\{academicYear\\}\\|compact\\|T\\ \\{term\\}\\ \u00b7\\ \\{academicYear\\ \\.\\ slice\\ \\(\\ 2\\ ,\\ 4\\ \\)\\}\\ /\\ \\{academicYear\\ \\.\\ slice\\ \\(\\ 7\\ \\)\\}\\|Term\\ \\{term\\}\\ \u2014\\ \\{academicYear\\}\\ \\{tag\\}$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ variant\\ ===\\ 'sheet'\\ \\?\\ \\(\\ <JSX/>\\ \\)\\ :\\ variant\\ ===\\ 'compact'\\ \\?\\ \\(\\ <JSX/>\\ \\)\\ :\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^role=\\{\\ variant\\ ===\\ 'sheet'\\ \\?\\ 'group'\\ :\\ 'dialog'\\ \\}$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ term\\ \\}$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ academicYear\\ \\}$",
+      "reason": "Owner-delegated decisions 16 Nov 2026 (RULEBOOK section 12 items 11 to 13, R5.4). New 'sheet' variant: a full-width row for the More sheet whose panel opens in the flow. Which year or term is picked, apply(), reset(), click-outside and Escape handling are untouched; the compact and desktop variants render as before (only the amber tag and two small notes get the 12px / tone colours)."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_STYLES\\ :\\ Record\\ <\\ string\\ ,\\ string\\ >\\ =\\ \\{\\ PENDING\\ :\\ 'text\\-status\\-warning'\\ ,\\ APPROVED\\ :\\ 'text\\-status\\-success'\\ ,\\ DENIED\\ :\\ 'text\\-status\\-danger'\\ ,\\ AWAITING_ADMISSION\\ :\\ 'text\\-status\\-info'\\ ,\\ ADMITTED\\ :\\ 'text\\-status\\-success'\\ ,\\ \\}$",
+      "reason": "Phase 8b-1 (R1, R3, R9): colour and button-pair tokens only (tone text colours, the shared brand button pair, no pastel card colours). No behaviour change."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ statusClass\\ =\\ STATUS_STYLES\\ \\[\\ app\\ \\.\\ status\\ \\]\\ \\?\\?\\ 'text\\-muted'$",
+      "reason": "Phase 8b-1 (R1, R3, R9): colour and button-pair tokens only (tone text colours, the shared brand button pair, no pastel card colours). No behaviour change."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ app\\ \\.\\ status\\ \\.\\ replace\\ \\(\\ /_/g\\ ,\\ '\\ '\\ \\)\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^label=\"Traditional\\ Authority\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^label=\"NRB\\ /\\ Birth\\ Cert\\.\\ No\\.\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^label=\"Health\\ /\\ medical\\ alert\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^value=\\{\\ app\\ \\.\\ status\\ \\.\\ replace\\ \\(\\ /_/g\\ ,\\ '\\ '\\ \\)\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_TONES\\ :\\ Record\\ <\\ string\\ ,\\ StatusTone\\ >\\ =\\ \\{\\ PENDING\\ :\\ 'warning'\\ ,\\ APPROVED\\ :\\ 'success'\\ ,\\ DENIED\\ :\\ 'danger'\\ ,\\ AWAITING_ADMISSION\\ :\\ 'info'\\ ,\\ ADMITTED\\ :\\ 'success'\\ ,\\ \\}$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ statusWord\\ \\(\\ s\\ :\\ string\\ \\)\\ :\\ string\\ \\{\\}$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ w\\ =\\ s\\ \\.\\ replace\\ \\(\\ /_/g\\ ,\\ '\\ '\\ \\)\\ \\.\\ toLowerCase\\ \\(\\ \\)$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ w\\ \\.\\ charAt\\ \\(\\ 0\\ \\)\\ \\.\\ toUpperCase\\ \\(\\ \\)\\ \\+\\ w\\ \\.\\ slice\\ \\(\\ 1\\ \\)$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ statusTone\\ :\\ StatusTone\\ =\\ STATUS_TONES\\ \\[\\ app\\ \\.\\ status\\ \\]\\ \\?\\?\\ 'neutral'$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\\{\\ statusTone\\ \\}$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ statusWord\\ \\(\\ app\\ \\.\\ status\\ \\)\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^label=\"Traditional\\ authority\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^label=\"NRB\\ or\\ birth\\ certificate\\ number\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^label=\"Health\\ or\\ medical\\ alert\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/applications/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^value=\\{\\ statusWord\\ \\(\\ app\\ \\.\\ status\\ \\)\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/applications/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_TABS\\ :\\ TabItem\\ <\\ ApplicationStatusValue\\ >\\ \\[\\ \\]\\ =\\ ApplicationStatusSchema\\ \\.\\ options\\ \\.\\ map\\ \\(\\ \\(\\ s\\ \\)\\ =>\\ \\(\\ \\{\\ id\\ :\\ s\\ ,\\ label\\ :\\ s\\ \\.\\ replace\\ \\(\\ /_/g\\ ,\\ '\\ '\\ \\)\\ \\}\\ \\)\\ \\)$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/applications/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ columns\\ :\\ DataColumn\\ <\\ ApiApplication\\ >\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ key\\ :\\ 'firstName'\\ ,\\ label\\ :\\ 'Applicant'\\ ,\\ sortable\\ :\\ true\\ ,\\ priority\\ :\\ 'critical'\\ ,\\ render\\ :\\ \\(\\ app\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'dateOfBirth'\\ ,\\ label\\ :\\ 'DOB'\\ ,\\ priority\\ :\\ 'important'\\ ,\\ render\\ :\\ \\(\\ app\\ \\)\\ =>\\ new\\ Date\\ \\(\\ app\\ \\.\\ dateOfBirth\\ \\)\\ \\.\\ toLocaleDateString\\ \\(\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'applyingForForm'\\ ,\\ label\\ :\\ 'Form'\\ ,\\ priority\\ :\\ 'important'\\ ,\\ render\\ :\\ \\(\\ app\\ \\)\\ =>\\ `Form\\ \\$\\{\\ app\\ \\.\\ applyingForForm\\ \\}`\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'guardianName'\\ ,\\ label\\ :\\ 'Guardian'\\ ,\\ priority\\ :\\ 'optional'\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'actions'\\ ,\\ label\\ :\\ 'Actions'\\ ,\\ priority\\ :\\ 'important'\\ ,\\ render\\ :\\ \\(\\ app\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/applications/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ mobileActions\\ :\\ MobileAction\\ <\\ ApiApplication\\ >\\ \\[\\ \\]\\ =\\ \\[\\ \\.\\.\\.\\ \\(\\ activeStatus\\ ===\\ 'PENDING'\\ \\&\\&\\ canApprove\\ \\?\\ \\[\\ \\{\\ label\\ :\\ 'Approve'\\ ,\\ icon\\ :\\ CheckCircle\\ ,\\ variant\\ :\\ 'default'\\ as\\ const\\ ,\\ onClick\\ :\\ \\(\\ row\\ :\\ ApiApplication\\ \\)\\ =>\\ handleUpdateStatus\\ \\(\\ row\\ \\.\\ id\\ ,\\ 'APPROVED'\\ \\)\\ ,\\ \\}\\ ,\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\.\\.\\.\\ \\(\\ activeStatus\\ ===\\ 'PENDING'\\ \\&\\&\\ canDeny\\ \\?\\ \\[\\ \\{\\ label\\ :\\ 'Deny'\\ ,\\ icon\\ :\\ XCircle\\ ,\\ variant\\ :\\ 'danger'\\ as\\ const\\ ,\\ onClick\\ :\\ \\(\\ row\\ :\\ ApiApplication\\ \\)\\ =>\\ handleUpdateStatus\\ \\(\\ row\\ \\.\\ id\\ ,\\ 'DENIED'\\ \\)\\ ,\\ \\}\\ ,\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\.\\.\\.\\ \\(\\ \\(\\ activeStatus\\ ===\\ 'APPROVED'\\ \\|\\|\\ activeStatus\\ ===\\ 'AWAITING_ADMISSION'\\ \\)\\ \\&\\&\\ canConvert\\ \\?\\ \\[\\ \\{\\ label\\ :\\ 'Admit\\ as\\ Student'\\ ,\\ icon\\ :\\ UserPlus\\ ,\\ variant\\ :\\ 'default'\\ as\\ const\\ ,\\ onClick\\ :\\ \\(\\ row\\ :\\ ApiApplication\\ \\)\\ =>\\ handleConvert\\ \\(\\ row\\ \\.\\ id\\ \\)\\ ,\\ \\}\\ ,\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\]$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/applications/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ activeStatus\\ \\.\\ replace\\ \\(\\ /_/g\\ ,\\ '\\ '\\ \\)\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/applications/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ statusWord\\ \\(\\ s\\ :\\ string\\ \\)\\ :\\ string\\ \\{\\}$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/applications/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ w\\ =\\ s\\ \\.\\ replace\\ \\(\\ /_/g\\ ,\\ '\\ '\\ \\)\\ \\.\\ toLowerCase\\ \\(\\ \\)$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/applications/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ w\\ \\.\\ charAt\\ \\(\\ 0\\ \\)\\ \\.\\ toUpperCase\\ \\(\\ \\)\\ \\+\\ w\\ \\.\\ slice\\ \\(\\ 1\\ \\)$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/applications/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_TABS\\ :\\ TabItem\\ <\\ ApplicationStatusValue\\ >\\ \\[\\ \\]\\ =\\ ApplicationStatusSchema\\ \\.\\ options\\ \\.\\ map\\ \\(\\ \\(\\ s\\ \\)\\ =>\\ \\(\\ \\{\\ id\\ :\\ s\\ ,\\ label\\ :\\ statusWord\\ \\(\\ s\\ \\)\\ \\}\\ \\)\\ \\)$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/applications/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ columns\\ :\\ DataColumn\\ <\\ ApiApplication\\ >\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ key\\ :\\ 'firstName'\\ ,\\ label\\ :\\ 'Applicant'\\ ,\\ sortable\\ :\\ true\\ ,\\ priority\\ :\\ 'critical'\\ ,\\ render\\ :\\ \\(\\ app\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'dateOfBirth'\\ ,\\ label\\ :\\ 'Date\\ of\\ birth'\\ ,\\ priority\\ :\\ 'important'\\ ,\\ render\\ :\\ \\(\\ app\\ \\)\\ =>\\ new\\ Date\\ \\(\\ app\\ \\.\\ dateOfBirth\\ \\)\\ \\.\\ toLocaleDateString\\ \\(\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'applyingForForm'\\ ,\\ label\\ :\\ 'Form'\\ ,\\ priority\\ :\\ 'important'\\ ,\\ render\\ :\\ \\(\\ app\\ \\)\\ =>\\ `Form\\ \\$\\{\\ app\\ \\.\\ applyingForForm\\ \\}`\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'guardianName'\\ ,\\ label\\ :\\ 'Guardian'\\ ,\\ priority\\ :\\ 'optional'\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'actions'\\ ,\\ label\\ :\\ 'Actions'\\ ,\\ priority\\ :\\ 'important'\\ ,\\ render\\ :\\ \\(\\ app\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/applications/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ mobileActions\\ :\\ MobileAction\\ <\\ ApiApplication\\ >\\ \\[\\ \\]\\ =\\ \\[\\ \\.\\.\\.\\ \\(\\ activeStatus\\ ===\\ 'PENDING'\\ \\&\\&\\ canApprove\\ \\?\\ \\[\\ \\{\\ label\\ :\\ 'Approve'\\ ,\\ icon\\ :\\ CheckCircle\\ ,\\ variant\\ :\\ 'default'\\ as\\ const\\ ,\\ onClick\\ :\\ \\(\\ row\\ :\\ ApiApplication\\ \\)\\ =>\\ handleUpdateStatus\\ \\(\\ row\\ \\.\\ id\\ ,\\ 'APPROVED'\\ \\)\\ ,\\ \\}\\ ,\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\.\\.\\.\\ \\(\\ activeStatus\\ ===\\ 'PENDING'\\ \\&\\&\\ canDeny\\ \\?\\ \\[\\ \\{\\ label\\ :\\ 'Deny'\\ ,\\ icon\\ :\\ XCircle\\ ,\\ variant\\ :\\ 'danger'\\ as\\ const\\ ,\\ onClick\\ :\\ \\(\\ row\\ :\\ ApiApplication\\ \\)\\ =>\\ handleUpdateStatus\\ \\(\\ row\\ \\.\\ id\\ ,\\ 'DENIED'\\ \\)\\ ,\\ \\}\\ ,\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\.\\.\\.\\ \\(\\ \\(\\ activeStatus\\ ===\\ 'APPROVED'\\ \\|\\|\\ activeStatus\\ ===\\ 'AWAITING_ADMISSION'\\ \\)\\ \\&\\&\\ canConvert\\ \\?\\ \\[\\ \\{\\ label\\ :\\ 'Admit\\ as\\ student'\\ ,\\ icon\\ :\\ UserPlus\\ ,\\ variant\\ :\\ 'default'\\ as\\ const\\ ,\\ onClick\\ :\\ \\(\\ row\\ :\\ ApiApplication\\ \\)\\ =>\\ handleConvert\\ \\(\\ row\\ \\.\\ id\\ \\)\\ ,\\ \\}\\ ,\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\]$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/applications/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ statusWord\\ \\(\\ activeStatus\\ \\)\\ \\.\\ toLowerCase\\ \\(\\ \\)\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible status word shown in sentence case (for example Awaiting admission). The status value, the tab id and every comparison are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/attendance/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_STYLE\\ :\\ Record\\ <\\ Status\\ ,\\ \\{\\ dot\\ :\\ string\\ ;\\ bg\\ :\\ string\\ ;\\ text\\ :\\ string\\ \\}\\ >\\ =\\ \\{\\ PRESENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-emerald\\-500'\\ ,\\ bg\\ :\\ 'bg\\-emerald\\-500/10'\\ ,\\ text\\ :\\ 'text\\-emerald\\-700\\ dark:text\\-emerald\\-400'\\ \\}\\ ,\\ ABSENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-coral'\\ ,\\ bg\\ :\\ 'bg\\-brand\\-coral/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-coral'\\ \\}\\ ,\\ LATE\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-amber'\\ ,\\ bg\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-amber'\\ \\}\\ ,\\ \\}$",
+      "reason": "Phase 8b-1 (R1, R3, R9): colour and button-pair tokens only (tone text colours, the shared brand button pair, no pastel card colours). No behaviour change."
+    },
+    {
+      "file": "src/app/(auth)/attendance/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_STYLE\\ :\\ Record\\ <\\ Status\\ ,\\ \\{\\ dot\\ :\\ string\\ ;\\ bg\\ :\\ string\\ ;\\ text\\ :\\ string\\ \\}\\ >\\ =\\ \\{\\ PRESENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-emerald\\-500'\\ ,\\ bg\\ :\\ 'bg\\-emerald\\-500/10'\\ ,\\ text\\ :\\ 'text\\-status\\-success'\\ \\}\\ ,\\ ABSENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-coral'\\ ,\\ bg\\ :\\ 'bg\\-brand\\-coral/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-coral'\\ \\}\\ ,\\ LATE\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-amber'\\ ,\\ bg\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ \\}\\ ,\\ \\}$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/app/(auth)/classes/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ TABS\\ :\\ TabItem\\ <\\ Tab\\ >\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ id\\ :\\ 'roster'\\ ,\\ label\\ :\\ 'Students'\\ ,\\ icon\\ :\\ Users\\ \\}\\ ,\\ \\.\\.\\.\\ \\(\\ canViewAttendance\\ \\?\\ \\[\\ \\{\\ id\\ :\\ 'attendance'\\ as\\ Tab\\ ,\\ label\\ :\\ 'Attendance'\\ ,\\ icon\\ :\\ ClipboardCheck\\ \\}\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\{\\ id\\ :\\ 'timetable'\\ ,\\ label\\ :\\ 'Timetable'\\ ,\\ icon\\ :\\ Clock\\ \\}\\ ,\\ \\{\\ id\\ :\\ 'assignments'\\ ,\\ label\\ :\\ 'Assignments'\\ ,\\ icon\\ :\\ BookOpen\\ ,\\ badge\\ :\\ role\\ ===\\ 'student'\\ \\?\\ countOutstanding\\ \\(\\ assignments\\ \\)\\ :\\ assignments\\ \\.\\ length\\ ,\\ \\}\\ ,\\ \\.\\.\\.\\ \\(\\ role\\ !==\\ 'student'\\ \\?\\ \\[\\ \\{\\ id\\ :\\ 'subjects'\\ as\\ Tab\\ ,\\ label\\ :\\ 'Subjects\\ \\&\\ teachers'\\ ,\\ icon\\ :\\ GraduationCap\\ \\}\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\]$",
+      "reason": "Phase 8b-1 (R4, R5.5, R6): tab text in sentence case; informational totals dropped from tabs, only the still-to-do or to-verify count stays, and it comes from the number the page already loads. Tab ids, visibility rules and handlers are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/classes/[id]/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Add\\ Slot$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ TABS\\ :\\ TabItem\\ <\\ Tab\\ >\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ id\\ :\\ 'roster'\\ ,\\ label\\ :\\ 'Students'\\ ,\\ icon\\ :\\ Users\\ \\}\\ ,\\ \\.\\.\\.\\ \\(\\ canViewAttendance\\ \\?\\ \\[\\ \\{\\ id\\ :\\ 'attendance'\\ as\\ Tab\\ ,\\ label\\ :\\ 'Attendance'\\ ,\\ icon\\ :\\ ClipboardCheck\\ \\}\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\{\\ id\\ :\\ 'timetable'\\ ,\\ label\\ :\\ 'Timetable'\\ ,\\ icon\\ :\\ Clock\\ \\}\\ ,\\ \\{\\ id\\ :\\ 'assignments'\\ ,\\ label\\ :\\ 'Assignments'\\ ,\\ icon\\ :\\ BookOpen\\ ,\\ badge\\ :\\ role\\ ===\\ 'student'\\ \\?\\ countOutstanding\\ \\(\\ assignments\\ \\)\\ :\\ undefined\\ ,\\ badgeNoun\\ :\\ 'to\\ do'\\ ,\\ \\}\\ ,\\ \\.\\.\\.\\ \\(\\ role\\ !==\\ 'student'\\ \\?\\ \\[\\ \\{\\ id\\ :\\ 'subjects'\\ as\\ Tab\\ ,\\ label\\ :\\ 'Subjects\\ and\\ teachers'\\ ,\\ icon\\ :\\ GraduationCap\\ \\}\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\]$",
+      "reason": "Phase 8b-1 (R4, R5.5, R6): tab text in sentence case; informational totals dropped from tabs, only the still-to-do or to-verify count stays, and it comes from the number the page already loads. Tab ids, visibility rules and handlers are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/classes/[id]/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Add\\ slot$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ FORM_COLORS\\ =\\ \\[\\ 'bg\\-blue\\-100\\ border\\-blue\\-300'\\ ,\\ 'bg\\-teal\\-100\\ border\\-teal\\-300'\\ ,\\ 'bg\\-purple\\-100\\ border\\-purple\\-300'\\ ,\\ 'bg\\-amber\\-100\\ border\\-amber\\-300'\\ ,\\ \\]$",
+      "reason": "Phase 8b-1 (R1, R3, R9): colour and button-pair tokens only (tone text colours, the shared brand button pair, no pastel card colours). No behaviour change."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ activeYear\\ \\?\\ `Academic\\ Year\\ \\$\\{\\ activeYear\\ \\}`\\ :\\ 'No\\ classes\\ yet'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Add\\ Class$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^description=\"This\\ will\\ affect\\ every\\ enrolled\\ student's\\ roster,\\ timetable,\\ and\\ attendance\\ history\\ for\\ this\\ class\\.\\ Records\\ are\\ preserved\\ and\\ can\\ be\\ restored\\ by\\ an\\ administrator\\.\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^confirmLabel=\"Archive\\ Class\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ isEdit\\ \\?\\ 'Edit\\ Class'\\ :\\ 'Add\\ New\\ Class'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Saving\u2026\\|Save\\ Changes\\|Create\\ Class$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ isPending\\ \\?\\ 'Saving\u2026'\\ :\\ isEdit\\ \\?\\ 'Save\\ Changes'\\ :\\ 'Create\\ Class'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^label=\"Class\\ Name\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ Form\\ 1A\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ Science\\ \\(optional\\)\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ Room\\ 12\\ \\(optional\\)\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^label=\"Class\\ Teacher\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Optional\\ \u2014\\ search\\ teacher\u2026\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^label=\"Academic\\ Year\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ activeYear\\ \\?\\ `Academic\\ year\\ \\$\\{\\ activeYear\\ \\}`\\ :\\ 'No\\ classes\\ yet'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Add\\ class$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\"neutral\"$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^description=\"This\\ will\\ affect\\ every\\ enrolled\\ student's\\ roster,\\ timetable\\ and\\ attendance\\ history\\ for\\ this\\ class\\.\\ Records\\ are\\ kept,\\ and\\ an\\ administrator\\ can\\ restore\\ them\\.\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^confirmLabel=\"Archive\\ class\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ isEdit\\ \\?\\ 'Edit\\ class'\\ :\\ 'Add\\ class'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Saving\u2026\\|Save\\ changes\\|Create\\ class$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ isPending\\ \\?\\ 'Saving\u2026'\\ :\\ isEdit\\ \\?\\ 'Save\\ changes'\\ :\\ 'Create\\ class'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^label=\"Class\\ name\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Form\\ 1A\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Science\\ \\(optional\\)\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Room\\ 12\\ \\(optional\\)\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^label=\"Class\\ teacher\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Search\\ for\\ a\\ teacher\\ \\(optional\\)\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/classes/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^label=\"Academic\\ year\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/placements/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ canViewRegistry\\ \\)\\ list\\ \\.\\ push\\ \\(\\ \\{\\ id\\ :\\ 'registry'\\ ,\\ label\\ :\\ 'Registry\\ \\&\\ Analytics'\\ ,\\ icon\\ :\\ ListChecks\\ \\}\\ \\)$",
+      "reason": "Phase 8b-1 (R4, R5.5, R6): tab text in sentence case; informational totals dropped from tabs, only the still-to-do or to-verify count stays, and it comes from the number the page already loads. Tab ids, visibility rules and handlers are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/placements/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^list\\ \\.\\ push\\ \\(\\ \\{\\ id\\ :\\ 'advisory'\\ ,\\ label\\ :\\ 'MSCE\\ Advisory'\\ ,\\ icon\\ :\\ Calculator\\ \\}\\ \\)$",
+      "reason": "Phase 8b-1 (R4, R5.5, R6): tab text in sentence case; informational totals dropped from tabs, only the still-to-do or to-verify count stays, and it comes from the number the page already loads. Tab ids, visibility rules and handlers are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/placements/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ canStaffEnter\\ \\)\\ list\\ \\.\\ push\\ \\(\\ \\{\\ id\\ :\\ 'staffEntry'\\ ,\\ label\\ :\\ 'Staff\\ Entry'\\ ,\\ icon\\ :\\ ClipboardEdit\\ \\}\\ \\)$",
+      "reason": "Phase 8b-1 (R4, R5.5, R6): tab text in sentence case; informational totals dropped from tabs, only the still-to-do or to-verify count stays, and it comes from the number the page already loads. Tab ids, visibility rules and handlers are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/placements/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ canVerify\\ \\)\\ list\\ \\.\\ push\\ \\(\\ \\{\\ id\\ :\\ 'verify'\\ ,\\ label\\ :\\ 'Verify\\ Claims'\\ ,\\ icon\\ :\\ ShieldCheck\\ ,\\ badge\\ :\\ pendingCount\\ \\}\\ \\)$",
+      "reason": "Phase 8b-1 (R4, R5.5, R6): tab text in sentence case; informational totals dropped from tabs, only the still-to-do or to-verify count stays, and it comes from the number the page already loads. Tab ids, visibility rules and handlers are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/placements/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ showMyClaimTab\\ \\)\\ list\\ \\.\\ push\\ \\(\\ \\{\\ id\\ :\\ 'myClaim'\\ ,\\ label\\ :\\ 'My\\ Claim'\\ ,\\ icon\\ :\\ GraduationCap\\ \\}\\ \\)$",
+      "reason": "Phase 8b-1 (R4, R5.5, R6): tab text in sentence case; informational totals dropped from tabs, only the still-to-do or to-verify count stays, and it comes from the number the page already loads. Tab ids, visibility rules and handlers are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/placements/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^setTitle\\ \\(\\ 'University\\ Placement'\\ \\)$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/app/(auth)/placements/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ canViewRegistry\\ \\)\\ list\\ \\.\\ push\\ \\(\\ \\{\\ id\\ :\\ 'registry'\\ ,\\ label\\ :\\ 'Registry\\ and\\ analytics'\\ ,\\ icon\\ :\\ ListChecks\\ \\}\\ \\)$",
+      "reason": "Phase 8b-1 (R4, R5.5, R6): tab text in sentence case; informational totals dropped from tabs, only the still-to-do or to-verify count stays, and it comes from the number the page already loads. Tab ids, visibility rules and handlers are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/placements/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^list\\ \\.\\ push\\ \\(\\ \\{\\ id\\ :\\ 'advisory'\\ ,\\ label\\ :\\ 'MSCE\\ advisory'\\ ,\\ icon\\ :\\ Calculator\\ \\}\\ \\)$",
+      "reason": "Phase 8b-1 (R4, R5.5, R6): tab text in sentence case; informational totals dropped from tabs, only the still-to-do or to-verify count stays, and it comes from the number the page already loads. Tab ids, visibility rules and handlers are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/placements/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ canStaffEnter\\ \\)\\ list\\ \\.\\ push\\ \\(\\ \\{\\ id\\ :\\ 'staffEntry'\\ ,\\ label\\ :\\ 'Staff\\ entry'\\ ,\\ icon\\ :\\ ClipboardEdit\\ \\}\\ \\)$",
+      "reason": "Phase 8b-1 (R4, R5.5, R6): tab text in sentence case; informational totals dropped from tabs, only the still-to-do or to-verify count stays, and it comes from the number the page already loads. Tab ids, visibility rules and handlers are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/placements/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ canVerify\\ \\)\\ list\\ \\.\\ push\\ \\(\\ \\{\\ id\\ :\\ 'verify'\\ ,\\ label\\ :\\ 'Verify\\ claims'\\ ,\\ icon\\ :\\ ShieldCheck\\ ,\\ badge\\ :\\ pendingCount\\ ,\\ badgeNoun\\ :\\ 'to\\ verify'\\ \\}\\ \\)$",
+      "reason": "Phase 8b-1 (R4, R5.5, R6): tab text in sentence case; informational totals dropped from tabs, only the still-to-do or to-verify count stays, and it comes from the number the page already loads. Tab ids, visibility rules and handlers are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/placements/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ showMyClaimTab\\ \\)\\ list\\ \\.\\ push\\ \\(\\ \\{\\ id\\ :\\ 'myClaim'\\ ,\\ label\\ :\\ 'My\\ claim'\\ ,\\ icon\\ :\\ GraduationCap\\ \\}\\ \\)$",
+      "reason": "Phase 8b-1 (R4, R5.5, R6): tab text in sentence case; informational totals dropped from tabs, only the still-to-do or to-verify count stays, and it comes from the number the page already loads. Tab ids, visibility rules and handlers are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/placements/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^setTitle\\ \\(\\ 'University\\ placement'\\ \\)$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/guardians/GuardianAccessLogTab.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ rows\\ \\.\\ map\\ \\(\\ \\(\\ r\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/guardians/GuardianAccessLogTab.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ usePagedRows\\ \\}\\ from\\ '@/lib/hills/usePagedRows'$",
+      "reason": "Phase 8b-1 (R7): client-side paging of an already-loaded list; shows the first rows and the rest on request. No request, filter, sort or permission changes; the rows, their order and their handlers are the same."
+    },
+    {
+      "file": "src/components/guardians/GuardianAccessLogTab.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ paging\\ =\\ usePagedRows\\ \\(\\ rows\\ ,\\ \\{\\ resetKey\\ :\\ student\\ \\?\\.\\ id\\ \\?\\?\\ ''\\ \\}\\ \\)$",
+      "reason": "Phase 8b-1 (R7): client-side paging of an already-loaded list; shows the first rows and the rest on request. No request, filter, sort or permission changes; the rows, their order and their handlers are the same."
+    },
+    {
+      "file": "src/components/guardians/GuardianAccessLogTab.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ paging\\ \\.\\ visible\\ \\.\\ map\\ \\(\\ \\(\\ r\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 8b-1 (R7): client-side paging of an already-loaded list; shows the first rows and the rest on request. No request, filter, sort or permission changes; the rows, their order and their handlers are the same."
+    },
+    {
+      "file": "src/components/guardians/GuardianAccessLogTab.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\"success\"$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/guardians/GuardianAccessLogTab.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\"danger\"$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/guardians/GuardianAccessLogTab.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^paging=\\{\\ paging\\ \\}$",
+      "reason": "Phase 8b-1 (R7): client-side paging of an already-loaded list; shows the first rows and the rest on request. No request, filter, sort or permission changes; the rows, their order and their handlers are the same."
+    },
+    {
+      "file": "src/components/guardians/GuardianLinkCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_TONE\\ :\\ Record\\ <\\ GuardianLinkStatusValue\\ ,\\ string\\ >\\ =\\ \\{\\ PENDING\\ :\\ 'bg\\-status\\-warning/10\\ text\\-status\\-warning'\\ ,\\ ACTIVE\\ :\\ 'bg\\-status\\-success/10\\ text\\-status\\-success'\\ ,\\ SUSPENDED\\ :\\ 'bg\\-brand\\-coral/10\\ text\\-brand\\-coral'\\ ,\\ REVOKED\\ :\\ 'bg\\-status\\-neutral/10\\ text\\-muted'\\ ,\\ REJECTED\\ :\\ 'bg\\-status\\-neutral/10\\ text\\-muted'\\ ,\\ \\}$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/guardians/GuardianLinkCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ BTN_PRIMARY\\ =\\ `\\$\\{\\ BTN\\ \\}\\ bg\\-brand\\-teal\\ text\\-white\\ hover:bg\\-brand\\-teal\\-light`$",
+      "reason": "Phase 8b-1 (R1, R3, R9): colour and button-pair tokens only (tone text colours, the shared brand button pair, no pastel card colours). No behaviour change."
+    },
+    {
+      "file": "src/components/guardians/GuardianLinkCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ BTN_DANGER_OUTLINE\\ =\\ `\\$\\{\\ BTN\\ \\}\\ border\\ border\\-brand\\-coral/40\\ text\\-brand\\-coral\\ hover:bg\\-brand\\-coral/10`$",
+      "reason": "Phase 8b-1 (R1, R3, R9): colour and button-pair tokens only (tone text colours, the shared brand button pair, no pastel card colours). No behaviour change."
+    },
+    {
+      "file": "src/components/guardians/GuardianLinkCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_TONE\\ :\\ Record\\ <\\ GuardianLinkStatusValue\\ ,\\ StatusTone\\ >\\ =\\ \\{\\ PENDING\\ :\\ 'warning'\\ ,\\ ACTIVE\\ :\\ 'success'\\ ,\\ SUSPENDED\\ :\\ 'danger'\\ ,\\ REVOKED\\ :\\ 'neutral'\\ ,\\ REJECTED\\ :\\ 'neutral'\\ ,\\ \\}$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/guardians/GuardianLinkCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ BTN_PRIMARY\\ =\\ `\\$\\{\\ BTN\\ \\}\\ bg\\-btn\\-brand\\ text\\-btn\\-brand\\-fg\\ hover:bg\\-btn\\-brand\\-hover`$",
+      "reason": "Phase 8b-1 (R1, R3, R9): colour and button-pair tokens only (tone text colours, the shared brand button pair, no pastel card colours). No behaviour change."
+    },
+    {
+      "file": "src/components/guardians/GuardianLinkCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ BTN_DANGER_OUTLINE\\ =\\ `\\$\\{\\ BTN\\ \\}\\ border\\ border\\-brand\\-coral/40\\ text\\-tone\\-coral\\ hover:bg\\-brand\\-coral/10`$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/guardians/GuardianLinkCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\\{\\ STATUS_TONE\\ \\[\\ link\\ \\.\\ status\\ \\]\\ \\}$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/guardians/GuardianLinkCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\"info\"$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/guardians/GuardianLinkCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\"info\"$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/guardians/GuardianLinkCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\"success\"$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/guardians/GuardianLinkCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\"danger\"$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/guardians/GuardianQueueTab.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ CHIP_ON\\ =\\ 'bg\\-brand\\-teal\\ text\\-white\\ border\\-brand\\-teal'$",
+      "reason": "Phase 8b-1 (R1, R3, R9): colour and button-pair tokens only (tone text colours, the shared brand button pair, no pastel card colours). No behaviour change."
+    },
+    {
+      "file": "src/components/guardians/GuardianQueueTab.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ CHIP_ON\\ =\\ 'bg\\-btn\\-brand\\ text\\-btn\\-brand\\-fg\\ border\\-brand\\-teal'$",
+      "reason": "Phase 8b-1 (R1, R3, R9): colour and button-pair tokens only (tone text colours, the shared brand button pair, no pastel card colours). No behaviour change."
+    },
+    {
+      "file": "src/components/placements/ClaimsVerificationPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ isPending\\ \\?\\ 'Pending\\ Physical\\ Inspection'\\ :\\ row\\ \\.\\ status\\ ===\\ 'CONFIRMED'\\ \\?\\ 'Approved\\ \\&\\ Confirmed'\\ :\\ 'Rejected'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/ClaimsVerificationPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ \\(\\ error\\ as\\ Error\\ \\)\\ \\?\\.\\ message\\ \\?\\?\\ 'Unknown\\ error\\ \u2014\\ check\\ your\\ connection\\ and\\ try\\ again\\.'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/ClaimsVerificationPanel.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ Name\\ not\\ found\\ on\\ the\\ published\\ NCHE\\ gazette\\ for\\ this\\ batch\\.\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/ClaimsVerificationPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\\{\\ isPending\\ \\?\\ 'warning'\\ :\\ row\\ \\.\\ status\\ ===\\ 'CONFIRMED'\\ \\?\\ 'success'\\ :\\ 'danger'\\ \\}$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/placements/ClaimsVerificationPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ isPending\\ \\?\\ 'Pending\\ physical\\ inspection'\\ :\\ row\\ \\.\\ status\\ ===\\ 'CONFIRMED'\\ \\?\\ 'Approved\\ and\\ confirmed'\\ :\\ 'Rejected'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/ClaimsVerificationPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ \\(\\ error\\ as\\ Error\\ \\)\\ \\?\\.\\ message\\ \\?\\?\\ 'Unknown\\ error\\.\\ Check\\ your\\ connection\\ and\\ try\\ again\\.'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/ClaimsVerificationPanel.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Name\\ not\\ found\\ on\\ the\\ published\\ NCHE\\ gazette\\ for\\ this\\ batch\\.\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementAdvisoryChecker.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ result\\ \\.\\ appliedTier\\ \\.\\ tier\\ ===\\ 'relaxed_no_career'\\ \\?\\ 'Not\\ enough\\ programmes\\ matched\\ every\\ preference,\\ so\\ your\\ career\\ preference\\ was\\ relaxed\\ for\\ this\\ list\\ \u2014\\ programmes\\ that\\ still\\ match\\ it\\ are\\ shown\\ first,\\ but\\ this\\ is\\ a\\ wider\\ set\\ than\\ a\\ strict\\ match\\.'\\ :\\ 'Not\\ enough\\ programmes\\ matched\\ your\\ preferences\\ at\\ all,\\ so\\ both\\ preferences\\ were\\ relaxed\\ for\\ this\\ list\\ \u2014\\ showing\\ everything\\ you\\ qualify\\ for,\\ with\\ any\\ matching\\ programmes\\ surfaced\\ first\\.'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementAdvisoryChecker.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ result\\ \\.\\ appliedTier\\ \\.\\ tier\\ ===\\ 'relaxed_no_career'\\ \\?\\ 'Not\\ enough\\ programmes\\ matched\\ every\\ preference,\\ so\\ your\\ career\\ preference\\ was\\ relaxed\\ for\\ this\\ list\\.\\ Programmes\\ that\\ still\\ match\\ it\\ are\\ shown\\ first,\\ but\\ this\\ is\\ a\\ wider\\ set\\ than\\ a\\ strict\\ match\\.'\\ :\\ 'Not\\ enough\\ programmes\\ matched\\ your\\ preferences\\ at\\ all,\\ so\\ both\\ preferences\\ were\\ relaxed\\ for\\ this\\ list\\.\\ This\\ shows\\ everything\\ you\\ qualify\\ for,\\ with\\ any\\ matching\\ programmes\\ surfaced\\ first\\.'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementAnalyticsPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^accent=\"bg\\-brand\\-teal/10\\ text\\-brand\\-teal\"$",
+      "reason": "Phase 8b-1 (R1, R3, R9): colour and button-pair tokens only (tone text colours, the shared brand button pair, no pastel card colours). No behaviour change."
+    },
+    {
+      "file": "src/components/placements/PlacementAnalyticsPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^accent=\"bg\\-brand\\-amber/10\\ text\\-brand\\-amber\"$",
+      "reason": "Phase 8b-1 (R1, R3, R9): colour and button-pair tokens only (tone text colours, the shared brand button pair, no pastel card colours). No behaviour change."
+    },
+    {
+      "file": "src/components/placements/PlacementAnalyticsPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^accent=\"bg\\-brand\\-coral/10\\ text\\-brand\\-coral\"$",
+      "reason": "Phase 8b-1 (R1, R3, R9): colour and button-pair tokens only (tone text colours, the shared brand button pair, no pastel card colours). No behaviour change."
+    },
+    {
+      "file": "src/components/placements/PlacementAnalyticsPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^value=\\{\\ genderTotal\\ >\\ 0\\ \\?\\ `\\$\\{\\ femalePct\\ \\}%`\\ :\\ '\u2014'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementAnalyticsPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^accent=\"bg\\-brand\\-teal/10\\ text\\-brand\\-teal\"$",
+      "reason": "Phase 8b-1 (R1, R3, R9): colour and button-pair tokens only (tone text colours, the shared brand button pair, no pastel card colours). No behaviour change."
+    },
+    {
+      "file": "src/components/placements/PlacementAnalyticsPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^accent=\"bg\\-brand\\-teal/10\\ text\\-tone\\-teal\"$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/placements/PlacementAnalyticsPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^accent=\"bg\\-brand\\-amber/10\\ text\\-tone\\-amber\"$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/placements/PlacementAnalyticsPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^accent=\"bg\\-brand\\-coral/10\\ text\\-tone\\-coral\"$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/placements/PlacementAnalyticsPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^value=\\{\\ genderTotal\\ >\\ 0\\ \\?\\ `\\$\\{\\ femalePct\\ \\}%`\\ :\\ '\\-'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementAnalyticsPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^accent=\"bg\\-brand\\-teal/10\\ text\\-tone\\-teal\"$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/placements/PlacementRecommendationCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ cutOffLabel\\ =\\ r\\ \\.\\ meetsCutOff\\ ===\\ true\\ \\?\\ 'Eligible\\ \\\\u2014\\ within\\ cutoff'\\ :\\ r\\ \\.\\ meetsCutOff\\ ===\\ false\\ \\?\\ 'Eligible\\ \\\\u2014\\ competitive\\ cutoff'\\ :\\ eligible\\ \\?\\ 'Meets\\ minimums'\\ :\\ 'Not\\ eligible\\ \\\\u2014\\ missing\\ prerequisites'$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRecommendationCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ r\\ \\.\\ durationYears\\ \\?\\ `Duration:\\ \\$\\{\\ r\\ \\.\\ durationYears\\ \\}\\ Years`\\ :\\ null\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRecommendationCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ r\\ \\.\\ cutOffPoints\\ \\?\\ `Typical\\ Cutoff:\\ \\~\\$\\{\\ r\\ \\.\\ cutOffPoints\\ \\}\\ pts`\\ :\\ null\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRecommendationCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ eligible\\ \\?\\ <JSX/>\\ :\\ <JSX/>\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRecommendationCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ cutOffLabel\\ =\\ r\\ \\.\\ meetsCutOff\\ ===\\ true\\ \\?\\ 'Eligible,\\ within\\ cutoff'\\ :\\ r\\ \\.\\ meetsCutOff\\ ===\\ false\\ \\?\\ 'Eligible,\\ competitive\\ cutoff'\\ :\\ eligible\\ \\?\\ 'Meets\\ minimums'\\ :\\ 'Not\\ eligible,\\ missing\\ prerequisites'$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRecommendationCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ r\\ \\.\\ durationYears\\ \\?\\ `Duration:\\ \\$\\{\\ r\\ \\.\\ durationYears\\ \\}\\ years`\\ :\\ null\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRecommendationCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ r\\ \\.\\ cutOffPoints\\ \\?\\ `Typical\\ cutoff:\\ \\~\\$\\{\\ r\\ \\.\\ cutOffPoints\\ \\}\\ pts`\\ :\\ null\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRecommendationCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\\{\\ eligible\\ \\?\\ \\(\\ r\\ \\.\\ meetsCutOff\\ ===\\ false\\ \\?\\ 'warning'\\ :\\ 'success'\\ \\)\\ :\\ 'danger'\\ \\}$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ ENTRY_SOURCE_LABEL\\ :\\ Record\\ <\\ string\\ ,\\ string\\ >\\ =\\ \\{\\ STAFF_OFFICIAL\\ :\\ 'Staff\\ Official\\ List'\\ ,\\ STUDENT_CLAIM\\ :\\ 'Student\\ Claim'\\ ,\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ columns\\ :\\ DataColumn\\ <\\ ApiUniversityPlacement\\ >\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ key\\ :\\ 'student'\\ ,\\ label\\ :\\ 'Student\\ \\&\\ Exam\\ ID'\\ ,\\ priority\\ :\\ 'critical'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'sex'\\ ,\\ label\\ :\\ 'Gender'\\ ,\\ priority\\ :\\ 'optional'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ row\\ \\.\\ student\\ \\?\\.\\ sex\\ ===\\ 'FEMALE'\\ \\?\\ 'Female'\\ :\\ row\\ \\.\\ student\\ \\?\\.\\ sex\\ ===\\ 'MALE'\\ \\?\\ 'Male'\\ :\\ '\\\\u2014'\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'placedUniversityId'\\ ,\\ label\\ :\\ 'Institution'\\ ,\\ priority\\ :\\ 'critical'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ row\\ \\.\\ placedUniversityName\\ \\?\\?\\ row\\ \\.\\ placedUniversityId\\ \\?\\?\\ '\\\\u2014'\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'placedProgrammeId'\\ ,\\ label\\ :\\ 'Faculty\\ \\&\\ Selected\\ Course'\\ ,\\ priority\\ :\\ 'important'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'ncheBatchRef'\\ ,\\ label\\ :\\ 'NCHE\\ Batch\\ Ref'\\ ,\\ priority\\ :\\ 'optional'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ row\\ \\.\\ ncheBatchRef\\ \\?\\?\\ '\\\\u2014'\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'entrySource'\\ ,\\ label\\ :\\ 'Entry\\ Source'\\ ,\\ priority\\ :\\ 'optional'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'status'\\ ,\\ label\\ :\\ 'Status'\\ ,\\ priority\\ :\\ 'important'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ <JSX/>\\ \\}\\ ,\\ \\]$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ row\\ \\.\\ placedProgrammeName\\ \\?\\?\\ row\\ \\.\\ placedProgrammeId\\ \\?\\?\\ '\\\\u2014'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ placements\\ \\.\\ length\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ \\(\\ error\\ as\\ Error\\ \\)\\ \\?\\.\\ message\\ \\?\\?\\ 'Unknown\\ error\\ \u2014\\ check\\ your\\ connection\\ and\\ try\\ again\\.'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^data=\\{\\ filtered\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^emptyMessage=\\{\\ placements\\ \\.\\ length\\ ===\\ 0\\ \\?\\ `No\\ confirmed\\ placements\\ recorded\\ for\\ \\$\\{\\ effectiveYear\\ \\}\\ yet\\.`\\ :\\ 'No\\ placements\\ match\\ your\\ search/filters\\.'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ usePagedRows\\ \\}\\ from\\ '@/lib/hills/usePagedRows'$",
+      "reason": "Phase 8b-1 (R7): client-side paging of an already-loaded list; shows the first rows and the rest on request. No request, filter, sort or permission changes; the rows, their order and their handlers are the same."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ENTRY_SOURCE_LABEL\\ :\\ Record\\ <\\ string\\ ,\\ string\\ >\\ =\\ \\{\\ STAFF_OFFICIAL\\ :\\ 'Staff\\ official\\ list'\\ ,\\ STUDENT_CLAIM\\ :\\ 'Student\\ claim'\\ ,\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ paging\\ =\\ usePagedRows\\ \\(\\ filtered\\ ,\\ \\{\\ resetKey\\ :\\ `\\$\\{\\ effectiveYear\\ \\}\\|\\$\\{\\ search\\ \\}\\|\\$\\{\\ universityFilter\\ \\}\\|\\$\\{\\ genderFilter\\ \\}`\\ \\}\\ \\)$",
+      "reason": "Phase 8b-1 (R7): client-side paging of an already-loaded list; shows the first rows and the rest on request. No request, filter, sort or permission changes; the rows, their order and their handlers are the same."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ columns\\ :\\ DataColumn\\ <\\ ApiUniversityPlacement\\ >\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ key\\ :\\ 'student'\\ ,\\ label\\ :\\ 'Student\\ and\\ exam\\ ID'\\ ,\\ priority\\ :\\ 'critical'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'sex'\\ ,\\ label\\ :\\ 'Gender'\\ ,\\ priority\\ :\\ 'optional'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ row\\ \\.\\ student\\ \\?\\.\\ sex\\ ===\\ 'FEMALE'\\ \\?\\ 'Female'\\ :\\ row\\ \\.\\ student\\ \\?\\.\\ sex\\ ===\\ 'MALE'\\ \\?\\ 'Male'\\ :\\ '\\-'\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'placedUniversityId'\\ ,\\ label\\ :\\ 'Institution'\\ ,\\ priority\\ :\\ 'critical'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ row\\ \\.\\ placedUniversityName\\ \\?\\?\\ row\\ \\.\\ placedUniversityId\\ \\?\\?\\ '\\-'\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'placedProgrammeId'\\ ,\\ label\\ :\\ 'Faculty\\ and\\ selected\\ course'\\ ,\\ priority\\ :\\ 'important'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'ncheBatchRef'\\ ,\\ label\\ :\\ 'NCHE\\ batch\\ reference'\\ ,\\ priority\\ :\\ 'optional'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ row\\ \\.\\ ncheBatchRef\\ \\?\\?\\ '\\-'\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'entrySource'\\ ,\\ label\\ :\\ 'Entry\\ source'\\ ,\\ priority\\ :\\ 'optional'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'status'\\ ,\\ label\\ :\\ 'Status'\\ ,\\ priority\\ :\\ 'important'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ <JSX/>\\ \\}\\ ,\\ \\]$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ row\\ \\.\\ placedProgrammeName\\ \\?\\?\\ row\\ \\.\\ placedProgrammeId\\ \\?\\?\\ '\\-'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ \\(\\ error\\ as\\ Error\\ \\)\\ \\?\\.\\ message\\ \\?\\?\\ 'Unknown\\ error\\.\\ Check\\ your\\ connection\\ and\\ try\\ again\\.'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^data=\\{\\ paging\\ \\.\\ visible\\ \\}$",
+      "reason": "Phase 8b-1 (R7): client-side paging of an already-loaded list; shows the first rows and the rest on request. No request, filter, sort or permission changes; the rows, their order and their handlers are the same."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^emptyMessage=\\{\\ placements\\ \\.\\ length\\ ===\\ 0\\ \\?\\ `No\\ confirmed\\ placements\\ recorded\\ for\\ \\$\\{\\ effectiveYear\\ \\}\\ yet\\.`\\ :\\ 'No\\ placements\\ match\\ your\\ search\\ or\\ filters\\.'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ !\\ isError\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^paging=\\{\\ paging\\ \\}$",
+      "reason": "Phase 8b-1 (R7): client-side paging of an already-loaded list; shows the first rows and the rest on request. No request, filter, sort or permission changes; the rows, their order and their handlers are the same."
+    },
+    {
+      "file": "src/components/placements/PlacementStatusBadge.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_META\\ :\\ Record\\ <\\ PlacementStatusValue\\ ,\\ \\{\\ label\\ :\\ string\\ ;\\ className\\ :\\ string\\ ;\\ Icon\\ :\\ typeof\\ Clock\\ \\}\\ >\\ =\\ \\{\\ PENDING_APPROVAL\\ :\\ \\{\\ label\\ :\\ 'Pending\\ Approval'\\ ,\\ className\\ :\\ 'text\\-status\\-warning'\\ ,\\ Icon\\ :\\ Clock\\ ,\\ \\}\\ ,\\ CONFIRMED\\ :\\ \\{\\ label\\ :\\ 'Confirmed'\\ ,\\ className\\ :\\ 'text\\-status\\-success'\\ ,\\ Icon\\ :\\ CheckCircle2\\ ,\\ \\}\\ ,\\ REJECTED\\ :\\ \\{\\ label\\ :\\ 'Rejected'\\ ,\\ className\\ :\\ 'text\\-status\\-danger'\\ ,\\ Icon\\ :\\ XCircle\\ ,\\ \\}\\ ,\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementStatusBadge.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ meta\\ =\\ STATUS_META\\ \\[\\ status\\ as\\ PlacementStatusValue\\ \\]\\ \\?\\?\\ \\{\\ label\\ :\\ status\\ ,\\ className\\ :\\ 'text\\-muted'\\ ,\\ Icon\\ :\\ Clock\\ ,\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementStatusBadge.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ label\\ ,\\ className\\ ,\\ Icon\\ \\}\\ =\\ meta$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementStatusBadge.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return\\ \\(\\ <JSX/>\\ \\)$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementStatusBadge.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ label\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementStatusBadge.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_META\\ :\\ Record\\ <\\ PlacementStatusValue\\ ,\\ \\{\\ label\\ :\\ string\\ ;\\ tone\\ :\\ StatusTone\\ \\}\\ >\\ =\\ \\{\\ PENDING_APPROVAL\\ :\\ \\{\\ label\\ :\\ 'Pending\\ approval'\\ ,\\ tone\\ :\\ 'warning'\\ \\}\\ ,\\ CONFIRMED\\ :\\ \\{\\ label\\ :\\ 'Confirmed'\\ ,\\ tone\\ :\\ 'success'\\ \\}\\ ,\\ REJECTED\\ :\\ \\{\\ label\\ :\\ 'Rejected'\\ ,\\ tone\\ :\\ 'danger'\\ \\}\\ ,\\ \\}$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/placements/PlacementStatusBadge.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ meta\\ =\\ STATUS_META\\ \\[\\ status\\ as\\ PlacementStatusValue\\ \\]\\ \\?\\?\\ \\{\\ label\\ :\\ status\\ ,\\ tone\\ :\\ 'neutral'\\ as\\ StatusTone\\ \\}$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/placements/PlacementStatusBadge.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ <JSX/>$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/PlacementStatusBadge.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tone=\\{\\ meta\\ \\.\\ tone\\ \\}$",
+      "reason": "Phase 8b-1 (R2): the status word is drawn by the shared StatusText (coloured word with a shape) instead of a pill. Same status values, same conditions; only how the word looks changes."
+    },
+    {
+      "file": "src/components/placements/PlacementStatusBadge.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ meta\\ \\.\\ label\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/StaffPlacementEntryPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ \\(\\ error\\ as\\ Error\\ \\)\\ \\?\\.\\ message\\ \\?\\?\\ 'Unknown\\ error\\ \u2014\\ check\\ your\\ connection\\ and\\ try\\ again\\.'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/StaffPlacementEntryPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ \\(\\ error\\ as\\ Error\\ \\)\\ \\?\\.\\ message\\ \\?\\?\\ 'Unknown\\ error\\.\\ Check\\ your\\ connection\\ and\\ try\\ again\\.'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/StudentClaimPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ record\\ !\\ \\.\\ status\\ ===\\ 'PENDING_APPROVAL'\\ \\?\\ 'You\\ already\\ have\\ a\\ claim\\ awaiting\\ verification\\ \u2014\\ see\\ the\\ tracker\\ for\\ details\\.'\\ :\\ 'You\\ already\\ have\\ a\\ confirmed\\ placement\\ on\\ file\\ \u2014\\ see\\ the\\ tracker\\ for\\ details\\.'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/StudentClaimPanel.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Claimed\\ Program\\ /\\ Course\\ Choose\\ a\\ programme\u2026\\ \\{p\\ \\.\\ name\\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/StudentClaimPanel.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ NCHE\\ 2026\\ Gazette,\\ Page\\ 44\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/StudentClaimPanel.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Additional\\ Verification\\ Note\\ /\\ Physical\\ Evidence$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/StudentClaimPanel.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ Verified\\ with\\ printed\\ list\\ pinned\\ at\\ DEO\\ office,\\ or\\ received\\ official\\ SMS\\ from\\ NCHE\\.\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/StudentClaimPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ record\\ \\?\\ 1\\ :\\ 0\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/StudentClaimPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ record\\ !\\ \\.\\ status\\ ===\\ 'PENDING_APPROVAL'\\ \\?\\ 'You\\ already\\ have\\ a\\ claim\\ awaiting\\ verification,\\ see\\ the\\ tracker\\ for\\ details\\.'\\ :\\ 'You\\ already\\ have\\ a\\ confirmed\\ placement\\ on\\ file,\\ see\\ the\\ tracker\\ for\\ details\\.'\\ \\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/StudentClaimPanel.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Claimed\\ programme\\ or\\ course\\ Choose\\ a\\ programme\u2026\\ \\{p\\ \\.\\ name\\}$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/StudentClaimPanel.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"NCHE\\ 2026\\ Gazette,\\ Page\\ 44\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/StudentClaimPanel.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Verification\\ note\\ or\\ physical\\ evidence$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/placements/StudentClaimPanel.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Verified\\ with\\ printed\\ list\\ pinned\\ at\\ DEO\\ office,\\ or\\ received\\ official\\ SMS\\ from\\ NCHE\\.\"$",
+      "reason": "Phase 8b-1 (R4): visible wording only (sentence case, plain words, no dashes or e.g.). Labels, placeholders and button text change; actions, values and validation do not."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=sheet\\|Viewing\\ period\\ Term\\ \\{term\\}\\ ,\\ \\{academicYear\\}\\|compact\\|T\\ \\{term\\}\\ \u00b7\\ \\{academicYear\\ \\.\\ slice\\ \\(\\ 2\\ ,\\ 4\\ \\)\\}\\ /\\ \\{academicYear\\ \\.\\ slice\\ \\(\\ 7\\ \\)\\}\\|Term\\ \\{term\\}\\ \u2014\\ \\{academicYear\\}\\ \\{tag\\}$",
+      "reason": "Phase 8b-1 (R4): the period label in the header and More sheet no longer uses a dash in visible text (Term 1, 2026/2027). Same values, same switching logic."
+    },
+    {
+      "file": "src/components/shared/PeriodSwitcher.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=sheet\\|Viewing\\ period\\ Term\\ \\{term\\}\\ ,\\ \\{academicYear\\}\\|compact\\|T\\ \\{term\\}\\ \u00b7\\ \\{academicYear\\ \\.\\ slice\\ \\(\\ 2\\ ,\\ 4\\ \\)\\}\\ /\\ \\{academicYear\\ \\.\\ slice\\ \\(\\ 7\\ \\)\\}\\|Term\\ \\{term\\}\\ ,\\ \\{academicYear\\}\\ \\{tag\\}$",
+      "reason": "Phase 8b-1 (R4): the period label in the header and More sheet no longer uses a dash in visible text (Term 1, 2026/2027). Same values, same switching logic."
+    },
+    {
+      "file": "src/components/placements/PlacementRegistryPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ columns\\ :\\ DataColumn\\ <\\ ApiUniversityPlacement\\ >\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ key\\ :\\ 'student'\\ ,\\ label\\ :\\ 'Student\\ and\\ exam\\ ID'\\ ,\\ priority\\ :\\ 'critical'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'sex'\\ ,\\ label\\ :\\ 'Gender'\\ ,\\ priority\\ :\\ 'optional'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ row\\ \\.\\ student\\ \\?\\.\\ sex\\ ===\\ 'FEMALE'\\ \\?\\ 'Female'\\ :\\ row\\ \\.\\ student\\ \\?\\.\\ sex\\ ===\\ 'MALE'\\ \\?\\ 'Male'\\ :\\ '\\-'\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'placedUniversityId'\\ ,\\ label\\ :\\ 'Institution'\\ ,\\ priority\\ :\\ 'critical'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ row\\ \\.\\ placedUniversityName\\ \\?\\?\\ row\\ \\.\\ placedUniversityId\\ \\?\\?\\ '\\-'\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'placedProgrammeId'\\ ,\\ label\\ :\\ 'Faculty\\ and\\ course'\\ ,\\ priority\\ :\\ 'important'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'ncheBatchRef'\\ ,\\ label\\ :\\ 'NCHE\\ batch\\ reference'\\ ,\\ priority\\ :\\ 'optional'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ row\\ \\.\\ ncheBatchRef\\ \\?\\?\\ '\\-'\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'entrySource'\\ ,\\ label\\ :\\ 'Entry\\ source'\\ ,\\ priority\\ :\\ 'optional'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'status'\\ ,\\ label\\ :\\ 'Status'\\ ,\\ priority\\ :\\ 'important'\\ ,\\ render\\ :\\ \\(\\ row\\ \\)\\ =>\\ <JSX/>\\ \\}\\ ,\\ \\]$",
+      "reason": "Phase 8b-1 (R4): visible wording only. The registry column label is shortened so it is not cut off on phones. Same column, same data."
     }
   ],
   "approvedFrozen": [

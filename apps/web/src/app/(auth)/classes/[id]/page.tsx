@@ -198,11 +198,12 @@ function ClassDetailContent() {
       label: 'Assignments',
       icon: BookOpen,
       // A student's badge counts work still to do and still on time (the shared
-      // "PENDING" definition); staff see the total.
-      badge: role === 'student' ? countOutstanding(assignments) : assignments.length,
+      // "PENDING" definition). Staff get no badge: a total is not something to act on.
+      badge: role === 'student' ? countOutstanding(assignments) : undefined,
+      badgeNoun: 'to do',
     },
     // Who teaches each subject. Students have no use for it.
-    ...(role !== 'student' ? [{ id: 'subjects' as Tab, label: 'Subjects & teachers', icon: GraduationCap }] : []),
+    ...(role !== 'student' ? [{ id: 'subjects' as Tab, label: 'Subjects and teachers', icon: GraduationCap }] : []),
   ]
 
   // [PRODUCTION FIX 2026-07-31] Full attendance/classes audit finding: this
@@ -239,7 +240,7 @@ function ClassDetailContent() {
         priority: 'important' as const,
         render: (s: RosterStudent) =>
           canViewStudentProfile ? (
-            <Link href={`/students/${s.id}`} className="text-brand-teal text-xs font-medium hover:underline">
+            <Link href={`/students/${s.id}`} className="text-tone-teal text-xs font-medium hover:underline">
               Profile
             </Link>
           ) : null,
@@ -263,7 +264,7 @@ function ClassDetailContent() {
       priority: 'important',
       render: (s) =>
         s.approvedAt ? null : (
-          <span className="inline-flex items-center gap-1 text-[10px] font-heading font-semibold text-brand-amber">
+          <span className="inline-flex items-center gap-1 text-xs font-heading font-semibold text-tone-amber">
             <Hourglass className="w-2.5 h-2.5" aria-hidden />
             Pending approval
           </span>
@@ -277,7 +278,7 @@ function ClassDetailContent() {
       <div className="flex items-center gap-3 flex-wrap">
         <Link
           href="/classes"
-          className="p-1.5 rounded-lg hover:bg-page border border-base"
+          className="p-1.5 rounded-lg hover:bg-page"
           aria-label="Back to classes"
         >
           <ArrowLeft className="w-4 h-4 text-muted" />
@@ -348,10 +349,10 @@ function ClassDetailContent() {
               <button
                 type="button"
                 onClick={() => setShowSlotForm(true)}
-                className="inline-flex items-center gap-2 bg-brand-teal text-white rounded-xl px-4 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+                className="inline-flex items-center gap-2 bg-btn-brand text-btn-brand-fg rounded-xl px-4 py-2 text-sm font-semibold hover:bg-btn-brand-hover min-h-11"
               >
                 <Plus className="w-4 h-4" aria-hidden />
-                Add Slot
+                Add slot
               </button>
             </RoleGuard>
             <span className="text-sm text-muted ml-auto" aria-label="Period shown">Term {term}</span>

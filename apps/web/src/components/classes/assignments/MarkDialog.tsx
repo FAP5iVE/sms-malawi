@@ -121,7 +121,7 @@ export function MarkDialog({ classId, assignmentId, dueDate, postedAt, marksEnab
       title={`${row.firstName} ${row.lastName}`}
       description={row.registrationNo}
       onClose={onClose}
-      size="md"
+      size="m"
       onSubmit={onSubmit}
       busy={isPending}
       bodyClassName="space-y-4"
@@ -142,7 +142,7 @@ export function MarkDialog({ classId, assignmentId, dueDate, postedAt, marksEnab
             <button
               type="button"
               onClick={() => void openAssignmentSubmissionFile(classId, assignmentId, row.studentId, row.fileName ?? 'hand-in').catch((e) => notifyError('Could not open the file', e))}
-              className="inline-flex max-w-full items-center gap-1.5 text-xs font-semibold text-brand-teal hover:underline"
+              className="inline-flex max-w-full items-center gap-1.5 text-xs font-semibold text-tone-teal hover:underline"
             >
               <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden /> <span className="truncate">{row.fileName ?? 'Open file'}</span>
             </button>
@@ -215,7 +215,7 @@ export function MarkDialog({ classId, assignmentId, dueDate, postedAt, marksEnab
                 className="w-full rounded-xl border border-base bg-page px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
               />
               {errors.marks && <p role="alert" className="mt-1 text-xs text-status-danger">{errors.marks}</p>}
-              <p className="mt-1 text-[11px] text-muted">The student sees this mark on their assignment. It does not count toward exams or C.A.</p>
+              <p className="mt-1 text-xs text-muted">The student sees this mark on their assignment. It does not count toward exams or C.A.</p>
             </div>
           )}
         </>
@@ -234,7 +234,7 @@ export function MarkDialog({ classId, assignmentId, dueDate, postedAt, marksEnab
             maxLength={2000}
             className="w-full resize-y rounded-xl border border-base bg-page px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
           />
-          <p className="mt-1 text-[11px] text-muted">Shown to the student together with their mark.</p>
+          <p className="mt-1 text-xs text-muted">Shown to the student together with their mark.</p>
         </div>
       )}
 

@@ -111,7 +111,7 @@ export function AssignmentsTab({
       ) : loadError ? (
         <div role="alert" className="flex flex-col items-center gap-3 rounded-xl border border-base py-10 text-center text-sm">
           <span className="inline-flex items-center gap-2 text-status-danger"><AlertCircle className="h-4 w-4" aria-hidden /> {loadError}</span>
-          <button type="button" onClick={onRetry} className="min-h-10 rounded-xl border border-base px-4 text-sm font-semibold text-brand-teal hover:bg-page">
+          <button type="button" onClick={onRetry} className="min-h-10 rounded-xl border border-base px-4 text-sm font-semibold text-tone-teal hover:bg-page">
             Try again
           </button>
         </div>

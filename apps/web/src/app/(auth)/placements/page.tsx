@@ -60,11 +60,11 @@ function PlacementsContent() {
 
   const tabs = useMemo<TabItem<PlacementTab>[]>(() => {
     const list: TabItem<PlacementTab>[] = []
-    if (canViewRegistry) list.push({ id: 'registry', label: 'Registry & Analytics', icon: ListChecks })
-    list.push({ id: 'advisory', label: 'MSCE Advisory', icon: Calculator })
-    if (canStaffEnter) list.push({ id: 'staffEntry', label: 'Staff Entry', icon: ClipboardEdit })
-    if (canVerify) list.push({ id: 'verify', label: 'Verify Claims', icon: ShieldCheck, badge: pendingCount })
-    if (showMyClaimTab) list.push({ id: 'myClaim', label: 'My Claim', icon: GraduationCap })
+    if (canViewRegistry) list.push({ id: 'registry', label: 'Registry and analytics', icon: ListChecks })
+    list.push({ id: 'advisory', label: 'MSCE advisory', icon: Calculator })
+    if (canStaffEnter) list.push({ id: 'staffEntry', label: 'Staff entry', icon: ClipboardEdit })
+    if (canVerify) list.push({ id: 'verify', label: 'Verify claims', icon: ShieldCheck, badge: pendingCount, badgeNoun: 'to verify' })
+    if (showMyClaimTab) list.push({ id: 'myClaim', label: 'My claim', icon: GraduationCap })
     return list
   }, [canViewRegistry, canStaffEnter, canVerify, pendingCount, showMyClaimTab])
 
@@ -76,7 +76,7 @@ function PlacementsContent() {
   const activeTab: PlacementTab = tabs.some((t) => t.id === active) ? active : (tabs[0]?.id ?? 'advisory')
 
   useEffect(() => {
-    setTitle('University Placement')
+    setTitle('University placement')
     setSubtitle('Registry, advisory & admissions')
     return () => {
       setTitle(null)

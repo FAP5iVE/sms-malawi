@@ -23,13 +23,13 @@ interface StatCardProps {
 
 function StatCard({ icon: Icon, label, value, accent }: StatCardProps) {
   return (
-    <div className="bg-surface border border-base rounded-xl p-4 flex items-center gap-3">
+    <div className="app-tint rounded-xl p-4 flex items-center gap-3">
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${accent}`}>
         <Icon className="w-5 h-5" />
       </div>
       <div className="min-w-0">
         <p className="text-xl font-heading font-bold text-body leading-tight">{value}</p>
-        <p className="text-xs text-muted truncate">{label}</p>
+        <p className="text-xs text-muted">{label}</p>
       </div>
     </div>
   )
@@ -61,15 +61,15 @@ export function PlacementAnalyticsPanel({ academicYear }: { academicYear: string
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatCard icon={GraduationCap} label={`${academicYear} MSCE cohort`} value={data.cohortSize} accent="bg-brand-navy/10 text-brand-navy" />
-        <StatCard icon={CheckCircle2} label="Confirmed placements" value={data.confirmedCount} accent="bg-brand-teal/10 text-brand-teal" />
-        <StatCard icon={Clock} label="Pending approval" value={data.pendingApprovalCount} accent="bg-brand-amber/10 text-brand-amber" />
-        <StatCard icon={XCircle} label="Rejected claims" value={data.rejectedCount} accent="bg-brand-coral/10 text-brand-coral" />
+        <StatCard icon={CheckCircle2} label="Confirmed placements" value={data.confirmedCount} accent="bg-brand-teal/10 text-tone-teal" />
+        <StatCard icon={Clock} label="Pending approval" value={data.pendingApprovalCount} accent="bg-brand-amber/10 text-tone-amber" />
+        <StatCard icon={XCircle} label="Rejected claims" value={data.rejectedCount} accent="bg-brand-coral/10 text-tone-coral" />
         <StatCard icon={Users} label="Placement rate" value={`${placementRate}%`} accent="bg-brand-navy/10 text-brand-navy" />
         <StatCard
           icon={Users}
           label="Female share of placements"
-          value={genderTotal > 0 ? `${femalePct}%` : '—'}
-          accent="bg-brand-teal/10 text-brand-teal"
+          value={genderTotal > 0 ? `${femalePct}%` : '-'}
+          accent="bg-brand-teal/10 text-tone-teal"
         />
       </div>
 

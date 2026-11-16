@@ -18,7 +18,7 @@ import { GuardianLinkCard } from './GuardianLinkCard'
 const FILTERS: GuardianLinkStatusValue[] = ['PENDING', 'ACTIVE', 'SUSPENDED', 'REJECTED', 'REVOKED']
 
 const CHIP = 'inline-flex items-center min-h-11 px-3.5 rounded-full text-sm font-medium border transition-colors'
-const CHIP_ON = 'bg-brand-teal text-white border-brand-teal'
+const CHIP_ON = 'bg-btn-brand text-btn-brand-fg border-brand-teal'
 const CHIP_OFF = 'border-base text-muted hover:text-body hover:bg-page'
 
 export function GuardianQueueTab() {
@@ -55,14 +55,14 @@ export function GuardianQueueTab() {
         <div className="flex items-center gap-2 text-sm text-muted" role="status"><Loader2 className="w-4 h-4 animate-spin" aria-hidden />Loading…</div>
       )}
       {queue.isError && (
-        <div role="alert" className="rounded-xl border border-brand-coral/40 bg-brand-coral/10 p-3 text-sm text-body">
+        <div role="alert" className="rounded-xl bg-brand-coral/10 p-3 text-sm text-body">
           Could not load the queue.{' '}
           <button type="button" className="font-medium underline" onClick={() => queue.refetch()}>Try again</button>
         </div>
       )}
 
       {queue.data && items.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-base p-10 text-center">
+        <div className="app-tint rounded-xl p-10 text-center">
           <Inbox className="w-8 h-8 mx-auto text-muted mb-2" aria-hidden />
           <p className="font-medium text-body">
             {skip > 0 ? 'No more guardians.' : reverify ? 'Nobody needs re-verifying.' : `Nothing ${GUARDIAN_LINK_STATUS_LABELS[status].toLowerCase()}.`}

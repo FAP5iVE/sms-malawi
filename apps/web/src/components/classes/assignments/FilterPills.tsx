@@ -21,7 +21,7 @@ export function FilterPills<T extends string>({ value, onChange, options, label 
           aria-pressed={value === o.id}
           onClick={() => onChange(o.id)}
           className={`min-h-9 rounded-full border px-3 text-xs font-heading font-semibold transition-colors ${
-            value === o.id ? 'border-brand-teal bg-brand-teal/10 text-brand-teal' : 'border-base text-muted hover:bg-page'
+            value === o.id ? 'border-brand-teal bg-brand-teal/10 text-tone-teal' : 'border-base text-muted hover:bg-page'
           }`}
         >
           {o.label}{o.count !== undefined ? ` (${o.count})` : ''}

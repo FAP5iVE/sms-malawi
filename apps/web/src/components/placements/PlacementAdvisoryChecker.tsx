@@ -124,10 +124,10 @@ export function PlacementAdvisoryChecker() {
 
   return (
     <div className="space-y-5">
-      <div className="bg-brand-navy/5 border border-brand-navy/15 rounded-xl px-4 py-3 text-sm text-body flex items-start gap-2">
+      <div className="bg-brand-navy/5 rounded-xl px-4 py-3 text-sm text-body flex items-start gap-2">
         <Calculator className="w-4 h-4 mt-0.5 shrink-0 text-brand-navy" />
         <span>
-          Type a set of subject grades — expected or real MSCE grades — for yourself or on behalf of a student
+          Type a set of subject grades (expected or real MSCE grades) for yourself or on behalf of a student
           you are advising. This is advisory only: it never looks at internal school exam marks, only the numbers
           entered here.
         </span>
@@ -166,7 +166,7 @@ export function PlacementAdvisoryChecker() {
                 onClick={() => removeGradeRow(i)}
                 disabled={grades.length <= 1}
                 aria-label="Remove subject"
-                className="p-2 text-muted hover:text-brand-coral disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-2 text-muted hover:text-tone-coral disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -177,7 +177,7 @@ export function PlacementAdvisoryChecker() {
           type="button"
           onClick={addGradeRow}
           disabled={grades.length >= MALAWI_SUBJECTS.length}
-          className="mt-2 flex items-center gap-1.5 text-sm text-brand-teal font-semibold hover:underline disabled:opacity-40"
+          className="mt-2 flex items-center gap-1.5 text-sm text-tone-teal font-semibold hover:underline disabled:opacity-40"
         >
           <Plus className="w-4 h-4" /> Add subject
         </button>
@@ -227,7 +227,7 @@ export function PlacementAdvisoryChecker() {
                     onClick={() => removeChosenRow(i)}
                     disabled={chosen.length <= 3}
                     aria-label="Remove programme"
-                    className="p-2 text-muted hover:text-brand-coral disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="p-2 text-muted hover:text-tone-coral disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -238,7 +238,7 @@ export function PlacementAdvisoryChecker() {
               type="button"
               onClick={addChosenRow}
               disabled={chosen.length >= 20}
-              className="flex items-center gap-1.5 text-sm text-brand-teal font-semibold hover:underline disabled:opacity-40"
+              className="flex items-center gap-1.5 text-sm text-tone-teal font-semibold hover:underline disabled:opacity-40"
             >
               <Plus className="w-4 h-4" /> Add programme
             </button>
@@ -279,7 +279,7 @@ export function PlacementAdvisoryChecker() {
       </section>
 
       {formError && (
-        <p role="alert" className="text-sm text-brand-coral">{formError}</p>
+        <p role="alert" className="text-sm text-tone-coral">{formError}</p>
       )}
 
       <button
@@ -293,7 +293,7 @@ export function PlacementAdvisoryChecker() {
       </button>
 
       {advisory.isError && (
-        <p role="alert" className="text-sm text-brand-coral">
+        <p role="alert" className="text-sm text-tone-coral">
           {(advisory.error as Error).message}
         </p>
       )}
@@ -314,12 +314,12 @@ export function PlacementAdvisoryChecker() {
           <section>
             <h3 className="font-heading font-semibold text-sm mb-3">Top 10 matching programmes</h3>
             {result.appliedTier && result.appliedTier.tier !== 'full' && (preferredField || preferredCareer) && (
-              <div className="bg-brand-amber/10 border border-brand-amber/25 rounded-xl px-4 py-3 text-sm text-body flex items-start gap-2 mb-3">
-                <Info className="w-4 h-4 mt-0.5 shrink-0 text-brand-amber" />
+              <div className="bg-brand-amber/10 rounded-xl px-4 py-3 text-sm text-body flex items-start gap-2 mb-3">
+                <Info className="w-4 h-4 mt-0.5 shrink-0 text-tone-amber" />
                 <span>
                   {result.appliedTier.tier === 'relaxed_no_career'
-                    ? 'Not enough programmes matched every preference, so your career preference was relaxed for this list — programmes that still match it are shown first, but this is a wider set than a strict match.'
-                    : 'Not enough programmes matched your preferences at all, so both preferences were relaxed for this list — showing everything you qualify for, with any matching programmes surfaced first.'}
+                    ? 'Not enough programmes matched every preference, so your career preference was relaxed for this list. Programmes that still match it are shown first, but this is a wider set than a strict match.'
+                    : 'Not enough programmes matched your preferences at all, so both preferences were relaxed for this list. This shows everything you qualify for, with any matching programmes surfaced first.'}
                 </span>
               </div>
             )}

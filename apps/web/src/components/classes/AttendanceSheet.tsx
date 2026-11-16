@@ -211,7 +211,7 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
             <button
               type="button"
               onClick={() => setViewDate(new Date())}
-              className="text-xs font-semibold text-brand-teal hover:underline ml-1"
+              className="text-xs font-semibold text-tone-teal hover:underline ml-1"
             >
               Today
             </button>
@@ -222,9 +222,9 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
           <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {markedCount}/{students.length} marked</span>
           <span className="hidden sm:inline">·</span>
           <span className="hidden sm:flex items-center gap-2.5">
-            <span className="text-emerald-600 dark:text-emerald-400 font-medium">{presentCount}P</span>
-            <span className="text-brand-coral font-medium">{absentCount}A</span>
-            <span className="text-brand-amber font-medium">{lateCount}L</span>
+            <span className="text-status-success font-medium">{presentCount}P</span>
+            <span className="text-tone-coral font-medium">{absentCount}A</span>
+            <span className="text-tone-amber font-medium">{lateCount}L</span>
           </span>
           {saving && <span>· saving…</span>}
         </div>
@@ -232,8 +232,8 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
 
       {readOnly && (
         <div className="mt-3 px-4 py-2 rounded-xl bg-brand-teal/8 flex items-start gap-2">
-          <Lock className="w-3.5 h-3.5 text-brand-teal shrink-0 mt-0.5" aria-hidden />
-          <p className="text-xs text-brand-teal">
+          <Lock className="w-3.5 h-3.5 text-tone-teal shrink-0 mt-0.5" aria-hidden />
+          <p className="text-xs text-tone-teal">
             View only — {classTeacherName
               ? <>only the assigned class teacher, <span className="font-semibold">{classTeacherName}</span>, can mark attendance for this class.</>
               : 'only the assigned class teacher can mark attendance, and this class has no teacher assigned yet.'}
@@ -243,8 +243,8 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
 
       {saveError && (
         <div className="mt-3 px-4 py-2 rounded-xl bg-brand-coral/10 flex items-center gap-2">
-          <AlertTriangle className="w-3.5 h-3.5 text-brand-coral shrink-0" aria-hidden />
-          <p className="text-xs text-brand-coral">{saveError}</p>
+          <AlertTriangle className="w-3.5 h-3.5 text-tone-coral shrink-0" aria-hidden />
+          <p className="text-xs text-tone-coral">{saveError}</p>
         </div>
       )}
 
@@ -255,7 +255,7 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
             type="button"
             onClick={markAllPresent}
             disabled={saving}
-            className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline disabled:opacity-50 min-h-11"
+            className="text-xs font-semibold text-status-success hover:underline disabled:opacity-50 min-h-11"
           >
             Mark all present
           </button>
@@ -350,8 +350,8 @@ function AttendanceLoadError({
     <div className="flex flex-col items-center gap-3 px-6 py-12 text-center" role="alert">
       <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${forbidden ? 'bg-brand-amber/10' : 'bg-brand-coral/10'}`}>
         {forbidden
-          ? <Lock className="w-5 h-5 text-brand-amber" aria-hidden />
-          : <AlertTriangle className="w-5 h-5 text-brand-coral" aria-hidden />}
+          ? <Lock className="w-5 h-5 text-tone-amber" aria-hidden />
+          : <AlertTriangle className="w-5 h-5 text-tone-coral" aria-hidden />}
       </div>
       <div className="space-y-1">
         <p className="font-heading font-semibold text-sm text-body">

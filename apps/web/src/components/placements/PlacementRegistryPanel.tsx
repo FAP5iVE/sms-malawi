@@ -21,6 +21,8 @@ import { usePlacementRegistry, usePlacementCatalogue } from '@/hooks/usePlacemen
 import { DataTable, type DataColumn } from '@/components/shared/DataTable'
 import { PlacementAnalyticsPanel } from '@/components/placements/PlacementAnalyticsPanel'
 import { PlacementStatusBadge } from '@/components/placements/PlacementStatusBadge'
+import { ListPager } from '@/components/shared/ListPager'
+import { usePagedRows } from '@/lib/hills/usePagedRows'
 import type { ApiUniversityPlacement } from '@shared/types/api'
 
 function studentName(row: ApiUniversityPlacement): string {
@@ -29,8 +31,8 @@ function studentName(row: ApiUniversityPlacement): string {
 }
 
 const ENTRY_SOURCE_LABEL: Record<string, string> = {
-  STAFF_OFFICIAL: 'Staff Official List',
-  STUDENT_CLAIM: 'Student Claim',
+  STAFF_OFFICIAL: 'Staff official list',
+  STUDENT_CLAIM: 'Student claim',
 }
 
 export function PlacementRegistryPanel() {
@@ -71,9 +73,12 @@ export function PlacementRegistryPanel() {
     })
   }, [placements, search, universityFilter, genderFilter])
 
+  // Hills 8b-1 (R7): client-side paging of the already-loaded, already-filtered list.
+  const paging = usePagedRows(filtered, { resetKey: `${effectiveYear}|${search}|${universityFilter}|${genderFilter}` })
+
   const columns: DataColumn<ApiUniversityPlacement>[] = [
     {
-      key: 'student', label: 'Student & Exam ID', priority: 'critical',
+      key: 'student', label: 'Student and exam ID', priority: 'critical',
       render: (row) => (
         <div>
           <p className="font-medium">{studentName(row)}</p>
@@ -83,24 +88,24 @@ export function PlacementRegistryPanel() {
     },
     {
       key: 'sex', label: 'Gender', priority: 'optional',
-      render: (row) => row.student?.sex === 'FEMALE' ? 'Female' : row.student?.sex === 'MALE' ? 'Male' : '\u2014',
+      render: (row) => row.student?.sex === 'FEMALE' ? 'Female' : row.student?.sex === 'MALE' ? 'Male' : '-',
     },
     {
       key: 'placedUniversityId', label: 'Institution', priority: 'critical',
-      render: (row) => row.placedUniversityName ?? row.placedUniversityId ?? '\u2014',
+      render: (row) => row.placedUniversityName ?? row.placedUniversityId ?? '-',
     },
     {
-      key: 'placedProgrammeId', label: 'Faculty & Selected Course', priority: 'important',
+      key: 'placedProgrammeId', label: 'Faculty and course', priority: 'important',
       render: (row) => (
         <div>
-          <p>{row.placedProgrammeName ?? row.placedProgrammeId ?? '\u2014'}</p>
+          <p>{row.placedProgrammeName ?? row.placedProgrammeId ?? '-'}</p>
           {facultyFor(row) && <p className="text-xs text-muted">{facultyFor(row)}</p>}
         </div>
       ),
     },
-    { key: 'ncheBatchRef', label: 'NCHE Batch Ref', priority: 'optional', render: (row) => row.ncheBatchRef ?? '\u2014' },
+    { key: 'ncheBatchRef', label: 'NCHE batch reference', priority: 'optional', render: (row) => row.ncheBatchRef ?? '-' },
     {
-      key: 'entrySource', label: 'Entry Source', priority: 'optional',
+      key: 'entrySource', label: 'Entry source', priority: 'optional',
       render: (row) => (
         <span className="inline-flex items-center text-xs">
           {ENTRY_SOURCE_LABEL[row.entrySource] ?? row.entrySource}
@@ -155,28 +160,29 @@ export function PlacementRegistryPanel() {
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <h4 className="font-heading font-semibold text-sm">Confirmed NCHE Placement List ({placements.length})</h4>
+          <h4 className="font-heading font-semibold text-sm">Confirmed NCHE placement list</h4>
           <span className="text-xs text-muted">Showing {filtered.length} of {placements.length} confirmed</span>
         </div>
         {isError ? (
-          <div className="text-sm text-brand-coral py-6 text-center px-4">
+          <div className="text-sm text-tone-coral py-6 text-center px-4">
             <p className="font-medium">Could not load the registry.</p>
-            <p className="text-xs text-muted mt-1">{(error as Error)?.message ?? 'Unknown error — check your connection and try again.'}</p>
+            <p className="text-xs text-muted mt-1">{(error as Error)?.message ?? 'Unknown error. Check your connection and try again.'}</p>
           </div>
         ) : (
           <DataTable
-            data={filtered}
+            data={paging.visible}
             isLoading={isLoading}
             columns={columns}
             rowKey="id"
             emptyMessage={
               placements.length === 0
                 ? `No confirmed placements recorded for ${effectiveYear} yet.`
-                : 'No placements match your search/filters.'
+                : 'No placements match your search or filters.'
             }
             bordered={false}
           />
         )}
+        {!isError && <ListPager paging={paging} />}
       </div>
     </div>
   )

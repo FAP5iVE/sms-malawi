@@ -70,13 +70,13 @@ export function AssignmentBody({ d }: { d: ApiAssignmentDetail }) {
                   <FileText className="h-4 w-4 shrink-0 text-muted" aria-hidden />
                   <span className="min-w-0 flex-1">
                     <span className="block break-all">{f.fileName}</span>
-                    <span className="block text-[11px] text-muted">{formatBytes(f.sizeBytes)}</span>
+                    <span className="block text-xs text-muted">{formatBytes(f.sizeBytes)}</span>
                   </span>
                   <button
                     type="button"
                     aria-label={`Download ${f.fileName}`}
                     onClick={() => void downloadAssignmentAttachment(f.url, f.fileName).catch((e) => notifyError('Could not download the file', e))}
-                    className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-base px-3 text-xs font-semibold text-brand-teal hover:bg-surface"
+                    className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-base px-3 text-xs font-semibold text-tone-teal hover:bg-surface"
                   >
                     <Download className="h-3.5 w-3.5" aria-hidden /> Download
                   </button>

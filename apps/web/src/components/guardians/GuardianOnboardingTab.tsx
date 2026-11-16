@@ -60,7 +60,7 @@ function BatchItems({ batchId }: { batchId: string }) {
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by what will happen">
         {[null, ...GUARDIAN_ONBOARDING_ACTIONS].map((a) => (
           <button key={a ?? 'all'} type="button" aria-pressed={action === a} onClick={() => pick(a)}
-            className={`${CHIP} ${action === a ? 'bg-brand-teal text-white border-brand-teal' : 'border-base text-muted hover:text-body hover:bg-page'}`}>
+            className={`${CHIP} ${action === a ? 'bg-btn-brand text-btn-brand-fg border-brand-teal' : 'border-base text-muted hover:text-body hover:bg-page'}`}>
             {a ? GUARDIAN_ONBOARDING_ACTION_LABELS[a] : 'All'}
           </button>
         ))}
@@ -146,7 +146,7 @@ export function GuardianOnboardingTab() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-base bg-surface p-4 space-y-4" aria-label="Choose who to include">
+      <section className="app-tint rounded-xl p-4 space-y-4" aria-label="Choose who to include">
         <div>
           <h2 className="font-heading font-semibold text-body">Bring existing guardians into the portal</h2>
           <p className="text-sm text-muted mt-1">
@@ -168,13 +168,13 @@ export function GuardianOnboardingTab() {
             <span className="text-sm text-body">Include students who are no longer enrolled</span>
           </label>
         </div>
-        <button type="button" disabled={dryRun.isPending || running} onClick={preview} className={`${BTN} bg-brand-teal text-white hover:bg-brand-teal-light`}>
+        <button type="button" disabled={dryRun.isPending || running} onClick={preview} className={`${BTN} bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover`}>
           {dryRun.isPending ? <><Loader2 className="w-4 h-4 animate-spin" aria-hidden />Preparing…</> : 'Preview'}
         </button>
       </section>
 
       {summary && (
-        <section className="rounded-2xl border border-base bg-surface p-4 space-y-4" aria-label="Preview">
+        <section className="app-tint rounded-xl p-4 space-y-4" aria-label="Preview">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="font-heading font-semibold text-body">{summary.cards} guardian contact{summary.cards === 1 ? '' : 's'} found</h2>
             {status && <span className="text-sm text-muted" role="status">{STATUS_TEXT[status]}</span>}
@@ -203,7 +203,7 @@ export function GuardianOnboardingTab() {
           <BatchItems batchId={summary.batchId} />
 
           {summary.truncated && (
-            <p role="note" className="rounded-xl border border-status-warning/40 bg-status-warning/10 p-3 text-sm text-body">
+            <p role="note" className="rounded-xl bg-status-warning/10 p-3 text-sm text-body">
               This batch hit its size limit, so only the first part is included. After creating these, run the preview again to pick up the rest.
             </p>
           )}
@@ -221,12 +221,12 @@ export function GuardianOnboardingTab() {
 
           <div className="flex flex-wrap gap-2">
             {(status === 'DRY_RUN' || status === 'APPLYING') && creatable > 0 && (
-              <button type="button" disabled={running} onClick={() => setConfirm('apply')} className={`${BTN} bg-brand-teal text-white hover:bg-brand-teal-light`}>
+              <button type="button" disabled={running} onClick={() => setConfirm('apply')} className={`${BTN} bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover`}>
                 {running ? <><Loader2 className="w-4 h-4 animate-spin" aria-hidden />Creating…</> : <><Play className="w-4 h-4" aria-hidden />{status === 'APPLYING' ? 'Continue creating' : `Create ${creatable} guardian${creatable === 1 ? '' : 's'}`}</>}
               </button>
             )}
             {(status === 'APPLYING' || status === 'APPLIED') && (
-              <button type="button" disabled={running || rollback.isPending} onClick={() => setConfirm('rollback')} className={`${BTN} border border-brand-coral/40 text-brand-coral hover:bg-brand-coral/10`}>
+              <button type="button" disabled={running || rollback.isPending} onClick={() => setConfirm('rollback')} className={`${BTN} border border-brand-coral/40 text-tone-coral hover:bg-brand-coral/10`}>
                 <Undo2 className="w-4 h-4" aria-hidden />Undo this batch
               </button>
             )}

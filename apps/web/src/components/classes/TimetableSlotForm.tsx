@@ -128,7 +128,7 @@ export function TimetableSlotForm({ classId, academicYear, term, onClose }: Prop
     <Modal
       title="Add Timetable Slot"
       onClose={onClose}
-      size="md"
+      size="m"
       onSubmit={handleSubmit(onSubmit)}
       busy={createSlot.isPending}
       footer={
@@ -171,7 +171,7 @@ export function TimetableSlotForm({ classId, academicYear, term, onClose }: Prop
             ))}
           </select>
           {errors.day && (
-            <p className="text-xs text-brand-coral mt-1" role="alert">
+            <p className="text-xs text-tone-coral mt-1" role="alert">
               {errors.day.message}
             </p>
           )}
@@ -196,7 +196,7 @@ export function TimetableSlotForm({ classId, academicYear, term, onClose }: Prop
           </label>
           <input id="ts-start" type="time" {...register('periodStart')} className={ic} />
           {errors.periodStart && (
-            <p className="text-xs text-brand-coral mt-1" role="alert">
+            <p className="text-xs text-tone-coral mt-1" role="alert">
               {errors.periodStart.message}
             </p>
           )}
@@ -208,7 +208,7 @@ export function TimetableSlotForm({ classId, academicYear, term, onClose }: Prop
           </label>
           <input id="ts-end" type="time" {...register('periodEnd')} className={ic} />
           {errors.periodEnd && (
-            <p className="text-xs text-brand-coral mt-1" role="alert">
+            <p className="text-xs text-tone-coral mt-1" role="alert">
               {errors.periodEnd.message}
             </p>
           )}
@@ -232,7 +232,7 @@ export function TimetableSlotForm({ classId, academicYear, term, onClose }: Prop
             ))}
           </select>
           {errors.subject && (
-            <p className="text-xs text-brand-coral mt-1" role="alert">
+            <p className="text-xs text-tone-coral mt-1" role="alert">
               {errors.subject.message}
             </p>
           )}
@@ -255,7 +255,7 @@ export function TimetableSlotForm({ classId, academicYear, term, onClose }: Prop
             placeholder="Search teacher…"
           />
           {errors.teacherUid && (
-            <p className="text-xs text-brand-coral mt-1" role="alert">
+            <p className="text-xs text-tone-coral mt-1" role="alert">
               {errors.teacherUid.message}
             </p>
           )}
@@ -271,7 +271,7 @@ export function TimetableSlotForm({ classId, academicYear, term, onClose }: Prop
       {submitError && (
         <p
           role="alert"
-          className="mt-4 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
+          className="mt-4 flex items-start gap-2 text-xs text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
         >
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
           {submitError}

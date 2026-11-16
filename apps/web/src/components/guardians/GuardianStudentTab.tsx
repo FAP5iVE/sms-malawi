@@ -50,7 +50,7 @@ export function GuardianStudentTab() {
         <div className="flex items-center gap-2 text-sm text-muted" role="status"><Loader2 className="w-4 h-4 animate-spin" aria-hidden />Loading guardians…</div>
       )}
       {student && view.isError && (
-        <div role="alert" className="rounded-xl border border-brand-coral/40 bg-brand-coral/10 p-3 text-sm text-body">
+        <div role="alert" className="rounded-xl bg-brand-coral/10 p-3 text-sm text-body">
           Could not load this student’s guardians.{' '}
           <button type="button" className="font-medium underline" onClick={() => view.refetch()}>Try again</button>
         </div>
@@ -58,7 +58,7 @@ export function GuardianStudentTab() {
 
       {data && (
         <>
-          <section className="rounded-2xl border border-base bg-surface p-4 space-y-3" aria-label="Contacts on the student record">
+          <section className="app-tint rounded-xl p-4 space-y-3" aria-label="Contacts on the student record">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="font-heading font-semibold text-body">Contacts on the student’s record</h2>
@@ -88,7 +88,7 @@ export function GuardianStudentTab() {
           </section>
 
           {data.links.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-base p-8 text-center">
+            <div className="app-tint rounded-xl p-8 text-center">
               <Users className="w-8 h-8 mx-auto text-muted mb-2" aria-hidden />
               <p className="font-medium text-body">No guardians linked yet</p>
               <p className="text-sm text-muted mt-1">

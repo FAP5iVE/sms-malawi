@@ -72,7 +72,7 @@ export function AssignmentDetailModal({ classId, assignmentId, role, subjectOpti
         title={d?.title ?? 'Assignment'}
         description={d ? `${d.subject} · Due ${formatDueDate(d.dueDate)}` : undefined}
         onClose={onClose}
-        size="2xl"
+        size="l"
         footer={
           d?.canManage ? (
             <>
@@ -104,7 +104,7 @@ export function AssignmentDetailModal({ classId, assignmentId, role, subjectOpti
         {isError && !unavailable && (
           <div role="alert" className="space-y-3 rounded-xl border border-base px-4 py-5 text-center text-sm">
             <p className="text-status-danger">{error instanceof Error ? error.message : 'Could not load this assignment.'}</p>
-            <button type="button" onClick={() => void refetch()} className="min-h-10 rounded-xl border border-base px-4 text-sm font-semibold text-brand-teal hover:bg-page">
+            <button type="button" onClick={() => void refetch()} className="min-h-10 rounded-xl border border-base px-4 text-sm font-semibold text-tone-teal hover:bg-page">
               Try again
             </button>
           </div>

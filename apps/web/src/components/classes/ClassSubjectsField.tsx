@@ -126,7 +126,7 @@ export function ClassSubjectsField({ classId, readOnly = false }: Props) {
                 aria-pressed={isChecked}
                 className={`text-left text-xs px-3 py-2 rounded-lg border transition-colors ${
                   isChecked
-                    ? 'bg-brand-teal/10 border-brand-teal text-brand-teal font-medium'
+                    ? 'bg-brand-teal/10 border-brand-teal text-tone-teal font-medium'
                     : 'bg-surface border-base text-muted'
                 } ${isOptionLocked ? 'cursor-default opacity-80' : 'hover:border-brand-teal/60 cursor-pointer'}`}
               >
@@ -143,13 +143,13 @@ export function ClassSubjectsField({ classId, readOnly = false }: Props) {
             type="button"
             onClick={handleSave}
             disabled={!isDirty || selected.size === 0 || setPresets.isPending}
-            className="min-h-10 px-4 rounded-xl bg-brand-teal text-white text-sm font-heading font-semibold hover:bg-brand-teal-light transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="min-h-10 px-4 rounded-xl bg-btn-brand text-btn-brand-fg text-sm font-heading font-semibold hover:bg-btn-brand-hover transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             {setPresets.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Save Subjects
           </button>
           {saved && !isDirty && (
-            <span className="flex items-center gap-1 text-xs text-brand-teal">
+            <span className="flex items-center gap-1 text-xs text-tone-teal">
               <CheckCircle2 className="w-3.5 h-3.5" /> Saved
             </span>
           )}
@@ -159,7 +159,7 @@ export function ClassSubjectsField({ classId, readOnly = false }: Props) {
       {saveError && (
         <p
           role="alert"
-          className="flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-3 py-2.5"
+          className="flex items-start gap-2 text-xs text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-3 py-2.5"
         >
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
           {saveError}

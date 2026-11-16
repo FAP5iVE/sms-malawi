@@ -85,7 +85,7 @@ export function ApproveDialog({ link, onClose }: { link: GuardianLinkDto; onClos
 
   return (
     <Modal
-      title="Approve guardian" size="md" onClose={onClose} busy={approve.isPending} onSubmit={submit} bodyClassName="space-y-4"
+      title="Approve guardian" size="m" onClose={onClose} busy={approve.isPending} onSubmit={submit} bodyClassName="space-y-4"
       description={`${guardianName(link)} as ${link.relationship.toLowerCase()} of ${studentName(link)}.`}
       footer={
         <>
@@ -111,7 +111,7 @@ export function ApproveDialog({ link, onClose }: { link: GuardianLinkDto; onClos
       )}
 
       <CapabilityPicker value={caps} onChange={setCaps} idPrefix={`approve-${link.id}`} />
-      {caps.length === 0 && <p role="alert" className="text-xs text-brand-coral">Choose at least one.</p>}
+      {caps.length === 0 && <p role="alert" className="text-xs text-tone-coral">Choose at least one.</p>}
     </Modal>
   )
 }
@@ -145,7 +145,7 @@ export function ReasonDialog({ link, action, onClose }: {
 
   return (
     <Modal
-      title={copy.title} size="sm" onClose={onClose} busy={transition.isPending} onSubmit={submit} bodyClassName="space-y-3"
+      title={copy.title} size="s" onClose={onClose} busy={transition.isPending} onSubmit={submit} bodyClassName="space-y-3"
       description={`${guardianName(link)} · ${studentName(link)}`}
       footer={
         <>
@@ -159,7 +159,7 @@ export function ReasonDialog({ link, action, onClose }: {
       <p className="text-sm text-muted">{copy.body}</p>
       <div>
         <label htmlFor={`reason-${link.id}`} className="block text-xs font-medium text-body mb-1">
-          Reason {copy.required ? <span className="text-brand-coral" aria-hidden>*</span> : <span className="text-muted">(optional)</span>}
+          Reason {copy.required ? <span className="text-tone-coral" aria-hidden>*</span> : <span className="text-muted">(optional)</span>}
         </label>
         <textarea
           id={`reason-${link.id}`} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} rows={3}
@@ -217,7 +217,7 @@ export function InviteDialog({ link, onClose }: { link: GuardianLinkDto; onClose
   if (issued?.code) {
     return (
       <Modal
-        title="Invitation ready" size="md" onClose={onClose} closeOnBackdrop={false} bodyClassName="space-y-4"
+        title="Invitation ready" size="m" onClose={onClose} closeOnBackdrop={false} bodyClassName="space-y-4"
         description={`For ${guardianName(link)} · ${studentName(link)}`}
         footer={<button type="button" onClick={onClose} className={MODAL_BTN_PRIMARY}>Done</button>}
       >
@@ -239,7 +239,7 @@ export function InviteDialog({ link, onClose }: { link: GuardianLinkDto; onClose
 
   return (
     <Modal
-      title="Invite to the portal" size="md" onClose={onClose} busy={issue.isPending} onSubmit={submit} bodyClassName="space-y-4"
+      title="Invite to the portal" size="m" onClose={onClose} busy={issue.isPending} onSubmit={submit} bodyClassName="space-y-4"
       description={`${guardianName(link)} · ${studentName(link)}`}
       footer={
         <>
@@ -300,7 +300,7 @@ export function CapabilitiesDialog({ link, onClose }: { link: GuardianLinkDto; o
 
   return (
     <Modal
-      title="What can they see?" size="md" onClose={onClose} busy={save.isPending} onSubmit={submit} bodyClassName="space-y-4"
+      title="What can they see?" size="m" onClose={onClose} busy={save.isPending} onSubmit={submit} bodyClassName="space-y-4"
       description={`${guardianName(link)} · ${studentName(link)}`}
       footer={
         <>
@@ -312,7 +312,7 @@ export function CapabilitiesDialog({ link, onClose }: { link: GuardianLinkDto; o
       }
     >
       <CapabilityPicker value={caps} onChange={setCaps} idPrefix={`caps-${link.id}`} />
-      {caps.length === 0 && <p role="alert" className="text-xs text-brand-coral">Choose at least one.</p>}
+      {caps.length === 0 && <p role="alert" className="text-xs text-tone-coral">Choose at least one.</p>}
     </Modal>
   )
 }
@@ -335,7 +335,7 @@ export function SuspendProfileDialog({ link, onClose }: { link: GuardianLinkDto;
 
   return (
     <Modal
-      title="Suspend this guardian everywhere" size="sm" onClose={onClose} busy={suspend.isPending} onSubmit={submit} bodyClassName="space-y-3"
+      title="Suspend this guardian everywhere" size="s" onClose={onClose} busy={suspend.isPending} onSubmit={submit} bodyClassName="space-y-3"
       description={guardianName(link)}
       footer={
         <>
@@ -352,7 +352,7 @@ export function SuspendProfileDialog({ link, onClose }: { link: GuardianLinkDto;
       </p>
       <div>
         <label htmlFor={`sp-reason-${profileId}`} className="block text-xs font-medium text-body mb-1">
-          Reason <span className="text-brand-coral" aria-hidden>*</span>
+          Reason <span className="text-tone-coral" aria-hidden>*</span>
         </label>
         <textarea
           id={`sp-reason-${profileId}`} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} rows={3}

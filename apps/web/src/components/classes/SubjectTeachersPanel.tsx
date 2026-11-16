@@ -122,7 +122,7 @@ export function SubjectTeachersPanel({ classId, academicYear, classTeacherUid, c
       </div>
 
       {unassigned.length > 0 && (
-        <p role="status" className="flex items-start gap-2 text-xs text-brand-amber bg-brand-amber/8 border border-brand-amber/20 rounded-xl px-4 py-3">
+        <p role="status" className="flex items-start gap-2 text-xs text-tone-amber bg-brand-amber/8 border border-brand-amber/20 rounded-xl px-4 py-3">
           <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
           {unassigned.length} of {subjects.length} subject{subjects.length === 1 ? '' : 's'} ha{unassigned.length === 1 ? 's' : 've'} no
           teacher yet ({unassigned.join(', ')}). No one can set assignments for {unassigned.length === 1 ? 'it' : 'them'} until one is assigned.
@@ -130,7 +130,7 @@ export function SubjectTeachersPanel({ classId, academicYear, classTeacherUid, c
       )}
 
       {error && (
-        <p role="alert" className="flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
+        <p role="alert" className="flex items-start gap-2 text-xs text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
           <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
           {error}
         </p>
@@ -169,7 +169,7 @@ export function SubjectTeachersPanel({ classId, academicYear, classTeacherUid, c
                   onClick={() => unassign(row.id)}
                   disabled={busy}
                   aria-label={`Remove the teacher from ${subject}`}
-                  className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-xl text-muted hover:text-brand-coral hover:bg-page transition-colors disabled:opacity-60"
+                  className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-xl text-muted hover:text-tone-coral hover:bg-page transition-colors disabled:opacity-60"
                 >
                   <Trash2 className="w-4 h-4" aria-hidden />
                 </button>

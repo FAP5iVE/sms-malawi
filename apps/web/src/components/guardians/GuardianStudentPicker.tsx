@@ -33,7 +33,7 @@ export function GuardianStudentPicker({ selected, onSelect, onClear, inputId = '
 
   if (selected) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-xl border border-base bg-surface px-4 py-3">
+      <div className="flex items-center justify-between gap-3 app-tint rounded-xl px-4 py-3">
         <div className="min-w-0">
           <p className="font-heading font-semibold text-body truncate">{selected.name}</p>
           <p className="text-sm text-muted">{selected.registrationNo}</p>
@@ -57,7 +57,7 @@ export function GuardianStudentPicker({ selected, onSelect, onClear, inputId = '
         />
       </div>
       {term.length >= 2 && search.isLoading && <p className="text-sm text-muted" role="status">Searching…</p>}
-      {term.length >= 2 && search.isError && <p className="text-sm text-brand-coral" role="alert">Could not search students. Try again.</p>}
+      {term.length >= 2 && search.isError && <p className="text-sm text-tone-coral" role="alert">Could not search students. Try again.</p>}
       {term.length >= 2 && !search.isLoading && !search.isError && students.length === 0 && (
         <p className="text-sm text-muted" role="status">No student matches “{term}”.</p>
       )}

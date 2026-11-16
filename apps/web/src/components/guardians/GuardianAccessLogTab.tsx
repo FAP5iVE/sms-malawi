@@ -13,6 +13,9 @@ import { useState } from 'react'
 import { Loader2, ScrollText } from 'lucide-react'
 import { GUARDIAN_CAPABILITY_LABELS, denyReasonLabel, isGuardianCapability } from '@shared/constants/guardianPortal'
 import { useGuardianAccessLog, useGuardianStudentView } from '@/hooks/useGuardians'
+import { ListPager } from '@/components/shared/ListPager'
+import { StatusText } from '@/components/shared/StatusText'
+import { usePagedRows } from '@/lib/hills/usePagedRows'
 import { GuardianStudentPicker, type PickedStudent } from './GuardianStudentPicker'
 
 /** Sections that are logged on their own but are not a grantable capability. */
@@ -34,6 +37,8 @@ export function GuardianAccessLogTab() {
   for (const l of view.data?.links ?? []) if (l.profile) names.set(l.profile.id, l.profile.fullName)
 
   const rows = log.data?.items ?? []
+  // Paging is done here on the rows already loaded (no new request).
+  const paging = usePagedRows(rows, { resetKey: student?.id ?? '' })
 
   return (
     <div className="space-y-4">
@@ -45,14 +50,14 @@ export function GuardianAccessLogTab() {
         <div className="flex items-center gap-2 text-sm text-muted" role="status"><Loader2 className="w-4 h-4 animate-spin" aria-hidden />Loading…</div>
       )}
       {student && log.isError && (
-        <div role="alert" className="rounded-xl border border-brand-coral/40 bg-brand-coral/10 p-3 text-sm text-body">
+        <div role="alert" className="rounded-xl bg-brand-coral/10 p-3 text-sm text-body">
           Could not load the access log.{' '}
           <button type="button" className="font-medium underline" onClick={() => log.refetch()}>Try again</button>
         </div>
       )}
 
       {log.data && rows.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-base p-10 text-center">
+        <div className="app-tint rounded-xl p-10 text-center">
           <ScrollText className="w-8 h-8 mx-auto text-muted mb-2" aria-hidden />
           <p className="font-medium text-body">No activity yet</p>
           <p className="text-sm text-muted mt-1">Nobody has opened this child’s information through the parent portal.</p>
@@ -60,7 +65,7 @@ export function GuardianAccessLogTab() {
       )}
 
       {rows.length > 0 && (
-        <div className="rounded-2xl border border-base bg-surface overflow-x-auto">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <caption className="sr-only">Parent portal access for {student?.name}</caption>
             <thead>
@@ -72,21 +77,22 @@ export function GuardianAccessLogTab() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {paging.visible.map((r) => (
                 <tr key={r.id} className="border-b border-base last:border-0 align-top">
                   <td className="px-4 py-3 whitespace-nowrap text-muted">{fmtWhen(r.createdAt)}</td>
                   <td className="px-4 py-3 text-body">{names.get(r.profileId) ?? 'Unknown guardian'}</td>
                   <td className="px-4 py-3 text-body">{isGuardianCapability(r.module) ? GUARDIAN_CAPABILITY_LABELS[r.module].label : (EXTRA_MODULE_LABELS[r.module] ?? r.module)}</td>
                   <td className="px-4 py-3">
                     {r.outcome === 'ALLOWED'
-                      ? <span className="rounded-full px-2.5 py-1 text-xs font-medium bg-status-success/10 text-status-success">Viewed</span>
-                      : <span className="rounded-full px-2.5 py-1 text-xs font-medium bg-brand-coral/10 text-brand-coral">Refused</span>}
+                      ? <StatusText tone="success">Viewed</StatusText>
+                      : <StatusText tone="danger">Refused</StatusText>}
                     {r.outcome !== 'ALLOWED' && r.reason && <span className="block text-xs text-muted mt-1">{denyReasonLabel(r.reason)}</span>}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <ListPager paging={paging} />
         </div>
       )}
       {rows.length === 100 && <p className="text-xs text-muted">Showing the most recent 100 entries.</p>}

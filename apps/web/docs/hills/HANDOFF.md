@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-15 (after Phase 8d shell, AT REVIEW GATE; before 8b-1). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
+Last updated: 2026-11-16 (after Phase 8b-1 pages, AT REVIEW GATE; 8d approved to proceed by the owner, 8b-2 next). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -40,7 +40,8 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | Plan extension 8b to 9 (`hills/phase-8-plan`, docs and tools only) | done, OWNER APPROVED 15 Nov 06:05 | `RULEBOOK.md`, `research/` |
 | 8b-0 foundations (text tones, StatusText, AttentionBadge, motion tokens, dialog sizes, paging, Button) (`hills/phase-8b0-foundations`, off `hills/phase-8-plan`) | done, AT REVIEW GATE | review pack 8b-0 |
 | 8d header + sidebar + phone bottom bar (`hills/phase-8d-shell`, off `hills/phase-8b0-foundations`) | done, AT REVIEW GATE | review pack 8d |
-| **8b-1, 8b-2, 8b-3** page rollout in three batches | **NEXT** (after the 8d gate) | |
+| 8b-1 pages: attendance, timetable, guardians, classes, placements, applications (`hills/phase-8b1-pages`, off `hills/phase-8d-shell`) | done, AT REVIEW GATE | review pack 8b-1 |
+| **8b-2, 8b-3** page rollout (remaining pages in two batches) | **NEXT** (after the 8b-1 gate) | |
 | **8c** dashboards, greeting, parent portal; **8e** calendar; **8f** emails; **8g** report cards + exports | after 8b; 8f and 8g exception APPROVED (presentation only) | |
 | **9** cleanup, ratchets (pills = 0, AI-tell count only down, contrast 100%) | last | |
 
@@ -413,9 +414,20 @@ after 6a.
     - **Sidebar (R5, owner decision 4).** Same items in runs under headings Learning / People / School / Admin (`lib/hills/navGroups.ts`, pure, tested; Dashboard first with no heading; unknown pages land in "More"; empty groups dropped; every href in `config/navigation.ts` has a group, tested). Icon rail shows a thin divider between groups. The phone bar and "More" sheet do NOT use this and keep the order from `useNavigation` (R5.1). Active row uses `text-tone-teal` (5.01:1 light on the 8% wash). "Signed in as" is 12px, no capitals.
     - **Sidebar colour (correction to 8b-0).** The real sidebar is `bg-surface` (light in light mode), NOT the navy `--sidebar-background`, so its badges use the normal `AttentionBadge` pair, never `onDark`. The `onDark` pair stays in the toolbox but is unused.
     - **Header.** Bell badge (desktop and phone) is the shared `AttentionBadge` on the same `unreadCount`; the phone cap changes from "9+" to "99+" (R6.2). Sign out uses `text-tone-coral`, "View all" uses `text-tone-teal`, notification times are 12px. Order of the right-hand tools was already search, bell, theme, user (R5.4).
-    - **Not done, needs the owner:** (a) R5.4 asks for crest + school name in the HEADER on desktop; today they live in the sidebar's brand row, and moving them is a layout rebuild with a collapse-state side effect. (b) R5.4 asks for an avatar on the phone header; the avatar and sign-out live in the "More" sheet today and a header avatar would have to open that sheet (shared state = logic). (c) Phone "Period" switcher squeezes the page title ("Stude..."); R5.4 says phones keep crest, search, bell, avatar only. Each needs a decision before the work.
+    - **Owner questions from the 8d pack, answered 16 Nov 2026 (RULEBOOK section 12, items 11 to 13):** crest and school name stay in the sidebar's top row (R5.4 amended); the phone header got an avatar that opens the More sheet through the shared flag `lib/hills/moreSheet.ts`; the period switcher moved from the phone header into a "Viewing period" row in the More sheet (`PeriodSwitcher variant="sheet"`), and `PeriodBanner` keeps warning on every page. Phone header is now crest, title, search, bell, avatar; title no longer truncates (measured, 390, both themes).
     - **Checked in the real app** (Students, admin, fake session, approvals badge mocked to 7): 390 / 768 / 1280, light and dark, no sideways overflow, 21 sidebar links identical to before, bar items and hrefs unchanged, overlay opens at 768. Pilot pages re-captured under the new shell: 30 of 30 views no overflow, no error screens. Bell badge could not be driven in the harness (Firestore feed), so it is checked only through the shared component's story and tests.
     - **Capture script:** `p8/shell8.mjs` (scratchpad) hides the React Query devtools button (`.tsqd-parent-container`) or it intercepts clicks on the phone bar.
+
+20. **Phase 8b-1: page rollout, batch 1** (attendance, timetable, guardians, classes, placements, applications). Branch `hills/phase-8b1-pages` off `hills/phase-8d-shell`. Looks only; logic gate clean against the 8d branch (166 declared tokens) and `main` (553 declared, 9 new files); contrast 502 pairs pass; tests 78; handler inventory regenerated (digests only, no handler item changed); eslint no errors; tsc clean for changed files.
+    - **Mechanical pass (31 in-scope files):** text tones (`text-tone-teal|coral|amber`), brand button pair (`bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover`), `text-[10px]/[11px]` to `text-xs`.
+    - **Status and role words (R2):** guardian link status and access-log result, placement status and verdict, claim status, application status, class "Archived" all use `StatusText`. No pills left in these six areas.
+    - **Surfaces (R1.2):** static bordered cards became `app-tint` tiles (guardian cards, class cards without the pastel Form colours, application detail sections, placement claim and recommendation cards, stat cards); inner chips sit on `bg-surface`. Section divider lines inside panels were removed. Inputs, selects and filter chips keep their borders (they are controls).
+    - **Tabs and counts (R5.5, R6):** class detail "Assignments" shows a badge only for students (still-to-do, `badgeNoun` "to do"), staff get none; placements "Verify claims" keeps its pending count (`badgeNoun` "to verify"); the "(N)" totals in headings were dropped.
+    - **Paging (R7):** `usePagedRows` + `ListPager` on the guardian access log and the placements registry (client-side, already-loaded rows, reset on filter change). The guardian queue keeps its own server paging; applications keep `DataTable`'s server pagination.
+    - **Dialogs (R8):** guardian dialogs s/m, class, timetable slot and mark dialogs m, assignment form and detail l.
+    - **Wording (R4):** sentence case labels and buttons ("Add class", "Save changes", "Verify claims"), no `e.g.` in placeholders, no dashes in visible text (also fixed in the period label from 8d: "Term 1, 2026/2027"), application statuses shown as "Awaiting admission" not "AWAITING ADMISSION". Selectors that tests may rely on (labels, button text) changed with the wording and are declared in the allowlist.
+    - **Checked in the real app** (admin, fake session, extended fixtures `p8/fixtures81.mjs`, capture `p8/pages81.mjs`): 8 routes x 3 widths x 2 themes = 48 views, no sideways overflow. Found and fixed: stat card labels cut off on phones, a long registry column label. Registry paging shown on desktop ("1 to 12 of 12", rows per page) and phone ("Showing 12 of 12").
+    - **Not covered / still open:** attendance calendar cells are colour-only (R10b, with 8e); filter chips keep their pill shape (controls); the assignment dialogs (form, detail, mark) were converted by tokens and sizes but not opened in a capture (fixtures for assignments are not built); Firefox and Safari untested; pixel-contrast measure not re-run for these pages.
 
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database. Do not retry or work around. tsc errors from missing

@@ -27,7 +27,7 @@ function StatTile({ label, value, tone = 'text-brand-navy' }: { label: string; v
   return (
     <div className="rounded-xl border border-base bg-page px-3 py-2">
       <p className={`font-heading text-xl font-bold ${tone}`}>{value}</p>
-      <p className="text-[11px] text-muted">{label}</p>
+      <p className="text-xs text-muted">{label}</p>
     </div>
   )
 }
@@ -60,7 +60,7 @@ export function RosterPanel({ classId, assignmentId, canOpenFiles }: { classId: 
     return (
       <div role="alert" className="space-y-3 rounded-xl border border-base px-4 py-5 text-center text-sm">
         <p className="text-status-danger">{error instanceof Error ? error.message : 'Could not load the class list.'}</p>
-        <button type="button" onClick={() => void refetch()} className="min-h-10 rounded-xl border border-base px-4 text-sm font-semibold text-brand-teal hover:bg-page">
+        <button type="button" onClick={() => void refetch()} className="min-h-10 rounded-xl border border-base px-4 text-sm font-semibold text-tone-teal hover:bg-page">
           Try again
         </button>
       </div>
@@ -156,7 +156,7 @@ export function RosterPanel({ classId, assignmentId, canOpenFiles }: { classId: 
                         <button
                           type="button"
                           onClick={() => void openAssignmentSubmissionFile(classId, assignmentId, r.studentId, r.fileName ?? 'hand-in').catch((e) => notifyError('Could not open the file', e))}
-                          className="inline-flex max-w-full items-center gap-1 text-brand-teal hover:underline"
+                          className="inline-flex max-w-full items-center gap-1 text-tone-teal hover:underline"
                         >
                           <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden /> <span className="truncate">{r.fileName ?? 'Open file'}</span>
                         </button>
@@ -184,7 +184,7 @@ export function RosterPanel({ classId, assignmentId, canOpenFiles }: { classId: 
                 <button
                   type="button"
                   onClick={() => setMarking(r)}
-                  className="min-h-9 w-full rounded-lg border border-base px-3 text-xs font-semibold text-brand-teal hover:bg-page sm:w-auto"
+                  className="min-h-9 w-full rounded-lg border border-base px-3 text-xs font-semibold text-tone-teal hover:bg-page sm:w-auto"
                 >
                   {r.status === 'NOT_SUBMITTED' && !r.updatedAt ? 'Record' : marksOn ? 'Update / marks' : 'Update'}
                 </button>

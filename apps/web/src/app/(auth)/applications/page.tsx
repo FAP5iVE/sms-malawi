@@ -47,8 +47,14 @@ import { CheckCircle, XCircle, UserPlus, Loader2, Inbox } from 'lucide-react'
 
 type ApplicationStatusValue = (typeof ApplicationStatusSchema.options)[number]
 
+// Sentence case for the visible word (R4): "Awaiting admission", not "AWAITING ADMISSION".
+function statusWord(s: string): string {
+  const w = s.replace(/_/g, ' ').toLowerCase()
+  return w.charAt(0).toUpperCase() + w.slice(1)
+}
+
 const STATUS_TABS: TabItem<ApplicationStatusValue>[] = ApplicationStatusSchema.options.map(
-  (s) => ({ id: s, label: s.replace(/_/g, ' ') })
+  (s) => ({ id: s, label: statusWord(s) })
 )
 
 export default function ApplicationsPage() {
@@ -119,7 +125,7 @@ function ApplicationsContent() {
     },
     {
       key:      'dateOfBirth',
-      label:    'DOB',
+      label:    'Date of birth',
       priority: 'important',
       render: (app) => new Date(app.dateOfBirth).toLocaleDateString(),
     },
@@ -211,7 +217,7 @@ function ApplicationsContent() {
     ...((activeStatus === 'APPROVED' || activeStatus === 'AWAITING_ADMISSION') && canConvert
       ? [
           {
-            label:   'Admit as Student',
+            label:   'Admit as student',
             icon:    UserPlus,
             variant: 'default' as const,
             onClick: (row: ApiApplication) => handleConvert(row.id),
@@ -246,7 +252,7 @@ function ApplicationsContent() {
       {actionError && (
         <p
           role="alert"
-          className="text-sm text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
+          className="text-sm text-tone-coral bg-brand-coral/8 rounded-xl px-4 py-3"
         >
           {actionError}
         </p>
@@ -258,7 +264,7 @@ function ApplicationsContent() {
           <div>
             <p className="font-heading font-semibold text-body">No applications found</p>
             <p className="text-sm text-muted mt-1">
-              There are no applications with status &ldquo;{activeStatus.replace(/_/g, ' ')}&rdquo; right now.
+              There are no applications with the status &ldquo;{statusWord(activeStatus).toLowerCase()}&rdquo; right now.
             </p>
           </div>
         </div>

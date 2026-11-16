@@ -35,7 +35,7 @@ export function AssignmentCard({ a, isStudent, onOpen }: AssignmentCardProps) {
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2 font-heading font-semibold text-body">
             <span className="min-w-0 break-words">{a.title}</span>
-            {isNew && <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-brand-coral">New</span>}
+            {isNew && <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-tone-coral">New</span>}
           </p>
           <p className="mt-0.5 break-words text-sm text-muted">
             {a.subject} · Due {formatDueDate(a.dueDate)}

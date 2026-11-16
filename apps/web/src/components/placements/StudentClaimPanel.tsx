@@ -61,7 +61,7 @@ export function StudentClaimPanel() {
   if (!data?.isGraduated) {
     return (
       <div className="text-center py-10 px-4">
-        <AlertTriangle className="w-8 h-8 mx-auto text-brand-amber mb-2" />
+        <AlertTriangle className="w-8 h-8 mx-auto text-tone-amber mb-2" />
         <p className="text-sm text-muted">
           The Student Claim Portal is only available once you have graduated (after your MSCE examinations).
         </p>
@@ -72,7 +72,7 @@ export function StudentClaimPanel() {
   if (!data.hasCertifiedMsce && !data.record) {
     return (
       <div className="text-center py-10 px-4">
-        <AlertTriangle className="w-8 h-8 mx-auto text-brand-amber mb-2" />
+        <AlertTriangle className="w-8 h-8 mx-auto text-tone-amber mb-2" />
         <p className="text-sm text-muted">
           No certified MSCE record was found for your account yet. Once your results are certified, you will be able
           to submit a placement claim here.
@@ -108,17 +108,17 @@ export function StudentClaimPanel() {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       {/* ── SUBMISSION FORM ──────────────────────────────────────────── */}
-      <div className="pb-5 border-b border-base space-y-4">
+      <div className="pb-5 space-y-4">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-brand-navy" />
-          <h3 className="font-heading font-semibold text-sm">Placement Claim Submission Form</h3>
+          <h3 className="font-heading font-semibold text-sm">Placement claim form</h3>
         </div>
 
         {!canSubmitNew ? (
           <p className="text-sm text-muted">
             {record!.status === 'PENDING_APPROVAL'
-              ? 'You already have a claim awaiting verification — see the tracker for details.'
-              : 'You already have a confirmed placement on file — see the tracker for details.'}
+              ? 'You already have a claim awaiting verification, see the tracker for details.'
+              : 'You already have a confirmed placement on file, see the tracker for details.'}
           </p>
         ) : (
           <>
@@ -143,7 +143,7 @@ export function StudentClaimPanel() {
             ) : (
               <>
                 <div>
-                  <p className="text-xs font-medium text-muted mb-1.5">Public University Where Selected</p>
+                  <p className="text-xs font-medium text-muted mb-1.5">Public university where selected</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {catalogue.map((u) => (
                       <button
@@ -155,7 +155,7 @@ export function StudentClaimPanel() {
                         }`}
                       >
                         <p className="text-xs font-bold">{u.shortName ?? u.id.toUpperCase()}</p>
-                        <p className={`text-[11px] leading-snug ${universityId === u.id ? 'text-white/80' : 'text-muted'}`}>{u.name}</p>
+                        <p className={`text-xs leading-snug ${universityId === u.id ? 'text-white/80' : 'text-muted'}`}>{u.name}</p>
                       </button>
                     ))}
                   </div>
@@ -179,7 +179,7 @@ export function StudentClaimPanel() {
 
                 {faculty && (
                   <label className="text-sm block">
-                    <span className="block text-xs text-muted mb-1">Claimed Program / Course</span>
+                    <span className="block text-xs text-muted mb-1">Claimed programme or course</span>
                     <select
                       value={programmeId}
                       onChange={(e) => setProgrammeId(e.target.value)}
@@ -194,7 +194,7 @@ export function StudentClaimPanel() {
                 )}
 
                 {selectedProgramme && (
-                  <p className="text-xs text-muted bg-page border border-base rounded-xl p-2.5">
+                  <p className="text-xs text-muted app-tint rounded-xl p-2.5">
                     {selectedProgramme.durationYears ? `Duration: ${selectedProgramme.durationYears} Years \u00b7 ` : ''}
                     Prerequisites: {formatPrerequisites(selectedProgramme)}
                   </p>
@@ -214,23 +214,23 @@ export function StudentClaimPanel() {
                 <span className="block text-xs text-muted mb-1">Where did you see your selection on the NCHE list?</span>
                 <input
                   type="text" value={ncheBatchRef} onChange={(e) => setNcheBatchRef(e.target.value)}
-                  placeholder="e.g. NCHE 2026 Gazette, Page 44"
+                  placeholder="NCHE 2026 Gazette, Page 44"
                   className="w-full border border-base rounded-xl px-3 py-2 text-sm bg-page focus:outline-none"
                 />
               </label>
             </div>
 
             <label className="text-sm block">
-              <span className="block text-xs text-muted mb-1">Additional Verification Note / Physical Evidence</span>
+              <span className="block text-xs text-muted mb-1">Verification note or physical evidence</span>
               <textarea
                 value={claimProofNote} onChange={(e) => setClaimProofNote(e.target.value)} rows={3}
-                placeholder="e.g. Verified with printed list pinned at DEO office, or received official SMS from NCHE."
+                placeholder="Verified with printed list pinned at DEO office, or received official SMS from NCHE."
                 className="w-full border border-base rounded-xl px-3 py-2 text-sm bg-page focus:outline-none resize-none"
               />
             </label>
 
-            {formError && <p role="alert" className="text-sm text-brand-coral">{formError}</p>}
-            {submitClaim.isError && <p role="alert" className="text-sm text-brand-coral">{(submitClaim.error as Error).message}</p>}
+            {formError && <p role="alert" className="text-sm text-tone-coral">{formError}</p>}
+            {submitClaim.isError && <p role="alert" className="text-sm text-tone-coral">{(submitClaim.error as Error).message}</p>}
 
             <button
               type="button"
@@ -250,34 +250,34 @@ export function StudentClaimPanel() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-brand-navy" />
-            <h3 className="font-heading font-semibold text-sm">Student Claims Tracker ({record ? 1 : 0})</h3>
+            <h3 className="font-heading font-semibold text-sm">Your claim</h3>
           </div>
-          <span className="text-xs text-muted">Live Status</span>
+          <span className="text-xs text-muted">Live status</span>
         </div>
 
         {!record ? (
           <p className="text-sm text-muted py-6 text-center">You have not submitted a placement claim yet.</p>
         ) : (
-          <div className="border-b border-base pb-3 last:border-b-0 space-y-2">
+          <div className="pb-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <PlacementStatusBadge status={record.status} />
-              {record.status === 'CONFIRMED' && <CheckCircle2 className="w-4 h-4 text-brand-teal" />}
+              {record.status === 'CONFIRMED' && <CheckCircle2 className="w-4 h-4 text-tone-teal" />}
             </div>
             <div>
               <p className="font-medium text-sm">{record.placedProgrammeName ?? record.placedProgrammeId}</p>
               <p className="text-xs text-muted">{record.placedUniversityName ?? record.placedUniversityId}</p>
             </div>
             {record.ncheBatchRef && (
-              <p className="text-xs text-muted"><span className="font-medium text-body">Gazette Ref:</span> {record.ncheBatchRef}</p>
+              <p className="text-xs text-muted"><span className="font-medium text-body">Gazette reference:</span> {record.ncheBatchRef}</p>
             )}
             {record.claimProofNote && (
-              <p className="text-xs text-muted italic bg-page border border-base rounded-lg p-2">{record.claimProofNote}</p>
+              <p className="text-xs text-muted italic app-tint rounded-lg p-2">{record.claimProofNote}</p>
             )}
             {record.status === 'REJECTED' && record.rejectionReason && (
-              <p className="text-xs text-brand-coral"><span className="font-medium">Reason:</span> {record.rejectionReason}</p>
+              <p className="text-xs text-tone-coral"><span className="font-medium">Reason:</span> {record.rejectionReason}</p>
             )}
             {record.verifiedByName && record.verifiedAt && (
-              <p className="text-[11px] text-muted">
+              <p className="text-xs text-muted">
                 {record.status === 'REJECTED' ? 'Reviewed' : 'Verified'} by {record.verifiedByName} on{' '}
                 {new Date(record.verifiedAt).toLocaleString()}
               </p>

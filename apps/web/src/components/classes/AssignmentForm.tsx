@@ -243,7 +243,7 @@ export default function AssignmentForm({ classId, onClose, subjectOptions, assig
     <Modal
       title={editing ? 'Edit Assignment' : 'New Assignment'}
       onClose={requestClose}
-      size="2xl"
+      size="l"
       onSubmit={handleSubmit}
       busy={busyServer}
       closeOnBackdrop={false}
@@ -262,7 +262,7 @@ export default function AssignmentForm({ classId, onClose, subjectOptions, assig
         <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-base bg-page px-3 py-2 text-xs">
           <span className="text-muted">You have an unfinished draft from {formatInstant(new Date(draft.savedAt).toISOString())}. It was never posted.</span>
           <span className="flex gap-2">
-            <button type="button" onClick={restoreDraft} className="font-semibold text-brand-teal underline">Restore draft</button>
+            <button type="button" onClick={restoreDraft} className="font-semibold text-tone-teal underline">Restore draft</button>
             <button type="button" onClick={discardDraft} className="font-semibold text-muted underline">Discard</button>
           </span>
         </div>
@@ -285,7 +285,7 @@ export default function AssignmentForm({ classId, onClose, subjectOptions, assig
             onChange={(e) => { setDueDate(e.target.value); touch() }}
             className={inputCls}
           />
-          <span className="mt-1 block text-[11px] text-muted">Students can hand in until the end of this day (Malawi time).</span>
+          <span className="mt-1 block text-xs text-muted">Students can hand in until the end of this day (Malawi time).</span>
         </Field>
       </div>
 
@@ -310,7 +310,7 @@ export default function AssignmentForm({ classId, onClose, subjectOptions, assig
           minHeightClassName="min-h-[200px]"
         />
         {nearLimit && (
-          <span className="mt-1 block text-[11px] text-muted">
+          <span className="mt-1 block text-xs text-muted">
             {Math.round((contentBytes / ASSIGNMENT_LIMITS.maxContentBytes) * 100)}% of the size limit used.
           </span>
         )}
@@ -332,10 +332,10 @@ export default function AssignmentForm({ classId, onClose, subjectOptions, assig
           Attachments <span className="font-normal text-muted">(optional, up to {ASSIGNMENT_LIMITS.maxAttachments}, {ASSIGNMENT_LIMITS.maxFileBytes / 1024 / 1024} MB each)</span>
         </p>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => fileInput.current?.click()} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-base px-3 text-sm hover:border-brand-teal hover:text-brand-teal">
+          <button type="button" onClick={() => fileInput.current?.click()} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-base px-3 text-sm hover:border-brand-teal hover:text-tone-teal">
             <Paperclip className="h-4 w-4" aria-hidden /> Attach file
           </button>
-          <button type="button" onClick={() => imageInput.current?.click()} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-base px-3 text-sm hover:border-brand-teal hover:text-brand-teal">
+          <button type="button" onClick={() => imageInput.current?.click()} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-base px-3 text-sm hover:border-brand-teal hover:text-tone-teal">
             <ImagePlus className="h-4 w-4" aria-hidden /> Attach picture
           </button>
           <input ref={fileInput} type="file" multiple hidden accept={acceptAttribute('ATTACHMENT')}

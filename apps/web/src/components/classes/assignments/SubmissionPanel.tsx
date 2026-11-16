@@ -94,7 +94,7 @@ export function SubmissionPanel({ classId, d }: { classId: string; d: ApiAssignm
             <button
               type="button"
               onClick={() => void openAssignmentSubmissionFile(classId, d.id, mine.studentId, mine.fileName ?? 'my-hand-in').catch((e) => notifyError('Could not open your file', e))}
-              className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-lg border border-base bg-surface px-3 text-xs font-semibold text-brand-teal"
+              className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-lg border border-base bg-surface px-3 text-xs font-semibold text-tone-teal"
             >
               <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden /> <span className="truncate">{mine.fileName ?? 'My file'}</span>
             </button>
@@ -113,7 +113,7 @@ export function SubmissionPanel({ classId, d }: { classId: string; d: ApiAssignm
           <p className="text-xs font-heading font-bold uppercase tracking-wider text-muted">Your mark</p>
           <p className="mt-0.5"><MarksText marks={mine!.marks as number} max={d.maxMarks} /></p>
           {mine!.feedback && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-body">{mine!.feedback}</p>}
-          <p className="mt-2 text-[11px] text-muted">Session mark — not counted toward exams or C.A.</p>
+          <p className="mt-2 text-xs text-muted">Session mark — not counted toward exams or C.A.</p>
         </div>
       )}
 
@@ -133,9 +133,9 @@ export function SubmissionPanel({ classId, d }: { classId: string; d: ApiAssignm
               type="file"
               accept={acceptAttribute('SUBMISSION')}
               onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-              className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-teal/10 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-brand-teal"
+              className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-teal/10 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-tone-teal"
             />
-            <p className="mt-1 text-[11px] text-muted">
+            <p className="mt-1 text-xs text-muted">
               Documents or photos, up to {ASSIGNMENT_LIMITS.maxFileBytes / 1024 / 1024} MB{file ? ` · selected: ${file.name} (${formatBytes(file.size)})` : ''}.
               {mine?.hasFile && !file ? ' Leave empty to keep the file you already sent.' : ''}
             </p>

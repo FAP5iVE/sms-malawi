@@ -56,6 +56,7 @@ import { useEffectiveViewingPeriod } from '@/hooks/useViewingPeriod'
 import { TeacherSelect } from '@/components/shared/TeacherSelect'
 import { ClassSubjectsField } from '@/components/classes/ClassSubjectsField'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import { StatusText } from '@/components/shared/StatusText'
 import type { ApiClass } from '@shared/types/api'
 import { Users, ChevronRight, UserPlus, Pencil, Archive, Inbox, ArchiveRestore, GraduationCap, Loader2 } from 'lucide-react'
 import { Modal, MODAL_BTN_PRIMARY
@@ -67,13 +68,6 @@ import { Modal, MODAL_BTN_PRIMARY
 // keeps the same four-color rotation and stays legible against the black
 // class-teacher/student-count text added below, without going as bold as a
 // solid fill.
-const FORM_COLORS = [
-  'bg-blue-100 border-blue-300',
-  'bg-teal-100 border-teal-300',
-  'bg-purple-100 border-purple-300',
-  'bg-amber-100 border-amber-300',
-]
-
 export default function ClassesPage() {
   return (
     <RoleGuard
@@ -135,7 +129,7 @@ function ClassesContent() {
         <div>
           <h1 className="font-heading text-2xl font-bold text-brand-navy">Classes</h1>
           <p className="text-sm text-muted mt-0.5">
-            {activeYear ? `Academic Year ${activeYear}` : 'No classes yet'}
+            {activeYear ? `Academic year ${activeYear}` : 'No classes yet'}
           </p>
         </div>
 
@@ -154,10 +148,10 @@ function ClassesContent() {
             <button
               type="button"
               onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-teal text-white hover:bg-brand-teal/90 transition-colors"
+              className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover transition-colors"
             >
               <UserPlus className="w-4 h-4" aria-hidden />
-              Add Class
+              Add class
             </button>
           </PermissionGuard>
         </div>
@@ -165,7 +159,7 @@ function ClassesContent() {
 
       <ModuleSurface>
       {actionError && (
-        <p role="alert" className="text-sm text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
+        <p role="alert" className="text-sm text-tone-coral bg-brand-coral/8 rounded-xl px-4 py-3">
           {actionError}
         </p>
       )}
@@ -196,16 +190,14 @@ function ClassesContent() {
                   : formClasses.map((cls) => (
                       <div
                         key={cls.id}
-                        className={`border rounded-xl p-4 flex flex-col gap-3 hover:shadow-md transition-all relative ${FORM_COLORS[(form - 1) % 4]} ${cls.status === 'ARCHIVED' ? 'opacity-60' : ''}`}
+                        className={`app-tint rounded-xl p-4 flex flex-col gap-3 relative ${cls.status === 'ARCHIVED' ? 'opacity-60' : ''}`}
                       >
                         <Link href={`/classes/${cls.id}`} className="flex items-start justify-between">
                           <div>
                             <p className="font-heading font-bold text-brand-navy">
                               {cls.name}
                               {cls.status === 'ARCHIVED' && (
-                                <span className="ml-2 text-[10px] font-sans font-normal text-muted uppercase tracking-wide">
-                                  Archived
-                                </span>
+                                <StatusText tone="neutral" className="ml-2 font-sans font-normal">Archived</StatusText>
                               )}
                             </p>
                             <p className="text-xs text-muted mt-0.5">
@@ -229,7 +221,7 @@ function ClassesContent() {
                                 <button
                                   type="button"
                                   onClick={() => setEditingClass(cls)}
-                                  className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-muted hover:bg-white/60 hover:text-body transition-colors"
+                                  className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-muted hover:bg-surface hover:text-body transition-colors"
                                   aria-label={`Edit ${cls.name}`}
                                 >
                                   <Pencil className="w-3.5 h-3.5" />
@@ -244,7 +236,7 @@ function ClassesContent() {
                                       : setPendingArchiveClass({ id: cls.id, name: cls.name })
                                   }
                                   disabled={archive.isPending}
-                                  className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-muted hover:bg-white/60 hover:text-brand-coral transition-colors disabled:opacity-50"
+                                  className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-muted hover:bg-surface hover:text-tone-coral transition-colors disabled:opacity-50"
                                   aria-label={cls.status === 'ARCHIVED' ? `Restore ${cls.name}` : `Archive ${cls.name}`}
                                 >
                                   {archive.isPending && archive.variables === cls.id
@@ -295,8 +287,8 @@ function ClassesContent() {
       <ConfirmDialog
         open={pendingArchiveClass !== null}
         title={`Archive ${pendingArchiveClass?.name ?? 'this class'}?`}
-        description="This will affect every enrolled student's roster, timetable, and attendance history for this class. Records are preserved and can be restored by an administrator."
-        confirmLabel="Archive Class"
+        description="This will affect every enrolled student's roster, timetable and attendance history for this class. Records are kept, and an administrator can restore them."
+        confirmLabel="Archive class"
         confirmingLabel="Archiving…"
         confirming={archive.isPending}
         destructive
@@ -390,9 +382,9 @@ function ClassFormDialog({ onClose, classToEdit, classes, activeYear, onCreated 
 
   return (
     <Modal
-      title={isEdit ? 'Edit Class' : 'Add New Class'}
+      title={isEdit ? 'Edit class' : 'Add class'}
       onClose={onClose}
-      size="md"
+      size="m"
       onSubmit={handleSubmit(onSubmit)}
       busy={isPending}
       bodyClassName="flex flex-col gap-4"
@@ -410,13 +402,13 @@ function ClassFormDialog({ onClose, classToEdit, classes, activeYear, onCreated 
             disabled={isPending}
             className={MODAL_BTN_PRIMARY}
           >
-            {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Class'}
+            {isPending ? 'Saving…' : isEdit ? 'Save changes' : 'Create class'}
           </button>
         </>
       }
     >
-      <Field label="Class Name" error={errors.name?.message} required>
-        <input type="text" {...register('name')} placeholder="e.g. Form 1A" className={inputCls} />
+      <Field label="Class name" error={errors.name?.message} required>
+        <input type="text" {...register('name')} placeholder="Form 1A" className={inputCls} />
       </Field>
       <Field label="Form" error={errors.form?.message} required>
         <select {...register('form', { valueAsNumber: true })} className={inputCls}>
@@ -426,10 +418,10 @@ function ClassFormDialog({ onClose, classToEdit, classes, activeYear, onCreated 
         </select>
       </Field>
       <Field label="Stream" error={errors.stream?.message}>
-        <input type="text" {...register('stream')} placeholder="e.g. Science (optional)" className={inputCls} />
+        <input type="text" {...register('stream')} placeholder="Science (optional)" className={inputCls} />
       </Field>
       <Field label="Room" error={errors.room?.message}>
-        <input type="text" {...register('room')} placeholder="e.g. Room 12 (optional)" className={inputCls} />
+        <input type="text" {...register('room')} placeholder="Room 12 (optional)" className={inputCls} />
       </Field>
       {/* [BUGFIX 2026-09-16] Was a free-text "Teacher Firebase UID"
           input — replaced with a searchable, name-based staff picker
@@ -439,13 +431,13 @@ function ClassFormDialog({ onClose, classToEdit, classes, activeYear, onCreated 
           showing this to lower_rank would only produce a confusing
           403 on save. */}
       {canAssignTeacher ? (
-        <Field label="Class Teacher" error={errors.teacherId?.message}>
+        <Field label="Class teacher" error={errors.teacherId?.message}>
           <TeacherSelect
             value={watch('teacherId')}
             onChange={(uid) => setValue('teacherId', uid, { shouldValidate: true, shouldDirty: true })}
             disabledUids={disabledTeacherUids}
             disabledReason={(t) => `${t.firstName} ${t.lastName} is already the class teacher of another class for ${formYear}.`}
-            placeholder="Optional — search teacher…"
+            placeholder="Search for a teacher (optional)"
           />
         </Field>
       ) : (
@@ -453,7 +445,7 @@ function ClassFormDialog({ onClose, classToEdit, classes, activeYear, onCreated 
           Only a high-ranking staff member can assign a class teacher.
         </p>
       )}
-      <Field label="Academic Year" error={errors.academicYear?.message} required>
+      <Field label="Academic year" error={errors.academicYear?.message} required>
         <AcademicYearSelect
           value={watch('academicYear')}
           {...register('academicYear')}
@@ -462,7 +454,7 @@ function ClassFormDialog({ onClose, classToEdit, classes, activeYear, onCreated 
       </Field>
 
       {submitError && (
-        <p role="alert" className="text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
+        <p role="alert" className="text-xs text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
           {submitError}
         </p>
       )}

@@ -22,6 +22,7 @@ import {
   type GuardianEvidenceValue, type GuardianLinkStatusValue,
 } from '@shared/constants/guardianPortal'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
+import { StatusText, type StatusTone } from '@/components/shared/StatusText'
 import { usePermissions } from '@/hooks/usePermissions'
 import {
   useConfirmReverified, useReinstateGuardianProfile, useRepointLink, useRevokeInvitation, useSetLinkEvidence,
@@ -32,12 +33,12 @@ import {
   guardianName, studentName,
 } from './GuardianLinkDialogs'
 
-const STATUS_TONE: Record<GuardianLinkStatusValue, string> = {
-  PENDING: 'bg-status-warning/10 text-status-warning',
-  ACTIVE: 'bg-status-success/10 text-status-success',
-  SUSPENDED: 'bg-brand-coral/10 text-brand-coral',
-  REVOKED: 'bg-status-neutral/10 text-muted',
-  REJECTED: 'bg-status-neutral/10 text-muted',
+const STATUS_TONE: Record<GuardianLinkStatusValue, StatusTone> = {
+  PENDING: 'warning',
+  ACTIVE: 'success',
+  SUSPENDED: 'danger',
+  REVOKED: 'neutral',
+  REJECTED: 'neutral',
 }
 
 const MATCH_LABELS: Record<string, string> = {
@@ -50,9 +51,9 @@ const MATCH_LABELS: Record<string, string> = {
 const BTN =
   'inline-flex items-center justify-center gap-1.5 min-h-11 px-3.5 rounded-xl text-sm font-heading font-semibold ' +
   'transition-colors disabled:opacity-60 disabled:pointer-events-none'
-const BTN_PRIMARY = `${BTN} bg-brand-teal text-white hover:bg-brand-teal-light`
+const BTN_PRIMARY = `${BTN} bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover`
 const BTN_OUTLINE = `${BTN} border border-base text-body hover:bg-page`
-const BTN_DANGER_OUTLINE = `${BTN} border border-brand-coral/40 text-brand-coral hover:bg-brand-coral/10`
+const BTN_DANGER_OUTLINE = `${BTN} border border-brand-coral/40 text-tone-coral hover:bg-brand-coral/10`
 
 type Open =
   | { kind: 'approve' } | { kind: 'invite' } | { kind: 'capabilities' } | { kind: 'suspendProfile' }
@@ -90,7 +91,7 @@ export function GuardianLinkCard({ link, showStudent = false, profileNames }: {
   const profileSuspended = profile?.status === 'SUSPENDED'
 
   return (
-    <article className="rounded-2xl border border-base bg-surface p-4 space-y-3" aria-label={`${guardianName(link)}, ${GUARDIAN_LINK_STATUS_LABELS[link.status]}`}>
+    <article className="app-tint rounded-xl p-4 space-y-3" aria-label={`${guardianName(link)}, ${GUARDIAN_LINK_STATUS_LABELS[link.status]}`}>
       {/* Header */}
       <header className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
@@ -100,12 +101,12 @@ export function GuardianLinkCard({ link, showStudent = false, profileNames }: {
             {showStudent && link.student && <> · for <span className="text-body font-medium">{studentName(link)}</span> ({link.student.registrationNo})</>}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_TONE[link.status]}`}>{GUARDIAN_LINK_STATUS_LABELS[link.status]}</span>
-          {link.isPrimaryContact && <span className="rounded-full px-2.5 py-1 text-xs font-medium bg-brand-teal/10 text-brand-teal">Primary contact</span>}
-          {link.isFinancialResponsible && <span className="rounded-full px-2.5 py-1 text-xs font-medium bg-brand-teal/10 text-brand-teal">Pays fees</span>}
-          {profile?.hasAccount && <span className="rounded-full px-2.5 py-1 text-xs font-medium bg-status-info/10 text-status-info">Has portal account</span>}
-          {profileSuspended && <span className="rounded-full px-2.5 py-1 text-xs font-medium bg-brand-coral/10 text-brand-coral">Guardian suspended</span>}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <StatusText tone={STATUS_TONE[link.status]}>{GUARDIAN_LINK_STATUS_LABELS[link.status]}</StatusText>
+          {link.isPrimaryContact && <StatusText tone="info">Primary contact</StatusText>}
+          {link.isFinancialResponsible && <StatusText tone="info">Pays fees</StatusText>}
+          {profile?.hasAccount && <StatusText tone="success">Has portal account</StatusText>}
+          {profileSuspended && <StatusText tone="danger">Guardian suspended</StatusText>}
         </div>
       </header>
 
@@ -123,7 +124,7 @@ export function GuardianLinkCard({ link, showStudent = false, profileNames }: {
 
       {/* Flags */}
       {link.reverifyRequired && (
-        <div role="note" className="flex items-start gap-2 rounded-xl border border-status-warning/40 bg-status-warning/10 p-3 text-sm text-body">
+        <div role="note" className="flex items-start gap-2 rounded-xl bg-status-warning/10 p-3 text-sm text-body">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-status-warning" aria-hidden />
           <div className="space-y-2">
             <p><strong>Re-verify needed.</strong> {link.reverifyReason ?? 'This guardian’s details changed after they were approved.'}</p>
@@ -137,7 +138,7 @@ export function GuardianLinkCard({ link, showStudent = false, profileNames }: {
       )}
 
       {link.suggestion && link.status === 'PENDING' && (
-        <div role="note" className="flex items-start gap-2 rounded-xl border border-status-warning/40 bg-status-warning/10 p-3 text-sm text-body">
+        <div role="note" className="flex items-start gap-2 rounded-xl bg-status-warning/10 p-3 text-sm text-body">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-status-warning" aria-hidden />
           <div className="space-y-2">
             <p>
@@ -183,7 +184,7 @@ export function GuardianLinkCard({ link, showStudent = false, profileNames }: {
             <dt className="text-xs text-muted">Can see</dt>
             <dd className="flex flex-wrap gap-1.5 mt-0.5">
               {link.capabilities.map((c) => (
-                <span key={c} className="rounded-full bg-page border border-base px-2.5 py-0.5 text-xs text-body">{GUARDIAN_CAPABILITY_LABELS[c].label}</span>
+                <span key={c} className="rounded-lg bg-surface px-2 py-1 text-xs text-body">{GUARDIAN_CAPABILITY_LABELS[c].label}</span>
               ))}
             </dd>
           </div>
@@ -202,13 +203,13 @@ export function GuardianLinkCard({ link, showStudent = false, profileNames }: {
           <p className="text-xs text-muted mb-1">Invitations</p>
           <ul className="space-y-1.5">
             {link.invitations.map((i) => (
-              <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-base px-3 py-2 text-sm">
+              <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface px-3 py-2 text-sm">
                 <span className="text-body">
                   {i.channel === 'EMAIL' ? 'E-mail' : 'Slip'} <span className="text-muted">· ref {i.ref}</span>
                   <span className="text-muted"> · {GUARDIAN_INVITATION_STATUS_LABELS[i.status]}{i.status === 'ACTIVE' ? `, until ${fmtDate(i.expiresAt)}` : ''}</span>
                 </span>
                 {i.status === 'ACTIVE' && can('guardian.invite') && (
-                  <button type="button" className="text-sm font-medium text-brand-coral hover:underline min-h-11 px-2" onClick={() => setOpen({ kind: 'cancelInvitation', id: i.id })}>
+                  <button type="button" className="text-sm font-medium text-tone-coral hover:underline min-h-11 px-2" onClick={() => setOpen({ kind: 'cancelInvitation', id: i.id })}>
                     Cancel
                   </button>
                 )}

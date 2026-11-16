@@ -1,49 +1,26 @@
 /**
  * [CHANGE TYPE]: TARGETED EDIT (OVERHAUL)
  * [FILE]: apps/web/src/components/placements/PlacementStatusBadge.tsx
- * [PURPOSE]: A small colored pill for a PlacementStatus value. Redesigned
+ * [PURPOSE]: A coloured status word (StatusText) for a PlacementStatus value. Redesigned
  *   for the reference module's three-status workflow (PENDING_APPROVAL,
  *   CONFIRMED, REJECTED) — the old seven-value pipeline states
  *   (NOT_STARTED/ELIGIBILITY_COMPUTED/CHOICES_RECORDED/PLACED/DECLINED/
  *   NOT_PLACED) no longer exist.
- * [DEPENDS ON]: lucide-react
+ * [DEPENDS ON]: StatusText
  */
-import { Clock, CheckCircle2, XCircle } from 'lucide-react'
+import { StatusText, type StatusTone } from '@/components/shared/StatusText'
 
 type PlacementStatusValue = 'PENDING_APPROVAL' | 'CONFIRMED' | 'REJECTED'
 
-const STATUS_META: Record<PlacementStatusValue, { label: string; className: string; Icon: typeof Clock }> = {
-  PENDING_APPROVAL: {
-    label: 'Pending Approval',
-    className: 'text-status-warning',
-    Icon: Clock,
-  },
-  CONFIRMED: {
-    label: 'Confirmed',
-    className: 'text-status-success',
-    Icon: CheckCircle2,
-  },
-  REJECTED: {
-    label: 'Rejected',
-    className: 'text-status-danger',
-    Icon: XCircle,
-  },
+// Hills 8b-1 (R2): status words use the shared StatusText, so the shape in front
+// of the word (not a colour or an icon) carries the meaning too.
+const STATUS_META: Record<PlacementStatusValue, { label: string; tone: StatusTone }> = {
+  PENDING_APPROVAL: { label: 'Pending approval', tone: 'warning' },
+  CONFIRMED: { label: 'Confirmed', tone: 'success' },
+  REJECTED: { label: 'Rejected', tone: 'danger' },
 }
 
 export function PlacementStatusBadge({ status }: { status: string }) {
-  const meta = STATUS_META[status as PlacementStatusValue] ?? {
-    label: status,
-    className: 'text-muted',
-    Icon: Clock,
-  }
-  const { label, className, Icon } = meta
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1 text-xs font-semibold ${className}`}
-    >
-      <Icon className="w-3.5 h-3.5" />
-      {label}
-    </span>
-  )
+  const meta = STATUS_META[status as PlacementStatusValue] ?? { label: status, tone: 'neutral' as StatusTone }
+  return <StatusText tone={meta.tone}>{meta.label}</StatusText>
 }

@@ -18,8 +18,11 @@
  *     person is NOT on the live period it says so on every page, because
  *     forms on a screen save into the period being viewed.
  *
- *   Two variants: 'desktop' (md+ header, left slot) and 'compact' (mobile
- *   header chip, panel docks below the header like the search/bell panels).
+ *   Three variants: 'desktop' (md+ header, left slot), 'compact' (mobile
+ *   header chip, panel docks below the header like the search/bell panels) and
+ *   'sheet' (Phase 8d: a full-width row inside the phone "More" sheet whose
+ *   panel opens in the flow, below the row; the phone header no longer carries
+ *   the chip, R5.4).
  * [DEPENDS ON]: @/hooks/useViewingPeriod, @shared/constants/malawi
  */
 
@@ -45,7 +48,7 @@ function yearChoices(currentYear: string | undefined, ensure: string | undefined
   return [...new Set(years)].sort().reverse()
 }
 
-export function PeriodSwitcher({ variant = 'desktop' }: { variant?: 'desktop' | 'compact' }) {
+export function PeriodSwitcher({ variant = 'desktop' }: { variant?: 'desktop' | 'compact' | 'sheet' }) {
   const {
     academicYear, term, isLoading, currentYear, currentTerm, relation, isOverridden, setPeriod, reset,
   } = useViewingPeriod()
@@ -89,17 +92,25 @@ export function PeriodSwitcher({ variant = 'desktop' }: { variant?: 'desktop' | 
   const away = relation !== 'current'
   const tag = relation === 'past' ? 'Past' : relation === 'future' ? 'Upcoming' : null
 
-  const triggerClass = [
-    'inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm font-semibold font-heading transition-colors',
-    away
-      ? 'border-brand-amber/50 bg-brand-amber/10 text-body hover:bg-brand-amber/15'
-      : 'border-transparent text-body hover:bg-page',
-  ].join(' ')
+  const triggerClass =
+    variant === 'sheet'
+      ? [
+          'flex w-full items-center gap-3.5 px-5 py-3 text-left text-sm font-semibold font-heading transition-colors min-h-12',
+          away ? 'bg-brand-amber/10 text-body hover:bg-brand-amber/15' : 'text-body hover:bg-page',
+        ].join(' ')
+      : [
+          'inline-flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm font-semibold font-heading transition-colors',
+          away
+            ? 'border-brand-amber/50 bg-brand-amber/10 text-body hover:bg-brand-amber/15'
+            : 'border-transparent text-body hover:bg-page',
+        ].join(' ')
 
   const panelClass =
-    variant === 'compact'
-      ? 'fixed left-3 right-3 top-14 z-50 rounded-2xl border border-base bg-surface shadow-lg p-4 md:hidden'
-      : 'absolute left-0 top-full mt-2 z-50 w-72 rounded-2xl border border-base bg-surface shadow-lg p-4'
+    variant === 'sheet'
+      ? 'border-t border-base bg-surface px-5 py-4'
+      : variant === 'compact'
+        ? 'fixed left-3 right-3 top-14 z-50 rounded-2xl border border-base bg-surface shadow-lg p-4 md:hidden'
+        : 'absolute left-0 top-full mt-2 z-50 w-72 rounded-2xl border border-base bg-surface shadow-lg p-4'
 
   return (
     <div ref={rootRef} className="relative">
@@ -111,14 +122,19 @@ export function PeriodSwitcher({ variant = 'desktop' }: { variant?: 'desktop' | 
         aria-haspopup="dialog"
         aria-label={`Viewing Term ${term}, ${academicYear}. Change academic period.`}
       >
-        <CalendarRange className="w-4 h-4 text-muted shrink-0" aria-hidden />
-        {variant === 'compact' ? (
+        <CalendarRange className={variant === 'sheet' ? 'w-5 h-5 text-muted shrink-0' : 'w-4 h-4 text-muted shrink-0'} aria-hidden />
+        {variant === 'sheet' ? (
+          <span className="flex-1 min-w-0">
+            <span className="block text-xs font-normal text-muted">Viewing period</span>
+            <span className="block truncate">Term {term}, {academicYear}</span>
+          </span>
+        ) : variant === 'compact' ? (
           <span className="tabular">T{term} · {academicYear.slice(2, 4)}/{academicYear.slice(7)}</span>
         ) : (
-          <span>Term {term} — {academicYear}</span>
+          <span>Term {term}, {academicYear}</span>
         )}
         {tag && (
-          <span className="rounded bg-brand-amber/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-amber">
+          <span className="rounded bg-brand-amber/20 px-1.5 py-0.5 text-xs font-bold text-tone-amber">
             {tag}
           </span>
         )}
@@ -129,7 +145,7 @@ export function PeriodSwitcher({ variant = 'desktop' }: { variant?: 'desktop' | 
       </button>
 
       {open && (
-        <div className={panelClass} role="dialog" aria-label="Academic period">
+        <div className={panelClass} role={variant === 'sheet' ? 'group' : 'dialog'} aria-label="Academic period">
           <p className="text-xs font-heading font-semibold uppercase tracking-wide text-muted mb-3">
             Viewing period
           </p>
@@ -169,7 +185,7 @@ export function PeriodSwitcher({ variant = 'desktop' }: { variant?: 'desktop' | 
                 >
                   Term {t}
                   {t === currentTerm && academicYear === currentYear && (
-                    <span className="block text-[10px] font-normal opacity-80">current</span>
+                    <span className="block text-xs font-normal opacity-80">current</span>
                   )}
                 </button>
               )
@@ -186,7 +202,7 @@ export function PeriodSwitcher({ variant = 'desktop' }: { variant?: 'desktop' | 
             Back to current{currentYear && currentTerm ? ` (T${currentTerm} · ${currentYear})` : ''}
           </button>
 
-          <p className="text-[11px] leading-snug text-muted mt-3">
+          <p className="text-xs leading-snug text-muted mt-3">
             This only changes what <em>you</em> are viewing. The school&rsquo;s current term is set by an
             administrator in Settings.
           </p>
@@ -211,7 +227,7 @@ export function PeriodBanner() {
       className="shrink-0 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-brand-amber/40 bg-brand-amber/10 px-4 md:px-6 py-2 text-xs text-body"
     >
       <p>
-        <strong className="font-heading">Viewing Term {term} · {academicYear}</strong> — {kind}.
+        <strong className="font-heading">Viewing Term {term} · {academicYear}</strong>: {kind}.
         Anything you record on a page is saved to this period.
       </p>
       <button
