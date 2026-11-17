@@ -50,7 +50,7 @@ export function FilterSelect({
 export function FilterBar({ children, ariaLabel = 'Report filters' }: { children: ReactNode; ariaLabel?: string }) {
   const flat = useFlatSurface()
   return (
-    <div role="group" aria-label={ariaLabel} className={`flex flex-wrap items-end gap-3 ${flat ? '' : 'rounded-xl border border-base bg-surface p-3'}`}>
+    <div role="group" aria-label={ariaLabel} className={`flex flex-wrap items-end gap-3 ${flat ? '' : 'rounded-xl app-tint p-3'}`}>
       {children}
     </div>
   )

@@ -93,7 +93,7 @@ export function LibraryCirculationTab() {
               { key: 'book', label: 'Book', sortValue: (r) => r.bookTitle },
               { key: 'borrower', label: 'Borrower', sortValue: (r) => r.borrower },
               { key: 'type', label: 'Type', hideOnMobile: true, sortValue: (r) => r.borrowerType, cell: (r) => (r.borrowerType === 'STUDENT' ? 'Student' : 'Staff'), exportValue: (r) => r.borrowerType },
-              { key: 'class', label: 'Class', hideOnMobile: true, sortValue: (r) => r.className ?? '', cell: (r) => r.className ?? '—', exportValue: (r) => r.className ?? '' },
+              { key: 'class', label: 'Class', hideOnMobile: true, sortValue: (r) => r.className ?? '', cell: (r) => r.className ?? '-', exportValue: (r) => r.className ?? '' },
               { key: 'due', label: 'Due', hideOnMobile: true, sortValue: (r) => r.dueDate, cell: (r) => formatDate(r.dueDate), exportValue: (r) => formatDate(r.dueDate) },
               { key: 'late', label: 'Days overdue', align: 'right', sortValue: (r) => r.daysOverdue, cell: (r) => formatDays(r.daysOverdue), exportValue: (r) => r.daysOverdue },
             ]}
@@ -125,7 +125,7 @@ export function LibraryFinesTab() {
         kpis={d ? [
           kpiTile('pending', 'Outstanding fines', d.pendingAmount, 'mwk', 'Fines assessed and not yet paid or waived.', d.pendingAmount > 0 ? 'watch' : 'healthy', `${formatCount(d.pendingCount)} fine${d.pendingCount === 1 ? '' : 's'}`),
           kpiTile('paid', 'Collected', d.paidAmount, 'mwk', 'Fines paid.'),
-          kpiTile('waived', 'Waived', d.waivedAmount, 'mwk', 'Fines forgiven — not money collected.'),
+          kpiTile('waived', 'Waived', d.waivedAmount, 'mwk', 'Fines forgiven: not money collected.'),
           kpiTile('rate', 'Collection rate', d.collectionRate, 'percent', 'Paid and waived, as a share of everything assessed.'),
         ] : undefined}
       />
@@ -285,7 +285,7 @@ export function LibraryDigitalTab() {
         </ReportCard>
       </TwoUp>
 
-      <ReportCard title="Awaiting approval" sub="Oldest first — open the library to approve" href={manage({ status: 'pending' })} hrefLabel="Open digital library">
+      <ReportCard title="Awaiting approval" sub="Oldest first: open the library to approve" href={manage({ status: 'pending' })} hrefLabel="Open digital library">
         <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
           <ReportTable<ApiDigitalPendingRow>
             rows={d?.pending}
@@ -297,7 +297,7 @@ export function LibraryDigitalTab() {
             columns={[
               { key: 'title', label: 'Resource', sortValue: (r) => r.title },
               { key: 'type', label: 'Type', hideOnMobile: true, sortValue: (r) => r.type, cell: (r) => humanize(r.type), exportValue: (r) => r.type },
-              { key: 'subject', label: 'Subject', hideOnMobile: true, sortValue: (r) => r.subject ?? '', cell: (r) => r.subject ?? '—', exportValue: (r) => r.subject ?? '' },
+              { key: 'subject', label: 'Subject', hideOnMobile: true, sortValue: (r) => r.subject ?? '', cell: (r) => r.subject ?? '-', exportValue: (r) => r.subject ?? '' },
               { key: 'form', label: 'Form', hideOnMobile: true, sortValue: (r) => r.form ?? 0, cell: (r) => (r.form ? `Form ${r.form}` : 'All'), exportValue: (r) => r.form ?? '' },
               { key: 'submitted', label: 'Submitted', hideOnMobile: true, sortValue: (r) => r.submittedAt, cell: (r) => formatDate(r.submittedAt), exportValue: (r) => r.submittedAt },
               { key: 'age', label: 'Days waiting', align: 'right', sortValue: (r) => r.ageDays, cell: (r) => formatDays(r.ageDays), exportValue: (r) => r.ageDays },
@@ -354,7 +354,7 @@ function UsageTable({
       columns={[
         { key: 'title', label: 'Resource', sortValue: (r) => r.title },
         { key: 'type', label: 'Type', hideOnMobile: true, sortValue: (r) => r.type, cell: (r) => humanize(r.type), exportValue: (r) => r.type },
-        { key: 'subject', label: 'Subject', hideOnMobile: true, sortValue: (r) => r.subject ?? '', cell: (r) => r.subject ?? '—', exportValue: (r) => r.subject ?? '' },
+        { key: 'subject', label: 'Subject', hideOnMobile: true, sortValue: (r) => r.subject ?? '', cell: (r) => r.subject ?? '-', exportValue: (r) => r.subject ?? '' },
         { key: 'views', label: 'Views', align: 'right', sortValue: (r) => r.views, cell: (r) => formatCount(r.views) },
         { key: 'people', label: 'People', align: 'right', hideOnMobile: true, sortValue: (r) => r.uniqueViewers, cell: (r) => formatCount(r.uniqueViewers) },
         { key: 'last', label: 'Last opened', align: 'right', hideOnMobile: true, sortValue: (r) => r.lastViewedAt, cell: (r) => (r.lastViewedAt ? formatDate(r.lastViewedAt) : 'Never'), exportValue: (r) => r.lastViewedAt },
@@ -396,14 +396,14 @@ export function LibraryStockTab() {
           kpiTile('copies', 'Copies owned', d.copies, 'count', 'Total copies across the titles that match the filter.', 'neutral', `${formatCount(d.titles)} titles`, catalog({ category })),
           kpiTile('available', 'On the shelf', d.availabilityRate, 'percent', 'Copies available to borrow now ÷ copies owned.', 'neutral', `${formatCount(d.available)} of ${formatCount(d.copies)} copies`),
           kpiTile('onLoan', 'On loan', d.onLoan, 'count', 'Copies currently borrowed and not returned (lost copies excluded).', 'neutral', d.overdueLoans > 0 ? `${formatCount(d.overdueLoans)} overdue` : undefined, '/library?tab=borrowings'),
-          kpiTile('offShelf', 'Neither on shelf nor on loan', d.offShelf, 'count', 'Copies owned that are not available and not out on loan — for example, copies marked damaged.', d.offShelf > 0 ? 'watch' : 'neutral'),
+          kpiTile('offShelf', 'Neither on shelf nor on loan', d.offShelf, 'count', 'Copies owned that are not available and not out on loan. For example, copies marked damaged.', d.offShelf > 0 ? 'watch' : 'neutral'),
           kpiTile('renewed', 'Loans renewed', d.renewals.loansRenewed, 'count', 'Loans whose latest renewal falls in the period. Only the latest renewal date is kept for each loan, so a loan is counted once, in the period it was last renewed. Renewals made before the count was stored were not recorded.', 'neutral', `${formatCount(d.renewals.renewalCount)} renewals in total on these loans`, '/library?tab=borrowings'),
           kpiTile('damaged', 'Damaged or lost', damagedOrLost, 'count', 'Copies marked damaged or lost from the catalogue, plus loans never returned. Repairs are not recorded, so this is a running total.', damagedOrLost ? 'watch' : 'neutral', d ? `${d.condition.shelfDamagedCopies} damaged · ${d.condition.shelfLostCopies + d.condition.loansLost} lost` : undefined),
         ] : undefined}
       />
 
       <TwoUp>
-        <ReportCard title="By category" sub="Lowest availability first — select a row to open the catalogue">
+        <ReportCard title="By category" sub="Lowest availability first: select a row to open the catalogue">
           <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
             <ReportTable<ApiLibraryStockCategoryRow>
               rows={d?.byCategory}
@@ -435,7 +435,7 @@ export function LibraryStockTab() {
         </ChartCard>
       </TwoUp>
 
-      <ReportCard title="No copy available" sub="Titles owned but with nothing on the shelf — most overdue first">
+      <ReportCard title="No copy available" sub="Titles owned but with nothing on the shelf. Most overdue first">
         <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
           <ReportTable<ApiLibraryUnavailableRow>
             rows={d?.unavailable}

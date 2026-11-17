@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { StatusText } from '@/components/shared/StatusText'
 import { Loader2, Save, Bell }  from 'lucide-react'
 import { useAuthStore }         from '@/store/authStore'
 import { apiFetch }            from '@/lib/api-client'
@@ -23,13 +24,13 @@ interface NotifPref {
 
 const ALL_PREFS: NotifPref[] = [
   { key: 'notif_announcements',    label: 'Announcements',        description: 'New school-wide announcements and events.' },
-  { key: 'notif_results_released', label: 'Exam Results',         description: 'When exam results are released.' },
-  { key: 'notif_fees_due',         label: 'Fee Reminders',        description: 'Upcoming and overdue fee notifications.' },
-  { key: 'notif_leave_status',     label: 'Leave Request Updates', description: 'When your leave request is approved or rejected.' },
-  { key: 'notif_library_overdue',  label: 'Library Overdue',      description: 'Reminders for overdue borrowed books.' },
-  { key: 'notif_payslip_ready',    label: 'Payslip Ready',        description: 'When your monthly payslip is generated.' },
-  { key: 'notif_pending_actions',  label: 'Pending Actions',      description: 'Items awaiting your approval or action.' },
-  { key: 'notif_system_alerts',    label: 'System Alerts',        description: 'Critical system errors and downtime notices (admin only).' },
+  { key: 'notif_results_released', label: 'Exam results',         description: 'When exam results are released.' },
+  { key: 'notif_fees_due',         label: 'Fee reminders',        description: 'Upcoming and overdue fee notifications.' },
+  { key: 'notif_leave_status',     label: 'Leave request updates', description: 'When your leave request is approved or rejected.' },
+  { key: 'notif_library_overdue',  label: 'Library overdue',      description: 'Reminders for overdue borrowed books.' },
+  { key: 'notif_payslip_ready',    label: 'Payslip ready',        description: 'When your monthly payslip is generated.' },
+  { key: 'notif_pending_actions',  label: 'Pending actions',      description: 'Items awaiting your approval or action.' },
+  { key: 'notif_system_alerts',    label: 'System alerts',        description: 'Critical system errors and downtime notices (admin only).' },
 ]
 
 // Role-based filter: show only relevant prefs
@@ -69,7 +70,7 @@ function ToggleRow({
       <div className="flex items-center gap-6 shrink-0">
         {/* Push toggle */}
         <label className="flex flex-col items-center gap-1 cursor-pointer">
-          <span className="text-[10px] font-heading font-semibold text-muted uppercase tracking-wide">Push</span>
+          <span className="text-xs font-heading font-semibold text-muted">Push</span>
           <button
             type="button"
             role="switch"
@@ -84,7 +85,7 @@ function ToggleRow({
         </label>
         {/* Email toggle */}
         <label className="flex flex-col items-center gap-1 cursor-pointer">
-          <span className="text-[10px] font-heading font-semibold text-muted uppercase tracking-wide">Email</span>
+          <span className="text-xs font-heading font-semibold text-muted">Email</span>
           <button
             type="button"
             role="switch"
@@ -151,7 +152,7 @@ export function NotificationSettings() {
       <div>
         <h2 className="font-heading font-bold text-lg text-brand-navy flex items-center gap-2">
           <Bell className="w-5 h-5" aria-hidden />
-          Notification Preferences
+          Notification preferences
         </h2>
         <p className="text-sm text-muted mt-0.5">Choose which notifications you receive via push and email.</p>
       </div>
@@ -168,14 +169,14 @@ export function NotificationSettings() {
         ))}
       </div>
 
-      {error && <p className="text-sm text-brand-coral">{error}</p>}
+      {error && <p className="text-sm text-tone-coral">{error}</p>}
 
       <div className="flex items-center gap-3">
         <button type="button" onClick={handleSave} disabled={saving}
           className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60 flex items-center gap-2">
           {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Preferences</>}
         </button>
-        {saved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}
+        {saved && <StatusText tone="success" size="md">Saved</StatusText>}
       </div>
     </div>
   )

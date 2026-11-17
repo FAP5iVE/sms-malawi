@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-16 (after Phase 8b-1 pages, AT REVIEW GATE; 8d approved to proceed by the owner, 8b-2 next). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
+Last updated: 2026-11-17 (after Phase 8b-2 pages, AT REVIEW GATE; 8b-1 packed and delivered, 8b-3 next). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -41,7 +41,8 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | 8b-0 foundations (text tones, StatusText, AttentionBadge, motion tokens, dialog sizes, paging, Button) (`hills/phase-8b0-foundations`, off `hills/phase-8-plan`) | done, AT REVIEW GATE | review pack 8b-0 |
 | 8d header + sidebar + phone bottom bar (`hills/phase-8d-shell`, off `hills/phase-8b0-foundations`) | done, AT REVIEW GATE | review pack 8d |
 | 8b-1 pages: attendance, timetable, guardians, classes, placements, applications (`hills/phase-8b1-pages`, off `hills/phase-8d-shell`) | done, AT REVIEW GATE | review pack 8b-1 |
-| **8b-2, 8b-3** page rollout (remaining pages in two batches) | **NEXT** (after the 8b-1 gate) | |
+| 8b-2 pages: library, HR, announcements, approvals, settings, monitoring, reports (`hills/phase-8b2-pages`, off `hills/phase-8b1-pages`) | done, AT REVIEW GATE | review pack 8b-2 |
+| **8b-3** page rollout (whatever pages are left after 8b-2: finances, exams, students, user management, calendar list views, parent pages) | **NEXT** (after the 8b-2 gate) | |
 | **8c** dashboards, greeting, parent portal; **8e** calendar; **8f** emails; **8g** report cards + exports | after 8b; 8f and 8g exception APPROVED (presentation only) | |
 | **9** cleanup, ratchets (pills = 0, AI-tell count only down, contrast 100%) | last | |
 
@@ -427,7 +428,17 @@ after 6a.
     - **Dialogs (R8):** guardian dialogs s/m, class, timetable slot and mark dialogs m, assignment form and detail l.
     - **Wording (R4):** sentence case labels and buttons ("Add class", "Save changes", "Verify claims"), no `e.g.` in placeholders, no dashes in visible text (also fixed in the period label from 8d: "Term 1, 2026/2027"), application statuses shown as "Awaiting admission" not "AWAITING ADMISSION". Selectors that tests may rely on (labels, button text) changed with the wording and are declared in the allowlist.
     - **Checked in the real app** (admin, fake session, extended fixtures `p8/fixtures81.mjs`, capture `p8/pages81.mjs`): 8 routes x 3 widths x 2 themes = 48 views, no sideways overflow. Found and fixed: stat card labels cut off on phones, a long registry column label. Registry paging shown on desktop ("1 to 12 of 12", rows per page) and phone ("Showing 12 of 12").
-    - **Not covered / still open:** attendance calendar cells are colour-only (R10b, with 8e); filter chips keep their pill shape (controls); the assignment dialogs (form, detail, mark) were converted by tokens and sizes but not opened in a capture (fixtures for assignments are not built); Firefox and Safari untested; pixel-contrast measure not re-run for these pages.
+    - **Filter chip decision (16 Nov 2026, RULEBOOK R2.7):** chips are controls, so they keep a border, but they use `rounded-xl` (not a full pill) and one shared look in `src/lib/hills/chip.ts` (guardian queue, onboarding, assignment filters). Reason: R2.2 already allows a filled selectable chip, but a full pill beside the status words would read as the pill we removed, and three different chip styles had appeared. Other chip sites switch as their pages are reached (8b-2: HR, library, monitoring alerts; calendar in 8e).
+    - **Not covered / still open:** attendance calendar cells are colour-only (R10b, with 8e); the assignment dialogs (form, detail, mark) were converted by tokens and sizes but not opened in a capture (fixtures for assignments are not built); Firefox and Safari untested; pixel-contrast measure not re-run for these pages.
+21. **Phase 8b-2: page rollout, batch 2** (library, HR, announcements, approvals, settings, monitoring, reports). Branch `hills/phase-8b2-pages` off `hills/phase-8b1-pages`. Looks only; logic gate clean against the 8b-1 branch (674 declared tokens) and `main` (1237 declared, 10 new files); contrast 502 pairs pass; tests 81; handler inventory regenerated (digests and token counts only, no handler item changed); eslint no errors; tsc clean for changed files.
+    - **Surfaces (R1.2):** report KPI tiles, report cards and filters, insight boxes, library stat tiles and the reports `KpiCard` are now flat `app-tint` tiles with no border. Inputs, selects, chips and buttons keep their borders as controls. Alert boxes lost their coloured borders and use `bg-brand-*/10`.
+    - **Status (R2):** announcement status, report KPI watch and critical states, and the settings "Saved" confirmations use `StatusText`. The announcement status code is shown through a small `statusWord()` helper so the raw code (PENDING_APPROVAL) never shows.
+    - **Tabs (R5.5, R6):** tab badges kept only where they count something to act on, with a `badgeNoun` ("to review", "to approve", "unfinished", "expiring"). Totals were dropped (library catalog, fines, borrowings; announcements published).
+    - **Dialogs (R8):** library, HR and approvals dialogs use sizes s, m or l. Dialog titles are sentence case ("Add book", "Issue book").
+    - **Chips (R2.7):** monitoring log, Vercel error and outage filters use `chipClass` from `src/lib/hills/chip.ts`. The outage filter keeps a danger look when on.
+    - **Wording (R4):** about 340 sentence-case, no-em-dash, plain-word edits and every `uppercase tracking-*` label removed. Each changed visible string that the gate sees is declared in the allowlist by category.
+    - **Checked in the real app** (admin, fake session, fixtures `p8/fixtures82.mjs`, capture `p8/pages81.mjs`): 7 routes x 2 widths (390, 1280) x 2 themes = 28 views, no sideways overflow.
+    - **Not covered / still open:** the reports page (3,200 lines) was converted mostly by tools and checked on the overview tab only, so deeper tabs (security, sessions, finance, exams) need an owner look; monitoring KPI labels such as "Crash-Free Sessions" come from data strings and stay Title Case; approval list cards keep their border as clickable rows (decision for the owner); HR tabs other than the default, the library dialogs and the announcements editor were converted by tokens but not opened in a capture; the announcements date "11/10/2026" is ambiguous (data format, out of scope); Firefox and Safari were not tested.
 
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database. Do not retry or work around. tsc errors from missing

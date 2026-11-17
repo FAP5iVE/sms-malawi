@@ -38,7 +38,7 @@ export function AlertsPanel({ canManage }: Props) {
       ),
     },
     {
-      key: 'lastTriggeredAt', label: 'Last Triggered', priority: 'important',
+      key: 'lastTriggeredAt', label: 'Last triggered', priority: 'important',
       render: (row) => row.lastTriggeredAt ? new Date(row.lastTriggeredAt).toLocaleString() : 'Never',
     },
   ]

@@ -69,7 +69,7 @@ export function MarkCompletionTab({ academicYear, term, showTeachers = true }: P
       />
       {d?.excludesManeb ? (
         <p role="note" className="rounded-lg border border-base bg-page px-3 py-2 text-xs text-muted">
-          MANEB national exams are not included — their marks are not entered by the school.
+          MANEB national exams are not included. Their marks are not entered by the school.
         </p>
       ) : null}
       <TwoUp>
@@ -133,11 +133,11 @@ const SOURCE_NOTE: Record<ApiExamWorkflowRow['stageSource'], string> = {
   audit: 'From the audit record of the change',
   marks: 'From when marks were entered',
   exam_date: 'From the exam date',
-  updated_at: 'Approximate — from the last edit to the exam',
+  updated_at: 'Approximate: from the last edit to the exam',
 }
 
 function daysCell(r: ApiExamWorkflowRow): string {
-  if (r.daysInStage === null) return '—'
+  if (r.daysInStage === null) return '-'
   if (r.status === 'RESULTS_RELEASED') return 'Released'
   return `${r.stageSource === 'updated_at' ? '~' : ''}${r.daysInStage}d`
 }
@@ -189,7 +189,7 @@ export function ExamWorkflowTab({ academicYear, term }: Period) {
                 { key: 'owner', label: 'Action by', sortValue: (r) => OWNER_LABEL[r.owner], cell: (r) => OWNER_LABEL[r.owner], exportValue: (r) => OWNER_LABEL[r.owner] },
                 { key: 'exams', label: 'Exams', align: 'right', sortValue: (r) => r.exams, cell: (r) => formatCount(r.exams) },
                 { key: 'delayed', label: 'Delayed', align: 'right', sortValue: (r) => r.delayed, cell: (r) => formatCount(r.delayed) },
-                { key: 'missing', label: 'Marks missing', align: 'right', hideOnMobile: true, sortValue: (r) => r.marksMissing, cell: (r) => (r.owner === 'teacher' ? formatCount(r.marksMissing) : '—'), exportValue: (r) => r.marksMissing },
+                { key: 'missing', label: 'Marks missing', align: 'right', hideOnMobile: true, sortValue: (r) => r.marksMissing, cell: (r) => (r.owner === 'teacher' ? formatCount(r.marksMissing) : '-'), exportValue: (r) => r.marksMissing },
                 { key: 'oldest', label: 'Longest wait', align: 'right', sortValue: (r) => r.oldestDays, cell: (r) => formatDays(r.oldestDays), exportValue: (r) => r.oldestDays },
               ]}
             />
@@ -197,29 +197,29 @@ export function ExamWorkflowTab({ academicYear, term }: Period) {
         </ReportCard>
       </TwoUp>
 
-      <ReportCard title="Exam by exam" sub="Delayed first, then longest in stage — select a row to go to where it is done" >
+      <ReportCard title="Exam by exam" sub="Delayed first, then longest in stage. Select a row to go to where it is done" >
         <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
           <ReportTable<ApiExamWorkflowRow>
             rows={d?.rows}
             rowKey={(r) => r.examId}
             rowHref={examHref}
             exportLabel="Exam workflow"
-            exportNote={d?.rowsTruncated ? `First ${d?.rows.length ?? 0} exams only — narrow the filters for the rest` : undefined}
+            exportNote={d?.rowsTruncated ? `First ${d?.rows.length ?? 0} exams only: narrow the filters for the rest` : undefined}
             emptyMessage={filtered ? 'No exams match these filters.' : 'No exams this term.'}
             columns={[
               { key: 'title', label: 'Exam', sortValue: (r) => r.title },
               { key: 'class', label: 'Class', sortValue: (r) => r.className },
               { key: 'subject', label: 'Subject', hideOnMobile: true, sortValue: (r) => r.subject },
               { key: 'teacher', label: 'Teacher', hideOnMobile: true, sortValue: (r) => r.teacher ?? '', cell: (r) => r.teacher ?? 'Unassigned', exportValue: (r) => r.teacher ?? 'Unassigned' },
-              { key: 'status', label: 'Stage', sortValue: (r) => r.status, cell: (r) => `${(d?.stages.find((s) => s.key === r.status)?.label ?? r.status)}${r.delayed ? ' — delayed' : ''}`, exportValue: (r) => r.status },
+              { key: 'status', label: 'Stage', sortValue: (r) => r.status, cell: (r) => `${(d?.stages.find((s) => s.key === r.status)?.label ?? r.status)}${r.delayed ? ' delayed' : ''}`, exportValue: (r) => r.status },
               { key: 'days', label: 'In stage', align: 'right', sortValue: (r) => r.daysInStage, cell: (r) => <span title={SOURCE_NOTE[r.stageSource]}>{daysCell(r)}</span>, exportValue: (r) => r.daysInStage },
-              { key: 'next', label: 'Next step', hideOnMobile: true, sortValue: (r) => r.nextAction ?? '', cell: (r) => (r.owner ? `${OWNER_LABEL[r.owner]}: ${r.nextAction ?? ''}` : '—'), exportValue: (r) => (r.owner ? `${OWNER_LABEL[r.owner]}: ${r.nextAction ?? ''}` : '') },
+              { key: 'next', label: 'Next step', hideOnMobile: true, sortValue: (r) => r.nextAction ?? '', cell: (r) => (r.owner ? `${OWNER_LABEL[r.owner]}: ${r.nextAction ?? ''}` : '-'), exportValue: (r) => (r.owner ? `${OWNER_LABEL[r.owner]}: ${r.nextAction ?? ''}` : '') },
               { key: 'missing', label: 'Missing', align: 'right', hideOnMobile: true, sortValue: (r) => r.missing, cell: (r) => formatCount(r.missing) },
               { key: 'rate', label: 'Complete', align: 'right', sortValue: (r) => r.completionRate, cell: (r) => formatPercent(r.completionRate), exportValue: (r) => r.completionRate },
-              { key: 'final', label: 'Finalised', align: 'right', hideOnMobile: true, sortValue: (r) => r.finalisedAt, cell: (r) => (r.finalisedAt ? formatDate(r.finalisedAt) : '—'), exportValue: (r) => r.finalisedAt },
-              { key: 'approved', label: 'Approved', align: 'right', hideOnMobile: true, sortValue: (r) => r.approvedAt, cell: (r) => (r.approvedAt ? formatDate(r.approvedAt) : '—'), exportValue: (r) => r.approvedAt },
-              { key: 'released', label: 'Released', align: 'right', hideOnMobile: true, sortValue: (r) => r.releasedAt, cell: (r) => (r.releasedAt ? formatDate(r.releasedAt) : '—'), exportValue: (r) => r.releasedAt },
-              { key: 'unlocks', label: 'Unlocked', align: 'right', hideOnMobile: true, sortValue: (r) => r.unlockCount, cell: (r) => (r.unlockCount ? `${r.unlockCount}×` : '—'), exportValue: (r) => r.unlockCount },
+              { key: 'final', label: 'Finalised', align: 'right', hideOnMobile: true, sortValue: (r) => r.finalisedAt, cell: (r) => (r.finalisedAt ? formatDate(r.finalisedAt) : '-'), exportValue: (r) => r.finalisedAt },
+              { key: 'approved', label: 'Approved', align: 'right', hideOnMobile: true, sortValue: (r) => r.approvedAt, cell: (r) => (r.approvedAt ? formatDate(r.approvedAt) : '-'), exportValue: (r) => r.approvedAt },
+              { key: 'released', label: 'Released', align: 'right', hideOnMobile: true, sortValue: (r) => r.releasedAt, cell: (r) => (r.releasedAt ? formatDate(r.releasedAt) : '-'), exportValue: (r) => r.releasedAt },
+              { key: 'unlocks', label: 'Unlocked', align: 'right', hideOnMobile: true, sortValue: (r) => r.unlockCount, cell: (r) => (r.unlockCount ? `${r.unlockCount}×` : '-'), exportValue: (r) => r.unlockCount },
             ]}
           />
           {d?.rowsTruncated ? <p className="mt-2 text-xs text-muted">Showing the first {d.rows.length}. Narrow the filters to see the rest.</p> : null}
@@ -240,7 +240,7 @@ export function ExamWorkflowTab({ academicYear, term }: Period) {
           </p>
           {d.termRelease.notReady.length > 0 ? (
             <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-muted">
-              {d.termRelease.notReady.map((n, i) => <li key={`${n.className}-${i}`}>{n.className} — {n.status.replace(/_/g, ' ').toLowerCase()}</li>)}
+              {d.termRelease.notReady.map((n, i) => <li key={`${n.className}-${i}`}>{n.className} - {n.status.replace(/_/g, ' ').toLowerCase()}</li>)}
             </ul>
           ) : null}
         </ReportCard>
@@ -268,7 +268,7 @@ export function ExamWorkflowTab({ academicYear, term }: Period) {
       ) : null}
 
       <p role="note" className="rounded-lg border border-base bg-page px-3 py-2 text-xs text-muted">
-        MANEB national exams are not part of this workflow — their results come from MANEB. See the MANEB report for their status.
+        MANEB national exams are not part of this workflow. Their results come from MANEB. See the MANEB report for their status.
       </p>
     </PanelStack>
   )
@@ -284,7 +284,7 @@ export function ManebStatusCard({ academicYear }: { academicYear: string }) {
   return (
     <ReportCard
       title="MANEB registration and results"
-      sub="External national-exam records held by the school — not marks entered by the school's teachers"
+      sub="External national-exam records held by the school. Not marks entered by the school's teachers"
       href="/exams?tab=maneb"
       hrefLabel="Open MANEB records"
     >

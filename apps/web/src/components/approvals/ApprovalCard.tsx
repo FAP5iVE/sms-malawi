@@ -54,7 +54,7 @@ export function ApprovalCard({ item, selectable, selected, onToggleSelect, onOpe
           />
         ) : null}
 
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-teal/10 text-brand-teal">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-teal/10 text-tone-teal">
           <Icon className="h-5 w-5" aria-hidden="true" />
         </div>
 

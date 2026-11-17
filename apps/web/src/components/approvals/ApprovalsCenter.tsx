@@ -159,7 +159,7 @@ export function ApprovalsCenter() {
       return
     }
     if (eligible.length < selectedItems.length) {
-      toast.info(`${selectedItems.length - eligible.length} selected request(s) will be skipped — you can't ${action} them.`)
+      toast.info(`${selectedItems.length - eligible.length} selected request(s) will be skipped. You can't ${action} them.`)
     }
     openDecision(eligible, action)
   }
@@ -213,7 +213,7 @@ export function ApprovalsCenter() {
     if (filters.status === 'PENDING') {
       if (filters.scope === 'review') return 'Nothing is waiting for your review. New requests will appear here.'
       if (filters.scope === 'mine') return 'You have no requests waiting for a decision.'
-      return 'No pending approvals — everything is up to date.'
+      return 'No pending approvals: everything is up to date.'
     }
     return `No ${APPROVAL_STATUS_CONFIG[filters.status].label.toLowerCase()} requests yet.`
   })()
@@ -245,7 +245,7 @@ export function ApprovalsCenter() {
                   <label
                     key={s.id}
                     className={`flex min-h-[28px] cursor-pointer items-center gap-2 text-sm transition-colors ${
-                      active ? 'font-semibold text-brand-teal' : 'text-muted hover:text-body'
+                      active ? 'font-semibold text-tone-teal' : 'text-muted hover:text-body'
                     }`}
                   >
                     <input
@@ -299,7 +299,7 @@ export function ApprovalsCenter() {
               aria-expanded={showFilters}
               onClick={() => setShowFilters((v) => !v)}
               className={`inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border px-3.5 text-sm font-semibold ${
-                advancedActive ? 'border-brand-teal text-brand-teal' : 'border-base text-muted hover:text-body'
+                advancedActive ? 'border-brand-teal text-tone-teal' : 'border-base text-muted hover:text-body'
               }`}
             >
               <SlidersHorizontal className="h-4 w-4" aria-hidden="true" /> Filters
@@ -319,7 +319,7 @@ export function ApprovalsCenter() {
         </div>
 
         {showFilters ? (
-          <div className="grid grid-cols-1 gap-3 rounded-xl border border-base bg-page p-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 rounded-xl app-tint p-3 sm:grid-cols-3">
             <div>
               <label htmlFor="approvals-from" className="mb-1 block text-xs font-semibold text-muted">Submitted from</label>
               <input id="approvals-from" type="date" value={filters.from} max={filters.to || undefined}
@@ -344,25 +344,25 @@ export function ApprovalsCenter() {
 
       {/* ── Notices ─────────────────────────────────────── */}
       {uniqueWarnings.length > 0 ? (
-        <p role="status" className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+        <p role="status" className="flex items-start gap-2 rounded-xl bg-status-warning/10 px-3 py-2 text-sm text-body">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          Some requests couldn’t be loaded right now ({uniqueWarnings.join(', ')}). Everything else is shown — try Refresh in a moment.
+          Some requests couldn’t be loaded right now ({uniqueWarnings.join(', ')}). Everything else is shown. Try Refresh in a moment.
         </p>
       ) : null}
 
       {report && report.failures.length > 0 ? (
-        <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-800 dark:text-red-200">
+        <div role="alert" className="rounded-xl bg-status-danger/10 px-3 py-2 text-sm text-body">
           <div className="flex items-start justify-between gap-2">
             <p className="font-semibold">
               {report.succeeded} done, {report.failures.length} could not be completed:
             </p>
-            <button type="button" onClick={() => setReport(null)} aria-label="Dismiss" className="shrink-0 rounded p-1 hover:bg-red-500/10">
+            <button type="button" onClick={() => setReport(null)} aria-label="Dismiss" className="shrink-0 rounded p-1 hover:bg-status-danger/10">
               <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
           <ul className="mt-1 list-disc space-y-0.5 pl-5">
             {report.failures.map((f) => (
-              <li key={`${f.title}-${f.error}`}><span className="font-medium">{f.title}</span> — {f.error}</li>
+              <li key={`${f.title}-${f.error}`}><span className="font-medium">{f.title}</span> - {f.error}</li>
             ))}
           </ul>
         </div>
@@ -405,8 +405,8 @@ export function ApprovalsCenter() {
           {[0, 1, 2].map((i) => <div key={i} className="skeleton h-28 w-full rounded-xl" />)}
         </div>
       ) : listQuery.isError ? (
-        <div role="alert" className="flex flex-col items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-10 text-center">
-          <AlertTriangle className="h-8 w-8 text-red-500" aria-hidden="true" />
+        <div role="alert" className="flex flex-col items-center gap-3 rounded-xl bg-status-danger/10 px-4 py-10 text-center">
+          <AlertTriangle className="h-8 w-8 text-status-danger" aria-hidden="true" />
           <p className="font-semibold text-body">We couldn’t load your approvals.</p>
           <p className="text-sm text-muted">{listQuery.error instanceof Error ? listQuery.error.message : 'Please try again.'}</p>
           <button type="button" onClick={refresh}

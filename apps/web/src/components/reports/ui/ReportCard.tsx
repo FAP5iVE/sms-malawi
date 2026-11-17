@@ -31,7 +31,7 @@ export function ReportCard({
   // On the Reports page the card sits on a ModuleSurface panel: no second card, just the section.
   const flat = useFlatSurface()
   return (
-    <section className={cn(!flat && 'rounded-xl border border-base bg-surface p-3 sm:p-5', className)}>
+    <section className={cn(!flat && 'rounded-xl app-tint p-3 sm:p-5', className)}>
       <header className="mb-3 flex items-start justify-between gap-3 sm:mb-4">
         <div className="min-w-0">
           <h3 className="font-heading text-sm font-semibold text-brand-navy">{title}</h3>
@@ -42,7 +42,7 @@ export function ReportCard({
           {href ? (
             <Link
               href={href}
-              className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-brand-teal hover:underline focus:outline-none focus:ring-2 focus:ring-brand-teal/30 rounded"
+              className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-tone-teal hover:underline focus:outline-none focus:ring-2 focus:ring-brand-teal/30 rounded"
             >
               {hrefLabel}
               <ArrowUpRight className="h-3 w-3" aria-hidden />
@@ -68,7 +68,7 @@ export function ReportSectionHeader({
   return (
     <div className="mb-3">
       <div className="flex items-center gap-2">
-        {icon ? <span className="text-brand-teal">{icon}</span> : null}
+        {icon ? <span className="text-tone-teal">{icon}</span> : null}
         <h2 className="font-heading text-base font-bold text-brand-navy">{title}</h2>
       </div>
       {description ? <p className="mt-0.5 text-xs text-muted">{description}</p> : null}

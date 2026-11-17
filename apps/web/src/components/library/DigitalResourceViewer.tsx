@@ -421,10 +421,10 @@ export function DigitalResourceViewer({
         >
           <div className="flex items-center gap-3 px-3 sm:px-5 py-2.5 bg-brand-navy/95 shrink-0 border-b border-white/10">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <Eye className="w-4 h-4 text-brand-teal shrink-0" aria-hidden />
+              <Eye className="w-4 h-4 text-tone-teal shrink-0" aria-hidden />
               <span className="font-heading font-semibold text-sm text-white truncate">{title}</span>
-              <span className="hidden sm:inline shrink-0 text-[10px] text-brand-teal font-heading font-semibold uppercase tracking-wide">
-                View Only
+              <span className="hidden sm:inline shrink-0 text-xs text-tone-teal font-heading font-semibold">
+                View only
               </span>
             </div>
 
@@ -465,7 +465,7 @@ export function DigitalResourceViewer({
                 >
                   <Minus className="w-4 h-4" />
                 </button>
-                <span className="w-12 text-center text-[11px] text-white/60 tabular-nums">
+                <span className="w-12 text-center text-xs text-white/60 tabular-nums">
                   {Math.round(zoom * 100)}%
                 </span>
                 <button
@@ -514,7 +514,7 @@ export function DigitalResourceViewer({
             {(loading || rendering) && !error && (
               <div className="sticky top-0 z-10 flex justify-center pointer-events-none">
                 <div className="inline-flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-xs text-white/80 backdrop-blur-sm">
-                  <Loader2 className="w-4 h-4 animate-spin text-brand-teal" />
+                  <Loader2 className="w-4 h-4 animate-spin text-tone-teal" />
                   {loading ? 'Loading PDF…' : 'Rendering page…'}
                 </div>
               </div>
@@ -523,13 +523,13 @@ export function DigitalResourceViewer({
             {error && (
               <div className="min-h-full flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3 max-w-md text-center">
-                  <AlertTriangle className="w-9 h-9 text-brand-coral" />
+                  <AlertTriangle className="w-9 h-9 text-tone-coral" />
                   <p className="text-white font-heading font-semibold">Unable to display resource</p>
                   <p className="text-sm text-white/60">{error}</p>
                   <button
                     type="button"
                     onClick={loadViewUrl}
-                    className="mt-2 px-5 py-2.5 rounded-xl bg-brand-teal text-white text-sm font-heading font-semibold hover:bg-brand-teal/90 transition-colors min-h-11"
+                    className="mt-2 px-5 py-2.5 rounded-xl bg-btn-brand text-btn-brand-fg text-sm font-heading font-semibold hover:bg-brand-teal/90 transition-colors min-h-11"
                   >
                     Try again
                   </button>
@@ -552,7 +552,7 @@ export function DigitalResourceViewer({
           </motion.div>
 
           <div className="shrink-0 px-3 sm:px-5 py-2 bg-brand-navy/95 text-center border-t border-white/10">
-            <p className="text-[10px] sm:text-[11px] text-white/40">
+            <p className="text-xs sm:text-xs text-white/40">
               View only. Downloading or reproducing this resource is not permitted.
             </p>
           </div>

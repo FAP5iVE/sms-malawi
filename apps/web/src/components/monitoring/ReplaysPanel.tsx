@@ -53,7 +53,7 @@ export function ReplaysPanel() {
             <p className="text-xs text-muted truncate">{r.urls[0] ?? 'Unknown page'}</p>
           </div>
           {r.errorCount > 0 && (
-            <span className="flex items-center gap-1 text-xs font-semibold text-brand-coral shrink-0">
+            <span className="flex items-center gap-1 text-xs font-semibold text-tone-coral shrink-0">
               <AlertCircle className="w-3.5 h-3.5" /> {r.errorCount}
             </span>
           )}

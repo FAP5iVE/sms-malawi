@@ -99,7 +99,7 @@ export function formatMwk(value: number): string {
 }
 
 export const ACTION_BUTTON_CLASS = {
-  approve: 'bg-brand-teal text-white hover:opacity-90',
-  reject:  'border border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10',
+  approve: 'bg-btn-brand text-btn-brand-fg hover:opacity-90',
+  reject:  'border border-status-danger/40 text-status-danger hover:bg-status-danger/10',
   neutral: 'border border-base text-body hover:bg-page',
 } as const

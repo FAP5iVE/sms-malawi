@@ -15,6 +15,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { StatusText } from '@/components/shared/StatusText'
 import { Loader2, Save, Plus, X, Building2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import type { DepartmentTitles } from '@shared/types/settings'
@@ -125,7 +126,7 @@ export function HRDepartmentsSettings() {
           (date of birth + this value) and the "retiring soon" list for HR. */}
       <div className="bg-surface rounded-xl p-5 space-y-3 max-w-xl">
         <div>
-          <h2 className="font-heading font-bold text-lg text-brand-navy">Retirement Age</h2>
+          <h2 className="font-heading font-bold text-lg text-brand-navy">Retirement age</h2>
           <p className="text-sm text-muted mt-0.5">
             Each staff member&apos;s retirement date is their date of birth plus this age. Changing it
             updates every staff profile at once. Visible to admin, HR and the headteacher only.
@@ -133,7 +134,7 @@ export function HRDepartmentsSettings() {
         </div>
         <div className="flex items-end gap-2">
           <div className="w-32">
-            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
               Age (years)
             </label>
             <input
@@ -154,13 +155,13 @@ export function HRDepartmentsSettings() {
           >
             {ageSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
           </button>
-          {ageSaved && <span className="text-sm text-brand-teal pb-3">Saved</span>}
+          {ageSaved && <span className="text-sm text-tone-teal pb-3">Saved</span>}
         </div>
-        {ageError && <p className="text-sm text-brand-coral">{ageError}</p>}
+        {ageError && <p className="text-sm text-tone-coral">{ageError}</p>}
       </div>
 
       <div>
-        <h2 className="font-heading font-bold text-lg text-brand-navy">Departments &amp; Job Titles</h2>
+        <h2 className="font-heading font-bold text-lg text-brand-navy">Departments and job titles</h2>
         <p className="text-sm text-muted mt-0.5">
           Defines the department and job title options offered when creating a staff member, and the
           filters available on the staff directory. Keeping this centralised avoids the same department
@@ -171,15 +172,15 @@ export function HRDepartmentsSettings() {
       {/* Add department */}
       <div className="flex items-end gap-2 max-w-md">
         <div className="flex-1">
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-            New Department
+          <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+            New department
           </label>
           <input
             value={newDept}
             onChange={(e) => setNewDept(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addDepartment() } }}
             className={inputCls}
-            placeholder="e.g. Music"
+            placeholder="Music"
           />
         </div>
         <button
@@ -203,13 +204,13 @@ export function HRDepartmentsSettings() {
             <div key={dept} className="pb-4 border-b border-base last:border-b-0">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-heading font-semibold text-sm text-body flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-brand-teal" aria-hidden />
+                  <Building2 className="w-4 h-4 text-tone-teal" aria-hidden />
                   {dept}
                 </h3>
                 <button
                   type="button"
                   onClick={() => removeDepartment(dept)}
-                  className="text-xs text-brand-coral hover:underline font-medium"
+                  className="text-xs text-tone-coral hover:underline font-medium"
                 >
                   Remove department
                 </button>
@@ -222,14 +223,14 @@ export function HRDepartmentsSettings() {
                   (data[dept] ?? []).map((title) => (
                     <span
                       key={title}
-                      className="inline-flex items-center gap-1.5 bg-page border border-base rounded-full px-3 py-1 text-xs text-body"
+                      className="inline-flex items-center gap-1.5 app-tint rounded-lg px-3 py-1 text-xs text-body"
                     >
                       {title}
                       <button
                         type="button"
                         onClick={() => removeTitle(dept, title)}
                         aria-label={`Remove ${title}`}
-                        className="text-muted hover:text-brand-coral"
+                        className="text-muted hover:text-tone-coral"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -260,7 +261,7 @@ export function HRDepartmentsSettings() {
         )}
       </div>
 
-      {error && <p className="text-sm text-brand-coral">{error}</p>}
+      {error && <p className="text-sm text-tone-coral">{error}</p>}
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -270,7 +271,7 @@ export function HRDepartmentsSettings() {
         >
           {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Changes</>}
         </button>
-        {saved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}
+        {saved && <StatusText tone="success" size="md">Saved</StatusText>}
       </div>
     </div>
   )

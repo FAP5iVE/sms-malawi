@@ -111,7 +111,7 @@ export function EnrollmentTab({ academicYear }: { academicYear: string }) {
           kpiTile('new', 'New this year', d.newThisYear, 'count', 'Active students first registered since the academic year began.'),
           kpiTile('returning', 'Returning', d.returning, 'count', 'Active students registered before this academic year.'),
           kpiTile('noClass', 'Without a class', d.records.activeWithoutClass, 'count', 'Active students not placed in any class.', d.records.activeWithoutClass > 0 ? 'watch' : 'healthy'),
-          kpiTile('noPhone', 'No guardian phone', d.records.missingGuardianPhone, 'count', 'Active students with no guardian phone on file — the school cannot reach their families.', d.records.missingGuardianPhone > 0 ? 'watch' : 'healthy'),
+          kpiTile('noPhone', 'No guardian phone', d.records.missingGuardianPhone, 'count', 'Active students with no guardian phone on file. The school cannot reach their families.', d.records.missingGuardianPhone > 0 ? 'watch' : 'healthy'),
           kpiTile('maneb', 'Awaiting MANEB registration', d.records.awaitingManeb, 'count', 'Active Form 4 students not yet registered for MANEB.'),
         ] : undefined}
       />

@@ -132,7 +132,7 @@ export function AlgoliaSeedPanel() {
     <div className="space-y-4">
       <div className="space-y-4">
         <div>
-          <h3 className="font-heading font-semibold text-brand-navy">Algolia Search Index</h3>
+          <h3 className="font-heading font-semibold text-brand-navy">Algolia search index</h3>
           <p className="text-xs text-muted mt-0.5">
             Bulk-seed search indices from the live Neon database. Safe to re-run, existing records are overwritten.
           </p>
@@ -142,16 +142,16 @@ export function AlgoliaSeedPanel() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-brand-navy">Configure index settings</p>
-              <p className="text-xs text-muted mt-0.5">Facets, searchable attributes &amp; sort-order replicas. Run this once, and again any time a new facet or sort order is added.</p>
+              <p className="text-xs text-muted mt-0.5">Facets, searchable attributes and sort-order replicas. Run this once, and again any time a new facet or sort order is added.</p>
             </div>
           </div>
           {configureState.status === 'success' && (
-            <div className="flex items-center gap-1.5 text-xs text-brand-teal">
+            <div className="flex items-center gap-1.5 text-xs text-tone-teal">
               <CheckCircle className="w-3.5 h-3.5" /> {configureState.message}
             </div>
           )}
           {configureState.status === 'error' && (
-            <div className="flex items-center gap-1.5 text-xs text-brand-coral">
+            <div className="flex items-center gap-1.5 text-xs text-tone-coral">
               <AlertTriangle className="w-3.5 h-3.5" /> {configureState.message}
             </div>
           )}
@@ -180,13 +180,13 @@ export function AlgoliaSeedPanel() {
                 </div>
 
                 {s.status === 'success' && (
-                  <div className="flex items-center gap-1.5 text-xs text-brand-teal">
+                  <div className="flex items-center gap-1.5 text-xs text-tone-teal">
                     <CheckCircle className="w-3.5 h-3.5" />
                     {s.message}
                   </div>
                 )}
                 {s.status === 'error' && (
-                  <div className="flex items-center gap-1.5 text-xs text-brand-coral">
+                  <div className="flex items-center gap-1.5 text-xs text-tone-coral">
                     <AlertTriangle className="w-3.5 h-3.5" />
                     {s.message}
                   </div>

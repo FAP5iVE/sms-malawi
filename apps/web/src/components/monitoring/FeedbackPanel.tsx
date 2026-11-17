@@ -33,11 +33,11 @@ export function FeedbackPanel() {
       key: 'reporterName',
       label: 'Reported by',
       priority: 'critical',
-      render: (row) => row.reporterName ?? '\u2014',
+      render: (row) => row.reporterName ?? '-',
     },
     {
       key: 'reporterIdNumber',
-      label: 'Employee / Student no.',
+      label: 'Employee / student no.',
       priority: 'important',
       render: (row) =>
         row.reporterIdNumber ? (
@@ -46,7 +46,7 @@ export function FeedbackPanel() {
             {row.idMatchesAccount === false && (
               <span
                 title="This number does not match the sender's account record"
-                className="inline-flex items-center gap-1 text-[10px] font-heading font-bold text-status-warning"
+                className="inline-flex items-center gap-1 text-xs font-heading font-bold text-status-warning"
               >
                 <AlertTriangle className="w-3 h-3" aria-hidden />
                 Mismatch
@@ -54,14 +54,14 @@ export function FeedbackPanel() {
             )}
           </span>
         ) : (
-          '\u2014'
+          '-'
         ),
     },
     {
       key: 'submittedByRole',
       label: 'Role',
       priority: 'important',
-      render: (row) => (row.submittedByRole ? (ROLE_LABELS[row.submittedByRole as UserRole] ?? row.submittedByRole) : '\u2014'),
+      render: (row) => (row.submittedByRole ? (ROLE_LABELS[row.submittedByRole as UserRole] ?? row.submittedByRole) : '-'),
     },
     { key: 'dateCreated', label: 'Date', priority: 'important', render: (row) => new Date(row.dateCreated).toLocaleString() },
   ]

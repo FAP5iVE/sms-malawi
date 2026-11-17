@@ -52,11 +52,10 @@ export function StudentProgressTab({ academicYear, term }: Period) {
   return (
     <PanelStack>
       {d?.currentWithheld ? (
-        <div role="status" className="flex items-start gap-3 rounded-xl border border-base bg-page p-4 text-sm text-brand-navy">
+        <div role="status" className="flex items-start gap-3 rounded-xl app-tint p-4 text-sm text-brand-navy">
           <Lock className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden />
           <p>
-            Results for this term are being held back because of an outstanding fee balance. They will show here as soon as the balance is cleared —
-            see the Fees tab for what is owed.
+            Results for this term are being held back because of an outstanding fee balance. They will show here as soon as the balance is cleared,             see the Fees tab for what is owed.
           </p>
         </div>
       ) : null}
@@ -65,7 +64,7 @@ export function StudentProgressTab({ academicYear, term }: Period) {
         kpis={d && d.current ? [
           kpiTile('average', 'Term average', d.current.average, 'score', 'Mean score across all your subjects this term.', d.current.passStatus ? 'healthy' : 'critical'),
           kpiTile('grade', 'Overall grade', d.current.grade, 'text', 'Your grade for the term.'),
-          kpiTile('position', 'Class position', d.current.position === null ? null : `${d.current.position} of ${d.current.classTotal ?? '—'}`, 'text', 'Where you rank in your class this term.'),
+          kpiTile('position', 'Class position', d.current.position === null ? null : `${d.current.position} of ${d.current.classTotal ?? '-'}`, 'text', 'Where you rank in your class this term.'),
           kpiTile('class', 'Class average', d.classAverage, 'score', 'The average for your whole class, for comparison.'),
         ] : undefined}
       />
@@ -91,7 +90,7 @@ export function StudentProgressTab({ academicYear, term }: Period) {
           />
         </ChartCard>
       </TwoUp>
-      <ReportCard title="Subject results" sub="Weakest first — distance from the pass mark shows how close you are">
+      <ReportCard title="Subject results" sub="Weakest first: distance from the pass mark shows how close you are">
         <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
           <ReportTable<ApiStudentSubjectRow>
             rows={d?.subjects}
@@ -145,7 +144,7 @@ export function StudentAssignmentsTab({ academicYear, term }: Period) {
               { key: 'subject', label: 'Subject', sortValue: (r) => r.subject },
               { key: 'due', label: 'Due', sortValue: (r) => r.dueDate, cell: (r) => formatDate(r.dueDate), exportValue: (r) => formatDate(r.dueDate) },
               { key: 'status', label: 'Status', sortValue: (r) => r.status, cell: (r) => STATUS_LABEL[r.status], exportValue: (r) => STATUS_LABEL[r.status] },
-              { key: 'at', label: 'Handed in', hideOnMobile: true, sortValue: (r) => r.submittedAt ?? '', cell: (r) => (r.submittedAt ? formatDate(r.submittedAt) : '—'), exportValue: (r) => (r.submittedAt ? formatDate(r.submittedAt) : '') },
+              { key: 'at', label: 'Handed in', hideOnMobile: true, sortValue: (r) => r.submittedAt ?? '', cell: (r) => (r.submittedAt ? formatDate(r.submittedAt) : '-'), exportValue: (r) => (r.submittedAt ? formatDate(r.submittedAt) : '') },
             ]}
           />
         </QueryState>
@@ -213,8 +212,8 @@ export function StudentLibraryTab({ academicYear, term }: Period) {
               { key: 'book', label: 'Book', sortValue: (r) => r.bookTitle },
               { key: 'issued', label: 'Borrowed', hideOnMobile: true, sortValue: (r) => r.issuedAt, cell: (r) => formatDate(r.issuedAt), exportValue: (r) => formatDate(r.issuedAt) },
               { key: 'due', label: 'Due back', sortValue: (r) => r.dueDate, cell: (r) => formatDate(r.dueDate), exportValue: (r) => formatDate(r.dueDate) },
-              { key: 'late', label: 'Days overdue', align: 'right', sortValue: (r) => r.daysOverdue, cell: (r) => (r.daysOverdue > 0 ? formatCount(r.daysOverdue) : '—'), exportValue: (r) => r.daysOverdue },
-              { key: 'accrued', label: 'Late fee so far', align: 'right', sortValue: (r) => r.accruedLateFee, cell: (r) => (r.accruedLateFee > 0 ? formatMwk(r.accruedLateFee) : '—'), exportValue: (r) => r.accruedLateFee },
+              { key: 'late', label: 'Days overdue', align: 'right', sortValue: (r) => r.daysOverdue, cell: (r) => (r.daysOverdue > 0 ? formatCount(r.daysOverdue) : '-'), exportValue: (r) => r.daysOverdue },
+              { key: 'accrued', label: 'Late fee so far', align: 'right', sortValue: (r) => r.accruedLateFee, cell: (r) => (r.accruedLateFee > 0 ? formatMwk(r.accruedLateFee) : '-'), exportValue: (r) => r.accruedLateFee },
             ]}
           />
         </QueryState>
@@ -301,12 +300,12 @@ export function StudentFeesTab({ academicYear, term }: Period) {
 }
 
 const PLACEMENT_TONE: Record<ApiStudentPlacementState, string> = {
-  published: 'border-green-200 bg-green-50 text-green-900',
-  pending: 'border-amber-200 bg-amber-50 text-amber-900',
-  not_approved: 'border-red-200 bg-red-50 text-red-900',
-  none: 'border-base bg-page text-body',
-  awaiting_results: 'border-base bg-page text-body',
-  not_yet_eligible: 'border-base bg-page text-body',
+  published: 'bg-status-success/10 text-body',
+  pending: 'bg-status-warning/10 text-body',
+  not_approved: 'bg-status-danger/10 text-body',
+  none: 'app-tint text-body',
+  awaiting_results: 'app-tint text-body',
+  not_yet_eligible: 'app-tint text-body',
 }
 
 function Field({ label, value }: { label: string; value: string | null }) {
@@ -333,7 +332,7 @@ export function StudentPlacementTab() {
         <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
           {d ? (
             <div className="space-y-4">
-              <div className={`rounded-lg border p-3 sm:p-4 ${PLACEMENT_TONE[d.state]}`} role="status">
+              <div className={`rounded-lg p-3 sm:p-4 ${PLACEMENT_TONE[d.state]}`} role="status">
                 <p className="font-heading text-base font-semibold">{d.headline}</p>
                 <p className="mt-1 text-sm">{d.detail}</p>
               </div>
@@ -350,7 +349,7 @@ export function StudentPlacementTab() {
 
               {d.claim ? (
                 <div>
-                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">What you submitted</h4>
+                  <h4 className="mb-2 text-xs font-semibold text-muted">What you submitted</h4>
                   <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <Field label="University" value={d.claim.university} />
                     <Field label="Programme" value={d.claim.programme} />

@@ -257,11 +257,11 @@ function HRContent() {
   // one (hr.viewAnyProfile is admin/high_rank/hr only) — the inverse of
   // the pre-fix visibility.
   const TABS = [
-    { id: 'directory' as Tab, label: 'Staff Directory', icon: Users },
-    { id: 'leave'     as Tab, label: 'Leave Requests',  icon: Calendar,      badge: pendingLeave      },
+    { id: 'directory' as Tab, label: 'Staff directory', icon: Users },
+    { id: 'leave'     as Tab, label: 'Leave requests',  icon: Calendar,      badge: pendingLeave, badgeNoun: 'to review' },
     { id: 'loans'     as Tab, label: 'Loans',           icon: CreditCard                              },
-    { id: 'mypay'     as Tab, label: 'My Pay',          icon: Wallet                                  },
-    { id: 'alerts'    as Tab, label: 'Contract Alerts', icon: AlertTriangle, badge: expiringContracts },
+    { id: 'mypay'     as Tab, label: 'My pay',          icon: Wallet                                  },
+    { id: 'alerts'    as Tab, label: 'Contract alerts', icon: AlertTriangle, badge: expiringContracts, badgeNoun: 'expiring' },
   // [PRODUCTION FIX 2026-07-28] leave was HR-only, meaning no staff member
   // could even see the tab to submit a leave request — useApplyForLeave()
   // existed and worked, it just had zero UI consumers. Now visible to
@@ -338,7 +338,7 @@ function HRContent() {
                   title="Grid view"
                   className={`flex items-center justify-center w-9 h-9 rounded-lg transition-colors ${
                     directoryView === 'grid'
-                      ? 'bg-brand-teal text-white'
+                      ? 'bg-btn-brand text-btn-brand-fg'
                       : 'text-muted hover:text-body hover:bg-page'
                   }`}
                 >
@@ -352,7 +352,7 @@ function HRContent() {
                   title="List view"
                   className={`flex items-center justify-center w-9 h-9 rounded-lg transition-colors ${
                     directoryView === 'list'
-                      ? 'bg-brand-teal text-white'
+                      ? 'bg-btn-brand text-btn-brand-fg'
                       : 'text-muted hover:text-body hover:bg-page'
                   }`}
                 >
@@ -363,10 +363,10 @@ function HRContent() {
                 <button
                   type="button"
                   onClick={() => setShowStaffForm(true)}
-                  className="shrink-0 inline-flex items-center gap-2 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+                  className="shrink-0 inline-flex items-center gap-2 bg-btn-brand text-btn-brand-fg rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
                 >
                   <UserPlus className="w-4 h-4" aria-hidden />
-                  Add Staff
+                  Add staff
                 </button>
               )}
             </div>
@@ -464,11 +464,11 @@ function HRContent() {
               apply-for-loan pattern. */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-heading font-semibold text-body">My Leave</h2>
+              <h2 className="font-heading font-semibold text-body">My leave</h2>
               <button
                 type="button"
                 onClick={() => setShowLeaveForm((v) => !v)}
-                className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+                className="inline-flex items-center gap-1.5 bg-btn-brand text-btn-brand-fg rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
               >
                 {showLeaveForm ? 'Cancel' : 'Request Leave'}
               </button>
@@ -515,7 +515,7 @@ function HRContent() {
                   {applyForLeave.isPending ? 'Submitting…' : 'Submit Request'}
                 </button>
                 {applyForLeave.isError && (
-                  <p className="text-sm text-brand-coral">
+                  <p className="text-sm text-tone-coral">
                     {applyForLeave.error instanceof Error ? applyForLeave.error.message : 'Failed to submit leave request.'}
                   </p>
                 )}
@@ -616,9 +616,9 @@ function HRContent() {
           {/* [R11] Conflict analysis shown after an approval that surfaced one */}
           {conflictPanel && (
             <Modal
-              title={<>Conflict Analysis — {conflictPanel.staffName}</>}
+              title={<>Conflict Analysis: {conflictPanel.staffName}</>}
               onClose={() => setConflictPanel(null)}
-              size="lg"
+              size="l"
             >
               <LeaveConflictWarning result={conflictPanel.result} />
             </Modal>
@@ -672,7 +672,7 @@ function HRContent() {
           )}
 
           {contractsError && !contractsLoading && (
-            <p role="alert" className="text-center py-10 text-brand-coral text-sm">
+            <p role="alert" className="text-center py-10 text-tone-coral text-sm">
               Could not load contract alerts. Please refresh and try again.
             </p>
           )}
@@ -687,19 +687,19 @@ function HRContent() {
             return (
               <div
                 key={s.id}
-                className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3"
+                className="bg-status-warning/10 rounded-xl p-4 flex items-center gap-3"
               >
-                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                <AlertTriangle className="w-5 h-5 text-status-warning shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-amber-900">
-                    {s.firstName} {s.lastName} — {s.department}
+                  <p className="font-semibold text-body">
+                    {s.firstName} {s.lastName} - {s.department}
                   </p>
-                  <p className="text-sm text-amber-700">
+                  <p className="text-sm text-body">
                     Contract expires:{' '}
                     {new Date(s.contractExpiry).toLocaleDateString('en-MW')}
                   </p>
                 </div>
-                <span className="shrink-0 text-xs font-semibold text-amber-800">
+                <span className="shrink-0 text-xs font-semibold text-tone-amber">
                   {daysLeft === 0 ? 'Today' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`}
                 </span>
               </div>
@@ -788,16 +788,16 @@ function LoansTab({
         <div className="pb-5 border-b border-base">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Banknote className="w-4 h-4 text-brand-teal" />
-              <h2 className="font-heading font-semibold text-body">Request a Loan</h2>
+              <Banknote className="w-4 h-4 text-tone-teal" />
+              <h2 className="font-heading font-semibold text-body">Request a loan</h2>
             </div>
             {!showRequestForm && (
               <button
                 type="button"
                 onClick={() => setShowRequestForm(true)}
-                className="text-xs font-semibold text-brand-teal hover:underline min-h-11"
+                className="text-xs font-semibold text-tone-teal hover:underline min-h-11"
               >
-                New Request
+                New request
               </button>
             )}
           </div>
@@ -811,17 +811,17 @@ function LoansTab({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="w-full border border-base rounded-lg px-3 py-2 text-sm"
-                  placeholder="e.g. 500000"
+                  placeholder="500000"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-muted mb-1">Monthly Deduction (MWK)</label>
+                <label className="block text-xs font-medium text-muted mb-1">Monthly deduction (MWK)</label>
                 <input
                   type="number"
                   value={monthlyDeduction}
                   onChange={(e) => setMonthlyDeduction(e.target.value)}
                   className="w-full border border-base rounded-lg px-3 py-2 text-sm"
-                  placeholder="e.g. 50000"
+                  placeholder="50000"
                 />
               </div>
               <div>
@@ -846,14 +846,14 @@ function LoansTab({
                   type="button"
                   onClick={submitRequest}
                   disabled={requestLoan.isPending || !amount || !monthlyDeduction || reason.trim().length < 10}
-                  className="flex-1 bg-brand-teal text-white rounded-lg py-2 text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 min-h-11"
+                  className="flex-1 bg-btn-brand text-btn-brand-fg rounded-lg py-2 text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2 min-h-11"
                 >
                   {requestLoan.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Submit Request
+                  Submit request
                 </button>
               </div>
               {requestLoan.isError && (
-                <p className="text-xs text-brand-coral">
+                <p className="text-xs text-tone-coral">
                   {requestLoan.error instanceof Error ? requestLoan.error.message : 'Failed to submit request.'}
                 </p>
               )}
@@ -866,7 +866,7 @@ function LoansTab({
           a request previously had no way to check on it afterward. */}
       {canApplyLoan && (
         <div>
-          <h2 className="font-heading font-semibold text-body mb-3">My Loan Status</h2>
+          <h2 className="font-heading font-semibold text-body mb-3">My loan status</h2>
           {myLoansLoading ? (
             <div className="h-16 rounded-xl bg-surface animate-pulse" />
           ) : (myLoans as ApiStaffLoan[]).length === 0 ? (
@@ -905,7 +905,7 @@ function LoansTab({
       {canManage && (
         <div>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <h2 className="font-heading font-semibold text-body">Manage Loan Requests</h2>
+            <h2 className="font-heading font-semibold text-body">Manage loan requests</h2>
             <select
               value={loanStatusFilter}
               onChange={(e) => setLoanStatusFilter(e.target.value as '' | ApiStaffLoan['status'])}
@@ -974,7 +974,7 @@ function LoansTab({
                           onClick={() => setRepayTargetId(loan.id)}
                           className="text-xs font-semibold border border-status-success/60 text-status-success px-3 py-1.5 rounded-lg hover:bg-status-success/10 transition-colors min-h-11"
                         >
-                          Record Repayment
+                          Record repayment
                         </button>
                       )}
                     </div>
@@ -993,7 +993,7 @@ function LoansTab({
                         type="button"
                         onClick={submitRepayment}
                         disabled={recordRepayment.isPending || !repayAmount}
-                        className="bg-brand-teal text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
+                        className="bg-btn-brand text-btn-brand-fg rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
                       >
                         Save
                       </button>

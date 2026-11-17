@@ -14,10 +14,10 @@ import { formatCount } from '@/lib/reportFormat'
 import { ageLabel } from '@/lib/dashboardTiers'
 
 const TONE: Record<ReportInsightSeverity, { box: string; icon: string; Icon: typeof Info }> = {
-  critical: { box: 'border-brand-coral/30 bg-brand-coral/5', icon: 'text-brand-coral', Icon: OctagonAlert },
-  watch: { box: 'border-brand-amber/40 bg-brand-amber/5', icon: 'text-brand-amber', Icon: AlertTriangle },
-  info: { box: 'border-base bg-page', icon: 'text-muted', Icon: Info },
-  positive: { box: 'border-brand-teal/30 bg-brand-teal/5', icon: 'text-brand-teal', Icon: CheckCircle2 },
+  critical: { box: 'bg-brand-coral/10', icon: 'text-tone-coral', Icon: OctagonAlert },
+  watch: { box: 'bg-brand-amber/10', icon: 'text-tone-amber', Icon: AlertTriangle },
+  info: { box: 'app-tint', icon: 'text-muted', Icon: Info },
+  positive: { box: 'bg-brand-teal/10', icon: 'text-tone-teal', Icon: CheckCircle2 },
 }
 
 function Row({
@@ -38,7 +38,7 @@ function Row({
 }) {
   const { box, icon, Icon } = TONE[severity]
   const inner = (
-    <div className={cn('flex items-start gap-3 rounded-lg border px-3 py-2.5', box)}>
+    <div className={cn('flex items-start gap-3 rounded-lg px-3 py-2.5', box)}>
       <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', icon)} aria-hidden />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-brand-navy">{title}</p>

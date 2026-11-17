@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { StatusText } from '@/components/shared/StatusText'
 import { Loader2, Save }       from 'lucide-react'
 import { apiFetch }            from '@/lib/api-client'
 
@@ -59,7 +60,7 @@ export function ClassroomSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-heading font-bold text-lg text-brand-navy">Classroom Preferences</h2>
+        <h2 className="font-heading font-bold text-lg text-brand-navy">Classroom preferences</h2>
         <p className="text-sm text-muted mt-0.5">Default values for assignments, marks entry, and lab bookings.</p>
       </div>
 
@@ -68,7 +69,7 @@ export function ClassroomSettings() {
         <div className="pb-5 border-b border-base">
           <h3 className="font-heading font-semibold text-sm text-body mb-4">Assignments</h3>
           <div className="max-w-xs">
-            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
               Default Deadline (days from today)
             </label>
             <input type="number" min={1} value={config.default_assignment_days} onChange={(e) => set('default_assignment_days', e.target.value)} className={inputCls} />
@@ -78,16 +79,16 @@ export function ClassroomSettings() {
 
         {/* Marks Entry */}
         <div className="pb-5 border-b border-base">
-          <h3 className="font-heading font-semibold text-sm text-body mb-4">Marks Entry</h3>
+          <h3 className="font-heading font-semibold text-sm text-body mb-4">Marks entry</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-sm">
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
                 Entry Reminder (hours before deadline)
               </label>
               <input type="number" min={1} value={config.marks_entry_reminder_hrs} onChange={(e) => set('marks_entry_reminder_hrs', e.target.value)} className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
                 Default Exam Duration (min)
               </label>
               <input type="number" min={30} step={30} value={config.default_exam_duration_min} onChange={(e) => set('default_exam_duration_min', e.target.value)} className={inputCls} />
@@ -106,9 +107,9 @@ export function ClassroomSettings() {
 
         {/* Lab Bookings */}
         <div>
-          <h3 className="font-heading font-semibold text-sm text-body mb-4">Laboratory Bookings</h3>
+          <h3 className="font-heading font-semibold text-sm text-body mb-4">Laboratory bookings</h3>
           <div className="max-w-xs">
-            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
               Minimum Advance Booking (days)
             </label>
             <input type="number" min={1} value={config.lab_booking_advance_days} onChange={(e) => set('lab_booking_advance_days', e.target.value)} className={inputCls} />
@@ -116,14 +117,14 @@ export function ClassroomSettings() {
           </div>
         </div>
 
-        {error && <p className="text-sm text-brand-coral">{error}</p>}
+        {error && <p className="text-sm text-tone-coral">{error}</p>}
 
         <div className="flex items-center gap-3">
           <button type="submit" disabled={saving}
             className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60 flex items-center gap-2">
             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Settings</>}
           </button>
-          {saved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}
+          {saved && <StatusText tone="success" size="md">Saved</StatusText>}
         </div>
       </form>
     </div>

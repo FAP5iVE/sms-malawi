@@ -6,6 +6,7 @@
  */
 
 import { useState } from 'react'
+import { StatusText } from '@/components/shared/StatusText'
 import { updateProfile, getAuth } from 'firebase/auth'
 import { requestPasswordResetEmail } from '@/lib/passwordResetRequest'
 import { Loader2, Save, KeyRound } from 'lucide-react'
@@ -43,7 +44,7 @@ function OwnDetailsCard() {
   if (!allowed || isError || !data) return null
 
   const cls = 'w-full max-w-sm min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25'
-  const lbl = 'block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5'
+  const lbl = 'block text-xs font-heading font-semibold text-muted mb-1.5'
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -56,14 +57,14 @@ function OwnDetailsCard() {
   return (
     <form onSubmit={submit} className="pt-4 border-t border-base space-y-4">
       <div>
-        <h3 className="font-heading font-semibold text-sm text-body">Contact &amp; next of kin</h3>
+        <h3 className="font-heading font-semibold text-sm text-body">Contact and next of kin</h3>
         <p className="text-xs text-muted mt-0.5">Keep these current. HR uses them in an emergency.</p>
       </div>
       <div><label className={lbl}>Phone</label><input className={cls} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} type="tel" /></div>
       <div><label className={lbl}>Next of kin</label><input className={cls} value={form.nextOfKinName} onChange={(e) => setForm({ ...form, nextOfKinName: e.target.value })} /></div>
       <div><label className={lbl}>Relationship</label><input className={cls} value={form.nextOfKinRelation} onChange={(e) => setForm({ ...form, nextOfKinRelation: e.target.value })} /></div>
       <div><label className={lbl}>Next of kin phone</label><input className={cls} value={form.nextOfKinPhone} onChange={(e) => setForm({ ...form, nextOfKinPhone: e.target.value })} type="tel" /></div>
-      {msg && <p className="text-sm text-brand-coral" role="alert">{msg}</p>}
+      {msg && <p className="text-sm text-tone-coral" role="alert">{msg}</p>}
       <button
         type="submit"
         disabled={save.isPending}
@@ -126,14 +127,14 @@ export function ProfileSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-heading font-bold text-lg text-brand-navy">Profile & Account</h2>
+        <h2 className="font-heading font-bold text-lg text-brand-navy">Profile and account</h2>
         <p className="text-sm text-muted mt-0.5">Update your display name and password.</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-5">
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-            Display Name
+          <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+            Display name
           </label>
           <input
             value={displayName}
@@ -144,8 +145,8 @@ export function ProfileSettings() {
         </div>
 
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-            Email Address
+          <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+            Email address
           </label>
           <input
             value={user?.email ?? ''}
@@ -156,7 +157,7 @@ export function ProfileSettings() {
         </div>
 
         {error && (
-          <p className="text-sm text-brand-coral">{error}</p>
+          <p className="text-sm text-tone-coral">{error}</p>
         )}
 
         <div className="flex items-center gap-3">
@@ -169,19 +170,19 @@ export function ProfileSettings() {
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
               : <><Save className="w-4 h-4" /> Save Changes</>}
           </button>
-          {saved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}
+          {saved && <StatusText tone="success" size="md">Saved</StatusText>}
         </div>
       </form>
 
       <OwnDetailsCard />
 
       <div className="pt-4 border-t border-base">
-        <h3 className="font-heading font-semibold text-sm text-body mb-1">Change Password</h3>
+        <h3 className="font-heading font-semibold text-sm text-body mb-1">Change password</h3>
         <p className="text-xs text-muted mb-3">
           A password reset link will be sent to {user?.email}.
         </p>
         {resetSent ? (
-          <p className="text-sm text-emerald-600 font-medium">Reset email sent ✓</p>
+          <StatusText tone="success" size="md">Reset email sent</StatusText>
         ) : (
           <button
             type="button"
@@ -189,7 +190,7 @@ export function ProfileSettings() {
             className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold border border-base text-muted hover:bg-page hover:text-body transition-colors flex items-center gap-2"
           >
             <KeyRound className="w-4 h-4" />
-            Send Password Reset Email
+            Send password reset email
           </button>
         )}
       </div>

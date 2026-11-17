@@ -24,10 +24,10 @@ type Responsibility = { id: string; title: string; startDate: string; endDate: s
 const fieldCls =
   'w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body ' +
   'focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal'
-const labelCls = 'block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5'
+const labelCls = 'block text-xs font-heading font-semibold text-muted mb-1.5'
 
 function fmt(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '—'
+  return iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '-'
 }
 
 export function StaffResponsibilities({
@@ -79,7 +79,7 @@ export function StaffResponsibilities({
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted">Responsibilities</p>
+        <p className="font-heading font-semibold text-xs text-muted">Responsibilities</p>
         {canEdit && (
           <button
             type="button"
@@ -108,7 +108,7 @@ export function StaffResponsibilities({
                   <button type="button" onClick={() => open(r)} aria-label={`Edit ${r.title}`} className="p-2 rounded-lg hover:bg-surface text-muted">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
-                  <button type="button" onClick={() => setDeleting(r)} aria-label={`Remove ${r.title}`} className="p-2 rounded-lg hover:bg-surface text-brand-coral">
+                  <button type="button" onClick={() => setDeleting(r)} aria-label={`Remove ${r.title}`} className="p-2 rounded-lg hover:bg-surface text-tone-coral">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -122,6 +122,7 @@ export function StaffResponsibilities({
         <Modal
           title={editing === 'new' ? 'Add responsibility' : 'Edit responsibility'}
           onClose={() => setEditing(null)}
+          size="m"
           busy={busy}
           onSubmit={submit}
           bodyClassName="space-y-4"
@@ -136,7 +137,7 @@ export function StaffResponsibilities({
         >
           <div>
             <label className={labelCls} htmlFor="resp-title">Title</label>
-            <input id="resp-title" className={fieldCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Head of Department (Sciences)" />
+            <input id="resp-title" className={fieldCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Head of Department (Sciences)" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -148,7 +149,7 @@ export function StaffResponsibilities({
               <input id="resp-end" type="date" className={fieldCls} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
             </div>
           </div>
-          {error && <p className="text-sm text-brand-coral" role="alert">{error}</p>}
+          {error && <p className="text-sm text-tone-coral" role="alert">{error}</p>}
         </Modal>
       )}
 

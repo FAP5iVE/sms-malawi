@@ -39,7 +39,7 @@ export function VercelDeploymentsPanel() {
     { key: 'target', label: 'Target', priority: 'important', render: (row) => row.target ?? 'preview' },
     {
       key: 'errorMessage', label: 'Detail', priority: 'important',
-      render: (row) => row.errorMessage ?? (row.url ? row.url : '—'),
+      render: (row) => row.errorMessage ?? (row.url ? row.url : '-'),
     },
     {
       key: 'createdAtVercel', label: 'Created', priority: 'critical',

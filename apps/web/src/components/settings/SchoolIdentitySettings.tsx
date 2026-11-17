@@ -39,6 +39,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { StatusText } from '@/components/shared/StatusText'
 import { Loader2, Save, Plus, X, Building2, ImagePlus } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import { uploadFileDirectly } from '@/lib/directUpload'
@@ -75,7 +76,7 @@ interface DiscoverCardEntry {
 const DISCOVER_CARD_DEFS: { cardKey: DiscoverCardEntry['cardKey']; label: string }[] = [
   { cardKey: 'leadership',   label: 'Leadership' },
   { cardKey: 'academics',    label: 'Academics' },
-  { cardKey: 'student_life', label: 'Student Life' },
+  { cardKey: 'student_life', label: 'Student life' },
   { cardKey: 'admissions',   label: 'Admissions' },
 ]
 
@@ -105,7 +106,7 @@ const inputCls =
   'w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body ' +
   'focus:outline-none focus:ring-2 focus:ring-brand-teal/25'
 const textareaCls = `${inputCls} resize-y min-h-[80px] py-2.5`
-const label = 'block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5'
+const label = 'block text-xs font-heading font-semibold text-muted mb-1.5'
 
 export function SchoolIdentitySettings() {
   const [data, setData]       = useState<SchoolIdentityData>({ coreValues: [], leadershipTeam: [], discoverCards: [] })
@@ -364,7 +365,7 @@ export function SchoolIdentitySettings() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="font-heading font-bold text-lg text-brand-navy">School Identity</h2>
+        <h2 className="font-heading font-bold text-lg text-brand-navy">School identity</h2>
         <p className="text-sm text-muted mt-0.5">
           Controls the school name, hero taglines, vision/mission, contact details, and leadership listing
           shown on the public landing page.
@@ -374,7 +375,7 @@ export function SchoolIdentitySettings() {
       {/* Name & taglines */}
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
-          <label className={label}>School Name</label>
+          <label className={label}>School name</label>
           <input value={data.school_name ?? ''} onChange={(e) => setField('school_name', e.target.value)} className={inputCls} placeholder="SMS Malawi" />
         </div>
         <div>
@@ -386,8 +387,8 @@ export function SchoolIdentitySettings() {
           <input value={data.school_system_tagline ?? ''} onChange={(e) => setField('school_system_tagline', e.target.value)} className={inputCls} placeholder="Secondary School Management System" />
         </div>
         <div>
-          <label className={label}>Hero Subtitle</label>
-          <input value={data.school_hero_subtitle ?? ''} onChange={(e) => setField('school_hero_subtitle', e.target.value)} className={inputCls} placeholder="Excellence in Education — from Form 1 through MSCE." />
+          <label className={label}>Hero subtitle</label>
+          <input value={data.school_hero_subtitle ?? ''} onChange={(e) => setField('school_hero_subtitle', e.target.value)} className={inputCls} placeholder="Excellence in Education: from Form 1 through MSCE." />
         </div>
       </div>
 
@@ -405,15 +406,15 @@ export function SchoolIdentitySettings() {
 
       {/* Core Values */}
       <div>
-        <label className={label}>Core Values</label>
+        <label className={label}>Core values</label>
         <div className="flex flex-wrap gap-2 mb-3">
           {data.coreValues.length === 0 ? (
             <span className="text-xs text-muted">No core values yet.</span>
           ) : (
             data.coreValues.map((v) => (
-              <span key={v} className="inline-flex items-center gap-1.5 bg-page border border-base rounded-full px-3 py-1 text-xs text-body">
+              <span key={v} className="inline-flex items-center gap-1.5 app-tint rounded-lg px-3 py-1 text-xs text-body">
                 {v}
-                <button type="button" onClick={() => removeCoreValue(v)} aria-label={`Remove ${v}`} className="text-muted hover:text-brand-coral">
+                <button type="button" onClick={() => removeCoreValue(v)} aria-label={`Remove ${v}`} className="text-muted hover:text-tone-coral">
                   <X className="w-3 h-3" />
                 </button>
               </span>
@@ -454,7 +455,7 @@ export function SchoolIdentitySettings() {
           "Years of excellence" stat is genuinely computed live from this,
           but until now there was nowhere to actually set it. */}
       <div className="max-w-xs">
-        <label className={label}>Founded Year</label>
+        <label className={label}>Founded year</label>
         <input
           type="number"
           value={data.foundedYear ?? ''}
@@ -469,7 +470,7 @@ export function SchoolIdentitySettings() {
           decorative with no real links in both the old page and the
           redesign. Any left blank simply won't render as a link. */}
       <div>
-        <label className={label}>Social Media Links</label>
+        <label className={label}>Social media links</label>
         <div className="grid sm:grid-cols-2 gap-3">
           {([
             ['social_facebook_url', 'Facebook', 'https://facebook.com/yourschool'],
@@ -500,8 +501,8 @@ export function SchoolIdentitySettings() {
           {/* [FIX] Add/edit/remove now save immediately (see
               persistLeadershipTeam) — this replaces the misleading "looks
               saved but isn't until you also click Save Changes" gap. */}
-          {savingLeadership && <span className="text-[11px] text-muted flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving…</span>}
-          {!savingLeadership && leadershipSaved && <span className="text-[11px] text-brand-teal font-medium">Saved ✓</span>}
+          {savingLeadership && <span className="text-xs text-muted flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving…</span>}
+          {!savingLeadership && leadershipSaved && <span className="text-xs text-tone-teal font-medium">Saved ✓</span>}
         </div>
         {leadershipError && <p className="text-xs text-destructive mb-2">{leadershipError}</p>}
         <div className="space-y-2 mb-4">
@@ -564,7 +565,7 @@ export function SchoolIdentitySettings() {
                       type="button"
                       onClick={saveEditLeader}
                       disabled={!editDraft.name.trim() || !editDraft.title.trim() || uploadingEditPhoto || savingLeadership}
-                      className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold bg-brand-teal text-white hover:bg-brand-teal-light disabled:opacity-40"
+                      className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover disabled:opacity-40"
                     >
                       {savingLeadership ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save'}
                     </button>
@@ -598,10 +599,10 @@ export function SchoolIdentitySettings() {
                     {/* [NEW] Edit — the missing piece; add/remove already
                         existed but there was no way to change an existing
                         member's name/title/bio/photo in place. */}
-                    <button type="button" onClick={() => startEditLeader(i)} disabled={savingLeadership} className="text-xs text-brand-teal hover:underline font-medium disabled:opacity-40">
+                    <button type="button" onClick={() => startEditLeader(i)} disabled={savingLeadership} className="text-xs text-tone-teal hover:underline font-medium disabled:opacity-40">
                       Edit
                     </button>
-                    <button type="button" onClick={() => removeLeader(i)} disabled={savingLeadership} className="text-xs text-brand-coral hover:underline font-medium disabled:opacity-40">
+                    <button type="button" onClick={() => removeLeader(i)} disabled={savingLeadership} className="text-xs text-tone-coral hover:underline font-medium disabled:opacity-40">
                       Remove
                     </button>
                   </div>
@@ -648,7 +649,7 @@ export function SchoolIdentitySettings() {
           upload-immediately-on-pick workflow as the Leadership Team photos
           above, just one fixed slot per card instead of an open list. */}
       <div>
-        <label className={label}>Discover Cards — Preview Images</label>
+        <label className={label}>Discover cards: preview images</label>
         <p className="text-xs text-muted mb-3 -mt-1">
           Shown behind each card in the public landing page&apos;s Discover section, replacing its default colour once set.
         </p>
@@ -684,7 +685,7 @@ export function SchoolIdentitySettings() {
         </div>
       </div>
 
-      {error && <p className="text-sm text-brand-coral">{error}</p>}
+      {error && <p className="text-sm text-tone-coral">{error}</p>}
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -694,7 +695,7 @@ export function SchoolIdentitySettings() {
         >
           {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Changes</>}
         </button>
-        {saved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}
+        {saved && <StatusText tone="success" size="md">Saved</StatusText>}
       </div>
     </div>
   )

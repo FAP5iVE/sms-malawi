@@ -1,7 +1,7 @@
 {
  "src/app/(auth)/announcements/page.tsx": {
-  "digest": "528385041a83530040e21e7ccd0f7daa4ed15c06",
-  "tokens": 354,
+  "digest": "edc3ca53a894041419b2ed8b6bd33797c95ade27",
+  "tokens": 358,
   "items": [
    {
     "k": "call",
@@ -1062,7 +1062,7 @@
   ]
  },
  "src/app/(auth)/hr/[id]/page.tsx": {
-  "digest": "d1a3ef86b62b8f3b9a340460b129dbd39a6a31ee",
+  "digest": "69369dec36b215e23f1c344c8570f25625d29fdd",
   "tokens": 110,
   "items": [
    {
@@ -1088,7 +1088,7 @@
   ]
  },
  "src/app/(auth)/hr/page.tsx": {
-  "digest": "b6d9419cee44485f661d089c98a10fe625ecc9e9",
+  "digest": "05de4c57be37a7d336e6d16a2fc979802422b6b6",
   "tokens": 389,
   "items": [
    {
@@ -1275,7 +1275,7 @@
   ]
  },
  "src/app/(auth)/library/page.tsx": {
-  "digest": "20603077c12414db65fb5d8b49afb6bf716e027a",
+  "digest": "977a97b95558f666fc8d788650406c06351833ca",
   "tokens": 1359,
   "items": [
    {
@@ -2061,7 +2061,7 @@
   ]
  },
  "src/app/(auth)/monitoring/page.tsx": {
-  "digest": "a7fa92610a92021123cd37409ff66050034c5a61",
+  "digest": "f9c94241eb1db6f796e70fb320558b2c3b1e9e6a",
   "tokens": 27,
   "items": [
    {
@@ -2088,7 +2088,7 @@
   ]
  },
  "src/app/(auth)/reports/page.tsx": {
-  "digest": "e8fdff5a4d667429f7d73d717c4adff5fd7b8a7d",
+  "digest": "e486f103f8c21d91b8b1400bee8d285903f3d8f4",
   "tokens": 1410,
   "items": [
    {
@@ -2139,7 +2139,7 @@
   ]
  },
  "src/app/(auth)/settings/_components/HolidaysManager.tsx": {
-  "digest": "6f4187e2a8cc5560f12bd74379ce47660fd5619f",
+  "digest": "8f2670ec14793efb5175f7c2d8dee4eb023528ec",
   "tokens": 76,
   "items": [
    {
@@ -2185,7 +2185,7 @@
   ]
  },
  "src/app/(auth)/settings/page.tsx": {
-  "digest": "3fcd8ead840d1b345149bb886d599566ad2d46d0",
+  "digest": "da9324b4b7bf74377d9a93c0acbf2fa49992968c",
   "tokens": 42,
   "items": [
    {
@@ -3207,7 +3207,7 @@
   "items": []
  },
  "src/components/announcements/AnnouncementForm.tsx": {
-  "digest": "3fa18ce30d8f6c6f198579f0338abd5fbe2030e8",
+  "digest": "c43744548cd0399e903688af181f887f568730b0",
   "tokens": 207,
   "items": [
    {
@@ -3334,7 +3334,7 @@
   ]
  },
  "src/components/approvals/ApprovalDecisionDialog.tsx": {
-  "digest": "6c58af750726d6b4aa9887d04d81ef26e5ce153a",
+  "digest": "7af4e2049c42b8e963ae2237b6a6a7b7b4cbf57b",
   "tokens": 59,
   "items": [
    {
@@ -3396,7 +3396,7 @@
   ]
  },
  "src/components/approvals/ApprovalsCenter.tsx": {
-  "digest": "bcd7be31b9b08349e918d7e4677fd005e125ec1f",
+  "digest": "5a759c13ec94310e59d18822eca70f76dd06e089",
   "tokens": 238,
   "items": [
    {
@@ -3527,7 +3527,7 @@
   ]
  },
  "src/components/approvals/approvalDisplay.tsx": {
-  "digest": "e8b49cf4da9a841cdccb66a0bd076a0043b5701b",
+  "digest": "1fb8358ebbd6467abea02170d6dc535901461d28",
   "tokens": 38,
   "items": []
  },
@@ -4646,8 +4646,8 @@
   ]
  },
  "src/components/classes/assignments/FilterPills.tsx": {
-  "digest": "8e22b3770fe848b93015faf64ee854c3ec50dddc",
-  "tokens": 13,
+  "digest": "65889852ed1a8ba816b14ff61ef788aebbd89c13",
+  "tokens": 14,
   "items": [
    {
     "k": "handler",
@@ -7265,7 +7265,7 @@
   ]
  },
  "src/components/guardians/GuardianOnboardingTab.tsx": {
-  "digest": "06e3accd59f2e08fcc36530e0e285414b17459c5",
+  "digest": "f8ae42957eba9833e1e3673f5c982330e0424bb3",
   "tokens": 178,
   "items": [
    {
@@ -7341,8 +7341,8 @@
   ]
  },
  "src/components/guardians/GuardianQueueTab.tsx": {
-  "digest": "4f81fbeb59dd0dd2d1522db597c16b45768327cc",
-  "tokens": 68,
+  "digest": "2b8860df5a50c9dd4e4d91d3292b6fdb0655c0bb",
+  "tokens": 66,
   "items": [
    {
     "k": "handler",
@@ -7435,7 +7435,7 @@
   ]
  },
  "src/components/hr/StaffForm.tsx": {
-  "digest": "492c82ef679b8f850eb1255c437b65685bd04a61",
+  "digest": "d91bd1d1572add33cd7f24e901e2f1721967fac5",
   "tokens": 511,
   "items": [
    {
@@ -7536,7 +7536,7 @@
   ]
  },
  "src/components/hr/StaffResponsibilities.tsx": {
-  "digest": "71769b1be36fac3dbe37e6ace40ff71e77822cc4",
+  "digest": "24252165cd5a52ffb759c171c57be1835b5d6e2f",
   "tokens": 106,
   "items": [
    {
@@ -7597,7 +7597,7 @@
   ]
  },
  "src/components/hr/TerminateStaffModal.tsx": {
-  "digest": "b5d8d0778f6a994cccd866b9b7b32842c1992245",
+  "digest": "32ea644d29004c67af9d49e2587c1b4f1e0fe826",
   "tokens": 56,
   "items": [
    {
@@ -7719,7 +7719,7 @@
   ]
  },
  "src/components/library/MyLibrary.tsx": {
-  "digest": "3bce79ab6abb522b9196d5ce952fdf906faf20d6",
+  "digest": "a4ed1310f740a2fcd9676236d19b886c841d45eb",
   "tokens": 169,
   "items": [
    {
@@ -7760,7 +7760,7 @@
   ]
  },
  "src/components/monitoring/AlertsPanel.tsx": {
-  "digest": "0493ab788f1d5a0a85ba5e23d5be91ef765fce37",
+  "digest": "624ab12a9cbaca057416b1a52371cbf0b66f8a6b",
   "tokens": 22,
   "items": [
    {
@@ -7771,8 +7771,8 @@
   ]
  },
  "src/components/monitoring/ErrorsOutagesPanel.tsx": {
-  "digest": "8c321c58f5474e5830a969b3bb27b277ae37bbd1",
-  "tokens": 37,
+  "digest": "622c972030b1207b53b1ce5728278dd80d345e24",
+  "tokens": 38,
   "items": [
    {
     "k": "handler",
@@ -7787,7 +7787,7 @@
   ]
  },
  "src/components/monitoring/FeedbackPanel.tsx": {
-  "digest": "26a994a35132be0171cfb2724e3e3ff83c1da391",
+  "digest": "612dda822a8d03a28865067ef1498960534cdbc1",
   "tokens": 25,
   "items": [
    {
@@ -7803,8 +7803,8 @@
   ]
  },
  "src/components/monitoring/LogsPanel.tsx": {
-  "digest": "86c438ad7c3049d321aecb18c80112bb79305b92",
-  "tokens": 28,
+  "digest": "72e3e160a08240ba07f102a3de8ac844406c18eb",
+  "tokens": 29,
   "items": [
    {
     "k": "handler",
@@ -7819,12 +7819,12 @@
   ]
  },
  "src/components/monitoring/MonitoringKpiStrip.tsx": {
-  "digest": "69b5b1de95f9a0ff376e7dd1540eb4ee8afc38a2",
+  "digest": "473f4da28130c2245a6a730c87ab934233bb8acc",
   "tokens": 50,
   "items": []
  },
  "src/components/monitoring/ReleasesPanel.tsx": {
-  "digest": "7ebca802a7dd3ef5f105e1d1570a34b9b60612e3",
+  "digest": "c3ed18936b7ffd051c7501b08a5aae60793570ff",
   "tokens": 27,
   "items": []
  },
@@ -7834,7 +7834,7 @@
   "items": []
  },
  "src/components/monitoring/VercelAlertsPanel.tsx": {
-  "digest": "6df19359336a658f2d68060fefccc5395609442b",
+  "digest": "ab5dfe6a51b762efcc90baaaba91c0fb45a17647",
   "tokens": 23,
   "items": [
    {
@@ -7845,13 +7845,13 @@
   ]
  },
  "src/components/monitoring/VercelDeploymentsPanel.tsx": {
-  "digest": "412d85d4b04c190a40f2e6539b63d83bdd89e7d6",
+  "digest": "27eebfcb1e6a0827e9b9fde84b13038c663da6ea",
   "tokens": 15,
   "items": []
  },
  "src/components/monitoring/VercelErrorsPanel.tsx": {
-  "digest": "723b165d6b3b3671df31b4d2bdb4a9dc17e6e2b5",
-  "tokens": 27,
+  "digest": "298dbec581d694774152dc26c4edd60506c32e8d",
+  "tokens": 28,
   "items": [
    {
     "k": "handler",
@@ -7866,7 +7866,7 @@
   ]
  },
  "src/components/monitoring/VercelPlatformPanel.tsx": {
-  "digest": "e1bbc89b80b2c05d608fe7bafc0f7d12902eb90b",
+  "digest": "b3fc415be13b25f342527e17adb0dce572a8d2bd",
   "tokens": 49,
   "items": [
    {
@@ -8398,7 +8398,7 @@
   ]
  },
  "src/components/reports/AdminSessionsPanel.tsx": {
-  "digest": "7e59c358a6897ef67ec7f47953dce2ac52cebaee",
+  "digest": "e02a33a50524915d38f68f7b35fa6c6ebd53e89c",
   "tokens": 270,
   "items": [
    {
@@ -8469,7 +8469,7 @@
   ]
  },
  "src/components/reports/panels/AcademicPanels.tsx": {
-  "digest": "a8beb701b00ca3b36b9b2ba3843b6b766a0951e1",
+  "digest": "7f6f54797517cffb777cf44e43dd0ead410e0403",
   "tokens": 137,
   "items": [
    {
@@ -8505,7 +8505,7 @@
   ]
  },
  "src/components/reports/panels/AdminPanels.tsx": {
-  "digest": "df0450e35b7c131e20c95f5fc08a190209e474c5",
+  "digest": "c57887ffae42faccc63933bb9d89a27d1a004be7",
   "tokens": 302,
   "items": [
    {
@@ -8586,7 +8586,7 @@
   ]
  },
  "src/components/reports/panels/AdmissionsPanels.tsx": {
-  "digest": "14ed70c0802a3754f11ab9b9a72d1f0678ebb882",
+  "digest": "6d2075449a557f6d76603187c15566030ce82a05",
   "tokens": 118,
   "items": [
    {
@@ -8618,7 +8618,7 @@
   ]
  },
  "src/components/reports/panels/ExamPanels.tsx": {
-  "digest": "c3e8c5aab042c2afe1462d54b823953df7e02b2e",
+  "digest": "bd5da9e9e67bf10477139bb5c0618516e6f663c6",
   "tokens": 193,
   "items": [
    {
@@ -8669,7 +8669,7 @@
   ]
  },
  "src/components/reports/panels/ExecutivePanels.tsx": {
-  "digest": "cd752dd02b989feae590a9132e0be335d3d4655b",
+  "digest": "f594321fcfbe68200a48c71b508f0643562c7876",
   "tokens": 73,
   "items": [
    {
@@ -8690,7 +8690,7 @@
   ]
  },
  "src/components/reports/panels/FinancePanels.tsx": {
-  "digest": "e3659c50467c970ee6cec98cc71d516b7c9562e7",
+  "digest": "e1ffcf87da099ba5acf0a8371ecb51a9f3302afd",
   "tokens": 102,
   "items": [
    {
@@ -8716,7 +8716,7 @@
   ]
  },
  "src/components/reports/panels/HrPanels.tsx": {
-  "digest": "c9b88b76419e5720e3bb850f8ec294a0b4cec5bf",
+  "digest": "61f2599f32bc21f38f799f6912643a3e50dbf623",
   "tokens": 189,
   "items": [
    {
@@ -8747,7 +8747,7 @@
   ]
  },
  "src/components/reports/panels/LibraryPanels.tsx": {
-  "digest": "557e4fcf5105ab56c9600418e512bfcc1778d64f",
+  "digest": "700ed79bb3274eb0bc2b692dcc86cd04d66920bb",
   "tokens": 326,
   "items": [
    {
@@ -8863,7 +8863,7 @@
   ]
  },
  "src/components/reports/panels/OperationsPanels.tsx": {
-  "digest": "26a775c2eb347be5bb4576ed51446306be665318",
+  "digest": "da581abaa1358334cb19d33261a94966bf676553",
   "tokens": 473,
   "items": [
    {
@@ -9074,7 +9074,7 @@
   ]
  },
  "src/components/reports/panels/StudentPanels.tsx": {
-  "digest": "4335ab9c30193c344b660245684cdf820c4ad84e",
+  "digest": "38e9cadddae2a61a30e3c91a6b01e64274724cc1",
   "tokens": 188,
   "items": [
    {
@@ -9141,7 +9141,7 @@
   "items": []
  },
  "src/components/reports/ui/InsightList.tsx": {
-  "digest": "ce515bc5674b9b97605a12472df5dff00289521e",
+  "digest": "a6957f1c43687d7398fa7368443f6e65ed46653b",
   "tokens": 54,
   "items": [
    {
@@ -9157,7 +9157,7 @@
   "items": []
  },
  "src/components/reports/ui/ReportExport.tsx": {
-  "digest": "ac203cd48bb5355fe45b1cd4adc0cedbb3bdf36f",
+  "digest": "81e7a71bd619c0745645c2bf21799389b516d923",
   "tokens": 138,
   "items": [
    {
@@ -9224,12 +9224,12 @@
   "items": []
  },
  "src/components/reports/ui/ReportKpiStrip.tsx": {
-  "digest": "1bfbbc0a1510dfc9b28492920b14bae47975aebf",
-  "tokens": 51,
+  "digest": "f0fa59c2dd4afc2d9bfafa1ff7c58c91dbadcff1",
+  "tokens": 53,
   "items": []
  },
  "src/components/reports/ui/ReportStates.tsx": {
-  "digest": "7e325daaff96651fcd2f2777ebf46f4f5d742b97",
+  "digest": "2a7113114fdc8237e8a9753ab867bcbcfc239b47",
   "tokens": 28,
   "items": [
    {
@@ -9245,7 +9245,7 @@
   ]
  },
  "src/components/reports/ui/ReportTable.tsx": {
-  "digest": "593620e57717915fb292188caa4f44e573af350f",
+  "digest": "55f05e792880bc060acecee74b427a10dca1ea44",
   "tokens": 71,
   "items": [
    {
@@ -9271,8 +9271,8 @@
   "items": []
  },
  "src/components/settings/AcademicPolicySettings.tsx": {
-  "digest": "2d573bbdd66484839d8c4cd53c8fe5657d4b038a",
-  "tokens": 67,
+  "digest": "2b01b2705fb36ba9fcac9a36053a189c9424e973",
+  "tokens": 68,
   "items": [
    {
     "k": "call",
@@ -9373,8 +9373,8 @@
   ]
  },
  "src/components/settings/ClassroomSettings.tsx": {
-  "digest": "493e1ef3672117b7a532b8da533566c8d2f395b6",
-  "tokens": 61,
+  "digest": "424e8c40edac151728833d121748310633a1dced",
+  "tokens": 62,
   "items": [
    {
     "k": "call",
@@ -9419,8 +9419,8 @@
   ]
  },
  "src/components/settings/ExamGradingSettings.tsx": {
-  "digest": "f64dd84f2cf55162ec6db11785f4e21eb520cc09",
-  "tokens": 157,
+  "digest": "7be5de378a55388f3a0fa7ae739da39050e2d218",
+  "tokens": 158,
   "items": [
    {
     "k": "call",
@@ -9510,8 +9510,8 @@
   ]
  },
  "src/components/settings/FinanceSettings.tsx": {
-  "digest": "b79f171858cfd2d966b08d0b96de38572d59811b",
-  "tokens": 131,
+  "digest": "e4c973887721e951c0aa25a5b4b5a7c5a31f069c",
+  "tokens": 132,
   "items": [
    {
     "k": "call",
@@ -9611,8 +9611,8 @@
   ]
  },
  "src/components/settings/HRDepartmentsSettings.tsx": {
-  "digest": "59451922f7564057638e15a01831fd60cf8a9212",
-  "tokens": 125,
+  "digest": "eb1617188f2ebbca5181e236f1947019fd4b8212",
+  "tokens": 126,
   "items": [
    {
     "k": "call",
@@ -9687,8 +9687,8 @@
   ]
  },
  "src/components/settings/LibrarySettings.tsx": {
-  "digest": "e6f6508cf27d82eeed5a2b7e6ef820620718c838",
-  "tokens": 60,
+  "digest": "404ed5b15ecbd49a11c5105476d8d6bdff04b6eb",
+  "tokens": 61,
   "items": [
    {
     "k": "call",
@@ -9728,8 +9728,8 @@
   ]
  },
  "src/components/settings/NotificationSettings.tsx": {
-  "digest": "94bacdbfe4300b677f94afb9f4cb43fef69230be",
-  "tokens": 68,
+  "digest": "998d647d922959875e28d6317db378766e410e70",
+  "tokens": 69,
   "items": [
    {
     "k": "call",
@@ -9764,8 +9764,8 @@
   ]
  },
  "src/components/settings/ProfileSettings.tsx": {
-  "digest": "26c74f647bc92e5cd40b8d9aa14819929b0e6ab2",
-  "tokens": 104,
+  "digest": "2778dd96941d2c411c43b2035e9f21662ab79163",
+  "tokens": 106,
   "items": [
    {
     "k": "handler",
@@ -9810,8 +9810,8 @@
   ]
  },
  "src/components/settings/SchoolIdentitySettings.tsx": {
-  "digest": "58989b7cdb2afd4319bdeba8ecae7ba000f3289d",
-  "tokens": 291,
+  "digest": "67a16ed537d1e9fb089dbe369dbc62b45ae7b3a9",
+  "tokens": 292,
   "items": [
    {
     "k": "call",
@@ -9986,8 +9986,8 @@
   ]
  },
  "src/components/settings/SystemConfigSettings.tsx": {
-  "digest": "33a1d696ac2037f76647a74ef17041c63f3951a6",
-  "tokens": 49,
+  "digest": "d08b98358a0464676b6931663196b15989316595",
+  "tokens": 50,
   "items": [
    {
     "k": "call",

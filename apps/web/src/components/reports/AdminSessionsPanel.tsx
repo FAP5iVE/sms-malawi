@@ -59,7 +59,7 @@ function displayLabel(s: ApiUserSession): string {
 }
 
 function identifierLabel(s: ApiUserSession): string {
-  return s.employeeNo ?? s.registrationNo ?? '—'
+  return s.employeeNo ?? s.registrationNo ?? '-'
 }
 
 function formatDateTime(iso: string, withSeconds = false): string {
@@ -98,7 +98,7 @@ function pageWindow(current: number, total: number): (number | null)[] {
 }
 
 function formatValue(v: unknown): string {
-  if (v === null || v === undefined) return '—'
+  if (v === null || v === undefined) return '-'
   const text = typeof v === 'string' ? v : JSON.stringify(v)
   return text.length > 200 ? `${text.slice(0, 200)}…` : text
 }
@@ -110,8 +110,8 @@ function formatValue(v: unknown): string {
 
 function SessionKpiCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="bg-surface border border-base rounded-2xl p-5 flex flex-col gap-1">
-      <p className="text-xs font-medium text-muted uppercase tracking-wide">{label}</p>
+    <div className="app-tint rounded-xl p-5 flex flex-col gap-1">
+      <p className="text-xs font-medium text-muted">{label}</p>
       <p className="text-2xl font-bold font-heading text-brand-navy">{value}</p>
     </div>
   )
@@ -133,7 +133,7 @@ const SEVERITY_STYLE: Record<ApiSessionAuditEntry['severity'], string> = {
 function DetailItem({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-medium text-muted uppercase tracking-wide">{label}</dt>
+      <dt className="text-xs font-medium text-muted">{label}</dt>
       <dd className="text-sm text-body mt-0.5 break-words">{children}</dd>
     </div>
   )
@@ -167,7 +167,7 @@ function Pager({
               onClick={() => onChange(p)}
               aria-current={p === page ? 'page' : undefined}
               className={`hidden sm:inline-block min-w-[36px] min-h-[36px] px-2 rounded-lg text-sm border ${
-                p === page ? 'bg-brand-teal text-white border-brand-teal font-semibold' : 'border-base hover:bg-page'
+                p === page ? 'bg-btn-brand text-btn-brand-fg border-brand-teal font-semibold' : 'border-base hover:bg-page'
               }`}
             >
               {p}
@@ -198,11 +198,11 @@ function EntryDetails({ metadata }: { metadata: NonNullable<ApiSessionAuditEntry
     <div className="space-y-3 text-xs">
       {changes.length > 0 && (
         <div>
-          <p className="font-semibold text-muted uppercase tracking-wide text-[10px] mb-1">Changes</p>
+          <p className="font-semibold text-muted text-xs mb-1">Changes</p>
           <ul className="space-y-0.5">
             {changes.map((c) => (
               <li key={c.field} className="break-words">
-                <span className="font-mono text-brand-teal">{c.field}</span>
+                <span className="font-mono text-tone-teal">{c.field}</span>
                 {': '}<span className="text-muted line-through">{formatValue(c.oldValue)}</span>
                 {' → '}<span className="text-body">{formatValue(c.newValue)}</span>
               </li>
@@ -212,7 +212,7 @@ function EntryDetails({ metadata }: { metadata: NonNullable<ApiSessionAuditEntry
       )}
       {context.length > 0 && (
         <div>
-          <p className="font-semibold text-muted uppercase tracking-wide text-[10px] mb-1">Context</p>
+          <p className="font-semibold text-muted text-xs mb-1">Context</p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
             {context.map(([k, v]) => (
               <Fragment key={k}>
@@ -227,13 +227,13 @@ function EntryDetails({ metadata }: { metadata: NonNullable<ApiSessionAuditEntry
         <div className="grid gap-3 sm:grid-cols-2">
           {hasBefore && (
             <div>
-              <p className="font-semibold text-muted uppercase tracking-wide text-[10px] mb-1">Before</p>
+              <p className="font-semibold text-muted text-xs mb-1">Before</p>
               <pre className="max-h-40 overflow-auto rounded-lg bg-surface border border-base p-2 whitespace-pre-wrap break-words">{JSON.stringify(metadata.before, null, 2)}</pre>
             </div>
           )}
           {hasAfter && (
             <div>
-              <p className="font-semibold text-muted uppercase tracking-wide text-[10px] mb-1">After</p>
+              <p className="font-semibold text-muted text-xs mb-1">After</p>
               <pre className="max-h-40 overflow-auto rounded-lg bg-surface border border-base p-2 whitespace-pre-wrap break-words">{JSON.stringify(metadata.after, null, 2)}</pre>
             </div>
           )}
@@ -270,8 +270,8 @@ function SessionDetailModal({ sessionId, onClose }: { sessionId: string; onClose
 
   return (
     <Modal
-      size="2xl"
-      title={session ? `Session — ${displayLabel(session)}` : 'Session details'}
+      size="l"
+      title={session ? `Session: ${displayLabel(session)}` : 'Session details'}
       description={
         session
           ? `${formatDateTime(session.loginAt)} → ${session.loggedOutAt ? formatDateTime(session.loggedOutAt) : session.isActiveNow ? 'now' : formatDateTime(session.lastSeenAt)}`
@@ -289,18 +289,18 @@ function SessionDetailModal({ sessionId, onClose }: { sessionId: string; onClose
         <p className="text-center py-8 text-sm text-muted">Could not load this session. Close and try again.</p>
       ) : (
         <>
-          <dl className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3 rounded-2xl border border-base bg-page p-4">
+          <dl className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3 rounded-xl app-tint p-4">
             <DetailItem label="Status">
-              <span className={`font-semibold ${session.isActiveNow ? 'text-brand-teal' : 'text-muted'}`}>{statusLabel(session)}</span>
+              <span className={`font-semibold ${session.isActiveNow ? 'text-tone-teal' : 'text-muted'}`}>{statusLabel(session)}</span>
             </DetailItem>
             <DetailItem label="Role">{session.role}</DetailItem>
             <DetailItem label="Employee / Reg. No.">
               <span className="font-mono text-xs">{identifierLabel(session)}</span>
             </DetailItem>
-            <DetailItem label="Email">{session.email ?? '—'}</DetailItem>
+            <DetailItem label="Email">{session.email ?? '-'}</DetailItem>
             <DetailItem label="Signed in">{formatDateTime(session.loginAt, true)}</DetailItem>
             <DetailItem label="Last active">{formatDateTime(session.lastSeenAt, true)}</DetailItem>
-            <DetailItem label="Signed out">{session.loggedOutAt ? formatDateTime(session.loggedOutAt, true) : '—'}</DetailItem>
+            <DetailItem label="Signed out">{session.loggedOutAt ? formatDateTime(session.loggedOutAt, true) : '-'}</DetailItem>
             <DetailItem label="Active for">{formatDuration(session.durationMs)}</DetailItem>
             <DetailItem label="How it ended">{endReasonLabel(session)}</DetailItem>
           </dl>
@@ -326,7 +326,7 @@ function SessionDetailModal({ sessionId, onClose }: { sessionId: string; onClose
                   <thead>
                     <tr className="bg-page border-b border-base">
                       {['Time', 'Action', 'Record', 'Severity', ''].map((h, i) => (
-                        <th key={`${h}-${i}`} className="px-3 py-2.5 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap">{h}</th>
+                        <th key={`${h}-${i}`} className="px-3 py-2.5 text-left text-xs font-heading font-semibold text-muted whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -338,15 +338,15 @@ function SessionDetailModal({ sessionId, onClose }: { sessionId: string; onClose
                         <Fragment key={entry.id}>
                           <tr className="hover:bg-page transition-colors">
                             <td className="px-3 py-2.5 text-xs text-muted whitespace-nowrap">{formatDateTime(entry.createdAt, true)}</td>
-                            <td className="px-3 py-2.5 font-mono text-xs text-brand-teal break-all">{entry.action}</td>
+                            <td className="px-3 py-2.5 font-mono text-xs text-tone-teal break-all">{entry.action}</td>
                             <td className="px-3 py-2.5 text-xs">
                               <span className="block">{entry.entityType}</span>
-                              <span className="font-mono text-[11px] text-muted">
+                              <span className="font-mono text-xs text-muted">
                                 <CopyableId value={entry.entityId} display={entry.entityId.length > 14 ? `${entry.entityId.slice(0, 12)}…` : entry.entityId} />
                               </span>
                             </td>
                             <td className="px-3 py-2.5">
-                              <span className={`text-[10px] font-semibold ${SEVERITY_STYLE[entry.severity]}`}>{entry.severity}</span>
+                              <span className={`text-xs font-semibold ${SEVERITY_STYLE[entry.severity]}`}>{entry.severity}</span>
                             </td>
                             <td className="px-3 py-2.5 text-right">
                               {expandable && (
@@ -437,7 +437,7 @@ export function AdminSessionsPanel() {
       render: (s) => <span className="text-xs">{s.role}</span>,
     },
     {
-      key: 'loginAt', label: 'Logged In', priority: 'important',
+      key: 'loginAt', label: 'Logged in', priority: 'important',
       render: (s) => (
         <span className="text-xs text-muted whitespace-nowrap">
           {formatDateTime(s.loginAt)}
@@ -445,13 +445,13 @@ export function AdminSessionsPanel() {
       ),
     },
     {
-      key: 'durationMs', label: 'Active For', priority: 'critical',
+      key: 'durationMs', label: 'Active for', priority: 'critical',
       render: (s) => <span className="text-xs font-medium text-body">{formatDuration(s.durationMs)}</span>,
     },
     {
       key: 'isActiveNow', label: 'Status', priority: 'critical',
       render: (s) => (
-        <span className={`text-xs font-semibold ${s.isActiveNow ? 'text-brand-teal' : 'text-muted'}`}>
+        <span className={`text-xs font-semibold ${s.isActiveNow ? 'text-tone-teal' : 'text-muted'}`}>
           {statusLabel(s)}
         </span>
       ),
@@ -466,10 +466,10 @@ export function AdminSessionsPanel() {
             disabled={!canTerminate || !s.isActiveNow || isSelf || forceLogout.isPending}
             onClick={(e) => { e.stopPropagation(); setPendingForceLogout(s) }}
             title={isSelf ? "Sign yourself out from the account menu instead" : s.isActiveNow ? 'Force logout' : 'Session already ended'}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-brand-coral hover:bg-brand-coral/10 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-tone-coral hover:bg-brand-coral/10 disabled:opacity-40 disabled:pointer-events-none transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" aria-hidden />
-            Force Logout
+            Force logout
           </button>
         )
       },
@@ -479,10 +479,10 @@ export function AdminSessionsPanel() {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <SessionKpiCard label="Active Now" value={summary?.activeNow ?? '—'} />
-        <SessionKpiCard label="Active — Last 10 min" value={summary?.last10m ?? '—'} />
-        <SessionKpiCard label="Active — Last 30 min" value={summary?.last30m ?? '—'} />
-        <SessionKpiCard label="Active — Last Hour" value={summary?.last1h ?? '—'} />
+        <SessionKpiCard label="Active now" value={summary?.activeNow ?? '-'} />
+        <SessionKpiCard label="Active: Last 10 min" value={summary?.last10m ?? '-'} />
+        <SessionKpiCard label="Active: Last 30 min" value={summary?.last30m ?? '-'} />
+        <SessionKpiCard label="Active: last hour" value={summary?.last1h ?? '-'} />
       </div>
 
       {!canTerminate && (
@@ -520,7 +520,7 @@ export function AdminSessionsPanel() {
         open={pendingForceLogout !== null}
         title={`Force logout ${pendingForceLogout ? displayLabel(pendingForceLogout) : 'this user'}?`}
         description="They will be signed out of every device on their next request. They can sign back in immediately with their existing password."
-        confirmLabel="Force Logout"
+        confirmLabel="Force logout"
         destructive
         confirming={forceLogout.isPending}
         confirmingLabel="Signing out…"

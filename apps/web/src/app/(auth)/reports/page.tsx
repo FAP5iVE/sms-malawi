@@ -293,7 +293,7 @@ const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNo
     { id: 'aging', label: 'Aging', icon: I.alert },
     { id: 'payments', label: 'Payments', icon: I.money },
     { id: 'expenses', label: 'Expenses', icon: I.chart },
-    { id: 'cashflow', label: 'Cash Flow', icon: I.activity },
+    { id: 'cashflow', label: 'Cash flow', icon: I.activity },
     { id: 'payroll', label: 'Payroll', icon: I.money },
     { id: 'scholarships', label: 'Scholarships', icon: I.grad },
     { id: 'procurement', label: 'Procurement', icon: I.doc },
@@ -320,12 +320,12 @@ const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNo
     { id: 'assignments', label: 'Assignments', icon: I.doc },
     { id: 'marks', label: 'Marks', icon: I.activity },
     { id: 'students', label: 'Students', icon: I.alert },
-    { id: 'readiness', label: 'Exam Readiness', icon: I.grad },
+    { id: 'readiness', label: 'Exam readiness', icon: I.grad },
     { id: 'attendance', label: 'Attendance', icon: I.users },
     { id: 'summary', label: 'My Classes', icon: I.grad },
   ],
   exam_officer: [
-    { id: 'completion', label: 'Mark Completion', icon: I.activity },
+    { id: 'completion', label: 'Mark completion', icon: I.activity },
     { id: 'pipeline', label: 'Workflow', icon: I.trend },
     { id: 'maneb', label: 'MANEB', icon: I.grad },
     { id: 'candidates', label: 'Candidates', icon: I.users },
@@ -339,7 +339,7 @@ const ROLE_TABS: Record<string, { id: string; label: string; icon: React.ReactNo
     { id: 'leave', label: 'Leave', icon: I.activity },
     { id: 'contracts', label: 'Contracts', icon: I.alert },
     { id: 'teaching', label: 'Teaching', icon: I.users },
-    { id: 'loans', label: 'Staff Loans', icon: I.money },
+    { id: 'loans', label: 'Staff loans', icon: I.money },
     { id: 'reviews', label: 'Reviews', icon: I.doc },
   ],
   student: [
@@ -390,19 +390,17 @@ function KpiCard({
   warn?: boolean
 }) {
   return (
-    <div
-      className={`bg-surface border rounded-2xl p-5 flex flex-col gap-1 ${warn ? 'border-brand-coral/40' : 'border-base'}`}
-    >
-      <p className="text-xs font-medium text-muted uppercase tracking-wide">{label}</p>
+    <div className="app-tint rounded-xl p-5 flex flex-col gap-1">
+      <p className="text-xs font-medium text-muted">{label}</p>
       <p
-        className={`text-2xl font-bold font-heading ${warn ? 'text-brand-coral' : 'text-brand-navy'}`}
+        className={`text-2xl font-bold font-heading ${warn ? 'text-tone-coral' : 'text-brand-navy'}`}
       >
         {value}
       </p>
       {(sub || trend) && (
         <div className="flex items-center gap-1 mt-0.5">
-          {trend === 'up' && <ArrowUpRight className="w-3.5 h-3.5 text-brand-teal" />}
-          {trend === 'down' && <ArrowDownRight className="w-3.5 h-3.5 text-brand-coral" />}
+          {trend === 'up' && <ArrowUpRight className="w-3.5 h-3.5 text-tone-teal" />}
+          {trend === 'down' && <ArrowDownRight className="w-3.5 h-3.5 text-tone-coral" />}
           {sub && <span className="text-xs text-muted">{sub}</span>}
         </div>
       )}
@@ -432,7 +430,7 @@ function ChartCard({
 function SectionHeader({ title, icon }: { title: string; icon: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-1">
-      <span className="text-brand-teal">{icon}</span>
+      <span className="text-tone-teal">{icon}</span>
       <h2 className="font-heading font-bold text-brand-navy text-base">{title}</h2>
     </div>
   )
@@ -516,18 +514,18 @@ function AdminOverviewPanel() {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <KpiCard label="Total Students" value={base?.totalStudents ?? '—'} />
-        <KpiCard label="Active Students" value={base?.activeStudents ?? '—'} trend="up" />
-        <KpiCard label="Active Staff" value={base?.totalStaff ?? '—'} />
-        <KpiCard label="Total Invoices" value={base?.totalInvoices ?? '—'} />
-        <KpiCard label="Paid Invoices" value={base?.paidInvoices ?? '—'} trend="up" />
-        <KpiCard label="Total Exams" value={base?.totalExams ?? '—'} />
+        <KpiCard label="Total students" value={base?.totalStudents ?? '-'} />
+        <KpiCard label="Active students" value={base?.activeStudents ?? '-'} trend="up" />
+        <KpiCard label="Active staff" value={base?.totalStaff ?? '-'} />
+        <KpiCard label="Total invoices" value={base?.totalInvoices ?? '-'} />
+        <KpiCard label="Paid invoices" value={base?.paidInvoices ?? '-'} trend="up" />
+        <KpiCard label="Total exams" value={base?.totalExams ?? '-'} />
       </div>
 
       {vLoading ? (
         <SkeletonChart />
       ) : (
-        <ChartCard title="System Write Activity — Last 30 Days">
+        <ChartCard title="System write activity: Last 30 days">
           <ResponsiveContainer width="100%" height={180}>
             <AreaChart data={volume ?? []}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -556,7 +554,7 @@ function AdminOverviewPanel() {
         <SkeletonChart />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartCard title="Activity by Entity Type">
+          <ChartCard title="Activity by entity type">
             {entity && entity.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={entity} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
@@ -581,7 +579,7 @@ function AdminOverviewPanel() {
               <EmptyState />
             )}
           </ChartCard>
-          <ChartCard title="Top Action Types">
+          <ChartCard title="Top action types">
             <AdminActionBreakdownChart />
           </ChartCard>
         </div>
@@ -623,7 +621,7 @@ function AdminHeatmapPanel() {
   const maxVal = Math.max(...cells.map((c) => c.count), 1)
 
   return (
-    <ChartCard title="Activity Heatmap — Hour × Day of Week">
+    <ChartCard title="Activity heatmap: hour × day of week">
       <div className="overflow-x-auto">
         <table className="min-w-full text-xs text-center">
           <thead>
@@ -651,7 +649,7 @@ function AdminHeatmapPanel() {
                           backgroundColor: `rgba(14,138,106,${intensity / 100})`,
                           minHeight: '20px',
                         }}
-                        title={`${day} ${h}:00 — ${cell?.count ?? 0} actions`}
+                        title={`${day} ${h}:00: ${cell?.count ?? 0} actions`}
                       />
                     </td>
                   )
@@ -732,9 +730,9 @@ function AdminAuditPanel() {
     { label: 'Action', value: (l) => l.action },
     { label: 'Entity', value: (l) => l.entityType },
     { label: 'Entity ID', value: (l) => l.entityId },
-    { label: 'Actor Name', value: (l) => l.actorName ?? '' },
-    { label: 'Employee No.', value: (l) => l.actorEmployeeNo ?? '' },
-    { label: 'Reg. No.', value: (l) => l.actorRegistrationNo ?? '' },
+    { label: 'Actor name', value: (l) => l.actorName ?? '' },
+    { label: 'Employee no.', value: (l) => l.actorEmployeeNo ?? '' },
+    { label: 'Reg. no.', value: (l) => l.actorRegistrationNo ?? '' },
     { label: 'Actor', value: (l) => l.actorUid },
     { label: 'Role', value: (l) => l.actorRole },
     { label: 'Time', value: (l) => l.createdAt },
@@ -789,7 +787,7 @@ function AdminAuditPanel() {
                 {AUDIT_HEADERS.map((h) => (
                   <th
                     key={h.key}
-                    className="relative px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap select-none"
+                    className="relative px-4 py-3 text-left text-xs font-heading font-semibold text-muted whitespace-nowrap select-none"
                   >
                     {h.label}
                     {/* Drag handle — grab the right edge of any header to
@@ -807,7 +805,7 @@ function AdminAuditPanel() {
             <tbody className="divide-y divide-base">
               {audit?.logs.map((log) => (
                 <tr key={log.id} className="hover:bg-page transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-brand-teal truncate">
+                  <td className="px-4 py-3 font-mono text-xs text-tone-teal truncate">
                     {log.action}
                   </td>
                   <td className="px-4 py-3 text-xs truncate">{log.entityType}</td>
@@ -826,11 +824,11 @@ function AdminAuditPanel() {
                   <td className="px-4 py-3 text-xs overflow-hidden">
                     <CopyableId
                       value={log.actorUid}
-                      display={log.actorName ?? <span className="text-muted">—</span>}
+                      display={log.actorName ?? <span className="text-muted">-</span>}
                     />
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-muted truncate">
-                    {log.actorEmployeeNo ?? log.actorRegistrationNo ?? <span>—</span>}
+                    {log.actorEmployeeNo ?? log.actorRegistrationNo ?? <span>-</span>}
                   </td>
                   <td className="px-4 py-3 truncate">
                     <span className="text-xs">{log.actorRole}</span>
@@ -879,7 +877,7 @@ function AdminAuditPanel() {
                   aria-current={p === safePage ? 'page' : undefined}
                   className={`min-w-[36px] min-h-[36px] px-2 rounded-lg text-sm border ${
                     p === safePage
-                      ? 'bg-brand-teal text-white border-brand-teal font-semibold'
+                      ? 'bg-btn-brand text-btn-brand-fg border-brand-teal font-semibold'
                       : 'border-base hover:bg-page'
                   }`}
                 >
@@ -927,18 +925,18 @@ function HighRankPerformancePanel({ academicYear, term }: { academicYear: string
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiCard
-          label="Pass Rate (Term)"
-          value={passRate !== null ? `${passRate}%` : '—'}
+          label="Pass rate (term)"
+          value={passRate !== null ? `${passRate}%` : '-'}
           trend="up"
         />
-        <KpiCard label="School Avg (Term)" value={avgScore !== null ? `${avgScore}%` : '—'} />
-        <KpiCard label="Students Assessed" value={current?.[0]?.total ?? '—'} />
-        <KpiCard label="Academic Year" value={academicYear} />
+        <KpiCard label="School avg (term)" value={avgScore !== null ? `${avgScore}%` : '-'} />
+        <KpiCard label="Students assessed" value={current?.[0]?.total ?? '-'} />
+        <KpiCard label="Academic year" value={academicYear} />
       </div>
       {tl ? (
         <SkeletonChart />
       ) : (
-        <ChartCard title="School Pass Rate Trend — All Terms">
+        <ChartCard title="School pass rate trend: all terms">
           {trend && trend.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={trend.map((t) => ({ ...t, label: `${t.academicYear} T${t.term}` }))} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
@@ -1018,7 +1016,7 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
       {cl ? (
         <SkeletonChart />
       ) : (
-        <ChartCard title="Class Comparison — Average Score">
+        <ChartCard title="Class comparison: average score">
           {classes && classes.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={classes} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
@@ -1057,7 +1055,7 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
           )}
           {notComputed.length > 0 && (
             <p role="note" className="mt-3 text-xs text-muted">
-              No computed results yet for {notComputed.map((c) => c.className).join(', ')} — shown
+              No computed results yet for {notComputed.map((c) => c.className).join(', ')} shown
               without a bar, not as 0%.
             </p>
           )}
@@ -1066,7 +1064,7 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
       {sl ? (
         <SkeletonChart />
       ) : (
-        <ChartCard title="Subject Average Comparison">
+        <ChartCard title="Subject average comparison">
           {subjects && subjects.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={subjects.slice(0, 12)} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
@@ -1106,7 +1104,7 @@ function HighRankClassPanel({ academicYear, term }: { academicYear: string; term
        */}
       <div className="space-y-5">
         <SectionHeader
-          title="Marks Distribution by Exam"
+          title="Marks distribution by exam"
           icon={<BarChart2 className="w-4 h-4" />}
         />
         <MarksDistributionPanel />
@@ -1139,7 +1137,7 @@ function HighRankTeachersPanel({ academicYear, term }: { academicYear: string; t
       { label: 'Subjects', value: (t) => t.subjectCount },
       { label: 'Classes', value: (t) => t.classesCount },
       { label: 'Avg Score', value: (t) => t.avgStudentScore },
-      { label: 'Avg Pass Rate', value: (t) => t.avgPassRate },
+      { label: 'Avg pass rate', value: (t) => t.avgPassRate },
     ]
   )
 
@@ -1158,14 +1156,14 @@ function HighRankTeachersPanel({ academicYear, term }: { academicYear: string; t
       {topTeacher && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <KpiCard
-            label="Highest Avg Score"
+            label="Highest avg score"
             value={`${topTeacher.avgStudentScore}%`}
             sub={topTeacher.teacherName}
             trend="up"
           />
           {bottomTeacher && (
             <KpiCard
-              label="Lowest Avg Score"
+              label="Lowest avg score"
               value={`${bottomTeacher.avgStudentScore}%`}
               sub={bottomTeacher.teacherName}
               trend={bottomTeacher.avgStudentScore < 50 ? 'down' : null}
@@ -1178,7 +1176,7 @@ function HighRankTeachersPanel({ academicYear, term }: { academicYear: string; t
         <SkeletonChart />
       ) : (
         <>
-          <ChartCard title="Teacher Effectiveness — Student Average Score">
+          <ChartCard title="Teacher effectiveness: student average score">
             {teachers && teachers.length > 0 ? (
               <ResponsiveContainer width="100%" height={Math.max(180, teachers.length * 36)}>
                 <BarChart data={teachers} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
@@ -1216,7 +1214,7 @@ function HighRankTeachersPanel({ academicYear, term }: { academicYear: string; t
                     {['Teacher', 'Department', 'Classes', 'Avg Score', 'Pass Rate'].map((h) => (
                       <th
                         key={h}
-                        className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase"
+                        className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted"
                       >
                         {h}
                       </th>
@@ -1231,14 +1229,14 @@ function HighRankTeachersPanel({ academicYear, term }: { academicYear: string; t
                       <td className="px-4 py-3">{t.classesCount}</td>
                       <td className="px-4 py-3">
                         <span
-                          className={`font-bold ${t.avgStudentScore >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}
+                          className={`font-bold ${t.avgStudentScore >= 50 ? 'text-tone-teal' : 'text-tone-coral'}`}
                         >
                           {t.avgStudentScore}%
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`font-semibold ${t.avgPassRate >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}
+                          className={`font-semibold ${t.avgPassRate >= 50 ? 'text-tone-teal' : 'text-tone-coral'}`}
                         >
                           {t.avgPassRate}%
                         </span>
@@ -1264,7 +1262,7 @@ function HighRankEnrollmentPanel() {
       {tl ? (
         <SkeletonChart />
       ) : (
-        <ChartCard title="Student Enrollment Trend — Last 12 Months">
+        <ChartCard title="Student enrollment trend: Last 12 months">
           {trend && trend.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <ComposedChart data={trend} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
@@ -1333,7 +1331,7 @@ function HighRankFinancePanel({ academicYear, term }: { academicYear: string; te
         {isLoading ? (
           <SkeletonChart />
         ) : (
-          <ChartCard title="Fees Collected vs Expenses & Payroll by Term">
+          <ChartCard title="Fees collected vs expenses and payroll by term">
             {cashFlow && cashFlow.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={cashFlow.map((r) => ({ ...r, label: `Term ${r.term}` }))} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
@@ -1393,11 +1391,11 @@ function HighRankFinancePanel({ academicYear, term }: { academicYear: string; te
         <FinanceCollectionPanel />
       </div>
       <div className="space-y-5">
-        <SectionHeader title="Outstanding Balances" icon={<AlertTriangle className="w-4 h-4" />} />
+        <SectionHeader title="Outstanding balances" icon={<AlertTriangle className="w-4 h-4" />} />
         <FinanceOutstandingPanel academicYear={academicYear} term={term} />
       </div>
       <div className="space-y-5">
-        <SectionHeader title="Expenses & Budget" icon={<FileText className="w-4 h-4" />} />
+        <SectionHeader title="Expenses and budget" icon={<FileText className="w-4 h-4" />} />
         <FinanceExpensesPanel academicYear={academicYear} term={term} />
       </div>
       <div className="space-y-5">
@@ -1442,7 +1440,7 @@ function FinanceCollectionPanel() {
       {dl ? (
         <SkeletonChart />
       ) : (
-        <ChartCard title="Daily Fee Collection — Last 30 Days">
+        <ChartCard title="Daily fee collection: Last 30 days">
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={dayData ?? []} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -1466,7 +1464,7 @@ function FinanceCollectionPanel() {
       {ml ? (
         <SkeletonChart />
       ) : (
-        <ChartCard title="Monthly Collection & Cumulative — Last 12 Months">
+        <ChartCard title="Monthly collection and cumulative: Last 12 months">
           <ResponsiveContainer width="100%" height={200}>
             <ComposedChart data={monthData ?? []} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -1518,7 +1516,7 @@ function FinanceOutstandingPanel({ academicYear, term }: { academicYear: string;
 
   useExportable<ApiOutstandingByClassRow>(`Outstanding Balances ${academicYear}`, rows, [
     { label: 'Class', value: (r) => r.className },
-    { label: 'Students Owing', value: (r) => r.studentCount },
+    { label: 'Students owing', value: (r) => r.studentCount },
     { label: 'Outstanding (MWK)', value: (r) => r.outstanding },
   ])
 
@@ -1526,19 +1524,19 @@ function FinanceOutstandingPanel({ academicYear, term }: { academicYear: string;
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3">
         <KpiCard
-          label="Total Outstanding"
+          label="Total outstanding"
           value={`MWK ${total.toLocaleString()}`}
           warn={total > 0}
         />
         <KpiCard
-          label="Classes Affected"
+          label="Classes affected"
           value={rows?.filter((r) => r.outstanding > 0).length ?? 0}
         />
       </div>
       {isLoading ? (
         <SkeletonChart />
       ) : (
-        <ChartCard title="Outstanding Balance by Class">
+        <ChartCard title="Outstanding balance by class">
           {rows && rows.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={200}>
@@ -1571,7 +1569,7 @@ function FinanceOutstandingPanel({ academicYear, term }: { academicYear: string;
                       {['Class', 'Students', 'Outstanding'].map((h) => (
                         <th
                           key={h}
-                          className="px-4 py-2 text-left text-xs font-semibold text-muted uppercase"
+                          className="px-4 py-2 text-left text-xs font-semibold text-muted"
                         >
                           {h}
                         </th>
@@ -1583,7 +1581,7 @@ function FinanceOutstandingPanel({ academicYear, term }: { academicYear: string;
                       <tr key={r.classId} className="hover:bg-page">
                         <td className="px-4 py-2 font-medium">{r.className}</td>
                         <td className="px-4 py-2 text-muted">{r.studentCount}</td>
-                        <td className="px-4 py-2 font-bold text-brand-coral">
+                        <td className="px-4 py-2 font-bold text-tone-coral">
                           MWK {r.outstanding.toLocaleString()}
                         </td>
                       </tr>
@@ -1625,7 +1623,7 @@ function FinanceExpensesPanel({ academicYear, term }: { academicYear: string; te
         {el ? (
           <SkeletonChart />
         ) : (
-          <ChartCard title="Expense Breakdown by Category">
+          <ChartCard title="Expense breakdown by category">
             {expenses && expenses.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
@@ -1668,7 +1666,7 @@ function FinanceExpensesPanel({ academicYear, term }: { academicYear: string; te
         {bl ? (
           <SkeletonChart />
         ) : (
-          <ChartCard title="Budget vs Actual by Category">
+          <ChartCard title="Budget vs actual by category">
             {budgets && budgets.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={budgets} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
@@ -1746,7 +1744,7 @@ function FinanceCashFlowPanel({ academicYear }: { academicYear: string }) {
       {isLoading ? (
         <SkeletonChart />
       ) : (
-        <ChartCard title="Cash Flow Statement by Term">
+        <ChartCard title="Cash flow statement by term">
           {rows && rows.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={220}>
@@ -1801,7 +1799,7 @@ function FinanceCashFlowPanel({ academicYear }: { academicYear: string }) {
                       {['Term', 'Fees collected', 'Expenses', 'Payroll', 'Net'].map((h) => (
                         <th
                           key={h}
-                          className="px-4 py-2 text-left text-xs font-semibold text-muted uppercase"
+                          className="px-4 py-2 text-left text-xs font-semibold text-muted"
                         >
                           {h}
                         </th>
@@ -1812,17 +1810,17 @@ function FinanceCashFlowPanel({ academicYear }: { academicYear: string }) {
                     {rows.map((r) => (
                       <tr key={r.term}>
                         <td className="px-4 py-2 font-medium">Term {r.term}</td>
-                        <td className="px-4 py-2 text-brand-teal">
+                        <td className="px-4 py-2 text-tone-teal">
                           MWK {r.revenue.toLocaleString()}
                         </td>
-                        <td className="px-4 py-2 text-brand-coral">
+                        <td className="px-4 py-2 text-tone-coral">
                           MWK {r.expenses.toLocaleString()}
                         </td>
-                        <td className="px-4 py-2 text-brand-amber">
+                        <td className="px-4 py-2 text-tone-amber">
                           MWK {r.payroll.toLocaleString()}
                         </td>
                         <td
-                          className={`px-4 py-2 font-bold ${r.net >= 0 ? 'text-brand-teal' : 'text-brand-coral'}`}
+                          className={`px-4 py-2 font-bold ${r.net >= 0 ? 'text-tone-teal' : 'text-tone-coral'}`}
                         >
                           MWK {r.net.toLocaleString()}
                         </td>
@@ -1849,16 +1847,16 @@ function FinancePayrollPanel() {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-3">
-        <KpiCard label="Total Payroll (12M)" value={`MWK ${total.toLocaleString()}`} />
+        <KpiCard label="Total payroll (12M)" value={`MWK ${total.toLocaleString()}`} />
         <KpiCard
-          label="Monthly Average"
-          value={`MWK ${data?.length ? Math.round(total / data.length).toLocaleString() : '—'}`}
+          label="Monthly average"
+          value={`MWK ${data?.length ? Math.round(total / data.length).toLocaleString() : '-'}`}
         />
       </div>
       {isLoading ? (
         <SkeletonChart />
       ) : (
-        <ChartCard title="Monthly Payroll Cost — Last 12 Months">
+        <ChartCard title="Monthly payroll cost: Last 12 months">
           {data && data.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={data}>
@@ -1909,8 +1907,8 @@ function LibraryOverviewPanel() {
     <div className="space-y-5">
       {health && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard label="Total Titles" value={health.totalTitles} />
-          <KpiCard label="Available Copies" value={health.availableCopies} trend="up" />
+          <KpiCard label="Total titles" value={health.totalTitles} />
+          <KpiCard label="Available copies" value={health.availableCopies} trend="up" />
           <KpiCard label="Overdue" value={health.overdueCount} warn={health.overdueCount > 0} />
           <KpiCard label="Availability" value={`${health.availabilityRate}%`} />
         </div>
@@ -1919,7 +1917,7 @@ function LibraryOverviewPanel() {
       {tl ? (
         <SkeletonChart />
       ) : (
-        <ChartCard title="Top 10 Most Borrowed Books">
+        <ChartCard title="Top 10 most borrowed books">
           {top && top.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={220}>
@@ -1962,7 +1960,7 @@ function LibraryOverviewPanel() {
                         </p>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-brand-teal">{b.borrowCount}×</span>
+                    <span className="text-sm font-bold text-tone-teal">{b.borrowCount}×</span>
                   </div>
                 ))}
               </div>
@@ -1985,7 +1983,7 @@ function LibraryBorrowingPanel() {
       {isLoading ? (
         <SkeletonChart />
       ) : (
-        <ChartCard title="Weekly Borrowing Trend — Last 12 Weeks">
+        <ChartCard title="Weekly borrowing trend: Last 12 weeks">
           {data && data.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={data}>
@@ -2038,7 +2036,7 @@ function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; t
         <SkeletonChart />
       ) : (
         <>
-          <ChartCard title="Subject Performance — My Classes">
+          <ChartCard title="Subject performance: my classes">
             {rows && rows.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={rows.slice(0, 12)} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
@@ -2084,7 +2082,7 @@ function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; t
                     {['Subject', 'Class', 'Students', 'Avg Score', 'Pass Rate'].map((h) => (
                       <th
                         key={h}
-                        className="px-4 py-2 text-left text-xs font-semibold text-muted uppercase"
+                        className="px-4 py-2 text-left text-xs font-semibold text-muted"
                       >
                         {h}
                       </th>
@@ -2100,7 +2098,7 @@ function AcademicSubjectsPanel({ academicYear, term }: { academicYear: string; t
                       <td className="px-4 py-2 font-bold text-brand-navy">{r.average}%</td>
                       <td className="px-4 py-2">
                         <span
-                          className={`text-xs font-semibold ${r.passRate >= 50 ? 'text-brand-teal' : 'text-brand-coral'}`}
+                          className={`text-xs font-semibold ${r.passRate >= 50 ? 'text-tone-teal' : 'text-tone-coral'}`}
                         >
                           {r.passRate}%
                         </span>
@@ -2141,10 +2139,10 @@ function ManebAnalyticsPanel({ academicYear }: { academicYear: string }) {
             <span className="text-sm text-muted">{stat.total} candidates</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <KpiCard label="Total Candidates" value={stat.total} />
+            <KpiCard label="Total candidates" value={stat.total} />
             <KpiCard label="Passed" value={stat.passCount} trend="up" />
             <KpiCard
-              label="Pass Rate"
+              label="Pass rate"
               value={`${stat.passRate}%`}
               trend={stat.passRate >= 50 ? 'up' : 'down'}
               warn={stat.passRate < 50}
@@ -2251,7 +2249,7 @@ function FinanceScholarshipsPanel({ academicYear }: { academicYear: string }) {
 
   useExportable<ApiScholarshipSummaryRow>(`Scholarships ${academicYear}`, data?.byScholarship, [
     { label: 'Scholarship', value: (r) => r.name },
-    { label: 'Discount Type', value: (r) => r.discountType },
+    { label: 'Discount type', value: (r) => r.discountType },
     { label: 'Recipients', value: (r) => r.recipientCount },
     { label: 'Discount (MWK)', value: (r) => r.totalDiscount },
   ])
@@ -2263,11 +2261,11 @@ function FinanceScholarshipsPanel({ academicYear }: { academicYear: string }) {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <KpiCard label="Active Awards" value={data.activeScholarships} />
+        <KpiCard label="Active awards" value={data.activeScholarships} />
         <KpiCard label="Recipients" value={data.recipientCount} />
-        <KpiCard label="Total Discount" value={`MWK ${data.totalDiscountMwk.toLocaleString()}`} />
+        <KpiCard label="Total discount" value={`MWK ${data.totalDiscountMwk.toLocaleString()}`} />
       </div>
-      <ChartCard title={`Scholarship Value — ${academicYear}`}>
+      <ChartCard title={`Scholarship Value: ${academicYear}`}>
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={data.byScholarship} layout="vertical" margin={{ top: 4, right: 48, left: 0, bottom: 0 }}>
             <XAxis
@@ -2301,7 +2299,7 @@ function FinanceScholarshipsPanel({ academicYear }: { academicYear: string }) {
                 {['Scholarship', 'Type', 'Recipients', 'Total Discount'].map((h) => (
                   <th
                     key={h}
-                    className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap"
+                    className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted whitespace-nowrap"
                   >
                     {h}
                   </th>
@@ -2334,7 +2332,7 @@ function FinanceScholarshipsPanel({ academicYear }: { academicYear: string }) {
               <thead>
                 <tr className="bg-page border-b border-base">
                   {['Sponsor', 'Learners', 'Total Discount'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap">
+                    <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted whitespace-nowrap">
                       {h}
                     </th>
                   ))}
@@ -2371,7 +2369,7 @@ function MarksDistributionPanel() {
   const { data: buckets, isLoading } = useAcademicMarksDistribution(examId)
 
   useExportable<ApiMarksDistributionBucket>('Marks Distribution', buckets, [
-    { label: 'Mark Range', value: (b) => b.bucket },
+    { label: 'Mark range', value: (b) => b.bucket },
     { label: 'Students', value: (b) => b.count },
   ])
 
@@ -2381,7 +2379,7 @@ function MarksDistributionPanel() {
         <div className="flex-1">
           <label
             htmlFor="marks-exam-id"
-            className="block text-xs font-medium text-muted uppercase tracking-wide mb-1.5"
+            className="block text-xs font-medium text-muted mb-1.5"
           >
             Exam ID
           </label>
@@ -2448,7 +2446,7 @@ function ManebCandidatesPanel({ academicYear }: { academicYear: string }) {
   useExportable<ApiManebResultSummary>(`MANEB Candidates ${academicYear}`, candidates, [
     { label: 'Candidate No', value: (c) => c.candidateNo },
     { label: 'Exam', value: (c) => c.examType },
-    { label: 'Overall Grade', value: (c) => c.overallGrade },
+    { label: 'Overall grade', value: (c) => c.overallGrade },
     { label: 'Status', value: (c) => c.status },
     {
       label: 'Subjects',
@@ -2460,7 +2458,7 @@ function ManebCandidatesPanel({ academicYear }: { academicYear: string }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <SectionHeader
-          title={`MANEB Candidates — ${academicYear}`}
+          title={`MANEB Candidates: ${academicYear}`}
           icon={<Users className="w-4 h-4" />}
         />
         <select
@@ -2486,7 +2484,7 @@ function ManebCandidatesPanel({ academicYear }: { academicYear: string }) {
                   {['Candidate No', 'Exam', 'Overall', 'Subjects', 'Status'].map((h) => (
                     <th
                       key={h}
-                      className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap"
+                      className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted whitespace-nowrap"
                     >
                       {h}
                     </th>
@@ -2500,7 +2498,7 @@ function ManebCandidatesPanel({ academicYear }: { academicYear: string }) {
                       {c.candidateNo}
                     </td>
                     <td className="px-4 py-3 text-muted">{c.examType}</td>
-                    <td className="px-4 py-3 font-bold">{c.overallGrade ?? '—'}</td>
+                    <td className="px-4 py-3 font-bold">{c.overallGrade ?? '-'}</td>
                     <td className="px-4 py-3 text-muted">{c.subjectGrades.length}</td>
                     <td className="px-4 py-3 text-muted">{c.status}</td>
                   </tr>
@@ -2604,32 +2602,32 @@ function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; te
   return (
     <div className="space-y-6">
       <SectionHeader
-        title={`School Summary — ${academicYear} Term ${term}`}
+        title={`School Summary: ${academicYear} Term ${term}`}
         icon={<FileText className="w-4 h-4" />}
       />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <SummaryStat label="Pass Rate" value={`${data.overall?.passRate ?? 0}%`} />
+        <SummaryStat label="Pass rate" value={`${data.overall?.passRate ?? 0}%`} />
         <SummaryStat label="Average" value={data.overall?.average ?? 0} />
         <SummaryStat label="Results" value={data.overall?.total ?? 0} />
         <SummaryStat
           label="Attendance"
-          value={attendance ? `${attendance.attendanceRate}%` : '—'}
+          value={attendance ? `${attendance.attendanceRate}%` : '-'}
         />
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <SummaryStat
-          label="Fee Collection"
-          value={finance && finance.collectionPct != null ? `${finance.collectionPct}%` : '—'}
+          label="Fee collection"
+          value={finance && finance.collectionPct != null ? `${finance.collectionPct}%` : '-'}
         />
-        <SummaryStat label="Total Staff" value={totalStaff ?? '—'} />
-        <SummaryStat label="Applications" value={totalApplications ?? '—'} />
-        <SummaryStat label="Library Books" value={library ? library.totalTitles : '—'} />
+        <SummaryStat label="Total staff" value={totalStaff ?? '-'} />
+        <SummaryStat label="Applications" value={totalApplications ?? '-'} />
+        <SummaryStat label="Library books" value={library ? library.totalTitles : '-'} />
       </div>
 
       <div className="pt-2">
         <SectionHeader
-          title="Issues Needing Attention"
+          title="Issues needing attention"
           icon={<AlertTriangle className="w-4 h-4" />}
         />
         {issues.length === 0 ? (
@@ -2639,9 +2637,9 @@ function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; te
             {issues.map((issue) => (
               <div
                 key={issue.label}
-                className="flex items-start gap-3 bg-brand-coral/5 border border-brand-coral/20 rounded-xl px-4 py-3"
+                className="flex items-start gap-3 bg-brand-coral/10 rounded-xl px-4 py-3"
               >
-                <AlertTriangle className="w-4 h-4 text-brand-coral shrink-0 mt-0.5" aria-hidden />
+                <AlertTriangle className="w-4 h-4 text-tone-coral shrink-0 mt-0.5" aria-hidden />
                 <div>
                   <p className="text-sm font-semibold text-brand-navy">{issue.label}</p>
                   <p className="text-xs text-muted">{issue.detail}</p>
@@ -2653,7 +2651,7 @@ function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; te
       </div>
 
       {data.classStats && data.classStats.length > 0 ? (
-        <ChartCard title="Class Sizes">
+        <ChartCard title="Class sizes">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={data.classStats} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -2685,7 +2683,7 @@ function HighRankSummaryPanel({ academicYear, term }: { academicYear: string; te
       )}
 
       {enrollmentByClass.length > 0 && (
-        <ChartCard title="Active Enrollment vs Total Roster by Class">
+        <ChartCard title="Active enrollment vs total roster by class">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={enrollmentByClass} margin={{ top: 22, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -2739,7 +2737,7 @@ function FinanceSummaryPanel({ academicYear, term }: { academicYear: string; ter
   return (
     <div className="space-y-5">
       <SectionHeader
-        title={`Fee Collection Summary — ${academicYear}`}
+        title={`Fee Collection Summary: ${academicYear}`}
         icon={<FileText className="w-4 h-4" />}
       />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -2750,7 +2748,7 @@ function FinanceSummaryPanel({ academicYear, term }: { academicYear: string; ter
           value={`MWK ${(data.outstanding ?? 0).toLocaleString()}`}
           warn={(data.outstanding ?? 0) > 0}
         />
-        <SummaryStat label="Collection" value={data.collectionPct != null ? `${data.collectionPct}%` : '—'} />
+        <SummaryStat label="Collection" value={data.collectionPct != null ? `${data.collectionPct}%` : '-'} />
       </div>
     </div>
   )
@@ -2774,7 +2772,7 @@ function AcademicSummaryPanel({ academicYear }: { academicYear: string }) {
   return (
     <div className="space-y-5">
       <SectionHeader
-        title={`My Classes — ${academicYear}`}
+        title={`My Classes: ${academicYear}`}
         icon={<GraduationCap className="w-4 h-4" />}
       />
       <div className="overflow-hidden">
@@ -2785,7 +2783,7 @@ function AcademicSummaryPanel({ academicYear }: { academicYear: string }) {
                 {['Class', 'Form', 'Results', 'Pass Rate', 'Average'].map((h) => (
                   <th
                     key={h}
-                    className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap"
+                    className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted whitespace-nowrap"
                   >
                     {h}
                   </th>
@@ -2800,12 +2798,12 @@ function AcademicSummaryPanel({ academicYear }: { academicYear: string }) {
                   <td className="px-4 py-3">{c.total}</td>
                   <td
                     className={`px-4 py-3 font-medium ${
-                      c.passRate === null ? 'text-muted' : c.passRate >= 50 ? 'text-brand-teal' : 'text-brand-coral'
+                      c.passRate === null ? 'text-muted' : c.passRate >= 50 ? 'text-tone-teal' : 'text-tone-coral'
                     }`}
                   >
-                    {c.passRate === null ? '—' : `${c.passRate}%`}
+                    {c.passRate === null ? '-' : `${c.passRate}%`}
                   </td>
-                  <td className="px-4 py-3">{c.avg ?? '—'}</td>
+                  <td className="px-4 py-3">{c.avg ?? '-'}</td>
                 </tr>
               ))}
             </tbody>
@@ -2841,7 +2839,7 @@ function StudentSummaryPanel({ studentId }: { studentId: string }) {
                 {['Year', 'Term', 'Average', 'Grade', 'Position', 'Result'].map((h) => (
                   <th
                     key={h}
-                    className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase whitespace-nowrap"
+                    className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted whitespace-nowrap"
                   >
                     {h}
                   </th>
@@ -2855,9 +2853,9 @@ function StudentSummaryPanel({ studentId }: { studentId: string }) {
                   <td className="px-4 py-3 text-muted">Term {r.term}</td>
                   <td className="px-4 py-3 font-medium text-brand-navy">{r.average}</td>
                   <td className="px-4 py-3 font-bold">{r.grade}</td>
-                  <td className="px-4 py-3">{r.position ?? '—'}</td>
+                  <td className="px-4 py-3">{r.position ?? '-'}</td>
                   <td
-                    className={`px-4 py-3 font-medium ${r.passStatus ? 'text-brand-teal' : 'text-brand-coral'}`}
+                    className={`px-4 py-3 font-medium ${r.passStatus ? 'text-tone-teal' : 'text-tone-coral'}`}
                   >
                     {r.passStatus ? 'Pass' : 'Fail'}
                   </td>
@@ -2933,7 +2931,7 @@ function ReportsContent() {
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
           <h1 className="font-heading text-2xl font-bold text-brand-navy">
-            Reports &amp; Analytics
+            Reports and analytics
           </h1>
           <p className="text-sm text-muted mt-0.5">
             {role === 'student'
@@ -2957,8 +2955,8 @@ function ReportsContent() {
             </span>
           )}
           <ExportToolbar
-            title={`Reports — ${(role ?? '').replace(/_/g, ' ')}${
-              tabs.find((t) => t.id === activeTab)?.label ? ` — ${tabs.find((t) => t.id === activeTab)?.label}` : ''
+            title={`Reports: ${(role ?? '').replace(/_/g, ' ')}${
+              tabs.find((t) => t.id === activeTab)?.label ? ` - ${tabs.find((t) => t.id === activeTab)?.label}` : ''
             }`}
             filters={year ? [`Academic year: ${year}`, ...(term ? [`Term: ${term}`] : [])] : []}
           />

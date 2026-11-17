@@ -34,9 +34,9 @@ export function ReleasesPanel({ summary }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-surface border border-base rounded-xl p-4 text-center max-w-xs">
+      <div className="app-tint rounded-xl p-4 text-center max-w-xs">
         <p className="text-2xl font-heading font-bold text-brand-navy">
-          {summary?.stats['releases_count:30d'] ?? '\u2014'}
+          {summary?.stats['releases_count:30d'] ?? '-'}
         </p>
         <p className="text-xs text-muted mt-1">Releases in the last 30 days</p>
       </div>

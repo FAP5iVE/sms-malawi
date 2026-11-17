@@ -128,7 +128,7 @@ function StaffProfileContent() {
           {staff.status !== 'TERMINATED' && (
             <button
               onClick={() => setTerminating(true)}
-              className="flex items-center gap-1.5 border border-brand-coral/40 text-brand-coral px-3 py-1.5 rounded-lg text-sm hover:bg-brand-coral/10"
+              className="flex items-center gap-1.5 border border-brand-coral/40 text-tone-coral px-3 py-1.5 rounded-lg text-sm hover:bg-brand-coral/10"
               aria-label="Terminate staff member"
             >
               Terminate
@@ -140,8 +140,8 @@ function StaffProfileContent() {
       <div className="bg-surface rounded-xl p-5 sm:p-6 divide-y divide-base">
         <div className="grid sm:grid-cols-2 gap-x-8 gap-y-5 pb-5">
           <div>
-            <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-              Employment Details
+            <p className="font-heading font-semibold text-xs text-muted mb-3">
+              Employment details
             </p>
             <div className="space-y-2.5">
               {[
@@ -151,7 +151,7 @@ function StaffProfileContent() {
                 ['Sex', staff.sex === 'MALE' ? 'Male' : staff.sex === 'FEMALE' ? 'Female' : 'Not recorded'],
                 ['Employment Type', staff.employmentType.replace('_', '-')],
                 ['Date Joined', new Date(staff.dateJoined).toLocaleDateString()],
-                ['Contract Expiry', staff.contractExpiry ? new Date(staff.contractExpiry).toLocaleDateString() : '—'],
+                ['Contract Expiry', staff.contractExpiry ? new Date(staff.contractExpiry).toLocaleDateString() : '-'],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between text-sm gap-4">
                   <span className="text-muted">{label}</span>
@@ -162,13 +162,13 @@ function StaffProfileContent() {
           </div>
 
           <div>
-            <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
+            <p className="font-heading font-semibold text-xs text-muted mb-3">
               Contact
             </p>
             <div className="space-y-2.5">
               {[
                 ['Email', staff.email],
-                ['Phone', staff.phone ?? '—'],
+                ['Phone', staff.phone ?? '-'],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between text-sm gap-4">
                   <span className="text-muted">{label}</span>
@@ -185,16 +185,16 @@ function StaffProfileContent() {
         {can('hr.viewStaffSensitive') && (
           <div className="py-5 grid sm:grid-cols-2 gap-x-8 gap-y-5">
             <div>
-              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
+              <p className="font-heading font-semibold text-xs text-muted mb-3">
                 Identity
               </p>
               <div className="space-y-2.5">
                 {[
-                  ['Date of Birth', staff.dateOfBirth ? formatDay(staff.dateOfBirth.slice(0, 10)) : '—'],
-                  ['Nationality', staff.nationality ?? '—'],
-                  ['Home District', staff.homeDistrict ?? '—'],
-                  ['NRB National ID', staff.nrbNumber ?? '—'],
-                  ['MRA TPIN', staff.tpin ?? '—'],
+                  ['Date of Birth', staff.dateOfBirth ? formatDay(staff.dateOfBirth.slice(0, 10)) : '-'],
+                  ['Nationality', staff.nationality ?? '-'],
+                  ['Home District', staff.homeDistrict ?? '-'],
+                  ['NRB National ID', staff.nrbNumber ?? '-'],
+                  ['MRA TPIN', staff.tpin ?? '-'],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between text-sm gap-4">
                     <span className="text-muted">{label}</span>
@@ -205,20 +205,20 @@ function StaffProfileContent() {
             </div>
 
             <div>
-              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-                Retirement &amp; Next of Kin
+              <p className="font-heading font-semibold text-xs text-muted mb-3">
+                Retirement and next of kin
               </p>
               <div className="space-y-2.5">
                 <div className="flex justify-between text-sm gap-4">
-                  <span className="text-muted">Retirement Date</span>
+                  <span className="text-muted">Retirement date</span>
                   <span className="font-medium text-right">
                     {staff.retirement ? (
                       <span
                         className={
                           staff.retirement.status === 'RETIRED'
-                            ? 'text-brand-coral'
+                            ? 'text-tone-coral'
                             : staff.retirement.status === 'DUE_WITHIN_YEAR'
-                              ? 'text-brand-amber'
+                              ? 'text-tone-amber'
                               : 'text-body'
                         }
                       >
@@ -235,9 +235,9 @@ function StaffProfileContent() {
                   </span>
                 </div>
                 {[
-                  ['Next of Kin', staff.nextOfKinName ?? '—'],
-                  ['Relationship', staff.nextOfKinRelation ?? '—'],
-                  ['Next of Kin Phone', staff.nextOfKinPhone ?? '—'],
+                  ['Next of Kin', staff.nextOfKinName ?? '-'],
+                  ['Relationship', staff.nextOfKinRelation ?? '-'],
+                  ['Next of Kin Phone', staff.nextOfKinPhone ?? '-'],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between text-sm gap-4">
                     <span className="text-muted">{label}</span>
@@ -254,38 +254,38 @@ function StaffProfileContent() {
         {can('hr.viewStaffSensitive') && (
           <div className="py-5 grid sm:grid-cols-2 gap-x-8 gap-y-5">
             <div>
-              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-                Teaching &amp; Licence
+              <p className="font-heading font-semibold text-xs text-muted mb-3">
+                Teaching and licence
               </p>
               <div className="space-y-2.5">
                 {[
                   ['Teaching Staff', staff.isTeaching ? 'Yes' : 'No'],
                   ...(staff.isTeaching
                     ? [
-                        ['TCM Registration No.', staff.tcmRegistrationNo ?? '—'],
+                        ['TCM Registration No.', staff.tcmRegistrationNo ?? '-'],
                         ['TCM Licence No.', staff.tcmLicenceNo ?? 'Missing'],
                       ]
                     : []),
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between text-sm gap-4">
                     <span className="text-muted">{label}</span>
-                    <span className={`font-medium text-right ${value === 'Missing' ? 'text-brand-coral' : 'text-body'}`}>{value}</span>
+                    <span className={`font-medium text-right ${value === 'Missing' ? 'text-tone-coral' : 'text-body'}`}>{value}</span>
                   </div>
                 ))}
                 {staff.isTeaching && (() => {
                   if (!staff.tcmLicenceExpiry) {
                     return (
                       <div className="flex justify-between text-sm gap-4">
-                        <span className="text-muted">Licence Expiry</span>
-                        <span className="font-medium text-brand-coral">Missing</span>
+                        <span className="text-muted">Licence expiry</span>
+                        <span className="font-medium text-tone-coral">Missing</span>
                       </div>
                     )
                   }
                   const days = Math.ceil((new Date(staff.tcmLicenceExpiry).getTime() - now) / 86_400_000)
-                  const cls = days < 0 ? 'text-brand-coral' : days <= LICENCE_EXPIRY_WARNING_DAYS ? 'text-brand-amber' : 'text-body'
+                  const cls = days < 0 ? 'text-tone-coral' : days <= LICENCE_EXPIRY_WARNING_DAYS ? 'text-tone-amber' : 'text-body'
                   return (
                     <div className="flex justify-between text-sm gap-4">
-                      <span className="text-muted">Licence Expiry</span>
+                      <span className="text-muted">Licence expiry</span>
                       <span className={`font-medium text-right ${cls}`}>
                         {formatDay(staff.tcmLicenceExpiry.slice(0, 10))}
                         <span className="block text-xs font-normal">
@@ -299,22 +299,22 @@ function StaffProfileContent() {
             </div>
 
             <div>
-              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-                Employment &amp; Qualifications
+              <p className="font-heading font-semibold text-xs text-muted mb-3">
+                Employment and qualifications
               </p>
               <div className="space-y-2.5">
                 {[
-                  ['Category', staff.employmentCategory ? EMPLOYMENT_CATEGORY_LABELS[staff.employmentCategory] : '—'],
-                  ['Payroll No.', staff.payrollNo ?? '—'],
-                  ['Highest Qualification', staff.highestQualification ? QUALIFICATION_LEVEL_LABELS[staff.highestQualification] : '—'],
-                  ['Training Route', staff.trainingRoute ? TRAINING_ROUTE_LABELS[staff.trainingRoute] : '—'],
-                  ['Qualified in Education', staff.qualifiedInEducation == null ? '—' : staff.qualifiedInEducation ? 'Yes' : 'No'],
-                  ['Qualified Subjects', staff.qualifiedSubjects && staff.qualifiedSubjects.length > 0 ? staff.qualifiedSubjects.map((q) => q.subject).join(', ') : '—'],
-                  ['Housing', staff.housingStatus ? HOUSING_STATUS_LABELS[staff.housingStatus] : '—'],
+                  ['Category', staff.employmentCategory ? EMPLOYMENT_CATEGORY_LABELS[staff.employmentCategory] : '-'],
+                  ['Payroll No.', staff.payrollNo ?? '-'],
+                  ['Highest Qualification', staff.highestQualification ? QUALIFICATION_LEVEL_LABELS[staff.highestQualification] : '-'],
+                  ['Training Route', staff.trainingRoute ? TRAINING_ROUTE_LABELS[staff.trainingRoute] : '-'],
+                  ['Qualified in Education', staff.qualifiedInEducation == null ? '-' : staff.qualifiedInEducation ? 'Yes' : 'No'],
+                  ['Qualified Subjects', staff.qualifiedSubjects && staff.qualifiedSubjects.length > 0 ? staff.qualifiedSubjects.map((q) => q.subject).join(', ') : '-'],
+                  ['Housing', staff.housingStatus ? HOUSING_STATUS_LABELS[staff.housingStatus] : '-'],
                   ...(staff.exitReason
                     ? [
                         ['Reason for Leaving', STAFF_EXIT_REASON_LABELS[staff.exitReason]],
-                        ['Last Day of Service', staff.exitDate ? formatDay(staff.exitDate.slice(0, 10)) : '—'],
+                        ['Last Day of Service', staff.exitDate ? formatDay(staff.exitDate.slice(0, 10)) : '-'],
                       ]
                     : []),
                 ].map(([label, value]) => (
@@ -347,8 +347,8 @@ function StaffProfileContent() {
         {/* Leave balances — current calendar year, grouped by leave type */}
         {staff.leaveBalances.length > 0 && (
           <div className="py-5">
-            <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-              Leave Balances ({staff.leaveBalances[0]?.year ?? new Date().getFullYear()})
+            <p className="font-heading font-semibold text-xs text-muted mb-3">
+              Leave balances ({staff.leaveBalances[0]?.year ?? new Date().getFullYear()})
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {staff.leaveBalances.map((b) => (
@@ -367,12 +367,12 @@ function StaffProfileContent() {
         {/* Active loan, if any */}
         {activeLoan && (
           <div className="py-5">
-            <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-              Active Loan
+            <p className="font-heading font-semibold text-xs text-muted mb-3">
+              Active loan
             </p>
             <div className="flex justify-between text-sm gap-4">
               <span className="text-muted">Remaining balance</span>
-              <span className="font-heading font-bold text-brand-amber">
+              <span className="font-heading font-bold text-tone-amber">
                 {activeLoan.balance.toLocaleString('en-MW', { style: 'currency', currency: 'MWK', minimumFractionDigits: 2 })}
               </span>
             </div>
@@ -382,8 +382,8 @@ function StaffProfileContent() {
         {/* Recent performance notes */}
         {staff.performanceNotes.length > 0 && (
           <div className="pt-5">
-            <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-              Recent Performance Notes
+            <p className="font-heading font-semibold text-xs text-muted mb-3">
+              Recent performance notes
             </p>
             <div className="space-y-3">
               {staff.performanceNotes.map((note) => (

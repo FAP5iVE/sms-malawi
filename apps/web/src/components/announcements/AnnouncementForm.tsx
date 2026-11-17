@@ -233,7 +233,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
       return
     }
     if (isNews && stripHtml(body).length < 10) {
-      setError('Write a bit more before publishing — the article looks empty.')
+      setError('Write a bit more before publishing. The article looks empty.')
       return
     }
     const parsed = AnnouncementSchema.safeParse({
@@ -285,10 +285,10 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
   }
 
   const HEADING: Record<FormMode, string> = {
-    announcement: draft ? 'Continue Draft — Announcement' : 'New Announcement',
-    event: draft ? 'Continue Draft — Event' : 'New Event',
-    news: draft ? 'Continue Draft — News Article' : 'Write News Article',
-    ads: draft ? 'Continue Draft — Academic Advertisement' : 'New Academic Advertisement',
+    announcement: draft ? 'Continue Draft: Announcement' : 'New Announcement',
+    event: draft ? 'Continue Draft: Event' : 'New Event',
+    news: draft ? 'Continue Draft: News Article' : 'Write News Article',
+    ads: draft ? 'Continue Draft: Academic Advertisement' : 'New Academic Advertisement',
   }
 
   // [PRODUCTION FIX] This modal now portals directly under <body> instead
@@ -310,7 +310,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
     <Modal
       title={HEADING[mode]}
       onClose={onClose}
-      size="2xl"
+      size="l"
       onSubmit={handleSubmit}
       busy={loading || savingDraft}
       bodyClassName="space-y-4"
@@ -360,7 +360,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
           placeholder={
             isEvent ? 'Event title'
             : isNews ? 'Article headline'
-            : isAds ? 'e.g. Call for Applications — 2027 Intake'
+            : isAds ? 'Call for Applications: 2027 Intake'
             : 'Announcement title'
           }
           maxLength={200}
@@ -380,7 +380,7 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
             id="announcement-author"
             value={authorName}
             onChange={(e) => setAuthorName(e.target.value)}
-            placeholder="e.g. Jane Banda, School Administration"
+            placeholder="Jane Banda, School Administration"
             maxLength={120}
             className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
           />
@@ -491,18 +491,18 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
               Publish to public website
             </label>
             <p className="text-xs text-muted mb-3">
-              Shows on the public landing page, in its own section — never mixed with News,
+              Shows on the public landing page, in its own section. Never mixed with News,
               Academic Advertisements, or each other. Separate from &quot;Send to everyone&quot;
-              above — that only controls who inside the school sees it.
-              {isEvent && ' Events are typically public — leave this checked unless this is an internal-only event.'}
+              above. That only controls who inside the school sees it.
+              {isEvent && ' Events are typically public: leave this checked unless this is an internal-only event.'}
             </p>
           </>
         )}
         {isPublicOnly && (
           <p className="text-xs text-muted mb-3">
             {isNews
-              ? 'News articles are public-website content only — this never appears in anyone\u2019s internal Announcements tab.'
-              : 'Academic Advertisements are a standalone, public-website-only section — this never appears in anyone\u2019s internal Announcements tab, and never as a News article or Event.'}
+              ? 'News articles are public-website content only. This never appears in anyone\u2019s internal Announcements tab.'
+              : 'Academic Advertisements are a standalone, public-website-only section. This never appears in anyone\u2019s internal Announcements tab, and never as a News article or Event.'}
           </p>
         )}
 
@@ -541,12 +541,12 @@ export function AnnouncementForm({ onClose, mode = 'announcement', draft }: Prop
         )}
       </div>
       {!canPublishDirectly && (
-        <p className="text-xs text-muted bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+        <p className="text-xs text-body bg-status-warning/10 rounded-lg px-3 py-2">
           Your {noun} will be submitted for approval before publishing.
         </p>
       )}
       {error && (
-        <p role="alert" className="text-xs text-brand-coral">
+        <p role="alert" className="text-xs text-tone-coral">
           {error}
         </p>
       )}

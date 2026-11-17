@@ -42,13 +42,13 @@ export default function MonitoringPage() {
   const { data: summary, isLoading: summaryLoading } = useMonitoringSummary()
 
   const tabs: TabItem<Tab>[] = [
-    { id: 'errors',   label: 'Errors & Outages', icon: AlertTriangle, badge: summary?.unresolvedIssues },
+    { id: 'errors',   label: 'Errors and outages', icon: AlertTriangle, badge: summary?.unresolvedIssues, badgeNoun: 'unresolved' },
     { id: 'logs',     label: 'Logs',              icon: ScrollText },
     { id: 'alerts',   label: 'Alerts',            icon: Bell },
     { id: 'replays',  label: 'Replays',           icon: Video },
     { id: 'releases', label: 'Releases',          icon: GitBranch },
     { id: 'feedback', label: 'Feedback',          icon: MessageSquareWarning },
-    { id: 'vercel',   label: 'Vercel Platform',   icon: Cloud },
+    { id: 'vercel',   label: 'Vercel platform',   icon: Cloud },
   ]
 
   return (

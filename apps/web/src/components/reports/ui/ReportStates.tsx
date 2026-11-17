@@ -10,7 +10,7 @@ import type { ReactNode } from 'react'
 
 export function ReportLoading({ label = 'Loading', height = 160 }: { label?: string; height?: number }) {
   return (
-    <div role="status" aria-label={`${label} — loading`} className="space-y-2" style={{ minHeight: height }}>
+    <div role="status" aria-label={`${label} loading`} className="space-y-2" style={{ minHeight: height }}>
       <div className="skeleton h-3 w-1/3 rounded" aria-hidden />
       <div className="skeleton w-full rounded" style={{ height: Math.max(height - 24, 40) }} aria-hidden />
     </div>
@@ -35,7 +35,7 @@ export function ReportError({
 }) {
   return (
     <div role="alert" className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-      <AlertTriangle className="h-6 w-6 text-brand-coral" aria-hidden />
+      <AlertTriangle className="h-6 w-6 text-tone-coral" aria-hidden />
       <p className="text-sm text-muted">{message}</p>
       {onRetry && (
         <button

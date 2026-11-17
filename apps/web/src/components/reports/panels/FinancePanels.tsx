@@ -121,7 +121,7 @@ export function FinanceAgingTab({ academicYear, term }: PeriodProps) {
               { key: 'class', label: 'Class', hideOnMobile: true, sortValue: (r) => r.className ?? '' },
               { key: 'balance', label: 'Balance', align: 'right', sortValue: (r) => r.balance, cell: (r) => formatMwk(r.balance), exportValue: (r) => r.balance },
               { key: 'due', label: 'Due', hideOnMobile: true, sortValue: (r) => r.dueDate, cell: (r) => formatDate(r.dueDate), exportValue: (r) => formatDate(r.dueDate) },
-              { key: 'days', label: 'Days overdue', align: 'right', sortValue: (r) => r.daysOverdue, cell: (r) => (r.daysOverdue > 0 ? formatDays(r.daysOverdue) : '—'), exportValue: (r) => r.daysOverdue },
+              { key: 'days', label: 'Days overdue', align: 'right', sortValue: (r) => r.daysOverdue, cell: (r) => (r.daysOverdue > 0 ? formatDays(r.daysOverdue) : '-'), exportValue: (r) => r.daysOverdue },
               { key: 'bucket', label: 'Bucket', sortValue: (r) => r.bucket, cell: (r) => bucketLabel(r.bucket), exportValue: (r) => bucketLabel(r.bucket) },
             ]}
           />

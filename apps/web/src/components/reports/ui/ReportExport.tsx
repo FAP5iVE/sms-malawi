@@ -315,7 +315,7 @@ export function ExportToolbar({
             >
               <FileText className="h-4 w-4 shrink-0 text-muted" aria-hidden />
               <span>
-                CSV — {t.label}
+                CSV: {t.label}
                 {t.note ? <span className="block text-xs text-muted">{t.note}</span> : null}
               </span>
             </button>
@@ -323,7 +323,7 @@ export function ExportToolbar({
         </div>
       )}
       {message && (
-        <p role="alert" className="text-xs text-brand-coral">
+        <p role="alert" className="text-xs text-tone-coral">
           {message}
         </p>
       )}

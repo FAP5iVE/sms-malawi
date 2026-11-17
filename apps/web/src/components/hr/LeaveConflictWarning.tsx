@@ -42,12 +42,12 @@ function ConflictAlert({
       role={isBlocking ? 'alert' : 'status'}
     >
       <Icon
-        className={`w-4 h-4 mt-0.5 shrink-0 ${isBlocking ? 'text-brand-coral' : 'text-brand-amber'}`}
+        className={`w-4 h-4 mt-0.5 shrink-0 ${isBlocking ? 'text-tone-coral' : 'text-tone-amber'}`}
         aria-hidden
       />
       <div className="min-w-0">
-        <p className={`text-sm font-heading font-semibold ${isBlocking ? 'text-brand-coral' : 'text-brand-amber'}`}>
-          {isBlocking ? 'Blocking Conflict' : 'Warning'} — {type.replace(/_/g, ' ')}
+        <p className={`text-sm font-heading font-semibold ${isBlocking ? 'text-tone-coral' : 'text-tone-amber'}`}>
+          {isBlocking ? 'Blocking Conflict' : 'Warning'} - {type.replace(/_/g, ' ')}
         </p>
         <p className="text-sm text-body mt-0.5 leading-relaxed">{message}</p>
         {detail && (
@@ -128,7 +128,7 @@ export function LeaveConflictWarning({
 }: LeaveConflictWarningProps) {
   if (!result.hasBlockingConflicts && !result.hasWarnings && teamSnapshot.length === 0) {
     return (
-      <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-800/40 dark:text-emerald-400">
+      <div className="flex items-center gap-2 bg-status-success/10 rounded-xl px-4 py-3 text-sm text-body">
         <Info className="w-4 h-4 shrink-0" />
         No conflicts detected for the requested leave period.
       </div>
@@ -136,13 +136,13 @@ export function LeaveConflictWarning({
   }
 
   return (
-    <div className="space-y-4 border border-base rounded-2xl p-5 bg-surface">
+    <div className="space-y-4 rounded-xl p-5 app-tint">
 
       {/* Section header */}
       <div className="flex items-center gap-2">
-        <AlertTriangle className="w-4 h-4 text-brand-amber" aria-hidden />
+        <AlertTriangle className="w-4 h-4 text-tone-amber" aria-hidden />
         <h3 className="font-heading font-semibold text-sm text-body">
-          Leave Conflict Analysis
+          Leave conflict analysis
         </h3>
       </div>
 
@@ -160,8 +160,8 @@ export function LeaveConflictWarning({
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Users className="w-3.5 h-3.5 text-muted" aria-hidden />
-            <span className="text-xs font-heading font-semibold text-muted uppercase tracking-wider">
-              Team Leave During This Period ({teamSnapshot.length})
+            <span className="text-xs font-heading font-semibold text-muted">
+              Team leave during this period ({teamSnapshot.length})
             </span>
           </div>
           <div className="border border-base rounded-xl overflow-hidden">
@@ -189,7 +189,7 @@ export function LeaveConflictWarning({
 
       {/* Blocking message */}
       {result.hasBlockingConflicts && (
-        <p className="text-xs text-brand-coral font-heading font-semibold">
+        <p className="text-xs text-tone-coral font-heading font-semibold">
           Approval is blocked until the conflict above is resolved.
         </p>
       )}

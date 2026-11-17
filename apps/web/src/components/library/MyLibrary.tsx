@@ -89,7 +89,7 @@ function Charges({ b }: { b: ApiMyBorrowing }) {
       </span>
     )
   }
-  return <span className="text-muted">—</span>
+  return <span className="text-muted">-</span>
 }
 
 type LoanFilter = 'current' | 'past' | 'all'
@@ -128,19 +128,19 @@ export function MyBorrowingsPanel() {
       </div>
 
       {accruing > 0 && (
-        <p role="note" className="text-xs rounded-lg px-3 py-2 bg-brand-coral/10 border border-brand-coral/25 text-brand-coral">
+        <p role="note" className="text-xs rounded-lg px-3 py-2 bg-brand-coral/10 border border-brand-coral/25 text-tone-coral">
           {formatMWK(accruing)} in late fees is building up on books you still have. Return them to stop it growing.
         </p>
       )}
 
       {isLoading ? (
-        <div className="space-y-2" role="status" aria-label="My borrowings — loading">
+        <div className="space-y-2" role="status" aria-label="My borrowings: loading">
           {[1, 2, 3].map((i) => <div key={i} className="skeleton h-12 w-full rounded-lg" aria-hidden />)}
         </div>
       ) : isError ? (
         <div role="alert" className="text-sm text-muted">
           Your borrowings could not be loaded.{' '}
-          <button type="button" onClick={() => void refetch()} className="font-semibold text-brand-teal underline min-h-11">Retry</button>
+          <button type="button" onClick={() => void refetch()} className="font-semibold text-tone-teal underline min-h-11">Retry</button>
         </div>
       ) : shown.length === 0 ? (
         <p className="text-center py-10 text-muted text-sm">
@@ -159,7 +159,7 @@ export function MyBorrowingsPanel() {
                     <span className={`text-xs font-semibold shrink-0 ${STATUS_TONE[st]}`}>{STATUS_LABEL[st]}</span>
                   </div>
                   <p className="text-xs text-muted">{b.author} · borrowed {fmtDate(b.issuedAt)}</p>
-                  <p className={`text-xs ${st === 'OVERDUE' ? 'text-brand-coral' : 'text-muted'}`}>{whenLabel(b)}</p>
+                  <p className={`text-xs ${st === 'OVERDUE' ? 'text-tone-coral' : 'text-muted'}`}>{whenLabel(b)}</p>
                   <p className="text-xs"><Charges b={b} /></p>
                 </li>
               )
@@ -171,7 +171,7 @@ export function MyBorrowingsPanel() {
             <thead>
               <tr className="bg-page border-b border-base">
                 {['Book', 'Borrowed', 'Due / Returned', 'Status', 'Late fee & charges'].map((h) => (
-                  <th key={h} scope="col" className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase">{h}</th>
+                  <th key={h} scope="col" className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -185,7 +185,7 @@ export function MyBorrowingsPanel() {
                       <p className="text-xs text-muted">{b.author}</p>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted">{fmtDate(b.issuedAt)}</td>
-                    <td className={`px-4 py-3 text-xs ${st === 'OVERDUE' ? 'text-brand-coral' : 'text-muted'}`}>{whenLabel(b)}</td>
+                    <td className={`px-4 py-3 text-xs ${st === 'OVERDUE' ? 'text-tone-coral' : 'text-muted'}`}>{whenLabel(b)}</td>
                     <td className="px-4 py-3"><span className={`text-xs font-semibold ${STATUS_TONE[st]}`}>{STATUS_LABEL[st]}</span></td>
                     <td className="px-4 py-3 text-xs"><Charges b={b} /></td>
                   </tr>
@@ -211,11 +211,11 @@ const FINE_STATUS_TONE: Record<ApiMyFine['status'], string> = {
 function WaiverState({ fine }: { fine: ApiMyFine }) {
   const w = fine.waiver
   if (!w) return null
-  if (w.status === 'PENDING') return <span className="text-xs font-semibold text-status-warning">Waiver requested — waiting for review</span>
+  if (w.status === 'PENDING') return <span className="text-xs font-semibold text-status-warning">Waiver requested: waiting for review</span>
   if (w.status === 'APPROVED') return <span className="text-xs font-semibold text-status-success">Waiver approved</span>
   return (
-    <span className="text-xs text-brand-coral">
-      <span className="font-semibold">Waiver declined</span>{w.reviewNotes ? ` — ${w.reviewNotes}` : ''}
+    <span className="text-xs text-tone-coral">
+      <span className="font-semibold">Waiver declined</span>{w.reviewNotes ? ` - ${w.reviewNotes}` : ''}
     </span>
   )
 }
@@ -248,7 +248,7 @@ export function FineWaiverRequestPanel() {
   return (
     <div className="space-y-3 pb-4 border-b border-base">
       <div>
-        <h3 className="font-heading font-semibold text-sm text-body">Request a Fine Waiver</h3>
+        <h3 className="font-heading font-semibold text-sm text-body">Request a fine waiver</h3>
         <p className="text-xs text-muted">
           These are the library fines charged to you, including damaged and lost books.
           Choose the one you would like reviewed and tell us why.
@@ -256,16 +256,16 @@ export function FineWaiverRequestPanel() {
         </p>
       </div>
 
-      {message && <p role="status" className="text-sm text-brand-teal">{message}</p>}
+      {message && <p role="status" className="text-sm text-tone-teal">{message}</p>}
 
       {isLoading ? (
-        <div className="space-y-2" role="status" aria-label="My fines — loading">
+        <div className="space-y-2" role="status" aria-label="My fines: loading">
           {[1, 2].map((i) => <div key={i} className="skeleton h-14 w-full rounded-lg" aria-hidden />)}
         </div>
       ) : isError ? (
         <div role="alert" className="text-sm text-muted">
           Your fines could not be loaded.{' '}
-          <button type="button" onClick={() => void refetch()} className="font-semibold text-brand-teal underline min-h-11">Retry</button>
+          <button type="button" onClick={() => void refetch()} className="font-semibold text-tone-teal underline min-h-11">Retry</button>
         </div>
       ) : fines.length === 0 ? (
         <p className="text-sm text-muted py-4">You have no library fines.</p>
@@ -291,7 +291,7 @@ export function FineWaiverRequestPanel() {
                       <button
                         type="button"
                         onClick={() => { setOpenFineId(f.id); setReason(''); setMessage(null); createWaiver.reset() }}
-                        className="mt-1 text-xs font-semibold text-brand-teal underline min-h-11"
+                        className="mt-1 text-xs font-semibold text-tone-teal underline min-h-11"
                       >
                         {f.waiver?.status === 'REJECTED' ? 'Ask again' : 'Request waiver'}
                       </button>
@@ -301,7 +301,7 @@ export function FineWaiverRequestPanel() {
 
                 {open && (
                   <div className="space-y-2">
-                    <label htmlFor={`waiver-reason-${f.id}`} className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider">
+                    <label htmlFor={`waiver-reason-${f.id}`} className="block text-xs font-heading font-semibold text-muted">
                       Why should this fine be waived?
                     </label>
                     <textarea
@@ -309,11 +309,11 @@ export function FineWaiverRequestPanel() {
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                       rows={2}
-                      placeholder="Explain the circumstance (e.g. financial hardship, verified flood damage, medical leave)…"
+                      placeholder="Explain the circumstance (for example financial hardship, verified flood damage, medical leave)…"
                       className="w-full border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
                     />
                     {createWaiver.error && (
-                      <p role="alert" className="text-sm text-brand-coral">
+                      <p role="alert" className="text-sm text-tone-coral">
                         {createWaiver.error instanceof Error ? createWaiver.error.message : 'Something went wrong.'}
                       </p>
                     )}

@@ -56,6 +56,7 @@
  */
 
 import { useState, useEffect }   from 'react'
+import { StatusText } from '@/components/shared/StatusText'
 import { Loader2, Save, RotateCcw, AlertTriangle } from 'lucide-react'
 import { apiFetch }              from '@/lib/api-client'
 import ConfirmDialog             from '@/components/shared/ConfirmDialog'
@@ -99,7 +100,7 @@ function GradeScaleTable({
         <thead>
           <tr className="bg-page border-b border-base">
             {['Grade', 'Min %', 'Max %', 'Label', 'Pass?'].map((h) => (
-              <th key={h} className="px-3 py-2.5 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wider">
+              <th key={h} className="px-3 py-2.5 text-left text-xs font-heading font-semibold text-muted">
                 {h}
               </th>
             ))}
@@ -289,12 +290,12 @@ export function ExamGradingSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-heading font-bold text-lg text-brand-navy">Exam & Grading Configuration</h2>
+        <h2 className="font-heading font-bold text-lg text-brand-navy">Exam and grading configuration</h2>
         <p className="text-sm text-muted mt-0.5">Configure grade boundaries and promotion thresholds.</p>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-brand-coral">
+        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-tone-coral">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {error}
         </div>
@@ -330,7 +331,7 @@ export function ExamGradingSettings() {
           {/* Continuous assessment */}
           <div className="pt-4 border-t border-base">
             <h3 className="font-heading font-semibold text-sm text-body mb-1">
-              Continuous Assessment
+              Continuous assessment
             </h3>
             <p className="text-xs text-muted mb-4 max-w-xl">
               Choose whether tests, quizzes, assignments and midterms (continuous assessments) are
@@ -353,7 +354,7 @@ export function ExamGradingSettings() {
             {caEnabled && (
               <div className="space-y-4 max-w-md">
                 <div>
-                  <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+                  <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
                     Number of continuous assessments per term
                   </label>
                   <input
@@ -365,7 +366,7 @@ export function ExamGradingSettings() {
                 </div>
 
                 <div>
-                  <p className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+                  <p className="block text-xs font-heading font-semibold text-muted mb-1.5">
                     Weight of each (% of the final term mark)
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -388,11 +389,11 @@ export function ExamGradingSettings() {
                   <p className="text-body">
                     Continuous assessments: <span className="font-semibold">{caTotal}%</span>
                     {' · '}
-                    End-of-term exam: <span className="font-semibold">{caProblem ? '—' : `${caExamShare}%`}</span>
+                    End-of-term exam: <span className="font-semibold">{caProblem ? '-' : `${caExamShare}%`}</span>
                     {' · '}
-                    Total: <span className="font-semibold">{caProblem ? '—' : '100%'}</span>
+                    Total: <span className="font-semibold">{caProblem ? '-' : '100%'}</span>
                   </p>
-                  {caProblem && <p className="text-xs text-brand-coral mt-1">{caProblem}</p>}
+                  {caProblem && <p className="text-xs text-tone-coral mt-1">{caProblem}</p>}
                 </div>
               </div>
             )}
@@ -401,12 +402,12 @@ export function ExamGradingSettings() {
           {/* Promotion thresholds */}
           <div className="pt-4 border-t border-base">
             <h3 className="font-heading font-semibold text-sm text-body mb-4">
-              Promotion Thresholds
+              Promotion thresholds
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-sm">
               <div>
-                <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-                  Minimum Average (%)
+                <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+                  Minimum average (%)
                 </label>
                 <input
                   type="number" min={0} max={100}
@@ -416,8 +417,8 @@ export function ExamGradingSettings() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-                  Min Subject Passes
+                <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+                  Min subject passes
                 </label>
                 <input
                   type="number" min={0} max={20}
@@ -441,7 +442,7 @@ export function ExamGradingSettings() {
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</>
                 : <><Save className="w-4 h-4" /> Save Settings</>}
             </button>
-            {saved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}
+            {saved && <StatusText tone="success" size="md">Saved</StatusText>}
             <button
               type="button"
               onClick={() => setConfirmResetOpen(true)}
@@ -451,7 +452,7 @@ export function ExamGradingSettings() {
               {resetting
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <RotateCcw className="w-4 h-4" />}
-              Reset to MANEB Defaults
+              Reset to MANEB defaults
             </button>
           </div>
         </>
@@ -462,7 +463,7 @@ export function ExamGradingSettings() {
         open={confirmResetOpen}
         title="Reset grading scales?"
         description="All grading scales will be restored to the MANEB defaults. Any custom grade boundaries you have configured will be lost. This cannot be undone."
-        confirmLabel="Reset to Defaults"
+        confirmLabel="Reset to defaults"
         destructive
         onConfirm={() => void handleReset()}
         onCancel={() => setConfirmResetOpen(false)}

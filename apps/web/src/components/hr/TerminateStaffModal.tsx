@@ -21,7 +21,7 @@ import { STAFF_EXIT_REASONS, STAFF_EXIT_REASON_LABELS } from '@shared/constants/
 const fieldCls =
   'w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body ' +
   'focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal'
-const labelCls = 'block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5'
+const labelCls = 'block text-xs font-heading font-semibold text-muted mb-1.5'
 
 export function TerminateStaffModal({
   staffId,
@@ -56,13 +56,14 @@ export function TerminateStaffModal({
       title={`Terminate ${staffName}?`}
       description="This ends their employment record. Their login stays active until it is disabled in User Management."
       onClose={onClose}
+      size="m"
       busy={terminate.isPending}
       onSubmit={submit}
       bodyClassName="space-y-4"
       footer={
         <>
           <button type="button" disabled={terminate.isPending} onClick={onClose} className="min-h-[44px] px-4 rounded-xl border border-base text-sm font-semibold">Cancel</button>
-          <button type="submit" disabled={terminate.isPending} className="min-h-[44px] px-4 rounded-xl bg-brand-coral text-white text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-1.5">
+          <button type="submit" disabled={terminate.isPending} className="min-h-[44px] px-4 rounded-xl bg-btn-danger text-btn-danger-fg text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-1.5">
             {terminate.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Terminate
           </button>
         </>
@@ -86,7 +87,7 @@ export function TerminateStaffModal({
           onChange={(e) => setExitDate(e.target.value)}
         />
       </div>
-      {error && <p className="text-sm text-brand-coral" role="alert">{error}</p>}
+      {error && <p className="text-sm text-tone-coral" role="alert">{error}</p>}
     </Modal>
   )
 }

@@ -130,7 +130,7 @@ export function ReportTable<T>({
       <table className="min-w-full text-sm">
         {caption ? <caption className="sr-only">{caption}</caption> : null}
         <thead>
-          <tr className="border-b border-base text-left text-xs uppercase tracking-wide text-muted">
+          <tr className="border-b border-base text-left text-xs text-muted">
             {columns.map((c) => {
               const active = sort?.key === c.key
               const SortIcon = !active ? ChevronsUpDown : sort?.direction === 'asc' ? ArrowUp : ArrowDown
@@ -150,7 +150,7 @@ export function ReportTable<T>({
                     <button
                       type="button"
                       onClick={() => toggleSort(c)}
-                      className="inline-flex items-center gap-1 uppercase tracking-wide hover:text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/20 rounded"
+                      className="inline-flex items-center gap-1 hover:text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-navy/20 rounded"
                     >
                       {c.label}
                       <SortIcon className={cn('h-3 w-3', active ? 'text-brand-navy' : 'opacity-40')} aria-hidden />
@@ -171,7 +171,7 @@ export function ReportTable<T>({
                 {columns.map((c, ci) => {
                   const content = c.cell
                     ? c.cell(row)
-                    : (c.sortValue?.(row) ?? '—')
+                    : (c.sortValue?.(row) ?? '-')
                   return (
                     <td
                       key={c.key}
@@ -183,7 +183,7 @@ export function ReportTable<T>({
                       )}
                     >
                       {href && ci === 0 ? (
-                        <Link href={href} className="font-medium text-brand-teal hover:underline">
+                        <Link href={href} className="font-medium text-tone-teal hover:underline">
                           {content}
                         </Link>
                       ) : (

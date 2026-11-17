@@ -29,8 +29,8 @@ interface Period {
 }
 
 const SPREAD_NOTE: Record<SpreadKind, string> = {
-  'class-wide': 'Low average with a tight spread — the whole class is struggling, which points to the teaching or the topic rather than individuals.',
-  'wide-spread': 'Very uneven results — some students are well ahead while others are far behind.',
+  'class-wide': 'Low average with a tight spread. The whole class is struggling, which points to the teaching or the topic rather than individuals.',
+  'wide-spread': 'Very uneven results: some students are well ahead while others are far behind.',
 }
 const SPREAD_LABEL: Record<SpreadKind, string> = { 'class-wide': 'Whole class struggling', 'wide-spread': 'Uneven results' }
 
@@ -121,7 +121,7 @@ export function AcademicTeachingTab({ academicYear, term }: Period) {
                 key: 'note',
                 label: 'Pattern',
                 sortValue: (r) => r.spread ?? '',
-                cell: (r) => (r.spread ? <span title={SPREAD_NOTE[r.spread]}>{SPREAD_LABEL[r.spread]}</span> : '—'),
+                cell: (r) => (r.spread ? <span title={SPREAD_NOTE[r.spread]}>{SPREAD_LABEL[r.spread]}</span> : '-'),
                 exportValue: (r) => (r.spread ? SPREAD_NOTE[r.spread] : ''),
               },
             ]}
@@ -206,7 +206,7 @@ export function AcademicStudentsTab({ academicYear, term }: Period) {
         isLoading={q.isLoading}
         kpis={d ? [
           kpiTile('flagged', 'Students flagged', d.totalFlagged, 'count', 'Students in your classes with at least one academic or attendance flag.', d.totalFlagged > 0 ? 'watch' : 'healthy'),
-          kpiTile('multi', 'Multiple flags', d.multiRisk, 'count', 'Students with two or more flags at once — the most likely to need intervention.', d.multiRisk > 0 ? 'critical' : 'healthy'),
+          kpiTile('multi', 'Multiple flags', d.multiRisk, 'count', 'Students with two or more flags at once. The most likely to need intervention.', d.multiRisk > 0 ? 'critical' : 'healthy'),
           kpiTile('low', FLAG_LABEL.LOW_AVERAGE, d.counts.LOW_AVERAGE, 'count', 'Overall average below the pass mark.'),
           kpiTile('fail', FLAG_LABEL.SUBJECT_FAILS, d.counts.SUBJECT_FAILS, 'count', 'Failing at least one subject.'),
           kpiTile('absence', FLAG_LABEL.ABSENCE, d.counts.ABSENCE, 'count', `Absent at least ${d.absenceThresholdPct}% of recorded days.`),
@@ -228,7 +228,7 @@ export function AcademicStudentsTab({ academicYear, term }: Period) {
               { key: 'class', label: 'Class', sortValue: (r) => r.className },
               { key: 'avg', label: 'Average', align: 'right', sortValue: (r) => r.average, cell: (r) => formatScore(r.average), exportValue: (r) => r.average },
               { key: 'change', label: 'Change', align: 'right', hideOnMobile: true, sortValue: (r) => r.change, cell: (r) => (r.change === null ? 'N/A' : `${r.change > 0 ? '+' : ''}${Math.round(r.change * 10) / 10}`), exportValue: (r) => r.change },
-              { key: 'fails', label: 'Failing subjects', hideOnMobile: true, sortValue: (r) => r.failingSubjects.length, cell: (r) => r.failingSubjects.join(', ') || '—', exportValue: (r) => r.failingSubjects.join(', ') },
+              { key: 'fails', label: 'Failing subjects', hideOnMobile: true, sortValue: (r) => r.failingSubjects.length, cell: (r) => r.failingSubjects.join(', ') || '-', exportValue: (r) => r.failingSubjects.join(', ') },
               { key: 'absence', label: 'Absence', align: 'right', sortValue: (r) => r.absenceRate, cell: (r) => formatPercent(r.absenceRate), exportValue: (r) => r.absenceRate },
               { key: 'flags', label: 'Flags', sortValue: (r) => r.flags.length, cell: (r) => r.flags.map((f) => FLAG_LABEL[f]).join(', '), exportValue: (r) => r.flags.map((f) => FLAG_LABEL[f]).join(', ') },
             ]}

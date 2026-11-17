@@ -43,6 +43,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { StatusText } from '@/components/shared/StatusText'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAnnouncements, usePendingAnnouncements, useMyDrafts, type Announcement } from '@/hooks/useAnnouncements'
 import { RoleGuard } from '@/components/shared/RoleGuard'
@@ -78,9 +79,15 @@ interface ContentTypeMeta {
 
 const CONTENT_TYPE_ORDER: PostType[] = ['NEWS', 'ADVERTISEMENT', 'ANNOUNCEMENT', 'EVENT']
 
+// Sentence case for the visible status word (R4): "Pending approval", not "PENDING_APPROVAL".
+function statusWord(s: string): string {
+  const w = s.replace(/_/g, ' ').toLowerCase()
+  return w.charAt(0).toUpperCase() + w.slice(1)
+}
+
 const CONTENT_TYPE_META: Record<PostType, ContentTypeMeta> = {
   NEWS: { id: 'NEWS', label: 'News', icon: Newspaper, formMode: 'news', createLabel: 'Write News Article' },
-  ADVERTISEMENT: { id: 'ADVERTISEMENT', label: 'Academic Advertisements', icon: Landmark, formMode: 'ads', createLabel: 'New Academic Advertisement' },
+  ADVERTISEMENT: { id: 'ADVERTISEMENT', label: 'Academic advertisements', icon: Landmark, formMode: 'ads', createLabel: 'New Academic Advertisement' },
   ANNOUNCEMENT: { id: 'ANNOUNCEMENT', label: 'Announcements', icon: Megaphone, formMode: 'announcement', createLabel: 'New Announcement' },
   EVENT: { id: 'EVENT', label: 'Events', icon: CalendarDays, formMode: 'event', createLabel: 'New Event' },
 }
@@ -129,7 +136,7 @@ function AnnouncementBody({ body, clamp = false }: { body: string; clamp?: boole
       <ol key={key} className="grid gap-x-6 gap-y-1 sm:grid-cols-2 mb-3">
         {rows.map((r, i) => (
           <li key={i} className="flex items-baseline gap-3 text-sm text-body">
-            <span className="w-6 shrink-0 text-right text-xs font-bold text-brand-teal tabular">{r.slice(0, r.indexOf('.'))}</span>
+            <span className="w-6 shrink-0 text-right text-xs font-bold text-tone-teal tabular">{r.slice(0, r.indexOf('.'))}</span>
             <span className="min-w-0">{r.slice(r.indexOf('.') + 2)}</span>
           </li>
         ))}
@@ -142,7 +149,7 @@ function AnnouncementBody({ body, clamp = false }: { body: string; clamp?: boole
     if (/^\d+\. /.test(l)) { rows.push(l); return }
     flush(`ol-${i}`)
     if (/^# /.test(l)) {
-      out.push(<h4 key={i} className="font-heading font-bold text-brand-navy text-sm uppercase tracking-wide mt-5 mb-2 pb-1 border-b border-base">{l.slice(2)}</h4>)
+      out.push(<h4 key={i} className="font-heading font-bold text-brand-navy text-sm mt-5 mb-2 pb-1 border-b border-base">{l.slice(2)}</h4>)
     } else if (/^## /.test(l)) {
       out.push(<h5 key={i} className="font-heading font-semibold text-body text-sm mt-3 mb-1.5">{l.slice(3)}</h5>)
     } else if (l.trim()) {
@@ -242,7 +249,7 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-brand-coral">
+      <div className="flex flex-col items-center justify-center py-16 text-tone-coral">
         <Bell className="w-10 h-10 mb-3 opacity-40" aria-hidden="true" />
         <p className="text-sm">{error}</p>
       </div>
@@ -261,7 +268,7 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
   return (
     <div className="space-y-5">
       {deleteError && (
-        <p role="alert" className="text-xs text-brand-coral">
+        <p role="alert" className="text-xs text-tone-coral">
           {deleteError}
         </p>
       )}
@@ -277,17 +284,17 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
                     href={publicHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group inline-flex items-center gap-1.5 font-heading font-semibold text-body hover:text-brand-teal transition-colors"
+                    className="group inline-flex items-center gap-1.5 font-heading font-semibold text-body hover:text-tone-teal transition-colors"
                   >
                     {a.title}
-                    <ExternalLink className="w-3.5 h-3.5 text-muted group-hover:text-brand-teal shrink-0" aria-hidden="true" />
+                    <ExternalLink className="w-3.5 h-3.5 text-muted group-hover:text-tone-teal shrink-0" aria-hidden="true" />
                     <span className="sr-only">(opens the public page in a new tab)</span>
                   </a>
                 ) : (
                   <h3 className="font-heading font-semibold text-body">{a.title}</h3>
                 )}
                 {a.eventDate && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-heading font-bold text-status-info">
+                  <span className="inline-flex items-center gap-1 text-xs font-heading font-bold text-status-info">
                     <CalendarDays className="w-3 h-3" aria-hidden />
                     {new Date(a.eventDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
@@ -302,23 +309,17 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
               )}
             </div>
             <div className="shrink-0 flex items-center gap-2">
-              <span
-                className={`text-[10px] font-heading font-bold ${
-                  a.status === 'PUBLISHED'
-                    ? 'text-status-success'
-                    : a.status === 'PENDING_APPROVAL'
-                      ? 'text-status-warning'
-                      : 'text-muted'
-                }`}
+              <StatusText
+                tone={a.status === 'PUBLISHED' ? 'success' : a.status === 'PENDING_APPROVAL' ? 'warning' : 'neutral'}
               >
-                {a.status}
-              </span>
+                {statusWord(a.status)}
+              </StatusText>
               {canDelete(a.createdByUid) && (
                 <button
                   onClick={() => setConfirmId(confirmId === a.id ? null : a.id)}
                   disabled={deletingId === a.id}
                   aria-label="Delete announcement"
-                  className="p-2 rounded-lg text-muted hover:text-brand-coral hover:bg-brand-coral/8 transition-colors disabled:opacity-60 min-h-[40px] min-w-[40px] flex items-center justify-center"
+                  className="p-2 rounded-lg text-muted hover:text-tone-coral hover:bg-brand-coral/8 transition-colors disabled:opacity-60 min-h-[40px] min-w-[40px] flex items-center justify-center"
                 >
                   <Trash2 className="w-4 h-4" aria-hidden="true" />
                 </button>
@@ -338,7 +339,7 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
                 <button
                   onClick={() => handleDelete(a.id)}
                   disabled={deletingId === a.id}
-                  className="flex items-center gap-1.5 bg-brand-coral text-white px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-60 min-h-[40px]"
+                  className="flex items-center gap-1.5 bg-btn-danger text-btn-danger-fg px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-60 min-h-[40px]"
                 >
                   {deletingId === a.id && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
                   Delete
@@ -347,7 +348,7 @@ function PublishedList({ announcements, isLoading, error }: { announcements: Ret
             </div>
           )}
           {a.createdAt && (
-            <p className="text-[10px] text-muted mt-3 font-sans">
+            <p className="text-xs text-muted mt-3 font-sans">
               {new Date(a.createdAt).toLocaleDateString()}
             </p>
           )}
@@ -453,7 +454,7 @@ function PendingApprovalList({
   // real fetch/permission failure as "nothing to approve."
   if (feedError) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-brand-coral">
+      <div className="flex flex-col items-center justify-center py-16 text-tone-coral">
         <Check className="w-10 h-10 mb-3 opacity-40" aria-hidden="true" />
         <p className="text-sm">{feedError}</p>
       </div>
@@ -472,7 +473,7 @@ function PendingApprovalList({
   return (
     <div className="space-y-5">
       {error && (
-        <p role="alert" className="text-xs text-brand-coral">
+        <p role="alert" className="text-xs text-tone-coral">
           {error}
         </p>
       )}
@@ -487,7 +488,7 @@ function PendingApprovalList({
               <button
                 onClick={() => handleApprove(a.id)}
                 disabled={busyId === a.id}
-                className="flex items-center justify-center gap-1.5 bg-brand-teal text-white px-3 py-2 rounded-xl text-xs font-heading font-semibold hover:bg-brand-teal-light transition-colors disabled:opacity-60 min-h-[44px]"
+                className="flex items-center justify-center gap-1.5 bg-btn-brand text-btn-brand-fg px-3 py-2 rounded-xl text-xs font-heading font-semibold hover:bg-brand-teal-light transition-colors disabled:opacity-60 min-h-[44px]"
               >
                 {busyId === a.id && rejectingId !== a.id ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
@@ -500,7 +501,7 @@ function PendingApprovalList({
                 <button
                   onClick={() => { setRejectingId(rejectingId === a.id ? null : a.id); setReason('') }}
                   disabled={busyId === a.id}
-                  className="flex items-center justify-center gap-1.5 border border-brand-coral/40 text-brand-coral px-3 py-2 rounded-xl text-xs font-heading font-semibold hover:bg-brand-coral/8 transition-colors disabled:opacity-60 min-h-[44px]"
+                  className="flex items-center justify-center gap-1.5 border border-brand-coral/40 text-tone-coral px-3 py-2 rounded-xl text-xs font-heading font-semibold hover:bg-brand-coral/8 transition-colors disabled:opacity-60 min-h-[44px]"
                 >
                   <X className="w-3.5 h-3.5" aria-hidden="true" />
                   Reject
@@ -511,14 +512,14 @@ function PendingApprovalList({
           {rejectingId === a.id && (
             <div className="mt-4 border-t border-base pt-4 space-y-2">
               <label htmlFor={`reason-${a.id}`} className="block text-xs font-medium text-body">
-                Reason (optional — shared with the author)
+                Reason (optional: shared with the author)
               </label>
               <textarea
                 id={`reason-${a.id}`}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 rows={2}
-                placeholder="e.g. Please target only Form 4 classes and resubmit."
+                placeholder="Please target only Form 4 classes and resubmit."
                 className="w-full border border-base rounded-xl px-3 py-2 text-sm bg-page resize-none focus:outline-none focus:ring-2 focus:ring-brand-coral/25"
               />
               <div className="flex justify-end gap-2">
@@ -531,10 +532,10 @@ function PendingApprovalList({
                 <button
                   onClick={() => handleReject(a.id)}
                   disabled={busyId === a.id}
-                  className="flex items-center gap-1.5 bg-brand-coral text-white px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-60 min-h-[40px]"
+                  className="flex items-center gap-1.5 bg-btn-danger text-btn-danger-fg px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-60 min-h-[40px]"
                 >
                   {busyId === a.id && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
-                  Confirm Reject
+                  Confirm reject
                 </button>
               </div>
             </div>
@@ -618,7 +619,7 @@ function DraftsList({
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-brand-coral">
+      <div className="flex flex-col items-center justify-center py-16 text-tone-coral">
         <FileEdit className="w-10 h-10 mb-3 opacity-40" aria-hidden="true" />
         <p className="text-sm">{error}</p>
       </div>
@@ -637,7 +638,7 @@ function DraftsList({
   return (
     <div className="space-y-5">
       {deleteError && (
-        <p role="alert" className="text-xs text-brand-coral">
+        <p role="alert" className="text-xs text-tone-coral">
           {deleteError}
         </p>
       )}
@@ -651,7 +652,7 @@ function DraftsList({
             <div className="shrink-0 flex items-center gap-2">
               <button
                 onClick={() => onContinue(d)}
-                className="flex items-center gap-1.5 bg-brand-teal text-white px-3 py-2 rounded-xl text-xs font-heading font-semibold hover:bg-brand-teal-light transition-colors min-h-[40px]"
+                className="flex items-center gap-1.5 bg-btn-brand text-btn-brand-fg px-3 py-2 rounded-xl text-xs font-heading font-semibold hover:bg-brand-teal-light transition-colors min-h-[40px]"
               >
                 <PencilLine className="w-3.5 h-3.5" aria-hidden="true" />
                 Continue
@@ -660,7 +661,7 @@ function DraftsList({
                 onClick={() => setConfirmId(confirmId === d.id ? null : d.id)}
                 disabled={deletingId === d.id}
                 aria-label="Delete draft"
-                className="p-2 rounded-lg text-muted hover:text-brand-coral hover:bg-brand-coral/8 transition-colors disabled:opacity-60 min-h-[40px] min-w-[40px] flex items-center justify-center"
+                className="p-2 rounded-lg text-muted hover:text-tone-coral hover:bg-brand-coral/8 transition-colors disabled:opacity-60 min-h-[40px] min-w-[40px] flex items-center justify-center"
               >
                 <Trash2 className="w-4 h-4" aria-hidden="true" />
               </button>
@@ -679,7 +680,7 @@ function DraftsList({
                 <button
                   onClick={() => handleDelete(d.id)}
                   disabled={deletingId === d.id}
-                  className="flex items-center gap-1.5 bg-brand-coral text-white px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-60 min-h-[40px]"
+                  className="flex items-center gap-1.5 bg-btn-danger text-btn-danger-fg px-4 py-2 rounded-xl text-xs font-semibold disabled:opacity-60 min-h-[40px]"
                 >
                   {deletingId === d.id && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
                   Delete
@@ -768,9 +769,9 @@ function AnnouncementsContent() {
   )
 
   const statusTabs: TabItem<StatusTab>[] = [
-    { id: 'published' as const, label: 'Published', badge: typeAnnouncements.length },
-    ...(canApprove ? [{ id: 'pending' as const, label: 'Pending Approval', badge: pendingCount }] : []),
-    ...(canCreate ? [{ id: 'drafts' as const, label: 'Drafts', badge: draftsCount }] : []),
+    { id: 'published' as const, label: 'Published' },
+    ...(canApprove ? [{ id: 'pending' as const, label: 'Pending approval', badge: pendingCount, badgeNoun: 'to approve' }] : []),
+    ...(canCreate ? [{ id: 'drafts' as const, label: 'Drafts', badge: draftsCount, badgeNoun: 'unfinished' }] : []),
   ]
 
   return (
@@ -778,10 +779,10 @@ function AnnouncementsContent() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2">
-          <Megaphone className="w-5 h-5 text-brand-teal" aria-hidden="true" />
+          <Megaphone className="w-5 h-5 text-tone-teal" aria-hidden="true" />
           <h1 className="font-heading font-bold text-xl text-brand-navy">Announcements</h1>
         </div>
-        <p className="text-sm text-muted mt-0.5">News, announcements, academic advertisements and events — all in one place.</p>
+        <p className="text-sm text-muted mt-0.5">News, announcements, academic advertisements and events. All in one place.</p>
       </div>
 
       {/* [NEW] Content-type navigation — News / Academic Advertisements /
@@ -809,7 +810,7 @@ function AnnouncementsContent() {
           {canCreate && (
             <button
               onClick={() => openCreate(activeTypeMeta.formMode)}
-              className="flex items-center gap-2 bg-brand-teal text-white px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-brand-teal-light transition-colors min-h-[44px]"
+              className="flex items-center gap-2 bg-btn-brand text-btn-brand-fg px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-brand-teal-light transition-colors min-h-[44px]"
             >
               {/* [PRESERVED] "New Announcement" kept its own distinct
                   PlusCircle icon (rather than reusing Megaphone) to match

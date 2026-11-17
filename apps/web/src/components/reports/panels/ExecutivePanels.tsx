@@ -87,7 +87,7 @@ export function RetentionPanel({ academicYear, term }: Period) {
             { key: 'promoted', label: 'Promoted', align: 'right', sortValue: (r) => r.promoted, cell: (r) => String(r.promoted) },
             { key: 'repeated', label: 'Repeated', align: 'right', sortValue: (r) => r.repeated, cell: (r) => String(r.repeated) },
             { key: 'graduated', label: 'Graduated / awaiting MANEB', align: 'right', sortValue: (r) => r.graduated + r.awaitingManeb, cell: (r) => String(r.graduated + r.awaitingManeb) },
-            { key: 'rate', label: 'Repetition rate', align: 'right', sortValue: (r) => r.repetitionRate ?? -1, cell: (r) => (r.repetitionRate == null ? '—' : formatPercent(r.repetitionRate)), exportValue: (r) => r.repetitionRate ?? '' },
+            { key: 'rate', label: 'Repetition rate', align: 'right', sortValue: (r) => r.repetitionRate ?? -1, cell: (r) => (r.repetitionRate == null ? '-' : formatPercent(r.repetitionRate)), exportValue: (r) => r.repetitionRate ?? '' },
           ]} />
         </QueryState>
       </ReportCard>

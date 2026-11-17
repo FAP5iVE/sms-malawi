@@ -116,7 +116,7 @@ export function AssetsTab() {
         kpis={d ? [
           kpiTile('assets', 'Register items', d.totals.assets, 'count', 'Rows in the asset register that match the filters. A bulk line (for example 40 chairs) is one row.', 'neutral', `${formatCount(d.totals.units)} units`, reg({ category, status, condition })),
           kpiTile('cost', 'Register valuation', d.totals.recordedCost, 'mwk', 'Recorded acquisition cost of items that are not disposed. Items with no cost recorded are not valued.', 'neutral', d.totals.withoutCost > 0 ? `${d.totals.withoutCost} with no cost recorded` : undefined),
-          kpiTile('store', 'In store (unassigned)', d.byStatus.find((s) => s.key === 'IN_STORE')?.count ?? 0, 'count', 'Items with status “in store” — not allocated to anyone.', 'neutral', undefined, reg({ status: 'IN_STORE', category, condition })),
+          kpiTile('store', 'In store (unassigned)', d.byStatus.find((s) => s.key === 'IN_STORE')?.count ?? 0, 'count', 'Items with status “in store”. Not allocated to anyone.', 'neutral', undefined, reg({ status: 'IN_STORE', category, condition })),
           kpiTile('allocated', 'Allocated', d.byStatus.find((s) => s.key === 'ALLOCATED')?.count ?? 0, 'count', 'Items currently allocated to a person, department or room.', 'neutral', undefined, reg({ status: 'ALLOCATED', category, condition })),
           kpiTile('action', 'Needing action', d.totals.needsAction, 'count', 'Items that are damaged, under repair, lost, out of warranty soon, with no location, or allocated with no custodian.', d.totals.needsAction > 0 ? 'watch' : 'healthy'),
         ] : undefined}
@@ -161,22 +161,22 @@ export function AssetsTab() {
         </ReportCard>
       </TwoUp>
 
-      <ReportCard title="Needs attention" sub="Damaged, under repair, lost, warranty ending, no location or custodian — open one to act on it" href="/assets?tab=register" hrefLabel="Open register">
+      <ReportCard title="Needs attention" sub="Damaged, under repair, lost, warranty ending, no location or custodian. Open one to act on it" href="/assets?tab=register" hrefLabel="Open register">
         <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
           <ReportTable<ApiAssetRecord>
             rows={d?.records}
             rowKey={(r) => r.id}
             rowHref={(r) => reg({ asset: r.id })}
             exportLabel="Assets needing attention"
-            exportNote={d?.recordsTruncated ? `First ${d?.records.length ?? 0} of ${d?.totals.needsAction ?? 'more'} only — narrow the filters for the rest` : undefined}
+            exportNote={d?.recordsTruncated ? `First ${d?.records.length ?? 0} of ${d?.totals.needsAction ?? 'more'} only: narrow the filters for the rest` : undefined}
             emptyMessage="No asset needs attention."
             columns={[
               { key: 'name', label: 'Asset', sortValue: (r) => r.name, cell: (r) => r.name, exportValue: (r) => r.name },
-              { key: 'tag', label: 'Tag', hideOnMobile: true, sortValue: (r) => r.assetTag ?? '', cell: (r) => r.assetTag ?? '—', exportValue: (r) => r.assetTag ?? '' },
+              { key: 'tag', label: 'Tag', hideOnMobile: true, sortValue: (r) => r.assetTag ?? '', cell: (r) => r.assetTag ?? '-', exportValue: (r) => r.assetTag ?? '' },
               { key: 'status', label: 'Status', sortValue: (r) => r.status, cell: (r) => humanize(r.status), exportValue: (r) => r.status },
               { key: 'condition', label: 'Condition', hideOnMobile: true, sortValue: (r) => r.condition, cell: (r) => humanize(r.condition), exportValue: (r) => r.condition },
               { key: 'location', label: 'Location', hideOnMobile: true, sortValue: (r) => r.location },
-              { key: 'custodian', label: 'Custodian', hideOnMobile: true, sortValue: (r) => r.custodian ?? '', cell: (r) => r.custodian ?? '—', exportValue: (r) => r.custodian ?? '' },
+              { key: 'custodian', label: 'Custodian', hideOnMobile: true, sortValue: (r) => r.custodian ?? '', cell: (r) => r.custodian ?? '-', exportValue: (r) => r.custodian ?? '' },
               { key: 'flags', label: 'Why', sortValue: (r) => r.flags.length, cell: (r) => r.flags.map((f) => FLAG_LABEL[f]).join(', '), exportValue: (r) => r.flags.map((f) => FLAG_LABEL[f]).join('; ') },
               { key: 'cost', label: 'Cost', align: 'right', hideOnMobile: true, sortValue: (r) => r.acquisitionCost, cell: (r) => formatMwkCompact(r.acquisitionCost), exportValue: (r) => r.acquisitionCost },
             ]}
@@ -204,7 +204,7 @@ export function AssetsTab() {
             />
           </QueryState>
         </ReportCard>
-        <ReportCard title="Who is responsible" sub="Assets allocated or kept in a custodian’s room — select a person to filter">
+        <ReportCard title="Who is responsible" sub="Assets allocated or kept in a custodian’s room. Select a person to filter">
           <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
             <ReportTable<ApiAssetCustodianRow>
               rows={d?.byCustodian}
@@ -240,7 +240,7 @@ export function AssetsTab() {
           <dl className="grid grid-cols-2 gap-3 text-sm sm:max-w-md">
             <div>
               <dt className="text-xs text-muted">Awaiting approval</dt>
-              <dd className="font-heading text-lg font-semibold text-brand-navy">{d ? formatCount(d.requests.pending) : '—'}</dd>
+              <dd className="font-heading text-lg font-semibold text-brand-navy">{d ? formatCount(d.requests.pending) : '-'}</dd>
             </div>
             {d && d.requests.outstandingAdvances !== null ? (
               <div>
@@ -295,7 +295,7 @@ export function StocktakeTab({ academicYear, term }: { academicYear: string; ter
         ] : undefined}
       />
 
-      <ReportCard title="Stocktakes" sub="Unfinished and overdue first — open one to count or resolve" href="/assets?tab=stocktakes" hrefLabel="Open stocktakes">
+      <ReportCard title="Stocktakes" sub="Unfinished and overdue first: open one to count or resolve" href="/assets?tab=stocktakes" hrefLabel="Open stocktakes">
         <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
           <ReportTable<ApiStocktakeRow>
             rows={d?.rows}
@@ -306,10 +306,10 @@ export function StocktakeTab({ academicYear, term }: { academicYear: string; ter
             columns={[
               { key: 'no', label: 'Stocktake', sortValue: (r) => r.stocktakeNumber },
               { key: 'room', label: 'Room', sortValue: (r) => `${r.building ?? ''} ${r.room ?? ''}`, cell: (r) => (r.room ? `${r.building ?? ''} · ${r.room}`.replace(/^ · /, '') : r.department ?? 'Whole school'), exportValue: (r) => r.room ?? r.department ?? 'Whole school' },
-              { key: 'term', label: 'Term', hideOnMobile: true, sortValue: (r) => r.term ?? 0, cell: (r) => (r.term ? `Term ${r.term}` : '—'), exportValue: (r) => r.term ?? '' },
-              { key: 'status', label: 'Status', sortValue: (r) => r.status, cell: (r) => `${humanize(r.status)}${r.stale ? ' — overdue' : ''}`, exportValue: (r) => r.status },
-              { key: 'who', label: 'Responsible', hideOnMobile: true, sortValue: (r) => r.responsible ?? '', cell: (r) => r.responsible ?? '—', exportValue: (r) => r.responsible ?? '' },
-              { key: 'open', label: 'Days open', align: 'right', sortValue: (r) => r.openDays, cell: (r) => (r.openDays === null ? '—' : String(r.openDays)), exportValue: (r) => r.openDays },
+              { key: 'term', label: 'Term', hideOnMobile: true, sortValue: (r) => r.term ?? 0, cell: (r) => (r.term ? `Term ${r.term}` : '-'), exportValue: (r) => r.term ?? '' },
+              { key: 'status', label: 'Status', sortValue: (r) => r.status, cell: (r) => `${humanize(r.status)}${r.stale ? ' overdue' : ''}`, exportValue: (r) => r.status },
+              { key: 'who', label: 'Responsible', hideOnMobile: true, sortValue: (r) => r.responsible ?? '', cell: (r) => r.responsible ?? '-', exportValue: (r) => r.responsible ?? '' },
+              { key: 'open', label: 'Days open', align: 'right', sortValue: (r) => r.openDays, cell: (r) => (r.openDays === null ? '-' : String(r.openDays)), exportValue: (r) => r.openDays },
               { key: 'lines', label: 'Lines', align: 'right', hideOnMobile: true, sortValue: (r) => r.lines, cell: (r) => formatCount(r.lines) },
               { key: 'exp', label: 'Expected', align: 'right', hideOnMobile: true, sortValue: (r) => r.expected, cell: (r) => num(r.expected), exportValue: (r) => r.expected },
               { key: 'cnt', label: 'Counted', align: 'right', hideOnMobile: true, sortValue: (r) => r.counted, cell: (r) => num(r.counted), exportValue: (r) => r.counted },
@@ -332,7 +332,7 @@ export function StocktakeTab({ academicYear, term }: { academicYear: string; ter
             />
           </QueryState>
         </ReportCard>
-        <ReportCard title="Unresolved discrepancies" sub={`Whole academic year ${academicYear} — unresolved first`}>
+        <ReportCard title="Unresolved discrepancies" sub={`Whole academic year ${academicYear} unresolved first`}>
           <QueryState isLoading={variance.isLoading} isError={variance.isError} onRetry={() => void variance.refetch()}>
             <ReportTable<ApiVarianceItemRow>
               rows={variance.data?.items}
@@ -402,12 +402,12 @@ export function ProcurementTab() {
           kpiTile('ordered', 'Ordered', value('ordered'), 'mwk', 'Total of approved purchase orders, including tax.', 'neutral', `${count('ordered')} orders`, list('orders')),
           kpiTile('received', 'Received', value('received'), 'mwk', 'Value of goods accepted so far, at ordered prices.', 'neutral', undefined, list('receipts')),
           kpiTile('paid', 'Paid', value('paid'), 'mwk', 'Approved expenses recorded against these orders that have a payment date.', 'neutral', d.expenses.payable > 0 ? `${formatMwkCompact(d.expenses.payable)} approved, not yet paid` : undefined),
-          kpiTile('open', 'Open commitments', d.openNow.value, 'mwk', 'Undelivered value of every open purchase order, whatever its date — the same figure Finance reports as open commitments.', 'neutral', `${d.openNow.orders} open orders`, list('orders')),
+          kpiTile('open', 'Open commitments', d.openNow.value, 'mwk', 'Undelivered value of every open purchase order, whatever its date. The same figure Finance reports as open commitments.', 'neutral', `${d.openNow.orders} open orders`, list('orders')),
         ] : undefined}
       />
 
       <TwoUp>
-        <ChartCard title="Value at each stage" sub="Different measures of the same requisitions — not added together" isLoading={q.isLoading} height={260}>
+        <ChartCard title="Value at each stage" sub="Different measures of the same requisitions. Not added together" isLoading={q.isLoading} height={260}>
           <Chart
             type="bar"
             data={(d?.stages ?? []).filter((s) => s.value !== null).map((s) => ({ x: s.label, value: s.value ?? 0 }))}
@@ -453,8 +453,8 @@ export function ProcurementTab() {
                 ))}
               </dl>
               {!d.orders.reconciles ? (
-                <p role="alert" className="rounded-lg border border-brand-coral/50 p-3 text-sm text-brand-coral">
-                  These figures do not add up — an order has a line with no quantity. Check the purchase orders.
+                <p role="alert" className="rounded-lg border border-brand-coral/50 p-3 text-sm text-tone-coral">
+                  These figures do not add up. An order has a line with no quantity. Check the purchase orders.
                 </p>
               ) : null}
               <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
@@ -519,7 +519,7 @@ export function ProcurementTab() {
               columns={[
                 { key: 'po', label: 'Order', sortValue: (r) => r.poNumber },
                 { key: 'supplier', label: 'Supplier', hideOnMobile: true, sortValue: (r) => r.supplier },
-                { key: 'late', label: 'Days late', align: 'right', sortValue: (r) => r.daysLate, cell: (r) => (r.daysLate === null ? '—' : String(r.daysLate)) },
+                { key: 'late', label: 'Days late', align: 'right', sortValue: (r) => r.daysLate, cell: (r) => (r.daysLate === null ? '-' : String(r.daysLate)) },
                 { key: 'open', label: 'Still to deliver', align: 'right', sortValue: (r) => r.openValue, cell: (r) => formatMwkCompact(r.openValue), exportValue: (r) => r.openValue },
               ]}
             />
@@ -551,13 +551,13 @@ export function ProcurementTab() {
             rowKey={(r) => r.id}
             rowHref={() => list('requisitions')}
             exportLabel="Requisitions by value"
-            exportNote={d?.requisitionsTruncated ? `Largest ${d?.requisitions.length ?? 0} only — narrow the filters for the rest` : undefined}
+            exportNote={d?.requisitionsTruncated ? `Largest ${d?.requisitions.length ?? 0} only: narrow the filters for the rest` : undefined}
             emptyMessage="No requisitions in this period."
             columns={[
               { key: 'no', label: 'Requisition', sortValue: (r) => r.requisitionNumber },
               { key: 'dept', label: 'Department', hideOnMobile: true, sortValue: (r) => r.department },
               { key: 'status', label: 'Status', sortValue: (r) => r.status, cell: (r) => humanize(r.status), exportValue: (r) => r.status },
-              { key: 'age', label: 'Days open', align: 'right', hideOnMobile: true, sortValue: (r) => r.ageDays, cell: (r) => (r.ageDays === null ? '—' : String(r.ageDays)), exportValue: (r) => r.ageDays },
+              { key: 'age', label: 'Days open', align: 'right', hideOnMobile: true, sortValue: (r) => r.ageDays, cell: (r) => (r.ageDays === null ? '-' : String(r.ageDays)), exportValue: (r) => r.ageDays },
               { key: 'req', label: 'Requested', align: 'right', sortValue: (r) => r.requested, cell: (r) => formatMwkCompact(r.requested), exportValue: (r) => r.requested },
               { key: 'ord', label: 'Ordered', align: 'right', hideOnMobile: true, sortValue: (r) => r.ordered, cell: (r) => formatMwkCompact(r.ordered), exportValue: (r) => r.ordered },
               { key: 'rec', label: 'Received', align: 'right', hideOnMobile: true, sortValue: (r) => r.received, cell: (r) => formatMwkCompact(r.received), exportValue: (r) => r.received },
@@ -612,12 +612,12 @@ export function InventoryTab() {
           kpiTile('items', 'Items tracked', d.totals.items, 'count', 'Active inventory items.', 'neutral', undefined, inv()),
           kpiTile('low', 'At or below reorder level', d.totals.belowReorder, 'count', 'Items whose balance (sum of all their movements) is at or below the reorder level. Items with no reorder level cannot be assessed.', d.totals.belowReorder > 0 ? 'watch' : 'healthy', undefined, inv({ low: '1' })),
           kpiTile('out', 'Out of stock', d.totals.outOfStock, 'count', 'Items that have had stock but whose balance is now zero or less.', d.totals.outOfStock > 0 ? 'watch' : 'healthy'),
-          kpiTile('negative', 'Negative balances', d.totals.negative, 'count', 'Items whose recorded issues exceed receipts — a record needs correcting.', d.totals.negative > 0 ? 'critical' : 'healthy'),
+          kpiTile('negative', 'Negative balances', d.totals.negative, 'count', 'Items whose recorded issues exceed receipts. A record needs correcting.', d.totals.negative > 0 ? 'critical' : 'healthy'),
           kpiTile('norl', 'No reorder level', d.totals.withoutReorderLevel, 'count', 'Items that cannot be checked for low stock because no reorder level is set.', 'neutral'),
         ] : undefined}
       />
 
-      <ReportCard title="Low stock" sub="With the movements that explain the change in the window — open an item to receive or issue stock" href="/assets?tab=inventory&low=1" hrefLabel="Open inventory">
+      <ReportCard title="Low stock" sub="With the movements that explain the change in the window. Open an item to receive or issue stock" href="/assets?tab=inventory&low=1" hrefLabel="Open inventory">
         <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
           <ReportTable<ApiLowStockRow>
             rows={d?.low}
@@ -632,7 +632,7 @@ export function InventoryTab() {
               { key: 'bal', label: 'Balance', align: 'right', sortValue: (r) => r.balance, cell: (r) => `${num(r.balance)} ${r.unit}`, exportValue: (r) => r.balance },
               { key: 'rl', label: 'Reorder at', align: 'right', hideOnMobile: true, sortValue: (r) => r.reorderLevel, cell: (r) => num(r.reorderLevel), exportValue: (r) => r.reorderLevel },
               { key: 'short', label: 'Shortfall', align: 'right', sortValue: (r) => r.shortfall, cell: (r) => num(r.shortfall), exportValue: (r) => r.shortfall },
-              { key: 'rq', label: 'Reorder qty', align: 'right', hideOnMobile: true, sortValue: (r) => r.reorderQuantity, cell: (r) => (r.reorderQuantity === null ? '—' : num(r.reorderQuantity)), exportValue: (r) => r.reorderQuantity },
+              { key: 'rq', label: 'Reorder qty', align: 'right', hideOnMobile: true, sortValue: (r) => r.reorderQuantity, cell: (r) => (r.reorderQuantity === null ? '-' : num(r.reorderQuantity)), exportValue: (r) => r.reorderQuantity },
               { key: 'in', label: 'In', align: 'right', hideOnMobile: true, sortValue: (r) => r.receivedInWindow, cell: (r) => num(r.receivedInWindow), exportValue: (r) => r.receivedInWindow },
               { key: 'out', label: 'Out', align: 'right', hideOnMobile: true, sortValue: (r) => r.issuedInWindow, cell: (r) => num(r.issuedInWindow), exportValue: (r) => r.issuedInWindow },
               { key: 'net', label: 'Net change', align: 'right', sortValue: (r) => r.netChangeInWindow, cell: (r) => num(r.netChangeInWindow), exportValue: (r) => r.netChangeInWindow },
@@ -677,16 +677,16 @@ export function InventoryTab() {
             rowKey={(r) => r.id}
             rowHref={(r) => inv({ item: r.itemCode })}
             exportLabel="Stock movements"
-            exportNote={d?.movementsTruncated ? `Latest ${d?.movements.length ?? 0} only — narrow the window for the rest` : undefined}
+            exportNote={d?.movementsTruncated ? `Latest ${d?.movements.length ?? 0} only: narrow the window for the rest` : undefined}
             emptyMessage="No stock movements in this window."
             columns={[
               { key: 'at', label: 'When', sortValue: (r) => r.at, cell: (r) => formatDate(r.at), exportValue: (r) => r.at },
               { key: 'item', label: 'Item', sortValue: (r) => r.itemName, cell: (r) => `${r.itemName} (${r.itemCode})`, exportValue: (r) => r.itemName },
               { key: 'type', label: 'Type', sortValue: (r) => r.type, cell: (r) => humanize(r.type), exportValue: (r) => r.type },
               { key: 'qty', label: 'Quantity', align: 'right', sortValue: (r) => r.quantity, cell: (r) => (r.effect === 0 ? num(r.quantity) : `${r.effect > 0 ? '+' : '−'}${num(Math.abs(r.effect))}`), exportValue: (r) => r.effect || r.quantity },
-              { key: 'route', label: 'From → to', hideOnMobile: true, sortValue: (r) => `${r.from ?? ''}${r.to ?? ''}`, cell: (r) => (r.from || r.to ? `${r.from ?? '—'} → ${r.to ?? '—'}` : '—'), exportValue: (r) => `${r.from ?? ''} → ${r.to ?? ''}` },
-              { key: 'dept', label: 'Department', hideOnMobile: true, sortValue: (r) => r.department ?? '', cell: (r) => r.department ?? '—', exportValue: (r) => r.department ?? '' },
-              { key: 'why', label: 'Reason', hideOnMobile: true, sortValue: (r) => r.reason ?? '', cell: (r) => r.reason ?? '—', exportValue: (r) => r.reason ?? '' },
+              { key: 'route', label: 'From → to', hideOnMobile: true, sortValue: (r) => `${r.from ?? ''}${r.to ?? ''}`, cell: (r) => (r.from || r.to ? `${r.from ?? '-'} → ${r.to ?? '-'}` : '-'), exportValue: (r) => `${r.from ?? ''} → ${r.to ?? ''}` },
+              { key: 'dept', label: 'Department', hideOnMobile: true, sortValue: (r) => r.department ?? '', cell: (r) => r.department ?? '-', exportValue: (r) => r.department ?? '' },
+              { key: 'why', label: 'Reason', hideOnMobile: true, sortValue: (r) => r.reason ?? '', cell: (r) => r.reason ?? '-', exportValue: (r) => r.reason ?? '' },
             ]}
           />
           {d?.movementsTruncated ? <p className="mt-2 text-xs text-muted">Showing the latest {d.movements.length}. Narrow the window to see earlier movements.</p> : null}

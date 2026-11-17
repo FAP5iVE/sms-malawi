@@ -57,10 +57,10 @@ export function ApprovalDetailDialog({ item, onClose, onAction }: Props) {
             ) : null}
 
             {item.details.length > 0 ? (
-              <dl className="grid grid-cols-1 gap-x-6 gap-y-3 rounded-xl border border-base bg-page p-4 sm:grid-cols-2">
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-3 rounded-xl app-tint p-4 sm:grid-cols-2">
                 {item.details.map((d) => (
                   <div key={`${d.label}-${d.value}`} className="min-w-0">
-                    <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{d.label}</dt>
+                    <dt className="text-xs font-semibold text-muted">{d.label}</dt>
                     <dd className="mt-0.5 break-words text-sm text-body">{d.value}</dd>
                   </div>
                 ))}
@@ -71,7 +71,7 @@ export function ApprovalDetailDialog({ item, onClose, onAction }: Props) {
               <h4 className="mb-2 font-heading text-sm font-semibold text-body">Timeline</h4>
               <ol className="space-y-3 border-l border-base pl-4">
                 <li className="relative">
-                  <CircleDot className="absolute -left-[25px] top-0.5 h-4 w-4 bg-surface text-brand-teal" aria-hidden="true" />
+                  <CircleDot className="absolute -left-[25px] top-0.5 h-4 w-4 bg-surface text-tone-teal" aria-hidden="true" />
                   <p className="text-sm font-medium text-body">
                     Submitted by {item.isMine ? 'you' : item.requester.name}
                     {item.requester.role ? ` (${humanize(item.requester.role)})` : ''}
@@ -80,7 +80,7 @@ export function ApprovalDetailDialog({ item, onClose, onAction }: Props) {
                 </li>
                 <li className="relative">
                   <CircleDot
-                    className={`absolute -left-[25px] top-0.5 h-4 w-4 bg-surface ${item.status === 'PENDING' ? 'text-amber-500' : 'text-brand-teal'}`}
+                    className={`absolute -left-[25px] top-0.5 h-4 w-4 bg-surface ${item.status === 'PENDING' ? 'text-status-warning' : 'text-tone-teal'}`}
                     aria-hidden="true"
                   />
                   {item.status === 'PENDING' ? (

@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { StatusText } from '@/components/shared/StatusText'
 import { Loader2, Save, Plus, X } from 'lucide-react'
 import { apiFetch }            from '@/lib/api-client'
 import type { PayeBracket }    from '@shared/types/settings'
@@ -101,33 +102,33 @@ export function FinanceSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-heading font-bold text-lg text-brand-navy">Finance Preferences</h2>
+        <h2 className="font-heading font-bold text-lg text-brand-navy">Finance preferences</h2>
         <p className="text-sm text-muted mt-0.5">Fee reminders, penalties, payroll and receipt settings.</p>
       </div>
       <form onSubmit={handleSave} className="space-y-6">
         {/* Fee Management */}
         <div className="pb-5 border-b border-base">
-          <h3 className="font-heading font-semibold text-sm text-body mb-4">Fee Management</h3>
+          <h3 className="font-heading font-semibold text-sm text-body mb-4">Fee management</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-lg">
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Reminder Days Before Due</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Reminder days before due</label>
               <input type="number" min={1} value={config.fee_reminder_days_before} onChange={(e) => set('fee_reminder_days_before', e.target.value)} className={inputCls} />
               <p className="text-xs text-muted mt-1">Send automated reminder this many days before the due date.</p>
             </div>
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Invoice Due Period (days)</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Invoice Due Period (days)</label>
               <input type="number" min={1} value={config.invoice_due_days} onChange={(e) => set('invoice_due_days', e.target.value)} className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Late Payment Grace Period (days)</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Late Payment Grace Period (days)</label>
               <input type="number" min={0} value={config.late_payment_grace_days} onChange={(e) => set('late_payment_grace_days', e.target.value)} className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Late Payment Penalty (%)</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Late payment penalty (%)</label>
               <input type="number" min={0} max={100} value={config.late_payment_penalty_pct} onChange={(e) => set('late_payment_penalty_pct', e.target.value)} className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Receipt Number Prefix</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Receipt number prefix</label>
               <input value={config.receipt_prefix} onChange={(e) => set('receipt_prefix', e.target.value)} className={inputCls} placeholder="RCP" />
             </div>
           </div>
@@ -141,24 +142,24 @@ export function FinanceSettings() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-5 max-w-3xl">
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Window Opens On (day 1–28)</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Window Opens On (day 1–28)</label>
               <input type="number" min={1} max={28} value={config.payroll_day_of_month} onChange={(e) => set('payroll_day_of_month', e.target.value)} className={inputCls} />
               <p className="text-xs text-muted mt-1">First day of the month the Run Payroll button becomes active.</p>
             </div>
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Window Length (days)</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Window Length (days)</label>
               <input type="number" min={1} max={31} value={config.payroll_run_window_days} onChange={(e) => set('payroll_run_window_days', e.target.value)} className={inputCls} />
               <p className="text-xs text-muted mt-1">
-                Stays open this many days — e.g. 25 + 5 = open through the 29th (or into next month if it overruns month-end).
+                Stays open this many days. For example 25 + 5 = open through the 29th (or into next month if it overruns month-end).
               </p>
             </div>
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Pension Contribution (%)</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Pension contribution (%)</label>
               <input type="number" min={0} max={100} value={pensionPercent} onChange={(e) => setPensionPercent(Number(e.target.value))} className={inputCls} />
               <p className="text-xs text-muted mt-1">Employee pension as % of gross salary.</p>
             </div>
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Staff Loan Interest Rate (%)</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Staff loan interest rate (%)</label>
               <input type="number" min={0} max={100} value={loanInterestRate} onChange={(e) => setLoanInterestRate(Number(e.target.value))} className={inputCls} />
               <p className="text-xs text-muted mt-1">Annual rate applied to new loans. 0 = interest-free.</p>
             </div>
@@ -186,15 +187,15 @@ export function FinanceSettings() {
               {payeBrackets.map((b, i) => (
                 <div key={i} className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end border border-base rounded-lg p-3">
                   <div>
-                    <label className="text-[11px] text-muted mb-1 block">Label</label>
+                    <label className="text-xs text-muted mb-1 block">Label</label>
                     <input value={b.label} onChange={(e) => updateBracket(i, { label: e.target.value })} className={`${inputCls} min-h-[36px] text-xs`} />
                   </div>
                   <div>
-                    <label className="text-[11px] text-muted mb-1 block">Min (MWK/yr)</label>
+                    <label className="text-xs text-muted mb-1 block">Min (MWK/yr)</label>
                     <input type="number" min={0} value={b.minAnnualMwk} onChange={(e) => updateBracket(i, { minAnnualMwk: Number(e.target.value) })} className={`${inputCls} min-h-[36px] text-xs`} />
                   </div>
                   <div>
-                    <label className="text-[11px] text-muted mb-1 block">Max (MWK/yr, blank = no ceiling)</label>
+                    <label className="text-xs text-muted mb-1 block">Max (MWK/yr, blank = no ceiling)</label>
                     <input
                       type="number"
                       min={0}
@@ -204,10 +205,10 @@ export function FinanceSettings() {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] text-muted mb-1 block">Rate (%)</label>
+                    <label className="text-xs text-muted mb-1 block">Rate (%)</label>
                     <input type="number" min={0} max={100} value={b.ratePercent} onChange={(e) => updateBracket(i, { ratePercent: Number(e.target.value) })} className={`${inputCls} min-h-[36px] text-xs`} />
                   </div>
-                  <button type="button" onClick={() => removeBracket(i)} className="text-brand-coral hover:underline text-xs font-medium flex items-center gap-1 justify-center min-h-[36px]">
+                  <button type="button" onClick={() => removeBracket(i)} className="text-tone-coral hover:underline text-xs font-medium flex items-center gap-1 justify-center min-h-[36px]">
                     <X className="w-3.5 h-3.5" /> Remove
                   </button>
                 </div>
@@ -217,7 +218,7 @@ export function FinanceSettings() {
         </div>
         {/* Currency */}
         <div>
-          <h3 className="font-heading font-semibold text-sm text-body mb-4">Currency Display</h3>
+          <h3 className="font-heading font-semibold text-sm text-body mb-4">Currency display</h3>
           <label className="flex items-start gap-3 cursor-pointer">
             <input type="checkbox" checked={config.enable_usd_display === 'true'} onChange={(e) => set('enable_usd_display', e.target.checked ? 'true' : 'false')} className="mt-0.5 w-4 h-4 accent-brand-teal" />
             <div>
@@ -226,13 +227,13 @@ export function FinanceSettings() {
             </div>
           </label>
         </div>
-        {error && <p className="text-sm text-brand-coral">{error}</p>}
+        {error && <p className="text-sm text-tone-coral">{error}</p>}
         <div className="flex items-center gap-3">
           <button type="submit" disabled={saving}
             className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60 flex items-center gap-2">
             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Settings</>}
           </button>
-          {saved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}
+          {saved && <StatusText tone="success" size="md">Saved</StatusText>}
         </div>
       </form>
     </div>

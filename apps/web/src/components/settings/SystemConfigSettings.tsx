@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { StatusText } from '@/components/shared/StatusText'
 import { Loader2, Save }       from 'lucide-react'
 import { apiFetch }            from '@/lib/api-client'
 
@@ -22,7 +23,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+      <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
         {label}
       </label>
       {children}
@@ -79,7 +80,7 @@ export function SystemConfigSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-heading font-bold text-lg text-brand-navy">System Configuration</h2>
+        <h2 className="font-heading font-bold text-lg text-brand-navy">System configuration</h2>
         <p className="text-sm text-muted mt-0.5">
           Global system settings. School identity now lives under its own
           &quot;School Identity&quot; section; academic calendar dates live under
@@ -103,14 +104,14 @@ export function SystemConfigSettings() {
           </div>
         </div>
 
-        {error && <p className="text-sm text-brand-coral">{error}</p>}
+        {error && <p className="text-sm text-tone-coral">{error}</p>}
 
         <div className="flex items-center gap-3">
           <button type="submit" disabled={saving}
             className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60 flex items-center gap-2">
             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Settings</>}
           </button>
-          {saved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}
+          {saved && <StatusText tone="success" size="md">Saved</StatusText>}
         </div>
       </form>
     </div>

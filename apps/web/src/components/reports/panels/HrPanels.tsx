@@ -43,7 +43,7 @@ export function HrWorkforceTab() {
         isLoading={q.isLoading}
         kpis={d ? [
           kpiTile('headcount', 'Active staff', d.headcount, 'count', 'Staff who are active or on leave (terminated and suspended excluded).'),
-          kpiTile('sexRecorded', 'Sex recorded', d.sexRecordedShare, 'percent', 'Share of staff whose sex is recorded — the gender split below is only as complete as this.', d.sexRecordedShare !== null && d.sexRecordedShare < 90 ? 'watch' : 'neutral'),
+          kpiTile('sexRecorded', 'Sex recorded', d.sexRecordedShare, 'percent', 'Share of staff whose sex is recorded. The gender split below is only as complete as this.', d.sexRecordedShare !== null && d.sexRecordedShare < 90 ? 'watch' : 'neutral'),
         ] : undefined}
       />
       <TwoUp>
@@ -89,7 +89,7 @@ export function HrLeaveTab() {
         ] : undefined}
       />
       <TwoUp>
-        <ChartCard title={`Leave days by month — ${year}`} sub="Each leave spell is spread across the months it covers" isLoading={q.isLoading} height={240}>
+        <ChartCard title={`Leave days by month: ${year}`} sub="Each leave spell is spread across the months it covers" isLoading={q.isLoading} height={240}>
           <Chart type="bar" data={(d?.byMonth ?? []).map((m) => ({ x: m.label, days: m.days }))} series={[{ key: 'days', label: 'Days' }]} height={240} emptyStateMessage="No leave recorded this year." ariaLabel="Leave days by month" />
         </ChartCard>
         <ChartCard title="Leave days by type" isLoading={q.isLoading} height={240}>
@@ -124,7 +124,7 @@ export function HrContractsTab() {
         isLoading={q.isLoading}
         kpis={d ? [
           ...d.windows.map((w) => kpiTile(w.key, w.label, w.count, 'count', w.key === 'expired' ? 'Active staff whose contract end date has already passed.' : `Contracts ending ${w.label.toLowerCase()}.`, w.count > 0 ? (WINDOW_TONE[w.key] ?? 'neutral') : 'healthy')),
-          kpiTile('none', 'No end date recorded', d.noExpiryRecorded, 'count', 'Active staff with no contract expiry on file — they cannot be tracked.'),
+          kpiTile('none', 'No end date recorded', d.noExpiryRecorded, 'count', 'Active staff with no contract expiry on file. They cannot be tracked.'),
         ] : undefined}
       />
       <ReportCard title="Contracts to act on" sub={d ? `Expired and expiring within ${d.lookaheadDays} days` : undefined}>
@@ -247,7 +247,7 @@ export function HrTeachingTab({ academicYear }: { academicYear: string }) {
             { key: 'dept', label: 'Department', hideOnMobile: true, sortValue: (r) => r.department },
             { key: 'licence', label: 'TCM licence', sortValue: (r) => LICENCE_ORDER[r.licenceStatus], cell: (r) => (r.licenceExpiry && r.licenceStatus !== 'MISSING' ? `${LICENCE_LABEL[r.licenceStatus]} (${formatDate(r.licenceExpiry)})` : LICENCE_LABEL[r.licenceStatus]), exportValue: (r) => LICENCE_LABEL[r.licenceStatus] },
             { key: 'periods', label: 'Periods / week', align: 'right', sortValue: (r) => r.periodsPerWeek, cell: (r) => String(r.periodsPerWeek), exportValue: (r) => r.periodsPerWeek },
-            { key: 'subjects', label: 'Teaches', hideOnMobile: true, sortValue: (r) => r.subjectsAssigned.join(', '), cell: (r) => (r.subjectsAssigned.length ? r.subjectsAssigned.join(', ') : '—'), exportValue: (r) => r.subjectsAssigned.join(', ') },
+            { key: 'subjects', label: 'Teaches', hideOnMobile: true, sortValue: (r) => r.subjectsAssigned.join(', '), cell: (r) => (r.subjectsAssigned.length ? r.subjectsAssigned.join(', ') : '-'), exportValue: (r) => r.subjectsAssigned.join(', ') },
             { key: 'outside', label: 'Outside qualification', sortValue: (r) => r.outsideQualification.length, cell: (r) => (r.qualificationsRecorded ? (r.outsideQualification.length ? r.outsideQualification.join(', ') : 'None') : 'Not recorded'), exportValue: (r) => (r.qualificationsRecorded ? r.outsideQualification.join(', ') : 'Not recorded') },
           ]} />
         </QueryState>

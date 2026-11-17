@@ -78,7 +78,7 @@ export function ApprovalDecisionDialog({ target, busy, error, onClose, onConfirm
   const canConfirm = !busy && (!reasonRequired || notes.trim().length > 0)
   const confirmClass =
     action === 'approve' ? ACTION_BUTTON_CLASS.approve
-    : action === 'reject' ? 'bg-red-600 text-white hover:bg-red-700'
+    : action === 'reject' ? 'bg-btn-danger text-btn-danger-fg hover:bg-btn-danger-hover'
     : 'bg-brand-deep text-white hover:opacity-90'
 
   return (
@@ -105,7 +105,7 @@ export function ApprovalDecisionDialog({ target, busy, error, onClose, onConfirm
               <span>
                 <span className="font-semibold">Already paid</span>
                 <span className="block text-muted">
-                  Posts to Cash. Untick if the amount is still owed — it will post to Accounts Payable
+                  Posts to Cash. Untick if the amount is still owed. It will post to Accounts Payable
                   and can be cleared later with “Mark paid”.
                 </span>
               </span>
@@ -134,7 +134,7 @@ export function ApprovalDecisionDialog({ target, busy, error, onClose, onConfirm
           ) : null}
 
           {error ? (
-            <p role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+            <p role="alert" className="rounded-lg bg-status-danger/10 px-3 py-2 text-sm text-body">
               {error}
             </p>
           ) : null}
@@ -156,7 +156,7 @@ export function ApprovalDecisionDialog({ target, busy, error, onClose, onConfirm
             className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${confirmClass}`}
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-            {busy ? 'Working…' : `Confirm — ${verb}`}
+            {busy ? 'Working…' : `Confirm: ${verb}`}
           </button>
         </DialogFooter>
       </DialogContent>

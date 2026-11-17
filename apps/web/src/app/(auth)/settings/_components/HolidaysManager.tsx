@@ -80,8 +80,8 @@ export function HolidaysManager() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4 text-brand-teal" />
-          <h3 className="font-heading font-semibold text-brand-navy">Malawi Public Holidays</h3>
+          <CalendarDays className="w-4 h-4 text-tone-teal" />
+          <h3 className="font-heading font-semibold text-brand-navy">Malawi public holidays</h3>
         </div>
         <select
           value={year}
@@ -94,7 +94,7 @@ export function HolidaysManager() {
 
       {/* Add holiday form */}
       <div className="space-y-3 pb-5 border-b border-base">
-        <p className="text-xs font-heading font-semibold text-muted uppercase">Add Holiday</p>
+        <p className="text-xs font-heading font-semibold text-muted">Add holiday</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <input
             value={form.name}
@@ -120,14 +120,14 @@ export function HolidaysManager() {
             </label>
           </div>
         </div>
-        {error && <p className="text-xs text-brand-coral">{error}</p>}
+        {error && <p className="text-xs text-tone-coral">{error}</p>}
         <button
           onClick={handleAdd}
           disabled={createMut.isPending}
           className="flex items-center gap-2 bg-brand-deep text-white px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-50 hover:brightness-110 transition-colors"
         >
           {createMut.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-          Add Holiday
+          Add holiday
         </button>
       </div>
 
@@ -152,7 +152,7 @@ export function HolidaysManager() {
                   onClick={() => setPendingDelete(h)}
                   disabled={deleteMut.isPending}
                   aria-label={`Delete ${h.name}`}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg text-muted hover:text-brand-coral hover:bg-brand-coral/10 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-muted hover:text-tone-coral hover:bg-brand-coral/10 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -171,7 +171,7 @@ export function HolidaysManager() {
             ? `"${pendingDelete.name}" will be removed from the ${year} public-holiday calendar${pendingDelete.isRecurring ? ' (it is marked as recurring yearly)' : ''}. This cannot be undone.`
             : ''
         }
-        confirmLabel="Delete Holiday"
+        confirmLabel="Delete holiday"
         destructive
         onConfirm={() => {
           if (pendingDelete) deleteMut.mutate(pendingDelete.id)

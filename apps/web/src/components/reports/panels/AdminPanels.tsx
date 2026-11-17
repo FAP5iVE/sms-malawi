@@ -89,7 +89,7 @@ export function AdminSecurityTab() {
         />
       </ChartCard>
       <TwoUp>
-        <ReportCard title="Repeated failures" sub="Last 24 hours — possible guessing or a locked-out user">
+        <ReportCard title="Repeated failures" sub="Last 24 hours: possible guessing or a locked-out user">
           <QueryState isLoading={q.isLoading} isError={q.isError} onRetry={() => void q.refetch()}>
             <ReportTable
               rows={d?.repeatedFailures}
@@ -225,7 +225,7 @@ export function AdminGovernanceTab() {
             columns={[
               { key: 'label', label: 'Category', sortValue: (r) => r.label, cell: (r) => <span title={r.description}>{r.label}</span>, exportValue: (r) => r.label },
               { key: 'count', label: 'Actions', align: 'right', sortValue: (r) => r.count, cell: (r) => formatCount(r.count) },
-              { key: 'top', label: 'Most frequent', hideOnMobile: true, sortValue: (r) => r.top[0]?.action ?? '', cell: (r) => r.top.map((t) => `${t.action} (${t.count})`).join(', ') || '—', exportValue: (r) => r.top.map((t) => `${t.action} (${t.count})`).join(', ') },
+              { key: 'top', label: 'Most frequent', hideOnMobile: true, sortValue: (r) => r.top[0]?.action ?? '', cell: (r) => r.top.map((t) => `${t.action} (${t.count})`).join(', ') || '-', exportValue: (r) => r.top.map((t) => `${t.action} (${t.count})`).join(', ') },
             ]}
           />
         </QueryState>
@@ -294,14 +294,14 @@ export function AdminAdoptionTab() {
 }
 
 const formatDateTime = (iso: string | null | undefined): string => {
-  if (!iso) return '—'
+  if (!iso) return '-'
   const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
+  if (Number.isNaN(d.getTime())) return '-'
   return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC'
 }
 
 const formatAge = (minutes: number | null): string => {
-  if (minutes === null) return '—'
+  if (minutes === null) return '-'
   if (minutes < 60) return `${minutes} min ago`
   if (minutes < 48 * 60) return `${Math.round(minutes / 60)} h ago`
   return `${Math.round(minutes / 1440)} days ago`
@@ -353,8 +353,8 @@ export function AdminOperationsTab() {
               columns={[
                 { key: 'name', label: 'Service', sortValue: (r) => r.name },
                 { key: 'status', label: 'Status', sortValue: (r) => r.status, cell: (r) => SERVICE_TEXT[r.status], exportValue: (r) => SERVICE_TEXT[r.status] },
-                { key: 'latency', label: 'Response', align: 'right', sortValue: (r) => r.latencyMs ?? -1, cell: (r) => (r.latencyMs === null ? '—' : `${r.latencyMs} ms`), exportValue: (r) => r.latencyMs ?? '' },
-                { key: 'details', label: 'Details', hideOnMobile: true, sortValue: (r) => r.details ?? '', cell: (r) => r.details ?? '—', exportValue: (r) => r.details ?? '' },
+                { key: 'latency', label: 'Response', align: 'right', sortValue: (r) => r.latencyMs ?? -1, cell: (r) => (r.latencyMs === null ? '-' : `${r.latencyMs} ms`), exportValue: (r) => r.latencyMs ?? '' },
+                { key: 'details', label: 'Details', hideOnMobile: true, sortValue: (r) => r.details ?? '', cell: (r) => r.details ?? '-', exportValue: (r) => r.details ?? '' },
               ]}
             />
           ) : (
@@ -383,7 +383,7 @@ export function AdminOperationsTab() {
                 columns={[
                   { key: 'at', label: 'Started', sortValue: (r) => r.at, cell: (r) => formatDateTime(r.at), exportValue: (r) => r.at },
                   { key: 'target', label: 'Target', hideOnMobile: true, sortValue: (r) => r.target ?? '', cell: (r) => r.target ?? 'preview', exportValue: (r) => r.target ?? 'preview' },
-                  { key: 'state', label: 'State', sortValue: (r) => r.state, cell: (r) => r.state.toLowerCase().replace(/_/g, ' ') + (r.error ? ` — ${r.error}` : ''), exportValue: (r) => r.state },
+                  { key: 'state', label: 'State', sortValue: (r) => r.state, cell: (r) => r.state.toLowerCase().replace(/_/g, ' ') + (r.error ? ` - ${r.error}` : ''), exportValue: (r) => r.state },
                 ]}
               />
             ) : (
@@ -414,7 +414,7 @@ export function AdminOperationsTab() {
             )}
             {err && err.configured && (
               <p className="mt-2 text-xs text-muted">
-                {err.last7d.toLocaleString('en-US')} errors in 7 days. Logs are only kept once synced — earliest recorded: {formatDateTime(err.oldestRecordedAt)}.
+                {err.last7d.toLocaleString('en-US')} errors in 7 days. Logs are only kept once synced. Earliest recorded: {formatDateTime(err.oldestRecordedAt)}.
               </p>
             )}
           </QueryState>
@@ -431,7 +431,7 @@ export function AdminOperationsTab() {
               emptyMessage="No monitoring sources."
               columns={[
                 { key: 'label', label: 'Source', sortValue: (r) => r.label },
-                { key: 'status', label: 'Status', sortValue: (r) => r.status, cell: (r) => SYNC_TEXT[r.status] + (r.lastError ? ` — ${r.lastError}` : ''), exportValue: (r) => SYNC_TEXT[r.status] },
+                { key: 'status', label: 'Status', sortValue: (r) => r.status, cell: (r) => SYNC_TEXT[r.status] + (r.lastError ? ` - ${r.lastError}` : ''), exportValue: (r) => SYNC_TEXT[r.status] },
                 { key: 'age', label: 'Last refresh', align: 'right', sortValue: (r) => r.ageMinutes ?? Number.MAX_SAFE_INTEGER, cell: (r) => formatAge(r.ageMinutes), exportValue: (r) => r.lastAttemptAt ?? '' },
                 { key: 'mode', label: 'Refreshes', hideOnMobile: true, sortValue: (r) => r.mode, cell: (r) => (r.mode === 'scheduled' ? 'On a schedule' : 'When monitoring is opened'), exportValue: (r) => r.mode },
               ]}

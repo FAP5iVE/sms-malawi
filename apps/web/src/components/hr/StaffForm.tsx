@@ -85,7 +85,7 @@ const ic =
   'w-full border border-base rounded-xl px-4 py-3 text-sm bg-surface text-body min-h-11 ' +
   'focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal transition-all'
 
-const lbl = 'block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5'
+const lbl = 'block text-xs font-semibold text-muted mb-1.5'
 
 export function StaffForm({ onClose, staffId }: Props) {
   const isEdit = !!staffId
@@ -212,7 +212,7 @@ export function StaffForm({ onClose, staffId }: Props) {
     <Modal
       title={created ? 'Staff Account Created' : isEdit ? 'Edit Staff Member' : 'Add Staff Member'}
       onClose={onClose}
-      size="xl"
+      size="l"
       onSubmit={created ? undefined : handleSubmit(onSubmit)}
       busy={createStaff.isPending || updateStaff.isPending}
       footer={
@@ -248,7 +248,7 @@ export function StaffForm({ onClose, staffId }: Props) {
       {/* Success view — show the temp password as a manual-relay fallback. */}
       {created ? (
         <div className="space-y-4">
-          <div className="flex items-start gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+          <div className="flex items-start gap-2 text-sm text-body bg-status-success/10 rounded-xl px-4 py-3">
             <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
             <span>
               {created.name}&apos;s account was created. A welcome email with these login
@@ -281,13 +281,13 @@ export function StaffForm({ onClose, staffId }: Props) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl} htmlFor="sf-firstName">First name</label>
-              <input id="sf-firstName" {...register('firstName')} className={ic} placeholder="e.g. Grace" />
-              {errors.firstName && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.firstName.message}</p>}
+              <input id="sf-firstName" {...register('firstName')} className={ic} placeholder="Grace" />
+              {errors.firstName && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.firstName.message}</p>}
             </div>
             <div>
               <label className={lbl} htmlFor="sf-lastName">Last name</label>
-              <input id="sf-lastName" {...register('lastName')} className={ic} placeholder="e.g. Banda" />
-              {errors.lastName && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.lastName.message}</p>}
+              <input id="sf-lastName" {...register('lastName')} className={ic} placeholder="Banda" />
+              {errors.lastName && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.lastName.message}</p>}
             </div>
             <div>
               <label className={lbl} htmlFor="sf-sex">Sex</label>
@@ -304,24 +304,24 @@ export function StaffForm({ onClose, staffId }: Props) {
                 <option value="MALE">Male</option>
                 <option value="FEMALE">Female</option>
               </select>
-              {errors.sex && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.sex.message}</p>}
+              {errors.sex && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.sex.message}</p>}
             </div>
             <div className="col-span-full">
               <label className={lbl} htmlFor="sf-email">Email (login)</label>
               <input id="sf-email" type="email" {...register('email')} className={ic} placeholder="name@school.mw" />
-              {errors.email && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.email.message}</p>}
+              {errors.email && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.email.message}</p>}
             </div>
             {!isEdit && (
               <div>
                 <label className={lbl} htmlFor="sf-employeeNo">Employee no.</label>
-                <input id="sf-employeeNo" {...register('employeeNo')} className={ic} placeholder="e.g. EMP-014" />
-                {errors.employeeNo && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.employeeNo.message}</p>}
+                <input id="sf-employeeNo" {...register('employeeNo')} className={ic} placeholder="EMP-014" />
+                {errors.employeeNo && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.employeeNo.message}</p>}
               </div>
             )}
             <div>
               <label className={lbl} htmlFor="sf-phone">Phone (optional)</label>
               <input id="sf-phone" {...register('phone')} className={ic} placeholder="+265…" />
-              {errors.phone && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.phone.message}</p>}
+              {errors.phone && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.phone.message}</p>}
             </div>
             {!isEdit && (
               <div>
@@ -330,7 +330,7 @@ export function StaffForm({ onClose, staffId }: Props) {
                   <option value="" disabled>Select role…</option>
                   {STAFF_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                 </select>
-                {errors.role && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.role.message}</p>}
+                {errors.role && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.role.message}</p>}
               </div>
             )}
             <div>
@@ -351,10 +351,10 @@ export function StaffForm({ onClose, staffId }: Props) {
                 <option value="" disabled>{deptLoading ? 'Loading…' : 'Select department…'}</option>
                 {departments.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
-              {errors.department && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.department.message}</p>}
+              {errors.department && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.department.message}</p>}
               {!deptLoading && departments.length === 0 && (
                 <p className="text-xs text-muted mt-1">
-                  No departments defined yet — set them up under Settings → Departments &amp; Titles.
+                  No departments defined yet: set them up under Settings → Departments and Titles.
                 </p>
               )}
             </div>
@@ -372,19 +372,19 @@ export function StaffForm({ onClose, staffId }: Props) {
                 </option>
                 {titlesForDept.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
-              {errors.jobTitle && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.jobTitle.message}</p>}
+              {errors.jobTitle && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.jobTitle.message}</p>}
             </div>
             {!isEdit && (
               <div>
                 <label className={lbl} htmlFor="sf-dateJoined">Date joined</label>
                 <input id="sf-dateJoined" type="date" {...register('dateJoined')} className={ic} />
-                {errors.dateJoined && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.dateJoined.message}</p>}
+                {errors.dateJoined && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.dateJoined.message}</p>}
               </div>
             )}
             <div>
               <label className={lbl} htmlFor="sf-contractExpiry">Contract expiry (optional)</label>
               <input id="sf-contractExpiry" type="date" {...register('contractExpiry')} className={ic} />
-              {errors.contractExpiry && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.contractExpiry.message}</p>}
+              {errors.contractExpiry && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.contractExpiry.message}</p>}
             </div>
           </div>
 
@@ -394,14 +394,14 @@ export function StaffForm({ onClose, staffId }: Props) {
               section (the form itself is HR/admin/headteacher only). */}
           {can('hr.viewStaffSensitive') && (
             <div className="mt-6">
-              <p className="text-xs font-heading font-bold text-muted uppercase tracking-widest mb-3">
-                Identity &amp; next of kin
+              <p className="text-xs font-heading font-bold text-muted mb-3">
+                Identity and next of kin
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={lbl} htmlFor="sf-dateOfBirth">Date of birth</label>
                   <input id="sf-dateOfBirth" type="date" {...register('dateOfBirth')} className={ic} />
-                  {errors.dateOfBirth && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.dateOfBirth.message}</p>}
+                  {errors.dateOfBirth && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.dateOfBirth.message}</p>}
                 </div>
                 <div>
                   <label className={lbl} htmlFor="sf-nationality">Nationality</label>
@@ -417,12 +417,12 @@ export function StaffForm({ onClose, staffId }: Props) {
                 <div>
                   <label className={lbl} htmlFor="sf-nrbNumber">NRB national ID no.</label>
                   <input id="sf-nrbNumber" {...register('nrbNumber')} className={ic} autoComplete="off" />
-                  {errors.nrbNumber && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.nrbNumber.message}</p>}
+                  {errors.nrbNumber && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.nrbNumber.message}</p>}
                 </div>
                 <div>
                   <label className={lbl} htmlFor="sf-tpin">MRA TPIN</label>
                   <input id="sf-tpin" {...register('tpin')} className={ic} autoComplete="off" />
-                  {errors.tpin && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.tpin.message}</p>}
+                  {errors.tpin && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.tpin.message}</p>}
                 </div>
                 <div />
                 <div>
@@ -431,7 +431,7 @@ export function StaffForm({ onClose, staffId }: Props) {
                 </div>
                 <div>
                   <label className={lbl} htmlFor="sf-nextOfKinRelation">Relationship</label>
-                  <input id="sf-nextOfKinRelation" {...register('nextOfKinRelation')} className={ic} placeholder="e.g. Spouse" />
+                  <input id="sf-nextOfKinRelation" {...register('nextOfKinRelation')} className={ic} placeholder="Spouse" />
                 </div>
                 <div className="col-span-2">
                   <label className={lbl} htmlFor="sf-nextOfKinPhone">Next of kin phone</label>
@@ -446,8 +446,8 @@ export function StaffForm({ onClose, staffId }: Props) {
               "Teaching staff" is ticked (isTeaching is never inferred from role). */}
           {can('hr.viewStaffSensitive') && (
             <div className="mt-6">
-              <p className="text-xs font-heading font-bold text-muted uppercase tracking-widest mb-3">
-                Teaching, licensing &amp; qualifications
+              <p className="text-xs font-heading font-bold text-muted mb-3">
+                Teaching, licensing and qualifications
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <label className="col-span-2 flex items-center gap-2 text-sm text-body">
@@ -464,12 +464,12 @@ export function StaffForm({ onClose, staffId }: Props) {
                     <div>
                       <label className={lbl} htmlFor="sf-tcmLic">TCM licence no.</label>
                       <input id="sf-tcmLic" {...register('tcmLicenceNo')} className={ic} />
-                      {errors.tcmLicenceNo && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.tcmLicenceNo.message}</p>}
+                      {errors.tcmLicenceNo && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.tcmLicenceNo.message}</p>}
                     </div>
                     <div className="col-span-2">
                       <label className={lbl} htmlFor="sf-tcmExp">TCM licence expiry</label>
                       <input id="sf-tcmExp" type="date" {...register('tcmLicenceExpiry')} className={ic} />
-                      {errors.tcmLicenceExpiry && <p className="text-xs text-brand-coral mt-1" role="alert">{errors.tcmLicenceExpiry.message}</p>}
+                      {errors.tcmLicenceExpiry && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.tcmLicenceExpiry.message}</p>}
                     </div>
                   </>
                 )}
@@ -550,7 +550,7 @@ export function StaffForm({ onClose, staffId }: Props) {
           )}
 
           {submitError && (
-            <p role="alert" className="mt-4 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
+            <p role="alert" className="mt-4 flex items-start gap-2 text-xs text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
               {submitError}
             </p>
@@ -652,7 +652,7 @@ function SalarySection({ staffId }: { staffId: string }) {
     <div className="space-y-4">
       <div className="flex items-center gap-2 -mb-1">
         <Wallet className="w-3.5 h-3.5 text-muted" aria-hidden />
-        <h3 className="text-xs font-heading font-bold text-muted uppercase tracking-widest">Salary structure</h3>
+        <h3 className="text-xs font-heading font-bold text-muted">Salary structure</h3>
       </div>
 
       {isLoading ? (
@@ -661,7 +661,7 @@ function SalarySection({ staffId }: { staffId: string }) {
         <>
           {!salary && (
             <p className="text-xs text-muted">
-              No salary set up for this staff member yet — payroll can&apos;t generate a payslip for them until this is filled in.
+              No salary set up for this staff member yet. Payroll can&apos;t generate a payslip for them until this is filled in.
             </p>
           )}
 
@@ -688,9 +688,9 @@ function SalarySection({ staffId }: { staffId: string }) {
                 {salary ? 'Update' : 'Set'}
               </button>
             </div>
-            {baseSaved && <p className="text-xs text-brand-teal mt-1">Saved.</p>}
+            {baseSaved && <p className="text-xs text-tone-teal mt-1">Saved.</p>}
             {updateSalary.error && (
-              <p className="text-xs text-brand-coral mt-1">
+              <p className="text-xs text-tone-coral mt-1">
                 {updateSalary.error instanceof Error ? updateSalary.error.message : 'Failed to save.'}
               </p>
             )}
@@ -703,7 +703,7 @@ function SalarySection({ staffId }: { staffId: string }) {
               <button
                 type="button"
                 onClick={() => setShowAddAllowance((v) => !v)}
-                className="text-xs font-semibold text-brand-teal hover:underline"
+                className="text-xs font-semibold text-tone-teal hover:underline"
               >
                 {showAddAllowance ? 'Cancel' : '+ Add allowance'}
               </button>
@@ -719,7 +719,7 @@ function SalarySection({ staffId }: { staffId: string }) {
                   <li key={a.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0">
                     <div className="min-w-0">
                       <p className="text-sm text-body font-medium truncate">
-                        {a.type} <span className="text-muted font-normal">— MWK {Number(a.amount).toLocaleString()}</span>
+                        {a.type} <span className="text-muted font-normal">MWK {Number(a.amount).toLocaleString()}</span>
                       </p>
                       <p className="text-xs text-muted">
                         {a.recurring
@@ -734,7 +734,7 @@ function SalarySection({ staffId }: { staffId: string }) {
                       disabled={deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id}
                       aria-busy={deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id}
                       aria-label={`Remove ${a.type} allowance`}
-                      className="shrink-0 text-brand-coral hover:underline text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1"
+                      className="shrink-0 text-tone-coral hover:underline text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1"
                     >
                       {deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id && <Loader2 className="w-3 h-3 animate-spin" aria-hidden />}
                       {deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id ? 'Removing…' : 'Remove'}
@@ -807,19 +807,19 @@ function SalarySection({ staffId }: { staffId: string }) {
 
                 <div>
                   <label className={lbl} htmlFor="sf-allow-notes">Notes (optional)</label>
-                  <input id="sf-allow-notes" value={allowNotes} onChange={(e) => setAllowNotes(e.target.value)} className={ic} placeholder="e.g. July fuel reimbursement" />
+                  <input id="sf-allow-notes" value={allowNotes} onChange={(e) => setAllowNotes(e.target.value)} className={ic} placeholder="July fuel reimbursement" />
                 </div>
 
-                {allowError && <p className="text-xs text-brand-coral">{allowError}</p>}
+                {allowError && <p className="text-xs text-tone-coral">{allowError}</p>}
 
                 <button
                   type="button"
                   onClick={handleAddAllowance}
                   disabled={addAllowance.isPending || !allowAmount}
-                  className="px-4 py-2 text-xs font-semibold bg-brand-teal text-white rounded-lg disabled:opacity-60 flex items-center gap-2 min-h-11"
+                  className="px-4 py-2 text-xs font-semibold bg-btn-brand text-btn-brand-fg rounded-lg disabled:opacity-60 flex items-center gap-2 min-h-11"
                 >
                   {addAllowance.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Add Allowance
+                  Add allowance
                 </button>
               </div>
             )}
@@ -839,7 +839,7 @@ function SalarySection({ staffId }: { staffId: string }) {
                 </div>
               ))}
               <div className="flex justify-between font-heading font-semibold text-body pt-1 border-t border-base mt-1">
-                <span>Monthly Gross</span>
+                <span>Monthly gross</span>
                 <span>MWK {monthlyGross.toLocaleString()}</span>
               </div>
               {oneTimeAllowances.length > 0 && (
@@ -848,7 +848,7 @@ function SalarySection({ staffId }: { staffId: string }) {
                 </p>
               )}
               <p className="text-xs text-muted pt-1">
-                PAYE, pension, and any loan deduction are calculated automatically at each pay run — not shown here.
+                PAYE, pension, and any loan deduction are calculated automatically at each pay run. Not shown here.
               </p>
             </div>
           )}

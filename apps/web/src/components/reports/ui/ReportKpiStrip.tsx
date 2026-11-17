@@ -11,14 +11,8 @@ import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
 import type { ReportKpi, ReportKpiComparison, ReportStatus } from '@shared/types/reporting'
 import { formatKpiValue } from '@/lib/reportFormat'
 import { cn } from '@/lib/utils'
+import { StatusText } from '@/components/shared/StatusText'
 import { ReportLoading } from './ReportStates'
-
-const STATUS_BORDER: Record<ReportStatus, string> = {
-  healthy: 'border-base',
-  watch: 'border-brand-amber/50',
-  critical: 'border-brand-coral/50',
-  neutral: 'border-base',
-}
 
 const STATUS_DOT: Record<ReportStatus, string> = {
   healthy: 'bg-brand-teal',
@@ -37,7 +31,7 @@ const STATUS_TEXT: Record<ReportStatus, string> = {
 function comparisonTone(c: ReportKpiComparison): string {
   if (c.direction === 'flat' || c.polarity === 'neutral') return 'text-muted'
   const good = (c.direction === 'up') === (c.polarity === 'up-good')
-  return good ? 'text-brand-teal' : 'text-brand-coral'
+  return good ? 'text-tone-teal' : 'text-tone-coral'
 }
 
 function Comparison({ c, unit }: { c: ReportKpiComparison; unit: ReportKpi['unit'] }) {
@@ -63,25 +57,27 @@ export function KpiTile({ kpi, showDescription = false }: { kpi: ReportKpi; show
   const body = (
     <div
       className={cn(
-        'flex h-full min-w-0 flex-col gap-1 rounded-xl border bg-surface p-3 sm:p-4',
-        STATUS_BORDER[kpi.status],
-        kpi.href && 'transition-colors hover:border-brand-teal/50',
+        'flex h-full min-w-0 flex-col gap-1 rounded-xl app-tint p-3 sm:p-4',
+        kpi.href && 'transition-colors hover:bg-brand-teal/10',
       )}
       title={kpi.description}
     >
       <div className="flex items-center gap-1.5">
-        {kpi.status !== 'neutral' && (
+        {kpi.status === 'healthy' && (
           <span className={cn('h-2 w-2 shrink-0 rounded-full', STATUS_DOT[kpi.status])} aria-hidden />
         )}
-        <p className="truncate text-xs font-medium uppercase tracking-wide text-muted">{kpi.label}</p>
-        {kpi.status !== 'neutral' && <span className="sr-only">{STATUS_TEXT[kpi.status]}</span>}
+        <p className="truncate text-xs font-medium text-muted">{kpi.label}</p>
+        {kpi.status === 'healthy' && <span className="sr-only">{STATUS_TEXT[kpi.status]}</span>}
       </div>
+      {kpi.status === 'watch' || kpi.status === 'critical' ? (
+        <StatusText tone={kpi.status === 'critical' ? 'danger' : 'warning'}>{STATUS_TEXT[kpi.status]}</StatusText>
+      ) : null}
       <p className="break-words font-heading text-xl font-bold tabular-nums text-brand-navy sm:text-2xl">
         {formatKpiValue(kpi.value, kpi.unit, true)}
       </p>
       {kpi.subLabel ? <p className="text-xs text-muted">{kpi.subLabel}</p> : null}
       {kpi.comparison ? <Comparison c={kpi.comparison} unit={kpi.unit} /> : null}
-      {showDescription ? <p className="mt-auto line-clamp-3 pt-1 text-[11px] leading-snug text-muted">{kpi.description}</p> : null}
+      {showDescription ? <p className="mt-auto line-clamp-3 pt-1 text-xs leading-snug text-muted">{kpi.description}</p> : null}
     </div>
   )
   return kpi.href ? (
@@ -112,7 +108,7 @@ export function ReportKpiStrip({
     return (
       <div className={cn(grid, className)}>
         {Array.from({ length: placeholders }, (_, i) => (
-          <div key={i} className="rounded-xl border border-base bg-surface p-4">
+          <div key={i} className="rounded-xl app-tint p-4">
             <ReportLoading label="KPI" height={56} />
           </div>
         ))}

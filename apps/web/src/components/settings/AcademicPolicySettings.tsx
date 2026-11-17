@@ -21,6 +21,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { StatusText } from '@/components/shared/StatusText'
 import { Loader2, Save }       from 'lucide-react'
 import { apiFetch }            from '@/lib/api-client'
 import { AcademicYearSelect }  from '@/components/shared/AcademicYearSelect'
@@ -100,8 +101,8 @@ export function AcademicPolicySettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-heading font-bold text-lg text-brand-navy">Academic Policy</h2>
-        <p className="text-sm text-muted mt-0.5">Term dates, attendance rules, and report card policy. Continuous assessment weighting is in Exam & Grading.</p>
+        <h2 className="font-heading font-bold text-lg text-brand-navy">Academic policy</h2>
+        <p className="text-sm text-muted mt-0.5">Term dates, attendance rules, and report card policy. Continuous assessment weighting is in Exam and Grading.</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
@@ -110,10 +111,10 @@ export function AcademicPolicySettings() {
             correct key (current_academic_year) instead of the dead
             current_year key the old form used. */}
         <div className="pb-5 border-b border-base">
-          <h3 className="font-heading font-semibold text-sm text-body mb-4">Current Term &amp; Year</h3>
+          <h3 className="font-heading font-semibold text-sm text-body mb-4">Current term and year</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Current Academic Year</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Current academic year</label>
               <AcademicYearSelect
                 value={policy.current_academic_year}
                 onChange={(e) => set('current_academic_year', e.target.value)}
@@ -122,7 +123,7 @@ export function AcademicPolicySettings() {
               />
             </div>
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Current Term</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Current term</label>
               <select value={policy.current_term} onChange={(e) => set('current_term', e.target.value)} className={inputCls}>
                 <option value="1">Term 1</option>
                 <option value="2">Term 2</option>
@@ -130,7 +131,7 @@ export function AcademicPolicySettings() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Next Term Start Date</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Next term start date</label>
               <input type="date" value={policy.next_term_date} onChange={(e) => set('next_term_date', e.target.value)} className={inputCls} />
             </div>
           </div>
@@ -138,7 +139,7 @@ export function AcademicPolicySettings() {
 
         {/* Term Dates */}
         <div className="pb-5 border-b border-base">
-          <h3 className="font-heading font-semibold text-sm text-body mb-4">Term Calendar Dates</h3>
+          <h3 className="font-heading font-semibold text-sm text-body mb-4">Term calendar dates</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {([
               ['term1_start', 'Term 1 Start'],
@@ -149,7 +150,7 @@ export function AcademicPolicySettings() {
               ['term3_end',   'Term 3 End'],
             ] as [keyof AcademicPolicy, string][]).map(([key, label]) => (
               <div key={key}>
-                <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">{label}</label>
+                <label className="block text-xs font-heading font-semibold text-muted mb-1.5">{label}</label>
                 <input type="date" value={policy[key]} onChange={(e) => set(key, e.target.value)} className={inputCls} />
               </div>
             ))}
@@ -158,10 +159,10 @@ export function AcademicPolicySettings() {
 
         {/* Attendance */}
         <div className="pb-5 border-b border-base">
-          <h3 className="font-heading font-semibold text-sm text-body mb-4">Attendance Policy</h3>
+          <h3 className="font-heading font-semibold text-sm text-body mb-4">Attendance policy</h3>
           <div className="max-w-xs">
-            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-              Minimum Attendance Required (%)
+            <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+              Minimum attendance required (%)
             </label>
             <input type="number" min={0} max={100}
               value={policy.min_attendance_pct}
@@ -176,7 +177,7 @@ export function AcademicPolicySettings() {
 
         {/* Report Card Policy */}
         <div>
-          <h3 className="font-heading font-semibold text-sm text-body mb-4">Report Card Policy</h3>
+          <h3 className="font-heading font-semibold text-sm text-body mb-4">Report card policy</h3>
           <label className="flex items-start gap-3 cursor-pointer">
             <input type="checkbox"
               checked={policy.report_card_comment_required === 'true'}
@@ -189,14 +190,14 @@ export function AcademicPolicySettings() {
           </label>
         </div>
 
-        {error && <p className="text-sm text-brand-coral">{error}</p>}
+        {error && <p className="text-sm text-tone-coral">{error}</p>}
 
         <div className="flex items-center gap-3">
           <button type="submit" disabled={saving}
             className="min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60 flex items-center gap-2">
             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save Settings</>}
           </button>
-          {saved && <span className="text-sm text-emerald-600 font-medium">Saved ✓</span>}
+          {saved && <StatusText tone="success" size="md">Saved</StatusText>}
         </div>
       </form>
     </div>

@@ -24,7 +24,7 @@ export default function ApprovalsPage() {
         <div>
           <h1 className="font-heading text-2xl font-bold text-brand-navy">Approvals</h1>
           <p className="mt-1 text-sm text-muted">
-            Requests awaiting review, and the status of your own submissions — from every module in one place.
+            Requests awaiting review, and the status of your own submissions. From every module in one place.
           </p>
         </div>
         <ApprovalsCenter />

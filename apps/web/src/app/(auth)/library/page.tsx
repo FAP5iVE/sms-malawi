@@ -120,7 +120,7 @@ import { PrintLetterhead } from '@/components/shared/PrintLetterhead'
 type Tab = 'catalog' | 'borrowings' | 'digital' | 'recommendations' | 'reports'
 
 const TABS = [
-  { id: 'catalog'         as Tab, label: 'Book Catalog',      icon: BookOpen  },
+  { id: 'catalog'         as Tab, label: 'Book catalog',      icon: BookOpen  },
   // [R21] Borrowings' tab icon was Scan — the same icon the catalog tab's
   // literal barcode-scan button uses, a direct visual conflict called out
   // when adopting the screenshot UI. Swapped for Repeat (a circulation/
@@ -128,13 +128,13 @@ const TABS = [
   // now shared with the "On Loan" stat tile and the "Active Borrowings"
   // sub-tab below. Every other tab icon is unchanged per instruction.
   { id: 'borrowings'      as Tab, label: 'Borrowings',        icon: Repeat    },
-  { id: 'digital'         as Tab, label: 'Digital Library',   icon: FileText  },
+  { id: 'digital'         as Tab, label: 'Digital library',   icon: FileText  },
   { id: 'recommendations' as Tab, label: 'Recommendations',   icon: Check     },
   // [PRODUCTION FIX 2026-07-28] Genuinely distinct librarian surface —
   // most-borrowed/most-read/category stats and fines management, gated
   // separately below (librarian/admin/high_rank only), not shown as just
   // another generic tab to every role.
-  { id: 'reports'         as Tab, label: 'Reports & Fines',   icon: Users2    },
+  { id: 'reports'         as Tab, label: 'Reports and fines',   icon: Users2    },
 ]
 
 // [R21] Displayed status derived client-side from a live (unreturned)
@@ -163,7 +163,7 @@ function borrowingCountdownLabel(b: ApiBorrowing): string {
 function borrowerLabel(b: ApiBorrowing): { name: string; sublabel: string } {
   if (b.student) return { name: `${b.student.firstName} ${b.student.lastName}`, sublabel: `${b.student.registrationNo}${b.student.class ? ` · ${b.student.class.name}` : ''}` }
   if (b.staff)   return { name: `${b.staff.firstName} ${b.staff.lastName}`,     sublabel: `${b.staff.employeeNo}${b.staff.department ? ` · ${b.staff.department}` : ''}` }
-  return { name: 'Unknown borrower', sublabel: '—' }
+  return { name: 'Unknown borrower', sublabel: '-' }
 }
 
 export default function LibraryPage() {
@@ -215,7 +215,7 @@ function BookRow({
             "MAT-2017-001 · Shelf M-02" under the title. */}
         {(b.barcode || b.shelf) && (
           <p className="text-xs font-mono text-muted mt-0.5">
-            {b.barcode ?? '—'}{b.shelf ? ` · Shelf ${b.shelf}` : ''}
+            {b.barcode ?? '-'}{b.shelf ? ` · Shelf ${b.shelf}` : ''}
           </p>
         )}
       </td>
@@ -223,11 +223,11 @@ function BookRow({
       <td className="px-4 py-3">
         <span className="text-xs">{b.category}</span>
       </td>
-      <td className="px-4 py-3 text-muted text-xs">{b.publisher ?? '—'}</td>
-      <td className="px-4 py-3 text-muted text-xs">{b.publishedYear ?? '—'}</td>
+      <td className="px-4 py-3 text-muted text-xs">{b.publisher ?? '-'}</td>
+      <td className="px-4 py-3 text-muted text-xs">{b.publishedYear ?? '-'}</td>
       <td className="px-4 py-3 text-center">{b.totalCopies}</td>
       <td className="px-4 py-3 text-center">
-        <span className={`font-semibold ${b.availableCopies === 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>
+        <span className={`font-semibold ${b.availableCopies === 0 ? 'text-tone-coral' : 'text-tone-teal'}`}>
           {b.availableCopies}
         </span>
       </td>
@@ -238,7 +238,7 @@ function BookRow({
               type="button"
               disabled={b.availableCopies === 0}
               onClick={() => onIssue(b.id)}
-              className="text-xs font-semibold text-brand-teal underline disabled:opacity-40 min-h-11"
+              className="text-xs font-semibold text-tone-teal underline disabled:opacity-40 min-h-11"
             >
               Issue
             </button>
@@ -314,9 +314,9 @@ function BookFormModal({
 
   return (
     <Modal
-      title={book ? 'Edit Book' : 'Add Book'}
+      title={book ? 'Edit book' : 'Add book'}
       onClose={onClose}
-      size="lg"
+      size="l"
       bodyClassName="space-y-3"
       footer={
         <>
@@ -344,7 +344,7 @@ function BookFormModal({
           <input id="book-author" value={author} onChange={(e) => setAuthor(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
         </div>
         <div>
-          <label htmlFor="book-isbn" className="text-xs text-muted mb-1 block">ISBN <span className="text-muted/70">(unique — best identifier for issue/return)</span></label>
+          <label htmlFor="book-isbn" className="text-xs text-muted mb-1 block">ISBN <span className="text-muted/70">(unique: best identifier for issue/return)</span></label>
           <input id="book-isbn" value={isbn} onChange={(e) => setIsbn(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
         </div>
         <div>
@@ -360,11 +360,11 @@ function BookFormModal({
           <input id="book-publisher" value={publisher} onChange={(e) => setPublisher(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
         </div>
         <div>
-          <label htmlFor="book-year" className="text-xs text-muted mb-1 block">Published Year</label>
+          <label htmlFor="book-year" className="text-xs text-muted mb-1 block">Published year</label>
           <input id="book-year" type="number" value={publishedYear} onChange={(e) => setPublishedYear(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
         </div>
         <div>
-          <label htmlFor="book-copies" className="text-xs text-muted mb-1 block">Total Copies</label>
+          <label htmlFor="book-copies" className="text-xs text-muted mb-1 block">Total copies</label>
           <input id="book-copies" type="number" min="1" value={totalCopies} onChange={(e) => setTotalCopies(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
         </div>
         <div>
@@ -372,23 +372,23 @@ function BookFormModal({
           <input id="book-barcode" value={barcode} onChange={(e) => setBarcode(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
         </div>
         <div>
-          <label htmlFor="book-shelf" className="text-xs text-muted mb-1 block">Shelf <span className="text-muted/70">(e.g. M-02)</span></label>
+          <label htmlFor="book-shelf" className="text-xs text-muted mb-1 block">Shelf <span className="text-muted/70">(for example M-02)</span></label>
           <input id="book-shelf" value={shelf} onChange={(e) => setShelf(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
         </div>
       </div>
 
-      {error && <p className="text-sm text-brand-coral">{error instanceof Error ? error.message : 'Something went wrong.'}</p>}
+      {error && <p className="text-sm text-tone-coral">{error instanceof Error ? error.message : 'Something went wrong.'}</p>}
 
       {book && (
         <div className="pt-4 mt-2 border-t border-base">
           {confirmArchive ? (
             <div className="flex items-center gap-3">
               <p className="text-xs text-muted flex-1">Archive this book? It will be removed from the searchable catalog (copies set to 0).</p>
-              <button type="button" onClick={handleArchive} disabled={pending} className="text-xs font-semibold text-brand-coral hover:underline shrink-0">Confirm</button>
+              <button type="button" onClick={handleArchive} disabled={pending} className="text-xs font-semibold text-tone-coral hover:underline shrink-0">Confirm</button>
               <button type="button" onClick={() => setConfirmArchive(false)} className="text-xs text-muted hover:underline shrink-0">Cancel</button>
             </div>
           ) : (
-            <button type="button" onClick={() => setConfirmArchive(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-coral hover:underline">
+            <button type="button" onClick={() => setConfirmArchive(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-coral hover:underline">
               <Archive className="w-3.5 h-3.5" /> Archive this book
             </button>
           )}
@@ -423,9 +423,9 @@ function UploadDigitalResourceModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      title="Add Digital Resource"
+      title="Add digital resource"
       onClose={onClose}
-      size="lg"
+      size="l"
       bodyClassName="space-y-3"
       footer={
         <>
@@ -452,9 +452,9 @@ function UploadDigitalResourceModal({ onClose }: { onClose: () => void }) {
           <label htmlFor="dr-type" className="text-xs text-muted mb-1 block">Type</label>
           <select id="dr-type" value={type} onChange={(e) => setType(e.target.value)} className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11">
             <option value="EBOOK">eBook</option>
-            <option value="PAST_PAPER">Past Paper</option>
+            <option value="PAST_PAPER">Past paper</option>
             <option value="REFERENCE">Reference</option>
-            <option value="STUDY_GUIDE">Study Guide</option>
+            <option value="STUDY_GUIDE">Study guide</option>
           </select>
         </div>
         <div>
@@ -479,12 +479,12 @@ function UploadDigitalResourceModal({ onClose }: { onClose: () => void }) {
           type="file"
           accept="application/pdf,image/*"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-teal/10 file:text-brand-teal file:text-xs file:font-semibold"
+          className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand-teal/10 file:text-tone-teal file:text-xs file:font-semibold"
         />
       </div>
 
       {upload.error && (
-        <p className="text-sm text-brand-coral">
+        <p className="text-sm text-tone-coral">
           {upload.error instanceof Error ? upload.error.message : 'Something went wrong.'}
         </p>
       )}
@@ -702,9 +702,9 @@ function IssueBookModal({
 
   return (
     <Modal
-      title="Issue Book"
+      title="Issue book"
       onClose={onClose}
-      size="md"
+      size="m"
       // [MAINT 2026-10-23 — Pop-up sizing] The Book / Student pickers open an
       // absolutely-positioned results list INSIDE the scrolling body; at the
       // default height only ~2 rows showed before it was clipped. Taller panel
@@ -769,7 +769,7 @@ function IssueBookModal({
       </div>
 
       {issueBorrowing.error && (
-        <p className="text-sm text-brand-coral">
+        <p className="text-sm text-tone-coral">
           {issueBorrowing.error instanceof Error ? issueBorrowing.error.message : 'Something went wrong.'}
         </p>
       )}
@@ -817,9 +817,9 @@ function ReturnBookModal({
 
   return (
     <Modal
-      title="Return Book"
+      title="Return book"
       onClose={onClose}
-      size="md"
+      size="m"
       bodyClassName="space-y-4"
       footer={
         <>
@@ -837,7 +837,7 @@ function ReturnBookModal({
         </>
       }
     >
-      <p className="text-sm text-body"><strong>{bookTitle}</strong> — {borrowerName}</p>
+      <p className="text-sm text-body"><strong>{bookTitle}</strong> - {borrowerName}</p>
 
       <div>
         <label className="text-xs text-muted mb-1.5 block">Condition on return</label>
@@ -849,7 +849,7 @@ function ReturnBookModal({
               onClick={() => setCondition(c)}
               className={`py-2 rounded-lg text-sm font-semibold border ${
                 condition === c
-                  ? c === 'GOOD' ? 'bg-brand-teal text-white border-brand-teal' : 'bg-brand-coral text-white border-brand-coral'
+                  ? c === 'GOOD' ? 'bg-btn-brand text-btn-brand-fg border-brand-teal' : 'bg-btn-danger text-btn-danger-fg border-brand-coral'
                   : 'border-base text-body'
               }`}
             >
@@ -870,13 +870,13 @@ function ReturnBookModal({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              placeholder={condition === 'LOST' ? 'e.g. Never returned; reported lost by borrower.' : 'e.g. Torn binding and water spill on chapters 3-4.'}
+              placeholder={condition === 'LOST' ? 'Never returned; reported lost by borrower.' : 'Torn binding and water spill on chapters 3-4.'}
               className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
             />
           </div>
           <div>
             <label htmlFor="return-fee" className="text-xs text-muted mb-1 block">
-              Amount to charge the borrower (MK) <span className="text-muted/70">(optional — leave blank for no charge)</span>
+              Amount to charge the borrower (MK) <span className="text-muted/70">(optional: leave blank for no charge)</span>
             </label>
             <input
               id="return-fee"
@@ -891,7 +891,7 @@ function ReturnBookModal({
       )}
 
       {returnBook.error && (
-        <p className="text-sm text-brand-coral">
+        <p className="text-sm text-tone-coral">
           {returnBook.error instanceof Error ? returnBook.error.message : 'Something went wrong.'}
         </p>
       )}
@@ -907,9 +907,9 @@ function BookDetailModal({ bookId, onClose }: { bookId: string; onClose: () => v
   const b = book as ApiBook | undefined
   return (
     <Modal
-      title="Book Details"
+      title="Book details"
       onClose={onClose}
-      size="lg"
+      size="l"
       bodyClassName="space-y-4"
     >
       {isLoading || !b ? (
@@ -922,16 +922,16 @@ function BookDetailModal({ bookId, onClose }: { bookId: string; onClose: () => v
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div><p className="text-xs text-muted">Category</p><p className="font-medium">{b.category}</p></div>
-            <div><p className="text-xs text-muted">Publisher</p><p className="font-medium">{b.publisher ?? '—'}</p></div>
-            <div><p className="text-xs text-muted">Year</p><p className="font-medium">{b.publishedYear ?? '—'}</p></div>
-            <div><p className="text-xs text-muted">ISBN</p><p className="font-medium">{b.isbn ?? '—'}</p></div>
-            <div><p className="text-xs text-muted">Barcode</p><p className="font-medium">{b.barcode ?? '—'}</p></div>
-            <div><p className="text-xs text-muted">Shelf</p><p className="font-medium">{b.shelf ?? '—'}</p></div>
+            <div><p className="text-xs text-muted">Publisher</p><p className="font-medium">{b.publisher ?? '-'}</p></div>
+            <div><p className="text-xs text-muted">Year</p><p className="font-medium">{b.publishedYear ?? '-'}</p></div>
+            <div><p className="text-xs text-muted">ISBN</p><p className="font-medium">{b.isbn ?? '-'}</p></div>
+            <div><p className="text-xs text-muted">Barcode</p><p className="font-medium">{b.barcode ?? '-'}</p></div>
+            <div><p className="text-xs text-muted">Shelf</p><p className="font-medium">{b.shelf ?? '-'}</p></div>
             <div><p className="text-xs text-muted">Copies</p><p className="font-medium">{b.totalCopies}</p></div>
-            <div><p className="text-xs text-muted">Available</p><p className={`font-semibold ${b.availableCopies === 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>{b.availableCopies}</p></div>
+            <div><p className="text-xs text-muted">Available</p><p className={`font-semibold ${b.availableCopies === 0 ? 'text-tone-coral' : 'text-tone-teal'}`}>{b.availableCopies}</p></div>
           </div>
           <div>
-            <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">Currently on loan</p>
+            <p className="text-xs font-heading font-semibold text-muted mb-2">Currently on loan</p>
             {!b.borrowings || b.borrowings.length === 0 ? (
               <p className="text-sm text-muted">No copies currently checked out.</p>
             ) : (
@@ -984,7 +984,7 @@ function MarkConditionSection({ book, onClose }: { book: ApiBook; onClose: () =>
   if (book.availableCopies === 0) {
     return (
       <div>
-        <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">Book Condition</p>
+        <p className="text-xs font-heading font-semibold text-muted mb-2">Book condition</p>
         <p className="text-sm text-muted">
           No copies of this title are currently on the shelf to mark. A copy that&apos;s out on loan is marked
           damaged or lost when it&apos;s returned, from the Borrowings tab.
@@ -1003,18 +1003,18 @@ function MarkConditionSection({ book, onClose }: { book: ApiBook; onClose: () =>
 
   return (
     <div>
-      <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">Book Condition</p>
+      <p className="text-xs font-heading font-semibold text-muted mb-2">Book condition</p>
       {!picking ? (
         <div className="flex gap-2">
           {canDamaged && (
             <button type="button" onClick={() => setPicking('DAMAGED')}
-              className="flex-1 py-2 rounded-lg text-sm font-semibold border border-brand-amber/40 text-brand-amber hover:bg-brand-amber/5">
+              className="flex-1 py-2 rounded-lg text-sm font-semibold border border-brand-amber/40 text-tone-amber hover:bg-brand-amber/5">
               Mark a copy Damaged
             </button>
           )}
           {canLost && (
             <button type="button" onClick={() => setPicking('LOST')}
-              className="flex-1 py-2 rounded-lg text-sm font-semibold border border-brand-coral/40 text-brand-coral hover:bg-brand-coral/5">
+              className="flex-1 py-2 rounded-lg text-sm font-semibold border border-brand-coral/40 text-tone-coral hover:bg-brand-coral/5">
               Mark a copy Lost
             </button>
           )}
@@ -1022,7 +1022,7 @@ function MarkConditionSection({ book, onClose }: { book: ApiBook; onClose: () =>
       ) : (
         <div className="space-y-3 border border-base rounded-lg p-3">
           <p className="text-sm font-medium text-body">
-            Mark {picking === 'LOST' ? 'lost' : 'damaged'} — {book.title}
+            Mark {picking === 'LOST' ? 'lost' : 'damaged'} - {book.title}
           </p>
           <div className="flex items-center gap-3">
             <label htmlFor="condition-copies" className="text-xs text-muted shrink-0">Copies</label>
@@ -1044,14 +1044,14 @@ function MarkConditionSection({ book, onClose }: { book: ApiBook; onClose: () =>
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              placeholder={picking === 'LOST' ? 'e.g. Not found during annual stock take.' : 'e.g. Water damage discovered on the shelf.'}
+              placeholder={picking === 'LOST' ? 'Not found during annual stock take.' : 'Water damage discovered on the shelf.'}
               className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page"
             />
           </div>
           {picking === 'LOST' && (
             <p className="text-xs text-muted">
               Marking a copy lost removes it from this title&apos;s total copy count. Marking it damaged only takes
-              it off the shelf — it stays in the total count as repairable.
+              it off the shelf. It stays in the total count as repairable.
             </p>
           )}
           <div className="flex gap-2">
@@ -1065,7 +1065,7 @@ function MarkConditionSection({ book, onClose }: { book: ApiBook; onClose: () =>
             </button>
           </div>
           {markCondition.error && (
-            <p className="text-xs text-brand-coral">
+            <p className="text-xs text-tone-coral">
               {markCondition.error instanceof Error ? markCondition.error.message : 'Something went wrong.'}
             </p>
           )}
@@ -1102,9 +1102,9 @@ function AssessFineModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      title="Assess Fine"
+      title="Assess fine"
       onClose={onClose}
-      size="md"
+      size="m"
       bodyClassName="space-y-4"
       footer={
         <>
@@ -1147,11 +1147,11 @@ function AssessFineModal({ onClose }: { onClose: () => void }) {
       <div>
         <label htmlFor="fine-reason" className="text-xs text-muted mb-1 block">Reason</label>
         <textarea id="fine-reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={2}
-          placeholder="e.g. Book returned damaged. Torn binding and water spill on chapters 3-4."
+          placeholder="Book returned damaged. Torn binding and water spill on chapters 3-4."
           className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page" />
       </div>
       {assessFine.error && (
-        <p className="text-sm text-brand-coral">
+        <p className="text-sm text-tone-coral">
           {assessFine.error instanceof Error ? assessFine.error.message : 'Something went wrong.'}
         </p>
       )}
@@ -1176,9 +1176,9 @@ function ClearanceCheckerModal({ allFines, onClose }: {
 
   return (
     <Modal
-      title="Student Library Clearance Audit"
+      title="Student library clearance audit"
       onClose={onClose}
-      size="lg"
+      size="l"
       bodyClassName="space-y-4"
     >
       <div>
@@ -1188,19 +1188,19 @@ function ClearanceCheckerModal({ allFines, onClose }: {
 
       {borrower && (
         <div className={`rounded-xl p-4 border ${isClear ? 'bg-brand-teal/8 border-brand-teal/25' : 'bg-brand-coral/8 border-brand-coral/25'}`}>
-          <p className={`font-heading font-semibold text-sm ${isClear ? 'text-brand-teal' : 'text-brand-coral'}`}>
-            {isClear ? 'Cleared — no outstanding books or fines' : 'Not cleared'}
+          <p className={`font-heading font-semibold text-sm ${isClear ? 'text-tone-teal' : 'text-tone-coral'}`}>
+            {isClear ? 'Cleared: no outstanding books or fines' : 'Not cleared'}
           </p>
           {!isClear && (
             <div className="mt-3 space-y-2">
               {outstandingLoans.map((loan) => (
                 <p key={loan.id} className="text-sm text-body">
-                  📕 {loan.book?.title ?? 'Untitled'} — {borrowingDisplayStatus(loan) === 'OVERDUE' ? borrowingCountdownLabel(loan) : `due ${new Date(loan.dueDate).toLocaleDateString()}`}
+                  📕 {loan.book?.title ?? 'Untitled'} - {borrowingDisplayStatus(loan) === 'OVERDUE' ? borrowingCountdownLabel(loan) : `due ${new Date(loan.dueDate).toLocaleDateString()}`}
                 </p>
               ))}
               {pendingFines.map((f) => (
                 <p key={f.id} className="text-sm text-body">
-                  💰 {f.bookTitle} — {formatMWK(f.amount)} pending
+                  💰 {f.bookTitle} - {formatMWK(f.amount)} pending
                 </p>
               ))}
             </div>
@@ -1521,26 +1521,24 @@ function LibraryContent() {
       {s && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {[
-            { label: 'Total Books',   value: String(s.totalBooks),                    sub: 'Cataloged & shelf-ready', icon: BookOpen, warn: false },
-            { label: 'On Loan',       value: String(s.activeBorrowings),               sub: 'Circulation active',      icon: Repeat,   warn: false },
+            { label: 'Total books',   value: String(s.totalBooks),                    sub: 'Cataloged & shelf-ready', icon: BookOpen, warn: false },
+            { label: 'On loan',       value: String(s.activeBorrowings),               sub: 'Circulation active',      icon: Repeat,   warn: false },
             { label: 'Overdue',       value: String(s.overdueBorrowings),              sub: 'Requires attention',      icon: AlertTriangle, warn: s.overdueBorrowings > 0 },
-            { label: 'Digital Files', value: String(s.digitalCount),                   sub: 'Past papers & guides',    icon: FileText, warn: false },
-            { label: 'Pending Fines', value: formatMWK(s.pendingFinesAmount),          sub: `${s.pendingFines} pending infraction${s.pendingFines === 1 ? '' : 's'}`, icon: AlertTriangle, warn: s.pendingFinesAmount > 0 },
+            { label: 'Digital files', value: String(s.digitalCount),                   sub: 'Past papers & guides',    icon: FileText, warn: false },
+            { label: 'Pending fines', value: formatMWK(s.pendingFinesAmount),          sub: `${s.pendingFines} pending infraction${s.pendingFines === 1 ? '' : 's'}`, icon: AlertTriangle, warn: s.pendingFinesAmount > 0 },
           ].map(({ label, value, sub, icon: Icon, warn }) => (
             <div
               key={label}
-              className={`bg-surface border rounded-xl p-4 ${
-                warn ? 'border-brand-coral/30 bg-brand-coral/5' : 'border-base'
-              }`}
+              className="app-tint rounded-xl p-4"
             >
               <div className="flex items-center justify-between">
-                <p className={`text-xs font-heading font-semibold uppercase tracking-wider ${warn ? 'text-brand-coral' : 'text-muted'}`}>{label}</p>
-                <Icon className={`w-4 h-4 ${warn ? 'text-brand-coral' : 'text-muted'}`} aria-hidden />
+                <p className={`text-xs font-heading font-semibold ${warn ? 'text-tone-coral' : 'text-muted'}`}>{label}</p>
+                <Icon className={`w-4 h-4 ${warn ? 'text-tone-coral' : 'text-muted'}`} aria-hidden />
               </div>
-              <p className={`text-2xl font-bold mt-1.5 ${warn ? 'text-brand-coral' : 'text-brand-navy'}`}>
+              <p className={`text-xl font-bold mt-1.5 break-words ${warn ? 'text-tone-coral' : 'text-brand-navy'}`}>
                 {value}
               </p>
-              <p className={`text-xs mt-1 ${warn ? 'text-brand-coral' : 'text-muted'}`}>{sub}</p>
+              <p className={`text-xs mt-1 ${warn ? 'text-tone-coral' : 'text-muted'}`}>{sub}</p>
             </div>
           ))}
         </div>
@@ -1624,10 +1622,10 @@ function LibraryContent() {
                 onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                 className="border border-base rounded-xl px-3 py-2.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
               >
-                <option value="title">Sort: Title</option>
-                <option value="author">Sort: Author</option>
-                <option value="publishedYear">Sort: Year</option>
-                <option value="availableCopies">Sort: Availability</option>
+                <option value="title">Sort: title</option>
+                <option value="author">Sort: author</option>
+                <option value="publishedYear">Sort: year</option>
+                <option value="availableCopies">Sort: availability</option>
               </select>
               <button
                 type="button"
@@ -1635,7 +1633,7 @@ function LibraryContent() {
                 aria-label={`Sort direction: ${sortDir === 'asc' ? 'ascending' : 'descending'}`}
                 className="border border-base rounded-xl p-2.5 bg-surface hover:bg-page min-h-[44px]"
               >
-                <ArrowUpDown className={`w-4 h-4 ${sortDir === 'desc' ? 'text-brand-teal' : 'text-muted'}`} />
+                <ArrowUpDown className={`w-4 h-4 ${sortDir === 'desc' ? 'text-tone-teal' : 'text-muted'}`} />
               </button>
             </div>
             <div className="w-40">
@@ -1694,16 +1692,16 @@ function LibraryContent() {
                     onClick={() => setShowStandaloneIssue(true)}
                     className="inline-flex items-center gap-1.5 bg-brand-deep text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:brightness-110 min-h-[44px]"
                   >
-                    <Check className="w-4 h-4" aria-hidden /> Issue Book
+                    <Check className="w-4 h-4" aria-hidden /> Issue book
                   </button>
                 </PermissionGuard>
                 {isLibStaff && (
                   <button
                     type="button"
                     onClick={() => setShowAddBook(true)}
-                    className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-[44px]"
+                    className="inline-flex items-center gap-1.5 bg-btn-brand text-btn-brand-fg rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-[44px]"
                   >
-                    <Plus className="w-4 h-4" aria-hidden /> Add Book
+                    <Plus className="w-4 h-4" aria-hidden /> Add book
                   </button>
                 )}
               </div>
@@ -1733,7 +1731,7 @@ function LibraryContent() {
               </div>
             </div>
 
-            {scanError && <p className="text-xs text-brand-coral">{scanError}</p>}
+            {scanError && <p className="text-xs text-tone-coral">{scanError}</p>}
             {scanResult && (
               <div className="text-xs bg-brand-teal/10 border border-brand-teal/25 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
                 <span>Found: <strong>{scanResult.title}</strong></span>
@@ -1741,7 +1739,7 @@ function LibraryContent() {
                   <button
                     type="button"
                     onClick={() => handleIssue(scanResult.id)}
-                    className="text-brand-teal font-semibold underline min-h-11"
+                    className="text-tone-teal font-semibold underline min-h-11"
                   >
                     Issue this book
                   </button>
@@ -1763,7 +1761,7 @@ function LibraryContent() {
                 <div className="col-span-full text-center py-12 text-muted text-sm">No books found.</div>
               )}
               {(books as ApiBook[]).map((b) => (
-                <div key={b.id} className="bg-surface border border-base rounded-xl p-4 flex flex-col gap-2">
+                <div key={b.id} className="app-tint rounded-xl p-4 flex flex-col gap-2">
                   <div className="w-full h-24 bg-page rounded-lg flex items-center justify-center">
                     <BookOpen className="w-8 h-8 text-muted/50" aria-hidden />
                   </div>
@@ -1771,18 +1769,18 @@ function LibraryContent() {
                     <p className="font-heading font-semibold text-sm text-body">{b.title}</p>
                     <p className="text-xs text-muted">{b.author}</p>
                     <p className="text-xs text-muted mt-0.5">
-                      {b.barcode ?? '—'}{b.shelf ? ` · Shelf ${b.shelf}` : ''}
+                      {b.barcode ?? '-'}{b.shelf ? ` · Shelf ${b.shelf}` : ''}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs">{b.category}</span>
-                    <span className={`text-xs font-semibold ${b.availableCopies === 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>
+                    <span className={`text-xs font-semibold ${b.availableCopies === 0 ? 'text-tone-coral' : 'text-tone-teal'}`}>
                       {b.availableCopies}/{b.totalCopies} available
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-auto pt-1">
                     <PermissionGuard permission="library.issueBook">
-                      <button type="button" disabled={b.availableCopies === 0} onClick={() => handleIssue(b.id)} className="text-xs font-semibold text-brand-teal underline disabled:opacity-40 min-h-11">Issue</button>
+                      <button type="button" disabled={b.availableCopies === 0} onClick={() => handleIssue(b.id)} className="text-xs font-semibold text-tone-teal underline disabled:opacity-40 min-h-11">Issue</button>
                     </PermissionGuard>
                     <button type="button" onClick={() => setViewingBookId(b.id)} aria-label={`View ${b.title}`} className="text-muted hover:text-body min-h-11 min-w-11 flex items-center justify-center"><Eye className="w-3.5 h-3.5" /></button>
                     {isLibStaff && (
@@ -1805,7 +1803,7 @@ function LibraryContent() {
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       <span className="text-xs">{b.category}</span>
                       <span className="text-xs text-muted">{b.totalCopies} copies</span>
-                      <span className={`text-xs font-semibold ${b.availableCopies === 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>
+                      <span className={`text-xs font-semibold ${b.availableCopies === 0 ? 'text-tone-coral' : 'text-tone-teal'}`}>
                         {b.availableCopies} available
                       </span>
                       <button type="button" onClick={() => setViewingBookId(b.id)} aria-label={`View ${b.title}`} className="text-muted hover:text-body min-h-11 min-w-11 flex items-center justify-center"><Eye className="w-3.5 h-3.5" /></button>
@@ -1814,7 +1812,7 @@ function LibraryContent() {
                           type="button"
                           disabled={b.availableCopies === 0}
                           onClick={() => handleIssue(b.id)}
-                          className="ml-auto text-xs font-semibold text-brand-teal underline disabled:opacity-40 min-h-11"
+                          className="ml-auto text-xs font-semibold text-tone-teal underline disabled:opacity-40 min-h-11"
                         >
                           Issue
                         </button>
@@ -1839,7 +1837,7 @@ function LibraryContent() {
                       <th
                         key={h}
                         scope="col"
-                        className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase"
+                        className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted"
                       >
                         {h}
                       </th>
@@ -1850,7 +1848,7 @@ function LibraryContent() {
                   groupedBooks.map(([groupName, groupBooks]) => (
                     <tbody key={groupName} className="divide-y divide-base">
                       <tr className="bg-page/70">
-                        <td colSpan={8} className="px-4 py-2 text-xs font-heading font-bold text-brand-teal uppercase tracking-wider">
+                        <td colSpan={8} className="px-4 py-2 text-xs font-heading font-bold text-tone-teal">
                           {groupName} · {groupBooks.length}
                         </td>
                       </tr>
@@ -1882,8 +1880,8 @@ function LibraryContent() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <ModuleTabs<'active' | 'waivers'>
               tabs={[
-                { id: 'active',  label: seesAllLoans ? 'Active Borrowings' : 'My Borrowings', icon: Repeat, badge: seesAllLoans ? (activeLoans as ApiBorrowing[]).length : undefined },
-                { id: 'waivers', label: 'Fine Waiver Portal',  icon: Shield, badge: canReviewWaivers ? fineWaivers.length : undefined },
+                { id: 'active',  label: seesAllLoans ? 'Active borrowings' : 'My borrowings', icon: Repeat },
+                { id: 'waivers', label: 'Fine waiver portal',  icon: Shield, badge: canReviewWaivers ? fineWaivers.length : undefined, badgeNoun: 'to review' },
               ]}
               active={borrowingsSubTab}
               onChange={setBorrowingsSubTab}
@@ -1894,9 +1892,9 @@ function LibraryContent() {
               <button
                 type="button"
                 onClick={() => setShowStandaloneIssue(true)}
-                className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-[44px] shrink-0"
+                className="inline-flex items-center gap-1.5 bg-btn-brand text-btn-brand-fg rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-[44px] shrink-0"
               >
-                <Plus className="w-4 h-4" aria-hidden /> Issue Book
+                <Plus className="w-4 h-4" aria-hidden /> Issue book
               </button>
             </PermissionGuard>
           </div>
@@ -1925,7 +1923,7 @@ function LibraryContent() {
                   }}
                   className="inline-flex items-center gap-1.5 border border-base rounded-xl px-3 py-2.5 text-sm text-body hover:bg-page min-h-[44px]"
                 >
-                  <Scan className="w-4 h-4" aria-hidden /> Scan Barcode
+                  <Scan className="w-4 h-4" aria-hidden /> Scan barcode
                 </button>
                 <div className="flex items-center gap-1.5 bg-page rounded-xl p-1">
                   {([
@@ -1947,12 +1945,12 @@ function LibraryContent() {
               </div>
 
               {(scanError || scanResult) && (
-                <div className={`text-xs rounded-lg px-3 py-2 flex items-center justify-between gap-2 ${scanError ? 'bg-brand-coral/10 border border-brand-coral/25 text-brand-coral' : 'bg-brand-teal/10 border border-brand-teal/25'}`}>
+                <div className={`text-xs rounded-lg px-3 py-2 flex items-center justify-between gap-2 ${scanError ? 'bg-brand-coral/10 border border-brand-coral/25 text-tone-coral' : 'bg-brand-teal/10 border border-brand-teal/25'}`}>
                   {scanError ? <span>{scanError}</span> : (
                     <>
                       <span>Found: <strong>{scanResult?.title}</strong></span>
                       <PermissionGuard permission="library.issueBook">
-                        <button type="button" onClick={() => handleIssue(scanResult!.id)} className="text-brand-teal font-semibold underline min-h-11">Issue this book</button>
+                        <button type="button" onClick={() => handleIssue(scanResult!.id)} className="text-tone-teal font-semibold underline min-h-11">Issue this book</button>
                       </PermissionGuard>
                     </>
                   )}
@@ -1988,7 +1986,7 @@ function LibraryContent() {
                             <button type="button" onClick={() => handleRenew(b.id)} disabled={renewBorrowing.isPending} className="text-xs font-semibold text-brand-navy underline">Renew (+14d)</button>
                           </PermissionGuard>
                           <PermissionGuard permission="library.processReturn">
-                            <button type="button" onClick={() => setReturningBorrowing(b)} className="text-xs font-semibold text-brand-teal underline">Return Book</button>
+                            <button type="button" onClick={() => setReturningBorrowing(b)} className="text-xs font-semibold text-tone-teal underline">Return book</button>
                           </PermissionGuard>
                         </div>
                       </div>
@@ -2001,7 +1999,7 @@ function LibraryContent() {
                   <thead>
                     <tr className="bg-page border-b border-base">
                       {['Borrower / Student', 'Book Title & Barcode', 'Issue Date', 'Due Date & Countdown', 'Status', 'Circulation Actions'].map((h) => (
-                        <th key={h} scope="col" className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase">{h}</th>
+                        <th key={h} scope="col" className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -2020,12 +2018,12 @@ function LibraryContent() {
                           </td>
                           <td className="px-4 py-3">
                             <p className="text-body">{b.book?.title ?? 'Untitled'}</p>
-                            <p className="text-xs font-mono text-muted">{b.book?.barcode ?? '—'}</p>
+                            <p className="text-xs font-mono text-muted">{b.book?.barcode ?? '-'}</p>
                           </td>
                           <td className="px-4 py-3 text-muted text-xs">{new Date(b.issuedAt).toLocaleDateString()}</td>
                           <td className="px-4 py-3">
                             <p className="text-xs">{new Date(b.dueDate).toLocaleDateString()}</p>
-                            <p className={`text-xs ${displayStatus === 'OVERDUE' ? 'text-brand-coral' : 'text-muted'}`}>{borrowingCountdownLabel(b)}</p>
+                            <p className={`text-xs ${displayStatus === 'OVERDUE' ? 'text-tone-coral' : 'text-muted'}`}>{borrowingCountdownLabel(b)}</p>
                           </td>
                           <td className="px-4 py-3">
                             <span className={`text-xs font-semibold ${
@@ -2044,8 +2042,8 @@ function LibraryContent() {
                                 </button>
                               </PermissionGuard>
                               <PermissionGuard permission="library.processReturn">
-                                <button type="button" onClick={() => setReturningBorrowing(b)} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-teal underline">
-                                  <Undo2 className="w-3 h-3" aria-hidden /> Return Book
+                                <button type="button" onClick={() => setReturningBorrowing(b)} className="inline-flex items-center gap-1 text-xs font-semibold text-tone-teal underline">
+                                  <Undo2 className="w-3 h-3" aria-hidden /> Return book
                                 </button>
                               </PermissionGuard>
                             </div>
@@ -2067,7 +2065,7 @@ function LibraryContent() {
 
               <PermissionGuard permission="library.waiveFine">
                 <div className="pt-1">
-                  <h3 className="font-heading font-semibold text-sm text-body mb-3">Pending Fine Waiver Requests</h3>
+                  <h3 className="font-heading font-semibold text-sm text-body mb-3">Pending fine waiver requests</h3>
                   {fineWaivers.length === 0 ? (
                     <p className="text-sm text-muted">No pending waiver requests.</p>
                   ) : (
@@ -2076,7 +2074,7 @@ function LibraryContent() {
                         <li key={w.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
                           <span className="min-w-0">
                             <span className="block font-medium text-body">
-                              {w.borrowerName ?? 'Borrower'} — {w.bookTitle ?? 'Book'}
+                              {w.borrowerName ?? 'Borrower'} - {w.bookTitle ?? 'Book'}
                               {w.kind ? <span className="ml-2 text-xs font-semibold text-muted">{FINE_KIND_LABEL[w.kind]}</span> : null}
                               <span className="ml-2 text-xs font-semibold">{formatMWK(w.amount)}</span>
                             </span>
@@ -2086,7 +2084,7 @@ function LibraryContent() {
                             <button type="button" onClick={() => approveFineWaiver.mutate(w.id)}
                               disabled={approveFineWaiver.isPending || rejectFineWaiver.isPending}
                               aria-busy={approveFineWaiver.isPending && approveFineWaiver.variables === w.id}
-                              aria-label="Approve waiver" className="text-brand-teal min-h-11 min-w-11 flex items-center justify-center disabled:opacity-50">
+                              aria-label="Approve waiver" className="text-tone-teal min-h-11 min-w-11 flex items-center justify-center disabled:opacity-50">
                               {approveFineWaiver.isPending && approveFineWaiver.variables === w.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                             </button>
                             <button type="button" onClick={() => {
@@ -2095,7 +2093,7 @@ function LibraryContent() {
                             }}
                               disabled={approveFineWaiver.isPending || rejectFineWaiver.isPending}
                               aria-busy={rejectFineWaiver.isPending && rejectFineWaiver.variables?.id === w.id}
-                              aria-label="Reject waiver" className="text-brand-coral min-h-11 min-w-11 flex items-center justify-center disabled:opacity-50">
+                              aria-label="Reject waiver" className="text-tone-coral min-h-11 min-w-11 flex items-center justify-center disabled:opacity-50">
                               {rejectFineWaiver.isPending && rejectFineWaiver.variables?.id === w.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XIcon className="w-4 h-4" />}
                             </button>
                           </div>
@@ -2123,9 +2121,9 @@ function LibraryContent() {
               >
                 <option value="">All types</option>
                 <option value="EBOOK">eBook</option>
-                <option value="PAST_PAPER">Past Paper</option>
+                <option value="PAST_PAPER">Past paper</option>
                 <option value="REFERENCE">Reference</option>
-                <option value="STUDY_GUIDE">Study Guide</option>
+                <option value="STUDY_GUIDE">Study guide</option>
               </select>
               <select
                 value={digitalFormFilter}
@@ -2162,7 +2160,7 @@ function LibraryContent() {
                   onClick={() => setFocusResourceId('')}
                   className="border border-base rounded-xl px-3 py-2 text-sm bg-surface min-h-[44px] text-brand-navy"
                 >
-                  Showing one resource — show all
+                  Showing one resource: show all
                 </button>
               )}
             </div>
@@ -2170,9 +2168,9 @@ function LibraryContent() {
               <button
                 type="button"
                 onClick={() => setShowUploadResource(true)}
-                className="shrink-0 inline-flex items-center gap-2 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+                className="shrink-0 inline-flex items-center gap-2 bg-btn-brand text-btn-brand-fg rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
               >
-                <Upload className="w-4 h-4" aria-hidden /> Add Resource
+                <Upload className="w-4 h-4" aria-hidden /> Add resource
               </button>
             )}
           </div>
@@ -2183,7 +2181,7 @@ function LibraryContent() {
               </div>
             )}
             {shownDigitalResources.map((r) => (
-              <div key={r.id} className="bg-surface border border-base rounded-xl p-4">
+              <div key={r.id} className="app-tint rounded-xl p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-body">{r.title}</p>
@@ -2194,7 +2192,7 @@ function LibraryContent() {
                     </p>
                     {digitalResourceState(r) === 'pending' && (
                       <span className="text-xs text-status-warning">
-                        Pending Approval
+                        Pending approval
                       </span>
                     )}
                     {digitalResourceState(r) === 'rejected' && (
@@ -2217,7 +2215,7 @@ function LibraryContent() {
                             type="button"
                             onClick={() => approveDigitalResource.mutate(r.id)}
                             disabled={approveDigitalResource.isPending}
-                            className="text-xs font-semibold text-brand-teal underline disabled:opacity-50"
+                            className="text-xs font-semibold text-tone-teal underline disabled:opacity-50"
                           >
                             {approveDigitalResource.isPending ? 'Approving…' : 'Approve'}
                           </button>
@@ -2260,7 +2258,7 @@ function LibraryContent() {
                       type="button"
                       onClick={() => setViewingResource({ id: r.id, title: r.title })}
                       aria-label={`View ${r.title}`}
-                      className="p-2 hover:bg-page rounded-xl text-brand-teal shrink-0 min-h-11 min-w-11 flex items-center justify-center"
+                      className="p-2 hover:bg-page rounded-xl text-tone-teal shrink-0 min-h-11 min-w-11 flex items-center justify-center"
                     >
                       <Eye className="w-4 h-4" aria-hidden />
                     </button>
@@ -2331,25 +2329,25 @@ function LibraryContent() {
           <PermissionGuard permission="library.recommendResource">
             <div className="space-y-4 pb-5 border-b border-base">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-brand-amber" aria-hidden />
-                <h3 className="font-heading font-semibold text-sm text-body">Recommend a Resource</h3>
+                <Sparkles className="w-4 h-4 text-tone-amber" aria-hidden />
+                <h3 className="font-heading font-semibold text-sm text-body">Recommend a resource</h3>
               </div>
               <p className="text-xs text-muted -mt-2">Suggest new books, textbooks, or syllabus guides for the school library acquisition budget.</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label htmlFor="rec-title" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Title *</label>
+                  <label htmlFor="rec-title" className="block text-xs font-heading font-semibold text-muted mb-1.5">Title *</label>
                   <input id="rec-title" value={recTitle} onChange={(e) => setRecTitle(e.target.value)}
                     placeholder="Book title, edition, or journal name…"
                     className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
                 </div>
                 <div>
-                  <label htmlFor="rec-author" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Author(s)</label>
+                  <label htmlFor="rec-author" className="block text-xs font-heading font-semibold text-muted mb-1.5">Author(s)</label>
                   <input id="rec-author" value={recAuthor} onChange={(e) => setRecAuthor(e.target.value)}
                     placeholder="Author, editor, or publishing house…"
                     className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
                 </div>
                 <div>
-                  <label htmlFor="rec-requester-name" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Requester Name &amp; Role</label>
+                  <label htmlFor="rec-requester-name" className="block text-xs font-heading font-semibold text-muted mb-1.5">Requester name and role</label>
                   <div className="flex gap-2">
                     <input id="rec-requester-name" value={recRequesterName} onChange={(e) => setRecRequesterName(e.target.value)}
                       placeholder="Your Name…"
@@ -2368,13 +2366,13 @@ function LibraryContent() {
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="rec-requester-class" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Class / Form / Department</label>
+                  <label htmlFor="rec-requester-class" className="block text-xs font-heading font-semibold text-muted mb-1.5">Class / form / department</label>
                   <input id="rec-requester-class" value={recRequesterClass} onChange={(e) => setRecRequesterClass(e.target.value)}
-                    placeholder="e.g. Form 4 Science B or Department of Languages"
+                    placeholder="Form 4 Science B or Department of Languages"
                     className="w-full min-h-11 border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
                 </div>
                 <div className="sm:col-span-2">
-                  <label htmlFor="rec-reason" className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Why should the library acquire this? *</label>
+                  <label htmlFor="rec-reason" className="block text-xs font-heading font-semibold text-muted mb-1.5">Why should the library acquire this? *</label>
                   <textarea id="rec-reason" value={recReason} onChange={(e) => setRecReason(e.target.value)} rows={3}
                     placeholder="Explain academic relevance, exam syllabus support, or general literary value…"
                     className="w-full border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
@@ -2384,7 +2382,7 @@ function LibraryContent() {
                 className="inline-flex items-center gap-1.5 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60">
                 {createRecommendation.isPending ? 'Submitting…' : 'Submit Recommendation'}
               </button>
-              {workflowMessage && <p className="text-sm text-brand-teal">{workflowMessage}</p>}
+              {workflowMessage && <p className="text-sm text-tone-teal">{workflowMessage}</p>}
             </div>
           </PermissionGuard>
 
@@ -2392,7 +2390,7 @@ function LibraryContent() {
               row now also shows the requester fields when present. */}
           <PermissionGuard permission="library.approveRecommendation">
             <div className="pt-1">
-              <h3 className="font-heading font-semibold text-sm text-body mb-3">Pending Recommendations</h3>
+              <h3 className="font-heading font-semibold text-sm text-body mb-3">Pending recommendations</h3>
               {recommendations.length === 0 ? (
                 <p className="text-sm text-muted">No pending recommendations.</p>
               ) : (
@@ -2400,7 +2398,7 @@ function LibraryContent() {
                   {recommendations.map((r) => (
                     <li key={r.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
                       <div>
-                        <p className="font-medium">{r.title}{r.author ? ` — ${r.author}` : ''}</p>
+                        <p className="font-medium">{r.title}{r.author ? ` - ${r.author}` : ''}</p>
                         <p className="text-xs text-muted">{r.reason}</p>
                         {(r.requesterName || r.requesterClass) && (
                           <p className="text-xs text-muted/80 mt-0.5">
@@ -2412,7 +2410,7 @@ function LibraryContent() {
                         <button type="button" onClick={() => approveRecommendation.mutate({ id: r.id })}
                           disabled={approveRecommendation.isPending || rejectRecommendation.isPending}
                           aria-busy={approveRecommendation.isPending && approveRecommendation.variables?.id === r.id}
-                          aria-label="Approve recommendation" className="text-brand-teal min-h-11 min-w-11 flex items-center justify-center disabled:opacity-50">
+                          aria-label="Approve recommendation" className="text-tone-teal min-h-11 min-w-11 flex items-center justify-center disabled:opacity-50">
                           {approveRecommendation.isPending && approveRecommendation.variables?.id === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                         </button>
                         <button type="button" onClick={() => {
@@ -2421,7 +2419,7 @@ function LibraryContent() {
                         }}
                           disabled={approveRecommendation.isPending || rejectRecommendation.isPending}
                           aria-busy={rejectRecommendation.isPending && rejectRecommendation.variables?.id === r.id}
-                          aria-label="Reject recommendation" className="text-brand-coral min-h-11 min-w-11 flex items-center justify-center disabled:opacity-50">
+                          aria-label="Reject recommendation" className="text-tone-coral min-h-11 min-w-11 flex items-center justify-center disabled:opacity-50">
                           {rejectRecommendation.isPending && rejectRecommendation.variables?.id === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <XIcon className="w-4 h-4" />}
                         </button>
                       </div>
@@ -2452,14 +2450,14 @@ function LibraryContent() {
 
         return (
           <div className="space-y-4">
-            <PrintLetterhead title="Library Report" />
+            <PrintLetterhead title="Library report" />
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <ModuleTabs<'fines' | 'circulation' | 'catalogDist' | 'clearance'>
                 tabs={[
-                  { id: 'fines',       label: 'Fines & Penalties Ledger',        icon: AlertTriangle,  badge: fines.length },
-                  { id: 'circulation', label: 'Circulation & Popularity Insights', icon: ArrowUpRight },
-                  { id: 'catalogDist', label: 'Catalog Distribution',            icon: BookMarked,     badge: catalogReport?.byCategory.length ?? 0 },
-                  { id: 'clearance',   label: 'Clearance & Audit Reports',       icon: ClipboardList },
+                  { id: 'fines',       label: 'Fines and penalties ledger',        icon: AlertTriangle },
+                  { id: 'circulation', label: 'Circulation and popularity insights', icon: ArrowUpRight },
+                  { id: 'catalogDist', label: 'Catalog distribution',            icon: BookMarked },
+                  { id: 'clearance',   label: 'Clearance and audit reports',       icon: ClipboardList },
                 ]}
                 active={reportsSubTab}
                 onChange={setReportsSubTab}
@@ -2480,27 +2478,27 @@ function LibraryContent() {
             {reportsSubTab === 'fines' && (
               <div className="space-y-4">
                 <div className="grid sm:grid-cols-3 gap-3">
-                  <div className="bg-surface border border-base rounded-xl p-4">
-                    <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider">Total Outstanding (Pending)</p>
-                    <p className="text-2xl font-bold text-brand-amber mt-1.5">{formatMWK(totalOutstanding)}</p>
-                    <p className="text-xs text-brand-amber mt-1">{allFines.filter((f) => f.status === 'PENDING').length} uncollected fines</p>
+                  <div className="app-tint rounded-xl p-4">
+                    <p className="text-xs font-heading font-semibold text-muted">Total outstanding (pending)</p>
+                    <p className="text-2xl font-bold text-tone-amber mt-1.5">{formatMWK(totalOutstanding)}</p>
+                    <p className="text-xs text-tone-amber mt-1">{allFines.filter((f) => f.status === 'PENDING').length} uncollected fines</p>
                   </div>
-                  <div className="bg-surface border border-base rounded-xl p-4">
-                    <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider">Collected Treasury Total</p>
-                    <p className="text-2xl font-bold text-brand-teal mt-1.5">{formatMWK(collectedTotal)}</p>
-                    <p className="text-xs text-brand-teal mt-1">{allFines.filter((f) => f.status === 'PAID').length} settled receipts on record</p>
+                  <div className="app-tint rounded-xl p-4">
+                    <p className="text-xs font-heading font-semibold text-muted">Collected treasury total</p>
+                    <p className="text-2xl font-bold text-tone-teal mt-1.5">{formatMWK(collectedTotal)}</p>
+                    <p className="text-xs text-tone-teal mt-1">{allFines.filter((f) => f.status === 'PAID').length} settled receipts on record</p>
                   </div>
-                  <div className="bg-surface border border-base rounded-xl p-4">
-                    <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider">Total Penalties Assessed</p>
+                  <div className="app-tint rounded-xl p-4">
+                    <p className="text-xs font-heading font-semibold text-muted">Total penalties assessed</p>
                     <p className="text-2xl font-bold text-brand-navy mt-1.5">{formatMWK(totalAssessed)}</p>
-                    <p className="text-xs text-muted mt-1">Damaged books, lost copies &amp; late fees</p>
+                    <p className="text-xs text-muted mt-1">Damaged books, lost copies and late fees</p>
                   </div>
                 </div>
 
                 <div className="pt-1">
                   <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
                     <div>
-                      <h3 className="font-heading font-semibold text-sm text-body">Library Fines &amp; Damages</h3>
+                      <h3 className="font-heading font-semibold text-sm text-body">Library fines and damages</h3>
                       <p className="text-xs text-muted">Manage book damages, lost copies, and overdue penalty settlements</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -2517,7 +2515,7 @@ function LibraryContent() {
                       </select>
                       <PermissionGuard permission="library.applyFine">
                         <button type="button" onClick={() => setAssessingFine(true)} className="inline-flex items-center gap-1.5 bg-brand-deep text-white rounded-lg px-3 py-1.5 text-sm font-semibold min-h-[36px]">
-                          <Plus className="w-3.5 h-3.5" aria-hidden /> Assess Fine
+                          <Plus className="w-3.5 h-3.5" aria-hidden /> Assess fine
                         </button>
                       </PermissionGuard>
                     </div>
@@ -2531,7 +2529,7 @@ function LibraryContent() {
                         <div key={f.id} className="flex items-center justify-between gap-3 px-1 py-3 text-sm">
                           <div>
                             <p className="font-medium text-body">
-                              {f.borrowerName} — {f.bookTitle}
+                              {f.borrowerName} - {f.bookTitle}
                               {f.status === 'PENDING' && <span className="ml-2 text-xs font-semibold text-status-warning">PENDING</span>}
                             </p>
                             <p className="text-xs text-muted">
@@ -2541,7 +2539,7 @@ function LibraryContent() {
                           {f.status === 'PENDING' ? (
                             <div className="flex items-center gap-3 shrink-0">
                               <PermissionGuard permission="library.clearFine">
-                                <button type="button" onClick={() => clearFine.mutate(f.id)} disabled={clearFine.isPending} className="text-xs font-semibold text-brand-teal hover:underline disabled:opacity-50">Mark Paid</button>
+                                <button type="button" onClick={() => clearFine.mutate(f.id)} disabled={clearFine.isPending} className="text-xs font-semibold text-tone-teal hover:underline disabled:opacity-50">Mark paid</button>
                               </PermissionGuard>
                               <PermissionGuard permission="library.waiveFine">
                                 <button type="button" onClick={() => waiveFine.mutate(f.id)} disabled={waiveFine.isPending} className="text-xs font-semibold text-muted hover:underline disabled:opacity-50">Waive</button>
@@ -2561,7 +2559,7 @@ function LibraryContent() {
                 {/* [R21] "no where to see how many and what books are
                     lost, damaged" — libraryService.getConditionReport(). */}
                 <div className="pt-1">
-                  <h3 className="font-heading font-semibold text-sm text-body mb-1">Damaged &amp; Lost Books</h3>
+                  <h3 className="font-heading font-semibold text-sm text-body mb-1">Damaged and lost books</h3>
                   <p className="text-xs text-muted mb-3">
                     {conditionReport.filter((c) => c.condition === 'DAMAGED').length} damaged · {conditionReport.filter((c) => c.condition === 'LOST').length} lost
                   </p>
@@ -2572,7 +2570,7 @@ function LibraryContent() {
                       {conditionReport.map((c: ApiLibraryConditionEntry) => (
                         <li key={c.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
                           <div>
-                            <p className="font-medium text-body">{c.bookTitle} — {c.borrowerName}</p>
+                            <p className="font-medium text-body">{c.bookTitle} - {c.borrowerName}</p>
                             {c.notes && <p className="text-xs text-muted">{c.notes}</p>}
                           </div>
                           <span className={`text-xs font-semibold shrink-0 ${c.condition === 'LOST' ? 'text-status-danger' : 'text-status-warning'}`}>
@@ -2591,8 +2589,8 @@ function LibraryContent() {
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="pt-1">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-heading font-semibold text-sm text-body">Most Borrowed Books</h3>
-                    <span className="text-xs text-muted">Physical Catalog</span>
+                    <h3 className="font-heading font-semibold text-sm text-body">Most borrowed books</h3>
+                    <span className="text-xs text-muted">Physical catalog</span>
                   </div>
                   <p className="text-xs text-muted mb-2">Top 10 physical library titles by checkout frequency</p>
                   {!catalogReport || catalogReport.mostBorrowed.length === 0 ? (
@@ -2604,9 +2602,9 @@ function LibraryContent() {
                           <div>
                             <span className="text-muted mr-2">{i + 1}.</span>
                             <span className="font-medium text-body">{r.book?.title}</span>
-                            <span className="text-muted ml-1.5">— {r.book?.author}</span>
+                            <span className="text-muted ml-1.5">- {r.book?.author}</span>
                           </div>
-                          <span className="font-heading font-semibold text-brand-teal shrink-0">{r.borrowCount}×</span>
+                          <span className="font-heading font-semibold text-tone-teal shrink-0">{r.borrowCount}×</span>
                         </div>
                       ))}
                     </div>
@@ -2614,10 +2612,10 @@ function LibraryContent() {
                 </div>
                 <div className="pt-1">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-heading font-semibold text-sm text-body">Most Read (Digital)</h3>
+                    <h3 className="font-heading font-semibold text-sm text-body">Most read (digital)</h3>
                     <span className="text-xs text-muted">Digital E-Library</span>
                   </div>
-                  <p className="text-xs text-muted mb-2">Top digital resources accessed by students &amp; faculty</p>
+                  <p className="text-xs text-muted mb-2">Top digital resources accessed by students and faculty</p>
                   {!catalogReport || catalogReport.mostRead.length === 0 ? (
                     <p className="text-sm text-muted">No digital resource views yet.</p>
                   ) : (
@@ -2627,9 +2625,9 @@ function LibraryContent() {
                           <div>
                             <span className="text-muted mr-2">{i + 1}.</span>
                             <span className="font-medium text-body">{r.resource?.title}</span>
-                            <span className="text-muted ml-1.5">— {r.resource?.type}</span>
+                            <span className="text-muted ml-1.5">- {r.resource?.type}</span>
                           </div>
-                          <span className="font-heading font-semibold text-brand-teal shrink-0">{r.viewCount} views</span>
+                          <span className="font-heading font-semibold text-tone-teal shrink-0">{r.viewCount} views</span>
                         </div>
                       ))}
                     </div>
@@ -2643,7 +2641,7 @@ function LibraryContent() {
               <div className="pt-1">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="font-heading font-semibold text-sm text-body">Catalog by Category</h3>
+                    <h3 className="font-heading font-semibold text-sm text-body">Catalog by category</h3>
                     <p className="text-xs text-muted">Collection volume distribution, title count, physical copies, and active shelf utilization</p>
                   </div>
                   <p className="text-xs text-muted shrink-0">Total physical copies: <strong className="text-body">{totalPhysicalCopies}</strong></p>
@@ -2665,7 +2663,7 @@ function LibraryContent() {
                           className={`text-left bg-page border rounded-xl p-4 hover:border-brand-teal/40 transition-colors ${selectedCategory === c.category ? 'border-brand-teal ring-1 ring-brand-teal/30' : 'border-base'}`}
                         >
                           <div className="flex items-center justify-between">
-                            <p className="font-heading font-semibold text-xs text-body uppercase tracking-wide">{c.category}</p>
+                            <p className="font-heading font-semibold text-xs text-body">{c.category}</p>
                             <ArrowUpRight className="w-3.5 h-3.5 text-muted" aria-hidden />
                           </div>
                           <p className="text-xs text-muted mt-1">{c.titleCount} title{c.titleCount === 1 ? '' : 's'} · {c.copyCount} copies</p>
@@ -2686,15 +2684,15 @@ function LibraryContent() {
 
                 {selectedCategory && (
                   <div className="mt-4 pt-4 border-t border-base">
-                    <h4 className="font-heading font-semibold text-sm text-body mb-2">{selectedCategory} — {categoryBooks.length} title{categoryBooks.length === 1 ? '' : 's'}</h4>
+                    <h4 className="font-heading font-semibold text-sm text-body mb-2">{selectedCategory} - {categoryBooks.length} title{categoryBooks.length === 1 ? '' : 's'}</h4>
                     {categoryBooks.length === 0 ? (
-                      <p className="text-sm text-muted">No titles loaded for this category yet — try opening the Book Catalog tab first.</p>
+                      <p className="text-sm text-muted">No titles loaded for this category yet. Try opening the Book Catalog tab first.</p>
                     ) : (
                       <ul className="divide-y divide-base">
                         {categoryBooks.map((b) => (
                           <li key={b.id} className="py-2 flex items-center justify-between text-sm">
-                            <span>{b.title} <span className="text-muted">— {b.author}</span></span>
-                            <span className={`text-xs font-semibold ${b.availableCopies === 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>{b.availableCopies}/{b.totalCopies} available</span>
+                            <span>{b.title} <span className="text-muted">- {b.author}</span></span>
+                            <span className={`text-xs font-semibold ${b.availableCopies === 0 ? 'text-tone-coral' : 'text-tone-teal'}`}>{b.availableCopies}/{b.totalCopies} available</span>
                           </li>
                         ))}
                       </ul>
@@ -2709,26 +2707,26 @@ function LibraryContent() {
               <div className="space-y-4">
                 <div className="pb-4 border-b border-base flex items-center justify-between gap-3 flex-wrap">
                   <div>
-                    <h3 className="font-heading font-semibold text-sm text-body">Student Library Clearance Audit</h3>
+                    <h3 className="font-heading font-semibold text-sm text-body">Student library clearance audit</h3>
                     <p className="text-xs text-muted">Official verification system for examination admit cards and school leaving certificates.</p>
                   </div>
-                  <button type="button" onClick={() => setShowClearanceChecker(true)} className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-[44px] shrink-0">
-                    <ShieldCheck className="w-4 h-4" aria-hidden /> Open Clearance Checker
+                  <button type="button" onClick={() => setShowClearanceChecker(true)} className="inline-flex items-center gap-1.5 bg-btn-brand text-btn-brand-fg rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-brand-teal-light min-h-[44px] shrink-0">
+                    <ShieldCheck className="w-4 h-4" aria-hidden /> Open clearance checker
                   </button>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="pt-1">
-                    <h3 className="font-heading font-semibold text-sm text-body">Treasury Settlement Report</h3>
+                    <h3 className="font-heading font-semibold text-sm text-body">Treasury settlement report</h3>
                     <p className="text-xs text-muted mt-1 mb-3">Summary of all fines collected in cash and school fee deductions this term.</p>
                     <button type="button" onClick={downloadTreasuryCsv} className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3 py-2 text-sm text-body hover:bg-page">
-                      <Download className="w-3.5 h-3.5" aria-hidden /> Download Treasury Audit (CSV)
+                      <Download className="w-3.5 h-3.5" aria-hidden /> Download treasury audit (CSV)
                     </button>
                   </div>
                   <div className="pt-1">
-                    <h3 className="font-heading font-semibold text-sm text-body">Overdue Loans Defaulter List</h3>
+                    <h3 className="font-heading font-semibold text-sm text-body">Overdue loans defaulter list</h3>
                     <p className="text-xs text-muted mt-1 mb-3">Print notice letters for students with books overdue past 14 days.</p>
                     <button type="button" onClick={printDefaultersNotice} className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3 py-2 text-sm text-body hover:bg-page">
-                      <Printer className="w-3.5 h-3.5" aria-hidden /> Print Defaulters Notice
+                      <Printer className="w-3.5 h-3.5" aria-hidden /> Print defaulters notice
                     </button>
                   </div>
                 </div>
