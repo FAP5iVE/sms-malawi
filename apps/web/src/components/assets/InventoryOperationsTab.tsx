@@ -60,11 +60,11 @@ export function InventoryOperationsTab({ initialSearch = '', initialLowStock = f
                 return <tr key={item.id} className="border-b border-base last:border-0 hover:bg-page">
                   <td className="px-4 py-3"><p className="font-medium">{item.name}</p><p className="text-xs text-muted font-mono">{item.itemCode}</p></td>
                   <td className="px-4 py-3 text-xs">{humanize(item.category ?? 'Uncategorized')}</td>
-                  <td className={`px-4 py-3 text-right font-semibold ${low ? 'text-brand-coral' : ''}`}>{balance} {item.unitOfMeasure}</td>
+                  <td className={`px-4 py-3 text-right font-semibold ${low ? 'text-tone-coral' : ''}`}>{balance} {item.unitOfMeasure}</td>
                   <td className="px-4 py-3 text-right text-muted">{reorder}</td>
                   <td className="px-4 py-3"><div className="flex justify-end gap-1">
-                    <PermissionGuard permission="inventory.receive"><button type="button" title="Receive stock" aria-label={`Receive ${item.name}`} onClick={() => { setSelected(item); setOperation('receive') }} className="min-h-11 min-w-11 flex items-center justify-center text-brand-teal"><PackagePlus className="w-4 h-4" /></button></PermissionGuard>
-                    <PermissionGuard permission="inventory.issue"><button type="button" title="Issue stock" aria-label={`Issue ${item.name}`} onClick={() => { setSelected(item); setOperation('issue') }} className="min-h-11 min-w-11 flex items-center justify-center text-brand-coral"><PackageMinus className="w-4 h-4" /></button></PermissionGuard>
+                    <PermissionGuard permission="inventory.receive"><button type="button" title="Receive stock" aria-label={`Receive ${item.name}`} onClick={() => { setSelected(item); setOperation('receive') }} className="min-h-11 min-w-11 flex items-center justify-center text-tone-teal"><PackagePlus className="w-4 h-4" /></button></PermissionGuard>
+                    <PermissionGuard permission="inventory.issue"><button type="button" title="Issue stock" aria-label={`Issue ${item.name}`} onClick={() => { setSelected(item); setOperation('issue') }} className="min-h-11 min-w-11 flex items-center justify-center text-tone-coral"><PackageMinus className="w-4 h-4" /></button></PermissionGuard>
                     <PermissionGuard permission="inventory.transfer"><button type="button" title="Transfer stock" aria-label={`Transfer ${item.name}`} onClick={() => { setSelected(item); setOperation('transfer') }} className="min-h-11 min-w-11 flex items-center justify-center text-brand-navy"><ArrowRightLeft className="w-4 h-4" /></button></PermissionGuard>
                     <PermissionGuard permission="inventory.manageItems"><button type="button" title="Adjust stock" aria-label={`Adjust ${item.name}`} onClick={() => { setSelected(item); setOperation('adjust') }} className="min-h-11 min-w-11 flex items-center justify-center text-brand-navy"><SlidersHorizontal className="w-4 h-4" /></button></PermissionGuard>
                     <PermissionGuard permission="inventory.manageItems"><button type="button" title="Edit item" aria-label={`Edit ${item.name}`} onClick={() => setEditing(item)} className="min-h-11 min-w-11 flex items-center justify-center text-muted"><Pencil className="w-4 h-4" /></button></PermissionGuard>
@@ -102,7 +102,7 @@ function InventoryItemForm({ item, onClose }: { item?: InventoryItem; onClose: (
     if (item) update.mutate({ id: item.id, ...common }, { onSuccess: onClose })
     else { if (!itemCode.trim() || !name.trim() || !unitOfMeasure.trim()) return; create.mutate({ itemCode: itemCode.trim(), unitOfMeasure: unitOfMeasure.trim(), ...common }, { onSuccess: onClose }) }
   }
-  return <Modal size="lg" title={item ? `Edit ${item.name}` : 'New inventory item'} onClose={onClose}>
+  return <Modal size="l" title={item ? `Edit ${item.name}` : 'New inventory item'} onClose={onClose}>
     <div className="space-y-3">
       {!item && <Field label="Item code"><input value={itemCode} onChange={(e) => setItemCode(e.target.value)} className="input" placeholder="INV-001" /></Field>}
       <Field label="Name"><input value={name} onChange={(e) => setName(e.target.value)} className="input" /></Field>
@@ -112,7 +112,7 @@ function InventoryItemForm({ item, onClose }: { item?: InventoryItem; onClose: (
         <Field label="Reorder level"><input type="number" min="0" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} className="input" /></Field>
         <Field label="Reorder quantity"><input type="number" min="0" value={reorderQuantity} onChange={(e) => setReorderQuantity(e.target.value)} className="input" /></Field>
       </div>
-      {error && <p className="text-sm text-brand-coral">{error}</p>}
+      {error && <p className="text-sm text-tone-coral">{error}</p>}
       <button type="button" onClick={submit} disabled={mutation.isPending} className="w-full min-h-11 rounded-lg bg-brand-deep text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60">{mutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />} {item ? 'Save changes' : 'Create item'}</button>
     </div>
   </Modal>
@@ -131,20 +131,20 @@ function InventoryOperationModal({ item, operation, onClose }: { item: Inventory
     if (operation === 'transfer') { if (!from || !to) return; transfer.mutate({ inventoryItemId: item.id, quantity: qty, sourceRoomId: from, destinationRoomId: to, reason: reason.trim() || undefined }, { onSuccess: onClose }) }
     if (operation === 'adjust') { if (!reason.trim()) return; adjust.mutate({ inventoryItemId: item.id, quantity: qty, direction, reason: reason.trim() }, { onSuccess: onClose }) }
   }
-  return <Modal size="lg" title={`${humanize(operation)} stock`} onClose={onClose}>
+  return <Modal size="l" title={`${humanize(operation)} stock`} onClose={onClose}>
     <p className="text-sm text-muted mb-4">{item.name} · {item.itemCode}</p>
     <div className="space-y-3">
       {operation === 'adjust' && <Field label="Direction">
         <div className="flex gap-2">
-          <button type="button" onClick={() => setDirection('INCREASE')} className={`flex-1 min-h-11 rounded-lg border text-sm ${direction === 'INCREASE' ? 'border-brand-teal bg-brand-teal/10 text-brand-teal font-semibold' : 'border-base'}`}>Increase</button>
-          <button type="button" onClick={() => setDirection('DECREASE')} className={`flex-1 min-h-11 rounded-lg border text-sm ${direction === 'DECREASE' ? 'border-brand-coral bg-brand-coral/10 text-brand-coral font-semibold' : 'border-base'}`}>Decrease</button>
+          <button type="button" onClick={() => setDirection('INCREASE')} className={`flex-1 min-h-11 rounded-lg border text-sm ${direction === 'INCREASE' ? 'border-brand-teal bg-brand-teal/10 text-tone-teal font-semibold' : 'border-base'}`}>Increase</button>
+          <button type="button" onClick={() => setDirection('DECREASE')} className={`flex-1 min-h-11 rounded-lg border text-sm ${direction === 'DECREASE' ? 'border-brand-coral bg-brand-coral/10 text-tone-coral font-semibold' : 'border-base'}`}>Decrease</button>
         </div>
       </Field>}
       <Field label="Quantity"><input type="number" min="0.01" step="0.01" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="input" /></Field>
       {(operation === 'issue' || operation === 'transfer') && <Field label="From room / location"><input value={from} onChange={(e) => setFrom(e.target.value)} className="input" placeholder="Room ID" /></Field>}
       {(operation === 'receive' || operation === 'transfer') && <Field label="To room / location"><input value={to} onChange={(e) => setTo(e.target.value)} className="input" placeholder="Room ID" /></Field>}
       {(operation !== 'receive') && <Field label={operation === 'adjust' ? 'Reason (required)' : 'Reason'}><textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} className="input" /></Field>}
-      {error && <p className="text-sm text-brand-coral">{error}</p>}
+      {error && <p className="text-sm text-tone-coral">{error}</p>}
       <button type="button" onClick={submit} disabled={mutation.isPending} className="w-full min-h-11 rounded-lg bg-brand-deep text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60">{mutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />} Confirm</button>
     </div>
   </Modal>
@@ -152,8 +152,8 @@ function InventoryOperationModal({ item, operation, onClose }: { item: Inventory
 
 function InventoryHistoryModal({ item, onClose }: { item: InventoryItem; onClose: () => void }) {
   const { data = [], isLoading } = useInventoryTransactions(item.id)
-  return <Modal size="lg" title={`Movement · ${item.name}`} onClose={onClose}>
-    {isLoading ? <div className="py-8 text-center"><Loader2 className="inline w-5 h-5 animate-spin" /></div> : data.length === 0 ? <p className="py-8 text-center text-sm text-muted">No movement recorded.</p> : <div className="space-y-2 max-h-96 overflow-y-auto">{data.map((row) => <div key={row.id} className="border border-base rounded-lg p-3"><div className="flex justify-between gap-3"><span className="font-medium">{humanize(row.transactionType)}</span><span className="tabular">{n(row.quantity)} {item.unitOfMeasure}</span></div><p className="text-xs text-muted mt-1">{new Date(row.createdAt).toLocaleString()} · {row.reason || 'No reason supplied'}</p></div>)}</div>}
+  return <Modal size="l" title={`Movement · ${item.name}`} onClose={onClose}>
+    {isLoading ? <div className="py-8 text-center"><Loader2 className="inline w-5 h-5 animate-spin" /></div> : data.length === 0 ? <p className="py-8 text-center text-sm text-muted">No movement recorded.</p> : <div className="space-y-2 max-h-96 overflow-y-auto">{data.map((row) => <div key={row.id} className="rounded-lg p-3 app-tint"><div className="flex justify-between gap-3"><span className="font-medium">{humanize(row.transactionType)}</span><span className="tabular">{n(row.quantity)} {item.unitOfMeasure}</span></div><p className="text-xs text-muted mt-1">{new Date(row.createdAt).toLocaleString()} · {row.reason || 'No reason supplied'}</p></div>)}</div>}
   </Modal>
 }
 

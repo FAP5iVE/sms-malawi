@@ -26,6 +26,9 @@ import { ExternalLink, GraduationCap, Plus, Trash2, Upload, Loader2 } from 'luci
 import type { ApiManebRecord } from '@shared/types/api'
 import type { CreateManebRecordInput } from '@shared/schemas/exam'
 import { MALAWI_SUBJECTS } from '@shared/constants/malawi'
+import { chipClass } from '@/lib/hills/chip'
+import { StatusText } from '@/components/shared/StatusText'
+import { statusTone, statusWord } from '@/lib/hills/statusWord'
 
 interface Props { academicYear: string }
 
@@ -136,10 +139,8 @@ export function ManebPanel({ academicYear }: Props) {
         <div className="flex gap-2">
           {(['JCE', 'MSCE'] as const).map((t) => (
             <button key={t} onClick={() => setExamType(t)}
-              className={`px-4 py-1.5 rounded-full text-sm font-semibold border transition-colors ${
-                examType === t ? 'bg-brand-deep text-white border-brand-navy' : 'border-base text-muted hover:border-brand-navy'
-              }`}>
-              {t === 'JCE' ? 'JCE — Form 2' : 'MSCE — Form 4'}
+              className={chipClass(examType === t)}>
+              {t === 'JCE' ? 'JCE, Form 2' : 'MSCE, Form 4'}
             </button>
           ))}
         </div>
@@ -157,27 +158,27 @@ export function ManebPanel({ academicYear }: Props) {
             </button>
           )}
           <a href="https://www.maneb.edu.mw/" target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-sm text-brand-teal hover:underline">
+            className="flex items-center gap-1.5 text-sm text-tone-teal hover:underline">
             <ExternalLink className="w-3.5 h-3.5" /> MANEB Portal
           </a>
         </div>
       </div>
 
-      <div className="py-1 text-sm text-brand-amber flex items-start gap-2">
+      <div className="py-1 text-sm text-tone-amber flex items-start gap-2">
         <GraduationCap className="w-4 h-4 mt-0.5 shrink-0" />
         <span>
           {examType === 'MSCE' ? (
             <>
-              MSCE grades (1–9, as reported by MANEB) are entered directly — 1–2 Distinction, 3–6 Credit, 7–8 Pass,
+              MSCE grades (1–9, as reported by MANEB) are entered directly. 1–2 Distinction, 3–6 Credit, 7–8 Pass,
               9 Fail. The <strong>aggregate</strong> is the sum of the candidate&apos;s best six subjects (English
-              counted only if it lands among them); the <strong>certificate award</strong> is a separate check —
+              counted only if it lands among them); the <strong>certificate award</strong> is a separate check, 
               Option A (6 subjects passed incl. English, ≥1 Distinction/Credit) or Option B (5 passed incl. English,
               ≥3 Distinction/Credit).
             </>
           ) : (
             <>
               JCE grades (A–F, as reported by MANEB) are entered directly. JCE has <strong>no numeric aggregate</strong>
-              {' '}— MANEB does not compute points or a total for the Junior Certificate. The overall result shown is
+              {' '}MANEB does not compute points or a total for the Junior Certificate. The overall result shown is
               simply PASS (≥6 subjects passed, English among them) or FAIL.
             </>
           )}
@@ -188,7 +189,7 @@ export function ManebPanel({ academicYear }: Props) {
 
       {showIndividual && canManage && (
         <div className="pb-4 border-b border-base space-y-3">
-          <p className="text-sm font-heading font-semibold">Individual {examType} entry — {academicYear}</p>
+          <p className="text-sm font-heading font-semibold">Individual {examType} entry: {academicYear}</p>
           <p className="text-xs text-muted">
             For a single candidate. Grades are entered per subject; leave a subject blank if the candidate did not
             sit it. Saved with status - Results received.
@@ -202,7 +203,7 @@ export function ManebPanel({ academicYear }: Props) {
           <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
             {MALAWI_SUBJECTS.map((subject) => (
               <div key={subject}>
-                <label className="block text-[10px] text-muted mb-0.5 truncate" title={subject}>{subject}</label>
+                <label className="block text-xs text-muted mb-0.5 truncate" title={subject}>{subject}</label>
                 <input
                   className={fieldClass}
                   placeholder={examType === 'MSCE' ? '1–9' : 'A–F'}
@@ -212,7 +213,7 @@ export function ManebPanel({ academicYear }: Props) {
               </div>
             ))}
           </div>
-          {individualFeedback && <p className="text-sm text-brand-coral">{individualFeedback}</p>}
+          {individualFeedback && <p className="text-sm text-tone-coral">{individualFeedback}</p>}
           <button
             onClick={() => {
               setIndividualFeedback(null)
@@ -259,16 +260,16 @@ export function ManebPanel({ academicYear }: Props) {
 
       {showBulk && canManage && (
         <div className="pb-4 border-b border-base space-y-3">
-          <p className="text-sm font-heading font-semibold">Bulk {examType} entry — {academicYear}</p>
+          <p className="text-sm font-heading font-semibold">Bulk {examType} entry: {academicYear}</p>
           <p className="text-xs text-muted">
             Add one row per candidate. Grades are entered per subject; leave a subject blank if the candidate did not
-            sit it. Records are saved with status “Results received”. MANEB is the authority — enter grades exactly as
+            sit it. Records are saved with status “Results received”. MANEB is the authority. Enter grades exactly as
             reported.
           </p>
 
           <div className="space-y-3">
             {rows.map((r, i) => (
-              <div key={i} className="rounded-lg border border-base p-3 space-y-2">
+              <div key={i} className="rounded-lg p-3 space-y-2 app-tint">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-muted">Candidate {i + 1}</span>
                   {rows.length > 1 && (
@@ -286,7 +287,7 @@ export function ManebPanel({ academicYear }: Props) {
                 <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
                   {MALAWI_SUBJECTS.map((subject) => (
                     <div key={subject}>
-                      <label className="block text-[10px] text-muted mb-0.5 truncate" title={subject}>{subject}</label>
+                      <label className="block text-xs text-muted mb-0.5 truncate" title={subject}>{subject}</label>
                       <input
                         className={fieldClass}
                         placeholder={examType === 'MSCE' ? '1–9' : 'A–F'}
@@ -302,7 +303,7 @@ export function ManebPanel({ academicYear }: Props) {
           </div>
 
           <div className="flex items-center gap-3">
-            <button onClick={addRow} className="inline-flex items-center gap-1.5 text-sm text-brand-teal font-semibold hover:underline">
+            <button onClick={addRow} className="inline-flex items-center gap-1.5 text-sm text-tone-teal font-semibold hover:underline">
               <Plus className="w-4 h-4" /> Add candidate
             </button>
             <button onClick={submit} disabled={bulkCreate.isPending}
@@ -334,7 +335,7 @@ export function ManebPanel({ academicYear }: Props) {
             <thead>
               <tr className="bg-page border-b border-base">
                 {['Candidate No','Student','Centre','Subjects','Overall Grade','Status'].map((h) => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wide">{h}</th>
+                  <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted ">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -359,7 +360,7 @@ export function ManebPanel({ academicYear }: Props) {
                     {r.aggregatePoints != null && <span className="ml-1 text-xs font-normal text-muted">({r.aggregatePoints} pts)</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs text-brand-teal">{r.status}</span>
+                    <StatusText tone={statusTone(r.status)}>{statusWord(r.status)}</StatusText>
                   </td>
                 </tr>
               ))}

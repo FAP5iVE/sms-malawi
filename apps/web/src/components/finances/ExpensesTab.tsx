@@ -39,14 +39,10 @@ import { ExpenseCategorySchema, type CreateExpenseInput } from '@shared/schemas/
 import { z } from 'zod'
 import { Plus, Check, X, Paperclip, FileText, Loader2 } from 'lucide-react'
 import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
+import { StatusText } from '@/components/shared/StatusText'
+import { statusTone, statusWord } from '@/lib/hills/statusWord'
 
 type ExpenseCategoryType = z.infer<typeof ExpenseCategorySchema>
-
-const STATUS_COLORS: Record<string, string> = {
-  PENDING: 'text-status-warning',
-  APPROVED: 'text-status-success',
-  REJECTED: 'text-status-danger',
-}
 
 const CATEGORY_OPTIONS: ExpenseCategoryType[] = [
   'SALARIES',
@@ -140,10 +136,10 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
         <div className="flex justify-end">
           <button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-1.5 bg-brand-teal text-white px-4 py-2 rounded-lg text-sm font-semibold min-h-[44px]"
+            className="flex items-center gap-1.5 bg-btn-brand text-btn-brand-fg px-4 py-2 rounded-lg text-sm font-semibold min-h-[44px]"
             type="button"
           >
-            <Plus className="w-4 h-4" /> Log Expense
+            <Plus className="w-4 h-4" /> Log expense
           </button>
         </div>
       )}
@@ -153,22 +149,22 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
         <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="border-b border-base bg-page">
-              <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+              <th className="text-left px-4 py-3 font-heading text-xs text-muted font-semibold">
                 Category
               </th>
-              <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+              <th className="text-left px-4 py-3 font-heading text-xs text-muted font-semibold">
                 Description
               </th>
-              <th className="text-right px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+              <th className="text-right px-4 py-3 font-heading text-xs text-muted font-semibold">
                 Amount
               </th>
-              <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+              <th className="text-left px-4 py-3 font-heading text-xs text-muted font-semibold">
                 Date
               </th>
-              <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+              <th className="text-left px-4 py-3 font-heading text-xs text-muted font-semibold">
                 Status
               </th>
-              <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+              <th className="text-left px-4 py-3 font-heading text-xs text-muted font-semibold">
                 Receipt
               </th>
               <th className="px-4 py-3"></th>
@@ -207,18 +203,14 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
                     {format(new Date(e.incurredAt), 'dd MMM yyyy')}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex text-xs font-semibold ${STATUS_COLORS[e.status] ?? ''}`}
-                    >
-                      {e.status}
-                    </span>
+                    <StatusText tone={statusTone(e.status)}>{statusWord(e.status)}</StatusText>
                   </td>
                   <td className="px-4 py-3">
                     {e.receiptKey ? (
                       <button
                         onClick={() => viewReceipt(e.id)}
                         disabled={isFetchingUrl}
-                        className="flex items-center gap-1 text-xs text-brand-teal hover:underline font-medium min-h-[44px]"
+                        className="flex items-center gap-1 text-xs text-tone-teal hover:underline font-medium min-h-[44px]"
                         type="button"
                         aria-label={`View receipt for ${e.description}`}
                       >
@@ -228,14 +220,14 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
                       <button
                         onClick={() => handleUploadPick(e.id)}
                         disabled={isUploading}
-                        className="flex items-center gap-1 text-xs text-muted hover:text-brand-teal font-medium min-h-[44px]"
+                        className="flex items-center gap-1 text-xs text-muted hover:text-tone-teal font-medium min-h-[44px]"
                         type="button"
                         aria-label={`Attach receipt for ${e.description}`}
                       >
                         <Paperclip className="w-3.5 h-3.5" /> Attach
                       </button>
                     ) : (
-                      <span className="text-xs text-muted">—</span>
+                      <span className="text-xs text-muted">-</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -249,19 +241,19 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
                               className="flex items-center gap-1 text-xs text-emerald-700 hover:underline font-medium min-h-[44px]"
                               type="button"
                               aria-label={`Approve expense ${e.description} as paid`}
-                              title="Approve — already paid in cash"
+                              title="Approve: already paid in cash"
                             >
-                              <Check className="w-3.5 h-3.5" /> Approve (Paid)
+                              <Check className="w-3.5 h-3.5" /> Approve (paid)
                             </button>
                             <button
                               onClick={() => approveExpense({ expenseId: e.id, paidImmediately: false })}
                               disabled={isApproving}
-                              className="flex items-center gap-1 text-xs text-brand-amber hover:underline font-medium min-h-[44px]"
+                              className="flex items-center gap-1 text-xs text-tone-amber hover:underline font-medium min-h-[44px]"
                               type="button"
                               aria-label={`Approve expense ${e.description} as owed`}
-                              title="Approve — owed to vendor, not yet paid (tracked as a debt)"
+                              title="Approve: owed to vendor, not yet paid (tracked as a debt)"
                             >
-                              <Check className="w-3.5 h-3.5" /> Approve (Owed)
+                              <Check className="w-3.5 h-3.5" /> Approve (owed)
                             </button>
                           </>
                         )}
@@ -269,7 +261,7 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
                           <button
                             onClick={() => rejectExpense(e.id)}
                             disabled={isRejecting}
-                            className="flex items-center gap-1 text-xs text-brand-coral hover:underline font-medium min-h-[44px]"
+                            className="flex items-center gap-1 text-xs text-tone-coral hover:underline font-medium min-h-[44px]"
                             type="button"
                             aria-label={`Reject expense ${e.description}`}
                           >
@@ -290,12 +282,12 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
       {/* Log Expense Modal */}
       {showCreate && (
         <Modal
-          title="Log Expense"
+          title="Log expense"
           onClose={() => {
             setShowCreate(false)
             resetCreateForm()
           }}
-          size="sm"
+          size="s"
           busy={isCreating}
           bodyClassName="space-y-3"
           footer={
@@ -317,7 +309,7 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
                 type="button"
               >
                 {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Log Expense
+                Log expense
               </button>
             </>
           }

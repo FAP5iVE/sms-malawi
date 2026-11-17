@@ -71,6 +71,8 @@ import { StudentExitSchema }                      from '@shared/schemas/student'
 import { StudentRiskBadge }                       from '@/components/shared/StudentRiskBadge'
 import type { ApiStudent }                        from '@shared/types/api'
 import { useRouter }                              from 'next/navigation'
+import StatusText from '@/components/shared/StatusText'
+import { statusWord } from '@/lib/hills/statusWord'
 
 type Student = ApiStudent
 
@@ -83,25 +85,15 @@ type Student = ApiStudent
 // dark mode a pale block sat against the near-black page. Status is now
 // carried by font colour alone, using the theme-aware brand tokens, which
 // resolve correctly under both :root and .dark.
-const STATUS_STYLES: Record<string, string> = {
-  ACTIVE:                 'text-brand-teal',
-  ARCHIVED:               'text-muted',
-  AWAITING_MANEB_RESULTS: 'text-brand-navy',
-  GRADUATED:              'text-brand-purple',
+const STATUS_TONES: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
+  ACTIVE:                 'success',
+  ARCHIVED:               'neutral',
+  AWAITING_MANEB_RESULTS: 'info',
+  GRADUATED:              'info',
 }
 
 function StatusBadge({ status }: { status: string }) {
-  return (
-    <span
-      className={`
-        inline-flex items-center
-        text-xs font-heading font-semibold uppercase tracking-wide
-        ${STATUS_STYLES[status] ?? 'text-muted'}
-      `}
-    >
-      {status.replace(/_/g, ' ')}
-    </span>
-  )
+  return <StatusText tone={STATUS_TONES[status] ?? 'neutral'}>{statusWord(status)}</StatusText>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,7 +103,7 @@ function StatusBadge({ status }: { status: string }) {
 const COLUMNS: DataColumn<Student>[] = [
   {
     key:      'registrationNo',
-    label:    'Reg No.',
+    label:    'Reg no.',
     sortable: true,
     width:    'w-28',
     // Always visible — primary identifier on all screen sizes
@@ -128,7 +120,7 @@ const COLUMNS: DataColumn<Student>[] = [
         <p className="font-heading font-medium text-body text-sm">
           {s.firstName} {s.lastName}
         </p>
-        <p className="text-xs text-muted">{s.sex}</p>
+        <p className="text-xs text-muted">{statusWord(s.sex)}</p>
       </div>
     ),
   },
@@ -166,7 +158,7 @@ const COLUMNS: DataColumn<Student>[] = [
         <span
           className={`
             text-xs font-semibold
-            ${cleared ? 'text-brand-teal' : 'text-brand-coral'}
+            ${cleared ? 'text-tone-teal' : 'text-tone-coral'}
           `}
         >
           {cleared ? 'Cleared' : 'Outstanding'}
@@ -377,12 +369,12 @@ function StudentsContent() {
               flex items-center gap-2
               min-h-11 px-5 rounded-xl
               text-sm font-heading font-semibold
-              bg-brand-teal text-white
+              bg-btn-brand text-btn-brand-fg
               hover:bg-brand-teal/90 transition-colors
             "
           >
             <UserPlus className="w-4 h-4" aria-hidden />
-            Add Student
+            Add student
           </button>
         </PermissionGuard>
       </div>
@@ -410,7 +402,7 @@ function StudentsContent() {
       {actionError && (
         <p
           role="alert"
-          className="text-sm text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
+          className="text-sm text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
         >
           {actionError}
         </p>
@@ -518,7 +510,7 @@ function StudentsContent() {
               <button
                 type="submit"
                 disabled={bulkArchiving}
-                className="min-h-[44px] px-4 rounded-xl bg-brand-coral text-white text-sm font-semibold disabled:opacity-40"
+                className="min-h-[44px] px-4 rounded-xl bg-btn-danger text-btn-danger-fg text-sm font-semibold disabled:opacity-40"
               >
                 {bulkArchiving ? 'Archiving…' : 'Archive'}
               </button>
@@ -526,7 +518,7 @@ function StudentsContent() {
           }
         >
           <div>
-            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5" htmlFor="exit-reason">
+            <label className="block text-xs font-heading font-semibold text-muted mb-1.5" htmlFor="exit-reason">
               Reason for leaving
             </label>
             <select
@@ -540,7 +532,7 @@ function StudentsContent() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5" htmlFor="exit-date">
+            <label className="block text-xs font-heading font-semibold text-muted mb-1.5" htmlFor="exit-date">
               Date left
             </label>
             <input
@@ -553,7 +545,7 @@ function StudentsContent() {
             />
           </div>
           <div>
-            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5" htmlFor="exit-note">
+            <label className="block text-xs font-heading font-semibold text-muted mb-1.5" htmlFor="exit-note">
               Note (optional)
             </label>
             <textarea
@@ -566,7 +558,7 @@ function StudentsContent() {
               placeholder="Visible only to admin, headteacher and HR"
             />
           </div>
-          {exitError && <p className="text-sm text-brand-coral" role="alert">{exitError}</p>}
+          {exitError && <p className="text-sm text-tone-coral" role="alert">{exitError}</p>}
         </Modal>
       )}
       </ModuleSurface>

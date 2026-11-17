@@ -169,8 +169,8 @@ function ProfileContent() {
           <div className="grid sm:grid-cols-2 gap-x-8 gap-y-6 pb-5">
             <div className="space-y-6">
               <div>
-                <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-                  Personal Details
+                <p className="font-heading font-semibold text-xs text-muted mb-3">
+                  Personal details
                 </p>
                 <div className="space-y-2.5">
                   {[
@@ -196,8 +196,8 @@ function ProfileContent() {
               </div>
 
               <div>
-                <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-                  Home &amp; Admission
+                <p className="font-heading font-semibold text-xs text-muted mb-3">
+                  Home and admission
                 </p>
                 <div className="space-y-2.5">
                   {[
@@ -230,8 +230,8 @@ function ProfileContent() {
 
             <div className="space-y-6">
               <div>
-                <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-                  Class &amp; Status
+                <p className="font-heading font-semibold text-xs text-muted mb-3">
+                  Class and status
                 </p>
                 <div className="space-y-2.5">
                   {[
@@ -282,14 +282,14 @@ function ProfileContent() {
 
           {can('student.viewFeeStatus') && (
             <div className="pt-5">
-              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-                Fee Status
+              <p className="font-heading font-semibold text-xs text-muted mb-3">
+                Fee status
               </p>
               <div>
-                <p className="text-xs text-muted mb-1">Outstanding Balance</p>
+                <p className="text-xs text-muted mb-1">Outstanding balance</p>
                 <p
                   className={`text-lg font-heading font-bold ${
-                    (student.feeBalance ?? 0) > 0 ? 'text-brand-coral' : 'text-brand-teal'
+                    (student.feeBalance ?? 0) > 0 ? 'text-tone-coral' : 'text-tone-teal'
                   }`}
                 >
                   {formatMWK(student.feeBalance ?? 0)}
@@ -303,8 +303,8 @@ function ProfileContent() {
               "Fee Status". Each factor links to the module that owns it. */}
           {can('student.viewRiskStatus') && (
             <div className="pt-5">
-              <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted mb-3">
-                Risk Overview
+              <p className="font-heading font-semibold text-xs text-muted mb-3">
+                Risk overview
               </p>
               <StudentRiskBadge
                 riskLevel={student.riskLevel ?? 'NONE'}
@@ -334,8 +334,8 @@ function ProfileContent() {
           )}
           {reportCardError && (
             <div className="flex flex-col items-center gap-2 py-16 text-center">
-              <AlertTriangle className="w-6 h-6 text-brand-coral" />
-              <p className="text-sm text-brand-coral font-medium">
+              <AlertTriangle className="w-6 h-6 text-tone-coral" />
+              <p className="text-sm text-tone-coral font-medium">
                 {reportCardError instanceof Error ? reportCardError.message : 'Failed to load report card.'}
               </p>
               <button

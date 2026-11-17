@@ -33,7 +33,7 @@ export type ProcurementTabId = Tab
 export const PROCUREMENT_TABS: readonly ProcurementTabId[] = ['requisitions', 'rfqs', 'quotations', 'orders', 'receipts', 'suppliers']
 const tabs: Array<{ id: Tab; label: string }> = [
   { id: 'requisitions', label: 'Requisitions' }, { id: 'rfqs', label: 'RFQs' }, { id: 'quotations', label: 'Quotations' },
-  { id: 'orders', label: 'Purchase Orders' }, { id: 'receipts', label: 'Goods Receipts' },
+  { id: 'orders', label: 'Purchase orders' }, { id: 'receipts', label: 'Goods receipts' },
   { id: 'suppliers', label: 'Suppliers' },
 ]
 function humanize(s: string) { return s.replace(/_/g, ' ').toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase()) }
@@ -120,18 +120,18 @@ function RequisitionRow({ row, academicYear, term }: { row: PurchaseRequisition;
             <option value="">Select a budget…</option>
             {budgets.map((b) => (
               <option key={b.id} value={b.id}>
-                {b.department} · {humanize(b.category)} · {b.term ? `T${b.term}` : 'Full year'} — {money(b.available)} available
+                {b.department} · {humanize(b.category)} · {b.term ? `T${b.term}` : 'Full year'} - {money(b.available)} available
               </option>
             ))}
           </select>
-          {budgets.length === 0 && <p className="text-xs text-muted self-start">No budgets exist for this period yet — add one under Budget → Allocations.</p>}
+          {budgets.length === 0 && <p className="text-xs text-muted self-start">No budgets exist for this period yet. Add one under Budget → Allocations.</p>}
           <div className="flex gap-1">
             <Action onClick={() => setChoosing(false)} label="Cancel">Cancel</Action>
             <Action onClick={confirmApprove} label="Approve with this budget">{approve.isPending ? 'Approving…' : 'Approve'}</Action>
           </div>
         </div>
       )}
-      {err && <p className="text-xs text-brand-coral mt-1">{errorMessage(err, 'Action failed.')}</p>}
+      {err && <p className="text-xs text-tone-coral mt-1">{errorMessage(err, 'Action failed.')}</p>}
     </td>
   </tr>
 }
@@ -174,8 +174,8 @@ function RequisitionForm({ onClose, academicYear, term }: { onClose: () => void;
       {canPickBudget ? (
         <Field label={`Budget (${academicYear} · Term ${term})`}>
           <select value={budgetId} onChange={e => setBudgetId(e.target.value)} className="input">
-            <option value="">Not decided — the approver will choose</option>
-            {budgets.map(b => <option key={b.id} value={b.id}>{b.department} · {humanize(b.category)} · {b.term ? `T${b.term}` : 'Full year'} — {money(b.available)} available</option>)}
+            <option value="">Not decided: the approver will choose</option>
+            {budgets.map(b => <option key={b.id} value={b.id}>{b.department} · {humanize(b.category)} · {b.term ? `T${b.term}` : 'Full year'} - {money(b.available)} available</option>)}
           </select>
         </Field>
       ) : (
@@ -201,7 +201,7 @@ function RequisitionForm({ onClose, academicYear, term }: { onClose: () => void;
       <span className="text-sm text-muted">Estimated total <strong className="text-brand-navy">{money(total)}</strong></span>
       <button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create draft'}</button>
     </div>
-    {create.error && <p className="text-sm text-brand-coral">{errorMessage(create.error, 'Could not create requisition.')}</p>}
+    {create.error && <p className="text-sm text-tone-coral">{errorMessage(create.error, 'Could not create requisition.')}</p>}
   </div>
 }
 
@@ -237,7 +237,7 @@ function RFQForm({ onClose }: { onClose: () => void }) {
     <Field label="Approved requisition">
       <select value={prId} onChange={e => { setPrId(e.target.value); setSelectedLines(new Set()) }} className="input">
         <option value="">Select a requisition…</option>
-        {approved.map(r => <option key={r.id} value={r.id}>{r.requisitionNumber} — {r.purpose}</option>)}
+        {approved.map(r => <option key={r.id} value={r.id}>{r.requisitionNumber} - {r.purpose}</option>)}
       </select>
     </Field>
     {approved.length === 0 && <p className="text-xs text-muted">No approved requisitions are waiting for an RFQ right now.</p>}
@@ -250,7 +250,7 @@ function RFQForm({ onClose }: { onClose: () => void }) {
     </div>}
     <Field label="Response deadline (optional)"><input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="input" /></Field>
     <button type="button" onClick={submit} disabled={create.isPending || !prId || selectedLines.size === 0} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Creating…' : 'Create RFQ'}</button>
-    {create.error && <p className="text-sm text-brand-coral">{errorMessage(create.error, 'Could not create RFQ.')}</p>}
+    {create.error && <p className="text-sm text-tone-coral">{errorMessage(create.error, 'Could not create RFQ.')}</p>}
   </div>
 }
 
@@ -303,7 +303,7 @@ function QuotationForm({ onClose }: { onClose: () => void }) {
       <Field label="RFQ">
         <select value={rfqId} onChange={e => setRfqId(e.target.value)} className="input">
           <option value="">Select an RFQ…</option>
-          {openRfqs.map(r => <option key={r.id} value={r.id}>{r.rfqNumber} — {r.purchaseRequisition?.requisitionNumber}</option>)}
+          {openRfqs.map(r => <option key={r.id} value={r.id}>{r.rfqNumber} - {r.purchaseRequisition?.requisitionNumber}</option>)}
         </select>
       </Field>
       <Field label="Supplier">
@@ -318,14 +318,14 @@ function QuotationForm({ onClose }: { onClose: () => void }) {
     {rfq && <div className="space-y-2">
       <p className="text-xs text-muted">Enter the unit price this supplier quoted for each line:</p>
       {lines.length === 0 && <p className="text-sm text-muted">This RFQ has no lines.</p>}
-      {lines.map(l => <div key={l.purchaseRequisitionLineId} className="flex items-center gap-3 border border-base rounded-lg p-2">
+      {lines.map(l => <div key={l.purchaseRequisitionLineId} className="flex items-center gap-3 rounded-lg p-2 app-tint">
         <span className="flex-1 text-sm">{l.description} <span className="text-muted text-xs">× {l.quantity}</span></span>
         <input type="number" min="0" step="0.01" value={prices[l.purchaseRequisitionLineId] ?? ''} onChange={e => setPrice(l.purchaseRequisitionLineId, e.target.value)} className="input w-32" placeholder="Unit price" />
       </div>)}
       {lines.length > 0 && <p className="text-sm text-right text-muted">Subtotal <strong className="text-brand-navy">{money(subtotal)}</strong></p>}
     </div>}
     <button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Saving…' : 'Save quotation'}</button>
-    {create.error && <p className="text-sm text-brand-coral">{errorMessage(create.error, 'Could not save quotation.')}</p>}
+    {create.error && <p className="text-sm text-tone-coral">{errorMessage(create.error, 'Could not save quotation.')}</p>}
   </div>
 }
 
@@ -367,24 +367,24 @@ function PurchaseOrderForm({ onClose }: { onClose: () => void }) {
   }
   return <div className="space-y-4">
     <div className="flex justify-between"><h4 className="font-semibold text-brand-navy">New purchase order</h4><button type="button" onClick={onClose} className="text-muted">Close</button></div>
-    <p className="text-xs text-muted">Emergency/sole-source POs with manually-entered lines are not supported from this form yet — only ordering against a selected quotation.</p>
+    <p className="text-xs text-muted">Emergency/sole-source POs with manually-entered lines are not supported from this form yet. Only ordering against a selected quotation.</p>
     <div className="grid sm:grid-cols-2 gap-3">
       <Field label="Approved requisition">
         <select value={prId} onChange={e => setPrId(e.target.value)} className="input">
           <option value="">Select a requisition…</option>
-          {approved.map(r => <option key={r.id} value={r.id}>{r.requisitionNumber} — {r.purpose}</option>)}
+          {approved.map(r => <option key={r.id} value={r.id}>{r.requisitionNumber} - {r.purpose}</option>)}
         </select>
       </Field>
       <Field label="Selected quotation">
         <select value={quotationId} onChange={e => setQuotationId(e.target.value)} className="input">
           <option value="">Select a quotation…</option>
-          {selectableQuotations.map(q => <option key={q.id} value={q.id}>{q.quotationNumber} — {q.supplier?.name} ({money(q.total)})</option>)}
+          {selectableQuotations.map(q => <option key={q.id} value={q.id}>{q.quotationNumber} - {q.supplier?.name} ({money(q.total)})</option>)}
         </select>
       </Field>
       <Field label="Expected delivery date"><input type="date" value={expectedDeliveryDate} onChange={e => setExpectedDeliveryDate(e.target.value)} className="input" /></Field>
     </div>
     <button type="button" onClick={submit} disabled={create.isPending || !prId || !quotationId} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Creating…' : 'Create PO'}</button>
-    {create.error && <p className="text-sm text-brand-coral">{errorMessage(create.error, 'Could not create purchase order.')}</p>}
+    {create.error && <p className="text-sm text-tone-coral">{errorMessage(create.error, 'Could not create purchase order.')}</p>}
   </div>
 }
 
@@ -429,7 +429,7 @@ function GoodsReceiptForm({ onClose }: { onClose: () => void }) {
       <Field label="Purchase order">
         <select value={poId} onChange={e => setPoId(e.target.value)} className="input">
           <option value="">Select a PO…</option>
-          {receivable.map(o => <option key={o.id} value={o.id}>{o.poNumber} — {o.supplier?.name}</option>)}
+          {receivable.map(o => <option key={o.id} value={o.id}>{o.poNumber} - {o.supplier?.name}</option>)}
         </select>
       </Field>
       <Field label="Supplier delivery reference (optional)"><input value={supplierRef} onChange={e => setSupplierRef(e.target.value)} className="input" /></Field>
@@ -439,7 +439,7 @@ function GoodsReceiptForm({ onClose }: { onClose: () => void }) {
       {outstandingLines.length === 0 && <p className="text-sm text-muted">Nothing outstanding on this PO.</p>}
       {outstandingLines.map(l => {
         const outstanding = Number(l.quantityOrdered) - Number(l.quantityReceived) - Number(l.quantityCancelled)
-        return <div key={l.id} className="border border-base rounded-lg p-2 space-y-1.5">
+        return <div key={l.id} className="rounded-lg p-2 space-y-1.5 app-tint">
           <p className="text-sm">{l.description} <span className="text-muted text-xs">outstanding: {outstanding}</span></p>
           <div className="flex gap-2">
             <Field label="Accepted"><input type="number" min="0" max={outstanding} value={accepted[l.id] ?? ''} onChange={e => setAccepted(prev => ({ ...prev, [l.id]: e.target.value }))} className="input" /></Field>
@@ -449,7 +449,7 @@ function GoodsReceiptForm({ onClose }: { onClose: () => void }) {
       })}
     </div>}
     <button type="button" onClick={submit} disabled={create.isPending || !poId} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Saving…' : 'Record receipt'}</button>
-    {create.error && <p className="text-sm text-brand-coral">{errorMessage(create.error, 'Could not record goods receipt.')}</p>}
+    {create.error && <p className="text-sm text-tone-coral">{errorMessage(create.error, 'Could not record goods receipt.')}</p>}
   </div>
 }
 
@@ -476,7 +476,7 @@ function Suppliers() {
       <Field label="Phone"><input value={phone} onChange={e => setPhone(e.target.value)} className="input" /></Field>
       <Field label="Email"><input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input" /></Field>
       <div className="sm:col-span-2"><button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create'}</button>
-        {create.error && <p className="text-sm text-brand-coral mt-2">{errorMessage(create.error, 'Could not create supplier.')}</p>}</div>
+        {create.error && <p className="text-sm text-tone-coral mt-2">{errorMessage(create.error, 'Could not create supplier.')}</p>}</div>
     </div>}
     {isLoading ? <Loading /> : <DataTable headers={['Code', 'Name', 'Contact', 'Phone', 'Email']}>{data.map((s: Supplier) => <tr key={s.id} className="border-b border-base last:border-0">
       <td className="px-4 py-3 font-mono text-xs">{s.supplierCode}</td><td className="px-4 py-3 font-medium">{s.name}</td>
@@ -494,5 +494,5 @@ function Action({ onClick, label, children }: { onClick: () => void; label: stri
 // — this workspace now renders inside ModuleSurface's own bg-surface/
 // border panel (finances/page.tsx), so the extra card here was a
 // redundant second layer nested inside the first.
-function DataTable({ headers, children }: { headers: string[]; children: ReactNode }) { return <div className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-base bg-page">{headers.map(h => <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wide text-muted font-semibold">{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div></div> }
+function DataTable({ headers, children }: { headers: string[]; children: ReactNode }) { return <div className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-base bg-page">{headers.map(h => <th key={h} className="text-left px-4 py-3 text-xs text-muted font-semibold">{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div></div> }
 function Loading() { return <div className="p-8 text-center text-muted"><Loader2 className="inline w-5 h-5 animate-spin" /></div> }

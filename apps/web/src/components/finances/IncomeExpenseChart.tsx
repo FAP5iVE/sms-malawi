@@ -61,7 +61,7 @@ export function IncomeExpenseChart({
 
   return (
     <ChartCard
-      title="Income vs Expenses"
+      title="Income vs expenses"
       sub={`Revenue, expenses and net · ${academicYear}`}
       isLoading={loading}
       height={260}

@@ -48,7 +48,7 @@ export function FeeCollectionRadial({
 
   return (
     <ChartCard
-      title="Fee Collection vs Target"
+      title="Fee collection vs target"
       sub={term ? `Term ${term} · ${academicYear}` : academicYear}
       isLoading={loading}
       height={220}

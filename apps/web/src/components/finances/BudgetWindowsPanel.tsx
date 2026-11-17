@@ -29,6 +29,7 @@ import {
   useBudgetWindows, useCreateBudgetWindow, useOpenBudgetWindow,
   useCloseBudgetWindow, useSetBudgetWindowStatus,
 } from '@/hooks/useProcurement'
+import StatusText from '@/components/shared/StatusText'
 
 const TYPES = ['ANNUAL', 'TERM', 'QUARTERLY', 'MONTHLY', 'CUSTOM'] as const
 // Only a TERM window is tied to a single term; the rest are year-wide or date-based.
@@ -41,12 +42,12 @@ function errMsg(err: unknown, fallback: string) {
   return err instanceof Error ? err.message : fallback
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  DRAFT: 'bg-page text-muted',
-  OPEN: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-  REVIEW: 'bg-brand-amber/10 text-brand-amber',
-  CLOSED: 'bg-brand-coral/10 text-brand-coral',
-  ARCHIVED: 'bg-page text-muted',
+const STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
+  DRAFT: 'neutral',
+  OPEN: 'success',
+  REVIEW: 'warning',
+  CLOSED: 'danger',
+  ARCHIVED: 'neutral',
 }
 
 export function BudgetWindowsPanel({ academicYear, term: viewingTerm }: { academicYear: string; term: number }) {
@@ -89,7 +90,7 @@ export function BudgetWindowsPanel({ academicYear, term: viewingTerm }: { academ
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h3 className="font-heading font-semibold text-brand-navy">Budget windows — {academicYear}</h3>
+          <h3 className="font-heading font-semibold text-brand-navy">Budget windows: {academicYear}</h3>
           <p className="text-sm text-muted">
             When departments may submit budget requests and requisitions. A requisition can only be raised
             under a window that is <strong>Open</strong>.
@@ -99,7 +100,7 @@ export function BudgetWindowsPanel({ academicYear, term: viewingTerm }: { academ
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
-            className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+            className="inline-flex items-center gap-1.5 bg-btn-brand text-btn-brand-fg rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
           >
             <Plus className="w-4 h-4" /> {showForm ? 'Cancel' : 'New window'}
           </button>
@@ -111,7 +112,7 @@ export function BudgetWindowsPanel({ academicYear, term: viewingTerm }: { academ
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="block">
               <span className="text-xs text-muted block mb-1">Window name</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} className="input" placeholder="e.g. Term 1 requisitions" />
+              <input value={name} onChange={(e) => setName(e.target.value)} className="input" placeholder="Term 1 requisitions" />
             </label>
             <label className="block">
               <span className="text-xs text-muted block mb-1">Type</span>
@@ -138,7 +139,7 @@ export function BudgetWindowsPanel({ academicYear, term: viewingTerm }: { academ
               <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="input" />
             </label>
           </div>
-          {dateError && <p className="text-sm text-brand-coral">{dateError}</p>}
+          {dateError && <p className="text-sm text-tone-coral">{dateError}</p>}
           <button
             type="button"
             onClick={make}
@@ -148,11 +149,11 @@ export function BudgetWindowsPanel({ academicYear, term: viewingTerm }: { academ
             {create.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
             {create.isPending ? 'Creating…' : 'Create window'}
           </button>
-          {create.isError && <p className="text-sm text-brand-coral">{errMsg(create.error, 'Could not create the window.')}</p>}
+          {create.isError && <p className="text-sm text-tone-coral">{errMsg(create.error, 'Could not create the window.')}</p>}
         </div>
       )}
 
-      {actionError && <p className="text-sm text-brand-coral">{errMsg(actionError, 'Could not change the window status.')}</p>}
+      {actionError && <p className="text-sm text-tone-coral">{errMsg(actionError, 'Could not change the window status.')}</p>}
 
       {isLoading ? (
         <div className="p-8 text-center text-muted"><Loader2 className="inline w-5 h-5 animate-spin" /></div>
@@ -164,7 +165,7 @@ export function BudgetWindowsPanel({ academicYear, term: viewingTerm }: { academ
             <thead>
               <tr className="border-b border-base bg-page">
                 {['Window', 'Period', 'Dates', 'Status', 'Actions'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wide text-muted font-semibold">{h}</th>
+                  <th key={h} className="text-left px-4 py-3 text-xs text-muted font-semibold">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -177,9 +178,7 @@ export function BudgetWindowsPanel({ academicYear, term: viewingTerm }: { academ
                     {new Date(w.submissionStart).toLocaleDateString()} – {new Date(w.submissionEnd).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[w.status] ?? ''}`}>
-                      {humanize(w.status)}
-                    </span>
+                    <StatusText tone={STATUS_TONE[w.status] ?? 'neutral'}>{humanize(w.status)}</StatusText>
                   </td>
                   <td className="px-4 py-3">
                     <PermissionGuard permission="finance.manageBudgetWindows">

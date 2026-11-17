@@ -70,17 +70,17 @@ const OUTCOME_CONFIG: Record<PromotionOutcome, {
   icon:  React.ElementType
   chip:  string
 }> = {
-  PROMOTED:        { label: 'Promoted',         icon: CheckCircle2,  chip: 'text-brand-teal' },
-  REPEATED:        { label: 'Repeats',          icon: XCircle,       chip: 'text-brand-coral' },
-  AWAITING_MANEB:  { label: 'Awaiting MANEB',  icon: Clock,         chip: 'text-brand-amber' },
-  ALREADY_AWAITING:{ label: 'Already Waiting', icon: Clock,         chip: 'bg-base text-muted border-base' },
+  PROMOTED:        { label: 'Promoted',         icon: CheckCircle2,  chip: 'text-tone-teal' },
+  REPEATED:        { label: 'Repeats',          icon: XCircle,       chip: 'text-tone-coral' },
+  AWAITING_MANEB:  { label: 'Awaiting MANEB',  icon: Clock,         chip: 'text-tone-amber' },
+  ALREADY_AWAITING:{ label: 'Already waiting', icon: Clock,         chip: 'bg-base text-muted border-base' },
   SKIPPED_NO_RESULT:{ label: 'Skipped',        icon: AlertTriangle, chip: 'bg-base text-muted border-base' },
 }
 
 function OutcomeBadge({ outcome }: { outcome: PromotionOutcome }) {
   const { label, icon: Icon, chip } = OUTCOME_CONFIG[outcome]
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide ${chip}`}>
+    <span className={`inline-flex items-center gap-1 text-xs font-semibold ${chip}`}>
       <Icon className="w-3 h-3" aria-hidden />
       {label}
     </span>
@@ -101,10 +101,10 @@ interface ConfirmDialogProps {
 function ConfirmDialog({ preview, onConfirm, onCancel, committing }: ConfirmDialogProps) {
   return (
     <Modal
-      title="Confirm Promotion"
+      title="Confirm promotion"
       description={`Academic year ${preview.academicYear}`}
       onClose={onCancel}
-      size="md"
+      size="m"
       busy={committing}
       bodyClassName="space-y-5"
       footer={
@@ -136,12 +136,12 @@ function ConfirmDialog({ preview, onConfirm, onCancel, committing }: ConfirmDial
     <div className="grid grid-cols-3 gap-3 text-center">
       {[
         { label: 'Promoted',      value: preview.promoted,      color: 'text-emerald-600' },
-        { label: 'Repeating',     value: preview.repeated,      color: 'text-brand-coral' },
-        { label: 'Await MANEB',   value: preview.awaitingManeb, color: 'text-brand-amber' },
+        { label: 'Repeating',     value: preview.repeated,      color: 'text-tone-coral' },
+        { label: 'Await MANEB',   value: preview.awaitingManeb, color: 'text-tone-amber' },
       ].map(({ label, value, color }) => (
-        <div key={label} className="bg-page rounded-xl p-3 border border-base">
+        <div key={label} className="app-tint rounded-xl p-3">
           <p className={`text-xl font-bold font-heading ${color}`}>{value}</p>
-          <p className="text-[10px] text-muted mt-0.5">{label}</p>
+          <p className="text-xs text-muted mt-0.5">{label}</p>
         </div>
       ))}
     </div>
@@ -247,22 +247,22 @@ export function PromotionEngine() {
 
       {/* Header */}
       <div>
-        <h1 className="font-heading text-2xl font-bold text-brand-navy">Promotion Engine</h1>
+        <h1 className="font-heading text-2xl font-bold text-brand-navy">Promotion engine</h1>
         <p className="text-sm text-muted mt-0.5">
-          End-of-year student promotion — Form 1→2→3→4 and Form 4 to MANEB awaiting status.
+          End-of-year student promotion: Form 1→2→3→4 and Form 4 to MANEB awaiting status.
         </p>
       </div>
 
       {/* Controls */}
       <div className="flex items-end gap-4 flex-wrap">
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-            Academic Year
+          <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+            Academic year
           </label>
           <input
             value={effectiveAcademicYear}
             onChange={(e) => setAcademicYear(e.target.value)}
-            placeholder="e.g. 2025/2026"
+            placeholder="2025/2026"
             className="border border-base rounded-xl px-4 py-2.5 text-sm bg-page text-body w-40 focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
           />
         </div>
@@ -283,10 +283,10 @@ export function PromotionEngine() {
           <button
             type="button"
             onClick={() => setShowConfirm(true)}
-            className="flex items-center gap-2 min-h-[44px] px-6 rounded-xl text-sm font-heading font-semibold bg-brand-teal text-white hover:bg-brand-teal/90 transition-colors"
+            className="flex items-center gap-2 min-h-[44px] px-6 rounded-xl text-sm font-heading font-semibold bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover transition-colors"
           >
             <Lock className="w-4 h-4" />
-            Commit Promotion
+            Commit promotion
           </button>
         )}
 
@@ -301,14 +301,14 @@ export function PromotionEngine() {
       {/* PR-2 eligibility notice */}
       {blockedReason && (
         <div role="status" className="flex items-start gap-2 bg-brand-amber/8 border border-brand-amber/20 rounded-xl px-4 py-3 text-sm text-body">
-          <Lock className="w-4 h-4 shrink-0 mt-0.5 text-brand-amber" aria-hidden />
+          <Lock className="w-4 h-4 shrink-0 mt-0.5 text-tone-amber" aria-hidden />
           <span>Promotion is locked: {blockedReason}</span>
         </div>
       )}
 
       {/* Error */}
       {error && (
-        <div className="bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-brand-coral">
+        <div className="bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-tone-coral">
           {error}
         </div>
       )}
@@ -317,19 +317,17 @@ export function PromotionEngine() {
       {preview && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: 'Promoted',      value: preview.promoted,       color: 'text-brand-teal', bg: '', outcome: 'PROMOTED' as PromotionOutcome },
-            { label: 'Repeating',     value: preview.repeated,       color: 'text-brand-coral',  bg: '', outcome: 'REPEATED' as PromotionOutcome },
-            { label: 'Await MANEB',   value: preview.awaitingManeb,  color: 'text-brand-amber',  bg: '', outcome: 'AWAITING_MANEB' as PromotionOutcome },
+            { label: 'Promoted',      value: preview.promoted,       color: 'text-tone-teal', bg: '', outcome: 'PROMOTED' as PromotionOutcome },
+            { label: 'Repeating',     value: preview.repeated,       color: 'text-tone-coral',  bg: '', outcome: 'REPEATED' as PromotionOutcome },
+            { label: 'Await MANEB',   value: preview.awaitingManeb,  color: 'text-tone-amber',  bg: '', outcome: 'AWAITING_MANEB' as PromotionOutcome },
             { label: 'Skipped',       value: preview.skipped,        color: 'text-muted',         bg: 'bg-page', outcome: 'SKIPPED_NO_RESULT' as PromotionOutcome },
           ].map(({ label, value, color, outcome }) => (
             <button
               key={label}
               type="button"
               onClick={() => setFilterOutcome(filterOutcome === outcome ? 'ALL' : outcome)}
-              className={`text-left border rounded-xl p-4 transition-all ${
-                filterOutcome === outcome
-                  ? 'border-brand-navy ring-2 ring-brand-navy/20'
-                  : 'border-base hover:border-brand-navy/30'
+              className={`text-left rounded-xl p-4 transition-colors app-tint hover:bg-brand-teal/10 ${
+                filterOutcome === outcome ? 'ring-2 ring-brand-teal' : ''
               }`}
             >
               <p className={`text-2xl font-bold font-heading ${color}`}>{value}</p>
@@ -352,7 +350,7 @@ export function PromotionEngine() {
             <button
               type="button"
               onClick={() => setFilterOutcome('ALL')}
-              className="text-xs text-brand-teal font-heading font-semibold hover:underline"
+              className="text-xs text-tone-teal font-heading font-semibold hover:underline"
             >
               Clear filter
             </button>
@@ -371,7 +369,7 @@ export function PromotionEngine() {
               <thead>
                 <tr className="bg-page border-b border-base">
                   {['Reg No.', 'Name', 'Current Form', 'Average', 'Passes', 'Outcome', 'Next Class'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wider">
+                    <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted ">
                       {h}
                     </th>
                   ))}
@@ -436,7 +434,7 @@ export function PromotionEngine() {
                   <span>Passes: <strong className="text-body">{s.subjectPasses}</strong></span>
                   {s.nextClassName && <span>→ <strong className="text-body">{s.nextClassName}</strong></span>}
                 </div>
-                <p className="text-[11px] text-muted italic">{s.reason}</p>
+                <p className="text-xs text-muted italic">{s.reason}</p>
               </motion.li>
             ))}
           </motion.ul>

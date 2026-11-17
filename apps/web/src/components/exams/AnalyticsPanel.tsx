@@ -56,7 +56,7 @@ function RankList({
   if (rows.length === 0) return null
   return (
     <div className="pb-2">
-      <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide mb-3">{title}</h3>
+      <h3 className="font-heading font-semibold text-sm text-muted mb-3">{title}</h3>
       <ol className="divide-y divide-base">
         {rows.map((r) => (
           <li key={r.studentId} className="flex items-center justify-between gap-3 py-2">
@@ -94,7 +94,7 @@ function PerClassTable({ rows }: { rows: ApiClassAnalyticsSummary[] }) {
         <thead>
           <tr className="bg-page border-b border-base">
             {['Class', 'Graded as', 'Students', 'Average', 'Aggregate', 'Pass rate', 'At risk'].map((h) => (
-              <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wide">
+              <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted ">
                 {h}
               </th>
             ))}
@@ -115,7 +115,7 @@ function PerClassTable({ rows }: { rows: ApiClassAnalyticsSummary[] }) {
                   : <span className="text-muted text-xs">n/a</span>}
               </td>
               <td className="px-4 py-3">{c.passRate != null ? `${c.passRate}%` : '—'}</td>
-              <td className={`px-4 py-3 font-semibold ${c.atRiskCount > 0 ? 'text-brand-coral' : 'text-brand-teal'}`}>
+              <td className={`px-4 py-3 font-semibold ${c.atRiskCount > 0 ? 'text-tone-coral' : 'text-tone-teal'}`}>
                 {c.atRiskCount}
               </td>
             </tr>
@@ -145,7 +145,7 @@ function StreamSubjectTable({ rows, streams }: { rows: ApiSubjectStreamCompariso
         <thead>
           <tr className="bg-page border-b border-base">
             {['Subject', ...streams, 'Combined', 'Gap'].map((h) => (
-              <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wide">{h}</th>
+              <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted ">{h}</th>
             ))}
           </tr>
         </thead>
@@ -159,12 +159,12 @@ function StreamSubjectTable({ rows, streams }: { rows: ApiSubjectStreamCompariso
               <tr key={r.subject} className="hover:bg-page">
                 <td className="px-4 py-3 font-medium text-body">{r.subject}</td>
                 {avgs.map((a, i) => (
-                  <td key={streams[i]} className={`px-4 py-3 tabular ${a !== null && a === top && gap ? 'text-brand-teal font-semibold' : 'text-body'}`}>
+                  <td key={streams[i]} className={`px-4 py-3 tabular ${a !== null && a === top && gap ? 'text-tone-teal font-semibold' : 'text-body'}`}>
                     {a !== null ? `${a.toFixed(1)}%` : '—'}
                   </td>
                 ))}
                 <td className="px-4 py-3 tabular text-muted">{r.overall !== null ? `${r.overall.toFixed(1)}%` : '—'}</td>
-                <td className={`px-4 py-3 tabular ${gap !== null && gap >= 10 ? 'text-brand-coral font-semibold' : 'text-muted'}`}>
+                <td className={`px-4 py-3 tabular ${gap !== null && gap >= 10 ? 'text-tone-coral font-semibold' : 'text-muted'}`}>
                   {gap !== null ? `${gap.toFixed(1)} pts` : '—'}
                 </td>
               </tr>
@@ -218,7 +218,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
           {groups.length > 0 && (
             <optgroup label="Combined streams">
               {groups.map((g) => (
-                <option key={g.form} value={`form:${g.form}`}>Form {g.form} — all streams ({g.names.join(' + ')})</option>
+                <option key={g.form} value={`form:${g.form}`}>Form {g.form} all streams ({g.names.join(' + ')})</option>
               ))}
             </optgroup>
           )}
@@ -235,7 +235,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
 
       {isLoading && <div className="text-center py-16 text-muted text-sm animate-pulse">Computing analytics…</div>}
       {error && (
-        <div role="alert" className="py-3 text-sm text-brand-coral">
+        <div role="alert" className="py-3 text-sm text-tone-coral">
           {(error as Error).message}
         </div>
       )}
@@ -255,7 +255,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { icon: TrendingUp,    label: 'Pass Rate', value: data.passRate != null ? `${data.passRate}%` : '—', ic: 'text-brand-teal' },
+              { icon: TrendingUp,    label: 'Pass rate', value: data.passRate != null ? `${data.passRate}%` : '—', ic: 'text-tone-teal' },
               {
                 icon: Users,
                 label: usePoints ? 'Avg. Points' : 'Average',
@@ -264,10 +264,10 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
                   : (data.classAverage != null ? `${data.classAverage.toFixed(1)}%` : '—'),
                 ic: 'text-brand-navy',
               },
-              { icon: AlertTriangle, label: 'At Risk',   value: String(data.atRiskCount), ic: 'text-brand-coral' },
-              { icon: Trophy,        label: 'Students',  value: String(data.total),       ic: 'text-brand-amber' },
+              { icon: AlertTriangle, label: 'At risk',   value: String(data.atRiskCount), ic: 'text-tone-coral' },
+              { icon: Trophy,        label: 'Students',  value: String(data.total),       ic: 'text-tone-amber' },
             ].map(({ icon: Icon, label, value, ic }) => (
-              <div key={label} className="bg-surface border border-base rounded-xl p-5 text-center">
+              <div key={label} className="app-tint rounded-xl p-5 text-center">
                 {/* Icon tinted by font colour, no filled colour tile behind it. */}
                 <Icon className={`w-5 h-5 mx-auto mb-2 ${ic}`} aria-hidden />
                 <p className="text-2xl font-bold text-brand-navy">{value}</p>
@@ -303,15 +303,15 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
                     </span>
                   </div>
                   <div className="pb-2">
-                    <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide mb-3">
+                    <h3 className="font-heading font-semibold text-sm text-muted mb-3">
                       Stream comparison
                     </h3>
                     <PerClassTable rows={data.perClass} />
                   </div>
                   {data.subjectComparison.length > 0 && (
                     <div className="pb-2 space-y-4">
-                      <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide">
-                        Subject by subject — average % per stream
+                      <h3 className="font-heading font-semibold text-sm text-muted ">
+                        Subject by subject: average % per stream
                       </h3>
                       <Chart type="bar" data={streamChart}
                         series={streamNames.map((n, i) => ({ key: `s${i}`, label: n }))}
@@ -326,7 +326,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
 
               {data.gradeDistribution.length > 0 && (
                 <div className="pb-2">
-                  <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide mb-3">
+                  <h3 className="font-heading font-semibold text-sm text-muted mb-3">
                     {usePoints ? 'Aggregate distribution' : 'Grade distribution'}
                   </h3>
                   <div className="flex flex-wrap gap-4">
@@ -342,7 +342,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
 
               {chartData.length > 0 && (
                 <div className="pb-2">
-                  <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide mb-4">
+                  <h3 className="font-heading font-semibold text-sm text-muted mb-4">
                     Top performers, {scopeLabel} ({metricLabel})
                   </h3>
                   <Chart type="bar" data={chartData}
@@ -355,9 +355,9 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
 
               <div className="grid gap-4 lg:grid-cols-2">
                 <RankList title={`Top 10 — ${scopeLabel}`} rows={data.top}
-                  accent="text-brand-teal" usePoints={!!usePoints} />
+                  accent="text-tone-teal" usePoints={!!usePoints} />
                 <RankList title={`Bottom 10 — ${scopeLabel}`} rows={data.bottom}
-                  accent="text-brand-coral" usePoints={!!usePoints} />
+                  accent="text-tone-coral" usePoints={!!usePoints} />
               </div>
             </>
           )}
@@ -392,10 +392,10 @@ function RangeBar({ you, best, worst, average }: { you: number; best: number; wo
 
 function CompareCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent: string }) {
   return (
-    <div className="bg-surface border border-base rounded-xl p-4 text-center">
+    <div className="app-tint rounded-xl p-4 text-center">
       <p className={`text-2xl font-bold tabular ${accent}`}>{value}</p>
       <p className="text-xs text-muted mt-1">{label}</p>
-      {sub && <p className="text-[10px] text-muted mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-muted mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -411,10 +411,10 @@ export function StudentAnalyticsPanel({ studentId, academicYear, term }: Student
     const msg = (error as Error).message
     const isFeeGate = msg.includes('fee') || msg.includes('Outstanding')
     return (
-      <div className="rounded-xl p-5 border border-base bg-surface flex items-start gap-3">
-        <AlertTriangle className={`w-5 h-5 mt-0.5 shrink-0 ${isFeeGate ? 'text-brand-coral' : 'text-muted'}`} aria-hidden />
+      <div className="rounded-xl p-5 app-tint flex items-start gap-3">
+        <AlertTriangle className={`w-5 h-5 mt-0.5 shrink-0 ${isFeeGate ? 'text-tone-coral' : 'text-muted'}`} aria-hidden />
         <div>
-          <p className={`font-semibold ${isFeeGate ? 'text-brand-coral' : 'text-body'}`}>
+          <p className={`font-semibold ${isFeeGate ? 'text-tone-coral' : 'text-body'}`}>
             {isFeeGate ? 'Class analytics unavailable, outstanding fee balance' : 'Class analytics unavailable'}
           </p>
           <p className="text-sm text-muted mt-1">
@@ -455,7 +455,7 @@ export function StudentAnalyticsPanel({ studentId, academicYear, term }: Student
         <p className="text-sm text-muted">
           You are <strong className="text-body">#{standing.position}</strong> of {standing.outOf} in your class
           {' '}
-          <span className={diff >= 0 ? 'text-brand-teal' : 'text-brand-coral'}>
+          <span className={diff >= 0 ? 'text-tone-teal' : 'text-tone-coral'}>
             ({diff >= 0 ? '+' : '−'}{Math.abs(diff).toFixed(1)} pts vs class average)
           </span>
         </p>
@@ -463,10 +463,10 @@ export function StudentAnalyticsPanel({ studentId, academicYear, term }: Student
 
       {/* Overall: you vs best vs average vs lowest — the lowest is a bare number. */}
       <div>
-        <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide mb-3">Overall comparison</h3>
+        <h3 className="font-heading font-semibold text-sm text-muted mb-3">Overall comparison</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <CompareCard label="You" value={pct1(standing.overall.you)}
-            sub={pts ? `${pts.you} pts` : undefined} accent="text-brand-teal" />
+            sub={pts ? `${pts.you} pts` : undefined} accent="text-tone-teal" />
           <CompareCard label="Class best" value={pct1(standing.overall.best)}
             sub={pts ? `${pts.best} pts` : undefined} accent="text-brand-navy" />
           <CompareCard label="Class average" value={pct1(standing.overall.average)}
@@ -475,8 +475,8 @@ export function StudentAnalyticsPanel({ studentId, academicYear, term }: Student
             sub={pts ? `${pts.worst} pts` : undefined} accent="text-muted" />
         </div>
         {pts && (
-          <p className="text-[11px] text-muted mt-2">
-            Points are your MSCE aggregate — lower is better, so the best points figure is the lowest total.
+          <p className="text-xs text-muted mt-2">
+            Points are your MSCE aggregate. Lower is better, so the best points figure is the lowest total.
           </p>
         )}
       </div>
@@ -484,7 +484,7 @@ export function StudentAnalyticsPanel({ studentId, academicYear, term }: Student
       {/* Subject by subject */}
       {standing.subjects.length > 0 && (
         <div className="space-y-4">
-          <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide">Subject by subject</h3>
+          <h3 className="font-heading font-semibold text-sm text-muted ">Subject by subject</h3>
           <Chart type="bar" data={chartData}
             series={[
               { key: 'you',     label: 'You',           format: 'percent' },
@@ -500,7 +500,7 @@ export function StudentAnalyticsPanel({ studentId, academicYear, term }: Student
               <thead>
                 <tr className="bg-page border-b border-base">
                   {['Subject', 'You', 'Best', 'Average', 'Lowest', 'Where you sit', 'Rank'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wide">{h}</th>
+                    <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted ">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -512,7 +512,7 @@ export function StudentAnalyticsPanel({ studentId, academicYear, term }: Student
                       <td className="px-4 py-3 font-medium text-body">{sub.subject}</td>
                       <td className="px-4 py-3 tabular">
                         <span className="font-semibold text-brand-navy">{pct1(sub.you)}</span>
-                        <span className={`ml-2 text-[11px] ${d >= 0 ? 'text-brand-teal' : 'text-brand-coral'}`}>
+                        <span className={`ml-2 text-xs ${d >= 0 ? 'text-tone-teal' : 'text-tone-coral'}`}>
                           {d >= 0 ? '+' : '−'}{Math.abs(d).toFixed(1)}
                         </span>
                       </td>
@@ -527,7 +527,7 @@ export function StudentAnalyticsPanel({ studentId, academicYear, term }: Student
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] text-muted">
+          <p className="text-xs text-muted">
             The ring is you, the tick is the class average, and the ends of the bar are the class lowest and best.
             Compared with your own class only; no other student is named except the top ten below.
           </p>
@@ -536,8 +536,8 @@ export function StudentAnalyticsPanel({ studentId, academicYear, term }: Student
 
       {/* Top ten of the student's own class — and nothing about the bottom. */}
       <div>
-        <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wide mb-3 flex items-center gap-2">
-          <Medal className="w-4 h-4 text-brand-amber" aria-hidden /> Top 10 — {className}
+        <h3 className="font-heading font-semibold text-sm text-muted mb-3 flex items-center gap-2">
+          <Medal className="w-4 h-4 text-tone-amber" aria-hidden /> Top 10: {className}
         </h3>
         <ol className="divide-y divide-base">
           {topTen.map((t) => (
@@ -545,12 +545,12 @@ export function StudentAnalyticsPanel({ studentId, academicYear, term }: Student
               className={`flex items-center justify-between gap-3 py-2 ${t.isYou ? 'font-semibold' : ''}`}
               aria-current={t.isYou ? 'true' : undefined}>
               <div className="flex items-center gap-3 min-w-0">
-                <span className="w-7 h-7 shrink-0 rounded-full border border-base text-xs font-bold flex items-center justify-center text-brand-teal">
+                <span className="w-7 h-7 shrink-0 rounded-full border border-base text-xs font-bold flex items-center justify-center text-tone-teal">
                   {t.position}
                 </span>
                 <p className="text-sm text-body truncate">
                   {t.name}
-                  {t.isYou && <span className="ml-2 text-[10px] uppercase tracking-wide text-brand-teal">You</span>}
+                  {t.isYou && <span className="ml-2 text-xs text-tone-teal">You</span>}
                 </p>
               </div>
               <span className="text-sm text-brand-navy tabular shrink-0">
@@ -561,7 +561,7 @@ export function StudentAnalyticsPanel({ studentId, academicYear, term }: Student
         </ol>
         {!me && (
           <p className="mt-3 text-sm text-muted">
-            You are #{standing.position} of {standing.outOf} — {pct1(standing.overall.you)}
+            You are #{standing.position} of {standing.outOf} - {pct1(standing.overall.you)}
             {pts ? `, ${pts.you} points` : ''}..
           </p>
         )}

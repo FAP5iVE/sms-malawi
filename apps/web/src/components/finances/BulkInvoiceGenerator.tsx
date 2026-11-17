@@ -76,6 +76,7 @@ import { useBulkGenerateInvoices } from '@/hooks/useFinances'
 import { formatMWK } from '@shared/constants/malawi'
 import type { ApiBulkInvoiceResult, ApiBulkInvoiceStudentResult } from '@shared/types/api'
 import type { BulkGenerateInvoicesInput } from '@shared/schemas/finance'
+import { chipClass } from '@/lib/hills/chip'
 
 type Outcome = ApiBulkInvoiceStudentResult['outcome']
 
@@ -120,13 +121,13 @@ function OutcomeBadge({ outcome }: { outcome: Outcome }) {
 function SummaryCards({ result }: { result: ApiBulkInvoiceResult }) {
   const cards = [
     {
-      label: 'Invoices Created',
+      label: 'Invoices created',
       value: result.created,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50 dark:bg-emerald-950/20',
     },
     {
-      label: 'Already Existed',
+      label: 'Already existed',
       value: result.existing,
       color: 'text-blue-600',
       bg: 'bg-blue-50 dark:bg-blue-950/20',
@@ -148,7 +149,7 @@ function SummaryCards({ result }: { result: ApiBulkInvoiceResult }) {
         </div>
       ))}
       <div className="col-span-2 sm:col-span-4 bg-brand-teal/8 border border-brand-teal/25 rounded-xl p-4 flex items-center gap-3">
-        <Banknote className="w-5 h-5 text-brand-teal shrink-0" aria-hidden />
+        <Banknote className="w-5 h-5 text-tone-teal shrink-0" aria-hidden />
         <div>
           <p className="font-heading font-bold text-brand-navy text-lg tabular">
             {formatMWK(result.totalRevenue)}
@@ -223,7 +224,7 @@ function RosterRow({
           <p className="text-xs text-muted tabular">Net: {formatMWK(row.totalAmount)}</p>
         )}
         {!!row.priorArrears && (
-          <p className="text-[11px] text-rose-600 tabular">
+          <p className="text-xs text-rose-600 tabular">
             Arrears: +{formatMWK(row.priorArrears)}
           </p>
         )}
@@ -252,16 +253,16 @@ function ImpactProjection({
   const netReceivable = readyToGenerate.reduce((sum, r) => sum + (r.totalAmount ?? 0), 0)
 
   const stats = [
-    { label: 'Target Cohort Count', value: preview ? `${preview.students.length} Students` : '—' },
-    { label: 'Ready to Generate', value: preview ? `${readyToGenerate.length} Invoices` : '—' },
-    { label: 'Scholarships Absorbed', value: preview ? `-${formatMWK(scholarshipTotal)}` : '—' },
-    { label: 'Advance Credit Consumed', value: preview ? `-${formatMWK(creditTotal)}` : '—' },
+    { label: 'Target cohort count', value: preview ? `${preview.students.length} Students` : '—' },
+    { label: 'Ready to generate', value: preview ? `${readyToGenerate.length} Invoices` : '—' },
+    { label: 'Scholarships absorbed', value: preview ? `-${formatMWK(scholarshipTotal)}` : '—' },
+    { label: 'Advance credit consumed', value: preview ? `-${formatMWK(creditTotal)}` : '—' },
   ]
 
   return (
     <div className="bg-brand-deep rounded-xl p-4 text-white space-y-2.5">
-      <h3 className="font-heading text-xs font-semibold uppercase tracking-wide text-white/70 flex items-center gap-1.5">
-        <PiggyBank className="w-3.5 h-3.5" /> Financial Impact Projection
+      <h3 className="font-heading text-xs font-semibold text-white/70 flex items-center gap-1.5">
+        <PiggyBank className="w-3.5 h-3.5" /> Financial impact projection
       </h3>
       {stats.map((s) => (
         <div key={s.label} className="flex items-center justify-between text-sm">
@@ -270,7 +271,7 @@ function ImpactProjection({
         </div>
       ))}
       <div className="border-t border-white/15 pt-2.5 flex items-center justify-between">
-        <span className="text-xs text-white/70">Net Projected Receivable</span>
+        <span className="text-xs text-white/70">Net projected receivable</span>
         <span className="font-heading font-bold text-lg tabular">
           {preview ? formatMWK(netReceivable) : formatMWK(0)}
         </span>
@@ -413,7 +414,7 @@ export function BulkInvoiceGenerator() {
     <div className="space-y-6">
       <div>
         <h2 className="font-heading font-bold text-xl text-brand-navy flex items-center gap-2">
-          <FileText className="w-5 h-5" aria-hidden /> Bulk Invoice Generator
+          <FileText className="w-5 h-5" aria-hidden /> Bulk invoice generator
         </h2>
         <p className="text-sm text-muted mt-0.5">
           Generate term invoices across a cohort, with a full preview before anything is committed.
@@ -423,11 +424,11 @@ export function BulkInvoiceGenerator() {
       <div className="grid lg:grid-cols-3 gap-4 items-start">
         {/* 1. Cohort & target selection */}
         <div className="space-y-3">
-          <h3 className="font-heading text-xs font-semibold uppercase tracking-wide text-muted flex items-center gap-1.5">
-            <Users className="w-3.5 h-3.5" /> Cohort &amp; Target Selection
+          <h3 className="font-heading text-xs font-semibold text-muted flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5" /> Cohort and target selection
           </h3>
           <div>
-            <label className="block text-xs text-muted mb-1">Academic Year</label>
+            <label className="block text-xs text-muted mb-1">Academic year</label>
             <AcademicYearSelect
               value={academicYear}
               onChange={(e) => setAcademicYear(e.target.value)}
@@ -435,7 +436,7 @@ export function BulkInvoiceGenerator() {
             />
           </div>
           <div>
-            <label className="block text-xs text-muted mb-1">Billing Term</label>
+            <label className="block text-xs text-muted mb-1">Billing term</label>
             <select
               value={term}
               onChange={(e) => setTerm(Number(e.target.value))}
@@ -447,13 +448,13 @@ export function BulkInvoiceGenerator() {
             </select>
           </div>
           <div>
-            <label className="block text-xs text-muted mb-1">Target Student Cohort</label>
+            <label className="block text-xs text-muted mb-1">Target student cohort</label>
             <select
               value={classId}
               onChange={(e) => setClassId(e.target.value)}
               className="w-full min-h-11 border border-base rounded-lg px-3 py-2 text-sm bg-page"
             >
-              <option value="ALL">Entire School (All Grades &amp; Forms)</option>
+              <option value="ALL">Entire school (all grades and forms)</option>
               {classes.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -465,29 +466,29 @@ export function BulkInvoiceGenerator() {
 
         {/* 2. Accounting rules & fee automation */}
         <div className="space-y-2.5">
-          <h3 className="font-heading text-xs font-semibold uppercase tracking-wide text-muted flex items-center gap-1.5">
-            <Wallet2 className="w-3.5 h-3.5" /> Accounting Rules &amp; Fee Automation
+          <h3 className="font-heading text-xs font-semibold text-muted flex items-center gap-1.5">
+            <Wallet2 className="w-3.5 h-3.5" /> Accounting rules and fee automation
           </h3>
           <RuleCheckbox
-            label="Include Mandatory Core Levies"
+            label="Include mandatory core levies"
             hint="Tuition, statutory levies, and other required fees per term schedule."
             checked={includeMandatory}
             onChange={setIncludeMandatory}
           />
           <RuleCheckbox
-            label="Include Enrolled Optional Services"
+            label="Include enrolled optional services"
             hint="Bill students only for the add-ons (transport, boarding, uniform, ...) they're actually enrolled in."
             checked={includeEnrolledOptional}
             onChange={setIncludeEnrolledOptional}
           />
           <RuleCheckbox
-            label="Apply Scholarship &amp; Staff Discounts"
+            label="Apply scholarship and staff discounts"
             hint="Deduct each student's active scholarship from their tuition line automatically."
             checked={applyScholarships}
             onChange={setApplyScholarships}
           />
           <RuleCheckbox
-            label="Consume Prior Advance Credit"
+            label="Consume prior advance credit"
             hint="Offset new bills against any overpayment carried over from a prior term."
             checked={consumeAdvanceCredit}
             onChange={setConsumeAdvanceCredit}
@@ -501,7 +502,7 @@ export function BulkInvoiceGenerator() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-xs text-muted flex items-center gap-1.5">
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-          Double-Billing Safe — students already invoiced for this term are automatically skipped.
+          Double-Billing Safe: students already invoiced for this term are automatically skipped.
         </p>
         <button
           type="button"
@@ -535,16 +536,16 @@ export function BulkInvoiceGenerator() {
               <button
                 type="button"
                 onClick={() => setSelected(new Set(eligibleRows.map((s) => s.studentId)))}
-                className="text-xs font-medium text-brand-teal hover:underline"
+                className="text-xs font-medium text-tone-teal hover:underline"
               >
-                Select All Eligible
+                Select all eligible
               </button>
               <button
                 type="button"
                 onClick={() => setSelected(new Set())}
                 className="text-xs font-medium text-muted hover:underline"
               >
-                Deselect All
+                Deselect all
               </button>
             </div>
           </div>
@@ -582,11 +583,7 @@ export function BulkInvoiceGenerator() {
                 key={o}
                 type="button"
                 onClick={() => setFilterOutcome(o)}
-                className={`px-3 py-1.5 rounded-full text-xs font-heading font-semibold border min-h-9 ${
-                  filterOutcome === o
-                    ? 'bg-brand-deep text-white border-brand-navy'
-                    : 'bg-surface border-base text-muted hover:border-brand-navy/30'
-                }`}
+                className={chipClass(filterOutcome === o)}
               >
                 {o === 'ALL' ? 'All' : o}
                 {o !== 'ALL' && (

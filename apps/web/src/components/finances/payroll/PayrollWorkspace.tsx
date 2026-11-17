@@ -59,11 +59,11 @@ export function PayrollWorkspace({ defaultTab }: PayrollWorkspaceProps) {
   const canViewAnyPayslips = can('hr.viewAnyPayslips')
 
   const tabs = [
-    canRuns ? { id: 'runs' as const, label: 'Payroll Runs & Approvals', icon: ClipboardList } : null,
-    canStructure ? { id: 'structure' as const, label: 'Salary Structure & Allowances', icon: Users } : null,
-    canMyPay ? { id: 'mypay' as const, label: 'My Pay (Self-Service)', icon: Wallet } : null,
-    canInsights ? { id: 'insights' as const, label: 'Financial Insights & Trends', icon: TrendingUp } : null,
-    canSettings ? { id: 'settings' as const, label: 'PAYE & Pension Settings', icon: Settings } : null,
+    canRuns ? { id: 'runs' as const, label: 'Payroll runs and approvals', icon: ClipboardList } : null,
+    canStructure ? { id: 'structure' as const, label: 'Salary structure and allowances', icon: Users } : null,
+    canMyPay ? { id: 'mypay' as const, label: 'My pay (Self-Service)', icon: Wallet } : null,
+    canInsights ? { id: 'insights' as const, label: 'Financial insights and trends', icon: TrendingUp } : null,
+    canSettings ? { id: 'settings' as const, label: 'PAYE and Pension Settings', icon: Settings } : null,
   ].filter((t): t is NonNullable<typeof t> => t !== null) as TabItem<PayrollWorkspaceTab>[]
 
   const [active, setActive] = useState<PayrollWorkspaceTab>(
@@ -81,7 +81,7 @@ export function PayrollWorkspace({ defaultTab }: PayrollWorkspaceProps) {
             entirely, in case a future role is added without any payroll
             permission at all. */}
         <p className="text-muted max-w-md mx-auto">
-          This account doesn&apos;t hold any payroll-related permission — nothing here to show.
+          This account doesn&apos;t hold any payroll-related permission. Nothing here to show.
         </p>
       </div>
     )

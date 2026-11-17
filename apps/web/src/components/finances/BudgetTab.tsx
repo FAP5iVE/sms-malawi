@@ -139,13 +139,13 @@ export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: s
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-heading font-semibold text-body">Budget vs Actual — {academicYear} · Term {viewingTerm}</h2>
+          <h2 className="font-heading font-semibold text-body">Budget vs actual: {academicYear} · Term {viewingTerm}</h2>
           <p className="text-xs text-muted mt-0.5">Includes full-year budgets, which apply to every term.</p>
         </div>
         <button
           type="button"
           onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+          className="inline-flex items-center gap-1.5 bg-btn-brand text-btn-brand-fg rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
         >
           <Plus className="w-4 h-4" /> {showForm ? 'Cancel' : 'Create Budget'}
         </button>
@@ -167,7 +167,7 @@ export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: s
               </select>
               {departments.length === 0 && (
                 <p className="text-xs text-muted mt-1">
-                  No departments defined yet — set them up under Settings → Departments &amp; Titles.
+                  No departments defined yet: set them up under Settings → Departments and Titles.
                 </p>
               )}
             </div>
@@ -195,7 +195,7 @@ export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: s
               />
             </div>
             <div>
-              <label htmlFor="budget-term" className="text-xs text-muted mb-1 block">Term <span className="text-muted/70">(optional — leave blank for the full year)</span></label>
+              <label htmlFor="budget-term" className="text-xs text-muted mb-1 block">Term <span className="text-muted">(optional: leave blank for the full year)</span></label>
               <select
                 id="budget-term"
                 value={term}
@@ -210,7 +210,7 @@ export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: s
             </div>
           </div>
           <div>
-            <label htmlFor="budget-window" className="text-xs text-muted mb-1 block">Budget window <span className="text-muted/70">(optional)</span></label>
+            <label htmlFor="budget-window" className="text-xs text-muted mb-1 block">Budget window <span className="text-muted">(optional)</span></label>
             <select
               id="budget-window"
               value={budgetWindowId}
@@ -224,7 +224,7 @@ export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: s
             </select>
           </div>
           <div>
-            <label htmlFor="budget-description" className="text-xs text-muted mb-1 block">Description <span className="text-muted/70">(optional)</span></label>
+            <label htmlFor="budget-description" className="text-xs text-muted mb-1 block">Description <span className="text-muted">(optional)</span></label>
             <textarea
               id="budget-description"
               rows={2}
@@ -243,7 +243,7 @@ export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: s
             {createBudget.isPending ? 'Creating…' : 'Save Budget'}
           </button>
           {createBudget.isError && (
-            <p className="text-sm text-brand-coral">
+            <p className="text-sm text-tone-coral">
               {createBudget.error instanceof Error ? createBudget.error.message : 'Failed to create budget.'}
             </p>
           )}
@@ -261,7 +261,7 @@ export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: s
           {/* Chart */}
           <div>
             <p className="font-heading font-semibold text-sm text-brand-navy mb-4">
-              Budget vs Actual Spending
+              Budget vs actual spending
             </p>
             <Chart type="bar" options={chartOptions} series={series} />
           </div>
@@ -275,7 +275,7 @@ export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: s
                     ['Department', 'left'], ['Category', 'left'], ['Applies to', 'left'],
                     ['Allocated', 'right'], ['Committed', 'right'], ['Spent', 'right'], ['Available', 'right'], ['Used', 'left'],
                   ].map(([h, align]) => (
-                    <th key={h} className={`${align === 'right' ? 'text-right' : 'text-left'} px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold`}>
+                    <th key={h} className={`${align === 'right' ? 'text-right' : 'text-left'} px-4 py-3 font-heading text-xs text-muted font-semibold`}>
                       {h}
                     </th>
                   ))}
@@ -293,7 +293,7 @@ export function BudgetTab({ academicYear, term: viewingTerm }: { academicYear: s
                       <td className="px-4 py-3 text-right tabular text-muted">{formatMWK(b.committed)}</td>
                       <td className="px-4 py-3 text-right tabular">{formatMWK(b.spent)}</td>
                       <td
-                        className={`px-4 py-3 text-right tabular font-semibold ${b.available < 0 ? 'text-brand-coral' : 'text-emerald-600'}`}
+                        className={`px-4 py-3 text-right tabular font-semibold ${b.available < 0 ? 'text-tone-coral' : 'text-emerald-600'}`}
                       >
                         {formatMWK(b.available)}
                       </td>

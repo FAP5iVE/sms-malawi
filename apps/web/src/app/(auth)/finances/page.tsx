@@ -165,24 +165,24 @@ function FinancesContent() {
     {
       id: 'billing', label: isStudent ? 'My Fees' : 'Billing', leaves: [
         { id: 'invoices',             label: 'Invoices',        show: !isHRPayrollViewer },
-        { id: 'bulkInvoiceGenerator', label: 'Bulk Generator',  show: isFinance },
+        { id: 'bulkInvoiceGenerator', label: 'Bulk generator',  show: isFinance },
         { id: 'scholarships',         label: 'Scholarships',    show: isFinance },
-        { id: 'fines',                label: 'Library Fines',   show: isFinance },
+        { id: 'fines',                label: 'Library fines',   show: isFinance },
       ],
     },
     {
       // feeStructure is the fee catalog *definition*; financeFeeStructure is its
       // per-student *application* (the bursar workstation). Natural pair.
-      id: 'feeSetup', label: 'Fee Setup', leaves: [
-        { id: 'feeStructure',        label: 'Fee Catalog',           show: isFinance },
-        { id: 'financeFeeStructure', label: 'Student Fee Structure', show: isFinance },
+      id: 'feeSetup', label: 'Fee setup', leaves: [
+        { id: 'feeStructure',        label: 'Fee catalog',           show: isFinance },
+        { id: 'financeFeeStructure', label: 'Student fee structure', show: isFinance },
       ],
     },
     {
       // high_rank holds finance.approveExpense/rejectExpense, so it reaches Expenses.
       id: 'spending', label: 'Spending', leaves: [
         { id: 'expenses', label: 'Expenses',       show: isFinance || isHighRank },
-        { id: 'debts',    label: 'Debts & Loans',  show: isFinance },
+        { id: 'debts',    label: 'Debts and loans',  show: isFinance },
       ],
     },
     {
@@ -313,7 +313,7 @@ function FinancesContent() {
       {!isStudent && !isHRPayrollViewer && (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
           <SummaryCard
-            label="Total Collected"
+            label="Total collected"
             value={summaryLoading ? '…' : formatMWK(summary?.totalCollected ?? 0)}
             icon={TrendingUp}
             color="text-emerald-600"
@@ -323,21 +323,21 @@ function FinancesContent() {
             label="Outstanding"
             value={summaryLoading ? '…' : formatMWK(summary?.totalOutstanding ?? 0)}
             icon={TrendingDown}
-            color="text-brand-coral"
+            color="text-tone-coral"
             bg="bg-brand-coral/10"
           />
           <SummaryCard
-            label="Total Expenses"
+            label="Total expenses"
             value={summaryLoading ? '…' : formatMWK(summary?.totalExpenses ?? 0)}
             icon={Banknote}
-            color="text-brand-amber"
+            color="text-tone-amber"
             bg="bg-brand-amber/10"
           />
           <SummaryCard
-            label="Collection Rate"
+            label="Collection rate"
             value={summaryLoading ? '…' : `${summary?.collectionPercent ?? 0}%`}
             icon={PieChart}
-            color="text-brand-teal"
+            color="text-tone-teal"
             bg="bg-brand-teal/10"
           />
         </div>

@@ -95,16 +95,8 @@ import {
   ArrowRight
 } from 'lucide-react'
 import { Modal, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
-
-const STATUS_COLORS: Record<string, string> = {
-  PAID: 'text-status-success',
-  PARTIAL:
-    'text-status-info',
-  UNPAID:
-    'text-status-warning',
-  OVERDUE:
-    'text-status-danger',
-}
+import { StatusText } from '@/components/shared/StatusText'
+import { statusTone, statusWord } from '@/lib/hills/statusWord'
 
 type PaymentMethodValue = (typeof PAYMENT_METHOD_OPTIONS)[number]['value']
 
@@ -631,7 +623,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="font-heading font-semibold text-body">Invoice Entry &amp; Allocation</h2>
+          <h2 className="font-heading font-semibold text-body">Invoice entry and allocation</h2>
           <p className="text-xs text-muted mt-0.5">
             Bill a student and record a payment in one step.
           </p>
@@ -642,7 +634,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
             onClick={() => router.push('/finances?tab=bulkInvoiceGenerator')}
             className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3.5 py-2 text-sm font-medium text-body hover:bg-page min-h-11"
           >
-            <Boxes className="w-4 h-4" /> Bulk Invoice Generator
+            <Boxes className="w-4 h-4" /> Bulk invoice generator
           </button>
         )}
       </div>
@@ -653,8 +645,8 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
       <div className="divide-y divide-base">
         {/* Bill To */}
         <div className="p-4 sm:p-6">
-          <label className="text-xs text-muted mb-1.5 block font-semibold uppercase tracking-wide">
-            Bill To (select student)
+          <label className="text-xs text-muted mb-1.5 block font-semibold ">
+            Bill to (select student)
           </label>
           {!selectedStudent ? (
             <div className="relative">
@@ -662,7 +654,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
               <input
                 value={studentSearch}
                 onChange={(e) => setStudentSearch(e.target.value)}
-                placeholder="Search by name or admission number…"
+                placeholder="Search by name or number…"
                 className="w-full border border-base rounded-lg pl-9 pr-3 py-2.5 text-sm bg-page min-h-11"
               />
               {studentSearch.length >= 2 && (
@@ -712,7 +704,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
               <button
                 type="button"
                 onClick={changeStudent}
-                className="text-sm font-medium text-brand-teal hover:underline"
+                className="text-sm font-medium text-tone-teal hover:underline"
               >
                 Change
               </button>
@@ -726,21 +718,17 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
             <div className="p-4 sm:p-6 space-y-3">
               <div className="grid sm:grid-cols-3 gap-4">
                 <MetaField
-                  label="Invoice Number"
+                  label="Invoice number"
                   value={existingInvoice ? existingInvoice.invoiceNumber : pendingInvoiceNumber}
                   caption={existingInvoice ? undefined : 'Assigned automatically when you save'}
                   mono
                 />
-                <MetaField label="Invoice Date" value={todayLabel} />
-                <MetaField label="Academic Year / Term" value={`${academicYear} · Term ${term}`} />
+                <MetaField label="Invoice date" value={todayLabel} />
+                <MetaField label="Academic year / term" value={`${academicYear} · Term ${term}`} />
               </div>
               {existingInvoice && (
                 <div className="flex items-center gap-2 text-sm">
-                  <span
-                    className={`inline-flex text-xs font-semibold ${STATUS_COLORS[existingInvoice.status] ?? ''}`}
-                  >
-                    {existingInvoice.status}
-                  </span>
+                  <StatusText tone={statusTone(existingInvoice.status)}>{statusWord(existingInvoice.status)}</StatusText>
                   <span className="text-muted">
                     Current balance:{' '}
                     <strong className="text-body tabular">
@@ -755,13 +743,13 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
             <div className="p-4 sm:p-6 space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <h3 className="font-heading text-sm font-semibold text-body">
-                  Payment Committed &amp; Remittance Particulars
+                  Payment committed and remittance particulars
                 </h3>
                 <button
                   type="button"
                   onClick={autoDistribute}
                   disabled={paymentCommitted <= 0 || isBusy}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-teal hover:underline disabled:opacity-40 disabled:no-underline"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-teal hover:underline disabled:opacity-40 disabled:no-underline"
                 >
                   <Wand2 className="w-3.5 h-3.5" /> Auto-Distribute Payment
                 </button>
@@ -769,7 +757,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
               <div className="grid sm:grid-cols-3 gap-4">
                 <div>
                   <label htmlFor="pay-amount" className="text-xs text-muted mb-1 block">
-                    Amount of Payment Being Paid (MWK)
+                    Amount of payment being paid (MWK)
                   </label>
                   <input
                     id="pay-amount"
@@ -786,7 +774,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                 </div>
                 <div>
                   <label htmlFor="pay-method" className="text-xs text-muted mb-1 block">
-                    Mode of Payment
+                    Mode of payment
                   </label>
                   <select
                     id="pay-method"
@@ -804,7 +792,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                 </div>
                 <div>
                   <label htmlFor="pay-ref" className="text-xs text-muted mb-1 block">
-                    Payment Reference <span className="text-muted/70">(optional)</span>
+                    Payment reference <span className="text-muted">(optional)</span>
                   </label>
                   <input
                     id="pay-ref"
@@ -817,7 +805,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
               </div>
               <div>
                 <label htmlFor="pay-notes" className="text-xs text-muted mb-1 block">
-                  Notes / Remarks <span className="text-muted/70">(optional)</span>
+                  Notes / remarks <span className="text-muted">(optional)</span>
                 </label>
                 <textarea
                   id="pay-notes"
@@ -875,9 +863,9 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                 </div>
               )}
               {allocationExceedsCommitted && (
-                <p className="text-brand-coral text-sm flex items-center gap-1.5">
+                <p className="text-tone-coral text-sm flex items-center gap-1.5">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
-                  Allocated amount exceeds the payment being made — reduce an allocation or increase
+                  Allocated amount exceeds the payment being made. Reduce an allocation or increase
                   the payment above.
                 </p>
               )}
@@ -887,7 +875,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
             <div className="p-4 sm:p-6 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="font-heading text-sm font-semibold text-body">
-                  Fee Line Items Ledger ({rows.length})
+                  Fee line items ledger ({rows.length})
                 </h3>
                 {ledgerSyncing && (
                   <span
@@ -912,16 +900,16 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                     <table className="w-full text-sm min-w-140">
                       <thead>
                         <tr className="border-b border-base bg-page">
-                          <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+                          <th className="text-left px-4 py-2.5 font-heading text-xs text-muted font-semibold">
                             Fee (sourced from Settings)
                           </th>
-                          <th className="text-right px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                            Fixed Amount
+                          <th className="text-right px-4 py-2.5 font-heading text-xs text-muted font-semibold">
+                            Fixed amount
                           </th>
-                          <th className="text-right px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+                          <th className="text-right px-4 py-2.5 font-heading text-xs text-muted font-semibold">
                             Allocated
                           </th>
-                          <th className="text-right px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+                          <th className="text-right px-4 py-2.5 font-heading text-xs text-muted font-semibold">
                             Balance
                           </th>
                           <th className="px-2 py-2.5"></th>
@@ -931,7 +919,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                         {rows.length === 0 ? (
                           <tr>
                             <td colSpan={5} className="px-4 py-8 text-center text-sm text-muted">
-                              No fee lines yet — add one below.
+                              No fee lines yet: add one below.
                             </td>
                           </tr>
                         ) : (
@@ -968,8 +956,8 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                                     }`}
                                   />
                                   {overBalance && (
-                                    <p className="text-[11px] text-amber-600 dark:text-amber-400 text-right mt-0.5">
-                                      +{formatMWK(row.excess)} over balance — becomes credit
+                                    <p className="text-xs text-amber-600 dark:text-amber-400 text-right mt-0.5">
+                                      +{formatMWK(row.excess)} over balance: becomes credit
                                     </p>
                                   )}
                                 </td>
@@ -981,7 +969,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                                     <button
                                       type="button"
                                       onClick={() => removeRow(row.key)}
-                                      className="p-1 rounded hover:bg-page text-muted hover:text-brand-coral"
+                                      className="p-1 rounded hover:bg-page text-muted hover:text-tone-coral"
                                       aria-label={`Remove ${row.feeName}`}
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
@@ -1005,7 +993,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                       <option value="">+ Add a line…</option>
                       {addLineOptions.map((f) => (
                         <option key={f.id} value={f.id}>
-                          {f.name} — {formatMWK(f.amount)}
+                          {f.name} - {formatMWK(f.amount)}
                         </option>
                       ))}
                     </select>
@@ -1024,11 +1012,11 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
 
             {/* Totals */}
             <div className="p-4 sm:p-6 bg-page/40 space-y-1.5 text-sm">
-              <TotalRow label="Total Fixed Fees" value={formatMWK(totalFixedFees)} />
+              <TotalRow label="Total fixed fees" value={formatMWK(totalFixedFees)} />
               {isNewInvoice && (
                 <div className="flex items-center justify-between py-0.5">
                   <label htmlFor="discount" className="text-muted">
-                    Additional Discount (MWK)
+                    Additional discount (MWK)
                   </label>
                   <input
                     id="discount"
@@ -1041,23 +1029,23 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                   />
                 </div>
               )}
-              <TotalRow label="Net Total Fees Due" value={formatMWK(netFeesDue)} />
-              <TotalRow label="Total Payment Committed" value={formatMWK(paymentCommitted)} />
-              <TotalRow label="Total Payment Allocated" value={formatMWK(totalAllocated)} />
+              <TotalRow label="Net total fees due" value={formatMWK(netFeesDue)} />
+              <TotalRow label="Total payment committed" value={formatMWK(paymentCommitted)} />
+              <TotalRow label="Total payment allocated" value={formatMWK(totalAllocated)} />
               {paymentCommitted > 0 && (
-                <TotalRow label="Applied to Fees" value={formatMWK(appliedToFees)} />
+                <TotalRow label="Applied to fees" value={formatMWK(appliedToFees)} />
               )}
               {hasOverpayment && (
                 <TotalRow
-                  label="Overpayment → Advance Credit"
+                  label="Overpayment → advance credit"
                   value={`+${formatMWK(overpaymentTotal)}`}
                   tone="warn"
                 />
               )}
               <div className="border-t border-base pt-2 mt-1 flex items-center justify-between">
-                <span className="font-heading font-semibold text-body">Arrears / Balance Due</span>
+                <span className="font-heading font-semibold text-body">Arrears / balance due</span>
                 <span
-                  className={`font-heading font-bold text-lg tabular ${arrearsBalance > 0 ? 'text-brand-coral' : 'text-emerald-600 dark:text-emerald-400'}`}
+                  className={`font-heading font-bold text-lg tabular ${arrearsBalance > 0 ? 'text-tone-coral' : 'text-emerald-600 dark:text-emerald-400'}`}
                 >
                   {formatMWK(arrearsBalance)}
                 </span>
@@ -1073,14 +1061,14 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
             {/* Submit */}
             <div className="p-4 sm:p-6 space-y-3">
               {submitError && (
-                <p className="text-brand-coral text-sm flex items-center gap-1.5">
+                <p className="text-tone-coral text-sm flex items-center gap-1.5">
                   <AlertTriangle className="w-4 h-4 shrink-0" /> {submitError}
                 </p>
               )}
               {needsAllocation && !allocationExceedsCommitted && (
                 <p className="text-sm text-muted flex items-center gap-1.5">
                   <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
-                  Allocate this payment to at least one fee — or use Auto-Distribute.
+                  Allocate this payment to at least one fee. Or use Auto-Distribute.
                 </p>
               )}
               {successMessage && (
@@ -1125,7 +1113,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                 // operations like recording payments; that's reserved for
                 // the 'finance' role). Silently hiding the button looked
                 // like a bug; this makes the boundary explicit instead.
-                <p className="text-sm text-muted flex items-center gap-1.5 bg-page rounded-lg px-3 py-2.5 border border-base">
+                <p className="text-sm text-muted flex items-center gap-1.5 app-tint rounded-lg px-3 py-2.5">
                   <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
                   Your role doesn&rsquo;t have permission to generate invoices or record payments.
                   Ask a Finance user to complete this transaction.
@@ -1207,7 +1195,7 @@ function StudentPaymentHistory({ studentId }: { studentId: string }) {
     <div className="overflow-hidden space-y-4">
       <div className="px-4 py-3 border-b border-base flex items-center justify-between gap-3 flex-wrap">
         <h3 className="font-heading text-sm font-semibold text-body">
-          Fee Payment History ({payments.length} payment{payments.length === 1 ? '' : 's'})
+          Fee payment history ({payments.length} payment{payments.length === 1 ? '' : 's'})
         </h3>
         {years.length > 1 && (
           <select
@@ -1239,7 +1227,7 @@ function StudentPaymentHistory({ studentId }: { studentId: string }) {
               { label: 'Outstanding', value: outstanding },
               { label: 'Advance credit', value: creditTotal },
             ].map((c) => (
-              <div key={c.label} className="rounded-lg border border-base px-3 py-2">
+              <div key={c.label} className="rounded-lg px-3 py-2 app-tint">
                 <p className="text-xs text-muted">{c.label}</p>
                 <p className="font-heading font-semibold text-body tabular">{formatMWK(c.value)}</p>
               </div>
@@ -1252,10 +1240,10 @@ function StudentPaymentHistory({ studentId }: { studentId: string }) {
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-170">
                 <thead>
-                  <tr className="border-b border-base bg-page text-left text-xs uppercase tracking-wide text-muted">
+                  <tr className="border-b border-base bg-page text-left text-xs text-muted">
                     <th className="px-4 py-2.5 font-semibold">Date</th>
                     <th className="px-4 py-2.5 font-semibold">Invoice</th>
-                    <th className="px-4 py-2.5 font-semibold">Method / Ref</th>
+                    <th className="px-4 py-2.5 font-semibold">Method / ref</th>
                     <th className="px-4 py-2.5 font-semibold">Applied to</th>
                     <th className="px-4 py-2.5 font-semibold">Recorded by</th>
                     <th className="px-4 py-2.5 font-semibold text-right">Amount</th>
@@ -1292,9 +1280,9 @@ function StudentPaymentHistory({ studentId }: { studentId: string }) {
                           type="button"
                           disabled={fetchReceipt.isPending}
                           onClick={() => fetchReceipt.mutate(p.id)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-brand-teal hover:underline disabled:opacity-50 whitespace-nowrap"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-tone-teal hover:underline disabled:opacity-50 whitespace-nowrap"
                         >
-                          <ReceiptIcon className="w-3.5 h-3.5" /> View Receipt <ExternalLink className="w-3 h-3" />
+                          <ReceiptIcon className="w-3.5 h-3.5" /> View receipt <ExternalLink className="w-3 h-3" />
                         </button>
                       </td>
                     </tr>
@@ -1305,7 +1293,7 @@ function StudentPaymentHistory({ studentId }: { studentId: string }) {
           )}
 
           <div className="px-4 pb-4">
-            <p className="text-xs uppercase tracking-wide text-muted font-semibold mb-2">Invoices</p>
+            <p className="text-xs text-muted font-semibold mb-2">Invoices</p>
             <ul className="divide-y divide-base border border-base rounded-lg">
               {shownInvoices.map((inv) => (
                 <li key={inv.id} className="px-3 py-2 flex items-center justify-between gap-3 flex-wrap text-xs">
@@ -1315,7 +1303,7 @@ function StudentPaymentHistory({ studentId }: { studentId: string }) {
                   </span>
                   <span className="tabular">
                     {formatMWK(Number(inv.paidAmount))} of {formatMWK(Number(inv.totalAmount))}
-                    <span className={`ml-2 font-semibold ${STATUS_COLORS[inv.status] ?? ''}`}>{inv.status}</span>
+                    <StatusText tone={statusTone(inv.status)} className="ml-2">{statusWord(inv.status)}</StatusText>
                   </span>
                 </li>
               ))}
@@ -1342,7 +1330,7 @@ function MetaField({
     <div>
       <p className="text-xs text-muted mb-0.5">{label}</p>
       <p className={`text-sm font-semibold text-body ${mono ? 'font-mono' : ''}`}>{value}</p>
-      {caption && <p className="text-[11px] text-muted/80 mt-0.5">{caption}</p>}
+      {caption && <p className="text-xs text-muted mt-0.5">{caption}</p>}
     </div>
   )
 }
@@ -1393,9 +1381,9 @@ function OverpaymentConfirmModal({
   const totalCredit = items.reduce((sum, i) => sum + i.excess, 0)
   return (
     <Modal
-      title={<span className="flex items-center gap-2"><AlertTriangle className="w-4.5 h-4.5 text-amber-500" /> Confirm Overpayment</span>}
+      title={<span className="flex items-center gap-2"><AlertTriangle className="w-4.5 h-4.5 text-amber-500" /> Confirm overpayment</span>}
       onClose={onCancel}
-      size="sm"
+      size="s"
       busy={isPending}
       bodyClassName="space-y-3"
       footer={
@@ -1414,7 +1402,7 @@ function OverpaymentConfirmModal({
           className="inline-flex items-center gap-2 bg-amber-500 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-amber-600 disabled:opacity-60 min-h-11"
         >
           {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          Confirm &amp; Save as Credit
+          Confirm and save as credit
         </button>
         </>
       }

@@ -43,9 +43,9 @@ import type {
 type SubTab = 'income' | 'trial' | 'ledger'
 
 const TABS = [
-  { id: 'income' as SubTab, label: 'Income Statement', icon: TrendingUp   },
-  { id: 'trial'  as SubTab, label: 'Trial Balance',    icon: Scale        },
-  { id: 'ledger' as SubTab, label: 'Account Ledger',   icon: BookOpen     },
+  { id: 'income' as SubTab, label: 'Income statement', icon: TrendingUp   },
+  { id: 'trial'  as SubTab, label: 'Trial balance',    icon: Scale        },
+  { id: 'ledger' as SubTab, label: 'Account ledger',   icon: BookOpen     },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,12 +76,12 @@ function IncomeStatementPanel() {
     <div className="space-y-5">
       <div className="flex items-end gap-4 flex-wrap">
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">From</label>
+          <label className="block text-xs font-heading font-semibold text-muted mb-1.5">From</label>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
             className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
         </div>
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">To</label>
+          <label className="block text-xs font-heading font-semibold text-muted mb-1.5">To</label>
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
             className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
         </div>
@@ -95,8 +95,8 @@ function IncomeStatementPanel() {
         <div className="space-y-4">
           {/* Net surplus card */}
           <div className={`rounded-2xl p-6 border ${data.netSurplus >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-brand-coral/8 border-brand-coral/25'}`}>
-            <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1">Net Surplus / (Deficit)</p>
-            <p className={`text-3xl font-bold font-heading tabular ${data.netSurplus >= 0 ? 'text-emerald-700' : 'text-brand-coral'}`}>
+            <p className="text-xs font-heading font-semibold text-muted mb-1">Net surplus / (deficit)</p>
+            <p className={`text-3xl font-bold font-heading tabular ${data.netSurplus >= 0 ? 'text-emerald-700' : 'text-tone-coral'}`}>
               {formatMWK(data.netSurplus)}
             </p>
           </div>
@@ -113,7 +113,7 @@ function IncomeStatementPanel() {
               <div className="divide-y divide-base">
                 {data.revenueLines.map((l) => (
                   <div key={l.code} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                    <span className="text-muted">{l.code} — {l.account}</span>
+                    <span className="text-muted">{l.code} - {l.account}</span>
                     <span className="font-medium tabular text-body">{formatMWK(l.amount)}</span>
                   </div>
                 ))}
@@ -123,15 +123,15 @@ function IncomeStatementPanel() {
             {/* Expenses */}
             <div className="overflow-hidden">
               <div className="bg-brand-coral/8 border-b border-brand-coral/20 px-4 py-3 flex items-center justify-between">
-                <span className="font-heading font-semibold text-sm text-brand-coral flex items-center gap-2">
+                <span className="font-heading font-semibold text-sm text-tone-coral flex items-center gap-2">
                   <TrendingDown className="w-4 h-4" /> Expenses
                 </span>
-                <span className="font-bold font-heading text-brand-coral tabular">{formatMWK(data.totalExpenses)}</span>
+                <span className="font-bold font-heading text-tone-coral tabular">{formatMWK(data.totalExpenses)}</span>
               </div>
               <div className="divide-y divide-base">
                 {data.expenseLines.map((l) => (
                   <div key={l.code} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                    <span className="text-muted">{l.code} — {l.account}</span>
+                    <span className="text-muted">{l.code} - {l.account}</span>
                     <span className="font-medium tabular text-body">{formatMWK(l.amount)}</span>
                   </div>
                 ))}
@@ -175,7 +175,7 @@ function TrialBalancePanel() {
           <thead>
             <tr className="bg-page border-b border-base">
               {['Code', 'Account Name', 'Type', 'Debit (MWK)', 'Credit (MWK)'].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wider">
+                <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted ">
                   {h}
                 </th>
               ))}
@@ -194,7 +194,7 @@ function TrialBalancePanel() {
           </tbody>
           <tfoot>
             <tr className="bg-page border-t-2 border-base font-bold">
-              <td colSpan={3} className="px-4 py-3 text-xs uppercase tracking-wider text-muted">Totals</td>
+              <td colSpan={3} className="px-4 py-3 text-xs text-muted">Totals</td>
               <td className="px-4 py-3 text-right tabular text-brand-navy">{formatMWK(totalDebit)}</td>
               <td className="px-4 py-3 text-right tabular text-brand-navy">{formatMWK(totalCredit)}</td>
             </tr>
@@ -253,17 +253,17 @@ function AccountLedgerPanel() {
     <div className="space-y-5">
       <div className="flex items-end gap-4 flex-wrap">
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Account Code</label>
-          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. 1000"
+          <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Account code</label>
+          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="1000"
             className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body w-28 focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
         </div>
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">From</label>
+          <label className="block text-xs font-heading font-semibold text-muted mb-1.5">From</label>
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
             className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
         </div>
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">To</label>
+          <label className="block text-xs font-heading font-semibold text-muted mb-1.5">To</label>
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
             className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25" />
         </div>
@@ -280,7 +280,7 @@ function AccountLedgerPanel() {
               <thead>
                 <tr className="bg-page border-b border-base">
                   {['Date', 'Reference', 'Description', 'Debit', 'Credit', 'Balance'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase tracking-wider">
+                    <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted ">
                       {h}
                     </th>
                   ))}
@@ -297,10 +297,10 @@ function AccountLedgerPanel() {
                     <td className="px-4 py-3 text-right tabular text-emerald-700">
                       {l.debit > 0 ? formatMWK(l.debit) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-right tabular text-brand-coral">
+                    <td className="px-4 py-3 text-right tabular text-tone-coral">
                       {l.credit > 0 ? formatMWK(l.credit) : '—'}
                     </td>
-                    <td className={`px-4 py-3 text-right tabular font-semibold ${l.balance >= 0 ? 'text-body' : 'text-brand-coral'}`}>
+                    <td className={`px-4 py-3 text-right tabular font-semibold ${l.balance >= 0 ? 'text-body' : 'text-tone-coral'}`}>
                       {formatMWK(Math.abs(l.balance))}{l.balance < 0 ? ' (Cr)' : ''}
                     </td>
                   </tr>
@@ -332,10 +332,10 @@ export function AccountingLedgerTab() {
       <div>
         <h2 className="font-heading font-bold text-xl text-brand-navy flex items-center gap-2">
           <Scale className="w-5 h-5" aria-hidden />
-          Accounting Ledger
+          Accounting ledger
         </h2>
         <p className="text-sm text-muted mt-0.5">
-          Double-entry bookkeeping — income statement, trial balance, and account ledger.
+          Double-entry bookkeeping: income statement, trial balance, and account ledger.
         </p>
       </div>
 

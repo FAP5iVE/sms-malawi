@@ -97,7 +97,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-heading font-semibold text-body">Finance &amp; Bursar Fee Structure Workstation</h2>
+          <h2 className="font-heading font-semibold text-body">Finance and bursar fee structure workstation</h2>
           <p className="text-xs text-muted mt-0.5">
             Manage each student&rsquo;s statutory fee commitments, optional service enrollment, and scholarship concessions.
           </p>
@@ -118,7 +118,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
         <div className="overflow-hidden">
           <div className="p-3 border-b border-base space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="font-heading text-sm font-semibold text-body">Student Roster</h3>
+              <h3 className="font-heading text-sm font-semibold text-body">Student roster</h3>
               <span className="text-xs text-muted">{studentsData?.total ?? 0} students</span>
             </div>
             <div className="relative">
@@ -135,7 +135,7 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
               onChange={(e) => setClassFilter(e.target.value)}
               className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
             >
-              <option value="">All Grades &amp; Forms</option>
+              <option value="">All grades and forms</option>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
@@ -205,10 +205,10 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
 
             {/* Summary cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <SummaryStat label="Statutory Tuition" value={formatMWK(statutoryTotal)} icon={Wallet2} />
+              <SummaryStat label="Statutory tuition" value={formatMWK(statutoryTotal)} icon={Wallet2} />
               <SummaryStat label="Enrolled Add-ons" value={formatMWK(addonsTotal)} icon={Receipt} />
               <SummaryStat
-                label="Scholarship Grant"
+                label="Scholarship grant"
                 value={
                   activeScholarship
                     ? activeScholarship.discountType === 'PERCENTAGE'
@@ -219,14 +219,14 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
                 icon={PiggyBank}
                 highlight={!!activeScholarship}
               />
-              <SummaryStat label="Net Term Commitment" value={formatMWK(netCommitment)} icon={Receipt} emphasis />
+              <SummaryStat label="Net term commitment" value={formatMWK(netCommitment)} icon={Receipt} emphasis />
             </div>
 
             {/* Itemized commitments table */}
             <div className="overflow-hidden">
               <div className="px-4 py-3 border-b border-base">
                 <h3 className="font-heading text-sm font-semibold text-body">
-                  Itemized Term Commitments ({fees.length})
+                  Itemized term commitments ({fees.length})
                 </h3>
               </div>
               {feesLoading ? (
@@ -240,10 +240,10 @@ export function FinanceFeeStructureTab({ academicYear, term }: { academicYear: s
                 <table className="w-full text-sm min-w-130">
                   <thead>
                     <tr className="border-b border-base bg-page">
-                      <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">Fee Category &amp; Code</th>
-                      <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold hidden sm:table-cell">Classification</th>
-                      <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold hidden md:table-cell">Schedule</th>
-                      <th className="text-right px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">Standard Rate</th>
+                      <th className="text-left px-4 py-2.5 font-heading text-xs text-muted font-semibold">Fee category and code</th>
+                      <th className="text-left px-4 py-2.5 font-heading text-xs text-muted font-semibold hidden sm:table-cell">Classification</th>
+                      <th className="text-left px-4 py-2.5 font-heading text-xs text-muted font-semibold hidden md:table-cell">Schedule</th>
+                      <th className="text-right px-4 py-2.5 font-heading text-xs text-muted font-semibold">Standard rate</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -365,7 +365,7 @@ function AddOnCommitmentsModal({
       title="Edit Add-on Commitments"
       description={`${student.firstName} ${student.lastName}`}
       onClose={onClose}
-      size="md"
+      size="m"
       footer={
         <>
         <button
@@ -394,7 +394,7 @@ function AddOnCommitmentsModal({
               (upsert.isPending && upsert.variables?.feeStructureId === fee.id) ||
               (updateStatus.isPending && updateStatus.variables?.id === existing?.id)
             return (
-              <li key={fee.id} className="flex items-center justify-between gap-3 border border-base rounded-lg px-3 py-2.5">
+              <li key={fee.id} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 app-tint">
                 <label className="flex items-center gap-2.5 cursor-pointer min-w-0">
                   <input
                     type="checkbox"

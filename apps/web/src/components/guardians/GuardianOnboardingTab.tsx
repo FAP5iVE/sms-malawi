@@ -17,6 +17,7 @@ import { ChevronLeft, ChevronRight, Loader2, Play, Undo2 } from 'lucide-react'
 import { GUARDIAN_ONBOARDING_ACTIONS, GUARDIAN_ONBOARDING_ACTION_LABELS, type GuardianOnboardingActionValue } from '@shared/constants/guardianPortal'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { useClasses } from '@/hooks/useClasses'
+import { CHIP, CHIP_ON, CHIP_OFF } from '@/lib/hills/chip'
 import {
   useApplyOnboarding, useOnboardingDryRun, useOnboardingReport, useRollbackOnboarding,
   type OnboardingRollbackResult,
@@ -45,7 +46,6 @@ const BTN =
   'inline-flex items-center justify-center gap-1.5 min-h-11 px-4 rounded-xl text-sm font-heading font-semibold transition-colors disabled:opacity-60 disabled:pointer-events-none'
 
 const ITEMS_PAGE = 100
-const CHIP = 'inline-flex items-center min-h-11 px-3.5 rounded-full text-sm font-medium border transition-colors'
 
 /** Who each row is about, with a filter by what would happen to it. Names come from the report itself. */
 function BatchItems({ batchId }: { batchId: string }) {
@@ -60,7 +60,7 @@ function BatchItems({ batchId }: { batchId: string }) {
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by what will happen">
         {[null, ...GUARDIAN_ONBOARDING_ACTIONS].map((a) => (
           <button key={a ?? 'all'} type="button" aria-pressed={action === a} onClick={() => pick(a)}
-            className={`${CHIP} ${action === a ? 'bg-btn-brand text-btn-brand-fg border-brand-teal' : 'border-base text-muted hover:text-body hover:bg-page'}`}>
+            className={`${CHIP} ${action === a ? CHIP_ON : CHIP_OFF}`}>
             {a ? GUARDIAN_ONBOARDING_ACTION_LABELS[a] : 'All'}
           </button>
         ))}

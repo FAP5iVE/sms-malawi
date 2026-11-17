@@ -52,8 +52,8 @@ function EmployeePicker({
 
   return (
     <div className="flex items-center gap-2">
-      <label className="text-xs font-heading font-semibold text-muted uppercase tracking-wider whitespace-nowrap">
-        Viewing Employee:
+      <label className="text-xs font-heading font-semibold text-muted whitespace-nowrap">
+        Viewing employee:
       </label>
       <select
         value={selected?.uid ?? 'self'}
@@ -87,20 +87,20 @@ function ActiveLoanCard({ loan }: {
     <div>
       <div className="flex items-center gap-2 mb-4">
         <PiggyBank className="w-4 h-4 text-brand-navy" aria-hidden />
-        <h3 className="text-xs font-heading font-semibold text-muted uppercase tracking-wider">Staff Welfare &amp; Savings</h3>
+        <h3 className="text-xs font-heading font-semibold text-muted ">Staff welfare and savings</h3>
       </div>
       {loan ? (
         <div className="space-y-2 mb-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted">Active Loan</span>
+            <span className="text-muted">Active loan</span>
             <span className="font-heading font-semibold text-body text-right">{loan.reason}</span>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted">Remaining Balance</span>
-            <span className="font-heading font-semibold tabular text-brand-coral">{formatMWK(loan.balance)}</span>
+            <span className="text-muted">Remaining balance</span>
+            <span className="font-heading font-semibold tabular text-tone-coral">{formatMWK(loan.balance)}</span>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted">Monthly Deduction</span>
+            <span className="text-muted">Monthly deduction</span>
             <span className="font-heading font-semibold tabular text-body">{formatMWK(loan.monthlyDeduction)}/mo</span>
           </div>
           <div className="h-1.5 rounded-full bg-base overflow-hidden mt-2">
@@ -158,14 +158,14 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
 
   const columns: DataColumn<ApiPayslip>[] = [
     {
-      key: 'payrollRun', label: 'Pay Period', priority: 'critical',
+      key: 'payrollRun', label: 'Pay period', priority: 'critical',
       render: (p) => p.payrollRun ? formatRunPeriod(p.payrollRun.month, p.payrollRun.year) : '—',
     },
-    { key: 'grossSalary', label: 'Gross Pay', priority: 'important', render: (p) => formatMWK(p.grossSalary) },
-    { key: 'paye', label: 'PAYE Tax', priority: 'important', render: (p) => <span className="text-brand-coral">-{formatMWK(p.paye)}</span> },
-    { key: 'pension', label: 'Pension', priority: 'optional', render: (p) => <span className="text-brand-coral">-{formatMWK(p.pension)}</span> },
-    { key: 'loanDeduction', label: 'Loan Ded.', priority: 'optional', render: (p) => p.loanDeduction > 0 ? <span className="text-brand-coral">-{formatMWK(p.loanDeduction)}</span> : <span className="text-muted">—</span> },
-    { key: 'netSalary', label: 'Net Remittance', priority: 'critical', render: (p) => <span className="font-semibold text-emerald-700">{formatMWK(p.netSalary)}</span> },
+    { key: 'grossSalary', label: 'Gross pay', priority: 'important', render: (p) => formatMWK(p.grossSalary) },
+    { key: 'paye', label: 'PAYE Tax', priority: 'important', render: (p) => <span className="text-tone-coral">-{formatMWK(p.paye)}</span> },
+    { key: 'pension', label: 'Pension', priority: 'optional', render: (p) => <span className="text-tone-coral">-{formatMWK(p.pension)}</span> },
+    { key: 'loanDeduction', label: 'Loan ded.', priority: 'optional', render: (p) => p.loanDeduction > 0 ? <span className="text-tone-coral">-{formatMWK(p.loanDeduction)}</span> : <span className="text-muted">-</span> },
+    { key: 'netSalary', label: 'Net remittance', priority: 'critical', render: (p) => <span className="font-semibold text-emerald-700">{formatMWK(p.netSalary)}</span> },
     {
       key: 'id', label: 'Action', priority: 'critical',
       render: (p) => {
@@ -204,13 +204,13 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Monthly Earnings Structure */}
         <div>
-          <h3 className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-3">Monthly Earnings Structure</h3>
+          <h3 className="text-xs font-heading font-semibold text-muted mb-3">Monthly earnings structure</h3>
           {salaryLoading && <p className="text-sm text-muted">Loading…</p>}
           {!salaryLoading && !salary && <p className="text-sm text-muted">No salary structure on record yet.</p>}
           {salary && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted">Base Salary</span>
+                <span className="text-muted">Base salary</span>
                 <span className="font-heading font-semibold tabular text-body">{formatMWK(salary.baseSalary)}</span>
               </div>
               {salary.allowances.map((a) => (
@@ -220,7 +220,7 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
                 </div>
               ))}
               <div className="border-t border-base pt-2 flex items-center justify-between">
-                <span className="text-sm font-heading font-semibold text-body">Total Gross Monthly</span>
+                <span className="text-sm font-heading font-semibold text-body">Total gross monthly</span>
                 <span className="font-heading font-bold tabular text-body">{formatMWK(salary.monthlyGross)}</span>
               </div>
             </div>
@@ -231,7 +231,7 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
         <div className="bg-brand-deep text-white rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-1">
             <Wallet className="w-4 h-4 text-emerald-300" aria-hidden />
-            <span className="text-xs font-heading font-semibold uppercase tracking-wider text-emerald-300">Latest Monthly Net Pay</span>
+            <span className="text-xs font-heading font-semibold text-emerald-300">Latest monthly net pay</span>
           </div>
           {latest ? (
             <>
@@ -250,7 +250,7 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
                 </div>
                 {latest.loanDeduction > 0 && (
                   <div className="flex items-center justify-between">
-                    <span className="text-white/70">Loan Repayment</span>
+                    <span className="text-white/70">Loan repayment</span>
                     <span className="tabular">-{formatMWK(latest.loanDeduction)}</span>
                   </div>
                 )}
@@ -272,8 +272,8 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
           { label: 'YTD Pension Contribution', value: ytd.pension },
           { label: 'YTD Total Net Received', value: ytd.net, emphasize: true },
         ].map((s) => (
-          <div key={s.label} className="bg-surface border border-base rounded-xl p-4">
-            <p className="text-[11px] font-heading font-semibold text-muted uppercase tracking-wider mb-1">{s.label}</p>
+          <div key={s.label} className="app-tint rounded-xl p-4">
+            <p className="text-xs font-heading font-semibold text-muted mb-1">{s.label}</p>
             <p className={`font-heading font-bold tabular ${s.emphasize ? 'text-emerald-700' : 'text-body'}`}>{formatMWK(s.value)}</p>
           </div>
         ))}
@@ -281,7 +281,7 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
 
       {/* Payslip records */}
       <div>
-        <h3 className="font-heading font-bold text-body mb-1">My Official Payslip Records</h3>
+        <h3 className="font-heading font-bold text-body mb-1">My official payslip records</h3>
         <p className="text-sm text-muted mb-4">Instant access to view and print official school payslip advice slips.</p>
         <DataTable
           data={payslips}

@@ -135,9 +135,9 @@ function WorkflowStepper({ run }: { run: ApiPayrollRun | undefined }) {
             <div className="flex items-center gap-2 mb-1">
               <span
                 className={[
-                  'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-heading font-bold shrink-0',
+                  'w-5 h-5 rounded-full flex items-center justify-center text-xs font-heading font-bold shrink-0',
                   isCurrent
-                    ? 'bg-brand-teal text-white'
+                    ? 'bg-btn-brand text-btn-brand-fg'
                     : isDone
                       ? 'bg-brand-deep text-white'
                       : 'bg-base text-muted',
@@ -147,7 +147,7 @@ function WorkflowStepper({ run }: { run: ApiPayrollRun | undefined }) {
               </span>
               <span className="text-xs font-heading font-semibold text-body">{s.label}</span>
             </div>
-            <p className="text-[11px] text-muted leading-snug">
+            <p className="text-xs text-muted leading-snug">
               {reached && attributionByStep[s.step] ? attributionByStep[s.step] : s.sublabel}
             </p>
           </div>
@@ -174,10 +174,10 @@ function RollbackDialog({
   if (!open) return null
   return (
     <Modal
-      title="Rollback Locked Payroll"
+      title="Rollback locked payroll"
       description="This voids the posted journal entry and returns the run to Pending Approval. A reason is required for the audit trail."
       onClose={onCancel}
-      size="sm"
+      size="s"
       busy={isPending}
       footer={
         <>
@@ -191,7 +191,7 @@ function RollbackDialog({
             className={MODAL_BTN_DANGER}
           >
             {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-            Rollback Run
+            Rollback run
           </button>
         </>
       }
@@ -241,7 +241,7 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
   return (
     <div>
       {actionError && (
-        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-brand-coral mb-3">
+        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-tone-coral mb-3">
           <AlertTriangle className="w-4 h-4 shrink-0" /> {actionError}
         </div>
       )}
@@ -249,12 +249,12 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
         {run.status === 'PROCESSING' && (
           <>
             <span className="text-xs text-muted flex items-center gap-1.5">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> Still calculating — this should only take a moment.
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> Still calculating: this should only take a moment.
             </span>
             {canRun && (
               <button type="button" onClick={() => setConfirmAction('discard')}
-                className="min-h-[36px] px-3.5 rounded-lg text-xs font-heading font-semibold border border-brand-coral/30 text-brand-coral hover:bg-brand-coral/5 transition-colors flex items-center gap-1.5">
-                <RotateCcw className="w-3.5 h-3.5" aria-hidden /> Stuck? Discard &amp; Retry
+                className="min-h-[36px] px-3.5 rounded-lg text-xs font-heading font-semibold border border-brand-coral/30 text-tone-coral hover:bg-brand-coral/5 transition-colors flex items-center gap-1.5">
+                <RotateCcw className="w-3.5 h-3.5" aria-hidden /> Stuck? discard &amp; retry
               </button>
             )}
           </>
@@ -264,7 +264,7 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
           <button type="button" onClick={() => setConfirmAction('submit')}
             className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-deep hover:brightness-110 transition-colors flex items-center gap-2">
             {submitMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-            <Send className="w-4 h-4" aria-hidden /> Submit for Approval
+            <Send className="w-4 h-4" aria-hidden /> Submit for approval
           </button>
         )}
         {run.status === 'COMPLETED' && !canRun && showInlineMessages && (
@@ -275,7 +275,7 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
           <button type="button" onClick={() => setConfirmAction('approve')}
             className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-teal hover:bg-brand-teal/90 transition-colors flex items-center gap-2">
             {approveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-            <ClipboardCheck className="w-4 h-4" aria-hidden /> Approve Payroll
+            <ClipboardCheck className="w-4 h-4" aria-hidden /> Approve payroll
           </button>
         )}
         {run.status === 'PENDING_APPROVAL' && !canApprove && showInlineMessages && (
@@ -286,16 +286,16 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
           <button type="button" onClick={() => setConfirmAction('lock')}
             className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-deep hover:brightness-110 transition-colors flex items-center gap-2">
             {lockMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-            <Lock className="w-4 h-4" aria-hidden /> Lock &amp; Post Journal
+            <Lock className="w-4 h-4" aria-hidden /> Lock and post journal
           </button>
         )}
         {run.status === 'APPROVED' && !canLock && showInlineMessages && (
-          <p className="text-xs text-muted">Awaiting lock &amp; posting by Finance.</p>
+          <p className="text-xs text-muted">Awaiting lock and posting by Finance.</p>
         )}
 
         {run.status === 'LOCKED' && canRollback && (
           <button type="button" onClick={() => setRollbackOpen(true)}
-            className="min-h-[44px] px-4 rounded-xl text-sm font-heading font-semibold border border-brand-coral/30 text-brand-coral hover:bg-brand-coral/5 transition-colors flex items-center gap-2">
+            className="min-h-[44px] px-4 rounded-xl text-sm font-heading font-semibold border border-brand-coral/30 text-tone-coral hover:bg-brand-coral/5 transition-colors flex items-center gap-2">
             <Undo2 className="w-4 h-4" aria-hidden /> Rollback
           </button>
         )}
@@ -303,7 +303,7 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
 
       <ConfirmDialog
         open={confirmAction === 'submit'}
-        title="Submit for Approval?"
+        title="Submit for approval?"
         description="Sends this run to a High Rank staff member for approval. You won't be able to edit salary structures affecting this run once approved."
         confirmLabel="Submit"
         confirming={submitMutation.isPending}
@@ -312,7 +312,7 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
       />
       <ConfirmDialog
         open={confirmAction === 'approve'}
-        title="Approve This Payroll Run?"
+        title="Approve this payroll run?"
         description="Confirms the calculated amounts are correct and clears the run for Finance to lock and post."
         confirmLabel="Approve"
         confirming={approveMutation.isPending}
@@ -321,9 +321,9 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
       />
       <ConfirmDialog
         open={confirmAction === 'lock'}
-        title="Lock & Post Journal Entry?"
+        title="Lock & post journal entry?"
         description="Posts the payroll journal entry to the accounting ledger and permanently locks this month. This cannot be undone without a rollback."
-        confirmLabel="Lock & Post"
+        confirmLabel="Lock and post"
         destructive
         confirming={lockMutation.isPending}
         onConfirm={() => runAction(() => lockMutation.mutateAsync(run.id))}
@@ -331,9 +331,9 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
       />
       <ConfirmDialog
         open={confirmAction === 'discard'}
-        title="Discard This Stuck Run?"
-        description="Permanently deletes this calculation (it never reached a usable state) so this month can be run again from scratch. Nothing has been submitted, approved, or posted — there's nothing to preserve."
-        confirmLabel="Discard & Allow Retry"
+        title="Discard this stuck run?"
+        description="Permanently deletes this calculation (it never reached a usable state) so this month can be run again from scratch. Nothing has been submitted, approved, or posted. There's nothing to preserve."
+        confirmLabel="Discard and allow retry"
         destructive
         confirming={discardMutation.isPending}
         onConfirm={() => runAction(() => discardMutation.mutateAsync(run.id))}
@@ -367,12 +367,12 @@ function RunDetailModal({ runId, onClose }: { runId: string; onClose: () => void
   const downloadPayslipMutation = useDownloadPayslip()
 
   const columns: DataColumn<ApiPayslip>[] = [
-    { key: 'staffName', label: 'Staff Member', priority: 'critical' },
-    { key: 'grossSalary', label: 'Gross Pay', priority: 'important', render: (p) => formatMWK(p.grossSalary) },
-    { key: 'paye', label: 'PAYE Tax', priority: 'important', render: (p) => <span className="text-brand-coral">-{formatMWK(p.paye)}</span> },
-    { key: 'pension', label: 'Pension', priority: 'optional', render: (p) => <span className="text-brand-coral">-{formatMWK(p.pension)}</span> },
-    { key: 'loanDeduction', label: 'Loan Ded.', priority: 'optional', render: (p) => p.loanDeduction > 0 ? <span className="text-brand-coral">-{formatMWK(p.loanDeduction)}</span> : <span className="text-muted">—</span> },
-    { key: 'netSalary', label: 'Net Pay', priority: 'critical', render: (p) => <span className="font-semibold text-brand-teal">{formatMWK(p.netSalary)}</span> },
+    { key: 'staffName', label: 'Staff member', priority: 'critical' },
+    { key: 'grossSalary', label: 'Gross pay', priority: 'important', render: (p) => formatMWK(p.grossSalary) },
+    { key: 'paye', label: 'PAYE Tax', priority: 'important', render: (p) => <span className="text-tone-coral">-{formatMWK(p.paye)}</span> },
+    { key: 'pension', label: 'Pension', priority: 'optional', render: (p) => <span className="text-tone-coral">-{formatMWK(p.pension)}</span> },
+    { key: 'loanDeduction', label: 'Loan ded.', priority: 'optional', render: (p) => p.loanDeduction > 0 ? <span className="text-tone-coral">-{formatMWK(p.loanDeduction)}</span> : <span className="text-muted">-</span> },
+    { key: 'netSalary', label: 'Net pay', priority: 'critical', render: (p) => <span className="font-semibold text-tone-teal">{formatMWK(p.netSalary)}</span> },
     {
       key: 'id', label: 'Payslip', priority: 'important',
       render: (p) => {
@@ -396,7 +396,7 @@ function RunDetailModal({ runId, onClose }: { runId: string; onClose: () => void
 
   return (
     <Modal
-      title={<>{run ? formatRunPeriod(run.month, run.year) : 'Payroll Run'} — Deep Inspection</>}
+      title={<>{run ? formatRunPeriod(run.month, run.year) : 'Payroll Run'} Deep Inspection</>}
       description={
         run
           ? `${run._count?.payslips ?? run.payslips?.length ?? 0} staff • Gross ${formatMWK(run.totalGross)} • Net ${formatMWK(run.totalNet)}`
@@ -407,7 +407,7 @@ function RunDetailModal({ runId, onClose }: { runId: string; onClose: () => void
     >
       {run && (
         <div className="bg-page rounded-xl p-4 mb-5">
-          <p className="text-sm font-heading font-semibold text-body mb-3">Workflow Status</p>
+          <p className="text-sm font-heading font-semibold text-body mb-3">Workflow status</p>
           <WorkflowStepper run={run} />
           <div className="mt-3">
             <RunActions run={run} />
@@ -460,14 +460,14 @@ function CurrentCycleCard({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="font-heading font-bold text-lg text-body">
-                Current Cycle: {formatRunPeriod(CURRENT_MONTH, CURRENT_YEAR)}
+                Current cycle: {formatRunPeriod(CURRENT_MONTH, CURRENT_YEAR)}
               </h2>
               <span className={`text-xs font-heading font-semibold ${meta.textClassName}`}>
                 {currentRun ? meta.badge : 'Not Started'}
               </span>
             </div>
             <p className="text-sm text-muted mt-1">
-              {staffCount} Staff Members Enrolled
+              {staffCount} Staff members enrolled
               {currentRun && (
                 <> • Gross: <span className="tabular font-semibold text-body">{formatMWK(currentRun.totalGross)}</span>
                 {' '}• Net Disbursable: <span className="tabular font-semibold text-body">{formatMWK(currentRun.totalNet)}</span></>
@@ -479,14 +479,14 @@ function CurrentCycleCard({
         {currentRun && (
           <button type="button" onClick={onInspect}
             className="min-h-[40px] px-4 rounded-xl text-sm font-heading font-semibold border border-base text-body hover:bg-page transition-colors flex items-center gap-2 shrink-0">
-            <ShieldCheck className="w-4 h-4" aria-hidden /> Deep Inspection
+            <ShieldCheck className="w-4 h-4" aria-hidden /> Deep inspection
           </button>
         )}
       </div>
 
       <div className="bg-page rounded-xl p-4 mb-4">
         <div className="mb-3">
-          <p className="text-sm font-heading font-semibold text-body">Workflow Status</p>
+          <p className="text-sm font-heading font-semibold text-body">Workflow status</p>
           <p className="text-xs text-muted mt-0.5">
             {!currentRun
               ? 'Payroll for this month has not been run yet.'
@@ -518,7 +518,7 @@ function CurrentCycleCard({
       )}
 
       {runError && (
-        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-brand-coral mb-3">
+        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-tone-coral mb-3">
           <AlertTriangle className="w-4 h-4 shrink-0" /> {runError}
         </div>
       )}
@@ -546,7 +546,7 @@ function CurrentCycleCard({
         open={confirmRun}
         title={`Run ${formatRunPeriod(CURRENT_MONTH, CURRENT_YEAR)} Payroll?`}
         description="This calculates salaries, PAYE, and pension for every enrolled staff member. Once run, this month is locked and cannot be run again."
-        confirmLabel="Run Payroll"
+        confirmLabel="Run payroll"
         onConfirm={() => {
           setRunError(null)
           runMutation.mutateAsync({ month: CURRENT_MONTH, year: CURRENT_YEAR })
@@ -611,7 +611,7 @@ export function PayrollRunsTab() {
 
   const columns: DataColumn<ApiPayrollRun>[] = [
     {
-      key: 'month', label: 'Pay Period', priority: 'critical', sortable: true,
+      key: 'month', label: 'Pay period', priority: 'critical', sortable: true,
       render: (r) => (
         <div>
           <p className="font-heading font-semibold text-body">{formatRunPeriod(r.month, r.year)}</p>
@@ -634,7 +634,7 @@ export function PayrollRunsTab() {
                 to help it. */}
             <span className={`text-xs font-heading font-semibold whitespace-nowrap ${meta.textClassName}`}>{meta.badge}</span>
             {actionable && (
-              <span className="inline-flex items-center gap-1 text-status-warning text-[10px] font-heading font-bold uppercase tracking-wide whitespace-nowrap">
+              <span className="inline-flex items-center gap-1 text-status-warning text-xs font-heading font-bold whitespace-nowrap">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-amber" aria-hidden /> Action needed
               </span>
             )}
@@ -643,10 +643,10 @@ export function PayrollRunsTab() {
       },
     },
     { key: '_count', label: 'Staff', priority: 'optional', render: (r) => r._count?.payslips ?? '—' },
-    { key: 'totalGross', label: 'Total Gross', priority: 'important', render: (r) => formatMWK(r.totalGross) },
-    { key: 'totalPaye', label: 'PAYE Withholding', priority: 'optional', render: (r) => r.totalPaye !== undefined ? <span className="text-brand-coral">-{formatMWK(r.totalPaye)}</span> : '—' },
-    { key: 'totalPension', label: 'Pension', priority: 'optional', render: (r) => r.totalPension !== undefined ? <span className="text-brand-coral">-{formatMWK(r.totalPension)}</span> : '—' },
-    { key: 'totalNet', label: 'Net Payable', priority: 'critical', render: (r) => <span className="font-semibold text-brand-teal">{formatMWK(r.totalNet)}</span> },
+    { key: 'totalGross', label: 'Total gross', priority: 'important', render: (r) => formatMWK(r.totalGross) },
+    { key: 'totalPaye', label: 'PAYE Withholding', priority: 'optional', render: (r) => r.totalPaye !== undefined ? <span className="text-tone-coral">-{formatMWK(r.totalPaye)}</span> : '—' },
+    { key: 'totalPension', label: 'Pension', priority: 'optional', render: (r) => r.totalPension !== undefined ? <span className="text-tone-coral">-{formatMWK(r.totalPension)}</span> : '—' },
+    { key: 'totalNet', label: 'Net payable', priority: 'critical', render: (r) => <span className="font-semibold text-tone-teal">{formatMWK(r.totalNet)}</span> },
     {
       key: 'id', label: 'Actions', priority: 'critical',
       render: (r) => (
@@ -665,7 +665,7 @@ export function PayrollRunsTab() {
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
-            <h3 className="font-heading font-bold text-body">Payroll Runs History &amp; Ledger Records</h3>
+            <h3 className="font-heading font-bold text-body">Payroll runs history and ledger records</h3>
             <p className="text-sm text-muted mt-0.5">Comprehensive registry of all monthly payroll batches, statutory remittances, and approval statuses.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -683,7 +683,7 @@ export function PayrollRunsTab() {
               onChange={(e) => setYearFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
               className="min-h-[40px] px-3 rounded-xl text-sm border border-base bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             >
-              <option value="all">All Years</option>
+              <option value="all">All years</option>
               {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
             <select
@@ -691,7 +691,7 @@ export function PayrollRunsTab() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="min-h-[40px] px-3 rounded-xl text-sm border border-base bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
             >
-              <option value="all">All Statuses</option>
+              <option value="all">All statuses</option>
               {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{getStatusMeta(s).badge}</option>)}
             </select>
           </div>

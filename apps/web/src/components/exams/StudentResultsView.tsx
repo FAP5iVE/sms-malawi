@@ -90,10 +90,10 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
     const msg = (error as Error).message
     const isFeeGate = msg.includes('fee') || msg.includes('Outstanding')
     return (
-      <div className="rounded-xl p-5 border border-base bg-surface flex items-start gap-3">
-        <AlertTriangle className={`w-5 h-5 mt-0.5 shrink-0 ${isFeeGate ? 'text-brand-coral' : 'text-muted'}`} />
+      <div className="rounded-xl p-5 app-tint flex items-start gap-3">
+        <AlertTriangle className={`w-5 h-5 mt-0.5 shrink-0 ${isFeeGate ? 'text-tone-coral' : 'text-muted'}`} />
         <div>
-          <p className={`font-semibold ${isFeeGate ? 'text-brand-coral' : 'text-body'}`}>
+          <p className={`font-semibold ${isFeeGate ? 'text-tone-coral' : 'text-body'}`}>
             {isFeeGate ? 'Results Unavailable — Outstanding Fee Balance' : 'Results Not Yet Released'}
           </p>
           <p className="text-sm text-muted mt-1">
@@ -145,7 +145,7 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
         <p className="text-sm text-muted" aria-label="Period shown">
           <span className="font-semibold text-body">Term {term}</span>
           {academicYear ? ` · ${academicYear}` : ''}
-          <span className="hidden sm:inline"> — change the period from the header</span>
+          <span className="hidden sm:inline"> change the period from the header</span>
         </p>
         {/* SR-3: opens the same in-browser PrintableReportCard staff use,
             which has its own Print button. Replaces the server-PDF download
@@ -155,7 +155,7 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
           className="flex items-center gap-1.5 text-sm border border-base px-3 py-1.5 rounded-xl hover:bg-page transition-colors"
         >
           <FileText className="w-4 h-4" />
-          View / Print Report Card
+          View / print report card
         </button>
       </div>
 
@@ -165,10 +165,10 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
           { label: headline.label,  value: headline.value,                          hint: headline.hint },
           { label: 'Position',      value: r.position ? `#${r.position}` : '—',     hint: 'Rank in your class' },
         ].map(({ label, value, hint }) => (
-          <div key={label} className="bg-surface border border-base rounded-xl p-4 text-center">
+          <div key={label} className="app-tint rounded-xl p-4 text-center">
             <p className="text-xl font-bold text-brand-navy">{value}</p>
             <p className="text-xs text-muted mt-1">{label}</p>
-            <p className="text-[10px] text-muted mt-0.5 leading-tight">{hint}</p>
+            <p className="text-xs text-muted mt-0.5 leading-tight">{hint}</p>
           </div>
         ))}
       </div>
@@ -176,18 +176,18 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
       {/* [MSCE CORRECTION] Show WHICH subjects made the aggregate, so the
           number is checkable rather than opaque. */}
       {isMsce && aggregateSubjects.length > 0 && (
-        <div className="bg-page border border-base rounded-xl px-4 py-3 text-xs text-muted">
+        <div className="app-tint rounded-xl px-4 py-3 text-xs text-muted">
           <span className="font-semibold text-body">Counted in your aggregate: </span>
           {aggregateSubjects.join(', ')}
-          <span className="block mt-1 text-[11px] italic">
-            MSCE adds the points of your six best subjects. A lower total is better — 6 is the best possible.
+          <span className="block mt-1 text-xs italic">
+            MSCE adds the points of your six best subjects. A lower total is better. 6 is the best possible.
           </span>
         </div>
       )}
 
       {/* SR-2: class benchmark — own vs class, no other students named */}
       {(r.classAverage != null || r.classSize != null) && (
-        <div className="flex items-center gap-4 flex-wrap text-xs text-muted bg-page border border-base rounded-xl px-4 py-3">
+        <div className="flex items-center gap-4 flex-wrap text-xs text-muted app-tint rounded-xl px-4 py-3">
           {r.classAverage != null && (
             <span>Class average: <strong className="text-body">{pct(r.classAverage)}</strong></span>
           )}
@@ -197,16 +197,16 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
           {r.position != null && r.classSize != null && (
             <span>Your position: <strong className="text-body">#{r.position} of {r.classSize}</strong></span>
           )}
-          <span className="text-[11px] italic">Open the Analytics tab for your class top ten and a subject-by-subject comparison.</span>
+          <span className="text-xs italic">Open the Analytics tab for your class top ten and a subject-by-subject comparison.</span>
         </div>
       )}
 
       {/* Verdict — font colour only, no colour block. Both brand tokens are
           theme-aware and read correctly in light and dark mode. */}
-      <div className="rounded-xl px-4 py-3 text-sm border border-base bg-surface flex items-start gap-2">
-        <TrendingUp className={`w-4 h-4 mt-0.5 shrink-0 ${r.passStatus ? 'text-brand-teal' : 'text-brand-coral'}`} />
+      <div className="rounded-xl px-4 py-3 text-sm app-tint flex items-start gap-2">
+        <TrendingUp className={`w-4 h-4 mt-0.5 shrink-0 ${r.passStatus ? 'text-tone-teal' : 'text-tone-coral'}`} />
         <div>
-          <span className={`font-semibold ${r.passStatus ? 'text-brand-teal' : 'text-brand-coral'}`}>
+          <span className={`font-semibold ${r.passStatus ? 'text-tone-teal' : 'text-tone-coral'}`}>
             {r.passStatus ? `Passed Term ${term}` : `Did not meet the pass requirement this term`}
           </span>
           <span className="text-muted">
@@ -234,7 +234,7 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
                 ...(hasCa ? ['CA', 'Exam', 'Final'] : ['Average']),
                 'Grade', 'Result',
               ].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase">{h}</th>
+                <th key={h} className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted ">{h}</th>
               ))}
             </tr>
           </thead>
@@ -246,7 +246,7 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
                   <td className="px-4 py-3 font-medium">
                     {subject}
                     {counted && (
-                      <span className="ml-2 text-[10px] text-brand-teal font-semibold uppercase tracking-wide">
+                      <span className="ml-2 text-xs text-tone-teal font-semibold ">
                         in aggregate
                       </span>
                     )}
@@ -267,7 +267,7 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
                       differs (points, not a grade). */}
                   <td className="px-4 py-3 font-bold text-brand-navy">{data?.grade ?? '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs font-semibold ${data?.pass ? 'text-brand-teal' : 'text-brand-coral'}`}>
+                    <span className={`text-xs font-semibold ${data?.pass ? 'text-tone-teal' : 'text-tone-coral'}`}>
                       {data?.pass ? 'Pass' : 'Fail'}
                     </span>
                   </td>
@@ -297,8 +297,8 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
           )}
           {reportCardError && (
             <div className="flex flex-col items-center gap-2 py-16 text-center">
-              <AlertTriangle className="w-6 h-6 text-brand-coral" />
-              <p className="text-sm text-brand-coral font-medium">
+              <AlertTriangle className="w-6 h-6 text-tone-coral" />
+              <p className="text-sm text-tone-coral font-medium">
                 {reportCardError instanceof Error ? reportCardError.message : 'Failed to load report card.'}
               </p>
               <button onClick={() => setShowReportCard(false)} className="mt-2 text-sm text-muted hover:text-body underline">

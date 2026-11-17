@@ -18,14 +18,14 @@ function humanize(s: string) { return s.replace(/_/g, ' ').toLowerCase().replace
 type Section = 'departments' | 'buildings' | 'rooms' | 'mappings'
 const SECTIONS: Array<{ id: Section; label: string }> = [
   { id: 'departments', label: 'Departments' }, { id: 'buildings', label: 'Buildings' },
-  { id: 'rooms', label: 'Rooms' }, { id: 'mappings', label: 'Legacy Data Mapping' },
+  { id: 'rooms', label: 'Rooms' }, { id: 'mappings', label: 'Legacy data mapping' },
 ]
 
 export function LocationsTab() {
   const [section, setSection] = useState<Section>('departments')
   return <div className="space-y-4">
     <div>
-      <h2 className="font-heading font-semibold text-brand-navy">Departments, Buildings &amp; Rooms</h2>
+      <h2 className="font-heading font-semibold text-brand-navy">Departments, buildings and rooms</h2>
       <p className="text-sm text-muted">The canonical location register requisitions, rooms and stocktakes link against. Legacy free-text fields stay as-is until mapped below.</p>
     </div>
     <div className="flex gap-1 border-b border-base overflow-x-auto">
@@ -53,7 +53,7 @@ function DepartmentsSection() {
       <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} className="input" placeholder="Science Department" /></Field>
       <Field label="Description (optional)"><input value={description} onChange={e => setDescription(e.target.value)} className="input" /></Field>
       <div className="sm:col-span-3"><button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create'}</button>
-        {create.error && <p className="text-sm text-brand-coral mt-2">{create.error instanceof Error ? create.error.message : 'Could not create department.'}</p>}</div>
+        {create.error && <p className="text-sm text-tone-coral mt-2">{create.error instanceof Error ? create.error.message : 'Could not create department.'}</p>}</div>
     </div>}
     {isLoading ? <Loading /> : <DataTable headers={['Code', 'Name', 'Status']}>{data.map(d => <tr key={d.id} className="border-b border-base last:border-0">
       <td className="px-4 py-3 font-mono text-xs">{d.code}</td><td className="px-4 py-3 font-medium">{d.name}</td>
@@ -73,7 +73,7 @@ function BuildingsSection() {
       <Field label="Code"><input value={code} onChange={e => setCode(e.target.value)} className="input" placeholder="MAIN" /></Field>
       <Field label="Name"><input value={name} onChange={e => setName(e.target.value)} className="input" placeholder="Main Block" /></Field>
       <div className="sm:col-span-2"><button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create'}</button>
-        {create.error && <p className="text-sm text-brand-coral mt-2">{create.error instanceof Error ? create.error.message : 'Could not create building.'}</p>}</div>
+        {create.error && <p className="text-sm text-tone-coral mt-2">{create.error instanceof Error ? create.error.message : 'Could not create building.'}</p>}</div>
     </div>}
     {isLoading ? <Loading /> : <DataTable headers={['Code', 'Name', 'Rooms', 'Status']}>{data.map(b => <tr key={b.id} className="border-b border-base last:border-0">
       <td className="px-4 py-3 font-mono text-xs">{b.code}</td><td className="px-4 py-3 font-medium">{b.name}</td>
@@ -104,7 +104,7 @@ function RoomsSection() {
       <Field label="Room type"><input value={roomType} onChange={e => setRoomType(e.target.value)} className="input" placeholder="Laboratory" /></Field>
       <Field label="Department (optional)"><select value={departmentId} onChange={e => setDepartmentId(e.target.value)} className="input"><option value="">None</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
       <div className="sm:col-span-2"><button type="button" onClick={submit} disabled={create.isPending} className="min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold">{create.isPending ? 'Creating…' : 'Create'}</button>
-        {create.error && <p className="text-sm text-brand-coral mt-2">{create.error instanceof Error ? create.error.message : 'Could not create room.'}</p>}</div>
+        {create.error && <p className="text-sm text-tone-coral mt-2">{create.error instanceof Error ? create.error.message : 'Could not create room.'}</p>}</div>
     </div>}
     {isLoading ? <Loading /> : <DataTable headers={['Room', 'Building', 'Type', 'Department', 'Custodian']}>{rooms.map(r => <tr key={r.id} className="border-b border-base last:border-0">
       <td className="px-4 py-3 font-medium">{r.name} <span className="text-xs text-muted font-mono">{r.code}</span></td>
@@ -126,16 +126,16 @@ function MappingsSection() {
         <button type="button" onClick={() => proposeDept.mutate()} disabled={proposeDept.isPending} className="min-h-11 px-3 rounded-lg border border-base text-sm">Scan department fields</button>
         <button type="button" onClick={() => proposeLoc.mutate()} disabled={proposeLoc.isPending} className="min-h-11 px-3 rounded-lg border border-base text-sm">Scan location fields</button>
         <button type="button" onClick={() => apply.mutate(undefined, { onSuccess: (res) => setApplyResult(`Applied ${(res as { applied?: number })?.applied ?? 0}, skipped ${(res as { skipped?: unknown[] })?.skipped?.length ?? 0}.`) })}
-          disabled={apply.isPending} className="min-h-11 px-3 rounded-lg bg-brand-teal text-white text-sm font-semibold inline-flex items-center gap-1.5"><PlayCircle className="w-4 h-4" /> Apply approved</button>
+          disabled={apply.isPending} className="min-h-11 px-3 rounded-lg bg-btn-brand text-btn-brand-fg text-sm font-semibold inline-flex items-center gap-1.5"><PlayCircle className="w-4 h-4" /> Apply approved</button>
       </div></PermissionGuard>} />
     <p className="text-xs text-muted">
-      Scanning finds distinct legacy values (e.g. every spelling of a department name across Staff/Budget/AssetRequest) and proposes a match against an existing Department or Room by name/code —
+      Scanning finds distinct legacy values (for example every spelling of a department name across Staff/Budget/AssetRequest) and proposes a match against an existing Department or Room by name/code, 
       it never merges values automatically. Review and approve or reject each one below, then apply.
     </p>
     {applyResult && <p className="text-sm text-brand-navy bg-brand-teal/10 rounded-lg p-3">{applyResult}</p>}
-    {(proposeDept.error || proposeLoc.error) && <p className="text-sm text-brand-coral">{(proposeDept.error ?? proposeLoc.error) instanceof Error ? (proposeDept.error ?? proposeLoc.error)?.message : 'Scan failed.'}</p>}
+    {(proposeDept.error || proposeLoc.error) && <p className="text-sm text-tone-coral">{(proposeDept.error ?? proposeLoc.error) instanceof Error ? (proposeDept.error ?? proposeLoc.error)?.message : 'Scan failed.'}</p>}
     {isLoading ? <Loading /> : proposed.length === 0 ? <p className="text-sm text-muted py-6 text-center">No pending mappings to review.</p> : <div className="space-y-2">
-      {proposed.map(m => <div key={m.id} className="border border-base rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
+      {proposed.map(m => <div key={m.id} className="rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap app-tint">
         <div><p className="text-sm font-medium">{m.legacyValue} <span className="text-muted">→</span> {humanize(m.targetType)} {m.targetId}</p><p className="text-xs text-muted">{humanize(m.mappingType)} mapping</p></div>
         <div className="flex gap-2">
           <button type="button" onClick={() => approve.mutate({ id: m.id })} disabled={approve.isPending} className="min-h-10 px-3 rounded-lg bg-brand-deep text-white text-xs font-semibold inline-flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Approve</button>
@@ -153,5 +153,5 @@ function Field({ label, children }: { label: string; children: ReactNode }) { re
 // panel (assets/page.tsx), so the extra card here was a redundant second
 // layer nested inside the first. Header row's bg-page + row dividers
 // already give the table definition without an outer card.
-function DataTable({ headers, children }: { headers: string[]; children: ReactNode }) { return <div className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-base bg-page">{headers.map(h => <th key={h} className="text-left px-4 py-3 text-xs uppercase tracking-wide text-muted font-semibold">{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div></div> }
+function DataTable({ headers, children }: { headers: string[]; children: ReactNode }) { return <div className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-base bg-page">{headers.map(h => <th key={h} className="text-left px-4 py-3 text-xs text-muted font-semibold">{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div></div> }
 function Loading() { return <div className="p-8 text-center text-muted"><Loader2 className="inline w-5 h-5 animate-spin" /></div> }

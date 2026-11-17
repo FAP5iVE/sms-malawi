@@ -147,17 +147,17 @@ export function Field({
 }: FieldProps) {
   return (
     <div className={className}>
-      <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+      <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
         {label}
         {required && (
-          <span className="text-brand-coral ml-0.5" aria-hidden>
+          <span className="text-tone-coral ml-0.5" aria-hidden>
             *
           </span>
         )}
       </label>
       {children}
       {error && (
-        <p role="alert" className="text-xs text-brand-coral mt-1 font-sans">
+        <p role="alert" className="text-xs text-tone-coral mt-1 font-sans">
           {error}
         </p>
       )}
@@ -175,7 +175,7 @@ export function FieldDivider({ title }: { title: string }) {
     <div className="col-span-2 pt-2 pb-1 hidden md:block">
       <div className="flex items-center gap-3">
         <div className="h-px flex-1 bg-base" />
-        <span className="text-[10px] font-heading font-bold text-muted uppercase tracking-widest">
+        <span className="text-xs font-heading font-bold text-muted ">
           {title}
         </span>
         <div className="h-px flex-1 bg-base" />
@@ -206,7 +206,7 @@ export function PersonalSection({ register, errors }: SectionProps) {
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
 
       {/* First name */}
-      <Field label="First Name" error={errors.firstName?.message} required>
+      <Field label="First name" error={errors.firstName?.message} required>
         <input
           {...register('firstName')}
           className={inputCls}
@@ -216,7 +216,7 @@ export function PersonalSection({ register, errors }: SectionProps) {
       </Field>
 
       {/* Last name */}
-      <Field label="Last Name" error={errors.lastName?.message} required>
+      <Field label="Last name" error={errors.lastName?.message} required>
         <input
           {...register('lastName')}
           className={inputCls}
@@ -226,7 +226,7 @@ export function PersonalSection({ register, errors }: SectionProps) {
       </Field>
       {/* Other names (middle names) — optional. The Student model carries this
           and applications capture it; it was previously never editable here. */}
-      <Field label="Other Names" error={errors.otherNames?.message}>
+      <Field label="Other names" error={errors.otherNames?.message}>
         <input
           {...register('otherNames')}
           className={inputCls}
@@ -236,7 +236,7 @@ export function PersonalSection({ register, errors }: SectionProps) {
       </Field>
 
       {/* Date of birth */}
-      <Field label="Date of Birth" error={errors.dateOfBirth?.message} required>
+      <Field label="Date of birth" error={errors.dateOfBirth?.message} required>
         <input
           type="date"
           {...register('dateOfBirth')}
@@ -268,7 +268,7 @@ export function PersonalSection({ register, errors }: SectionProps) {
       </Field>
 
       {/* District of origin (Malawi) */}
-      <Field label="District of Origin" error={errors.district?.message}>
+      <Field label="District of origin" error={errors.district?.message}>
         <select {...register('district')} className={inputCls}>
           <option value="">Select district…</option>
           {MALAWI_DISTRICTS.map((d) => (
@@ -280,11 +280,11 @@ export function PersonalSection({ register, errors }: SectionProps) {
       </Field>
 
       {/* Traditional Authority — free text; sits with district of origin */}
-      <Field label="Traditional Authority (T/A)" error={errors.traditionalAuthority?.message}>
+      <Field label="Traditional authority (T/A)" error={errors.traditionalAuthority?.message}>
         <input
           {...register('traditionalAuthority')}
           className={inputCls}
-          placeholder="e.g. T/A Kuntaja"
+          placeholder="T/A Kuntaja"
         />
       </Field>
 
@@ -316,19 +316,19 @@ export function PersonalSection({ register, errors }: SectionProps) {
           {...register('religion')}
           list="student-religions"
           className={inputCls}
-          placeholder="e.g. Christianity, Islam"
+          placeholder="Christianity, Islam"
         />
         <datalist id="student-religions">
           {RELIGIONS.map((r) => <option key={r} value={r} />)}
         </datalist>
       </Field>
 
-      <Field label="Home Language" error={errors.homeLanguage?.message}>
+      <Field label="Home language" error={errors.homeLanguage?.message}>
         <input
           {...register('homeLanguage')}
           list="student-languages"
           className={inputCls}
-          placeholder="e.g. Chichewa, Chitumbuka"
+          placeholder="Chichewa, Chitumbuka"
         />
         <datalist id="student-languages">
           {HOME_LANGUAGES.map((l) => <option key={l} value={l} />)}
@@ -359,7 +359,7 @@ export function AcademicSection({ register, errors, selectedClassId }: SectionPr
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
 
       {/* Form / class — real dropdown, submits the selected Class.id (cuid) */}
-      <Field label="Form / Class" error={errors.classId?.message} required>
+      <Field label="Form / class" error={errors.classId?.message} required>
         <select {...register('classId')} className={inputCls} disabled={classesLoading}>
           <option value="">{classesLoading ? 'Loading classes…' : 'Select class…'}</option>
           {classes?.map((c) => (
@@ -371,7 +371,7 @@ export function AcademicSection({ register, errors, selectedClassId }: SectionPr
       </Field>
 
       {/* Academic status */}
-      <Field label="Academic Status" error={errors.status?.message} required>
+      <Field label="Academic status" error={errors.status?.message} required>
         <select {...register('status')} className={inputCls}>
           {StudentStatusSchema.options.map((s) => (
             <option key={s} value={s}>
@@ -381,10 +381,10 @@ export function AcademicSection({ register, errors, selectedClassId }: SectionPr
         </select>
       </Field>
 
-      <FieldDivider title="Home & Admission" />
+      <FieldDivider title="Home and admission" />
 
       {/* Where the learner stays and how far they travel. */}
-      <Field label="Where the Student Stays" error={errors.residenceType?.message}>
+      <Field label="Where the student stays" error={errors.residenceType?.message}>
         <select
           {...register('residenceType', { setValueAs: blankToUndefined })}
           className={inputCls}
@@ -407,14 +407,14 @@ export function AcademicSection({ register, errors, selectedClassId }: SectionPr
           min={0}
           max={TRAVEL_MINUTES_MAX}
           className={inputCls}
-          placeholder="e.g. 45"
+          placeholder="45"
         />
       </Field>
 
       {/* How the learner joined. Applications convert to NEW_INTAKE (Form 1) or
           TRANSFER_IN (Form 2+) automatically unless the applicant chose; RETURNEE
           is set here by staff. */}
-      <Field label="Admission Type" error={errors.admissionType?.message}>
+      <Field label="Admission type" error={errors.admissionType?.message}>
         <select {...register('admissionType')} className={inputCls} defaultValue="NEW_INTAKE">
           {ADMISSION_TYPES.map((t) => (
             <option key={t} value={t}>{ADMISSION_TYPE_LABELS[t]}</option>
@@ -422,7 +422,7 @@ export function AcademicSection({ register, errors, selectedClassId }: SectionPr
         </select>
       </Field>
 
-      <Field label="Previous School" error={errors.previousSchool?.message}>
+      <Field label="Previous school" error={errors.previousSchool?.message}>
         <input
           {...register('previousSchool')}
           className={inputCls}
@@ -431,7 +431,7 @@ export function AcademicSection({ register, errors, selectedClassId }: SectionPr
       </Field>
 
       <Field
-        label="Reason for Transfer"
+        label="Reason for transfer"
         error={errors.reasonForTransfer?.message}
         className="col-span-full"
       >
@@ -456,7 +456,7 @@ export function ContactSection({ register, errors }: SectionProps) {
 
       {/* Email — login identifier; spans full width */}
       <Field
-        label="Email Address"
+        label="Email address"
         error={errors.email?.message}
         required
         className="col-span-full"
@@ -474,7 +474,7 @@ export function ContactSection({ register, errors }: SectionProps) {
       </Field>
 
       {/* Phone */}
-      <Field label="Phone Number" error={errors.phone?.message}>
+      <Field label="Phone number" error={errors.phone?.message}>
         <input
           {...register('phone')}
           type="tel"
@@ -486,7 +486,7 @@ export function ContactSection({ register, errors }: SectionProps) {
 
       {/* Address — spans full width */}
       <Field
-        label="Postal / Physical Address"
+        label="Postal / physical address"
         error={errors.address?.message}
         className="col-span-full"
       >
@@ -498,10 +498,10 @@ export function ContactSection({ register, errors }: SectionProps) {
         />
       </Field>
 
-      <FieldDivider title="Guardian / Next of Kin" />
+      <FieldDivider title="Guardian / next of kin" />
 
       {/* Guardian name */}
-      <Field label="Guardian Full Name" error={errors.guardianName?.message} required>
+      <Field label="Guardian full name" error={errors.guardianName?.message} required>
         <input
           {...register('guardianName')}
           className={inputCls}
@@ -519,7 +519,7 @@ export function ContactSection({ register, errors }: SectionProps) {
 
       {/* Guardian phone — spans full width */}
       <Field
-        label="Guardian Phone Number"
+        label="Guardian phone number"
         error={errors.guardianPhone?.message}
         required
         className="col-span-full"
@@ -604,7 +604,7 @@ export function WelfareSection({
         Sensitive. Visible only to the headteacher, administrators and HR. Everything here is optional.
       </p>
 
-      <Field label="Orphan Status">
+      <Field label="Orphan status">
         <select
           className={inputCls}
           value={value.orphanStatus}
@@ -629,7 +629,7 @@ export function WelfareSection({
       </div>
 
       {value.isVulnerable && (
-        <Field label="Vulnerability Note" className="col-span-full">
+        <Field label="Vulnerability note" className="col-span-full">
           <textarea
             className={`${inputCls} resize-none`}
             rows={2}
@@ -640,20 +640,20 @@ export function WelfareSection({
         </Field>
       )}
 
-      <Field label="Health / Medical Alert" className="col-span-full">
+      <Field label="Health / medical alert" className="col-span-full">
         <textarea
           className={`${inputCls} resize-none`}
           rows={2}
           maxLength={500}
           value={value.medicalAlert}
           onChange={(e) => set('medicalAlert', e.target.value)}
-          placeholder="e.g. Asthma - inhaler kept at the school office"
+          placeholder="Asthma - inhaler kept at the school office"
         />
       </Field>
 
       <div className="col-span-full">
-        <p className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">
-          Special Needs
+        <p className="block text-xs font-heading font-semibold text-muted mb-2">
+          Special needs
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2.5">
           {SUPPORT_NEED_TYPES.map((t) => (
@@ -679,7 +679,7 @@ export function WelfareSection({
                     maxLength={300}
                     value={n.accommodation}
                     onChange={(e) => patchNeed(n.type, { accommodation: e.target.value })}
-                    placeholder="e.g. Front-row seating, large print"
+                    placeholder="Front-row seating, large print"
                   />
                 </Field>
                 <Field label={`${SUPPORT_NEED_LABELS[n.type]}: assistive device`}>

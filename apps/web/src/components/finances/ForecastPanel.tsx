@@ -128,15 +128,15 @@ function SummaryCard({
   color:    string
 }) {
   return (
-    <div className="bg-surface border border-base rounded-xl p-4">
-      <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">{label}</p>
+    <div className="app-tint rounded-xl p-4">
+      <p className="text-xs font-heading font-semibold text-muted mb-2">{label}</p>
       <div className="space-y-1">
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted">Actual YTD</span>
           <span className="font-bold font-heading tabular text-body">{formatMWK(actual)}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted">Forecast Remaining</span>
+          <span className="text-xs text-muted">Forecast remaining</span>
           <span className="font-semibold font-heading tabular" style={{ color }}>{formatMWK(forecast)}</span>
         </div>
       </div>
@@ -213,7 +213,7 @@ export function ForecastPanel() {
         <div>
           <h2 className="font-heading font-bold text-xl text-brand-navy flex items-center gap-2">
             <TrendingUp className="w-5 h-5" aria-hidden />
-            Finance Forecast
+            Finance forecast
           </h2>
           <p className="text-sm text-muted mt-0.5">
             Actual vs projected fee revenue and cash flow.
@@ -222,14 +222,14 @@ export function ForecastPanel() {
 
         <div className="flex items-end gap-3 flex-wrap">
           <div>
-            <p className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-              Academic Year
+            <p className="block text-xs font-heading font-semibold text-muted mb-1.5">
+              Academic year
             </p>
             <p className="min-h-11 flex items-center text-sm text-body">{academicYear}</p>
           </div>
           <div>
-            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-              Forecast Months
+            <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+              Forecast months
             </label>
             <select value={forwardMonths} onChange={(e) => setForwardMonths(Number(e.target.value))}
               className="min-h-11 border border-base rounded-xl px-3 text-sm bg-page text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25">
@@ -247,7 +247,7 @@ export function ForecastPanel() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-brand-coral">
+        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-tone-coral">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {error}
         </div>
@@ -257,7 +257,7 @@ export function ForecastPanel() {
       {report && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <SummaryCard
-            label="Fee Revenue"
+            label="Fee revenue"
             actual={report.totalActualRev}
             forecast={report.totalForecastRev}
             color="var(--color-brand-teal, #0d9488)"
@@ -268,14 +268,14 @@ export function ForecastPanel() {
             forecast={report.totalForecastExp}
             color="var(--color-brand-coral, #f97316)"
           />
-          <div className="bg-surface border border-base rounded-xl p-4">
-            <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-2">
-              Net Surplus Forecast
+          <div className="app-tint rounded-xl p-4">
+            <p className="text-xs font-heading font-semibold text-muted mb-2">
+              Net surplus forecast
             </p>
             <p className={`text-xl font-bold font-heading tabular ${
               (report.totalActualRev + report.totalForecastRev - report.totalActualExp - report.totalForecastExp) >= 0
                 ? 'text-emerald-600'
-                : 'text-brand-coral'
+                : 'text-tone-coral'
             }`}>
               {formatMWK(
                 report.totalActualRev + report.totalForecastRev
@@ -290,8 +290,8 @@ export function ForecastPanel() {
       {/* Chart */}
       {report && chartData.length > 0 && (
         <div>
-          <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-4">
-            Monthly Cash Flow — Actual (solid) vs Forecast (light)
+          <p className="text-xs font-heading font-semibold text-muted mb-4">
+            Monthly Cash Flow: Actual (solid) vs Forecast (light)
           </p>
           <ResponsiveContainer width="100%" height={320}>
             <ComposedChart data={chartData} margin={{ top: 22, right: 20, bottom: 5, left: 10 }}>

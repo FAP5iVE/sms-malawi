@@ -44,17 +44,17 @@ export function StudentFeeStructure({ studentId }: { studentId: string }) {
   const isLoading = feesLoading || invoicesLoading
 
   return (
-    <div className="border border-base rounded-xl p-4 bg-page/50 space-y-3">
+    <div className="rounded-xl p-4 space-y-3 app-tint">
       <div className="flex items-center gap-2">
-        <Wallet className="w-4 h-4 text-brand-teal" aria-hidden />
-        <h3 className="text-sm font-heading font-semibold text-body">Fee Structure — {CURRENT_YEAR} Term {CURRENT_TERM}</h3>
+        <Wallet className="w-4 h-4 text-tone-teal" aria-hidden />
+        <h3 className="text-sm font-heading font-semibold text-body">Fee structure: {CURRENT_YEAR} Term {CURRENT_TERM}</h3>
       </div>
 
       {isLoading ? (
         <p className="text-xs text-muted">Loading…</p>
       ) : feeStructures.length === 0 ? (
         <p className="text-xs text-muted">
-          No fee types are configured for this student&apos;s class yet — set them up under Finances → Fee Structures.
+          No fee types are configured for this student&apos;s class yet. Set them up under Finances → Fee Structures.
         </p>
       ) : (
         <>
@@ -76,7 +76,7 @@ export function StudentFeeStructure({ studentId }: { studentId: string }) {
                       <CheckCircle2 className="w-3.5 h-3.5" aria-hidden /> Paid
                     </span>
                   ) : (
-                    <span className="text-xs font-semibold text-brand-coral">
+                    <span className="text-xs font-semibold text-tone-coral">
                       {formatMWK(lineItem.balance)} due
                     </span>
                   )}
@@ -86,7 +86,7 @@ export function StudentFeeStructure({ studentId }: { studentId: string }) {
           </ul>
 
           <div className="flex justify-between text-sm font-heading font-semibold text-body pt-1">
-            <span>Total Termly Fees</span>
+            <span>Total termly fees</span>
             <span>{formatMWK(totalFees)}</span>
           </div>
 
@@ -97,8 +97,8 @@ export function StudentFeeStructure({ studentId }: { studentId: string }) {
           )}
 
           {availableCredit > 0 && (
-            <p className="text-xs text-brand-teal bg-brand-teal/10 border border-brand-teal/25 rounded-lg px-3 py-2">
-              MWK {availableCredit.toLocaleString()} credit available from a prior overpayment — applied automatically to their next invoice.
+            <p className="text-xs text-tone-teal bg-brand-teal/10 border border-brand-teal/25 rounded-lg px-3 py-2">
+              MWK {availableCredit.toLocaleString()} credit available from a prior overpayment. Applied automatically to their next invoice.
             </p>
           )}
         </>

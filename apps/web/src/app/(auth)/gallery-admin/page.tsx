@@ -104,9 +104,9 @@ function UploadForm({ onDone }: { onDone: () => void }) {
 
   return (
     <Modal
-      title="Add Photo"
+      title="Add photo"
       onClose={onDone}
-      size="md"
+      size="m"
       onSubmit={handleSubmit}
       busy={loading}
       bodyClassName="space-y-4"
@@ -125,7 +125,7 @@ function UploadForm({ onDone }: { onDone: () => void }) {
             className={MODAL_BTN_PRIMARY}
           >
             {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Add to Gallery
+            Add to gallery
           </button>
         </>
       }
@@ -161,7 +161,7 @@ function UploadForm({ onDone }: { onDone: () => void }) {
           onChange={(e) => setCaption(e.target.value)}
           required
           rows={2}
-          placeholder="e.g. Form 3 students at Sports Day, August 2026"
+          placeholder="Form 3 students at Sports Day, August 2026"
           className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page resize-none focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
         />
       </div>
@@ -173,12 +173,12 @@ function UploadForm({ onDone }: { onDone: () => void }) {
           id="gallery-category"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          placeholder="e.g. Sports Day, Assembly, Graduation"
+          placeholder="Sports Day, Assembly, Graduation"
           className="w-full border border-base rounded-xl px-4 py-2.5 text-sm bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
         />
       </div>
       {error && (
-        <p role="alert" className="text-xs text-brand-coral">{error}</p>
+        <p role="alert" className="text-xs text-tone-coral">{error}</p>
       )}
     </Modal>
   )
@@ -223,20 +223,20 @@ function GalleryContent() {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
-          <Images className="w-5 h-5 text-brand-teal" aria-hidden="true" />
+          <Images className="w-5 h-5 text-tone-teal" aria-hidden="true" />
           <h1 className="font-heading font-bold text-xl text-brand-navy">Gallery</h1>
         </div>
         <button
           onClick={() => setShowUpload(true)}
-          className="flex items-center gap-2 bg-brand-teal text-white px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-brand-teal-light transition-colors min-h-[44px]"
+          className="flex items-center gap-2 bg-btn-brand text-btn-brand-fg px-4 py-2 rounded-xl text-sm font-heading font-semibold hover:bg-brand-teal-light transition-colors min-h-[44px]"
         >
-          <ImagePlus className="w-4 h-4" aria-hidden="true" /> Add Photo
+          <ImagePlus className="w-4 h-4" aria-hidden="true" /> Add photo
         </button>
       </div>
 
       <ModuleSurface contentClassName="">
       {deleteError && (
-        <p role="alert" className="text-xs text-brand-coral mb-4">{deleteError}</p>
+        <p role="alert" className="text-xs text-tone-coral mb-4">{deleteError}</p>
       )}
 
       {isLoading ? (
@@ -246,14 +246,14 @@ function GalleryContent() {
           ))}
         </div>
       ) : error ? (
-        <div className="flex flex-col items-center justify-center py-16 text-brand-coral">
+        <div className="flex flex-col items-center justify-center py-16 text-tone-coral">
           <Images className="w-10 h-10 mb-3 opacity-40" aria-hidden="true" />
           <p className="text-sm">Failed to load gallery photos.</p>
         </div>
       ) : photos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted">
           <Images className="w-10 h-10 mb-3 opacity-30" aria-hidden="true" />
-          <p className="text-sm">No photos yet — add the first one.</p>
+          <p className="text-sm">No photos yet: add the first one.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -273,7 +273,7 @@ function GalleryContent() {
               </button>
               <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
                 {p.category && (
-                  <span className="inline-block text-[10px] font-heading font-bold text-white/90 bg-white/20 rounded-full px-2 py-0.5 mb-1">
+                  <span className="inline-block text-xs font-heading font-bold text-white/90 bg-white/20 rounded-full px-2 py-0.5 mb-1">
                     {p.category}
                   </span>
                 )}
@@ -300,7 +300,7 @@ function GalleryContent() {
                     <button
                       onClick={() => handleDelete(p.id)}
                       disabled={deletingId === p.id}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-brand-coral text-white rounded-lg disabled:opacity-60"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-btn-danger text-btn-danger-fg rounded-lg disabled:opacity-60"
                     >
                       {deletingId === p.id && <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />}
                       Delete

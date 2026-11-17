@@ -144,21 +144,21 @@ function AddAllowanceForm({ staffId, onDone }: { staffId: string; onDone: () => 
 
   return (
     <div className="bg-page rounded-xl p-4 space-y-3">
-      {error && <p className="text-xs text-brand-coral">{error}</p>}
+      {error && <p className="text-xs text-tone-coral">{error}</p>}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1">
+          <label className="block text-xs font-heading font-semibold text-muted mb-1">
             Type
           </label>
           <input
             value={type}
             onChange={(e) => setType(e.target.value)}
-            placeholder="e.g. Housing"
+            placeholder="Housing"
             className="w-full min-h-[40px] px-3 rounded-lg text-sm border border-base bg-surface text-body focus:outline-none focus:ring-2 focus:ring-brand-teal/25"
           />
         </div>
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1">
+          <label className="block text-xs font-heading font-semibold text-muted mb-1">
             Amount (MWK)
           </label>
           <input
@@ -183,8 +183,8 @@ function AddAllowanceForm({ staffId, onDone }: { staffId: string; onDone: () => 
       {!recurring && (
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1">
-              Paid Month
+            <label className="block text-xs font-heading font-semibold text-muted mb-1">
+              Paid month
             </label>
             <select
               value={paidMonth}
@@ -199,8 +199,8 @@ function AddAllowanceForm({ staffId, onDone }: { staffId: string; onDone: () => 
             </select>
           </div>
           <div>
-            <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1">
-              Paid Year
+            <label className="block text-xs font-heading font-semibold text-muted mb-1">
+              Paid year
             </label>
             <input
               value={paidYear}
@@ -212,7 +212,7 @@ function AddAllowanceForm({ staffId, onDone }: { staffId: string; onDone: () => 
         </div>
       )}
       <div>
-        <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1">
+        <label className="block text-xs font-heading font-semibold text-muted mb-1">
           Notes (optional)
         </label>
         <input
@@ -236,7 +236,7 @@ function AddAllowanceForm({ staffId, onDone }: { staffId: string; onDone: () => 
           className="min-h-[40px] px-4 rounded-lg text-sm font-heading font-semibold text-white bg-brand-deep hover:brightness-110 disabled:opacity-50 flex items-center gap-2"
         >
           {addAllowance.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-          Add Allowance
+          Add allowance
         </button>
       </div>
     </div>
@@ -299,8 +299,8 @@ function SalaryEditor({ staff }: { staff: ApiStaffProfile }) {
 
       {/* Base salary */}
       <div>
-        <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
-          Base Salary (Monthly, MWK)
+        <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
+          Base salary (monthly, MWK)
         </label>
         <div className="flex items-center gap-3 flex-wrap">
           <input
@@ -329,9 +329,9 @@ function SalaryEditor({ staff }: { staff: ApiStaffProfile }) {
       {/* Loan deduction — read-only, driven by the staff member's real active loan */}
       <div className="bg-page rounded-xl p-4 flex items-center justify-between">
         <div>
-          <p className="text-sm font-heading font-semibold text-body">Monthly Loan Deduction</p>
+          <p className="text-sm font-heading font-semibold text-body">Monthly loan deduction</p>
           <p className="text-xs text-muted mt-0.5">
-            Set automatically when a staff loan is disbursed — not directly editable here.
+            Set automatically when a staff loan is disbursed. Not directly editable here.
           </p>
         </div>
         <p className="font-heading font-bold text-body tabular">
@@ -349,7 +349,7 @@ function SalaryEditor({ staff }: { staff: ApiStaffProfile }) {
               onClick={() => setShowAddForm(true)}
               className="inline-flex items-center gap-1.5 text-xs font-heading font-semibold text-brand-navy hover:underline"
             >
-              <Plus className="w-3.5 h-3.5" aria-hidden /> Add Allowance
+              <Plus className="w-3.5 h-3.5" aria-hidden /> Add allowance
             </button>
           )}
         </div>
@@ -387,7 +387,7 @@ function SalaryEditor({ staff }: { staff: ApiStaffProfile }) {
                   onClick={() => deleteAllowance.mutate({ allowanceId: a.id, staffId: staff.id })}
                   disabled={deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id}
                   aria-busy={deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id}
-                  className="p-1.5 rounded-lg text-muted hover:bg-brand-coral/10 hover:text-brand-coral transition-colors disabled:opacity-50"
+                  className="p-1.5 rounded-lg text-muted hover:bg-brand-coral/10 hover:text-tone-coral transition-colors disabled:opacity-50"
                 >
                   {deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id
                     ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
@@ -401,7 +401,7 @@ function SalaryEditor({ staff }: { staff: ApiStaffProfile }) {
 
       {/* Computed summary — mirrors exactly what payrollService.ts sums for a real payslip's gross */}
       <div className="border-t border-base pt-4 flex items-center justify-between">
-        <span className="text-sm font-heading font-semibold text-body">Total Gross Monthly</span>
+        <span className="text-sm font-heading font-semibold text-body">Total gross monthly</span>
         <span className="text-lg font-heading font-bold tabular text-body">
           {formatMWK(monthlyGross)}
         </span>

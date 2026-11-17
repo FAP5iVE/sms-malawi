@@ -102,17 +102,17 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <GraduationCap className="w-5 h-5 text-brand-teal" />
+          <GraduationCap className="w-5 h-5 text-tone-teal" />
           <h3 className="font-heading font-semibold text-sm text-brand-navy">
-            Scholarship & Bursary Registry
+            Scholarship and bursary registry
           </h3>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-1.5 bg-brand-teal text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-brand-teal-light transition-colors"
+          className="flex items-center gap-1.5 bg-btn-brand text-btn-brand-fg px-3 py-2 rounded-lg text-sm font-semibold hover:bg-brand-teal-light transition-colors"
           type="button"
         >
-          <PlusCircle className="w-4 h-4" /> Add Scholarship
+          <PlusCircle className="w-4 h-4" /> Add scholarship
         </button>
       </div>
 
@@ -121,22 +121,22 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
         <table className="w-full text-sm min-w-140">
           <thead>
             <tr className="border-b border-base bg-page">
-              <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+              <th className="text-left px-4 py-3 font-heading text-xs text-muted font-semibold">
                 Name
               </th>
-              <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+              <th className="text-left px-4 py-3 font-heading text-xs text-muted font-semibold">
                 Student
               </th>
-              <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+              <th className="text-left px-4 py-3 font-heading text-xs text-muted font-semibold">
                 Sponsor
               </th>
-              <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+              <th className="text-left px-4 py-3 font-heading text-xs text-muted font-semibold">
                 Type
               </th>
-              <th className="text-right px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+              <th className="text-right px-4 py-3 font-heading text-xs text-muted font-semibold">
                 Value
               </th>
-              <th className="text-left px-4 py-3 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
+              <th className="text-left px-4 py-3 font-heading text-xs text-muted font-semibold">
                 Status
               </th>
             </tr>
@@ -164,18 +164,18 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
                   <td className="px-4 py-3 font-medium">{s.name}</td>
                   <td className="px-4 py-3 text-sm">{scholarshipStudentName(s)}</td>
                   <td className="px-4 py-3 text-xs">
-                    {s.sponsorType ? SPONSOR_TYPE_LABELS[s.sponsorType] : <span className="text-muted">—</span>}
+                    {s.sponsorType ? SPONSOR_TYPE_LABELS[s.sponsorType] : <span className="text-muted">-</span>}
                     {s.sponsorName && <span className="block text-muted">{s.sponsorName}</span>}
                   </td>
                   <td className="px-4 py-3 text-muted text-xs">
                     {s.discountType.replace('_', ' ')}
                   </td>
-                  <td className="px-4 py-3 text-right tabular font-semibold text-brand-teal">
+                  <td className="px-4 py-3 text-right tabular font-semibold text-tone-teal">
                     {s.discountType === 'PERCENTAGE' ? `${s.value}%` : formatMWK(s.value)}
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex text-xs font-semibold ${s.isActive ? 'text-brand-teal' : 'text-muted'}`}
+                      className={`inline-flex text-xs font-semibold ${s.isActive ? 'text-tone-teal' : 'text-muted'}`}
                     >
                       {s.isActive ? 'Active' : 'Inactive'}
                     </span>
@@ -190,9 +190,9 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
       {/* Add scholarship modal */}
       {showForm && (
         <Modal
-          title="Add Scholarship"
+          title="Add scholarship"
           onClose={closeAndReset}
-          size="md"
+          size="m"
           onSubmit={handleSubmit((d) => create(d))}
           busy={isPending}
           bodyClassName="space-y-3"
@@ -211,21 +211,21 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
                 className={MODAL_BTN_PRIMARY}
               >
                 {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                Save Scholarship
+                Save scholarship
               </button>
             </>
           }
         >
           <div>
-            <label className="block text-sm font-medium mb-1">Scholarship Name</label>
+            <label className="block text-sm font-medium mb-1">Scholarship name</label>
             <input
               {...register('name')}
               type="text"
-              placeholder="e.g. Government Bursary"
+              placeholder="Government Bursary"
               className="input w-full"
             />
             {errors.name && (
-              <p className="text-xs text-brand-coral mt-1">{errors.name.message}</p>
+              <p className="text-xs text-tone-coral mt-1">{errors.name.message}</p>
             )}
           </div>
 
@@ -242,7 +242,7 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
                     setSelectedStudentLabel('')
                   }}
                   aria-label="Clear selected student"
-                  className="text-muted hover:text-brand-coral"
+                  className="text-muted hover:text-tone-coral"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -288,31 +288,31 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
               </div>
             )}
             {errors.studentId && !studentId && (
-              <p className="text-xs text-brand-coral mt-1">{errors.studentId.message}</p>
+              <p className="text-xs text-tone-coral mt-1">{errors.studentId.message}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Academic Year</label>
+            <label className="block text-sm font-medium mb-1">Academic year</label>
             <AcademicYearSelect
               value={watch('academicYear')}
               {...register('academicYear')}
               className="input w-full"
             />
             {errors.academicYear && (
-              <p className="text-xs text-brand-coral mt-1">{errors.academicYear.message}</p>
+              <p className="text-xs text-tone-coral mt-1">{errors.academicYear.message}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Discount Type</label>
+            <label className="block text-sm font-medium mb-1">Discount type</label>
             <select
               {...register('discountType')}
               className="input w-full"
               aria-label="Discount type"
             >
               <option value="PERCENTAGE">Percentage (%)</option>
-              <option value="FIXED_AMOUNT">Fixed Amount (MWK)</option>
+              <option value="FIXED_AMOUNT">Fixed amount (MWK)</option>
             </select>
           </div>
 
@@ -347,7 +347,7 @@ export function ScholarshipTab({ academicYear }: { academicYear: string }) {
             <input
               {...register('sponsorName')}
               className="input w-full"
-              placeholder="e.g. CDSS Bursary, Catholic Diocese of Mzuzu"
+              placeholder="CDSS Bursary, Catholic Diocese of Mzuzu"
             />
           </div>
         </Modal>

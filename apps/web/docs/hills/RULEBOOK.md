@@ -12,7 +12,7 @@ need one, it is listed in section 12 and waits for the owner.
 
 ## 1. One look (already decided by the pilot)
 - R1.1 One surface per page: border 1px, radius 14px, padding 20px (24px from 1024px), edge to edge under 768px. [ours, 8a]
-- R1.2 Inside a surface nothing else has a border: tint tiles (`.app-tint`), dividers, plain text. Bordered cards only where the whole card is tappable. [ours, 8a]
+- R1.2 Inside a surface nothing else has a border: tint tiles (`.app-tint`), dividers, plain text. Tappable cards and list rows are tint tiles too (hover `hover:bg-brand-teal/10`); a selected one gets `ring-2 ring-brand-teal`, not a border. Only controls (inputs, selects, chips, buttons) keep borders. [ours, 8a; owner decision 17 Nov 2026]
 - R1.3 Page title and tabs sit on the sky above the surface; idle tab text uses `.app-sky-idle`. [ours, 8a, measured]
 - R1.4 Gutters 16 / 24 / 32px. [ours, 8a]
 
@@ -22,7 +22,8 @@ need one, it is listed in section 12 and waits for the owner.
 - R2.3 Five meanings only: success, warning, danger, info, neutral. One component (`StatusText`) renders them, so the dot, the weight and the spacing are the same everywhere. [ours]
 - R2.4 Colour is never the only signal: the word is always present, and danger/warning also carry an icon or the word itself. [read: WCAG 1.4.1 via Analysis Function and Eleken]
 - R2.5 Text length at most 25 characters. Red and red-orange are for failure or error only. [read: Red Hat]
-- R2.6 Scope of the sweep: about 14 `rounded-full ... px-2/px-3` sites and about 25 to 32 pill-like spans found by the audit, including the five in `GuardianLinkCard.tsx`. Every one is converted as its page is reached; a final grep in Phase 9 proves none are left.
+- R2.6 Scope of the sweep: about 14 `rounded-full ... px-2/px-3` sites and about 25 to 32 pill-like spans found by the audit, including the five in `GuardianLinkCard.tsx`. Every one is converted as its page is reached; a final grep in Phase 9 proves none are left.
+- R2.7 A selectable filter chip is a CONTROL: it keeps a border but uses the button radius (`rounded-xl`), never a full pill, so it cannot be mistaken for a status pill. Selected = filled brand pair (`bg-btn-brand text-btn-brand-fg`), not selected = outline. 44px tall. One source: `src/lib/hills/chip.ts` (`CHIP`, `CHIP_ON`, `CHIP_OFF`, `chipClass`). Decided 16 Nov 2026 (owner asked for a debate on the 8b-1 open question). Other chip sites (HR, library, monitoring alerts, calendar category bar) switch to it as their pages are reached. [ours]
 
 ## 3. Colour of text (fix of the old failures)
 - R3.1 Text is 4.5:1 on its real background (3:1 only for 18px+ or bold 14px+). [read: WCAG, GSS palette page]
@@ -134,7 +135,7 @@ All seven items from the first draft are decided. This is the record; do not ask
 9. **Fix the three public home page buttons that used white on teal ("Login Portal", "Menu", "All about us"): YES,** as long as logic and workflow stay exactly as before. Done as a class-only swap to the brand button pair (5.52:1 light, 10.06:1 dark). No href, handler or text changed.
 10. **Unsaved-changes warning on form dialogs (R8.4): YES.** Logic exception, recorded in `logic-allowlist.json`. Rule in `src/lib/hills/unsaved.ts`. Only Hills form dialogs (size s/m/l with onSubmit) that have been typed in ask "Keep editing" or "Discard changes" before an outside click, the X or Escape closes them. Untouched dialogs, old sizes, the footer's own Cancel/Save and all caller callbacks are unchanged.
 
-### Open after 8d (need an answer before the work)
-11. **Crest and school name in the desktop header (R5.4).** Today they sit in the sidebar's top row. Moving them to the header changes what the sidebar's collapse control looks like. Do it, or keep them in the sidebar?
-12. **Avatar on the phone header (R5.4).** It would open the existing "More" sheet (where the avatar and sign-out already live). That needs the header and the bar to share the sheet's open state. Do it, or keep the avatar inside "More"?
-13. **Period switcher on phones.** It takes space the page title needs. Keep it, or move it into "More"?
+### Decided after 8d (owner delegated the call, 16 Nov 2026)
+11. **Crest and school name stay in the sidebar's top row.** On desktop the sidebar's top row and the header are one 64px band, so the sidebar's top-left IS the left end of the header (crest, school name, one link to home, collapse control). Moving them into the header would float the brand mid-screen, leave a hole at the top-left and drop the crest in the icon rail. R5.4 is read this way: on desktop and tablet the band is sidebar row + header; on phones the header itself carries the crest.
+12. **Phone header avatar: DONE.** It opens the same More sheet as the bar's last slot, through one shared open flag (`lib/hills/moreSheet.ts`, tested). Logic change declared in the allowlist. The phone header is now crest, page title, search, bell, avatar.
+13. **Period switcher leaves the phone header and becomes a "Viewing period" row at the top of the More sheet.** The strip under the header (`PeriodBanner`) still shows on every page whenever the viewing period is not the live one, with its "Return to ..." link, so nobody saves into the wrong term unseen. The page title no longer truncates.

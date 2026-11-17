@@ -22,6 +22,7 @@ import { formatMWK } from '@shared/constants/malawi'
 import { format } from 'date-fns'
 import { Building2, Users, ArrowUpRight, Check, Loader2, AlertCircle } from 'lucide-react'
 import type { ApiExpense, ApiStaffLoan } from '@shared/types/api'
+import { statusTone, statusWord } from '@/lib/hills/statusWord'
 
 export function DebtsLoansTab() {
   const { data, isLoading, isError } = useDebts()
@@ -44,7 +45,7 @@ export function DebtsLoansTab() {
 
   if (isError) {
     return (
-      <div className="flex items-center gap-2 text-sm text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
+      <div className="flex items-center gap-2 text-sm text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
         <AlertCircle className="w-4 h-4 shrink-0" aria-hidden />
         Failed to load debts overview. Please refresh.
       </div>
@@ -55,14 +56,14 @@ export function DebtsLoansTab() {
     <div className="space-y-8">
       {/* Summary strip */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-surface border border-base rounded-xl p-5 min-w-0">
-          <p className="text-xs text-muted uppercase tracking-wider">Owed to Vendors &amp; Companies</p>
-          <p className="text-xl sm:text-2xl font-bold text-brand-coral mt-1 break-words">{formatMWK(totalVendor)}</p>
+        <div className="app-tint rounded-xl p-5 min-w-0">
+          <p className="text-xs text-muted ">Owed to vendors and companies</p>
+          <p className="text-xl sm:text-2xl font-bold text-tone-coral mt-1 break-words">{formatMWK(totalVendor)}</p>
           <p className="text-xs text-muted mt-1">{vendorDebts.length} unpaid expense{vendorDebts.length === 1 ? '' : 's'}</p>
         </div>
-        <div className="bg-surface border border-base rounded-xl p-5 min-w-0">
-          <p className="text-xs text-muted uppercase tracking-wider">Outstanding Staff Loan Balance</p>
-          <p className="text-xl sm:text-2xl font-bold text-brand-amber mt-1 break-words">{formatMWK(totalStaff)}</p>
+        <div className="app-tint rounded-xl p-5 min-w-0">
+          <p className="text-xs text-muted ">Outstanding staff loan balance</p>
+          <p className="text-xl sm:text-2xl font-bold text-tone-amber mt-1 break-words">{formatMWK(totalStaff)}</p>
           <p className="text-xs text-muted mt-1">{staffLoans.length} active loan{staffLoans.length === 1 ? '' : 's'}</p>
         </div>
       </div>
@@ -70,12 +71,12 @@ export function DebtsLoansTab() {
       {/* Vendor & Company Debts */}
       <div>
         <h2 className="font-heading font-semibold text-body mb-3 flex items-center gap-2">
-          <Building2 className="w-4 h-4 text-brand-teal" aria-hidden />
-          Vendor &amp; Company Debts
+          <Building2 className="w-4 h-4 text-tone-teal" aria-hidden />
+          Vendor and company debts
         </h2>
         {vendorDebts.length === 0 ? (
           <div className="text-center py-10 text-muted text-sm">
-            No outstanding vendor debts — every approved expense is fully paid.
+            No outstanding vendor debts: every approved expense is fully paid.
           </div>
         ) : (
           <div className="divide-y divide-base">
@@ -89,19 +90,19 @@ export function DebtsLoansTab() {
                   <p className="text-xs text-muted mt-0.5">
                     {e.category} · Approved {e.incurredAt ? format(new Date(e.incurredAt), 'dd MMM yyyy') : '—'}
                   </p>
-                  <p className="text-sm font-semibold text-brand-coral mt-1">{formatMWK(e.amount)}</p>
+                  <p className="text-sm font-semibold text-tone-coral mt-1">{formatMWK(e.amount)}</p>
                 </div>
                 {canMarkPaid && (
                   <button
                     type="button"
                     onClick={() => markPaid.mutate(e.id)}
                     disabled={markPaid.isPending}
-                    className="shrink-0 inline-flex items-center gap-2 bg-brand-teal text-white rounded-lg px-4 py-2 text-xs font-semibold hover:bg-brand-teal-light disabled:opacity-60 min-h-11"
+                    className="shrink-0 inline-flex items-center gap-2 bg-btn-brand text-btn-brand-fg rounded-lg px-4 py-2 text-xs font-semibold hover:bg-brand-teal-light disabled:opacity-60 min-h-11"
                   >
                     {markPaid.isPending
                       ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
                       : <Check className="w-3.5 h-3.5" aria-hidden />}
-                    Mark as Paid
+                    Mark as paid
                   </button>
                 )}
               </div>
@@ -109,7 +110,7 @@ export function DebtsLoansTab() {
           </div>
         )}
         {markPaid.isError && (
-          <p role="alert" className="text-xs text-brand-coral mt-2">
+          <p role="alert" className="text-xs text-tone-coral mt-2">
             {markPaid.error instanceof Error ? markPaid.error.message : 'Failed to mark expense as paid.'}
           </p>
         )}
@@ -119,12 +120,12 @@ export function DebtsLoansTab() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-heading font-semibold text-body flex items-center gap-2">
-            <Users className="w-4 h-4 text-brand-teal" aria-hidden />
-            Staff Loans
+            <Users className="w-4 h-4 text-tone-teal" aria-hidden />
+            Staff loans
           </h2>
           <Link
             href="/hr?tab=loans"
-            className="text-xs font-semibold text-brand-teal hover:underline inline-flex items-center gap-1"
+            className="text-xs font-semibold text-tone-teal hover:underline inline-flex items-center gap-1"
           >
             Manage in HR <ArrowUpRight className="w-3 h-3" aria-hidden />
           </Link>
@@ -146,10 +147,10 @@ export function DebtsLoansTab() {
                     {l.staff && <span className="text-xs text-muted ml-2">({l.staff.employeeNo})</span>}
                   </p>
                   <p className="text-xs text-muted mt-0.5">
-                    {formatMWK(l.monthlyDeduction)}/mo deduction · {l.status}
+                    {formatMWK(l.monthlyDeduction)}/mo deduction · {statusWord(l.status)}
                   </p>
                 </div>
-                <p className="text-sm font-semibold text-brand-amber shrink-0">
+                <p className="text-sm font-semibold text-tone-amber shrink-0">
                   {formatMWK(l.balance)} remaining
                 </p>
               </div>

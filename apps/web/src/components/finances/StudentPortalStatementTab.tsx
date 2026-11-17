@@ -80,11 +80,11 @@ export function StudentPortalStatementTab({
 
   return (
     <div className="space-y-5">
-      <PrintLetterhead title="Student Financial Statement" />
+      <PrintLetterhead title="Student financial statement" />
       <div className="flex items-center justify-between gap-3 flex-wrap print:hidden">
         <div>
           <h2 className="font-heading font-semibold text-body">
-            Student Fee Structure &amp; Financial Statement Portal
+            Student fee structure and financial statement portal
           </h2>
           <p className="text-xs text-muted mt-0.5">
             Your approved term fee schedule, verified payment receipts, and real-time account
@@ -96,7 +96,7 @@ export function StudentPortalStatementTab({
           onClick={() => window.print()}
           className="inline-flex items-center gap-1.5 border border-base rounded-lg px-3.5 py-2 text-sm font-medium text-body hover:bg-page min-h-11"
         >
-          <Printer className="w-4 h-4" /> Print Statement
+          <Printer className="w-4 h-4" /> Print statement
         </button>
       </div>
 
@@ -112,7 +112,7 @@ export function StudentPortalStatementTab({
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <span className="inline-flex items-center text-xs font-semibold text-brand-navy mb-1.5">
-                Verified Student Profile
+                Verified student profile
               </span>
               <h3 className="font-heading font-bold text-lg text-body">
                 {me.firstName} {me.lastName}
@@ -130,15 +130,15 @@ export function StudentPortalStatementTab({
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-muted mb-0.5">Current Account State</p>
+              <p className="text-xs text-muted mb-0.5">Current account state</p>
               <p
-                className={`font-heading font-bold text-xl tabular ${currentBalance > 0 ? 'text-brand-coral' : 'text-emerald-600 dark:text-emerald-400'}`}
+                className={`font-heading font-bold text-xl tabular ${currentBalance > 0 ? 'text-tone-coral' : 'text-emerald-600 dark:text-emerald-400'}`}
               >
                 {formatMWK(currentBalance)}
               </p>
               {currentBalance <= 0 && (
-                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 justify-end">
-                  <CheckCircle2 className="w-3 h-3" /> Fees Fully Settled
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 justify-end">
+                  <CheckCircle2 className="w-3 h-3" /> Fees fully settled
                 </p>
               )}
             </div>
@@ -150,9 +150,9 @@ export function StudentPortalStatementTab({
       <div className="overflow-hidden">
         <div className="px-4 py-3 border-b border-base flex items-center justify-between">
           <h3 className="font-heading text-sm font-semibold text-body">
-            Approved Standard Term Fee Schedule
+            Approved standard term fee schedule
           </h3>
-          <span className="text-xs text-muted">Academic Year {academicYear}</span>
+          <span className="text-xs text-muted">Academic year {academicYear}</span>
         </div>
         {scheduleLoading ? (
           <div className="p-4">
@@ -167,17 +167,17 @@ export function StudentPortalStatementTab({
             <table className="w-full text-sm min-w-130">
               <thead>
                 <tr className="border-b border-base bg-page">
-                  <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                    Fee Line Particulars
+                  <th className="text-left px-4 py-2.5 font-heading text-xs text-muted font-semibold">
+                    Fee line particulars
                   </th>
-                  <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold hidden sm:table-cell">
+                  <th className="text-left px-4 py-2.5 font-heading text-xs text-muted font-semibold hidden sm:table-cell">
                     Classification
                   </th>
-                  <th className="text-left px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold hidden md:table-cell">
-                    Billing Frequency
+                  <th className="text-left px-4 py-2.5 font-heading text-xs text-muted font-semibold hidden md:table-cell">
+                    Billing frequency
                   </th>
-                  <th className="text-right px-4 py-2.5 font-heading text-xs uppercase tracking-wide text-muted font-semibold">
-                    Standard Rate
+                  <th className="text-right px-4 py-2.5 font-heading text-xs text-muted font-semibold">
+                    Standard rate
                   </th>
                 </tr>
               </thead>
@@ -218,7 +218,7 @@ export function StudentPortalStatementTab({
       <div className="overflow-hidden">
         <div className="px-4 py-3 border-b border-base">
           <h3 className="font-heading text-sm font-semibold text-body">
-            Student Invoices &amp; Receipts ({payments.length} document
+            Student invoices and receipts ({payments.length} document
             {payments.length === 1 ? '' : 's'})
           </h3>
         </div>
@@ -255,14 +255,14 @@ export function StudentPortalStatementTab({
                   type="button"
                   disabled={fetchReceipt.isPending}
                   onClick={() => fetchReceipt.mutate(p.id)}
-                  className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-teal hover:underline disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-tone-teal hover:underline disabled:opacity-50"
                 >
                   {fetchReceipt.isPending ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <ReceiptIcon className="w-4 h-4" />
                   )}
-                  View / Download <ExternalLink className="w-3.5 h-3.5" />
+                  View / download <ExternalLink className="w-3.5 h-3.5" />
                 </button>
               </li>
             ))}

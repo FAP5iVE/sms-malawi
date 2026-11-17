@@ -289,13 +289,13 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
       >
           {/* Result of the last action - persists after the toast fades. */}
           {actionError && (
-            <p role="alert" className="mx-5 mt-4 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
+            <p role="alert" className="mx-5 mt-4 flex items-start gap-2 text-xs text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
               {actionError}
             </p>
           )}
           {!actionError && draftSavedAt && !busy && !readOnly && !correctionMode && (
-            <p role="status" className="mx-5 mt-4 flex items-center gap-2 text-xs text-brand-teal">
+            <p role="status" className="mx-5 mt-4 flex items-center gap-2 text-xs text-tone-teal">
               <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden />
               Draft saved at {draftSavedAt.toLocaleTimeString('en-MW', { hour: '2-digit', minute: '2-digit' })}. You can close this and come back to finish later.
             </p>
@@ -309,9 +309,9 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
             <table className="w-full text-sm border-collapse min-w-75">
               <thead>
                 <tr className="border-b border-base bg-page">
-                  <th className="px-5 py-3 text-left font-heading text-xs uppercase tracking-wide text-muted">Student</th>
-                  <th className="px-5 py-3 text-left font-heading text-xs uppercase tracking-wide text-muted w-36">Mark (/{maxMark})</th>
-                  <th className="px-5 py-3 text-center font-heading text-xs uppercase tracking-wide text-muted w-24">Absent</th>
+                  <th className="px-5 py-3 text-left font-heading text-xs text-muted">Student</th>
+                  <th className="px-5 py-3 text-left font-heading text-xs text-muted w-36">Mark (/{maxMark})</th>
+                  <th className="px-5 py-3 text-center font-heading text-xs text-muted w-24">Absent</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-base">
@@ -333,7 +333,7 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
                         } disabled:opacity-40`}
                       />
                       {errors[student.id] && (
-                        <p className="text-xs text-brand-coral mt-1 flex items-center gap-1">
+                        <p className="text-xs text-tone-coral mt-1 flex items-center gap-1">
                           <AlertTriangle className="w-3 h-3" /> {errors[student.id]}
                         </p>
                       )}

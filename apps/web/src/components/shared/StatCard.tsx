@@ -149,9 +149,9 @@ export function StatCard({
   href,
 }: StatCardProps) {
   const motionEnabled = useMotionEnabled()
-  // On a ModuleSurface a plain stat is a tint tile, not a second bordered card.
-  // A clickable one (href) keeps its border, so it still reads as a button.
-  const flat = useFlatSurface() && !href
+  // On a ModuleSurface a stat is a tint tile, not a second bordered card. A clickable
+  // one is a tint tile too and shows it can be pressed with a hover tint (RULEBOOK R1.2).
+  const flat = useFlatSurface()
 
   const TrendIcon =
     trend === 'up'
@@ -217,7 +217,7 @@ export function StatCard({
       className={cn(
         flat ? 'app-tint rounded-xl p-3 sm:p-4' : 'bg-surface border border-base rounded-xl p-3 sm:p-5',
         'flex flex-col gap-2 sm:gap-3',
-        href ? 'cursor-pointer hover:border-brand-teal/40 transition-colors' : 'cursor-default',
+        href ? `cursor-pointer transition-colors ${flat ? 'hover:bg-brand-teal/10' : 'hover:border-brand-teal/40'}` : 'cursor-default',
         className
       )}
       {...hoverProps}
@@ -247,7 +247,7 @@ export function StatCard({
 
       {/* ── Value + Labels ────────────────────────────────────────────────── */}
       <div className="min-w-0">
-        <p className="text-xl sm:text-2xl font-bold font-heading text-brand-navy tabular break-words">
+        <p className="text-xl font-bold font-heading text-brand-navy tabular break-words">
           {value}
         </p>
         {subLabel && <p className="text-xs text-muted mt-0.5">{subLabel}</p>}

@@ -187,7 +187,7 @@
   "items": []
  },
  "src/app/(auth)/assets/page.tsx": {
-  "digest": "d7f98c5c56e756327cb59770d3744cd20b4064ea",
+  "digest": "1eb0b95889186ad00cd2e037371e560738e5c27e",
   "tokens": 635,
   "items": [
    {
@@ -808,8 +808,8 @@
   ]
  },
  "src/app/(auth)/exams/page.tsx": {
-  "digest": "556df232fdc5a67842cca743eeba16d1f7a25fcb",
-  "tokens": 268,
+  "digest": "6042bd398dc09e5ad297d052b0e188ab5ba2e84d",
+  "tokens": 271,
   "items": [
    {
     "k": "effect",
@@ -934,7 +934,7 @@
   ]
  },
  "src/app/(auth)/finances/page.tsx": {
-  "digest": "99306ecd44b73032873e7a1138d2d311a53b8342",
+  "digest": "9cde9312664b6833e9ff24b96886f1286a61818c",
   "tokens": 124,
   "items": [
    {
@@ -960,7 +960,7 @@
   ]
  },
  "src/app/(auth)/gallery-admin/page.tsx": {
-  "digest": "6aee2208348a0d4c11606294610f56e3d52d6c6c",
+  "digest": "2a63b59b9bd21a31d4995c93ab493a546d110ca0",
   "tokens": 142,
   "items": [
    {
@@ -2237,8 +2237,8 @@
   ]
  },
  "src/app/(auth)/students/page.tsx": {
-  "digest": "d182c23db217e4fcf2c15c967c2fa7cc2fcca157",
-  "tokens": 194,
+  "digest": "b22c605c620468b54d8f0dd716fbeaa68a017d31",
+  "tokens": 196,
   "items": [
    {
     "k": "handler",
@@ -2334,8 +2334,8 @@
   ]
  },
  "src/app/(auth)/user-management/page.tsx": {
-  "digest": "30c931be5dd790fe4d0e26216082a867292a49b7",
-  "tokens": 262,
+  "digest": "cb53ee3d349e0b0b9a5200266b3cda8849ee5efe",
+  "tokens": 264,
   "items": [
    {
     "k": "handler",
@@ -3688,7 +3688,7 @@
   ]
  },
  "src/components/assets/LocationsTab.tsx": {
-  "digest": "c43aa120e7c48521a870e1cdad306bd732b66d38",
+  "digest": "7e8007c1a3879db431ef90169dd66e6a6b1b06e7",
   "tokens": 243,
   "items": [
    {
@@ -5005,7 +5005,7 @@
   ]
  },
  "src/components/exams/AnalyticsPanel.tsx": {
-  "digest": "ba9bdd8f31f0f439e47010703dabaaa2c16fc4d4",
+  "digest": "e2a639542fd34f4807384d68efe1cf7363546e1f",
   "tokens": 245,
   "items": [
    {
@@ -5021,7 +5021,7 @@
   ]
  },
  "src/components/exams/ExamForm.tsx": {
-  "digest": "9753f0fef709b0aaf556c249b02298feb72dae00",
+  "digest": "47481408215a8f01be100587067dd9caf1da3813",
   "tokens": 163,
   "items": [
    {
@@ -5047,8 +5047,8 @@
   ]
  },
  "src/components/exams/ManebPanel.tsx": {
-  "digest": "b8b65a2d613d09429acf1cb67ef3173375aa9e67",
-  "tokens": 191,
+  "digest": "efa839e1e675221ff3412a0116588d477fda9da9",
+  "tokens": 194,
   "items": [
    {
     "k": "handler",
@@ -5189,7 +5189,7 @@
   ]
  },
  "src/components/exams/PromotionEngine.tsx": {
-  "digest": "7d24e42979040b76294fc06dcc2f58cb3de35ec3",
+  "digest": "f2b53480a4bf31ea498c4a56d3e51d371197901a",
   "tokens": 173,
   "items": [
    {
@@ -5286,8 +5286,8 @@
   ]
  },
  "src/components/exams/ResultsReleaseWorkflow.tsx": {
-  "digest": "88f767f550faf774d6239e19b9d1ee84fa5d8c71",
-  "tokens": 183,
+  "digest": "da681342124afef8e6e627f5e7751be7928f292e",
+  "tokens": 184,
   "items": [
    {
     "k": "call",
@@ -5347,7 +5347,7 @@
   ]
  },
  "src/components/exams/StudentResultsView.tsx": {
-  "digest": "b2efea896d1ac4e5191e1c153426b3d6ad278cf7",
+  "digest": "49c21702149b197912299c43a96d8f3b4327cda7",
   "tokens": 85,
   "items": [
    {
@@ -5373,7 +5373,7 @@
   ]
  },
  "src/components/finances/AccountingLedgerTab.tsx": {
-  "digest": "c45ddaf53129ee2f0c9ddc30a266441ed33ea01e",
+  "digest": "273349a84caca88451c7a6be019a13513b556726",
   "tokens": 131,
   "items": [
    {
@@ -5424,7 +5424,7 @@
   ]
  },
  "src/components/finances/BudgetTab.tsx": {
-  "digest": "725d441cb3bf1eb99e1e21ae424fd3710d1d9ae1",
+  "digest": "d1c6782aca7caad17f4955cbe1e22210ce17fc75",
   "tokens": 134,
   "items": [
    {
@@ -5470,8 +5470,8 @@
   ]
  },
  "src/components/finances/BudgetWindowsPanel.tsx": {
-  "digest": "04d9fff9e6ffde9c0e42bbea02cbff0d340fd7f5",
-  "tokens": 109,
+  "digest": "90f78d7fc8fb6c8cedfb7fc6ff257fe3e7054d2b",
+  "tokens": 110,
   "items": [
    {
     "k": "handler",
@@ -5541,8 +5541,8 @@
   ]
  },
  "src/components/finances/BulkInvoiceGenerator.tsx": {
-  "digest": "d847fe88aa3f63c2aba4062e67e96536663703c1",
-  "tokens": 224,
+  "digest": "c0d0ab2f62c63228312c93253f8f5ccf90193c9e",
+  "tokens": 225,
   "items": [
    {
     "k": "handler",
@@ -5632,8 +5632,8 @@
   ]
  },
  "src/components/finances/DebtsLoansTab.tsx": {
-  "digest": "2315e94a9185948e5e3e1e8c82ba0c279607b418",
-  "tokens": 54,
+  "digest": "744ac9d30062c3accc504bbc8a950b998ac5cfa6",
+  "tokens": 55,
   "items": [
    {
     "k": "handler",
@@ -5643,8 +5643,8 @@
   ]
  },
  "src/components/finances/ExpensesTab.tsx": {
-  "digest": "ad183e6998a736a259ea8f6480ea33e8f67045ae",
-  "tokens": 150,
+  "digest": "1b49587fda7c90a3c94997958a09cd3e6889788b",
+  "tokens": 151,
   "items": [
    {
     "k": "handler",
@@ -5724,13 +5724,13 @@
   ]
  },
  "src/components/finances/FeeCollectionRadial.tsx": {
-  "digest": "6936e5f857884488bdb3d0ed2fccaaed9f40a352",
+  "digest": "36fbaa4d1d95680d38eaee7ff3013c60a52400e9",
   "tokens": 17,
   "items": []
  },
  "src/components/finances/FeeStructureTab.tsx": {
-  "digest": "45a61235dc6cb7ffec5dbd726e792924f2b8075f",
-  "tokens": 196,
+  "digest": "b5f4440d44d470cd8653bc7f78c7614138a69922",
+  "tokens": 197,
   "items": [
    {
     "k": "call",
@@ -5835,7 +5835,7 @@
   ]
  },
  "src/components/finances/FinanceFeeStructureTab.tsx": {
-  "digest": "80e05c5f38705f5acf3fda57a608dfe9964150ce",
+  "digest": "d0800281fec8b46e54eef3dc26dd7902bb132eef",
   "tokens": 150,
   "items": [
    {
@@ -5886,7 +5886,7 @@
   ]
  },
  "src/components/finances/ForecastPanel.tsx": {
-  "digest": "df4add9fab620642dc6657858286993ab869e5ed",
+  "digest": "5e64adf839838a7e9cd9864a277b52c5678ac49f",
   "tokens": 104,
   "items": [
    {
@@ -5907,7 +5907,7 @@
   ]
  },
  "src/components/finances/IncomeExpenseChart.tsx": {
-  "digest": "e6e1201223d7ffda4cade8a93c8ce6d6059b484f",
+  "digest": "6d1b8b8eda9e8db1e4cd4a79edbe8554d0cad2aa",
   "tokens": 19,
   "items": [
    {
@@ -5939,8 +5939,8 @@
   ]
  },
  "src/components/finances/InvoicesTab.tsx": {
-  "digest": "47b666c74562c0837449596ad132d131dfc058df",
-  "tokens": 493,
+  "digest": "c0e956a156e6df9cec7857bb8d6c0bdc73771fa4",
+  "tokens": 495,
   "items": [
    {
     "k": "effect",
@@ -6060,8 +6060,8 @@
   ]
  },
  "src/components/finances/LibraryFinesTab.tsx": {
-  "digest": "7c2bdb33649664049563988678d8b17d93ede416",
-  "tokens": 54,
+  "digest": "f3d64d97587f4b5b30416bdb75f926f8eaeff169",
+  "tokens": 56,
   "items": [
    {
     "k": "call",
@@ -6106,7 +6106,7 @@
   "items": []
  },
  "src/components/finances/ProcurementWorkspace.tsx": {
-  "digest": "f11899bce562a9e16ef41f0e77b1965449e2c11c",
+  "digest": "6d225dbb3501bfe79fda81ff7feee4e426879f7f",
   "tokens": 651,
   "items": [
    {
@@ -6467,7 +6467,7 @@
   ]
  },
  "src/components/finances/ReportsExportPanel.tsx": {
-  "digest": "c23ed0ad2db6bf692016e50664adafaa8bc29e6e",
+  "digest": "4ee867c3e056dd0984dc5afb50ce36c46c6b4703",
   "tokens": 74,
   "items": [
    {
@@ -6488,7 +6488,7 @@
   ]
  },
  "src/components/finances/ScholarshipTab.tsx": {
-  "digest": "02ce78a0fbadadee913273685b76e7aa9b45d65b",
+  "digest": "366e6b9a1db0e8f18b99a2eaf745f1958dd86cdf",
   "tokens": 131,
   "items": [
    {
@@ -6539,7 +6539,7 @@
   ]
  },
  "src/components/finances/StudentPortalStatementTab.tsx": {
-  "digest": "db51ba0d8e21ddd10bd538cbcdedb5e6e0205c7d",
+  "digest": "d5e18927f8169321bdcffa7e1a212e1a1097b87d",
   "tokens": 53,
   "items": [
    {
@@ -6555,7 +6555,7 @@
   ]
  },
  "src/components/finances/payroll/MyPayTab.tsx": {
-  "digest": "b422cde48799ea7befadb3490f7015889bf38257",
+  "digest": "53b45d3a516bcaf96c732a566bb86b8b3580219e",
   "tokens": 100,
   "items": [
    {
@@ -6587,7 +6587,7 @@
   ]
  },
  "src/components/finances/payroll/PayrollRunsTab.tsx": {
-  "digest": "da9c12709c04273f3adbac55e62b0e20abc3305d",
+  "digest": "1ecb663e2d8fc042c3a2096d1987d8156919a0c3",
   "tokens": 282,
   "items": [
    {
@@ -6748,7 +6748,7 @@
   ]
  },
  "src/components/finances/payroll/PayrollSettingsTab.tsx": {
-  "digest": "32d1a12ef4609a4e6b69de8b238ac661eeb04c3a",
+  "digest": "58c89815558459e4fe95b778eeba07556e348bfb",
   "tokens": 102,
   "items": [
    {
@@ -6819,7 +6819,7 @@
   ]
  },
  "src/components/finances/payroll/PayrollWorkspace.tsx": {
-  "digest": "1488c98137ca168da9b730ff2112e6b996ce6ed3",
+  "digest": "0af8079d70204083baa42adf094e8c6e52fc031b",
   "tokens": 33,
   "items": [
    {
@@ -6830,7 +6830,7 @@
   ]
  },
  "src/components/finances/payroll/SalaryStructureTab.tsx": {
-  "digest": "7a429a8e5e4491cf1e422f562b0a019ba1f534da",
+  "digest": "2bf4cafa1f743741c1c250495a0763c4f7933ad9",
   "tokens": 157,
   "items": [
    {
@@ -11465,7 +11465,7 @@
   ]
  },
  "src/components/shared/StatCard.tsx": {
-  "digest": "0b4abf8aec27f69a6abc8f02a03011608882ebe2",
+  "digest": "ce5c4c1250f77f89be734ced5a37ca9cc91dbfba",
   "tokens": 45,
   "items": []
  },
@@ -11475,7 +11475,7 @@
   "items": []
  },
  "src/components/shared/StudentRiskBadge.tsx": {
-  "digest": "11e8f77d80a809dcbe1db200da8192e675f058b7",
+  "digest": "fea03b1c133786dddf24e83c46efb40480c2942f",
   "tokens": 68,
   "items": []
  },
@@ -11558,7 +11558,7 @@
   "items": []
  },
  "src/components/students/GuardiansCard.tsx": {
-  "digest": "de087a0b000ba9e7d543dd22a9482a36c1d66699",
+  "digest": "3610b99d11530acee84b60dda37279354b5f25b5",
   "tokens": 181,
   "items": [
    {
@@ -11669,7 +11669,7 @@
   "items": []
  },
  "src/components/students/StudentForm.tsx": {
-  "digest": "539c8a2a4e0e07e3b3daeb654f491206717505c5",
+  "digest": "76973982ca64c2c8b938fed35e3883931d3a73c3",
   "tokens": 280,
   "items": [
    {
@@ -11780,7 +11780,7 @@
   ]
  },
  "src/components/students/StudentFormSections.tsx": {
-  "digest": "93b987f960a76105af078789a019e7510c6a8dee",
+  "digest": "24d95d2affefe20b1b8745e402780dbf5bab5394",
   "tokens": 264,
   "items": [
    {
@@ -11821,7 +11821,7 @@
   ]
  },
  "src/components/students/WelfareCard.tsx": {
-  "digest": "8a9d1f390d84521afc9d7261c9f01d82ce6bddb8",
+  "digest": "b69a711a3de8029c4f9ce8cebaae2ef491c459ce",
   "tokens": 206,
   "items": [
    {

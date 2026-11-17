@@ -18,8 +18,8 @@ export function StocktakesTab({ initialSelectedId = null }: { initialSelectedId?
   function createStocktake() { if (!academicYear || !term || !roomId.trim()) return; create.mutate({ academicYear, term, roomId: roomId.trim() }, { onSuccess: () => { setShowForm(false); setRoomId('') } }) }
 
   return <div className="space-y-4">
-    <div className="flex items-center justify-between gap-3 flex-wrap"><div><h2 className="font-heading font-semibold text-brand-navy">Termly Stocktakes</h2><p className="text-sm text-muted">Physical verification by room. Variances remain open until resolved.</p></div><PermissionGuard permission="inventory.performStocktake"><button type="button" onClick={() => setShowForm((v) => !v)} className="inline-flex items-center gap-2 min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold"><Plus className="w-4 h-4" /> Schedule stocktake</button></PermissionGuard></div>
-    {showForm && <div className="bg-surface border border-base rounded-xl p-4 flex gap-3 flex-wrap"><input value={roomId} onChange={(e) => setRoomId(e.target.value)} placeholder="Room ID" className="flex-1 min-w-60 border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" /><button type="button" onClick={createStocktake} disabled={create.isPending || !academicYear || !term || !roomId.trim()} className="min-h-11 px-4 rounded-lg bg-brand-teal text-white text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Creating…' : 'Create'}</button></div>}
+    <div className="flex items-center justify-between gap-3 flex-wrap"><div><h2 className="font-heading font-semibold text-brand-navy">Termly stocktakes</h2><p className="text-sm text-muted">Physical verification by room. Variances remain open until resolved.</p></div><PermissionGuard permission="inventory.performStocktake"><button type="button" onClick={() => setShowForm((v) => !v)} className="inline-flex items-center gap-2 min-h-11 px-4 rounded-lg bg-brand-deep text-white text-sm font-semibold"><Plus className="w-4 h-4" /> Schedule stocktake</button></PermissionGuard></div>
+    {showForm && <div className="app-tint rounded-xl p-4 flex gap-3 flex-wrap"><input value={roomId} onChange={(e) => setRoomId(e.target.value)} placeholder="Room ID" className="flex-1 min-w-60 border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" /><button type="button" onClick={createStocktake} disabled={create.isPending || !academicYear || !term || !roomId.trim()} className="min-h-11 px-4 rounded-lg bg-btn-brand text-btn-brand-fg text-sm font-semibold disabled:opacity-60">{create.isPending ? 'Creating…' : 'Create'}</button></div>}
     <div className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-base bg-page"><th className="text-left px-4 py-3">Room</th><th className="text-left px-4 py-3">Period</th><th className="text-left px-4 py-3">Status</th><th className="text-right px-4 py-3">Actions</th></tr></thead><tbody>{isLoading && <tr><td colSpan={4} className="p-8 text-center"><Loader2 className="inline w-5 h-5 animate-spin" /></td></tr>}{!isLoading && rows.length === 0 && <tr><td colSpan={4} className="p-8 text-center text-muted">No stocktake scheduled for this term.</td></tr>}{rows.map((row) => <StocktakeRow key={row.id} row={row} onOpen={() => setSelectedId(row.id)} />)}</tbody></table></div></div>
     {selectedId && <StocktakeDetail id={selectedId} onClose={() => setSelectedId(null)} />}
   </div>
@@ -59,7 +59,7 @@ function StocktakeDetail({ id, onClose }: { id: string; onClose: () => void }) {
         ))}
       </div>
 
-      {canComplete && <PermissionGuard permission="inventory.performStocktake"><button type="button" onClick={() => complete.mutate(id, { onSuccess: onClose })} disabled={complete.isPending} className="w-full min-h-11 rounded-lg bg-brand-teal text-white text-sm font-semibold">{complete.isPending ? 'Completing…' : 'Complete stocktake'}</button></PermissionGuard>}
+      {canComplete && <PermissionGuard permission="inventory.performStocktake"><button type="button" onClick={() => complete.mutate(id, { onSuccess: onClose })} disabled={complete.isPending} className="w-full min-h-11 rounded-lg bg-btn-brand text-btn-brand-fg text-sm font-semibold">{complete.isPending ? 'Completing…' : 'Complete stocktake'}</button></PermissionGuard>}
     </div>
   </Modal>
 }
@@ -70,7 +70,7 @@ function StocktakeLineRow({ stocktakeId, line }: { stocktakeId: string; line: St
   const record = useRecordStocktakeLine()
   const [actual, setActual] = useState(String(num(line.actualQuantity)))
   const label = line.assetId ? `Asset ${line.assetId}` : line.inventoryItemId ? `Item ${line.inventoryItemId}` : line.id
-  return <div className="flex items-center gap-3 border border-base rounded-lg p-2.5">
+  return <div className="flex items-center gap-3 rounded-lg p-2.5 app-tint">
     <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{label}</p><p className="text-xs text-muted">Expected: {num(line.expectedQuantity)}</p></div>
     <input type="number" min="0" step="1" value={actual} onChange={(e) => setActual(e.target.value)} className="input w-24" />
     <button type="button" disabled={record.isPending}
@@ -106,4 +106,4 @@ function VarianceRow({ stocktakeId, varianceId, varianceQuantity, varianceType, 
   </div>
 }
 
-function Mini({ label, value }: { label: string; value: string }) { return <div className="bg-page border border-base rounded-lg p-3"><p className="text-xs text-muted">{label}</p><p className="font-semibold mt-1">{value}</p></div> }
+function Mini({ label, value }: { label: string; value: string }) { return <div className="app-tint rounded-lg p-3"><p className="text-xs text-muted">{label}</p><p className="font-semibold mt-1">{value}</p></div> }

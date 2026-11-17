@@ -24,16 +24,16 @@ interface ReportDef {
 const REPORTS: ReportDef[] = [
   {
     type: 'fee_collection',
-    label: 'Fee Collection',
+    label: 'Fee collection',
     desc: 'All invoices with paid/balance breakdown',
   },
   {
     type: 'outstanding_balances',
-    label: 'Outstanding Balances',
+    label: 'Outstanding balances',
     desc: 'Students with unpaid or overdue fees',
   },
-  { type: 'expense_breakdown', label: 'Expense Breakdown', desc: 'All expenses by category' },
-  { type: 'payroll_summary', label: 'Payroll Summary', desc: 'Monthly payroll runs for the year' },
+  { type: 'expense_breakdown', label: 'Expense breakdown', desc: 'All expenses by category' },
+  { type: 'payroll_summary', label: 'Payroll summary', desc: 'Monthly payroll runs for the year' },
 ]
 
 type ReportRow = Record<string, string | number | null>
@@ -52,7 +52,7 @@ function ReportTable({ rows }: { rows: ReportRow[] }) {
         <thead>
           <tr className="border-b border-base">
             {columns.map((c) => (
-              <th key={c} className="text-left px-3 py-2 font-heading font-semibold text-muted uppercase tracking-wide">
+              <th key={c} className="text-left px-3 py-2 font-heading font-semibold text-muted ">
                 {c.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())}
               </th>
             ))}
@@ -152,7 +152,7 @@ export function ReportsExportPanel({ academicYear, term }: { academicYear: strin
                     type="button"
                     onClick={() => void toggleView(r.type)}
                     aria-label={`View ${r.label} report`}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-teal hover:underline"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-teal hover:underline"
                   >
                     {viewingType === r.type ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     {viewingType === r.type ? 'Hide' : 'View'}

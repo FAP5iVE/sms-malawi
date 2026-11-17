@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-17 (after Phase 8b-2 pages, AT REVIEW GATE; 8b-1 packed and delivered, 8b-3 next). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
+Last updated: 2026-11-17 (after Phase 8b-3 pages, AT REVIEW GATE; 8b-2 packed and delivered, 8c dashboard next). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -42,8 +42,8 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | 8d header + sidebar + phone bottom bar (`hills/phase-8d-shell`, off `hills/phase-8b0-foundations`) | done, AT REVIEW GATE | review pack 8d |
 | 8b-1 pages: attendance, timetable, guardians, classes, placements, applications (`hills/phase-8b1-pages`, off `hills/phase-8d-shell`) | done, AT REVIEW GATE | review pack 8b-1 |
 | 8b-2 pages: library, HR, announcements, approvals, settings, monitoring, reports (`hills/phase-8b2-pages`, off `hills/phase-8b1-pages`) | done, AT REVIEW GATE | review pack 8b-2 |
-| **8b-3** page rollout (whatever pages are left after 8b-2: finances, exams, students, user management, calendar list views, parent pages) | **NEXT** (after the 8b-2 gate) | |
-| **8c** dashboards, greeting, parent portal; **8e** calendar; **8f** emails; **8g** report cards + exports | after 8b; 8f and 8g exception APPROVED (presentation only) | |
+| 8b-3 pages: assets, exams, finances, gallery admin, students, user management (`hills/phase-8b3-pages`, off `hills/phase-8b2-pages`) | done, AT REVIEW GATE | review pack 8b-3 |
+| **8c** dashboards, greeting, parent portal (**NEXT**, after the 8b-3 gate); **8e** calendar; **8f** emails; **8g** report cards + exports | after 8b; 8f and 8g exception APPROVED (presentation only) | |
 | **9** cleanup, ratchets (pills = 0, AI-tell count only down, contrast 100%) | last | |
 
 The user asked for Phases 0 to the logo step to be reviewed as ONE package. Phases 3 and 4 were each reviewed on their own. Phase 6 is split in two review drops (6a, then 6b). Next review gate is
@@ -438,7 +438,17 @@ after 6a.
     - **Chips (R2.7):** monitoring log, Vercel error and outage filters use `chipClass` from `src/lib/hills/chip.ts`. The outage filter keeps a danger look when on.
     - **Wording (R4):** about 340 sentence-case, no-em-dash, plain-word edits and every `uppercase tracking-*` label removed. Each changed visible string that the gate sees is declared in the allowlist by category.
     - **Checked in the real app** (admin, fake session, fixtures `p8/fixtures82.mjs`, capture `p8/pages81.mjs`): 7 routes x 2 widths (390, 1280) x 2 themes = 28 views, no sideways overflow.
-    - **Not covered / still open:** the reports page (3,200 lines) was converted mostly by tools and checked on the overview tab only, so deeper tabs (security, sessions, finance, exams) need an owner look; monitoring KPI labels such as "Crash-Free Sessions" come from data strings and stay Title Case; approval list cards keep their border as clickable rows (decision for the owner); HR tabs other than the default, the library dialogs and the announcements editor were converted by tokens but not opened in a capture; the announcements date "11/10/2026" is ambiguous (data format, out of scope); Firefox and Safari were not tested.
+    - **Owner decision (17 Nov 2026), R1.2 standard:** approval list cards and their inner boxes were flattened to `app-tint` tiles like everything else; a selected card shows `ring-2 ring-brand-teal`. Clickable cards and rows follow the same rule from now on; only controls keep borders.
+    - **Not covered / still open:** the reports page (3,200 lines) was converted mostly by tools and checked on the overview tab only, so deeper tabs (security, sessions, finance, exams) need an owner look; monitoring KPI labels such as "Crash-Free Sessions" come from data strings and stay Title Case; HR tabs other than the default, the library dialogs and the announcements editor were converted by tokens but not opened in a capture; the announcements date "11/10/2026" is ambiguous (data format, out of scope); Firefox and Safari were not tested.
+22. **Phase 8b-3: page rollout, batch 3** (assets, exams, finances, gallery admin, students, user management). Branch `hills/phase-8b3-pages` off `hills/phase-8b2-pages`. Looks only; logic gate clean against the 8b-2 branch (477 declared tokens) and `main` (1726 declared, 11 new files); contrast 502 pairs pass; tests 83; handler inventory matches (digests and token counts moved, no handler item changed); eslint no errors; tsc clean for changed files.
+    - **R1.2 standard applied:** bordered boxes, alerts and clickable cards became `app-tint` tiles (selected: `ring-2 ring-brand-teal`). The shared `StatCard` no longer keeps a border on tiles that link somewhere (hover tint instead), and its value is `text-xl` so long money values no longer break in the middle. Floating chart tooltips keep their border because they are overlays, not boxes inside a surface.
+    - **Status (R2, R4):** new `src/lib/hills/statusWord.ts` (`statusWord`, `statusTone`, with a test) turns raw codes (PENDING, END_OF_TERM, AWAITING_MANEB_RESULTS) into sentence-case words and tones. Used for exam, expense, invoice, library fine, MANEB, budget window, student, loan and system health statuses. Callers still compare the raw code. Acronyms (CA, MANEB, JCE, MSCE) stay in capitals.
+    - **Chips (R2.7):** fee structure, bulk invoice, MANEB, results release filters use `chipClass`. The promotion outcome tiles are tappable tint tiles with a teal ring when chosen.
+    - **Dialogs (R8):** sm, md and lg dialogs moved to s, m and l. The xl and 2xl dialogs were left as they are (see open items).
+    - **Readability:** faded text (`text-muted/70`, 10.5px user ids) now `text-muted` at 12px. Risk labels in `StudentRiskBadge` are sentence case ("On track", "High risk").
+    - **Wording (R4):** sentence case, no uppercase labels, no em dashes in visible text.
+    - **Checked in the real app** (admin, fake session, `p8/fixtures83.mjs`, `p8/pages81.mjs`): assets, exams, students, user management, gallery admin and finances (default tabs) at 390 and 1280, light and dark, no sideways overflow.
+    - **Not covered / still open:** the xl and 2xl dialogs (stocktake, marks entry, student results, payroll run, student detail) hold wide tables or several contexts and by R8.1 probably should be pages, so they keep their old sizes until the owner decides; inner tabs of finances, exams and students detail pages were converted by tokens but not opened in a capture; the assets tab strip scrolls sideways at 1280 (existing); dev-only warnings from React Compiler remain (existing); Firefox and Safari untested.
 
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database. Do not retry or work around. tsc errors from missing

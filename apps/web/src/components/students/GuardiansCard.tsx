@@ -34,7 +34,7 @@ import type { ApiStudentGuardian } from '@shared/types/api'
 const fieldCls =
   'w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body ' +
   'placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal'
-const labelCls = 'block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5'
+const labelCls = 'block text-xs font-heading font-semibold text-muted mb-1.5'
 
 interface FormState {
   fullName: string
@@ -73,10 +73,10 @@ function toForm(g: ApiStudentGuardian): FormState {
 
 function Badge({ children, tone }: { children: string; tone: 'teal' | 'amber' | 'coral' }) {
   const cls =
-    tone === 'teal' ? 'bg-brand-teal/10 text-brand-teal'
-    : tone === 'amber' ? 'bg-brand-amber/10 text-brand-amber'
-    : 'bg-brand-coral/10 text-brand-coral'
-  return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${cls}`}>{children}</span>
+    tone === 'teal' ? 'text-tone-teal'
+    : tone === 'amber' ? 'text-tone-amber'
+    : 'text-tone-coral'
+  return <span className={`text-xs font-semibold px-2 py-0.5 rounded-lg app-tint ${cls}`}>{children}</span>
 }
 
 export function GuardiansCard({ studentId, canEdit }: { studentId: string; canEdit: boolean }) {
@@ -139,7 +139,7 @@ export function GuardiansCard({ studentId, canEdit }: { studentId: string; canEd
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted">Guardians</p>
+        <p className="font-heading font-semibold text-xs text-muted">Guardians</p>
         {canEdit && (
           <button
             type="button"
@@ -181,7 +181,7 @@ export function GuardiansCard({ studentId, canEdit }: { studentId: string; canEd
                         type="button"
                         onClick={() => setDeleting(g)}
                         aria-label={`Remove ${g.fullName}`}
-                        className="p-2 rounded-lg hover:bg-page text-brand-coral"
+                        className="p-2 rounded-lg hover:bg-page text-tone-coral"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -210,7 +210,7 @@ export function GuardiansCard({ studentId, canEdit }: { studentId: string; canEd
           title={editing === 'new' ? 'Add guardian' : 'Edit guardian'}
           description="A student has one primary guardian and at least one emergency contact."
           onClose={() => setEditing(null)}
-          size="md"
+          size="m"
           busy={busy}
           onSubmit={handleSubmit}
           bodyClassName="space-y-4"
@@ -296,7 +296,7 @@ export function GuardiansCard({ studentId, canEdit }: { studentId: string; canEd
             </label>
           </div>
 
-          {error && <p className="text-sm text-brand-coral" role="alert">{error}</p>}
+          {error && <p className="text-sm text-tone-coral" role="alert">{error}</p>}
         </Modal>
       )}
 

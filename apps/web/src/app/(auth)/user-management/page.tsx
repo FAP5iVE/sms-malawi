@@ -60,6 +60,8 @@ import { queryKeys } from '@/lib/api-client'
 import type { ApiFirebaseUser, ApiUserListResponse, ApiSystemHealth, ApiServiceHealth } from '@shared/types/api'
 import { UserPlus, Shield, Power, Key, Activity, Search, ArrowUpDown, Loader2 } from 'lucide-react'
 import { USER_ROLES, ROLE_LABELS } from '@shared/types/roles'
+import { StatusText } from '@/components/shared/StatusText'
+import { statusWord } from '@/lib/hills/statusWord'
 
 export default function UserManagementPage() {
   return (
@@ -91,10 +93,10 @@ function SortHeader({
   return (
     <button
       onClick={() => onToggle(sortKeyVal)}
-      className="flex items-center gap-1 text-xs font-heading font-semibold text-muted uppercase hover:text-body transition-colors"
+      className="flex items-center gap-1 text-xs font-heading font-semibold text-muted hover:text-body transition-colors"
     >
       {label}
-      <ArrowUpDown className={`w-3 h-3 ${activeSortKey === sortKeyVal ? 'text-brand-teal' : 'text-muted/50'}`} aria-hidden />
+      <ArrowUpDown className={`w-3 h-3 ${activeSortKey === sortKeyVal ? 'text-tone-teal' : 'text-muted/50'}`} aria-hidden />
     </button>
   )
 }
@@ -216,13 +218,13 @@ function UserManagementContent() {
             <Link href={profileHref} className="block hover:underline">
               <p className="font-medium text-body">{u.displayName || u.email}</p>
               <p className="text-xs text-muted">{u.email}</p>
-              <p className="text-[10.5px] text-muted/70 font-mono mt-0.5">{u.uid}</p>
+              <p className="text-xs text-muted font-mono mt-0.5">{u.uid}</p>
             </Link>
           ) : (
             <>
               <p className="font-medium text-body">{u.displayName || u.email}</p>
               <p className="text-xs text-muted">{u.email}</p>
-              <p className="text-[10.5px] text-muted/70 font-mono mt-0.5">{u.uid}</p>
+              <p className="text-xs text-muted font-mono mt-0.5">{u.uid}</p>
             </>
           )}
         </td>
@@ -239,10 +241,10 @@ function UserManagementContent() {
           </select>
         </td>
         <td className="px-4 py-3">
-          <span className={`text-xs font-semibold ${u.disabled ? 'text-brand-coral' : 'text-brand-teal'}`}>
+          <span className={`text-xs font-semibold ${u.disabled ? 'text-tone-coral' : 'text-tone-teal'}`}>
             {u.disabled ? 'Disabled' : 'Active'}
           </span>
-          {u.requiresPasswordChange && <span className="ml-1 text-xs text-brand-amber">Must Change PW</span>}
+          {u.requiresPasswordChange && <span className="ml-1 text-xs text-tone-amber">Must change PW</span>}
         </td>
         <td className="px-4 py-3 text-xs text-muted">{u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString('en-MW') : 'Never'}</td>
         <td className="px-4 py-3 text-xs text-muted font-mono">{u.employeeNo ?? u.registrationNo ?? '—'}</td>
@@ -304,9 +306,9 @@ function UserManagementContent() {
             {profileHref ? (
               <Link href={profileHref} className="block active:underline">{identity}</Link>
             ) : identity}
-            <p className="text-[10.5px] text-muted/70 font-mono mt-0.5 truncate">{u.uid}</p>
+            <p className="text-xs text-muted font-mono mt-0.5 truncate">{u.uid}</p>
           </div>
-          <span className={`shrink-0 text-xs font-semibold ${u.disabled ? 'text-brand-coral' : 'text-brand-teal'}`}>
+          <span className={`shrink-0 text-xs font-semibold ${u.disabled ? 'text-tone-coral' : 'text-tone-teal'}`}>
             {u.disabled ? 'Disabled' : 'Active'}
           </span>
         </div>
@@ -314,7 +316,7 @@ function UserManagementContent() {
         <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
           {refNo && <span className="font-mono">{refNo}</span>}
           <span>Last sign-in: {u.lastSignIn ? new Date(u.lastSignIn).toLocaleDateString('en-MW') : 'Never'}</span>
-          {u.requiresPasswordChange && <span className="text-brand-amber">Must change PW</span>}
+          {u.requiresPasswordChange && <span className="text-tone-amber">Must change PW</span>}
         </div>
 
         <div className="flex items-center gap-2">
@@ -365,13 +367,13 @@ function UserManagementContent() {
     <div className="space-y-4 md:space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-brand-navy dark:text-white">System Administration</h1>
+          <h1 className="font-heading text-2xl font-bold text-brand-navy dark:text-white">System administration</h1>
           <p className="text-sm text-muted mt-0.5">User accounts, roles, and system health</p>
         </div>
         {tab === 'users' && (
           <button onClick={() => setShowTypeChooser(true)}
-            className="flex items-center justify-center gap-2 min-h-11 bg-brand-teal text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-teal-light">
-            <UserPlus className="w-4 h-4" /> Add User
+            className="flex items-center justify-center gap-2 min-h-11 bg-btn-brand text-btn-brand-fg px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-teal-light">
+            <UserPlus className="w-4 h-4" /> Add user
           </button>
         )}
       </div>
@@ -379,12 +381,12 @@ function UserManagementContent() {
       <ModuleSurface>
       <div className="flex gap-1 border-b border-base" role="tablist">
         {([
-          { id: 'users'  as const, label: 'User Accounts', icon: Shield  },
-          { id: 'health' as const, label: 'System Health', icon: Activity },
+          { id: 'users'  as const, label: 'User accounts', icon: Shield  },
+          { id: 'health' as const, label: 'System health', icon: Activity },
         ]).map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setTab(id)}
             role="tab" aria-selected={tab === id}
-            className={`flex flex-1 sm:flex-none items-center justify-center gap-1.5 min-h-11 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === id ? 'border-brand-teal text-brand-teal' : 'border-transparent text-muted hover:text-body'}`}>
+            className={`flex flex-1 sm:flex-none items-center justify-center gap-1.5 min-h-11 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${tab === id ? 'border-brand-teal text-tone-teal' : 'border-transparent text-muted hover:text-body'}`}>
             <Icon className="w-4 h-4" /> {label}
           </button>
         ))}
@@ -431,9 +433,9 @@ function UserManagementContent() {
                 aria-label="Sort by"
                 className="flex-1 min-w-0 min-h-11 border border-base rounded-lg px-3 py-2 text-sm bg-page text-body focus:outline-none"
               >
-                <option value="user">Sort: User</option>
-                <option value="role">Sort: Role</option>
-                <option value="status">Sort: Status</option>
+                <option value="user">Sort: user</option>
+                <option value="role">Sort: role</option>
+                <option value="status">Sort: status</option>
                 <option value="lastSignIn">Sort: Last sign-in</option>
               </select>
               <button
@@ -456,7 +458,7 @@ function UserManagementContent() {
             {grouped ? (
               grouped.map(([role, rows]) => (
                 <section key={role}>
-                  <h2 className="py-2 text-xs font-heading font-bold text-brand-teal uppercase tracking-wider border-b border-base">
+                  <h2 className="py-2 text-xs font-heading font-bold text-tone-teal border-b border-base">
                     {role === 'unassigned' ? 'No role assigned' : ROLE_LABELS[role as keyof typeof ROLE_LABELS] ?? role} · {rows.length}
                   </h2>
                   <ul className="divide-y divide-base">{rows.map(renderUserCard)}</ul>
@@ -477,16 +479,16 @@ function UserManagementContent() {
                   <th className="px-4 py-3 text-left"><SortHeader label="User" sortKeyVal="user" activeSortKey={sortKey} onToggle={toggleSort} /></th>
                   <th className="px-4 py-3 text-left"><SortHeader label="Role" sortKeyVal="role" activeSortKey={sortKey} onToggle={toggleSort} /></th>
                   <th className="px-4 py-3 text-left"><SortHeader label="Status" sortKeyVal="status" activeSortKey={sortKey} onToggle={toggleSort} /></th>
-                  <th className="px-4 py-3 text-left"><SortHeader label="Last Sign In" sortKeyVal="lastSignIn" activeSortKey={sortKey} onToggle={toggleSort} /></th>
-                  <th className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase">Employee / Reg. No.</th>
-                  <th className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted uppercase">Actions</th>
+                  <th className="px-4 py-3 text-left"><SortHeader label="Last sign in" sortKeyVal="lastSignIn" activeSortKey={sortKey} onToggle={toggleSort} /></th>
+                  <th className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted ">Employee / reg. no.</th>
+                  <th className="px-4 py-3 text-left text-xs font-heading font-semibold text-muted ">Actions</th>
                 </tr>
               </thead>
               {grouped ? (
                 grouped.map(([role, rows]) => (
                   <tbody key={role} className="divide-y divide-base">
                     <tr className="bg-page/70">
-                      <td colSpan={6} className="px-4 py-2 text-xs font-heading font-bold text-brand-teal uppercase tracking-wider">
+                      <td colSpan={6} className="px-4 py-2 text-xs font-heading font-bold text-tone-teal ">
                         {role === 'unassigned' ? 'No role assigned' : ROLE_LABELS[role as keyof typeof ROLE_LABELS] ?? role} · {rows.length}
                       </td>
                     </tr>
@@ -518,7 +520,7 @@ function UserManagementContent() {
             {h.services.map((s: ApiServiceHealth) => (
               <div key={s.name} className="bg-surface p-4">
                 <p className="font-semibold text-sm text-body">{s.name}</p>
-                <p className={`text-xs mt-1 font-bold uppercase ${s.status === 'ok' ? 'text-emerald-700 dark:text-emerald-400' : s.status === 'degraded' ? 'text-amber-700 dark:text-amber-400' : 'text-brand-coral'}`}>{s.status}</p>
+                <StatusText tone={s.status === 'ok' ? 'success' : s.status === 'degraded' ? 'warning' : 'danger'} className="mt-1">{statusWord(s.status)}</StatusText>
                 {s.latencyMs && <p className="text-xs text-muted mt-0.5">{s.latencyMs}ms</p>}
                 {s.details && <p className="text-xs text-muted mt-0.5 truncate">{s.details}</p>}
               </div>
@@ -552,7 +554,7 @@ function UserManagementContent() {
         open={pendingDisable !== null}
         title={`Disable ${pendingDisable?.displayName ?? pendingDisable?.email ?? 'this user'}?`}
         description="They will be immediately signed out and unable to log back in until an admin re-enables their account."
-        confirmLabel="Disable User"
+        confirmLabel="Disable user"
         confirmingLabel="Disabling…"
         confirming={toggleDisabled.isPending}
         destructive

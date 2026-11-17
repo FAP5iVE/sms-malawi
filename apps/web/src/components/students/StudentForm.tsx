@@ -174,7 +174,7 @@ function StepIndicator({
               })}
               className={[
                 'w-7 h-7 rounded-full border-2 flex items-center justify-center',
-                'text-[11px] font-heading font-bold transition-colors',
+                'text-xs font-heading font-bold transition-colors',
                 done    ? 'text-white'         : '',
                 active  ? 'text-white'         : '',
                 future  ? 'text-muted'         : '',
@@ -252,7 +252,7 @@ function PhotoUpload({ preview, onChange, compact = false }: PhotoUploadProps) {
       <div>
         <label
           htmlFor="student-photo-upload"
-          className="cursor-pointer text-sm font-heading font-semibold text-brand-teal hover:text-brand-teal/80 transition-colors"
+          className="cursor-pointer text-sm font-heading font-semibold text-tone-teal hover:text-brand-teal/80 transition-colors"
         >
           {preview ? 'Change photo' : 'Upload photo'}
         </label>
@@ -593,7 +593,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                     {isEdit ? 'Edit Student' : 'Add Student'}
                   </h2>
                   <p className="text-xs text-muted mt-0.5">
-                    Step {currentStep + 1} of {stepCount} — {steps[currentStep]!.label}
+                    Step {currentStep + 1} of {stepCount} - {steps[currentStep]!.label}
                   </p>
                 </div>
 
@@ -667,7 +667,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                 {submitError && currentStep === stepCount - 1 && (
                   <p
                     role="alert"
-                    className="mx-5 mb-3 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
+                    className="mx-5 mb-3 flex items-start gap-2 text-xs text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3"
                   >
                     <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
                     {submitError}
@@ -704,7 +704,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                     <button
                       type="submit"
                       disabled={isPending}
-                      className="flex items-center gap-2 min-h-11 px-6 rounded-xl text-sm font-heading font-semibold bg-brand-teal text-white hover:bg-brand-teal/90 transition-colors disabled:opacity-60"
+                      className="flex items-center gap-2 min-h-11 px-6 rounded-xl text-sm font-heading font-semibold bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover transition-colors disabled:opacity-60"
                     >
                       {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />}
                       {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Student'}
@@ -793,19 +793,19 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
               <div className="px-6 py-5 space-y-1">
                 {/* Personal section */}
                 <div className="grid grid-cols-2 gap-x-5 gap-y-1">
-                  <FieldDivider title="Personal Details" />
+                  <FieldDivider title="Personal details" />
                 </div>
                 <PersonalSection {...sectionProps} />
 
                 {/* Academic section */}
                 <div className="grid grid-cols-2 gap-x-5 gap-y-1 mt-2">
-                  <FieldDivider title="Academic Details" />
+                  <FieldDivider title="Academic details" />
                 </div>
                 <AcademicSection {...sectionProps} />
 
                 {/* Contact section */}
                 <div className="grid grid-cols-2 gap-x-5 gap-y-1 mt-2">
-                  <FieldDivider title="Contact Details" />
+                  <FieldDivider title="Contact details" />
                 </div>
                 <ContactSection {...sectionProps} />
 
@@ -813,7 +813,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                 {withWelfare && (
                   <>
                     <div className="grid grid-cols-2 gap-x-5 gap-y-1 mt-2">
-                      <FieldDivider title="Welfare & Health" />
+                      <FieldDivider title="Welfare and health" />
                     </div>
                     <WelfareSection value={welfare} onChange={setWelfare} />
                   </>
@@ -834,7 +834,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                 {submitError && (
                   <p
                     role="alert"
-                    className="flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3 mt-2"
+                    className="flex items-start gap-2 text-xs text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3 mt-2"
                   >
                     <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
                     {submitError}

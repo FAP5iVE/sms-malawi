@@ -71,6 +71,7 @@ import {
 import { apiFetch }                       from '@/lib/api-client'
 import { notifySuccess, notifyError, getErrorMessage } from '@/lib/feedback'
 import { Modal } from '@/components/shared/Modal'
+import { chipClass } from '@/lib/hills/chip'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -115,19 +116,19 @@ const STATUS_CONFIG: Record<ExamStatus, {
   step:   number
 }> = {
   SCHEDULED:        { label: 'Scheduled',       icon: Clock,         chip: 'text-muted',                   step: 0 },
-  IN_PROGRESS:      { label: 'In Progress',     icon: Clock,         chip: 'text-status-info', step: 1 },
-  MARKS_PENDING:    { label: 'Marks Pending',   icon: Clock,         chip: 'text-status-warning', step: 2 },
-  MARKS_DRAFT:      { label: 'Marks (Draft)',   icon: Clock,         chip: 'text-status-warning', step: 2 },
-  MARKS_FINAL:      { label: 'Marks Final',     icon: CheckCircle2,  chip: 'text-brand-teal', step: 3 },
-  RESULTS_APPROVED: { label: 'Exam Approved',   icon: CheckCircle2,  chip: 'text-brand-teal', step: 4 },
+  IN_PROGRESS:      { label: 'In progress',     icon: Clock,         chip: 'text-status-info', step: 1 },
+  MARKS_PENDING:    { label: 'Marks pending',   icon: Clock,         chip: 'text-status-warning', step: 2 },
+  MARKS_DRAFT:      { label: 'Marks (draft)',   icon: Clock,         chip: 'text-status-warning', step: 2 },
+  MARKS_FINAL:      { label: 'Marks final',     icon: CheckCircle2,  chip: 'text-tone-teal', step: 3 },
+  RESULTS_APPROVED: { label: 'Exam approved',   icon: CheckCircle2,  chip: 'text-tone-teal', step: 4 },
   RESULTS_RELEASED: { label: 'Released',        icon: Eye,           chip: 'text-brand-purple', step: 5 },
 }
 
 const PIPELINE_STEPS = [
   { label: 'Scheduled',    step: 0 },
-  { label: 'In Progress',  step: 1 },
-  { label: 'Marks Entry',  step: 2 },
-  { label: 'Marks Final',  step: 3 },
+  { label: 'In progress',  step: 1 },
+  { label: 'Marks entry',  step: 2 },
+  { label: 'Marks final',  step: 3 },
   { label: 'Approved',     step: 4 },
   { label: 'Released',     step: 5 },
 ]
@@ -139,7 +140,7 @@ const PIPELINE_STEPS = [
 function StatusBadge({ status }: { status: ExamStatus }) {
   const { label, icon: Icon, chip } = STATUS_CONFIG[status]
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-heading font-semibold uppercase tracking-wide ${chip}`}>
+    <span className={`inline-flex items-center gap-1 text-xs font-heading font-semibold ${chip}`}>
       <Icon className="w-3 h-3 shrink-0" aria-hidden />
       {label}
     </span>
@@ -161,15 +162,15 @@ function PipelineBar({ currentStep }: { currentStep: number }) {
             <div className="flex flex-col items-center gap-1">
               <div
                 className={`
-                  w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold
-                  ${done   ? 'bg-brand-teal text-white'
+                  w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+                  ${done   ? 'bg-btn-brand text-btn-brand-fg'
                   : active ? 'bg-brand-deep text-white ring-2 ring-brand-navy/30'
                   :          'bg-base text-muted border border-base'}
                 `}
               >
                 {done ? '✓' : step + 1}
               </div>
-              <span className={`text-[9px] whitespace-nowrap ${active ? 'text-brand-navy font-semibold' : 'text-muted'}`}>
+              <span className={`text-xs whitespace-nowrap ${active ? 'text-brand-navy font-semibold' : 'text-muted'}`}>
                 {label}
               </span>
             </div>
@@ -222,7 +223,7 @@ function ExamRow({ exam, onAction, loading, canApprove, canRelease, onShowFeeBlo
             <span>{exam.marksEntered}/{exam.totalStudents} marks</span>
           </div>
           {exam.feeBlockedCount > 0 && (
-            <div className="flex items-center gap-1.5 text-brand-coral text-xs font-semibold">
+            <div className="flex items-center gap-1.5 text-tone-coral text-xs font-semibold">
               <Lock className="w-3.5 h-3.5" />
               {exam.feeBlockedCount} fee-blocked
             </div>
@@ -241,12 +242,12 @@ function ExamRow({ exam, onAction, loading, canApprove, canRelease, onShowFeeBlo
               type="button"
               disabled={loading}
               onClick={() => onAction(exam.id, 'approve')}
-              className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-teal text-white hover:bg-brand-teal/90 transition-colors disabled:opacity-60"
+              className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover transition-colors disabled:opacity-60"
             >
               {loading
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <CheckCircle2 className="w-4 h-4" />}
-              Approve Results
+              Approve results
             </button>
           )}
           {showReleaseBtn && (
@@ -267,7 +268,7 @@ function ExamRow({ exam, onAction, loading, canApprove, canRelease, onShowFeeBlo
                 {loading
                   ? <Loader2 className="w-4 h-4 animate-spin" />
                   : <Eye className="w-4 h-4" />}
-                Authorise Release
+                Authorise release
               </button>
             </>
           )}
@@ -279,7 +280,7 @@ function ExamRow({ exam, onAction, loading, canApprove, canRelease, onShowFeeBlo
           <CheckCircle2 className="w-3.5 h-3.5" />
           Results are live.{' '}
           {exam.feeBlockedCount > 0
-            ? <button type="button" onClick={onShowFeeBlocked} className="text-brand-amber underline hover:no-underline">{exam.feeBlockedCount} student(s) blocked by unpaid fees — view list</button>
+            ? <button type="button" onClick={onShowFeeBlocked} className="text-tone-amber underline hover:no-underline">{exam.feeBlockedCount} student(s) blocked by unpaid fees. View list</button>
             : 'All students can view results.'}
         </p>
       )}
@@ -419,7 +420,7 @@ export function ResultsReleaseWorkflow({
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="font-heading font-bold text-lg text-brand-navy">
-            Results Release Workflow
+            Results release workflow
           </h2>
           <p className="text-sm text-muted mt-0.5">
             {academicYear} · Term {term} · 3-stage approval pipeline
@@ -453,7 +454,7 @@ export function ResultsReleaseWorkflow({
             type="button"
             onClick={handleReleaseTerm}
             disabled={releasing}
-            className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-teal text-white hover:bg-brand-teal/90 transition-colors disabled:opacity-60 shrink-0"
+            className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover transition-colors disabled:opacity-60 shrink-0"
           >
             {releasing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trophy className="w-4 h-4" />}
             Release End-of-Term (in unison)
@@ -462,7 +463,7 @@ export function ResultsReleaseWorkflow({
       )}
 
       {releaseNote && (
-        <div role="status" className="py-2 text-sm text-brand-teal flex items-center gap-2">
+        <div role="status" className="py-2 text-sm text-tone-teal flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           {releaseNote}
         </div>
@@ -470,7 +471,7 @@ export function ResultsReleaseWorkflow({
 
       {/* Error */}
       {error && (
-        <div className="bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-brand-coral">
+        <div className="bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-tone-coral">
           {error}
         </div>
       )}
@@ -483,12 +484,7 @@ export function ResultsReleaseWorkflow({
               key={s}
               type="button"
               onClick={() => setFilterStatus(s)}
-              className={`
-                px-3 py-1.5 rounded-full text-xs font-heading font-semibold border transition-colors min-h-[36px]
-                ${filterStatus === s
-                  ? 'bg-brand-deep text-white border-brand-navy'
-                  : 'bg-surface border-base text-muted hover:border-brand-navy/30 hover:text-body'}
-              `}
+              className={chipClass(filterStatus === s)}
             >
               {s === 'ALL' ? 'All' : STATUS_CONFIG[s].label}
               {s !== 'ALL' && (
@@ -551,7 +547,7 @@ export function ResultsReleaseWorkflow({
               </span>
             }
             onClose={() => setFeeBlocked(null)}
-            size="md"
+            size="m"
             flush
           >
             <div className="p-2">
@@ -567,7 +563,7 @@ export function ResultsReleaseWorkflow({
                         <p className="text-sm font-medium text-body">{st.name}</p>
                         <p className="text-xs text-muted font-mono">{st.registrationNo}</p>
                       </div>
-                      <span className="text-sm font-semibold text-brand-coral tabular">MWK {st.balance.toLocaleString()}</span>
+                      <span className="text-sm font-semibold text-tone-coral tabular">MWK {st.balance.toLocaleString()}</span>
                     </li>
                   ))}
                 </ul>

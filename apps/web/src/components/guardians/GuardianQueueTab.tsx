@@ -13,13 +13,11 @@ import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Inbox, Loader2 } from 'lucide-react'
 import { GUARDIAN_LINK_STATUS_LABELS, type GuardianLinkStatusValue } from '@shared/constants/guardianPortal'
 import { QUEUE_PAGE_SIZE, useGuardianQueue } from '@/hooks/useGuardians'
+import { CHIP, CHIP_ON, CHIP_OFF } from '@/lib/hills/chip'
 import { GuardianLinkCard } from './GuardianLinkCard'
 
 const FILTERS: GuardianLinkStatusValue[] = ['PENDING', 'ACTIVE', 'SUSPENDED', 'REJECTED', 'REVOKED']
 
-const CHIP = 'inline-flex items-center min-h-11 px-3.5 rounded-full text-sm font-medium border transition-colors'
-const CHIP_ON = 'bg-btn-brand text-btn-brand-fg border-brand-teal'
-const CHIP_OFF = 'border-base text-muted hover:text-body hover:bg-page'
 
 export function GuardianQueueTab() {
   const [status, setStatus] = useState<GuardianLinkStatusValue>('PENDING')

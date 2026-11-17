@@ -73,7 +73,7 @@ export function PayrollInsightsTab() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="font-heading font-bold text-lg text-brand-navy flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" aria-hidden /> Financial Insights &amp; Trends
+            <TrendingUp className="w-5 h-5" aria-hidden /> Financial insights and trends
           </h2>
           <p className="text-sm text-muted mt-0.5">Payroll cost, tax, and pension trends over time.</p>
         </div>
@@ -88,26 +88,26 @@ export function PayrollInsightsTab() {
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-surface border border-base rounded-xl p-4">
-          <p className="text-[11px] font-heading font-semibold text-muted uppercase tracking-wider mb-1">Total Payroll Cost</p>
+        <div className="app-tint rounded-xl p-4">
+          <p className="text-xs font-heading font-semibold text-muted mb-1">Total payroll cost</p>
           <p className="font-heading font-bold tabular text-body">{formatMWK(ytdGross)}</p>
           <p className="text-xs text-muted mt-0.5">Over {points.length} run{points.length === 1 ? '' : 's'}</p>
         </div>
-        <div className="bg-surface border border-base rounded-xl p-4">
-          <p className="text-[11px] font-heading font-semibold text-muted uppercase tracking-wider mb-1">Avg. Effective PAYE Rate</p>
+        <div className="app-tint rounded-xl p-4">
+          <p className="text-xs font-heading font-semibold text-muted mb-1">Avg. effective PAYE rate</p>
           <p className="font-heading font-bold tabular text-body">{avgEffectiveRate.toFixed(1)}%</p>
           <p className="text-xs text-muted mt-0.5">Of gross payroll</p>
         </div>
-        <div className="bg-surface border border-base rounded-xl p-4">
-          <p className="text-[11px] font-heading font-semibold text-muted uppercase tracking-wider mb-1 flex items-center gap-1">
-            <Users2 className="w-3 h-3" aria-hidden /> Latest Enrolled Staff
+        <div className="app-tint rounded-xl p-4">
+          <p className="text-xs font-heading font-semibold text-muted mb-1 flex items-center gap-1">
+            <Users2 className="w-3 h-3" aria-hidden /> Latest enrolled staff
           </p>
           <p className="font-heading font-bold tabular text-body">{latest?.staffCount ?? '—'}</p>
           <p className="text-xs text-muted mt-0.5">{latest ? latest.label : 'No runs yet'}</p>
         </div>
-        <div className="bg-surface border border-base rounded-xl p-4">
-          <p className="text-[11px] font-heading font-semibold text-muted uppercase tracking-wider mb-1">Month-over-Month</p>
-          <p className={`font-heading font-bold tabular ${momChange !== null && momChange >= 0 ? 'text-emerald-600' : 'text-brand-coral'}`}>
+        <div className="app-tint rounded-xl p-4">
+          <p className="text-xs font-heading font-semibold text-muted mb-1">Month-over-Month</p>
+          <p className={`font-heading font-bold tabular ${momChange !== null && momChange >= 0 ? 'text-emerald-600' : 'text-tone-coral'}`}>
             {momChange !== null ? `${momChange >= 0 ? '+' : ''}${momChange.toFixed(1)}%` : '—'}
           </p>
           <p className="text-xs text-muted mt-0.5">Net payroll disbursed</p>
@@ -116,8 +116,8 @@ export function PayrollInsightsTab() {
 
       {/* Chart */}
       <div>
-        <p className="text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-4">
-          Gross Payroll, PAYE &amp; Pension, and Net Disbursed
+        <p className="text-xs font-heading font-semibold text-muted mb-4">
+          Gross payroll, PAYE and pension, and net disbursed
         </p>
         {isLoading && <p className="text-sm text-muted py-16 text-center">Loading…</p>}
         {!isLoading && points.length === 0 && (

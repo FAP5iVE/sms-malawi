@@ -67,7 +67,7 @@ const RISK_CONFIG: Record<RiskLevel, {
   cardTitle: string
 }> = {
   HIGH: {
-    label:     'High Risk',
+    label:     'High risk',
     icon:      AlertTriangle,
     badge:     'text-brand-coral',
     dot:       'bg-red-500',
@@ -75,7 +75,7 @@ const RISK_CONFIG: Record<RiskLevel, {
     cardTitle: 'text-red-700 dark:text-red-400',
   },
   MEDIUM: {
-    label:     'Medium Risk',
+    label:     'Medium risk',
     icon:      AlertCircle,
     // [PRODUCTION FIX 2026-07-27] Was the one risk level using the custom
     // brand-amber CSS variable with an opacity modifier (bg-brand-amber/10)
@@ -93,7 +93,7 @@ const RISK_CONFIG: Record<RiskLevel, {
     cardTitle: 'text-amber-700 dark:text-amber-400',
   },
   LOW: {
-    label:     'Low Risk',
+    label:     'Low risk',
     icon:      Info,
     badge:     'text-brand-navy',
     dot:       'bg-blue-400',
@@ -101,7 +101,7 @@ const RISK_CONFIG: Record<RiskLevel, {
     cardTitle: 'text-blue-600 dark:text-blue-400',
   },
   NONE: {
-    label:     'On Track',
+    label:     'On track',
     icon:      ShieldCheck,
     badge:     'text-brand-teal',
     dot:       'bg-emerald-500',
@@ -187,7 +187,7 @@ function DotVariant({ riskLevel, hint }: { riskLevel: RiskLevel; hint?: string }
     <span
       className={`inline-block w-2.5 h-2.5 rounded-full ${dot} shrink-0`}
       aria-label={`Risk: ${label}`}
-      title={hint ? `${label} — ${hint}` : label}
+      title={hint ? `${label}: ${hint}` : label}
     />
   )
 }

@@ -195,7 +195,7 @@ export function ExamForm({ onClose, academicYear, term, exam }: Props) {
     <Modal
       title={isEdit ? 'Edit Exam' : 'Schedule Exam'}
       onClose={onClose}
-      size="lg"
+      size="l"
       onSubmit={handleSubmit(onSubmit)}
       busy={pending}
       footer={
@@ -211,19 +211,19 @@ export function ExamForm({ onClose, academicYear, term, exam }: Props) {
     >
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-full">
-          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Title</label>
-          <input {...register('title')} className={ic} placeholder="e.g. Week 3 Biology Test" />
-          {errors.title && <p className="text-xs text-brand-coral mt-1">{errors.title.message}</p>}
+          <label className="block text-xs font-semibold text-muted mb-1.5">Title</label>
+          <input {...register('title')} className={ic} placeholder="Week 3 Biology Test" />
+          {errors.title && <p className="text-xs text-tone-coral mt-1">{errors.title.message}</p>}
         </div>
         <div>
-          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Type</label>
+          <label className="block text-xs font-semibold text-muted mb-1.5">Type</label>
           <select {...register('type')} className={ic} aria-label="Exam type">
             {availableTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </div>
         {showCaSlot && caConfig && (
           <div>
-            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Continuous assessment</label>
+            <label className="block text-xs font-semibold text-muted mb-1.5">Continuous assessment</label>
             <select
               {...register('caSlot', { setValueAs: (v) => (v === '' || v == null ? null : Number(v)) })}
               className={ic}
@@ -231,13 +231,13 @@ export function ExamForm({ onClose, academicYear, term, exam }: Props) {
             >
               <option value="">Select CA…</option>
               {caConfig.weights.map((w, i) => (
-                <option key={i} value={i + 1}>CA {i + 1} — counts {w}% of the term mark</option>
+                <option key={i} value={i + 1}>CA {i + 1} counts {w}% of the term mark</option>
               ))}
             </select>
           </div>
         )}
         <div>
-          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Class</label>
+          <label className="block text-xs font-semibold text-muted mb-1.5">Class</label>
           {/* Not `disabled`: react-hook-form drops disabled fields from the submitted values,
               which would fail the required-classId check. Locked visually and from the keyboard instead. */}
           <select {...register('classId')} className={`${ic}${classLocked ? ' pointer-events-none opacity-60' : ''}`}
@@ -245,7 +245,7 @@ export function ExamForm({ onClose, academicYear, term, exam }: Props) {
             <option value="">Select class…</option>
             {availableClasses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          {errors.classId && <p className="text-xs text-brand-coral mt-1">{errors.classId.message}</p>}
+          {errors.classId && <p className="text-xs text-tone-coral mt-1">{errors.classId.message}</p>}
           {classLocked && (
             <p className="text-xs text-muted mt-1">Marks have been entered, so the class can&apos;t be changed.</p>
           )}
@@ -254,7 +254,7 @@ export function ExamForm({ onClose, academicYear, term, exam }: Props) {
           )}
         </div>
         <div>
-          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Subject</label>
+          <label className="block text-xs font-semibold text-muted mb-1.5">Subject</label>
           <select {...register('subject')} className={ic} aria-label="Subject" disabled={isTeacher && !selectedClassId}>
             <option value="">{isTeacher && !selectedClassId ? 'Select a class first\u2026' : 'Select subject\u2026'}</option>
             {availableSubjects.map((s) => {
@@ -266,40 +266,40 @@ export function ExamForm({ onClose, academicYear, term, exam }: Props) {
               )
             })}
           </select>
-          {errors.subject && <p className="text-xs text-brand-coral mt-1">{errors.subject.message}</p>}
+          {errors.subject && <p className="text-xs text-tone-coral mt-1">{errors.subject.message}</p>}
           {selectedClassId && !hasPresets && (
             <p className="text-xs text-muted mt-1">
-              This class has no preset subjects yet — every subject is selectable until they are set.
+              This class has no preset subjects yet. Every subject is selectable until they are set.
             </p>
           )}
         </div>
         <div>
-          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Date</label>
+          <label className="block text-xs font-semibold text-muted mb-1.5">Date</label>
           <input type="date" {...register('date')} className={ic} />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Start Time</label>
+          <label className="block text-xs font-semibold text-muted mb-1.5">Start time</label>
           <input type="time" {...register('timeStart')} className={ic} />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">End Time</label>
+          <label className="block text-xs font-semibold text-muted mb-1.5">End time</label>
           <input type="time" {...register('timeEnd')} className={ic} />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Venue</label>
-          <input {...register('venue')} className={ic} placeholder="e.g. Room 12" />
+          <label className="block text-xs font-semibold text-muted mb-1.5">Venue</label>
+          <input {...register('venue')} className={ic} placeholder="Room 12" />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Max Mark</label>
+          <label className="block text-xs font-semibold text-muted mb-1.5">Max mark</label>
           <input type="number" {...register('maxMark', { valueAsNumber: true })} className={ic} min={1} max={1000} />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Weight (% of term)</label>
+          <label className="block text-xs font-semibold text-muted mb-1.5">Weight (% of term)</label>
           <input type="number" {...register('weightPercent', { valueAsNumber: true })} className={ic} min={1} max={100} />
         </div>
       </div>
       {submitError && (
-        <p role="alert" className="mt-4 flex items-start gap-2 text-xs text-brand-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
+        <p role="alert" className="mt-4 flex items-start gap-2 text-xs text-tone-coral bg-brand-coral/8 border border-brand-coral/20 rounded-xl px-4 py-3">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
           {submitError}
         </p>

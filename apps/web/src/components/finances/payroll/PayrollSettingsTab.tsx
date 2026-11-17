@@ -98,45 +98,45 @@ export function PayrollSettingsTab() {
     <div className="space-y-6">
       <div>
         <h2 className="font-heading font-bold text-lg text-brand-navy flex items-center gap-2">
-          <SettingsIcon className="w-5 h-5" aria-hidden /> PAYE &amp; Pension Settings
+          <SettingsIcon className="w-5 h-5" aria-hidden /> PAYE and Pension Settings
         </h2>
         <p className="text-sm text-muted mt-0.5">
-          Controls the run window Payroll Runs &amp; Approvals enforces, and the tax/pension figures every payslip is calculated from.
+          Controls the run window Payroll Runs and Approvals enforces, and the tax/pension figures every payslip is calculated from.
         </p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* Run window */}
         <div className="pb-5 border-b border-base">
-          <h3 className="font-heading font-semibold text-sm text-body mb-1">Payroll Run Window</h3>
+          <h3 className="font-heading font-semibold text-sm text-body mb-1">Payroll run window</h3>
           <p className="text-xs text-muted mb-4 max-w-2xl">
             Run Payroll is only enabled inside this window each month. Once a month is run it is permanently
-            locked — nothing here can reopen it, by design.
+            locked. Nothing here can reopen it, by design.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-xl">
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Window Opens On (day 1–28)</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Window Opens On (day 1–28)</label>
               <input type="number" min={1} max={28} value={config.payroll_day_of_month} onChange={(e) => set('payroll_day_of_month', e.target.value)} className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Window Length (days)</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Window Length (days)</label>
               <input type="number" min={1} max={31} value={config.payroll_run_window_days} onChange={(e) => set('payroll_run_window_days', e.target.value)} className={inputCls} />
-              <p className="text-xs text-muted mt-1">e.g. 25 + 5 = open through the 29th.</p>
+              <p className="text-xs text-muted mt-1">25 + 5 = open through the 29th.</p>
             </div>
           </div>
         </div>
 
         {/* Pension & loan interest */}
         <div className="pb-5 border-b border-base">
-          <h3 className="font-heading font-semibold text-sm text-body mb-4">Pension &amp; Loans</h3>
+          <h3 className="font-heading font-semibold text-sm text-body mb-4">Pension and loans</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-xl">
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Pension Contribution (%)</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Pension contribution (%)</label>
               <input type="number" min={0} max={100} value={pensionPercent} onChange={(e) => setPensionPercent(Number(e.target.value))} className={inputCls} />
               <p className="text-xs text-muted mt-1">Employee pension as % of gross salary.</p>
             </div>
             <div>
-              <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">Staff Loan Interest Rate (%)</label>
+              <label className="block text-xs font-heading font-semibold text-muted mb-1.5">Staff loan interest rate (%)</label>
               <input type="number" min={0} max={100} value={loanInterestRate} onChange={(e) => setLoanInterestRate(Number(e.target.value))} className={inputCls} />
               <p className="text-xs text-muted mt-1">Annual rate applied to new loans. 0 = interest-free.</p>
             </div>
@@ -158,26 +158,26 @@ export function PayrollSettingsTab() {
           ) : (
             <div className="space-y-2">
               {payeBrackets.map((b, i) => (
-                <div key={i} className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end border border-base rounded-lg p-3">
+                <div key={i} className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end rounded-lg p-3 app-tint">
                   <div>
-                    <label className="text-[11px] text-muted mb-1 block">Label</label>
+                    <label className="text-xs text-muted mb-1 block">Label</label>
                     <input value={b.label} onChange={(e) => updateBracket(i, { label: e.target.value })} className={`${inputCls} min-h-[36px] text-xs`} />
                   </div>
                   <div>
-                    <label className="text-[11px] text-muted mb-1 block">Min (MWK/yr)</label>
+                    <label className="text-xs text-muted mb-1 block">Min (MWK/yr)</label>
                     <input type="number" min={0} value={b.minAnnualMwk} onChange={(e) => updateBracket(i, { minAnnualMwk: Number(e.target.value) })} className={`${inputCls} min-h-[36px] text-xs`} />
                   </div>
                   <div>
-                    <label className="text-[11px] text-muted mb-1 block">Max (MWK/yr, blank = no ceiling)</label>
+                    <label className="text-xs text-muted mb-1 block">Max (MWK/yr, blank = no ceiling)</label>
                     <input type="number" min={0} value={b.maxAnnualMwk ?? ''}
                       onChange={(e) => updateBracket(i, { maxAnnualMwk: e.target.value ? Number(e.target.value) : null })}
                       className={`${inputCls} min-h-[36px] text-xs`} />
                   </div>
                   <div>
-                    <label className="text-[11px] text-muted mb-1 block">Rate (%)</label>
+                    <label className="text-xs text-muted mb-1 block">Rate (%)</label>
                     <input type="number" min={0} max={100} value={b.ratePercent} onChange={(e) => updateBracket(i, { ratePercent: Number(e.target.value) })} className={`${inputCls} min-h-[36px] text-xs`} />
                   </div>
-                  <button type="button" onClick={() => removeBracket(i)} className="text-brand-coral hover:underline text-xs font-medium flex items-center gap-1 justify-center min-h-[36px]">
+                  <button type="button" onClick={() => removeBracket(i)} className="text-tone-coral hover:underline text-xs font-medium flex items-center gap-1 justify-center min-h-[36px]">
                     <X className="w-3.5 h-3.5" /> Remove
                   </button>
                 </div>
@@ -186,7 +186,7 @@ export function PayrollSettingsTab() {
           )}
         </div>
 
-        {error && <p className="text-sm text-brand-coral">{error}</p>}
+        {error && <p className="text-sm text-tone-coral">{error}</p>}
         <div className="flex items-center gap-3">
           <button type="submit" disabled={saving}
             className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-deep text-white hover:brightness-110 transition-colors disabled:opacity-60 flex items-center gap-2">

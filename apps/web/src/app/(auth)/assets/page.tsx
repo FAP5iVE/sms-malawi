@@ -105,8 +105,8 @@ const STATUS_COLOR: Record<string, string> = {
 type Tab = 'register' | 'rooms' | 'mine' | 'requests' | 'inventory' | 'stocktakes' | 'locations'
 const TABS = [
   { id: 'register' as Tab, label: 'Register', icon: Boxes },
-  { id: 'rooms' as Tab, label: 'By Room/Dept', icon: DoorOpen },
-  { id: 'mine' as Tab, label: 'My Assigned', icon: PackageCheck },
+  { id: 'rooms' as Tab, label: 'By room or department', icon: DoorOpen },
+  { id: 'mine' as Tab, label: 'My assigned', icon: PackageCheck },
   { id: 'requests' as Tab, label: 'Requests', icon: ClipboardList },
   { id: 'inventory' as Tab, label: 'Inventory', icon: Warehouse },
   { id: 'stocktakes' as Tab, label: 'Stocktakes', icon: ClipboardCheck },
@@ -167,16 +167,16 @@ function AssetsContent() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="font-heading font-bold text-xl text-brand-navy">Assets &amp; Inventory</h1>
+          <h1 className="font-heading font-bold text-xl text-brand-navy">Assets and inventory</h1>
           <p className="text-sm text-muted mt-0.5">
-             centralized tracking, monitoring, and management of the physical and digital resources.
+             Centralized tracking, monitoring, and management of the physical and digital resources.
           </p>
         </div>
       </div>
 
       <ModuleSurface>
       <PermissionGuard permission="assets.viewInventoryReports">
-        <StatCardGrid className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <StatCardGrid className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-5 gap-4">
           <StatCard
             index={0}
             label="Assets in store"
@@ -205,7 +205,7 @@ function AssetsContent() {
             label="Pending requests"
             icon={ClipboardList}
             iconColor="bg-brand-coral/10"
-            iconText="text-brand-coral"
+            iconText="text-tone-coral"
             value={stats ? stats.pendingRequests : '…'}
             href="/assets?tab=requests"
           />
@@ -346,7 +346,7 @@ function RegisterTab({ preset }: { preset: RegisterPreset }) {
             onClick={() => setFormAsset(null)}
             className="inline-flex items-center gap-1.5 bg-brand-deep text-white rounded-lg px-4 py-2.5 text-sm font-semibold min-h-11 shrink-0"
           >
-            <Plus className="w-4 h-4" /> Add Asset
+            <Plus className="w-4 h-4" /> Add asset
           </button>
         </PermissionGuard>
       </div>
@@ -414,7 +414,7 @@ function RegisterTab({ preset }: { preset: RegisterPreset }) {
                           type="button"
                           onClick={() => setAllocateAsset(a)}
                           aria-label={`Allocate ${a.name}`}
-                          className="text-brand-teal min-h-11 min-w-11 flex items-center justify-center"
+                          className="text-tone-teal min-h-11 min-w-11 flex items-center justify-center"
                         >
                           <UserPlus className="w-4 h-4" />
                         </button>
@@ -505,7 +505,7 @@ function AssetFormModal({ asset, onClose }: { asset: ApiAsset | null; onClose: (
     <Modal
       title={asset ? 'Edit Asset' : 'Add Asset'}
       onClose={onClose}
-      size="lg"
+      size="l"
       bodyClassName="space-y-3"
       footer={
         <>
@@ -571,8 +571,8 @@ function AssetFormModal({ asset, onClose }: { asset: ApiAsset | null; onClose: (
         </div>
         <div>
           <label htmlFor="asset-serial" className="text-xs text-muted mb-1 block">
-            Serial Number{' '}
-            <span className="text-muted/70">(individually-tracked items only)</span>
+            Serial number{' '}
+            <span className="text-muted">(individually-tracked items only)</span>
           </label>
           <input
             id="asset-serial"
@@ -596,19 +596,19 @@ function AssetFormModal({ asset, onClose }: { asset: ApiAsset | null; onClose: (
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="asset-location" className="text-xs text-muted mb-1 block">
-            Location <span className="text-muted/70">(while in store)</span>
+            Location <span className="text-muted">(while in store)</span>
           </label>
           <input
             id="asset-location"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. Science Lab storeroom"
+            placeholder="Science Lab storeroom"
             className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
           />
         </div>
         <div>
           <label htmlFor="asset-cost" className="text-xs text-muted mb-1 block">
-            Acquisition Cost (MWK)
+            Acquisition cost (MWK)
           </label>
           <input
             id="asset-cost"
@@ -645,7 +645,7 @@ function AssetFormModal({ asset, onClose }: { asset: ApiAsset | null; onClose: (
       </div>
 
       {error && (
-        <p className="text-sm text-brand-coral">
+        <p className="text-sm text-tone-coral">
           {error instanceof Error ? error.message : 'Something went wrong.'}
         </p>
       )}
@@ -681,9 +681,9 @@ function AllocateModal({ asset, onClose }: { asset: ApiAsset; onClose: () => voi
 
   return (
     <Modal
-      title={<>Allocate — {asset.name}</>}
+      title={<>Allocate: {asset.name}</>}
       onClose={onClose}
-      size="md"
+      size="m"
       bodyClassName="space-y-3"
       footer={
         <>
@@ -749,7 +749,7 @@ function AllocateModal({ asset, onClose }: { asset: ApiAsset; onClose: () => voi
         />
       </div>
       {allocate.error && (
-        <p className="text-sm text-brand-coral">
+        <p className="text-sm text-tone-coral">
           {allocate.error instanceof Error ? allocate.error.message : 'Something went wrong.'}
         </p>
       )}
@@ -766,9 +766,9 @@ function ConditionModal({ asset, onClose }: { asset: ApiAsset; onClose: () => vo
 
   return (
     <Modal
-      title={<>Condition — {asset.name}</>}
+      title={<>Condition: {asset.name}</>}
       onClose={onClose}
-      size="md"
+      size="m"
       bodyClassName="space-y-3"
       footer={
         <>
@@ -824,7 +824,7 @@ function ConditionModal({ asset, onClose }: { asset: ApiAsset; onClose: () => vo
         />
       </div>
       {markCondition.error && (
-        <p className="text-sm text-brand-coral">
+        <p className="text-sm text-tone-coral">
           {markCondition.error instanceof Error
             ? markCondition.error.message
             : 'Something went wrong.'}
@@ -848,7 +848,7 @@ function ConditionModal({ asset, onClose }: { asset: ApiAsset; onClose: () => vo
                     { onSuccess: onClose }
                   )
                 }
-                className="text-xs font-semibold text-brand-coral hover:underline shrink-0"
+                className="text-xs font-semibold text-tone-coral hover:underline shrink-0"
               >
                 Confirm
               </button>
@@ -864,13 +864,13 @@ function ConditionModal({ asset, onClose }: { asset: ApiAsset; onClose: () => vo
             <button
               type="button"
               onClick={() => setConfirmDispose(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-coral hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-coral hover:underline"
             >
               <Trash2 className="w-3.5 h-3.5" /> Mark disposed
             </button>
           )}
           {disposeAsset.error && (
-            <p className="text-sm text-brand-coral mt-2">
+            <p className="text-sm text-tone-coral mt-2">
               {disposeAsset.error instanceof Error
                 ? disposeAsset.error.message
                 : 'Something went wrong.'}
@@ -891,7 +891,7 @@ function AssetDetailModal({ assetId, onClose }: { assetId: string; onClose: () =
     <Modal
       title={asset?.name ?? 'Asset'}
       onClose={onClose}
-      size="lg"
+      size="l"
       bodyClassName="space-y-4"
     >
       {asset && (
@@ -954,7 +954,7 @@ function AssetDetailModal({ assetId, onClose }: { assetId: string; onClose: () =
                     type="button"
                     disabled={returnAsset.isPending}
                     onClick={() => returnAsset.mutate({ assignmentId: a.id, data: {} })}
-                    className="inline-flex items-center gap-1 text-brand-teal font-semibold min-h-11 px-2"
+                    className="inline-flex items-center gap-1 text-tone-teal font-semibold min-h-11 px-2"
                   >
                     <Undo2 className="w-3.5 h-3.5" /> Return
                   </button>
@@ -1103,13 +1103,13 @@ function RequestsTab() {
       <PermissionGuard permission="assets.requestItem">
         <div className="pb-2">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-heading font-semibold text-brand-navy text-sm">My Requests</h2>
+            <h2 className="font-heading font-semibold text-brand-navy text-sm">My requests</h2>
             <button
               type="button"
               onClick={() => setShowForm(true)}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline"
             >
-              <Plus className="w-3.5 h-3.5" /> New Request
+              <Plus className="w-3.5 h-3.5" /> New request
             </button>
           </div>
           <div className="space-y-2">
@@ -1148,7 +1148,7 @@ function RequestsTab() {
       <PermissionGuard permission="assets.approveRequest">
         <div className="pb-2">
           <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
-            <h2 className="font-heading font-semibold text-brand-navy text-sm">Pending Review</h2>
+            <h2 className="font-heading font-semibold text-brand-navy text-sm">Pending review</h2>
             <input
               value={deptFilter}
               onChange={(e) => setDeptFilter(e.target.value)}
@@ -1202,13 +1202,13 @@ function AdvancesPanel() {
   return (
     <div className="pb-2">
       <h2 className="font-heading font-semibold text-brand-navy text-sm mb-3">
-        Procurement Advances
+        Procurement advances
       </h2>
 
       <PermissionGuard permission="assets.manageAdvances">
         {approvedRequests && approvedRequests.length > 0 && (
           <div className="mb-4">
-            <p className="text-xs font-semibold text-muted mb-2">Approved — awaiting procurement</p>
+            <p className="text-xs font-semibold text-muted mb-2">Approved: awaiting procurement</p>
             <div className="space-y-2">
               {approvedRequests.map((r: ApiAssetRequest) => (
                 <div
@@ -1227,7 +1227,7 @@ function AdvancesPanel() {
                     onClick={() => setAdvancingRequestId(r.id)}
                     className="inline-flex items-center gap-1 text-brand-navy font-semibold min-h-11 px-2"
                   >
-                    <HandCoins className="w-3.5 h-3.5" /> Record Advance
+                    <HandCoins className="w-3.5 h-3.5" /> Record advance
                   </button>
                 </div>
               ))}
@@ -1248,7 +1248,7 @@ function AdvancesPanel() {
           >
             <div>
               <p className="font-medium">
-                {a.supplier} — {formatMWK(a.amount)}
+                {a.supplier} - {formatMWK(a.amount)}
               </p>
               <p className="text-muted">
                 {a.assetRequest?.title ?? 'Request deleted'} · advanced{' '}
@@ -1261,7 +1261,7 @@ function AdvancesPanel() {
                   type="button"
                   disabled={reconcile.isPending}
                   onClick={() => reconcile.mutate({ id: a.id, data: {} })}
-                  className="text-brand-teal font-semibold min-h-11 px-1"
+                  className="text-tone-teal font-semibold min-h-11 px-1"
                 >
                   Reconcile
                 </button>
@@ -1269,7 +1269,7 @@ function AdvancesPanel() {
                   type="button"
                   disabled={writeOff.isPending}
                   onClick={() => writeOff.mutate({ id: a.id, data: {} })}
-                  className="text-brand-coral font-semibold min-h-11 px-1"
+                  className="text-tone-coral font-semibold min-h-11 px-1"
                 >
                   Write off
                 </button>
@@ -1299,7 +1299,7 @@ function RecordAdvanceModal({ requestId, onClose }: { requestId: string; onClose
     <Modal
       title="Record Advance"
       onClose={onClose}
-      size="sm"
+      size="s"
       bodyClassName="space-y-3"
       footer={
         <>
@@ -1366,7 +1366,7 @@ function RecordAdvanceModal({ requestId, onClose }: { requestId: string; onClose
         />
       </div>
       {recordAdvance.error && (
-        <p className="text-sm text-brand-coral">
+        <p className="text-sm text-tone-coral">
           {recordAdvance.error instanceof Error
             ? recordAdvance.error.message
             : 'Something went wrong.'}
@@ -1399,14 +1399,14 @@ function ReviewRequestRow({ request }: { request: ApiAssetRequest }) {
               type="button"
               disabled={approve.isPending}
               onClick={() => approve.mutate({ id: request.id, data: {} })}
-              className="inline-flex items-center gap-1 text-brand-teal font-semibold min-h-11 px-2"
+              className="inline-flex items-center gap-1 text-tone-teal font-semibold min-h-11 px-2"
             >
               <Check className="w-3.5 h-3.5" /> Approve
             </button>
             <button
               type="button"
               onClick={() => setRejecting(true)}
-              className="inline-flex items-center gap-1 text-brand-coral font-semibold min-h-11 px-2"
+              className="inline-flex items-center gap-1 text-tone-coral font-semibold min-h-11 px-2"
             >
               <PackageX className="w-3.5 h-3.5" /> Reject
             </button>
@@ -1430,7 +1430,7 @@ function ReviewRequestRow({ request }: { request: ApiAssetRequest }) {
                 { onSuccess: () => setRejecting(false) }
               )
             }
-            className="text-brand-coral font-semibold shrink-0"
+            className="text-tone-coral font-semibold shrink-0"
           >
             Confirm
           </button>
@@ -1453,9 +1453,9 @@ function RequestFormModal({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal
-      title="Request Equipment"
+      title="Request equipment"
       onClose={onClose}
-      size="md"
+      size="m"
       bodyClassName="space-y-3"
       footer={
         <>
@@ -1492,7 +1492,7 @@ function RequestFormModal({ onClose }: { onClose: () => void }) {
           id="req-title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. 10 microscopes for Form 3 Biology"
+          placeholder="10 microscopes for Form 3 Biology"
           className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
         />
       </div>
@@ -1536,7 +1536,7 @@ function RequestFormModal({ onClose }: { onClose: () => void }) {
           id="req-dept"
           value={department}
           onChange={(e) => setDepartment(e.target.value)}
-          placeholder="e.g. Biology Department"
+          placeholder="Biology Department"
           className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
         />
       </div>
@@ -1553,7 +1553,7 @@ function RequestFormModal({ onClose }: { onClose: () => void }) {
         />
       </div>
       {createRequest.error && (
-        <p className="text-sm text-brand-coral">
+        <p className="text-sm text-tone-coral">
           {createRequest.error instanceof Error
             ? createRequest.error.message
             : 'Something went wrong.'}

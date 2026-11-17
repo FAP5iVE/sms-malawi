@@ -41,7 +41,7 @@ import type { ApiSupportNeed } from '@shared/types/api'
 const fieldCls =
   'w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body ' +
   'placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand-teal/25 focus:border-brand-teal'
-const labelCls = 'block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5'
+const labelCls = 'block text-xs font-heading font-semibold text-muted mb-1.5'
 
 const cancelBtn = 'min-h-[44px] px-4 rounded-xl border border-base text-sm font-semibold'
 const saveBtn =
@@ -145,7 +145,7 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-heading font-semibold text-xs uppercase tracking-wide text-muted flex items-center gap-1.5">
+          <p className="font-heading font-semibold text-xs text-muted flex items-center gap-1.5">
             <ShieldAlert className="w-3.5 h-3.5" /> Welfare
           </p>
           <p className="text-xs text-muted mt-0.5">
@@ -182,7 +182,7 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-heading font-semibold uppercase tracking-wide text-muted">Special needs</p>
+          <p className="text-xs font-heading font-semibold text-muted">Special needs</p>
           {canEdit && (
             <button
               type="button"
@@ -210,7 +210,7 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
                     <button type="button" onClick={() => openNeed(n)} aria-label="Edit special need" className="p-2 rounded-lg hover:bg-page text-muted">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <button type="button" onClick={() => setNeedDeleting(n)} aria-label="Remove special need" className="p-2 rounded-lg hover:bg-page text-brand-coral">
+                    <button type="button" onClick={() => setNeedDeleting(n)} aria-label="Remove special need" className="p-2 rounded-lg hover:bg-page text-tone-coral">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -261,10 +261,10 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
               value={medicalAlert}
               onChange={(e) => setMedicalAlert(e.target.value)}
               maxLength={500}
-              placeholder="e.g. Asthma - inhaler kept at the school office"
+              placeholder="Asthma - inhaler kept at the school office"
             />
           </div>
-          {welfareError && <p className="text-sm text-brand-coral" role="alert">{welfareError}</p>}
+          {welfareError && <p className="text-sm text-tone-coral" role="alert">{welfareError}</p>}
         </Modal>
       )}
 
@@ -293,7 +293,7 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
           </div>
           <div>
             <label className={labelCls} htmlFor="n-acc">Accommodation</label>
-            <input id="n-acc" className={fieldCls} value={accommodation} onChange={(e) => setAccommodation(e.target.value)} placeholder="e.g. Front-row seating, large print" />
+            <input id="n-acc" className={fieldCls} value={accommodation} onChange={(e) => setAccommodation(e.target.value)} placeholder="Front-row seating, large print" />
           </div>
           <div>
             <label className={labelCls} htmlFor="n-dev">Assistive device</label>
@@ -303,7 +303,7 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
             <label className={labelCls} htmlFor="n-date">Date identified</label>
             <input id="n-date" type="date" className={fieldCls} value={identifiedAt} onChange={(e) => setIdentifiedAt(e.target.value)} />
           </div>
-          {needError && <p className="text-sm text-brand-coral" role="alert">{needError}</p>}
+          {needError && <p className="text-sm text-tone-coral" role="alert">{needError}</p>}
         </Modal>
       )}
 

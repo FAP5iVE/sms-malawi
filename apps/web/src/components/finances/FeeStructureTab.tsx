@@ -39,6 +39,7 @@ import type { ApiFeeStructure } from '@shared/types/api'
 import type { CreateFeeStructureInput } from '@shared/schemas/finance'
 import { Plus, Loader2, Globe, Pencil, Archive, ArchiveRestore, Wallet } from 'lucide-react'
 import { Modal, MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from '@/components/shared/Modal'
+import { chipClass } from '@/lib/hills/chip'
 
 // ─────────────────────────────────────────────────────────────────────────
 // BADGE HELPERS — literal-palette + explicit dark: variants, following
@@ -138,15 +139,15 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
     },
     {
       key: 'name',
-      label: 'Fee Name & Description',
+      label: 'Fee name and description',
       priority: 'critical',
       render: (row) => (
         <div className="min-w-0">
           <p className="font-medium text-body truncate">{row.name}</p>
           {row.description && <p className="text-xs text-muted truncate">{row.description}</p>}
           {!row.classId && !row.term && (
-            <span className="text-[11px] text-brand-teal inline-flex items-center gap-1 mt-0.5">
-              <Globe className="w-3 h-3" /> Applies to all classes &amp; terms
+            <span className="text-xs text-tone-teal inline-flex items-center gap-1 mt-0.5">
+              <Globe className="w-3 h-3" /> Applies to all classes and terms
             </span>
           )}
         </div>
@@ -160,13 +161,13 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
     },
     {
       key: 'schedule',
-      label: 'Status & Schedule',
+      label: 'Status and schedule',
       priority: 'important',
       render: (row) => <ScheduleBadge mandatory={row.mandatory} schedule={row.schedule} />,
     },
     {
       key: 'amount',
-      label: 'Standard Rate',
+      label: 'Standard rate',
       priority: 'critical',
       sortable: true,
       render: (row) => <span className="tabular font-semibold whitespace-nowrap">{formatMWK(row.amount)}</span>,
@@ -202,17 +203,17 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-heading font-semibold text-body">Fee Catalog &amp; Accounting Settings</h2>
+          <h2 className="font-heading font-semibold text-body">Fee catalog and accounting settings</h2>
           <p className="text-xs text-muted mt-0.5">
-            Configure fee categories, standard rates, and how each fee bills — sourced across invoices and fee structures.
+            Configure fee categories, standard rates, and how each fee bills. Sourced across invoices and fee structures.
           </p>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex items-center gap-1.5 bg-brand-teal text-white rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
+          className="inline-flex items-center gap-1.5 bg-btn-brand text-btn-brand-fg rounded-lg px-3.5 py-2 text-sm font-semibold hover:bg-brand-teal-light min-h-11"
         >
-          <Plus className="w-4 h-4" /> Add Fee Category
+          <Plus className="w-4 h-4" /> Add fee category
         </button>
       </div>
 
@@ -223,7 +224,7 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
       <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 rounded-xl p-3 text-xs text-blue-800 dark:text-blue-300 flex items-start gap-2">
         <Wallet className="w-4 h-4 shrink-0 mt-0.5" />
         <p>
-          <strong>Ledger Preservation Policy:</strong> archiving a fee removes it from new invoice line-item pickers only —
+          <strong>Ledger preservation policy:</strong> archiving a fee removes it from new invoice line-item pickers only, 
           every existing invoice, line item, and receipt that already reference it stay exactly as they are, and an
           archived fee can be restored at any time.
         </p>
@@ -236,9 +237,7 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
             key={f}
             type="button"
             onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize ${
-              filter === f ? 'bg-brand-deep text-white' : 'bg-page text-muted hover:text-body'
-            }`}
+            className={`${chipClass(filter === f)} capitalize`}
           >
             {f} ({counts[f]})
           </button>
@@ -258,7 +257,7 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
         mobileActions={[
           { label: 'Edit', icon: Pencil, onClick: openEdit },
           {
-            label: 'Archive / Restore',
+            label: 'Archive / restore',
             icon: Archive,
             onClick: (row) => (row.isActive ? setArchiveTarget(row) : updateFee.mutate({ id: row.id, data: { isActive: true } })),
           },
@@ -270,9 +269,9 @@ export function FeeStructureTab({ academicYear }: { academicYear: string }) {
           system itself supports end to end (receipts, allocation, ledger
           posting); not a free-text list an admin edits here. */}
       <div className="pt-2">
-        <h3 className="font-heading text-sm font-semibold text-body mb-1">System Configured Payment Modes</h3>
+        <h3 className="font-heading text-sm font-semibold text-body mb-1">System configured payment modes</h3>
         <p className="text-xs text-muted mb-3">
-          These payment options populate the mode-of-payment picker in Invoice Entry &amp; Allocation.
+          These payment options populate the mode-of-payment picker in Invoice Entry and Allocation.
         </p>
         <div className="flex flex-wrap gap-2">
           {PAYMENT_METHOD_OPTIONS.map((m) => (
@@ -385,7 +384,7 @@ function FeeFormModal({
     <Modal
       title={isEditing ? 'Edit Fee Category' : 'Add Fee Category'}
       onClose={onClose}
-      size="lg"
+      size="l"
       busy={isPending}
       bodyClassName="space-y-3"
       footer={
@@ -411,7 +410,7 @@ function FeeFormModal({
           <label htmlFor="fee-name" className="text-xs text-muted mb-1 block">Fee name</label>
           <input
             id="fee-name" value={name} onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. School Fee (Tuition)"
+            placeholder="School Fee (Tuition)"
             className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
           />
         </div>
@@ -419,7 +418,7 @@ function FeeFormModal({
           <label htmlFor="fee-code" className="text-xs text-muted mb-1 block">Code</label>
           <input
             id="fee-code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="e.g. TUI-01"
+            placeholder="TUI-01"
             className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11 font-mono"
           />
         </div>
@@ -467,7 +466,7 @@ function FeeFormModal({
 
       <div>
         <label htmlFor="fee-description" className="text-xs text-muted mb-1 block">
-          Description <span className="text-muted/70">(optional)</span>
+          Description <span className="text-muted">(optional)</span>
         </label>
         <textarea
           id="fee-description" value={description} onChange={(e) => setDescription(e.target.value)}
@@ -479,7 +478,7 @@ function FeeFormModal({
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
           <label htmlFor="fee-class" className="text-xs text-muted mb-1 block">
-            Class <span className="text-muted/70">(optional — blank = all classes)</span>
+            Class <span className="text-muted">(optional: blank = all classes)</span>
           </label>
           <select
             id="fee-class" value={classId} onChange={(e) => setClassId(e.target.value)}
@@ -491,7 +490,7 @@ function FeeFormModal({
         </div>
         <div>
           <label htmlFor="fee-term" className="text-xs text-muted mb-1 block">
-            Term <span className="text-muted/70">(optional — blank = all terms)</span>
+            Term <span className="text-muted">(optional: blank = all terms)</span>
           </label>
           <select
             id="fee-term" value={term} onChange={(e) => setTerm(e.target.value)}
@@ -506,7 +505,7 @@ function FeeFormModal({
       </div>
 
       {error && (
-        <p className="text-sm text-brand-coral">
+        <p className="text-sm text-tone-coral">
           {error instanceof Error ? error.message : 'Failed to save fee category.'}
         </p>
       )}

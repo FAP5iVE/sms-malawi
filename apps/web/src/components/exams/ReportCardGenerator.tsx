@@ -97,7 +97,7 @@ function ProgressBar({
       <div className="flex justify-between text-xs text-muted">
         <span>{done} / {total} generated</span>
         {failed > 0 && (
-          <span className="text-brand-coral">{failed} failed</span>
+          <span className="text-tone-coral">{failed} failed</span>
         )}
       </div>
       <div className="h-2 bg-page rounded-full overflow-hidden border border-base">
@@ -152,9 +152,9 @@ function StudentResultRow({
       {/* Status icon */}
       <div className="shrink-0 w-6 flex items-center justify-center">
         {row.rowStatus === 'queued'     && <span className="w-2 h-2 rounded-full bg-base border border-muted" />}
-        {row.rowStatus === 'generating' && <Loader2 className="w-4 h-4 text-brand-teal animate-spin" />}
+        {row.rowStatus === 'generating' && <Loader2 className="w-4 h-4 text-tone-teal animate-spin" />}
         {row.rowStatus === 'done'       && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-        {row.rowStatus === 'failed'     && <XCircle className="w-4 h-4 text-brand-coral" />}
+        {row.rowStatus === 'failed'     && <XCircle className="w-4 h-4 text-tone-coral" />}
       </div>
 
       {/* Student info */}
@@ -162,7 +162,7 @@ function StudentResultRow({
         <p className="text-sm font-heading font-medium text-body truncate">{row.fullName}</p>
         <p className="text-xs text-muted">{row.registrationNo}</p>
         {row.error && (
-          <p className="text-xs text-brand-coral mt-0.5 truncate">{row.error}</p>
+          <p className="text-xs text-tone-coral mt-0.5 truncate">{row.error}</p>
         )}
       </div>
 
@@ -172,7 +172,7 @@ function StudentResultRow({
           <button
             type="button"
             onClick={openPreview}
-            className="p-1.5 rounded-lg text-brand-teal hover:bg-brand-teal/10 transition-colors"
+            className="p-1.5 rounded-lg text-tone-teal hover:bg-brand-teal/10 transition-colors"
             aria-label={`View report card for ${row.fullName}`}
             title="View report card (opens in a new tab)"
           >
@@ -183,7 +183,7 @@ function StudentResultRow({
           <button
             type="button"
             onClick={() => onRetry(row.studentId)}
-            className="p-1.5 rounded-lg text-brand-amber hover:bg-brand-amber/10 transition-colors"
+            className="p-1.5 rounded-lg text-tone-amber hover:bg-brand-amber/10 transition-colors"
             aria-label={`Retry generation for ${row.fullName}`}
           >
             <RefreshCw className="w-4 h-4" />
@@ -310,7 +310,7 @@ export function ReportCardGenerator() {
       <div>
         <h2 className="font-heading font-bold text-xl text-brand-navy flex items-center gap-2">
           <FileText className="w-5 h-5" aria-hidden />
-          Report Card Generator
+          Report card generator
         </h2>
         <p className="text-sm text-muted mt-0.5">
           Batch-generate PDF report cards and upload to Appwrite storage.
@@ -320,7 +320,7 @@ export function ReportCardGenerator() {
       {/* Controls */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
         <div>
-          <label className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-heading font-semibold text-muted mb-1.5">
             Class
           </label>
           <select
@@ -336,7 +336,7 @@ export function ReportCardGenerator() {
         </div>
 
         <div>
-          <p className="block text-xs font-heading font-semibold text-muted uppercase tracking-wider mb-1.5">
+          <p className="block text-xs font-heading font-semibold text-muted mb-1.5">
             Period
           </p>
           <p className="min-h-[44px] flex items-center text-sm text-body">
@@ -360,7 +360,7 @@ export function ReportCardGenerator() {
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-brand-coral">
+        <div className="flex items-center gap-2 bg-brand-coral/8 border border-brand-coral/25 rounded-xl px-4 py-3 text-sm text-tone-coral">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {error}
         </div>
@@ -378,7 +378,7 @@ export function ReportCardGenerator() {
 
       {/* Success summary */}
       {done && (
-        <div className="flex items-center gap-2 border border-base rounded-xl px-4 py-3 text-sm text-brand-teal">
+        <div className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm text-tone-teal app-tint">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           {doneCount} report card{doneCount !== 1 ? 's' : ''} generated successfully.
           {failedCount > 0 && ` ${failedCount} failed — use the retry button to regenerate.`}
