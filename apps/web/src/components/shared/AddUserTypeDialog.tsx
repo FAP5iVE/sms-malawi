@@ -164,9 +164,9 @@ export function AddUserTypeDialog({ open, onSelect, onCancel }: AddUserTypeDialo
                   onClick={() => onSelect('staff')}
                   className="
                     flex flex-col items-center gap-2 min-h-[88px] p-4 rounded-xl
-                    border border-base bg-page text-body
-                    hover:border-brand-teal hover:bg-brand-teal/5
-                    active:bg-brand-teal/10
+                    app-tint text-body
+                    hover:bg-brand-teal/10
+                    active:bg-brand-teal/15
                     transition-colors
                   "
                 >
@@ -182,9 +182,9 @@ export function AddUserTypeDialog({ open, onSelect, onCancel }: AddUserTypeDialo
                   onClick={() => onSelect('student')}
                   className="
                     flex flex-col items-center gap-2 min-h-[88px] p-4 rounded-xl
-                    border border-base bg-page text-body
-                    hover:border-brand-teal hover:bg-brand-teal/5
-                    active:bg-brand-teal/10
+                    app-tint text-body
+                    hover:bg-brand-teal/10
+                    active:bg-brand-teal/15
                     transition-colors
                   "
                 >

@@ -44,16 +44,16 @@ import type { QuickAction } from '@/components/shared/QuickActions'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    label: 'Issue Book',
+    label: 'Issue book',
     // R15: was /library/issue — a route that has never existed (404).
     // Issuing lives in the Borrowings tab (page reads ?tab= as of this phase).
     href: '/library?tab=borrowings',
     icon: PlusCircle,
     color: 'bg-brand-teal/10',
-    text: 'text-brand-teal',
+    text: 'text-tone-teal',
   },
   {
-    label: 'Return Book',
+    label: 'Return book',
     // R15: was /library/return (404) — returns live in the same Borrowings tab
     href: '/library?tab=borrowings',
     icon: RotateCcw,
@@ -61,14 +61,14 @@ const QUICK_ACTIONS: QuickAction[] = [
     text: 'text-blue-600',
   },
   {
-    label: 'Search Catalog',
+    label: 'Search catalog',
     href: '/library?tab=catalog',
     icon: Search,
     color: 'bg-brand-amber/10',
-    text: 'text-brand-amber',
+    text: 'text-tone-amber',
   },
   {
-    label: 'Library Report',
+    label: 'Library report',
     href: '/reports',
     icon: FileText,
     color: 'bg-brand-navy/8',
@@ -102,7 +102,7 @@ export function LibraryDashboard() {
   return (
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
-        title="Library at a glance"
+        title="Library"
         summary="See which books are out, what is overdue and what is available to borrow."
         overview={overview}
         preferred={PREFERRED}
@@ -136,13 +136,13 @@ export function LibraryDashboard() {
             scrolls inside the card instead of stretching the row. Same frame,
             padding and title/sub styling as ChartCard. */}
         <div className="relative md:min-h-72">
-          <div className="flex h-full flex-col rounded-xl border border-base bg-surface p-3 sm:p-5 md:absolute md:inset-0">
+          <div className="flex h-full flex-col rounded-xl app-tint p-3 sm:p-5 md:absolute md:inset-0">
             <div className="mb-3 sm:mb-4">
-              <p className="font-heading font-semibold text-sm text-brand-navy">Overdue Students</p>
+              <p className="font-heading font-semibold text-sm text-brand-navy">Overdue students</p>
               <p className="mt-1 text-xs text-muted">Open loans past their due date, by class</p>
             </div>
             {overdueLoading ? (
-              <div className="flex-1 space-y-2" role="status" aria-label="Overdue students — loading">
+              <div className="flex-1 space-y-2" role="status" aria-label="Overdue students: loading">
                 {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton h-8 w-full rounded-lg" aria-hidden />)}
               </div>
             ) : overdueError ? (
@@ -164,9 +164,9 @@ export function LibraryDashboard() {
               <div className="min-h-0 max-h-72 flex-1 space-y-3 overflow-y-auto pr-1 md:max-h-none">
                 {overdueByClass.map((c) => (
                   <div key={c.className}>
-                    <p className="text-xs font-heading font-semibold text-muted uppercase">{c.className} · {c.students.length}</p>
+                    <p className="text-xs font-heading font-semibold text-muted ">{c.className} · {c.students.length}</p>
                     {c.students.slice(0, 3).map((s, i) => (
-                      <p key={i} className="truncate text-xs text-body">{s.studentName} — {s.bookTitle}</p>
+                      <p key={i} className="truncate text-xs text-body">{s.studentName} - {s.bookTitle}</p>
                     ))}
                   </div>
                 ))}

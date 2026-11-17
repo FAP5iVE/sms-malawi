@@ -386,7 +386,7 @@ function HRContent() {
                 <Link
                   key={s.id}
                   href={`/hr/${s.id}`}
-                  className="bg-surface border border-base rounded-xl p-4 flex items-center gap-3 text-left hover:border-brand-teal active:bg-page transition-colors"
+                  className="app-tint rounded-xl p-4 flex items-center gap-3 text-left hover:bg-brand-teal/10 transition-colors"
                 >
                   <div className="w-10 h-10 rounded-full bg-brand-navy/10 flex items-center justify-center text-brand-navy font-semibold text-sm shrink-0">
                     {s.firstName[0]}

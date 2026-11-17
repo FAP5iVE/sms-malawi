@@ -72,7 +72,7 @@ export function KpiTile({ kpi, showDescription = false }: { kpi: ReportKpi; show
       {kpi.status === 'watch' || kpi.status === 'critical' ? (
         <StatusText tone={kpi.status === 'critical' ? 'danger' : 'warning'}>{STATUS_TEXT[kpi.status]}</StatusText>
       ) : null}
-      <p className="break-words font-heading text-xl font-bold tabular-nums text-brand-navy sm:text-2xl">
+      <p data-kpi-value className="break-words font-heading text-xl font-bold tabular-nums text-brand-navy">
         {formatKpiValue(kpi.value, kpi.unit, true)}
       </p>
       {kpi.subLabel ? <p className="text-xs text-muted">{kpi.subLabel}</p> : null}
@@ -117,7 +117,7 @@ export function ReportKpiStrip({
   }
   if (!kpis || kpis.length === 0) return null
   // 4 or fewer KPIs get wider tiles.
-  const cols = kpis.length <= 4 ? 'grid grid-cols-2 gap-3 lg:grid-cols-4' : grid
+  const cols = kpis.length <= 4 ? 'grid grid-cols-2 gap-3 lg:grid-cols-4 sm:[&_[data-kpi-value]]:text-2xl' : grid
   return (
     <div className={cn(cols, className)}>
       {kpis.map((k) => (

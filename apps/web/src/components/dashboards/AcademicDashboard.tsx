@@ -55,14 +55,14 @@ import type { QuickAction } from '@/components/shared/QuickActions'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    label: 'Mark Attendance',
+    label: 'Mark attendance',
     href: '/classes',
     icon: ClipboardCheck,
     color: 'bg-brand-teal/10',
-    text: 'text-brand-teal',
+    text: 'text-tone-teal',
   },
   {
-    label: 'Enter Marks',
+    label: 'Enter marks',
     // R15: marks entry lives in the Exams tab (page reads ?tab= as of this phase)
     href: '/exams?tab=exams',
     icon: PenLine,
@@ -70,11 +70,11 @@ const QUICK_ACTIONS: QuickAction[] = [
     text: 'text-blue-600',
   },
   {
-    label: 'View Timetable',
+    label: 'View timetable',
     href: '/timetable',
     icon: Clock,
     color: 'bg-brand-amber/10',
-    text: 'text-brand-amber',
+    text: 'text-tone-amber',
   },
   {
     label: 'Announcements',
@@ -110,7 +110,7 @@ export function AcademicDashboard() {
   return (
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
-        title="Teaching at a glance"
+        title="Teaching"
         summary="See how your classes are doing and follow up on missing marks or students who may need help."
         academicYear={academicYear}
         term={term}
@@ -120,7 +120,7 @@ export function AcademicDashboard() {
       />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
-          title="Today's Timetable"
+          title="Today's timetable"
           sub="Your classes today"
           isLoading={timetableLoading}
           isEmpty={(timetableToday ?? []).length === 0}
@@ -131,7 +131,7 @@ export function AcademicDashboard() {
           <TodaysTimetableList slots={timetableToday ?? []} />
         </ListCard>
         <ListCard
-          title="Students Needing Attention"
+          title="Students needing attention"
           sub="High-risk active students"
           isLoading={riskLoading}
           isEmpty={highRiskStudents.length === 0}

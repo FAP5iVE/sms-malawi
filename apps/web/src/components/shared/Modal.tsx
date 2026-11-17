@@ -70,7 +70,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
-import { X } from 'lucide-react'
+import { ArrowLeft, X } from 'lucide-react'
 import { useMotionEnabled } from '@/store/motionStore'
 import { DIALOG_ENTER_S, DIALOG_EASE_ENTER } from '@/lib/hills/motion'
 import {
@@ -311,7 +311,36 @@ export function Modal({
         </div>
       )}
 
-      {hasHeader && (
+      {hasHeader && isScreen && (
+        <div className="shrink-0 border-b border-base px-4 sm:px-6 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+          <div className="mx-auto flex w-full max-w-6xl items-center gap-3">
+            <button
+              type="button"
+              onClick={requestClose}
+              disabled={busy}
+              aria-label="Close and go back"
+              className="-ml-2 inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-2 text-sm font-medium text-muted transition-colors hover:bg-page hover:text-body disabled:opacity-40"
+            >
+              <ArrowLeft className="h-5 w-5" aria-hidden />
+              Back
+            </button>
+            <div className="min-w-0">
+              {title != null && (
+                <h2 id={titleId} className="font-heading text-lg font-bold leading-snug text-brand-navy break-words">
+                  {title}
+                </h2>
+              )}
+              {description != null && (
+                <p id={descId} className="text-sm text-muted">
+                  {description}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {hasHeader && !isScreen && (
         <div className="flex items-start justify-between gap-3 px-5 sm:px-6 pt-3 sm:pt-5 pb-3 border-b border-base shrink-0">
           <div className="min-w-0">
             {title != null && (
@@ -340,12 +369,14 @@ export function Modal({
       <div
         className={`app-modal-body min-h-0 flex-1 overflow-y-auto overscroll-contain ${flush ? '' : 'px-5 sm:px-6 py-4'} ${bodyClassName}`}
       >
-        {children}
+        {isScreen ? <div className="mx-auto w-full max-w-6xl">{children}</div> : children}
       </div>
 
       {footer != null && (
-        <div className="app-modal-footer shrink-0 border-t border-base bg-surface px-5 sm:px-6 pt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:items-center">
-          {footer}
+        <div className="app-modal-footer shrink-0 border-t border-base bg-surface px-5 sm:px-6 pt-3">
+          <div className={`flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:items-center ${isScreen ? 'mx-auto w-full max-w-6xl' : ''}`}>
+            {footer}
+          </div>
         </div>
       )}
     </>
@@ -365,7 +396,7 @@ export function Modal({
     )
 
   return createPortal(
-    <div className="app-modal-root fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6">
+    <div className={`app-modal-root fixed inset-0 z-50 flex items-end sm:items-center justify-center ${isScreen ? '' : 'sm:p-6'}`}>
       {/* Backdrop */}
       <motion.div
         initial={motionEnabled ? { opacity: 0 } : false}

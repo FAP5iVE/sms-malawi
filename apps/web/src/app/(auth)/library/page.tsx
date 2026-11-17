@@ -2660,7 +2660,7 @@ function LibraryContent() {
                           key={c.category}
                           type="button"
                           onClick={() => setSelectedCategory(selectedCategory === c.category ? null : c.category)}
-                          className={`text-left bg-page border rounded-xl p-4 hover:border-brand-teal/40 transition-colors ${selectedCategory === c.category ? 'border-brand-teal ring-1 ring-brand-teal/30' : 'border-base'}`}
+                          className={`text-left app-tint rounded-xl p-4 hover:bg-brand-teal/10 transition-colors ${selectedCategory === c.category ? 'ring-2 ring-brand-teal' : ''}`}
                         >
                           <div className="flex items-center justify-between">
                             <p className="font-heading font-semibold text-xs text-body">{c.category}</p>

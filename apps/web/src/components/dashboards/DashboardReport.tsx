@@ -63,7 +63,7 @@ export function DashboardKpis({
         </ReportCard>
       ) : null}
       {data?.warnings?.map((w) => (
-        <p key={w.key} role="note" className="rounded-lg border border-base bg-page px-3 py-2 text-xs text-muted">
+        <p key={w.key} role="note" className="rounded-lg app-tint px-3 py-2 text-xs text-muted">
           {w.message}
         </p>
       ))}

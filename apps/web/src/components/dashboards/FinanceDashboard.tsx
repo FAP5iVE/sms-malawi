@@ -52,22 +52,22 @@ const QUICK_ACTIONS: QuickAction[] = [
     // there's no longer a separate "new invoice" mode to deep-link into,
     // so ?action=new was dropped; landing on the tab and searching for the
     // student now IS the new-invoice flow.
-    label: 'New Invoice',
+    label: 'New invoice',
     href: '/finances?tab=invoices',
     icon: FileText,
     color: 'bg-brand-navy/10',
     text: 'text-brand-navy',
   },
   {
-    label: 'Record Payment',
+    label: 'Record payment',
     // R15: payments live in the Invoices tab (page reads ?tab= as of this phase)
     href: '/finances?tab=invoices',
     icon: PlusCircle,
     color: 'bg-brand-teal/10',
-    text: 'text-brand-teal',
+    text: 'text-tone-teal',
   },
   {
-    label: 'Generate Receipt',
+    label: 'Generate receipt',
     // R15: receipts are issued from a recorded payment — same Invoices tab
     href: '/finances?tab=invoices',
     icon: Receipt,
@@ -75,18 +75,18 @@ const QUICK_ACTIONS: QuickAction[] = [
     text: 'text-emerald-600',
   },
   {
-    label: 'Fee Reports',
+    label: 'Fee reports',
     href: '/reports',
     icon: FileText,
     color: 'bg-blue-50',
     text: 'text-blue-600',
   },
   {
-    label: 'Student Balances',
+    label: 'Student balances',
     href: '/finances?tab=invoices',
     icon: Users,
     color: 'bg-brand-amber/10',
-    text: 'text-brand-amber',
+    text: 'text-tone-amber',
   },
 ]
 
@@ -111,7 +111,7 @@ export function FinanceDashboard() {
   return (
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
-        title="Finance at a glance"
+        title="Finance"
         summary="See what has come in, what is still owed and how spending compares with the budget."
         academicYear={academicYear}
         term={term}

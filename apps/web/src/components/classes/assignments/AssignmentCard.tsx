@@ -29,7 +29,7 @@ export function AssignmentCard({ a, isStudent, onOpen }: AssignmentCardProps) {
     <button
       type="button"
       onClick={onOpen}
-      className="w-full rounded-xl border border-base bg-surface p-4 text-left transition-colors hover:border-brand-teal/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/40"
+      className="w-full rounded-xl app-tint p-4 text-left transition-colors hover:bg-brand-teal/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/40"
     >
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
         <div className="min-w-0 flex-1">

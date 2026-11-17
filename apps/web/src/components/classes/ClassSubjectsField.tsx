@@ -124,11 +124,11 @@ export function ClassSubjectsField({ classId, readOnly = false }: Props) {
                 onClick={() => toggle(subject)}
                 disabled={isOptionLocked}
                 aria-pressed={isChecked}
-                className={`text-left text-xs px-3 py-2 rounded-lg border transition-colors ${
+                className={`text-left text-xs px-3 py-2 rounded-lg transition-colors ${
                   isChecked
-                    ? 'bg-brand-teal/10 border-brand-teal text-tone-teal font-medium'
-                    : 'bg-surface border-base text-muted'
-                } ${isOptionLocked ? 'cursor-default opacity-80' : 'hover:border-brand-teal/60 cursor-pointer'}`}
+                    ? 'bg-btn-brand text-btn-brand-fg font-medium'
+                    : 'app-tint text-muted'
+                } ${isOptionLocked ? 'cursor-default opacity-80' : isChecked ? 'cursor-pointer' : 'hover:bg-brand-teal/10 hover:text-body cursor-pointer'}`}
               >
                 {subject}
               </button>

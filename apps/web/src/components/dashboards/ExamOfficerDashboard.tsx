@@ -52,15 +52,15 @@ import type { QuickAction } from '@/components/shared/QuickActions'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    label: 'Enter Marks',
+    label: 'Enter marks',
     // R15: was /exams/marks — a route that has never existed (404)
     href: '/exams?tab=exams',
     icon: PenLine,
     color: 'bg-brand-teal/10',
-    text: 'text-brand-teal',
+    text: 'text-tone-teal',
   },
   {
-    label: 'Release Results',
+    label: 'Release results',
     // R15: was /exams/results (404) — release lives in the Results Release tab
     href: '/exams?tab=release',
     icon: CheckCircle,
@@ -76,15 +76,15 @@ const QUICK_ACTIONS: QuickAction[] = [
     text: 'text-blue-600',
   },
   {
-    label: 'Exam Analytics',
+    label: 'Exam analytics',
     // R15: the exams page has its own Analytics tab — more direct than /reports
     href: '/exams?tab=analytics',
     icon: BarChart3,
     color: 'bg-brand-amber/10',
-    text: 'text-brand-amber',
+    text: 'text-tone-amber',
   },
   {
-    label: 'Exam Settings',
+    label: 'Exam settings',
     // R15: deep-links to the Exam & Grading section (page reads ?section=)
     href: '/settings?section=exam-grading',
     icon: Settings,
@@ -138,7 +138,7 @@ export function ExamOfficerDashboard() {
   return (
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
-        title="Examinations at a glance"
+        title="Examinations"
         summary="Check marking progress, results awaiting approval and exams still to be completed."
         academicYear={academicYear}
         term={term}
@@ -152,8 +152,8 @@ export function ExamOfficerDashboard() {
             fetched on this dashboard for the stat cards above; both lists
             below just reuse the same examFilters predicates instead of
             fetching anything new. */}
-        <div className="bg-surface border border-base rounded-xl p-5">
-          <h3 className="font-heading font-semibold text-body mb-1">Exam Schedule This Week</h3>
+        <div className="app-tint rounded-xl p-5">
+          <h3 className="font-heading font-semibold text-body mb-1">Exam schedule this week</h3>
           <p className="text-xs text-muted mb-4">Exams scheduled in the next 7 days</p>
           {isLoading ? (
             <div className="space-y-2">
@@ -172,7 +172,7 @@ export function ExamOfficerDashboard() {
                   className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-page transition-colors"
                 >
                   <div>
-                    <p className="text-sm font-medium text-body">{ex.subject} — {ex.className ?? ex.classId}</p>
+                    <p className="text-sm font-medium text-body">{ex.subject} - {ex.className ?? ex.classId}</p>
                     <p className="text-xs text-muted">{new Date(ex.date).toLocaleDateString('en-MW', { weekday: 'short', day: 'numeric', month: 'short' })} · {ex.timeStart}</p>
                   </div>
                 </Link>
@@ -181,8 +181,8 @@ export function ExamOfficerDashboard() {
           )}
         </div>
 
-        <div className="bg-surface border border-base rounded-xl p-5">
-          <h3 className="font-heading font-semibold text-body mb-1">Results Release Queue</h3>
+        <div className="app-tint rounded-xl p-5">
+          <h3 className="font-heading font-semibold text-body mb-1">Results release queue</h3>
           <p className="text-xs text-muted mb-4">Approved results awaiting release</p>
           {isLoading ? (
             <div className="space-y-2">
@@ -201,7 +201,7 @@ export function ExamOfficerDashboard() {
                   className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-page transition-colors"
                 >
                   <div>
-                    <p className="text-sm font-medium text-body">{ex.subject} — {ex.className ?? ex.classId}</p>
+                    <p className="text-sm font-medium text-body">{ex.subject} - {ex.className ?? ex.classId}</p>
                     <p className="text-xs text-muted">{ex.title}</p>
                   </div>
                 </Link>

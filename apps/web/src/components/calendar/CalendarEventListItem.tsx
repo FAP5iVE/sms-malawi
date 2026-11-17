@@ -98,7 +98,7 @@ export function CalendarEventListItem({
   }
 
   return (
-    <div className="group relative flex items-start gap-3 p-3.5 rounded-xl bg-surface hover:bg-page border border-base transition-colors">
+    <div className="group relative flex items-start gap-3 p-3.5 rounded-xl app-tint hover:bg-brand-teal/10 transition-colors">
       <div
         className="w-1.5 self-stretch rounded-full shrink-0 my-0.5"
         style={{ backgroundColor: color }}

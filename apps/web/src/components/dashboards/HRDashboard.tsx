@@ -53,15 +53,15 @@ import type { ApiLeaveRequest, ApiContractAlert } from '@shared/types/api'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    label: 'Approve Leave',
+    label: 'Approve leave',
     // R15: was /hr/leave — a route that has never existed (404)
     href: '/hr?tab=leave',
     icon: CheckCircle,
     color: 'bg-brand-teal/10',
-    text: 'text-brand-teal',
+    text: 'text-tone-teal',
   },
   {
-    label: 'Add Staff',
+    label: 'Add staff',
     // R15: was /hr/staff/new (404) — staff creation lives in the Directory tab
     href: '/hr?tab=directory',
     icon: UserPlus,
@@ -69,11 +69,11 @@ const QUICK_ACTIONS: QuickAction[] = [
     text: 'text-blue-600',
   },
   {
-    label: 'Leave Calendar',
+    label: 'Leave calendar',
     href: '/calendar',
     icon: CalendarDays,
     color: 'bg-brand-amber/10',
-    text: 'text-brand-amber',
+    text: 'text-tone-amber',
   },
   {
     label: 'HR Reports',
@@ -137,7 +137,7 @@ export function HRDashboard() {
   return (
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
-        title="Workforce at a glance"
+        title="Workforce"
         summary="Check staff numbers, upcoming contract dates, leave and requests waiting for a decision."
         academicYear={academicYear}
         overview={overview}
@@ -146,7 +146,7 @@ export function HRDashboard() {
       />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
-          title="Contract Expiry Alerts"
+          title="Contract expiry alerts"
           sub={`Expiring in the next ${CONTRACT_ALERT_DAYS} days`}
           isLoading={contractLoading}
           isEmpty={(contracts ?? []).length === 0}
@@ -163,7 +163,7 @@ export function HRDashboard() {
                   </p>
                   <p className="text-xs text-muted truncate">{c.department}</p>
                 </div>
-                <span className="text-xs text-brand-coral whitespace-nowrap shrink-0">
+                <span className="text-xs text-tone-coral whitespace-nowrap shrink-0">
                   {new Date(c.contractExpiry).toLocaleDateString('en-MW')}
                 </span>
               </li>
@@ -171,7 +171,7 @@ export function HRDashboard() {
           </ul>
         </ListCard>
         <ListCard
-          title="Staff Leave Calendar"
+          title="Staff leave calendar"
           sub="Who is off this week"
           isLoading={approvedLeaveLoading}
           isEmpty={offThisWeek.length === 0}

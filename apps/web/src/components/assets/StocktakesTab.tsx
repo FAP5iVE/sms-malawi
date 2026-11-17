@@ -31,14 +31,14 @@ function StocktakeRow({ row, onOpen }: { row: Stocktake; onOpen: () => void }) {
 function StocktakeDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const { data, isLoading } = useStocktake(id)
   const complete = useCompleteStocktake()
-  if (isLoading || !data) return <Modal size="xl" title="Stocktake" onClose={onClose}><div className="py-8 text-center"><Loader2 className="inline w-5 h-5 animate-spin" /></div></Modal>
+  if (isLoading || !data) return <Modal size="screen" title="Stocktake" onClose={onClose}><div className="py-8 text-center"><Loader2 className="inline w-5 h-5 animate-spin" /></div></Modal>
   // Only IN_PROGRESS is countable/completable — DRAFT hasn't been started yet,
   // REVIEWED/COMPLETED/CANCELLED are already closed out.
   const canComplete = data.status === 'IN_PROGRESS'
   // No filtering needed here: variances only get created once completeStocktake()
   // runs, so every line is still open for counting while IN_PROGRESS.
   const lines = data.lines ?? []
-  return <Modal size="xl" title={`Stocktake · ${data.stocktakeNumber}`} onClose={onClose}>
+  return <Modal size="screen" title={`Stocktake · ${data.stocktakeNumber}`} onClose={onClose}>
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3"><Mini label="Status" value={humanize(data.status)} /><Mini label="Lines" value={String(data.lines?.length ?? 0)} /><Mini label="Open variances" value={String((data.variances ?? []).filter(v => v.status === 'OPEN' || v.status === 'INVESTIGATING').length)} /></div>
 
@@ -72,7 +72,7 @@ function StocktakeLineRow({ stocktakeId, line }: { stocktakeId: string; line: St
   const label = line.assetId ? `Asset ${line.assetId}` : line.inventoryItemId ? `Item ${line.inventoryItemId}` : line.id
   return <div className="flex items-center gap-3 rounded-lg p-2.5 app-tint">
     <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{label}</p><p className="text-xs text-muted">Expected: {num(line.expectedQuantity)}</p></div>
-    <input type="number" min="0" step="1" value={actual} onChange={(e) => setActual(e.target.value)} className="input w-24" />
+    <input type="number" min="0" step="1" value={actual} onChange={(e) => setActual(e.target.value)} className="input max-w-24 shrink-0" />
     <button type="button" disabled={record.isPending}
       onClick={() => record.mutate({ stocktakeId, lineId: line.id, actualQuantity: num(actual) })}
       className="min-h-11 px-3 rounded-lg bg-brand-deep text-white text-xs font-semibold disabled:opacity-60">
@@ -85,7 +85,7 @@ function VarianceRow({ stocktakeId, varianceId, varianceQuantity, varianceType, 
   const resolve = useResolveInventoryVariance()
   const [note, setNote] = useState('')
   const isOpen = status === 'OPEN' || status === 'INVESTIGATING'
-  return <div className="border border-brand-coral/20 bg-brand-coral/5 rounded-lg p-3">
+  return <div className="bg-brand-coral/10 rounded-lg p-3">
     <div className="flex justify-between">
       <span className="font-semibold">{humanize(varianceType)} of {Math.abs(num(varianceQuantity))}</span>
       <span className="text-xs text-muted">{humanize(status)}</span>
@@ -93,7 +93,7 @@ function VarianceRow({ stocktakeId, varianceId, varianceQuantity, varianceType, 
     {isOpen && (
       <PermissionGuard permission="inventory.resolveVariance">
         <div className="flex gap-2 mt-3">
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Resolution note (optional)" className="input flex-1" />
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" className="input flex-1" />
           <button type="button" disabled={resolve.isPending}
             onClick={() => resolve.mutate({ stocktakeId, varianceId, resolution: 'RESOLVED', resolutionNote: note.trim() || undefined }, { onSuccess: () => setNote('') })}
             className="min-h-11 px-3 rounded-lg bg-brand-deep text-white text-sm">Resolve</button>

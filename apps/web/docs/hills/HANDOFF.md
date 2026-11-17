@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-17 (after Phase 8b-3 pages, AT REVIEW GATE; 8b-2 packed and delivered, 8c dashboard next). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
+Last updated: 2026-11-17 (after Phase 8c dashboards and parent portal, AT REVIEW GATE; 8b-3 delivered, 8e calendar next). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -43,7 +43,8 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | 8b-1 pages: attendance, timetable, guardians, classes, placements, applications (`hills/phase-8b1-pages`, off `hills/phase-8d-shell`) | done, AT REVIEW GATE | review pack 8b-1 |
 | 8b-2 pages: library, HR, announcements, approvals, settings, monitoring, reports (`hills/phase-8b2-pages`, off `hills/phase-8b1-pages`) | done, AT REVIEW GATE | review pack 8b-2 |
 | 8b-3 pages: assets, exams, finances, gallery admin, students, user management (`hills/phase-8b3-pages`, off `hills/phase-8b2-pages`) | done, AT REVIEW GATE | review pack 8b-3 |
-| **8c** dashboards, greeting, parent portal (**NEXT**, after the 8b-3 gate); **8e** calendar; **8f** emails; **8g** report cards + exports | after 8b; 8f and 8g exception APPROVED (presentation only) | |
+| 8c dashboards, greeting, parent portal, big dialogs as pages, bordered-card sweep (`hills/phase-8c-dashboards`, off `hills/phase-8b3-pages`) | done, AT REVIEW GATE | review pack 8c |
+| **8e** calendar (**NEXT**, after the 8c gate); **8f** emails; **8g** report cards + exports | after 8c; 8f and 8g exception APPROVED (presentation only) | |
 | **9** cleanup, ratchets (pills = 0, AI-tell count only down, contrast 100%) | last | |
 
 The user asked for Phases 0 to the logo step to be reviewed as ONE package. Phases 3 and 4 were each reviewed on their own. Phase 6 is split in two review drops (6a, then 6b). Next review gate is
@@ -449,6 +450,16 @@ after 6a.
     - **Wording (R4):** sentence case, no uppercase labels, no em dashes in visible text.
     - **Checked in the real app** (admin, fake session, `p8/fixtures83.mjs`, `p8/pages81.mjs`): assets, exams, students, user management, gallery admin and finances (default tabs) at 390 and 1280, light and dark, no sideways overflow.
     - **Not covered / still open:** the xl and 2xl dialogs (stocktake, marks entry, student results, payroll run, student detail) hold wide tables or several contexts and by R8.1 probably should be pages, so they keep their old sizes until the owner decides; inner tabs of finances, exams and students detail pages were converted by tokens but not opened in a capture; the assets tab strip scrolls sideways at 1280 (existing); dev-only warnings from React Compiler remain (existing); Firefox and Safari untested.
+23. **Phase 8c: dashboards, parent portal, big dialogs as pages, card sweep.** Branch `hills/phase-8c-dashboards` off `hills/phase-8b3-pages`. Looks only apart from the owner-approved items below; logic gate clean against the 8b-3 branch (98 declared tokens) and `main` (11 new files); contrast 502 pairs pass; handler inventory matches (digests only); 83 tests pass; eslint shows only old warnings; tsc on changed files clean (Prisma noise ignored).
+    - **Dashboard page (R1.1, R4.12):** greeting sits on the sky, the role dashboard and the super-user role switcher sit on one `ModuleSurface`. The line under the greeting is now role (or job title), term and date ("Head of School · Term 1 2026/2027 · Tuesday 17 November"). It reads the existing `useViewingPeriod` hook. The R4.11 facts line is NOT shown yet: the page itself loads no data, and showing nothing is the rule when there is nothing to say. Add it only if a role dashboard exposes a count the page already holds.
+    - **Dashboards:** bordered boxes, notes and link rows became `app-tint` tiles; link tiles get a hover tint; the urgent link on the High Rank dashboard has no coral border (`bg-brand-coral/10`). `QuickActions` is a tint block with tint tiles. "X at a glance" titles are now plain names (School figures, Administration, Finance, Workforce, Registry, Teaching, Examinations, My term, Library). Em dashes removed from visible text; empty-value dashes ("—") stay, as in earlier phases.
+    - **Stat-value size (owner: decide from the established layout):** two tiers. Module-page `StatCard` stays `text-xl` (narrow 5-up grids, long money values). Report and dashboard KPI strips use `text-xl`, and `sm:text-2xl` only when the strip has 4 or fewer tiles (wide tiles). Done in `ReportKpiStrip` with a `data-kpi-value` hook; no logic. Recorded in RULEBOOK R10.5.
+    - **Parent portal:** already on one surface; only `ParentPanels` wording, colour tokens and borders were adjusted.
+    - **Big dialogs as pages (owner: YES):** `Modal` has a new `size="screen"`: full-screen page with a Back button (same close path and busy lock as X), content centred at `max-w-6xl`. Stocktake detail, stocktake create, marks entry and the payroll run use it. Student results and student detail were not changed in 8c (see open items).
+    - **Clean sweep (owner: YES):** ~14 bordered clickable cards across earlier pages became tint tiles (AddUserTypeDialog, ClassSubjectsField, AssignmentCard, StudentClaimPanel, StaffPlacementEntryPanel, CalendarEventListItem, hr and library pages, GuardianLinkDialogs, GuardianOnboardingTab).
+    - **Found while capturing:** in the stocktake page the count box (`.input`, 100% wide) squeezed the item name away. Fixed with `max-w-24 shrink-0`; placeholder shortened to "Note (optional)".
+    - **Checked in the real app** (fake session, `p8/pages81.mjs`, `p8/fixtures8c.mjs`): all nine role dashboards at 390 and 1280, light and dark, no sideways overflow; stocktake page at 390 and 1280, light and dark.
+    - **Not covered / still open:** marks entry and payroll run in screen mode were not opened in the capture (need exam and payroll fixtures); dashboards were captured with empty data only, so filled charts and lists were not seen; student results and student detail dialogs still xl/2xl; R7.3 top-5 lists and R10.1 chart titles on dashboards were not changed (they would need data changes); parent report card dialog stays until 8g.
 
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database. Do not retry or work around. tsc errors from missing

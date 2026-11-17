@@ -47,10 +47,10 @@ export function PrimaryKpis({
 }) {
   const { data, isLoading, isError, refetch } = overview
   return (
-    <section aria-label="School at a glance" className="space-y-3">
+    <section aria-label="School figures" className="space-y-3">
       <DashboardIntro
-        title="School at a glance"
-        summary="Review school results, attendance, enrolment and finances in one place."
+        title="School figures"
+        summary="Results, attendance, enrolment and finances for the selected term."
         academicYear={academicYear}
         term={term}
         reportsHref="/reports?tab=overview"
@@ -63,14 +63,14 @@ export function PrimaryKpis({
       ) : isLoading || !data ? (
         <ReportKpiStrip kpis={undefined} isLoading placeholders={4} />
       ) : data.primary.length === 0 ? (
-        <p role="status" className="rounded-lg border border-base bg-page px-3 py-2 text-sm text-muted">
+        <p role="status" className="rounded-lg app-tint px-3 py-2 text-sm text-muted">
           No headline figures are available for your role.
         </p>
       ) : (
         <ReportKpiStrip kpis={data.primary} showDescription />
       )}
       {data?.warnings.map((w) => (
-        <p key={w.key} role="note" className="rounded-lg border border-base bg-page px-3 py-2 text-xs text-muted">
+        <p key={w.key} role="note" className="rounded-lg app-tint px-3 py-2 text-xs text-muted">
           {w.message}
         </p>
       ))}
@@ -121,7 +121,7 @@ function CompactDelta({ c, unit }: { c: ReportKpiComparison; unit: ReportKpi['un
   const mag = Math.abs(c.delta)
   const text = unit === 'percent' ? `${mag} pts` : unit === 'mwk' ? formatKpiValue(mag, 'mwk', true) : mag.toLocaleString('en-US')
   return (
-    <span className={cn('inline-flex items-center gap-0.5 text-xs', good ? 'text-brand-teal' : bad ? 'text-brand-coral' : 'text-muted')}>
+    <span className={cn('inline-flex items-center gap-0.5 text-xs', good ? 'text-tone-teal' : bad ? 'text-tone-coral' : 'text-muted')}>
       <Icon className="h-3 w-3" aria-hidden />
       {c.direction === 'flat' ? 'No change' : text}
       <span className="sr-only"> {c.label}</span>
@@ -192,7 +192,7 @@ export function DashboardSection({
   const [open, setOpen] = useState(defaultOpen)
   const panelId = useId()
   return (
-    <section className="rounded-xl border border-base bg-surface">
+    <section className="rounded-xl app-tint">
       <h3>
         <button
           type="button"
@@ -213,7 +213,7 @@ export function DashboardSection({
           <div className="space-y-4">
             {children}
             {href ? (
-              <Link href={href} className="inline-flex min-h-11 items-center gap-0.5 text-xs font-medium text-brand-teal hover:underline">
+              <Link href={href} className="inline-flex min-h-11 items-center gap-0.5 text-xs font-medium text-tone-teal hover:underline">
                 {hrefLabel}
                 <ArrowUpRight className="h-3 w-3" aria-hidden />
               </Link>
@@ -236,14 +236,14 @@ export interface ReportLink {
 /** Drill-down links to the full reports (filters, tables, exports live there). */
 export function ReportLinks({ links, title = 'Detailed reports' }: { links: readonly ReportLink[]; title?: string }) {
   return (
-    <section aria-label={title} className="rounded-xl border border-base bg-surface p-3 sm:p-5">
+    <section aria-label={title} className="rounded-xl app-tint p-3 sm:p-5">
       <h3 className="mb-2 font-heading text-sm font-semibold text-brand-navy sm:mb-3">{title}</h3>
       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {links.map((l) => (
           <li key={l.href}>
             <Link
               href={l.href}
-              className="flex min-h-11 flex-col justify-center rounded-lg border border-base px-3 py-2 hover:border-brand-teal/50 hover:bg-page focus:outline-none focus:ring-2 focus:ring-brand-teal/30"
+              className="flex min-h-11 flex-col justify-center rounded-lg bg-surface px-3 py-2 transition-colors hover:bg-brand-teal/10 focus:outline-none focus:ring-2 focus:ring-brand-teal/30"
             >
               <span className="text-sm font-medium text-brand-navy">{l.label}</span>
               {l.description ? <span className="text-xs text-muted">{l.description}</span> : null}
@@ -294,14 +294,14 @@ export function PrimaryOverviewKpis({
       ) : isLoading || !data ? (
         <ReportKpiStrip kpis={undefined} isLoading placeholders={max} />
       ) : primary.length === 0 ? (
-        <p role="status" className="rounded-lg border border-base bg-page px-3 py-2 text-sm text-muted">
+        <p role="status" className="rounded-lg app-tint px-3 py-2 text-sm text-muted">
           No figures are available for this period.
         </p>
       ) : (
         <ReportKpiStrip kpis={primary} showDescription />
       )}
       {data?.warnings?.map((w) => (
-        <p key={w.key} role="note" className="rounded-lg border border-base bg-page px-3 py-2 text-xs text-muted">
+        <p key={w.key} role="note" className="rounded-lg app-tint px-3 py-2 text-xs text-muted">
           {w.message}
         </p>
       ))}
@@ -334,7 +334,7 @@ export function SecondaryKpis({
         {secondary.length > 0 ? <CompactKpiList kpis={secondary} /> : <p className="text-sm text-muted">No further figures for this period.</p>}
         {insights.length > 0 ? (
           <div className="mt-3">
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">What stands out</h4>
+            <h4 className="mb-2 text-xs font-semibold text-muted">What stands out</h4>
             <InsightList insights={insights} />
           </div>
         ) : null}

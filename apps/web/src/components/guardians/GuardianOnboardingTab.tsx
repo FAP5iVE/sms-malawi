@@ -163,7 +163,7 @@ export function GuardianOnboardingTab() {
               {(classes.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-          <label className="flex items-start gap-3 rounded-xl border border-base px-3 py-2.5 min-h-11 cursor-pointer hover:bg-page self-end">
+          <label className="flex items-start gap-3 rounded-xl app-tint px-3 py-2.5 min-h-11 cursor-pointer hover:bg-brand-teal/10 self-end">
             <input type="checkbox" checked={includeNotEnrolled} onChange={(e) => setIncludeNotEnrolled(e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand-teal" />
             <span className="text-sm text-body">Include students who are no longer enrolled</span>
           </label>

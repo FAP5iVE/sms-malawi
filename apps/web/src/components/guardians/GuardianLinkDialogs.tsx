@@ -51,7 +51,7 @@ function CapabilityPicker({ value, onChange, idPrefix }: {
     <fieldset className="space-y-2">
       <legend className="text-xs font-medium text-body mb-1">What this guardian can see for this child</legend>
       {GUARDIAN_CAPABILITIES.map((c) => (
-        <label key={c} htmlFor={`${idPrefix}-${c}`} className="flex items-start gap-3 rounded-xl border border-base px-3 py-2.5 cursor-pointer hover:bg-page min-h-11">
+        <label key={c} htmlFor={`${idPrefix}-${c}`} className="flex items-start gap-3 rounded-xl app-tint px-3 py-2.5 cursor-pointer hover:bg-brand-teal/10 min-h-11">
           <input
             id={`${idPrefix}-${c}`} type="checkbox" checked={value.includes(c)} onChange={() => toggle(c)}
             className="mt-0.5 h-4 w-4 accent-brand-teal"
@@ -102,7 +102,7 @@ export function ApproveDialog({ link, onClose }: { link: GuardianLinkDto; onClos
       </p>
 
       {link.suggestion && (
-        <label className="flex items-start gap-3 rounded-xl border border-status-warning/40 bg-status-warning/10 px-3 py-3 cursor-pointer">
+        <label className="flex items-start gap-3 rounded-xl bg-status-warning/10 px-3 py-3 cursor-pointer">
           <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5 h-4 w-4 accent-brand-teal" />
           <span className="text-sm text-body">
             This guardian may already be on file under another entry. I have checked and they are a different person.
@@ -256,14 +256,14 @@ export function InviteDialog({ link, onClose }: { link: GuardianLinkDto; onClose
         <>
           <fieldset className="space-y-2">
             <legend className="text-xs font-medium text-body mb-1">How should they receive it?</legend>
-            <label className={`flex items-start gap-3 rounded-xl border border-base px-3 py-2.5 min-h-11 ${emails.length ? 'cursor-pointer hover:bg-page' : 'opacity-60'}`}>
+            <label className={`flex items-start gap-3 rounded-xl app-tint px-3 py-2.5 min-h-11 ${emails.length ? 'cursor-pointer hover:bg-brand-teal/10' : 'opacity-60'}`}>
               <input type="radio" name="inv-channel" checked={channel === 'EMAIL'} disabled={emails.length === 0} onChange={() => setChannel('EMAIL')} className="mt-0.5 accent-brand-teal" />
               <span>
                 <span className="block text-sm font-medium text-body">E-mail</span>
                 <span className="block text-xs text-muted">{emails.length ? 'Sends a link and a code.' : 'No e-mail address on file for this guardian.'}</span>
               </span>
             </label>
-            <label className="flex items-start gap-3 rounded-xl border border-base px-3 py-2.5 min-h-11 cursor-pointer hover:bg-page">
+            <label className="flex items-start gap-3 rounded-xl app-tint px-3 py-2.5 min-h-11 cursor-pointer hover:bg-brand-teal/10">
               <input type="radio" name="inv-channel" checked={channel === 'SLIP'} onChange={() => setChannel('SLIP')} className="mt-0.5 accent-brand-teal" />
               <span>
                 <span className="block text-sm font-medium text-body">Printed slip</span>

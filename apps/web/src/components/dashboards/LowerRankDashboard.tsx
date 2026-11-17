@@ -49,23 +49,23 @@ import type { QuickAction } from '@/components/shared/QuickActions'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    label: 'Add Student',
+    label: 'Add student',
     // R15: was /students/new — a route that has never existed (404).
     // Student creation is in-page at /students.
     href: '/students',
     icon: UserPlus,
     color: 'bg-brand-teal/10',
-    text: 'text-brand-teal',
+    text: 'text-tone-teal',
   },
   {
     label: 'Applications',
     href: '/applications',
     icon: ClipboardList,
     color: 'bg-brand-amber/10',
-    text: 'text-brand-amber',
+    text: 'text-tone-amber',
   },
   {
-    label: 'View Calendar',
+    label: 'View calendar',
     href: '/calendar',
     icon: CalendarDays,
     color: 'bg-blue-50',
@@ -110,7 +110,7 @@ export function LowerRankDashboard() {
   return (
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
-        title="Registry at a glance"
+        title="Registry"
         summary="Keep up with admissions, student registration and attendance issues that need follow-up."
         academicYear={academicYear}
         term={term}
@@ -120,7 +120,7 @@ export function LowerRankDashboard() {
       />
       <div className="grid md:grid-cols-2 gap-3 md:gap-4">
         <ListCard
-          title="Exam Schedule This Week"
+          title="Exam schedule this week"
           sub="Next 7 days"
           isLoading={periodLoading || examsLoading}
           isEmpty={examsThisWeekList.length === 0}
@@ -145,7 +145,7 @@ export function LowerRankDashboard() {
           </ul>
         </ListCard>
         <ListCard
-          title="Recent Applications"
+          title="Recent applications"
           sub="Pending review"
           isLoading={pendingLoading}
           isEmpty={recentApplications.length === 0}

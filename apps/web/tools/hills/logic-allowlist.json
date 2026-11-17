@@ -12436,6 +12436,699 @@
       "kind": "selector",
       "pattern": "^placeholder=\"Search\\ by\\ name\\ or\\ number\u2026\"$",
       "reason": "8b-3: visible wording (button, label or placeholder text) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/exams/MarksEntrySheet.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ correctionMode\\ \\?\\ 'Correct\\ Marks\\ \\(Review\\)'\\ :\\ 'Enter\\ Marks'\\ \\}$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/exams/MarksEntrySheet.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ correctionMode\\ \\?\\ 'Correct\\ marks\\ \\(review\\)'\\ :\\ 'Enter\\ marks'\\ \\}$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/finances/payroll/PayrollRunsTab.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ run\\ \\?\\ formatRunPeriod\\ \\(\\ run\\ \\.\\ month\\ ,\\ run\\ \\.\\ year\\ \\)\\ :\\ 'Payroll\\ Run'\\ \\}$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/finances/payroll/PayrollRunsTab.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ run\\ \\?\\ formatRunPeriod\\ \\(\\ run\\ \\.\\ month\\ ,\\ run\\ \\.\\ year\\ \\)\\ :\\ 'Payroll\\ run'\\ \\}$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ hasHeader\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ hasHeader\\ \\&\\&\\ isScreen\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"Close\\ and\\ go\\ back\"$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Back$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ hasHeader\\ \\&\\&\\ !\\ isScreen\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ title\\ !=\\ null\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^id=\\{\\ titleId\\ \\}$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ title\\ \\}$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ description\\ !=\\ null\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^id=\\{\\ descId\\ \\}$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ description\\ \\}$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onClick=\\{\\ requestClose\\ \\}$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^disabled=\\{\\ busy\\ \\}$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ isScreen\\ \\?\\ <JSX/>\\ :\\ children\\ \\}$",
+      "reason": "8c: owner-approved (17 Nov 2026) - the largest dialogs become full-screen pages. For size 'screen' the header is a page header with a Back button; the title and description markup is the same, split in two branches by isScreen. Back calls the same requestClose as the X button and obeys the same busy lock. Other sizes render exactly as before."
+    },
+    {
+      "file": "src/app/(auth)/dashboard/page.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ type\\ \\{\\ UserRole\\ \\}\\ from\\ '@shared/types/roles'$",
+      "reason": "8c: owner-approved (R4.12, review answer item 6). The role line under the greeting now reads role, term and date. The term and year come from the existing useViewingPeriod hook (read only); role title falls back to ROLE_LABELS; the date is the browser date. Nothing is fetched or saved that was not before."
+    },
+    {
+      "file": "src/app/(auth)/dashboard/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^detail=\\{\\ subtitle\\ \\?\\ <JSX/>\\ :\\ role\\ \\?\\.\\ replace\\ \\(\\ '_'\\ ,\\ '\\ '\\ \\)\\ \\}$",
+      "reason": "8c: owner-approved (R4.12, review answer item 6). The role line under the greeting now reads role, term and date. The term and year come from the existing useViewingPeriod hook (read only); role title falls back to ROLE_LABELS; the date is the browser date. Nothing is fetched or saved that was not before."
+    },
+    {
+      "file": "src/app/(auth)/dashboard/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ subtitle\\ \\}$",
+      "reason": "8c: owner-approved (R4.12, review answer item 6). The role line under the greeting now reads role, term and date. The term and year come from the existing useViewingPeriod hook (read only); role title falls back to ROLE_LABELS; the date is the browser date. Nothing is fetched or saved that was not before."
+    },
+    {
+      "file": "src/app/(auth)/dashboard/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ role\\ \\?\\.\\ replace\\ \\(\\ '_'\\ ,\\ '\\ '\\ \\)\\ \\}$",
+      "reason": "8c: owner-approved (R4.12, review answer item 6). The role line under the greeting now reads role, term and date. The term and year come from the existing useViewingPeriod hook (read only); role title falls back to ROLE_LABELS; the date is the browser date. Nothing is fetched or saved that was not before."
+    },
+    {
+      "file": "src/app/(auth)/dashboard/page.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ ROLE_LABELS\\ ,\\ type\\ UserRole\\ \\}\\ from\\ '@shared/types/roles'$",
+      "reason": "8c: owner-approved (R4.12, review answer item 6). The role line under the greeting now reads role, term and date. The term and year come from the existing useViewingPeriod hook (read only); role title falls back to ROLE_LABELS; the date is the browser date. Nothing is fetched or saved that was not before."
+    },
+    {
+      "file": "src/app/(auth)/dashboard/page.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useViewingPeriod\\ \\}\\ from\\ '@/hooks/useViewingPeriod'$",
+      "reason": "8c: owner-approved (R4.12, review answer item 6). The role line under the greeting now reads role, term and date. The term and year come from the existing useViewingPeriod hook (read only); role title falls back to ROLE_LABELS; the date is the browser date. Nothing is fetched or saved that was not before."
+    },
+    {
+      "file": "src/app/(auth)/dashboard/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ academicYear\\ ,\\ term\\ \\}\\ =\\ useViewingPeriod\\ \\(\\ \\)$",
+      "reason": "8c: owner-approved (R4.12, review answer item 6). The role line under the greeting now reads role, term and date. The term and year come from the existing useViewingPeriod hook (read only); role title falls back to ROLE_LABELS; the date is the browser date. Nothing is fetched or saved that was not before."
+    },
+    {
+      "file": "src/app/(auth)/dashboard/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ roleTitle\\ =\\ subtitle\\ \\?\\?\\ \\(\\ role\\ \\?\\ ROLE_LABELS\\ \\[\\ role\\ \\]\\ :\\ ''\\ \\)$",
+      "reason": "8c: owner-approved (R4.12, review answer item 6). The role line under the greeting now reads role, term and date. The term and year come from the existing useViewingPeriod hook (read only); role title falls back to ROLE_LABELS; the date is the browser date. Nothing is fetched or saved that was not before."
+    },
+    {
+      "file": "src/app/(auth)/dashboard/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ termLabel\\ =\\ term\\ \\&\\&\\ academicYear\\ \\?\\ `Term\\ \\$\\{\\ term\\ \\}\\ \\$\\{\\ academicYear\\ \\}`\\ :\\ ''$",
+      "reason": "8c: owner-approved (R4.12, review answer item 6). The role line under the greeting now reads role, term and date. The term and year come from the existing useViewingPeriod hook (read only); role title falls back to ROLE_LABELS; the date is the browser date. Nothing is fetched or saved that was not before."
+    },
+    {
+      "file": "src/app/(auth)/dashboard/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ today\\ =\\ new\\ Date\\ \\(\\ \\)\\ \\.\\ toLocaleDateString\\ \\(\\ 'en\\-GB'\\ ,\\ \\{\\ weekday\\ :\\ 'long'\\ ,\\ day\\ :\\ 'numeric'\\ ,\\ month\\ :\\ 'long'\\ \\}\\ \\)$",
+      "reason": "8c: owner-approved (R4.12, review answer item 6). The role line under the greeting now reads role, term and date. The term and year come from the existing useViewingPeriod hook (read only); role title falls back to ROLE_LABELS; the date is the browser date. Nothing is fetched or saved that was not before."
+    },
+    {
+      "file": "src/app/(auth)/dashboard/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ detail\\ =\\ \\[\\ roleTitle\\ ,\\ termLabel\\ ,\\ today\\ \\]\\ \\.\\ filter\\ \\(\\ Boolean\\ \\)\\ \\.\\ join\\ \\(\\ '\\ \u00b7\\ '\\ \\)$",
+      "reason": "8c: owner-approved (R4.12, review answer item 6). The role line under the greeting now reads role, term and date. The term and year come from the existing useViewingPeriod hook (read only); role title falls back to ROLE_LABELS; the date is the browser date. Nothing is fetched or saved that was not before."
+    },
+    {
+      "file": "src/app/(auth)/dashboard/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^detail=\\{\\ detail\\ \\}$",
+      "reason": "8c: owner-approved (R4.12, review answer item 6). The role line under the greeting now reads role, term and date. The term and year come from the existing useViewingPeriod hook (read only); role title falls back to ROLE_LABELS; the date is the browser date. Nothing is fetched or saved that was not before."
+    },
+    {
+      "file": "src/components/dashboards/AcademicDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Mark\\ Attendance'\\ ,\\ href\\ :\\ '/classes'\\ ,\\ icon\\ :\\ ClipboardCheck\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Enter\\ Marks'\\ ,\\ href\\ :\\ '/exams\\?tab=exams'\\ ,\\ icon\\ :\\ PenLine\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'View\\ Timetable'\\ ,\\ href\\ :\\ '/timetable'\\ ,\\ icon\\ :\\ Clock\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-amber'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Announcements'\\ ,\\ href\\ :\\ '/announcements'\\ ,\\ icon\\ :\\ Bell\\ ,\\ color\\ :\\ 'bg\\-purple\\-50'\\ ,\\ text\\ :\\ 'text\\-purple\\-600'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/AcademicDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Today's\\ Timetable\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/AcademicDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Students\\ Needing\\ Attention\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/AcademicDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Mark\\ attendance'\\ ,\\ href\\ :\\ '/classes'\\ ,\\ icon\\ :\\ ClipboardCheck\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Enter\\ marks'\\ ,\\ href\\ :\\ '/exams\\?tab=exams'\\ ,\\ icon\\ :\\ PenLine\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'View\\ timetable'\\ ,\\ href\\ :\\ '/timetable'\\ ,\\ icon\\ :\\ Clock\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Announcements'\\ ,\\ href\\ :\\ '/announcements'\\ ,\\ icon\\ :\\ Bell\\ ,\\ color\\ :\\ 'bg\\-purple\\-50'\\ ,\\ text\\ :\\ 'text\\-purple\\-600'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/AcademicDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Today's\\ timetable\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/AcademicDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Students\\ needing\\ attention\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/AdminDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Add\\ User'\\ ,\\ href\\ :\\ '/user\\-management'\\ ,\\ icon\\ :\\ UserPlus\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Audit\\ Logs'\\ ,\\ href\\ :\\ '/reports\\?tab=audit'\\ ,\\ icon\\ :\\ FileSearch\\ ,\\ color\\ :\\ 'bg\\-brand\\-navy/8'\\ ,\\ text\\ :\\ 'text\\-brand\\-navy'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'System\\ Health'\\ ,\\ href\\ :\\ '/user\\-management\\?tab=health'\\ ,\\ icon\\ :\\ Activity\\ ,\\ color\\ :\\ 'bg\\-emerald\\-50'\\ ,\\ text\\ :\\ 'text\\-emerald\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Settings'\\ ,\\ href\\ :\\ '/settings'\\ ,\\ icon\\ :\\ Settings\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-amber'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Announcements'\\ ,\\ href\\ :\\ '/announcements'\\ ,\\ icon\\ :\\ Bell\\ ,\\ color\\ :\\ 'bg\\-purple\\-50'\\ ,\\ text\\ :\\ 'text\\-purple\\-600'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/AdminDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Add\\ user'\\ ,\\ href\\ :\\ '/user\\-management'\\ ,\\ icon\\ :\\ UserPlus\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Audit\\ logs'\\ ,\\ href\\ :\\ '/reports\\?tab=audit'\\ ,\\ icon\\ :\\ FileSearch\\ ,\\ color\\ :\\ 'bg\\-brand\\-navy/8'\\ ,\\ text\\ :\\ 'text\\-brand\\-navy'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'System\\ health'\\ ,\\ href\\ :\\ '/user\\-management\\?tab=health'\\ ,\\ icon\\ :\\ Activity\\ ,\\ color\\ :\\ 'bg\\-emerald\\-50'\\ ,\\ text\\ :\\ 'text\\-emerald\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Settings'\\ ,\\ href\\ :\\ '/settings'\\ ,\\ icon\\ :\\ Settings\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Announcements'\\ ,\\ href\\ :\\ '/announcements'\\ ,\\ icon\\ :\\ Bell\\ ,\\ color\\ :\\ 'bg\\-purple\\-50'\\ ,\\ text\\ :\\ 'text\\-purple\\-600'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/ExamOfficerDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Enter\\ Marks'\\ ,\\ href\\ :\\ '/exams\\?tab=exams'\\ ,\\ icon\\ :\\ PenLine\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Release\\ Results'\\ ,\\ href\\ :\\ '/exams\\?tab=release'\\ ,\\ icon\\ :\\ CheckCircle\\ ,\\ color\\ :\\ 'bg\\-emerald\\-50'\\ ,\\ text\\ :\\ 'text\\-emerald\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'MANEB\\ Records'\\ ,\\ href\\ :\\ '/exams\\?tab=maneb'\\ ,\\ icon\\ :\\ ClipboardList\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Exam\\ Analytics'\\ ,\\ href\\ :\\ '/exams\\?tab=analytics'\\ ,\\ icon\\ :\\ BarChart3\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-amber'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Exam\\ Settings'\\ ,\\ href\\ :\\ '/settings\\?section=exam\\-grading'\\ ,\\ icon\\ :\\ Settings\\ ,\\ color\\ :\\ 'bg\\-brand\\-navy/8'\\ ,\\ text\\ :\\ 'text\\-brand\\-navy'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/ExamOfficerDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Enter\\ marks'\\ ,\\ href\\ :\\ '/exams\\?tab=exams'\\ ,\\ icon\\ :\\ PenLine\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Release\\ results'\\ ,\\ href\\ :\\ '/exams\\?tab=release'\\ ,\\ icon\\ :\\ CheckCircle\\ ,\\ color\\ :\\ 'bg\\-emerald\\-50'\\ ,\\ text\\ :\\ 'text\\-emerald\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'MANEB\\ Records'\\ ,\\ href\\ :\\ '/exams\\?tab=maneb'\\ ,\\ icon\\ :\\ ClipboardList\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Exam\\ analytics'\\ ,\\ href\\ :\\ '/exams\\?tab=analytics'\\ ,\\ icon\\ :\\ BarChart3\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Exam\\ settings'\\ ,\\ href\\ :\\ '/settings\\?section=exam\\-grading'\\ ,\\ icon\\ :\\ Settings\\ ,\\ color\\ :\\ 'bg\\-brand\\-navy/8'\\ ,\\ text\\ :\\ 'text\\-brand\\-navy'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/FinanceDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'New\\ Invoice'\\ ,\\ href\\ :\\ '/finances\\?tab=invoices'\\ ,\\ icon\\ :\\ FileText\\ ,\\ color\\ :\\ 'bg\\-brand\\-navy/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-navy'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Record\\ Payment'\\ ,\\ href\\ :\\ '/finances\\?tab=invoices'\\ ,\\ icon\\ :\\ PlusCircle\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Generate\\ Receipt'\\ ,\\ href\\ :\\ '/finances\\?tab=invoices'\\ ,\\ icon\\ :\\ Receipt\\ ,\\ color\\ :\\ 'bg\\-emerald\\-50'\\ ,\\ text\\ :\\ 'text\\-emerald\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Fee\\ Reports'\\ ,\\ href\\ :\\ '/reports'\\ ,\\ icon\\ :\\ FileText\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Student\\ Balances'\\ ,\\ href\\ :\\ '/finances\\?tab=invoices'\\ ,\\ icon\\ :\\ Users\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-amber'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/FinanceDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'New\\ invoice'\\ ,\\ href\\ :\\ '/finances\\?tab=invoices'\\ ,\\ icon\\ :\\ FileText\\ ,\\ color\\ :\\ 'bg\\-brand\\-navy/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-navy'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Record\\ payment'\\ ,\\ href\\ :\\ '/finances\\?tab=invoices'\\ ,\\ icon\\ :\\ PlusCircle\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Generate\\ receipt'\\ ,\\ href\\ :\\ '/finances\\?tab=invoices'\\ ,\\ icon\\ :\\ Receipt\\ ,\\ color\\ :\\ 'bg\\-emerald\\-50'\\ ,\\ text\\ :\\ 'text\\-emerald\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Fee\\ reports'\\ ,\\ href\\ :\\ '/reports'\\ ,\\ icon\\ :\\ FileText\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Student\\ balances'\\ ,\\ href\\ :\\ '/finances\\?tab=invoices'\\ ,\\ icon\\ :\\ Users\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/HighRankDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Approvals'\\ ,\\ href\\ :\\ '/approvals'\\ ,\\ icon\\ :\\ ClipboardCheck\\ ,\\ text\\ :\\ 'text\\-brand\\-navy'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Make\\ announcement'\\ ,\\ href\\ :\\ '/announcements'\\ ,\\ icon\\ :\\ Megaphone\\ ,\\ text\\ :\\ 'text\\-brand\\-coral'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'School\\ reports'\\ ,\\ href\\ :\\ '/reports'\\ ,\\ icon\\ :\\ BarChart3\\ ,\\ text\\ :\\ 'text\\-brand\\-teal'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Students'\\ ,\\ href\\ :\\ '/students'\\ ,\\ icon\\ :\\ Users\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Exam\\ results'\\ ,\\ href\\ :\\ '/exams'\\ ,\\ icon\\ :\\ GraduationCap\\ ,\\ text\\ :\\ 'text\\-purple\\-600'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Finances'\\ ,\\ href\\ :\\ '/finances'\\ ,\\ icon\\ :\\ Banknote\\ ,\\ text\\ :\\ 'text\\-emerald\\-600'\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/HighRankDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"People\\ \\&\\ operations\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/HighRankDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Approvals'\\ ,\\ href\\ :\\ '/approvals'\\ ,\\ icon\\ :\\ ClipboardCheck\\ ,\\ text\\ :\\ 'text\\-brand\\-navy'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Make\\ announcement'\\ ,\\ href\\ :\\ '/announcements'\\ ,\\ icon\\ :\\ Megaphone\\ ,\\ text\\ :\\ 'text\\-tone\\-coral'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'School\\ reports'\\ ,\\ href\\ :\\ '/reports'\\ ,\\ icon\\ :\\ BarChart3\\ ,\\ text\\ :\\ 'text\\-tone\\-teal'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Students'\\ ,\\ href\\ :\\ '/students'\\ ,\\ icon\\ :\\ Users\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Exam\\ results'\\ ,\\ href\\ :\\ '/exams'\\ ,\\ icon\\ :\\ GraduationCap\\ ,\\ text\\ :\\ 'text\\-purple\\-600'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Finances'\\ ,\\ href\\ :\\ '/finances'\\ ,\\ icon\\ :\\ Banknote\\ ,\\ text\\ :\\ 'text\\-emerald\\-600'\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/HighRankDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"People\\ and\\ operations\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/HRDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Approve\\ Leave'\\ ,\\ href\\ :\\ '/hr\\?tab=leave'\\ ,\\ icon\\ :\\ CheckCircle\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Add\\ Staff'\\ ,\\ href\\ :\\ '/hr\\?tab=directory'\\ ,\\ icon\\ :\\ UserPlus\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Leave\\ Calendar'\\ ,\\ href\\ :\\ '/calendar'\\ ,\\ icon\\ :\\ CalendarDays\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-amber'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'HR\\ Reports'\\ ,\\ href\\ :\\ '/reports'\\ ,\\ icon\\ :\\ FileText\\ ,\\ color\\ :\\ 'bg\\-brand\\-navy/8'\\ ,\\ text\\ :\\ 'text\\-brand\\-navy'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/HRDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Contract\\ Expiry\\ Alerts\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/HRDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Staff\\ Leave\\ Calendar\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/HRDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Approve\\ leave'\\ ,\\ href\\ :\\ '/hr\\?tab=leave'\\ ,\\ icon\\ :\\ CheckCircle\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Add\\ staff'\\ ,\\ href\\ :\\ '/hr\\?tab=directory'\\ ,\\ icon\\ :\\ UserPlus\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Leave\\ calendar'\\ ,\\ href\\ :\\ '/calendar'\\ ,\\ icon\\ :\\ CalendarDays\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'HR\\ Reports'\\ ,\\ href\\ :\\ '/reports'\\ ,\\ icon\\ :\\ FileText\\ ,\\ color\\ :\\ 'bg\\-brand\\-navy/8'\\ ,\\ text\\ :\\ 'text\\-brand\\-navy'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/HRDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Contract\\ expiry\\ alerts\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/HRDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Staff\\ leave\\ calendar\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/LibraryDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Issue\\ Book'\\ ,\\ href\\ :\\ '/library\\?tab=borrowings'\\ ,\\ icon\\ :\\ PlusCircle\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Return\\ Book'\\ ,\\ href\\ :\\ '/library\\?tab=borrowings'\\ ,\\ icon\\ :\\ RotateCcw\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Search\\ Catalog'\\ ,\\ href\\ :\\ '/library\\?tab=catalog'\\ ,\\ icon\\ :\\ Search\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-amber'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Library\\ Report'\\ ,\\ href\\ :\\ '/reports'\\ ,\\ icon\\ :\\ FileText\\ ,\\ color\\ :\\ 'bg\\-brand\\-navy/8'\\ ,\\ text\\ :\\ 'text\\-brand\\-navy'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/LibraryDashboard.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"Overdue\\ students\\ \u2014\\ loading\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/LibraryDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Issue\\ book'\\ ,\\ href\\ :\\ '/library\\?tab=borrowings'\\ ,\\ icon\\ :\\ PlusCircle\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Return\\ book'\\ ,\\ href\\ :\\ '/library\\?tab=borrowings'\\ ,\\ icon\\ :\\ RotateCcw\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Search\\ catalog'\\ ,\\ href\\ :\\ '/library\\?tab=catalog'\\ ,\\ icon\\ :\\ Search\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Library\\ report'\\ ,\\ href\\ :\\ '/reports'\\ ,\\ icon\\ :\\ FileText\\ ,\\ color\\ :\\ 'bg\\-brand\\-navy/8'\\ ,\\ text\\ :\\ 'text\\-brand\\-navy'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/LibraryDashboard.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"Overdue\\ students:\\ loading\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/LowerRankDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Add\\ Student'\\ ,\\ href\\ :\\ '/students'\\ ,\\ icon\\ :\\ UserPlus\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Applications'\\ ,\\ href\\ :\\ '/applications'\\ ,\\ icon\\ :\\ ClipboardList\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-amber'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'View\\ Calendar'\\ ,\\ href\\ :\\ '/calendar'\\ ,\\ icon\\ :\\ CalendarDays\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Announcements'\\ ,\\ href\\ :\\ '/announcements'\\ ,\\ icon\\ :\\ Bell\\ ,\\ color\\ :\\ 'bg\\-purple\\-50'\\ ,\\ text\\ :\\ 'text\\-purple\\-600'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/LowerRankDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Exam\\ Schedule\\ This\\ Week\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/LowerRankDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Recent\\ Applications\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/LowerRankDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Add\\ student'\\ ,\\ href\\ :\\ '/students'\\ ,\\ icon\\ :\\ UserPlus\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Applications'\\ ,\\ href\\ :\\ '/applications'\\ ,\\ icon\\ :\\ ClipboardList\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'View\\ calendar'\\ ,\\ href\\ :\\ '/calendar'\\ ,\\ icon\\ :\\ CalendarDays\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Announcements'\\ ,\\ href\\ :\\ '/announcements'\\ ,\\ icon\\ :\\ Bell\\ ,\\ color\\ :\\ 'bg\\-purple\\-50'\\ ,\\ text\\ :\\ 'text\\-purple\\-600'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/LowerRankDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Exam\\ schedule\\ this\\ week\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/LowerRankDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Recent\\ applications\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/StudentDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'My\\ Timetable'\\ ,\\ href\\ :\\ '/timetable'\\ ,\\ icon\\ :\\ Clock\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Library'\\ ,\\ href\\ :\\ '/library'\\ ,\\ icon\\ :\\ Library\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'My\\ Results'\\ ,\\ href\\ :\\ '/exams\\?tab=results'\\ ,\\ icon\\ :\\ BarChart3\\ ,\\ color\\ :\\ 'bg\\-purple\\-50'\\ ,\\ text\\ :\\ 'text\\-purple\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Announcements'\\ ,\\ href\\ :\\ '/announcements'\\ ,\\ icon\\ :\\ Bell\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-amber'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/StudentDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^ariaLabel=\\{\\ attendance\\ \\?\\ `Attendance\\ this\\ term:\\ \\$\\{\\ attendance\\ \\.\\ daysPresent\\ \\}\\ days\\ present,\\ \\$\\{\\ attendance\\ \\.\\ daysAbsent\\ \\}\\ absent,\\ \\$\\{\\ attendance\\ \\.\\ daysLate\\ \\}\\ late`\\ :\\ 'Attendance\\ breakdown\\ \u2014\\ no\\ data\\ available'\\ \\}$",
+      "reason": "8c: screen-reader label text changed (em dash removed). Same data."
+    },
+    {
+      "file": "src/components/dashboards/StudentDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Today's\\ Timetable\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/StudentDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ QUICK_ACTIONS\\ :\\ QuickAction\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'My\\ timetable'\\ ,\\ href\\ :\\ '/timetable'\\ ,\\ icon\\ :\\ Clock\\ ,\\ color\\ :\\ 'bg\\-brand\\-teal/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-teal'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Library'\\ ,\\ href\\ :\\ '/library'\\ ,\\ icon\\ :\\ Library\\ ,\\ color\\ :\\ 'bg\\-blue\\-50'\\ ,\\ text\\ :\\ 'text\\-blue\\-600'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'My\\ results'\\ ,\\ href\\ :\\ '/exams\\?tab=results'\\ ,\\ icon\\ :\\ BarChart3\\ ,\\ color\\ :\\ 'bg\\-purple\\-50'\\ ,\\ text\\ :\\ 'text\\-purple\\-600'\\ ,\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Announcements'\\ ,\\ href\\ :\\ '/announcements'\\ ,\\ icon\\ :\\ Bell\\ ,\\ color\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ ,\\ \\}\\ ,\\ \\]$",
+      "reason": "8c: quick-action labels changed to sentence case (R4.6). Same links, icons and order."
+    },
+    {
+      "file": "src/components/dashboards/StudentDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ariaLabel=\\{\\ attendance\\ \\?\\ `Attendance\\ this\\ term:\\ \\$\\{\\ attendance\\ \\.\\ daysPresent\\ \\}\\ days\\ present,\\ \\$\\{\\ attendance\\ \\.\\ daysAbsent\\ \\}\\ absent,\\ \\$\\{\\ attendance\\ \\.\\ daysLate\\ \\}\\ late`\\ :\\ 'Attendance\\ breakdown:\\ no\\ data\\ available'\\ \\}$",
+      "reason": "8c: screen-reader label text changed (em dash removed). Same data."
+    },
+    {
+      "file": "src/components/dashboards/StudentDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Today's\\ timetable\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/parent/ParentPanels.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ TONE_TEXT\\ :\\ Record\\ <\\ StatusTone\\ ,\\ string\\ >\\ =\\ \\{\\ success\\ :\\ 'text\\-emerald\\-700\\ dark:text\\-emerald\\-400'\\ ,\\ warning\\ :\\ 'text\\-brand\\-amber'\\ ,\\ danger\\ :\\ 'text\\-brand\\-coral'\\ ,\\ neutral\\ :\\ 'text\\-muted'\\ ,\\ \\}$",
+      "reason": "8c: colour class names only (amber text moved to the darker tone-amber token for contrast)."
+    },
+    {
+      "file": "src/components/parent/ParentPanels.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_STYLE\\ :\\ Record\\ <\\ 'PRESENT'\\ \\|\\ 'ABSENT'\\ \\|\\ 'LATE'\\ ,\\ \\{\\ dot\\ :\\ string\\ ;\\ bg\\ :\\ string\\ ;\\ text\\ :\\ string\\ \\}\\ >\\ =\\ \\{\\ PRESENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-emerald\\-500'\\ ,\\ bg\\ :\\ 'bg\\-emerald\\-500/10'\\ ,\\ text\\ :\\ 'text\\-emerald\\-700\\ dark:text\\-emerald\\-400'\\ \\}\\ ,\\ ABSENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-coral'\\ ,\\ bg\\ :\\ 'bg\\-brand\\-coral/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-coral'\\ \\}\\ ,\\ LATE\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-amber'\\ ,\\ bg\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-brand\\-amber'\\ \\}\\ ,\\ \\}$",
+      "reason": "8c: colour class names only (amber text moved to the darker tone-amber token for contrast)."
+    },
+    {
+      "file": "src/components/parent/ParentPanels.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ TONE_TEXT\\ :\\ Record\\ <\\ StatusTone\\ ,\\ string\\ >\\ =\\ \\{\\ success\\ :\\ 'text\\-emerald\\-700\\ dark:text\\-emerald\\-400'\\ ,\\ warning\\ :\\ 'text\\-tone\\-amber'\\ ,\\ danger\\ :\\ 'text\\-tone\\-coral'\\ ,\\ neutral\\ :\\ 'text\\-muted'\\ ,\\ \\}$",
+      "reason": "8c: colour class names only (amber text moved to the darker tone-amber token for contrast)."
+    },
+    {
+      "file": "src/components/parent/ParentPanels.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_STYLE\\ :\\ Record\\ <\\ 'PRESENT'\\ \\|\\ 'ABSENT'\\ \\|\\ 'LATE'\\ ,\\ \\{\\ dot\\ :\\ string\\ ;\\ bg\\ :\\ string\\ ;\\ text\\ :\\ string\\ \\}\\ >\\ =\\ \\{\\ PRESENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-emerald\\-500'\\ ,\\ bg\\ :\\ 'bg\\-emerald\\-500/10'\\ ,\\ text\\ :\\ 'text\\-emerald\\-700\\ dark:text\\-emerald\\-400'\\ \\}\\ ,\\ ABSENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-coral'\\ ,\\ bg\\ :\\ 'bg\\-brand\\-coral/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-coral'\\ \\}\\ ,\\ LATE\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-amber'\\ ,\\ bg\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ \\}\\ ,\\ \\}$",
+      "reason": "8c: colour class names only (amber text moved to the darker tone-amber token for contrast)."
+    },
+    {
+      "file": "src/components/reports/ui/ReportKpiStrip.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ cols\\ =\\ kpis\\ \\.\\ length\\ <=\\ 4\\ \\?\\ 'grid\\ grid\\-cols\\-2\\ gap\\-3\\ lg:grid\\-cols\\-4'\\ :\\ grid$",
+      "reason": "8c: stat-value size decision (owner, 17 Nov 2026). The larger sm:text-2xl value size now applies only to the 4-or-fewer tile layout, set from the strip wrapper through a data-kpi-value hook instead of on every tile. Class strings and one inert data attribute; no logic."
+    },
+    {
+      "file": "src/components/reports/ui/ReportKpiStrip.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^data\\-kpi\\-value=true$",
+      "reason": "8c: stat-value size decision (owner, 17 Nov 2026). The larger sm:text-2xl value size now applies only to the 4-or-fewer tile layout, set from the strip wrapper through a data-kpi-value hook instead of on every tile. Class strings and one inert data attribute; no logic."
+    },
+    {
+      "file": "src/components/reports/ui/ReportKpiStrip.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ cols\\ =\\ kpis\\ \\.\\ length\\ <=\\ 4\\ \\?\\ 'grid\\ grid\\-cols\\-2\\ gap\\-3\\ lg:grid\\-cols\\-4\\ sm:\\[\\&_\\[data\\-kpi\\-value\\]\\]:text\\-2xl'\\ :\\ grid$",
+      "reason": "8c: stat-value size decision (owner, 17 Nov 2026). The larger sm:text-2xl value size now applies only to the 4-or-fewer tile layout, set from the strip wrapper through a data-kpi-value hook instead of on every tile. Class strings and one inert data attribute; no logic."
+    },
+    {
+      "file": "src/components/dashboards/AcademicDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Teaching\\ at\\ a\\ glance\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/AcademicDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Teaching\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/AdminDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Administration\\ at\\ a\\ glance\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/AdminDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Administration\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/DashboardSections.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"School\\ at\\ a\\ glance\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/DashboardSections.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"School\\ at\\ a\\ glance\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/DashboardSections.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^summary=\"Review\\ school\\ results,\\ attendance,\\ enrolment\\ and\\ finances\\ in\\ one\\ place\\.\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/DashboardSections.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"School\\ figures\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/DashboardSections.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"School\\ figures\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/DashboardSections.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^summary=\"Results,\\ attendance,\\ enrolment\\ and\\ finances\\ for\\ the\\ selected\\ term\\.\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/ExamOfficerDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Examinations\\ at\\ a\\ glance\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/ExamOfficerDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Examinations\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/FinanceDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Finance\\ at\\ a\\ glance\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/FinanceDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Finance\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/HRDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Workforce\\ at\\ a\\ glance\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/HRDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Workforce\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/LibraryDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Library\\ at\\ a\\ glance\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/LibraryDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Library\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/LowerRankDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Registry\\ at\\ a\\ glance\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/LowerRankDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Registry\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/StudentDashboard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"My\\ term\\ at\\ a\\ glance\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/dashboards/StudentDashboard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"My\\ term\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/assets/StocktakesTab.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Resolution\\ note\\ \\(optional\\)\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/assets/StocktakesTab.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Note\\ \\(optional\\)\"$",
+      "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
     }
   ],
   "approvedFrozen": [

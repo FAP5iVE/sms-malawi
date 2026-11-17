@@ -23,7 +23,7 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { SuperUserRoleSwitcher } from '@/components/shared/SuperUserRoleSwitcher'
-import type { UserRole } from '@shared/types/roles'
+import { ROLE_LABELS, type UserRole } from '@shared/types/roles'
 import { WelcomeHeader } from '@/components/shared/WelcomeHeader'
 import { AdminDashboard } from '@/components/dashboards/AdminDashboard'
 import { HighRankDashboard } from '@/components/dashboards/HighRankDashboard'
@@ -34,6 +34,8 @@ import { AcademicDashboard } from '@/components/dashboards/AcademicDashboard'
 import { HRDashboard } from '@/components/dashboards/HRDashboard'
 import { ExamOfficerDashboard } from '@/components/dashboards/ExamOfficerDashboard'
 import { StudentDashboard } from '@/components/dashboards/StudentDashboard'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
+import { useViewingPeriod } from '@/hooks/useViewingPeriod'
 
 /** Time-of-day greeting: morning until noon, afternoon until 17:00, evening after. */
 function greetingForHour(hour: number): string {
@@ -47,6 +49,7 @@ export default function DashboardPage() {
   // alpha_admin can open any staff role's dashboard; everyone else sees their own.
   const [viewAs, setViewAs] = useState<UserRole>('admin')
   const role = superUser ? viewAs : authRole
+  const { academicYear, term } = useViewingPeriod()
 
   // Show skeleton while auth initialises
   if (!initialized) {
@@ -64,9 +67,13 @@ export default function DashboardPage() {
   }
 
   const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'there'
+  const roleTitle = subtitle ?? (role ? ROLE_LABELS[role] : '')
+  const termLabel = term && academicYear ? `Term ${term} ${academicYear}` : ''
+  const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+  const detail = [roleTitle, termLabel, today].filter(Boolean).join(' · ')
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-4 md:space-y-5">
       {/* [PRODUCTION FIX 2026-07-28] subtitle (a real per-staff job
           title, e.g. "Head Teacher") is null for many roles, so the old
           `{subtitle} · {role}` concatenation rendered as a bare
@@ -75,24 +82,26 @@ export default function DashboardPage() {
       <WelcomeHeader
         greeting={greetingForHour(new Date().getHours())}
         name={displayName}
-        detail={subtitle ? <>{subtitle} · {role?.replace('_', ' ')}</> : role?.replace('_', ' ')}
+        detail={detail}
       />
 
-      {superUser && (
-        <div className="flex justify-end">
-          <SuperUserRoleSwitcher value={viewAs} onChange={setViewAs} />
-        </div>
-      )}
+      <ModuleSurface>
+        {superUser && (
+          <div className="flex justify-end">
+            <SuperUserRoleSwitcher value={viewAs} onChange={setViewAs} />
+          </div>
+        )}
 
-      {role === 'admin' && <AdminDashboard />}
-      {role === 'high_rank' && <HighRankDashboard />}
-      {role === 'finance' && <FinanceDashboard />}
-      {role === 'library' && <LibraryDashboard />}
-      {role === 'lower_rank' && <LowerRankDashboard />}
-      {role === 'academic' && <AcademicDashboard />}
-      {role === 'hr' && <HRDashboard />}
-      {role === 'exam_officer' && <ExamOfficerDashboard />}
-      {role === 'student' && <StudentDashboard />}
+        {role === 'admin' && <AdminDashboard />}
+        {role === 'high_rank' && <HighRankDashboard />}
+        {role === 'finance' && <FinanceDashboard />}
+        {role === 'library' && <LibraryDashboard />}
+        {role === 'lower_rank' && <LowerRankDashboard />}
+        {role === 'academic' && <AcademicDashboard />}
+        {role === 'hr' && <HRDashboard />}
+        {role === 'exam_officer' && <ExamOfficerDashboard />}
+        {role === 'student' && <StudentDashboard />}
+      </ModuleSurface>
     </div>
   )
 }

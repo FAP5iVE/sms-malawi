@@ -100,7 +100,7 @@ The scan is line based. It misses multi-line strings, so it is a ratchet, and a 
 - R10.2 Type by question: change over time = line (few points = columns); comparing or ranking = bars; part of a whole = stacked bar, or pie only with a dominant slice and 5 categories at most. [read: Analysis Function, Datawrapper]
 - R10.3 Bars start at zero. No dual axis, no 3D, no shadows. Lines 4 at most. Direct labels, legend only if needed. On phones prefer horizontal bars. [read]
 - R10.4 Every chart has a text alternative or data table directly under it (collapsible). [read: Analysis Function checklist]
-- R10.5 KPI tile: label (12px, no abbreviations), value (largest), change with symbol and colour, comparison ("vs last term"). 4 tiles per page, never more than 6. [read: NHSBSA, Setproduct]
+- R10.5 KPI tile: label (12px, no abbreviations), value (largest), change with symbol and colour, comparison ("vs last term"). 4 tiles per page, never more than 6. Value size: `text-xl` by default; `sm:text-2xl` only in a strip of 4 or fewer wide tiles (module-page stat tiles stay `text-xl`). [read: NHSBSA, Setproduct; owner decision 17 Nov 2026]
 - R10.6 Numbers: exact under 1,000, then 1.2K style in tiles only; money without cents in summaries ("MK 18,450,000"). "Last updated" time on dashboards and reports. [read: Setproduct]
 - R10.7 Audit: 23 BarChart, 6 ComposedChart, 4 AreaChart, 2 LineChart, 2 PieChart usages. Each is checked against R10.2 to R10.4. The two pies are checked against the pie rule.
 - R10.8 Report cards (HTML view): the same surface, tint tiles for marks, school crest and name at the top, term and form, marks table, remarks, signatures. Grading logic is untouched. [ours]

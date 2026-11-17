@@ -396,14 +396,14 @@ function RunDetailModal({ runId, onClose }: { runId: string; onClose: () => void
 
   return (
     <Modal
-      title={<>{run ? formatRunPeriod(run.month, run.year) : 'Payroll Run'} Deep Inspection</>}
+      title={<>{run ? formatRunPeriod(run.month, run.year) : 'Payroll run'} details</>}
       description={
         run
           ? `${run._count?.payslips ?? run.payslips?.length ?? 0} staff • Gross ${formatMWK(run.totalGross)} • Net ${formatMWK(run.totalNet)}`
           : undefined
       }
       onClose={onClose}
-      size="2xl"
+      size="screen"
     >
       {run && (
         <div className="bg-page rounded-xl p-4 mb-5">

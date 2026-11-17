@@ -797,8 +797,8 @@
   ]
  },
  "src/app/(auth)/dashboard/page.tsx": {
-  "digest": "3a11f73d8839b02d32c37ed5745311cbd0d4f80e",
-  "tokens": 35,
+  "digest": "e5f85205e29d88b99c7b060e71eb1699f909baf1",
+  "tokens": 39,
   "items": [
    {
     "k": "handler",
@@ -3804,7 +3804,7 @@
   ]
  },
  "src/components/assets/StocktakesTab.tsx": {
-  "digest": "a78285a6aed9366b201c9b72cdc7306a7557295a",
+  "digest": "c23d9ee2a99cd8dd2e8e7222db07dbfdf7ddc955",
   "tokens": 140,
   "items": [
    {
@@ -4775,7 +4775,7 @@
   "items": []
  },
  "src/components/dashboards/AcademicDashboard.tsx": {
-  "digest": "b55052a02b50673aa050ac3ce913e666575c36fa",
+  "digest": "86a5b5c67707017150e97d71e9ea5757529baf70",
   "tokens": 61,
   "items": [
    {
@@ -4791,7 +4791,7 @@
   ]
  },
  "src/components/dashboards/AdminDashboard.tsx": {
-  "digest": "43db76b1378c6bf25d779c0ec51d7d2fca0e8b63",
+  "digest": "cf3d56d6b91c5a5b3f0769be63dc4f59b1e75567",
   "tokens": 54,
   "items": [
    {
@@ -4823,7 +4823,7 @@
   ]
  },
  "src/components/dashboards/DashboardSections.tsx": {
-  "digest": "66ce18de388a8ddbaa19e733250f5799255c1470",
+  "digest": "efce8b82576b3e4e6fd5afe189311b5f7333c3ab",
   "tokens": 145,
   "items": [
    {
@@ -4854,7 +4854,7 @@
   ]
  },
  "src/components/dashboards/ExamOfficerDashboard.tsx": {
-  "digest": "3ddfe2f2c65de8c14ccfcb8eaca70a2b659b0f0d",
+  "digest": "c0674402ab27c03ffdc07af2bb57c8ff0ca2889b",
   "tokens": 75,
   "items": [
    {
@@ -4880,12 +4880,12 @@
   ]
  },
  "src/components/dashboards/FinanceDashboard.tsx": {
-  "digest": "e440bcab75674bdf0bfe38a2717ebb416409dc94",
+  "digest": "9c45d48111b831982ae84fb4743961e72cf542ea",
   "tokens": 34,
   "items": []
  },
  "src/components/dashboards/HRDashboard.tsx": {
-  "digest": "e7d061855ef25ece2fb61e85f2dff5ac814584fe",
+  "digest": "5f9c876a63d44436d31a51941bf8bd726617e2b5",
   "tokens": 71,
   "items": [
    {
@@ -4901,7 +4901,7 @@
   ]
  },
  "src/components/dashboards/HighRankDashboard.tsx": {
-  "digest": "b34c4e2fdef7c9fcf338dd7bb406f9de1b9da70c",
+  "digest": "9023bd3361d1b9a82f1dbffe1a76897484f08a39",
   "tokens": 184,
   "items": [
    {
@@ -4947,7 +4947,7 @@
   ]
  },
  "src/components/dashboards/LibraryDashboard.tsx": {
-  "digest": "495d29cbb675e51b88d07632cd8bff1692f42357",
+  "digest": "353f224384450b479898bdc929c31262c7612a8c",
   "tokens": 59,
   "items": [
    {
@@ -4963,7 +4963,7 @@
   ]
  },
  "src/components/dashboards/LowerRankDashboard.tsx": {
-  "digest": "fda0cc9db484028e830c805d2e2ab62f0c724cb3",
+  "digest": "475cc19ea3e2003e65ecc86986b9d0e8004d86f5",
   "tokens": 70,
   "items": [
    {
@@ -4979,7 +4979,7 @@
   ]
  },
  "src/components/dashboards/StudentDashboard.tsx": {
-  "digest": "3665ccdf4493dfe081dcb64afe05e76e0b226b98",
+  "digest": "9aaf58b24a36199ecd1a35af9ce5f07fd2227613",
   "tokens": 82,
   "items": [
    {
@@ -5138,7 +5138,7 @@
   ]
  },
  "src/components/exams/MarksEntrySheet.tsx": {
-  "digest": "20a4e73d2291f1a38a2bbeac7053502b620633ea",
+  "digest": "52d00c5f2cc415ed3c3608dc159b73c2929879c8",
   "tokens": 162,
   "items": [
    {
@@ -6587,7 +6587,7 @@
   ]
  },
  "src/components/finances/payroll/PayrollRunsTab.tsx": {
-  "digest": "1ecb663e2d8fc042c3a2096d1987d8156919a0c3",
+  "digest": "2e8f98a40f27b84d8b6b416b7ec037f22aaa3c8c",
   "tokens": 282,
   "items": [
    {
@@ -7893,7 +7893,7 @@
   "items": []
  },
  "src/components/parent/ParentPanels.tsx": {
-  "digest": "de1960bca43ba89a1778354bf5c672cccfbd7df4",
+  "digest": "687dfd4b2f326211580c5ccbc03acb202e4116b4",
   "tokens": 248,
   "items": [
    {
@@ -9224,8 +9224,8 @@
   "items": []
  },
  "src/components/reports/ui/ReportKpiStrip.tsx": {
-  "digest": "f0fa59c2dd4afc2d9bfafa1ff7c58c91dbadcff1",
-  "tokens": 53,
+  "digest": "3a6b63bd56f4feeb3a38e27c8b4b45892cb31f3d",
+  "tokens": 54,
   "items": []
  },
  "src/components/reports/ui/ReportStates.tsx": {
@@ -10622,8 +10622,8 @@
   ]
  },
  "src/components/shared/Modal.tsx": {
-  "digest": "c6b07e8f0d4dc3175f3e814341e75ba38898bb77",
-  "tokens": 142,
+  "digest": "d784124290e855ca69392bb47622360f2e30452b",
+  "tokens": 155,
   "items": [
    {
     "k": "effect",
@@ -10649,6 +10649,11 @@
     "k": "effect",
     "n": "useEffect",
     "h": "c3087899"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "2686f0a4"
    },
    {
     "k": "handler",

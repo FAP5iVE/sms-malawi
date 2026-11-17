@@ -68,15 +68,15 @@ import { formatMWK } from '@shared/constants/malawi'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    label: 'My Timetable',
+    label: 'My timetable',
     href: '/timetable',
     icon: Clock,
     color: 'bg-brand-teal/10',
-    text: 'text-brand-teal',
+    text: 'text-tone-teal',
   },
   { label: 'Library', href: '/library', icon: Library, color: 'bg-blue-50', text: 'text-blue-600' },
   {
-    label: 'My Results',
+    label: 'My results',
     // R15: results live in the My Results tab (page reads ?tab= as of this phase)
     href: '/exams?tab=results',
     icon: BarChart3,
@@ -88,7 +88,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     href: '/announcements',
     icon: Bell,
     color: 'bg-brand-amber/10',
-    text: 'text-brand-amber',
+    text: 'text-tone-amber',
   },
 ]
 
@@ -142,7 +142,7 @@ export function StudentDashboard() {
   return (
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
-        title="My term at a glance"
+        title="My term"
         summary="Check your results, attendance and assignments for the selected term."
         academicYear={academicYear}
         term={term}
@@ -155,8 +155,8 @@ export function StudentDashboard() {
           real balance (R9's feeBalance from /students/me) is outstanding,
           instead of unconditionally for every student. */}
       {me !== undefined && me.feeBalance > 0 && (
-        <div className="bg-brand-amber/10 border border-brand-amber/30 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-brand-amber shrink-0 mt-0.5" aria-hidden />
+        <div className="bg-brand-amber/10 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-tone-amber shrink-0 mt-0.5" aria-hidden />
           <div>
             <p className="font-heading font-semibold text-sm text-brand-navy">
               Exam results are linked to your fee balance
@@ -205,14 +205,14 @@ export function StudentDashboard() {
             ariaLabel={
               attendance
                 ? `Attendance this term: ${attendance.daysPresent} days present, ${attendance.daysAbsent} absent, ${attendance.daysLate} late`
-                : 'Attendance breakdown — no data available'
+                : 'Attendance breakdown: no data available'
             }
           />
         </TrendCard>
       </div>
       <DashboardAttention query={attention} title="For you to look at" limit={5} />
       <ListCard
-        title="Today's Timetable"
+        title="Today's timetable"
         sub="Your schedule today"
         isLoading={timetableLoading}
         isEmpty={(timetableToday ?? []).length === 0}
@@ -222,8 +222,8 @@ export function StudentDashboard() {
       >
         <TodaysTimetableList slots={timetableToday ?? []} />
       </ListCard>
-      <div className="bg-surface border border-base rounded-2xl p-5">
-        <h3 className="font-heading font-semibold text-brand-navy mb-4">My Exam Results</h3>
+      <div className="app-tint rounded-xl p-5">
+        <h3 className="font-heading font-semibold text-brand-navy mb-4">My exam results</h3>
         {/* R15: the real Student.id from /students/me — not the Firebase UID */}
         {me?.id
           ? <StudentResultsView studentId={me.id} />

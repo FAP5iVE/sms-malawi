@@ -32,7 +32,7 @@ export function DashboardIntro({
       <div className="min-w-0">
         <h2 className="font-heading text-base font-semibold text-brand-navy">
           {title}
-          {period ? <span className="font-normal text-muted"> — {period}</span> : null}
+          {period ? <span className="font-normal text-muted"> - {period}</span> : null}
         </h2>
         <p className="mt-0.5 max-w-3xl text-sm text-muted">{summary}</p>
       </div>
@@ -46,7 +46,7 @@ export function DashboardIntro({
         {reportsHref ? (
           <Link
             href={reportsHref}
-            className="inline-flex items-center gap-0.5 font-medium text-brand-teal hover:underline"
+            className="inline-flex items-center gap-0.5 font-medium text-tone-teal hover:underline"
           >
             Open reports
             <ArrowUpRight className="h-3 w-3" aria-hidden />

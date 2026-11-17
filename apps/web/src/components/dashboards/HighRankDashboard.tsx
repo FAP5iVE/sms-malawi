@@ -66,8 +66,8 @@ const PRIMARY_KEYS = new Set(['active', 'attendanceRate', 'schoolPassRate', 'col
 /** Common tasks only; everything else is one tap away in the sidebar. */
 const QUICK_ACTIONS: QuickAction[] = [
   { label: 'Approvals', href: '/approvals', icon: ClipboardCheck, text: 'text-brand-navy' },
-  { label: 'Make announcement', href: '/announcements', icon: Megaphone, text: 'text-brand-coral' },
-  { label: 'School reports', href: '/reports', icon: BarChart3, text: 'text-brand-teal' },
+  { label: 'Make announcement', href: '/announcements', icon: Megaphone, text: 'text-tone-coral' },
+  { label: 'School reports', href: '/reports', icon: BarChart3, text: 'text-tone-teal' },
   { label: 'Students', href: '/students', icon: Users, text: 'text-blue-600' },
   { label: 'Exam results', href: '/exams', icon: GraduationCap, text: 'text-purple-600' },
   { label: 'Finances', href: '/finances', icon: Banknote, text: 'text-emerald-600' },
@@ -254,12 +254,12 @@ export function HighRankDashboard() {
       {urgent > 0 ? (
         <Link
           href="#needs-attention"
-          className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-brand-coral/30 bg-brand-coral/5 px-3 py-2 text-sm font-medium text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-coral/30"
+          className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-brand-coral/10 px-3 py-2 text-sm font-medium text-brand-navy transition-colors hover:bg-brand-coral/15 focus:outline-none focus:ring-2 focus:ring-brand-coral/30"
         >
           <span>
             {urgent} urgent {urgent === 1 ? 'issue needs' : 'issues need'} attention
           </span>
-          <span className="text-xs text-brand-coral">See the queue</span>
+          <span className="text-xs text-tone-coral">See the queue</span>
         </Link>
       ) : null}
 
@@ -274,7 +274,7 @@ export function HighRankDashboard() {
       </div>
 
       <section aria-label="Details by area" className="space-y-2">
-        <h2 className="font-heading text-xs font-semibold uppercase tracking-wide text-muted">Details by area</h2>
+        <h2 className="font-heading text-xs font-semibold text-muted">Details by area</h2>
         <DashboardSection title="Academic" headline={headlineFor(executive, 'academic')} href="/reports?tab=performance" hrefLabel="Open performance report">
           <GroupKpis overview={executive} groupKey="academic" />
           <ClassComparison academicYear={academicYear} term={term} />
@@ -289,7 +289,7 @@ export function HighRankDashboard() {
         <DashboardSection title="Finance" headline={headlineFor(executive, 'finance')} href="/reports?tab=finance" hrefLabel="Open finance report">
           <GroupKpis overview={executive} groupKey="finance" />
         </DashboardSection>
-        <DashboardSection title="People & operations" headline={headlineFor(executive, 'operations')} href="/reports?tab=workforce" hrefLabel="Open HR report">
+        <DashboardSection title="People and operations" headline={headlineFor(executive, 'operations')} href="/reports?tab=workforce" hrefLabel="Open HR report">
           <GroupKpis overview={executive} groupKey="operations" />
           <div className="grid gap-3 md:grid-cols-2">
             <StaffByDepartment />

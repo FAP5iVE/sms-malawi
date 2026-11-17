@@ -54,23 +54,23 @@ import { useAnnouncements }       from '@/hooks/useAnnouncements'
 
 const QUICK_ACTIONS: QuickAction[] = [
   {
-    label: 'Add User',
+    label: 'Add user',
     // R15: was /user-management/new — a route that has never existed.
     // User creation is in-page at /user-management.
     href:  '/user-management',
     icon:  UserPlus,
     color: 'bg-brand-teal/10',
-    text:  'text-brand-teal',
+    text:  'text-tone-teal',
   },
   {
-    label: 'Audit Logs',
+    label: 'Audit logs',
     href:  '/reports?tab=audit',
     icon:  FileSearch,
     color: 'bg-brand-navy/8',
     text:  'text-brand-navy',
   },
   {
-    label: 'System Health',
+    label: 'System health',
     // R15: deep-links to the health tab (page reads ?tab= as of this phase).
     href:  '/user-management?tab=health',
     icon:  Activity,
@@ -82,7 +82,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     href:  '/settings',
     icon:  Settings,
     color: 'bg-brand-amber/10',
-    text:  'text-brand-amber',
+    text:  'text-tone-amber',
   },
   {
     label: 'Announcements',
@@ -122,7 +122,7 @@ export function AdminDashboard() {
   return (
     <div className="space-y-4 md:space-y-6">
       <PrimaryOverviewKpis
-        title="Administration at a glance"
+        title="Administration"
         summary="Review sign-ins, see how the system is being used and check for issues that need attention."
         overview={overview}
         preferred={PREFERRED}

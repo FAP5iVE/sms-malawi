@@ -40,8 +40,8 @@ import {
 /** Status by font colour only: the system does not use coloured blocks for status. */
 const TONE_TEXT: Record<StatusTone, string> = {
   success: 'text-emerald-700 dark:text-emerald-400',
-  warning: 'text-brand-amber',
-  danger: 'text-brand-coral',
+  warning: 'text-tone-amber',
+  danger: 'text-tone-coral',
   neutral: 'text-muted',
 }
 
@@ -70,7 +70,7 @@ function QueryState({ query, children }: {
     }
     return (
       <div role="alert" className="flex items-start gap-2 py-4 text-sm text-body">
-        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-brand-coral" aria-hidden />
+        <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-tone-coral" aria-hidden />
         <span>We could not load this just now.{' '}
           <button type="button" className="font-medium underline" onClick={() => query.refetch()}>Try again</button>
         </span>
@@ -108,7 +108,7 @@ function ReportCardModal({ linkId, academicYear, term, onClose }: { linkId: stri
       {q.isLoading && <div className="flex items-center justify-center gap-2 py-16 text-muted text-sm"><Loader2 className="w-4 h-4 animate-spin" aria-hidden />Loading report card…</div>}
       {q.isError && (
         <div className="flex flex-col items-center gap-2 py-16 text-center" role="alert">
-          <AlertTriangle className="w-6 h-6 text-brand-coral" aria-hidden />
+          <AlertTriangle className="w-6 h-6 text-tone-coral" aria-hidden />
           <p className="text-sm text-body">The report card is not available right now. Please contact the school office if this continues.</p>
           <button type="button" onClick={onClose} className="mt-2 text-sm text-muted hover:text-body underline">Close</button>
         </div>
@@ -221,7 +221,7 @@ function TermSection({ t, first, onReportCard, onExam }: {
 
           {t.exams.length > 0 && (
             <div>
-              <h4 className="text-xs font-medium text-muted uppercase tracking-wide mb-1">Exams</h4>
+              <h4 className="text-xs font-medium text-muted mb-1">Exams</h4>
               <ul className={DIVIDE_Y}>
                 {t.exams.map((e) => (
                   <li key={e.id}>
@@ -352,8 +352,8 @@ export function FeesPanel({ linkId }: { linkId: string }) {
 
 const STATUS_STYLE: Record<'PRESENT' | 'ABSENT' | 'LATE', { dot: string; bg: string; text: string }> = {
   PRESENT: { dot: 'bg-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-400' },
-  ABSENT:  { dot: 'bg-brand-coral', bg: 'bg-brand-coral/10', text: 'text-brand-coral' },
-  LATE:    { dot: 'bg-brand-amber', bg: 'bg-brand-amber/10', text: 'text-brand-amber' },
+  ABSENT:  { dot: 'bg-brand-coral', bg: 'bg-brand-coral/10', text: 'text-tone-coral' },
+  LATE:    { dot: 'bg-brand-amber', bg: 'bg-brand-amber/10', text: 'text-tone-amber' },
 }
 const isStatus = (s: string | undefined): s is keyof typeof STATUS_STYLE => s === 'PRESENT' || s === 'ABSENT' || s === 'LATE'
 
@@ -375,7 +375,7 @@ export function AttendancePanel({ linkId }: { linkId: string }) {
         <div className="space-y-6">
           <div className="bg-surface rounded-xl p-5">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-              <p className="font-heading font-semibold text-sm text-body">Term Summary</p>
+              <p className="font-heading font-semibold text-sm text-body">Term summary</p>
               <div className="flex items-center gap-1" role="group" aria-label="Term shown">
                 {[1, 2, 3].map((t) => (
                   <button
@@ -394,14 +394,14 @@ export function AttendancePanel({ linkId }: { linkId: string }) {
               </div>
               <div className="p-3 rounded-lg bg-page">
                 <p className="text-xs text-muted mb-1">Absent</p>
-                <p className="text-2xl font-heading font-bold text-brand-coral">{d.summary.absent}</p>
+                <p className="text-2xl font-heading font-bold text-tone-coral">{d.summary.absent}</p>
               </div>
               <div className="p-3 rounded-lg bg-page">
                 <p className="text-xs text-muted mb-1">Late</p>
-                <p className="text-2xl font-heading font-bold text-brand-amber">{d.summary.late}</p>
+                <p className="text-2xl font-heading font-bold text-tone-amber">{d.summary.late}</p>
               </div>
               <div className="p-3 rounded-lg bg-page">
-                <p className="text-xs text-muted mb-1">Attendance Rate</p>
+                <p className="text-xs text-muted mb-1">Attendance rate</p>
                 <p className="text-2xl font-heading font-bold text-brand-navy dark:text-white">{d.summary.recorded === 0 || d.summary.attendanceRate === null ? '—' : `${d.summary.attendanceRate}%`}</p>
               </div>
             </div>
@@ -416,7 +416,7 @@ export function AttendancePanel({ linkId }: { linkId: string }) {
               >
                 <ChevronLeft className="w-4 h-4" aria-hidden />
               </button>
-              <p className="font-heading font-semibold text-body flex items-center gap-2"><CalendarDays className="w-4 h-4 text-brand-teal" aria-hidden />{monthLabel(view.year, view.monthIndex)}</p>
+              <p className="font-heading font-semibold text-body flex items-center gap-2"><CalendarDays className="w-4 h-4 text-tone-teal" aria-hidden />{monthLabel(view.year, view.monthIndex)}</p>
               <button
                 type="button" onClick={() => setView(next)}
                 disabled={isFutureMonth(next.year, next.monthIndex, now)}
@@ -429,7 +429,7 @@ export function AttendancePanel({ linkId }: { linkId: string }) {
 
             <div className="grid grid-cols-7 gap-1.5 mb-1.5">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                <div key={day} className="text-center text-[11px] font-heading font-semibold text-muted uppercase py-1">{day}</div>
+                <div key={day} className="text-center text-xs font-heading font-semibold text-muted py-1">{day}</div>
               ))}
             </div>
             <div className="grid grid-cols-7 gap-1.5">
@@ -452,8 +452,8 @@ export function AttendancePanel({ linkId }: { linkId: string }) {
 
             <div className="flex items-center gap-4 mt-4 pt-4 border-t border-base flex-wrap">
               <span className="flex items-center gap-1.5 text-xs text-muted"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" aria-hidden /> Present</span>
-              <span className="flex items-center gap-1.5 text-xs text-muted"><XCircle className="w-3.5 h-3.5 text-brand-coral" aria-hidden /> Absent</span>
-              <span className="flex items-center gap-1.5 text-xs text-muted"><Clock3 className="w-3.5 h-3.5 text-brand-amber" aria-hidden /> Late</span>
+              <span className="flex items-center gap-1.5 text-xs text-muted"><XCircle className="w-3.5 h-3.5 text-tone-coral" aria-hidden /> Absent</span>
+              <span className="flex items-center gap-1.5 text-xs text-muted"><Clock3 className="w-3.5 h-3.5 text-tone-amber" aria-hidden /> Late</span>
               <span className="flex items-center gap-1.5 text-xs text-muted"><span className="w-3.5 h-3.5 rounded bg-page border border-base inline-block" /> No record</span>
             </div>
           </div>

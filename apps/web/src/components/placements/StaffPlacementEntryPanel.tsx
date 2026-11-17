@@ -227,10 +227,8 @@ export function StaffPlacementEntryPanel() {
                     key={c.studentId}
                     type="button"
                     onClick={() => selectCandidate(c)}
-                    className={`w-full text-left rounded-xl border p-3 transition-colors ${
-                      selected
-                        ? 'border-brand-navy bg-brand-navy/5'
-                        : 'border-base bg-page hover:border-brand-navy/40'
+                    className={`w-full text-left rounded-xl p-3 transition-colors app-tint ${
+                      selected ? 'ring-2 ring-brand-teal' : 'hover:bg-brand-teal/10'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -341,10 +339,10 @@ export function StaffPlacementEntryPanel() {
                             setFaculty('')
                             setProgrammeId('')
                           }}
-                          className={`text-left rounded-xl border p-2.5 transition-colors ${
+                          className={`text-left rounded-xl p-2.5 transition-colors ${
                             universityId === u.id
-                              ? 'border-brand-navy bg-brand-navy text-white'
-                              : 'border-base bg-page hover:border-brand-navy/40'
+                              ? 'bg-btn-brand text-btn-brand-fg'
+                              : 'app-tint hover:bg-brand-teal/10'
                           }`}
                         >
                           <p className="text-xs font-bold">{u.shortName ?? u.id.toUpperCase()}</p>

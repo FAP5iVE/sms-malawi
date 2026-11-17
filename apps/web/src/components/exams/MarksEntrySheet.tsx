@@ -256,11 +256,11 @@ export function MarksEntrySheet({ examId, classId, maxMark, onClose, readOnly = 
   return (
     <>
       <Modal
-        title={correctionMode ? 'Correct Marks (Review)' : 'Enter Marks'}
+        title={correctionMode ? 'Correct marks (review)' : 'Enter marks'}
         description={loading ? 'Loading…' : `${students.length} students · out of ${maxMark}`}
         onClose={onClose}
         busy={busy}
-        size="xl"
+        size="screen"
         flush
         footer={
           <>

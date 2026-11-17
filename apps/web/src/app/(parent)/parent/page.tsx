@@ -26,7 +26,7 @@ export default function ParentHomePage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold text-brand-navy dark:text-white flex items-center gap-2">
-          <GraduationCap className="w-6 h-6 text-brand-teal" aria-hidden />
+          <GraduationCap className="w-6 h-6 text-tone-teal" aria-hidden />
           {me.data?.displayName ? `Hello, ${me.data.displayName}` : 'Hello'}
         </h1>
         <p className="text-sm text-muted mt-0.5">Choose a child to see their results, fees and attendance.</p>
