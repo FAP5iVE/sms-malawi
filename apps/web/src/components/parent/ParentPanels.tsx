@@ -351,10 +351,12 @@ export function FeesPanel({ linkId }: { linkId: string }) {
 // ─── Attendance (the student's own design, reproduced) ────
 
 const STATUS_STYLE: Record<'PRESENT' | 'ABSENT' | 'LATE', { dot: string; bg: string; text: string }> = {
-  PRESENT: { dot: 'bg-emerald-500', bg: 'bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-400' },
-  ABSENT:  { dot: 'bg-brand-coral', bg: 'bg-brand-coral/10', text: 'text-tone-coral' },
-  LATE:    { dot: 'bg-brand-amber', bg: 'bg-brand-amber/10', text: 'text-tone-amber' },
+  PRESENT: { dot: 'bg-emerald-500', bg: 'app-tint', text: 'text-status-success' },
+  ABSENT:  { dot: 'bg-brand-coral', bg: 'app-tint', text: 'text-tone-coral' },
+  LATE:    { dot: 'bg-brand-amber', bg: 'app-tint', text: 'text-tone-amber' },
 }
+// Each status also has its own icon, so the calendar never relies on colour alone (R2.4).
+const STATUS_ICON = { PRESENT: CheckCircle2, ABSENT: XCircle, LATE: Clock3 }
 const isStatus = (s: string | undefined): s is keyof typeof STATUS_STYLE => s === 'PRESENT' || s === 'ABSENT' || s === 'LATE'
 
 export function AttendancePanel({ linkId }: { linkId: string }) {
@@ -437,24 +439,25 @@ export function AttendancePanel({ linkId }: { linkId: string }) {
               {grid.days.map(({ day, key }) => {
                 const status = byDate.get(key)
                 const style = isStatus(status) ? STATUS_STYLE[status] : null
+                const StatusIcon = isStatus(status) ? STATUS_ICON[status] : null
                 return (
                   <div
                     key={key}
-                    className={`aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-xs ${style ? style.bg : 'bg-page'} ${key === todayKey ? 'ring-2 ring-brand-teal' : ''}`}
+                    className={`aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-xs ${style ? style.bg : 'app-tint'} ${key === todayKey ? 'ring-2 ring-brand-teal' : ''}`}
                     {...(status ? { title: status.charAt(0) + status.slice(1).toLowerCase() } : {})}
                   >
                     <span className={`font-medium ${style ? style.text : 'text-muted'}`}>{day}</span>
-                    {style && <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} aria-hidden />}
+                    {StatusIcon && <StatusIcon className={`w-3.5 h-3.5 ${style!.text}`} aria-hidden />}
                   </div>
                 )
               })}
             </div>
 
             <div className="flex items-center gap-4 mt-4 pt-4 border-t border-base flex-wrap">
-              <span className="flex items-center gap-1.5 text-xs text-muted"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" aria-hidden /> Present</span>
+              <span className="flex items-center gap-1.5 text-xs text-muted"><CheckCircle2 className="w-3.5 h-3.5 text-status-success" aria-hidden /> Present</span>
               <span className="flex items-center gap-1.5 text-xs text-muted"><XCircle className="w-3.5 h-3.5 text-tone-coral" aria-hidden /> Absent</span>
               <span className="flex items-center gap-1.5 text-xs text-muted"><Clock3 className="w-3.5 h-3.5 text-tone-amber" aria-hidden /> Late</span>
-              <span className="flex items-center gap-1.5 text-xs text-muted"><span className="w-3.5 h-3.5 rounded bg-page border border-base inline-block" /> No record</span>
+              <span className="flex items-center gap-1.5 text-xs text-muted"><span className="w-3.5 h-3.5 rounded app-tint inline-block" aria-hidden /> No record</span>
             </div>
           </div>
         </div>

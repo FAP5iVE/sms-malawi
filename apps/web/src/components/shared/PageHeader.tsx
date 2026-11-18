@@ -63,7 +63,7 @@
  *   @shared/types/roles (ROLE_LABELS)
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { SchoolMark } from '@/components/shared/SchoolMark'
 import { usePathname, useRouter }       from 'next/navigation'
 import { AnimatePresence, motion }       from 'framer-motion'
@@ -98,6 +98,7 @@ import { GlobalSearch }  from '@/components/shared/GlobalSearch'
 import { ReportProblemModal } from '@/components/shared/ReportProblemModal'
 import { AttentionBadge } from '@/components/shared/AttentionBadge'
 import { attentionNoun } from '@/lib/hills/attention'
+import { getMoreSheetOpen, setMoreSheetOpen, subscribeMoreSheet } from '@/lib/hills/moreSheet'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED PANEL MOTION (R15 — de-duplicates the identical variant/transition
@@ -482,6 +483,9 @@ export function PageHeader() {
   const displayName = user?.displayName ?? user?.email?.split('@')[0] ?? 'User'
   const initials    = displayName.slice(0, 2).toUpperCase()
 
+  // Shared with MobileBottomNav: the avatar and the "More" slot open the same sheet.
+  const moreSheetOpen = useSyncExternalStore(subscribeMoreSheet, getMoreSheetOpen, () => false)
+
   // Desktop dropdown open states
   const [bellOpen,  setBellOpen]  = useState(false)
   const [userOpen,  setUserOpen]  = useState(false)
@@ -593,10 +597,10 @@ export function PageHeader() {
             <PageTitle title={pageTitle} motionEnabled={motionEnabled} />
           </div>
 
-          {/* Right: Period + Search + Bell */}
+          {/* Right: Search + Bell + Avatar (R5.4). The period switcher now lives in the
+              More sheet; the strip under this header still warns when the viewing
+              period is not the live one. */}
           <div className="flex items-center gap-0.5 shrink-0">
-            <PeriodSwitcher variant="compact" />
-
             <button
               type="button"
               onClick={() => {
@@ -625,6 +629,22 @@ export function PageHeader() {
                   className="absolute right-0.5 top-1"
                 />
               )}
+            </button>
+
+            {/* Avatar: opens the same "More" sheet as the bottom bar's last slot
+                (account, viewing period, report a problem, sign out, theme). */}
+            <button
+              type="button"
+              onClick={() => setMoreSheetOpen(true)}
+              className="touch-target rounded-lg transition-colors hover:bg-page"
+              aria-label="Account and menu"
+              aria-haspopup="dialog"
+              aria-expanded={moreSheetOpen}
+              aria-controls="mobile-more-sheet"
+            >
+              <span className="flex size-8 items-center justify-center rounded-full bg-brand-deep text-xs font-bold font-heading text-white">
+                {initials}
+              </span>
             </button>
           </div>
         </div>

@@ -13129,6 +13129,629 @@
       "kind": "selector",
       "pattern": "^placeholder=\"Note\\ \\(optional\\)\"$",
       "reason": "8c: visible wording (title) changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/app/(auth)/attendance/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_STYLE\\ :\\ Record\\ <\\ Status\\ ,\\ \\{\\ dot\\ :\\ string\\ ;\\ bg\\ :\\ string\\ ;\\ text\\ :\\ string\\ \\}\\ >\\ =\\ \\{\\ PRESENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-emerald\\-500'\\ ,\\ bg\\ :\\ 'bg\\-emerald\\-500/10'\\ ,\\ text\\ :\\ 'text\\-status\\-success'\\ \\}\\ ,\\ ABSENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-coral'\\ ,\\ bg\\ :\\ 'bg\\-brand\\-coral/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-coral'\\ \\}\\ ,\\ LATE\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-amber'\\ ,\\ bg\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ \\}\\ ,\\ \\}$",
+      "reason": "8e: attendance calendar shows a status icon next to the colour (R2.4) and tint cells (R1). Same status lookup, same data. Display only."
+    },
+    {
+      "file": "src/app/(auth)/attendance/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ status\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/app/(auth)/attendance/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_STYLE\\ :\\ Record\\ <\\ Status\\ ,\\ \\{\\ dot\\ :\\ string\\ ;\\ bg\\ :\\ string\\ ;\\ text\\ :\\ string\\ \\}\\ >\\ =\\ \\{\\ PRESENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-emerald\\-500'\\ ,\\ bg\\ :\\ 'app\\-tint'\\ ,\\ text\\ :\\ 'text\\-status\\-success'\\ \\}\\ ,\\ ABSENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-coral'\\ ,\\ bg\\ :\\ 'app\\-tint'\\ ,\\ text\\ :\\ 'text\\-tone\\-coral'\\ \\}\\ ,\\ LATE\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-amber'\\ ,\\ bg\\ :\\ 'app\\-tint'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ \\}\\ ,\\ \\}$",
+      "reason": "8e: attendance calendar shows a status icon next to the colour (R2.4) and tint cells (R1). Same status lookup, same data. Display only."
+    },
+    {
+      "file": "src/app/(auth)/attendance/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_ICON\\ =\\ \\{\\ PRESENT\\ :\\ CheckCircle2\\ ,\\ ABSENT\\ :\\ XCircle\\ ,\\ LATE\\ :\\ Clock3\\ \\}$",
+      "reason": "8e: attendance calendar shows a status icon next to the colour (R2.4) and tint cells (R1). Same status lookup, same data. Display only."
+    },
+    {
+      "file": "src/app/(auth)/attendance/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ StatusIcon\\ =\\ status\\ \\?\\ STATUS_ICON\\ \\[\\ status\\ \\]\\ :\\ null$",
+      "reason": "8e: attendance calendar shows a status icon next to the colour (R2.4) and tint cells (R1). Same status lookup, same data. Display only."
+    },
+    {
+      "file": "src/app/(auth)/attendance/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ StatusIcon\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "8e: attendance calendar shows a status icon next to the colour (R2.4) and tint cells (R1). Same status lookup, same data. Display only."
+    },
+    {
+      "file": "src/app/(auth)/calendar/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^confirmLabel=\"Delete\\ Event\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/app/(auth)/calendar/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^confirmLabel=\"Delete\\ event\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/calendarConfig.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ CATEGORY_LEGEND\\ :\\ CategoryLegendItem\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ category\\ :\\ 'term'\\ ,\\ label\\ :\\ 'Term\\ Dates'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'holiday'\\ ,\\ label\\ :\\ 'Public\\ Holidays'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'exam'\\ ,\\ label\\ :\\ 'Exams'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'timetable'\\ ,\\ label\\ :\\ 'Timetable'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'lab_booking'\\ ,\\ label\\ :\\ 'Lab\\ Bookings'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'leave'\\ ,\\ label\\ :\\ 'Leave'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'announcement'\\ ,\\ label\\ :\\ 'Announcements'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'assignment'\\ ,\\ label\\ :\\ 'Assignments'\\ \\}\\ ,\\ \\]$",
+      "reason": "8e: category names changed to sentence case (R4). Same categories and keys."
+    },
+    {
+      "file": "src/components/calendar/calendarConfig.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ CATEGORY_LEGEND\\ :\\ CategoryLegendItem\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ category\\ :\\ 'term'\\ ,\\ label\\ :\\ 'Term\\ dates'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'holiday'\\ ,\\ label\\ :\\ 'Public\\ holidays'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'exam'\\ ,\\ label\\ :\\ 'Exams'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'timetable'\\ ,\\ label\\ :\\ 'Timetable'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'lab_booking'\\ ,\\ label\\ :\\ 'Lab\\ bookings'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'leave'\\ ,\\ label\\ :\\ 'Leave'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'announcement'\\ ,\\ label\\ :\\ 'Announcements'\\ \\}\\ ,\\ \\{\\ category\\ :\\ 'assignment'\\ ,\\ label\\ :\\ 'Assignments'\\ \\}\\ ,\\ \\]$",
+      "reason": "8e: category names changed to sentence case (R4). Same categories and keys."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Event\\ Title$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ Mid\\-Term\\ Exam,\\ Faculty\\ Review,\\ Lab\\ Practical\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=All\\-day$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Location\\ /\\ Room$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ Science\\ Complex\\ Lab\\ 4,\\ Main\\ Auditorium,\\ Room\\ 204\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Description\\ /\\ Notes$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Add\\ additional\\ details,\\ agenda\\ or\\ requirements\\.\\.\\.\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{pending\\ \\&\\&\\ <JSX/>\\}\\ Save\\ Changes\\|Create\\ Event$",
+      "reason": "8e: the save button says \"Saving\u2026\" while the request runs (R9.7). Reads the existing pending flag, nothing new is triggered."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ isEditing\\ \\?\\ 'Save\\ Changes'\\ :\\ 'Create\\ Event'\\ \\}$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ isEditing\\ \\?\\ 'Edit\\ Event'\\ :\\ 'New\\ Calendar\\ Event'\\ \\}$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ isEditing\\ \\?\\ 'Edit\\ Event'\\ :\\ 'New\\ Calendar\\ Event'\\ \\}$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ chipClass\\ \\}\\ from\\ '@/lib/hills/chip'$",
+      "reason": "8e: imports the class-text helper for chips (R2.7). Class names only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Event\\ title$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Mid\\-term\\ exam,\\ staff\\ review,\\ lab\\ practical\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=All\\ day$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Location\\ or\\ room$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Science\\ lab\\ 4,\\ main\\ hall,\\ room\\ 204\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Description\\ or\\ notes$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Details,\\ agenda\\ or\\ requirements\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{pending\\ \\&\\&\\ <JSX/>\\}\\ Saving\u2026\\|Save\\ changes\\|Create\\ event$",
+      "reason": "8e: the save button says \"Saving\u2026\" while the request runs (R9.7). Reads the existing pending flag, nothing new is triggered."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ pending\\ \\?\\ 'Saving\u2026'\\ :\\ isEditing\\ \\?\\ 'Save\\ changes'\\ :\\ 'Create\\ event'\\ \\}$",
+      "reason": "8e: the save button says \"Saving\u2026\" while the request runs (R9.7). Reads the existing pending flag, nothing new is triggered."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ isEditing\\ \\?\\ 'Edit\\ event'\\ :\\ 'New\\ calendar\\ event'\\ \\}$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventFormDialog.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ isEditing\\ \\?\\ 'Edit\\ event'\\ :\\ 'New\\ calendar\\ event'\\ \\}$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CalendarEventListItem.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ categoryLabel\\ \\(\\ event\\ \\.\\ category\\ \\)\\ \\}$",
+      "reason": "8e: the phone event row names the category in words, not by colour alone (R2.4). Reads an existing value."
+    },
+    {
+      "file": "src/components/calendar/calendarUtils.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ WEEK_HEADERS\\ =\\ \\[\\ 'MON'\\ ,\\ 'TUE'\\ ,\\ 'WED'\\ ,\\ 'THU'\\ ,\\ 'FRI'\\ ,\\ 'SAT'\\ ,\\ 'SUN'\\ \\]$",
+      "reason": "8e: weekday and date display strings only (R4: day before month as in Malawi, no uppercase letters). Same dates, same functions, same week start (Monday)."
+    },
+    {
+      "file": "src/components/calendar/calendarUtils.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return\\ format\\ \\(\\ date\\ ,\\ 'MMM'\\ \\)\\ \\.\\ toUpperCase\\ \\(\\ \\)$",
+      "reason": "8e: weekday and date display strings only (R4: day before month as in Malawi, no uppercase letters). Same dates, same functions, same week start (Monday)."
+    },
+    {
+      "file": "src/components/calendar/calendarUtils.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return\\ format\\ \\(\\ parseISO\\ \\(\\ `\\$\\{\\ dateKey\\ \\}T00:00:00`\\ \\)\\ ,\\ 'EEEE,\\ MMMM\\ d,\\ yyyy'\\ \\)$",
+      "reason": "8e: weekday and date display strings only (R4: day before month as in Malawi, no uppercase letters). Same dates, same functions, same week start (Monday)."
+    },
+    {
+      "file": "src/components/calendar/calendarUtils.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return\\ format\\ \\(\\ parseISO\\ \\(\\ `\\$\\{\\ dateKey\\ \\}T00:00:00`\\ \\)\\ ,\\ 'MMM\\ d'\\ \\)$",
+      "reason": "8e: weekday and date display strings only (R4: day before month as in Malawi, no uppercase letters). Same dates, same functions, same week start (Monday)."
+    },
+    {
+      "file": "src/components/calendar/calendarUtils.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return\\ format\\ \\(\\ parseISO\\ \\(\\ `\\$\\{\\ dateKey\\ \\}T00:00:00`\\ \\)\\ ,\\ 'EEE,\\ MMM\\ d'\\ \\)$",
+      "reason": "8e: weekday and date display strings only (R4: day before month as in Malawi, no uppercase letters). Same dates, same functions, same week start (Monday)."
+    },
+    {
+      "file": "src/components/calendar/calendarUtils.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return\\ `\\$\\{\\ startLabel\\ \\}\\ \u2013\\ \\$\\{\\ format\\ \\(\\ end\\ ,\\ 'MMM\\ d,\\ h:mm\\ a'\\ \\)\\ \\}`$",
+      "reason": "8e: weekday and date display strings only (R4: day before month as in Malawi, no uppercase letters). Same dates, same functions, same week start (Monday)."
+    },
+    {
+      "file": "src/components/calendar/calendarUtils.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ WEEK_HEADERS\\ =\\ \\[\\ 'Mon'\\ ,\\ 'Tue'\\ ,\\ 'Wed'\\ ,\\ 'Thu'\\ ,\\ 'Fri'\\ ,\\ 'Sat'\\ ,\\ 'Sun'\\ \\]$",
+      "reason": "8e: weekday and date display strings only (R4: day before month as in Malawi, no uppercase letters). Same dates, same functions, same week start (Monday)."
+    },
+    {
+      "file": "src/components/calendar/calendarUtils.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ format\\ \\(\\ date\\ ,\\ 'MMM'\\ \\)$",
+      "reason": "8e: weekday and date display strings only (R4: day before month as in Malawi, no uppercase letters). Same dates, same functions, same week start (Monday)."
+    },
+    {
+      "file": "src/components/calendar/calendarUtils.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ format\\ \\(\\ parseISO\\ \\(\\ `\\$\\{\\ dateKey\\ \\}T00:00:00`\\ \\)\\ ,\\ 'EEEE\\ d\\ MMMM\\ yyyy'\\ \\)$",
+      "reason": "8e: weekday and date display strings only (R4: day before month as in Malawi, no uppercase letters). Same dates, same functions, same week start (Monday)."
+    },
+    {
+      "file": "src/components/calendar/calendarUtils.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ format\\ \\(\\ parseISO\\ \\(\\ `\\$\\{\\ dateKey\\ \\}T00:00:00`\\ \\)\\ ,\\ 'd\\ MMM'\\ \\)$",
+      "reason": "8e: weekday and date display strings only (R4: day before month as in Malawi, no uppercase letters). Same dates, same functions, same week start (Monday)."
+    },
+    {
+      "file": "src/components/calendar/calendarUtils.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ format\\ \\(\\ parseISO\\ \\(\\ `\\$\\{\\ dateKey\\ \\}T00:00:00`\\ \\)\\ ,\\ 'EEE\\ d\\ MMM'\\ \\)$",
+      "reason": "8e: weekday and date display strings only (R4: day before month as in Malawi, no uppercase letters). Same dates, same functions, same week start (Monday)."
+    },
+    {
+      "file": "src/components/calendar/calendarUtils.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ `\\$\\{\\ startLabel\\ \\}\\ \u2013\\ \\$\\{\\ format\\ \\(\\ end\\ ,\\ 'd\\ MMM,\\ h:mm\\ a'\\ \\)\\ \\}`$",
+      "reason": "8e: weekday and date display strings only (R4: day before month as in Malawi, no uppercase letters). Same dates, same functions, same week start (Monday)."
+    },
+    {
+      "file": "src/components/calendar/CategoryFilterBar.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{label\\}$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CategoryFilterBar.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ chipClass\\ \\}\\ from\\ '@/lib/hills/chip'$",
+      "reason": "8e: imports the class-text helper for chips (R2.7). Class names only."
+    },
+    {
+      "file": "src/components/calendar/CategoryFilterBar.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{label\\}\\ \\{active\\ \\&\\&\\ <JSX/>\\}$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CategoryFilterBar.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ active\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CategoryFilterDropdown.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ count\\ ===\\ 0\\ \\)\\ label\\ =\\ 'No\\ Categories'\\ else\\ if\\ \\(\\ count\\ ===\\ total\\ \\)\\ label\\ =\\ 'All\\ Categories'\\ else\\ if\\ \\(\\ onlyActive\\ \\)\\ label\\ =\\ categoryLabel\\ \\(\\ onlyActive\\ \\)\\ else\\ label\\ =\\ `\\$\\{\\ count\\ \\}\\ Categories`$",
+      "reason": "8e: the phone event row names the category in words, not by colour alone (R2.4). Reads an existing value."
+    },
+    {
+      "file": "src/components/calendar/CategoryFilterDropdown.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Clear\\ All$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CategoryFilterDropdown.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Select\\ All$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CategoryFilterDropdown.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ count\\ ===\\ 0\\ \\)\\ label\\ =\\ 'No\\ categories'\\ else\\ if\\ \\(\\ count\\ ===\\ total\\ \\)\\ label\\ =\\ 'All\\ categories'\\ else\\ if\\ \\(\\ onlyActive\\ \\)\\ label\\ =\\ categoryLabel\\ \\(\\ onlyActive\\ \\)\\ else\\ label\\ =\\ `\\$\\{\\ count\\ \\}\\ categories`$",
+      "reason": "8e: the phone event row names the category in words, not by colour alone (R2.4). Reads an existing value."
+    },
+    {
+      "file": "src/components/calendar/CategoryFilterDropdown.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Clear\\ all$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/CategoryFilterDropdown.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Select\\ all$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Create\\ Event\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ canCreate\\ \\?\\ 'Click\\ below\\ to\\ add\\ a\\ lecture,\\ deadline,\\ holiday,\\ or\\ schedule\\ item\\.'\\ :\\ 'Nothing\\ on\\ the\\ calendar\\ for\\ this\\ day\\ yet\\.'\\ \\}$",
+      "reason": "8e: empty-state hint reworded, no \"Click\" (R4). Same condition."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Add\\ Event\\ for\\ this\\ Day$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Search\\ events\\.\\.\\.\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Create\\ event\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ canCreate\\ \\?\\ 'Add\\ a\\ lecture,\\ deadline,\\ holiday\\ or\\ schedule\\ item\\.'\\ :\\ 'Nothing\\ on\\ the\\ calendar\\ for\\ this\\ day\\ yet\\.'\\ \\}$",
+      "reason": "8e: empty-state hint reworded, no \"Click\" (R4). Same condition."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Add\\ event\\ for\\ this\\ day$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Search\\ events\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ WEEK_HEADERS_SHORT\\ ,\\ formatMonthShort\\ ,\\ formatMonthYear\\ ,\\ formatDisplayDate\\ ,\\ formatGroupHeading\\ ,\\ groupEventsByDate\\ ,\\ type\\ CalendarDayCell\\ ,\\ \\}\\ from\\ '\\./calendarUtils'$",
+      "reason": "8e: phone month grid shows three-letter weekday names (R10b.1) from the same list the desktop grid uses. Display only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Search\\ events\\.\\.\\.\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Add\\ Event$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ WEEK_HEADERS_SHORT\\ \\.\\ map\\ \\(\\ \\(\\ d\\ ,\\ i\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "8e: phone month grid uses the same weekday list as the desktop grid. Display only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\\{\\ `Add\\ event\\ on\\ \\$\\{\\ formatMonthShort\\ \\(\\ monthDate\\ \\)\\ \\}\\ \\$\\{\\ Number\\ \\(\\ selectedDateKey\\ \\.\\ split\\ \\(\\ '\\-'\\ \\)\\ \\[\\ 2\\ \\]\\ \\)\\ \\}`\\ \\}$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\"Filter\\ by\\ Category\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Select\\ All$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Clear\\ All$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ WEEK_HEADERS\\ ,\\ formatMonthShort\\ ,\\ formatMonthYear\\ ,\\ formatDisplayDate\\ ,\\ formatGroupHeading\\ ,\\ groupEventsByDate\\ ,\\ type\\ CalendarDayCell\\ ,\\ \\}\\ from\\ '\\./calendarUtils'$",
+      "reason": "8e: phone month grid shows three-letter weekday names (R10b.1) from the same list the desktop grid uses. Display only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Today$",
+      "reason": "8e: the Today button on phones shows its word, not only an icon (R10b.1). Same click handler, same aria-label."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Search\\ events\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Add\\ event$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ WEEK_HEADERS\\ \\.\\ map\\ \\(\\ \\(\\ d\\ ,\\ i\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "8e: phone month grid uses the same weekday list as the desktop grid. Display only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ selectedDayEvents\\ \\.\\ length\\ ===\\ 1\\ \\?\\ 'event'\\ :\\ 'events'\\ \\}$",
+      "reason": "8e: the phone day list says \"1 event\" / \"n events\" instead of a bare number (R6.3). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\\{\\ `Add\\ event\\ on\\ \\$\\{\\ Number\\ \\(\\ selectedDateKey\\ \\.\\ split\\ \\(\\ '\\-'\\ \\)\\ \\[\\ 2\\ \\]\\ \\)\\ \\}\\ \\$\\{\\ formatMonthShort\\ \\(\\ monthDate\\ \\)\\ \\}`\\ \\}$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\"Filter\\ by\\ category\"$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Select\\ all$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/calendar/MobileCalendarView.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Clear\\ all$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/parent/ParentPanels.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_STYLE\\ :\\ Record\\ <\\ 'PRESENT'\\ \\|\\ 'ABSENT'\\ \\|\\ 'LATE'\\ ,\\ \\{\\ dot\\ :\\ string\\ ;\\ bg\\ :\\ string\\ ;\\ text\\ :\\ string\\ \\}\\ >\\ =\\ \\{\\ PRESENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-emerald\\-500'\\ ,\\ bg\\ :\\ 'bg\\-emerald\\-500/10'\\ ,\\ text\\ :\\ 'text\\-emerald\\-700\\ dark:text\\-emerald\\-400'\\ \\}\\ ,\\ ABSENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-coral'\\ ,\\ bg\\ :\\ 'bg\\-brand\\-coral/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-coral'\\ \\}\\ ,\\ LATE\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-amber'\\ ,\\ bg\\ :\\ 'bg\\-brand\\-amber/10'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ \\}\\ ,\\ \\}$",
+      "reason": "8e: attendance calendar shows a status icon next to the colour (R2.4) and tint cells (R1). Same status lookup, same data. Display only."
+    },
+    {
+      "file": "src/components/parent/ParentPanels.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ style\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "8e: visible wording changed to sentence case and plain words (R4). Text only."
+    },
+    {
+      "file": "src/components/parent/ParentPanels.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_STYLE\\ :\\ Record\\ <\\ 'PRESENT'\\ \\|\\ 'ABSENT'\\ \\|\\ 'LATE'\\ ,\\ \\{\\ dot\\ :\\ string\\ ;\\ bg\\ :\\ string\\ ;\\ text\\ :\\ string\\ \\}\\ >\\ =\\ \\{\\ PRESENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-emerald\\-500'\\ ,\\ bg\\ :\\ 'app\\-tint'\\ ,\\ text\\ :\\ 'text\\-status\\-success'\\ \\}\\ ,\\ ABSENT\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-coral'\\ ,\\ bg\\ :\\ 'app\\-tint'\\ ,\\ text\\ :\\ 'text\\-tone\\-coral'\\ \\}\\ ,\\ LATE\\ :\\ \\{\\ dot\\ :\\ 'bg\\-brand\\-amber'\\ ,\\ bg\\ :\\ 'app\\-tint'\\ ,\\ text\\ :\\ 'text\\-tone\\-amber'\\ \\}\\ ,\\ \\}$",
+      "reason": "8e: attendance calendar shows a status icon next to the colour (R2.4) and tint cells (R1). Same status lookup, same data. Display only."
+    },
+    {
+      "file": "src/components/parent/ParentPanels.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ STATUS_ICON\\ =\\ \\{\\ PRESENT\\ :\\ CheckCircle2\\ ,\\ ABSENT\\ :\\ XCircle\\ ,\\ LATE\\ :\\ Clock3\\ \\}$",
+      "reason": "8e: attendance calendar shows a status icon next to the colour (R2.4) and tint cells (R1). Same status lookup, same data. Display only."
+    },
+    {
+      "file": "src/components/parent/ParentPanels.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ StatusIcon\\ =\\ isStatus\\ \\(\\ status\\ \\)\\ \\?\\ STATUS_ICON\\ \\[\\ status\\ \\]\\ :\\ null$",
+      "reason": "8e: attendance calendar shows a status icon next to the colour (R2.4) and tint cells (R1). Same status lookup, same data. Display only."
+    },
+    {
+      "file": "src/components/parent/ParentPanels.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ StatusIcon\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "8e: attendance calendar shows a status icon next to the colour (R2.4) and tint cells (R1). Same status lookup, same data. Display only."
     }
   ],
   "approvedFrozen": [

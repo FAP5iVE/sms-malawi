@@ -47,10 +47,12 @@ export default function AttendancePage() {
 type Status = 'PRESENT' | 'ABSENT' | 'LATE'
 
 const STATUS_STYLE: Record<Status, { dot: string; bg: string; text: string }> = {
-  PRESENT: { dot: 'bg-emerald-500', bg: 'bg-emerald-500/10', text: 'text-status-success' },
-  ABSENT:  { dot: 'bg-brand-coral', bg: 'bg-brand-coral/10', text: 'text-tone-coral' },
-  LATE:    { dot: 'bg-brand-amber', bg: 'bg-brand-amber/10', text: 'text-tone-amber' },
+  PRESENT: { dot: 'bg-emerald-500', bg: 'app-tint', text: 'text-status-success' },
+  ABSENT:  { dot: 'bg-brand-coral', bg: 'app-tint', text: 'text-tone-coral' },
+  LATE:    { dot: 'bg-brand-amber', bg: 'app-tint', text: 'text-tone-amber' },
 }
+// Each status also has its own icon, so the calendar never relies on colour alone (R2.4).
+const STATUS_ICON = { PRESENT: CheckCircle2, ABSENT: XCircle, LATE: Clock3 }
 
 function AttendanceContent() {
   const { data: me } = useStudentMe()
@@ -154,7 +156,7 @@ function AttendanceContent() {
           <>
             <div className="grid grid-cols-7 gap-1.5 mb-1.5">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-                <div key={d} className="text-center text-xs font-heading font-semibold text-muted uppercase py-1">{d}</div>
+                <div key={d} className="text-center text-xs font-heading font-semibold text-muted py-1">{d}</div>
               ))}
             </div>
             <div className="grid grid-cols-7 gap-1.5">
@@ -163,15 +165,16 @@ function AttendanceContent() {
                 const key = format(day, 'yyyy-MM-dd')
                 const status = recordByDate.get(key)
                 const style = status ? STATUS_STYLE[status] : null
+                const StatusIcon = status ? STATUS_ICON[status] : null
                 return (
                   <div
                     key={key}
                     className={`aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-xs
-                      ${style ? style.bg : 'bg-page'}
+                      ${style ? style.bg : 'app-tint'}
                       ${isToday(day) ? 'ring-2 ring-brand-teal' : ''}`}
                   >
                     <span className={`font-medium ${style ? style.text : 'text-muted'}`}>{format(day, 'd')}</span>
-                    {status && <span className={`w-1.5 h-1.5 rounded-full ${style!.dot}`} aria-hidden />}
+                    {StatusIcon && <StatusIcon className={`w-3.5 h-3.5 ${style!.text}`} aria-hidden />}
                   </div>
                 )
               })}
@@ -183,7 +186,7 @@ function AttendanceContent() {
           <span className="flex items-center gap-1.5 text-xs text-muted"><CheckCircle2 className="w-3.5 h-3.5 text-status-success" /> Present</span>
           <span className="flex items-center gap-1.5 text-xs text-muted"><XCircle className="w-3.5 h-3.5 text-tone-coral" /> Absent</span>
           <span className="flex items-center gap-1.5 text-xs text-muted"><Clock3 className="w-3.5 h-3.5 text-tone-amber" /> Late</span>
-          <span className="flex items-center gap-1.5 text-xs text-muted"><span className="w-3.5 h-3.5 rounded bg-page border border-base inline-block" /> No record</span>
+          <span className="flex items-center gap-1.5 text-xs text-muted"><span className="w-3.5 h-3.5 rounded app-tint inline-block" aria-hidden /> No record</span>
         </div>
       </div>
       </ModuleSurface>

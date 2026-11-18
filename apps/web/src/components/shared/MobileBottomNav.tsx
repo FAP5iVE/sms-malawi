@@ -41,7 +41,7 @@
 
 import Link               from 'next/link'
 import { useRouter }       from 'next/navigation'
-import { useState }        from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   MoreHorizontal,
@@ -57,6 +57,8 @@ import { useMotionEnabled }    from '@/store/motionStore'
 import { ModeToggle }          from '@/components/shared/ModeToggle'
 import { AttentionBadge }      from '@/components/shared/AttentionBadge'
 import { attentionNoun }       from '@/lib/hills/attention'
+import { PeriodSwitcher }      from '@/components/shared/PeriodSwitcher'
+import { getMoreSheetOpen, setMoreSheetOpen, subscribeMoreSheet } from '@/lib/hills/moreSheet'
 import { ReportProblemModal }  from '@/components/shared/ReportProblemModal'
 import {
   reducedMotionVariants,
@@ -132,7 +134,10 @@ export function MobileBottomNav() {
   const { primaryItems, moreItems, ready } = useNavigation()
   const motionEnabled              = useMotionEnabled()
 
-  const [moreOpen, setMoreOpen]    = useState(false)
+  // The open flag is shared with the avatar in the phone header (R5.4), so both
+  // open the same sheet. See lib/hills/moreSheet.ts.
+  const moreOpen = useSyncExternalStore(subscribeMoreSheet, getMoreSheetOpen, () => false)
+  const setMoreOpen = setMoreSheetOpen
   // "Report a problem" dialog — open to every role. State lives out here (not
   // inside the More sheet) so the dialog survives the sheet closing.
   const [reportOpen, setReportOpen] = useState(false)
@@ -334,6 +339,12 @@ export function MobileBottomNav() {
                 >
                   <X className="w-5 h-5" />
                 </button>
+              </div>
+
+              {/* Viewing period: moved here from the phone header (R5.4). The strip under
+                  the header still warns on every page when you are not on the live period. */}
+              <div className="shrink-0 border-b border-base">
+                <PeriodSwitcher variant="sheet" />
               </div>
 
               {/* Overflow navigation items — scrollable */}

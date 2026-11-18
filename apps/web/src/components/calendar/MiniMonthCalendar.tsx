@@ -43,7 +43,7 @@ export function MiniMonthCalendar({
             type="button"
             onClick={() => onNavigateMonth(-1)}
             aria-label="Previous month"
-            className="p-1.5 min-h-[32px] min-w-[32px] rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
+            className="inline-flex items-center justify-center min-h-9 min-w-9 rounded-xl text-muted hover:text-body hover:bg-page transition-colors"
           >
             <ChevronLeft className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -51,7 +51,7 @@ export function MiniMonthCalendar({
             type="button"
             onClick={() => onNavigateMonth(1)}
             aria-label="Next month"
-            className="p-1.5 min-h-[32px] min-w-[32px] rounded-lg text-muted hover:text-body hover:bg-page transition-colors"
+            className="inline-flex items-center justify-center min-h-9 min-w-9 rounded-xl text-muted hover:text-body hover:bg-page transition-colors"
           >
             <ChevronRight className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -60,7 +60,7 @@ export function MiniMonthCalendar({
 
       <div className="grid grid-cols-7 gap-y-1 text-center">
         {WEEK_HEADERS_SHORT.map((d, i) => (
-          <span key={i} className="text-[10px] font-medium text-muted py-0.5">
+          <span key={i} className="text-xs font-medium text-muted py-1">
             {d}
           </span>
         ))}
@@ -75,14 +75,14 @@ export function MiniMonthCalendar({
               onClick={() => onSelectDate(cell.dateKey)}
               aria-label={cell.dateKey}
               aria-pressed={isSelected}
-              className={`h-7 w-7 mx-auto rounded-full text-xs font-medium flex items-center justify-center relative transition-colors ${
+              className={`h-9 w-9 mx-auto rounded-xl text-sm font-medium flex items-center justify-center relative transition-colors ${
                 isSelected
-                  ? 'bg-brand-teal text-white font-bold shadow-sm'
+                  ? 'bg-btn-brand text-btn-brand-fg font-bold'
                   : cell.isToday
-                    ? 'border border-brand-teal/60 text-brand-teal font-semibold'
+                    ? 'ring-2 ring-brand-teal text-tone-teal font-semibold'
                     : cell.isCurrentMonth
                       ? 'text-body hover:bg-page'
-                      : 'text-muted/50 hover:bg-page'
+                      : 'text-muted hover:bg-page'
               }`}
             >
               {cell.dayNumber}

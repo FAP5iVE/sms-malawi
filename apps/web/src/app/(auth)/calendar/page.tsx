@@ -234,9 +234,6 @@ function CalendarContent() {
       {/* ── Header ── */}
       <div>
         <h1 className="font-heading text-2xl font-bold text-brand-navy">Calendar</h1>
-        <p className="text-sm text-muted mt-0.5">
-          School academic calendar — all events, exams, and schedules
-        </p>
       </div>
 
       <ModuleSurface>
@@ -313,7 +310,7 @@ function CalendarContent() {
             ? `"${deleteTarget.title}" will be permanently removed from the calendar. This can't be undone.`
             : ''
         }
-        confirmLabel="Delete Event"
+        confirmLabel="Delete event"
         confirmingLabel="Deleting…"
         confirming={deleteEvent.isPending}
         destructive

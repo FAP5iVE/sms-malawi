@@ -49,10 +49,10 @@ export function CategoryFilterDropdown({
   const onlyActive = count === 1 ? Array.from(activeCategories)[0] : null
 
   let label: string
-  if (count === 0) label = 'No Categories'
-  else if (count === total) label = 'All Categories'
+  if (count === 0) label = 'No categories'
+  else if (count === total) label = 'All categories'
   else if (onlyActive) label = categoryLabel(onlyActive)
-  else label = `${count} Categories`
+  else label = `${count} categories`
 
   const previewColors = onlyActive
     ? [categoryColor(onlyActive)]
@@ -66,14 +66,14 @@ export function CategoryFilterDropdown({
         <button
           type="button"
           aria-label="Filter events by category"
-          className="flex items-center gap-2 px-3 py-2 min-h-[36px] rounded-xl bg-page border border-base hover:bg-surface transition-colors text-xs font-heading font-medium text-body max-w-[180px]"
+          className="flex items-center gap-2 px-3 py-2 min-h-11 rounded-xl border border-base hover:bg-page transition-colors text-sm font-heading font-medium text-body max-w-[200px]"
         >
           {previewColors.length > 0 ? (
             <span className="flex -space-x-1 shrink-0">
               {previewColors.map((c, i) => (
                 <span
                   key={i}
-                  className="w-2.5 h-2.5 rounded-full ring-2 ring-page"
+                  className="w-2.5 h-2.5 rounded-full ring-2 ring-surface"
                   style={{ backgroundColor: c }}
                   aria-hidden="true"
                 />
@@ -89,8 +89,8 @@ export function CategoryFilterDropdown({
 
       <PopoverContent className="w-64 p-0" align="end">
         <div className="px-3 py-2.5 border-b border-base">
-          <span className="text-xs font-heading font-semibold text-muted uppercase tracking-wide">
-            Filter by Category
+          <span className="text-sm font-heading font-semibold text-body">
+            Filter by category
           </span>
         </div>
 
@@ -104,14 +104,13 @@ export function CategoryFilterDropdown({
                 type="button"
                 onClick={() => onToggleCategory(category)}
                 aria-pressed={active}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-page text-sm text-left transition-colors"
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 min-h-11 rounded-xl hover:bg-page text-sm text-left transition-colors"
               >
                 <span
-                  className="w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors"
-                  style={active ? { backgroundColor: color, borderColor: color } : undefined}
+                  className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${active ? 'bg-btn-brand text-btn-brand-fg border-brand-teal' : 'border-base'}`}
                   aria-hidden="true"
                 >
-                  {active && <Check className="w-3 h-3 text-white" aria-hidden="true" />}
+                  {active && <Check className="w-3 h-3" aria-hidden="true" />}
                 </span>
                 <span
                   className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -128,16 +127,16 @@ export function CategoryFilterDropdown({
           <button
             type="button"
             onClick={onClearAll}
-            className="flex-1 py-1.5 text-xs font-medium border border-base rounded-lg hover:bg-page transition-colors"
+            className="flex-1 py-1.5 min-h-11 text-sm font-medium border border-base rounded-xl hover:bg-page transition-colors"
           >
-            Clear All
+            Clear all
           </button>
           <button
             type="button"
             onClick={onSelectAll}
-            className="flex-1 py-1.5 text-xs font-medium border border-base rounded-lg hover:bg-page transition-colors"
+            className="flex-1 py-1.5 min-h-11 text-sm font-medium border border-base rounded-xl hover:bg-page transition-colors"
           >
-            Select All
+            Select all
           </button>
         </div>
       </PopoverContent>

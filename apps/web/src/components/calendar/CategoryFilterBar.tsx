@@ -15,6 +15,7 @@
 'use client'
 import { Check } from 'lucide-react'
 import { CATEGORY_LEGEND } from './calendarConfig'
+import { chipClass } from '@/lib/hills/chip'
 import { CALENDAR_COLORS } from '@shared/types/calendar'
 import type { CalendarEventCategory } from '@shared/types/calendar'
 
@@ -49,15 +50,8 @@ export function CategoryFilterBar({
         type="button"
         onClick={() => (isAllActive ? onClearAll() : onSelectAll())}
         aria-pressed={isAllActive}
-        className={`flex items-center gap-1.5 rounded-full font-heading font-medium border shrink-0 transition-colors ${
-          compact ? 'min-h-[40px] px-3.5 py-2 text-sm' : 'px-3 py-1.5 text-xs'
-        } ${
-          isAllActive
-            ? 'bg-brand-deep text-white border-brand-navy'
-            : 'border-base text-muted bg-surface hover:bg-page'
-        }`}
+        className={`${chipClass(isAllActive)} gap-1.5 shrink-0`}
       >
-        <span className="w-2 h-2 rounded-full bg-current opacity-70" aria-hidden="true" />
         All
         {isAllActive && <Check className="w-3.5 h-3.5" aria-hidden="true" />}
       </button>
@@ -71,21 +65,15 @@ export function CategoryFilterBar({
             type="button"
             onClick={() => onToggle(category)}
             aria-pressed={active}
-            className={`flex items-center gap-1.5 rounded-full font-medium border shrink-0 transition-all ${
-              compact ? 'min-h-[40px] px-3.5 py-2 text-sm' : 'px-3 py-1.5 text-xs'
-            } ${
-              active
-                ? 'border-transparent text-white shadow-sm'
-                : 'border-base text-muted bg-surface opacity-60 hover:opacity-100 hover:bg-page'
-            }`}
-            style={active ? { backgroundColor: color } : {}}
+            className={`${chipClass(active)} gap-1.5 shrink-0`}
           >
             <span
-              className={`rounded-full shrink-0 ${compact ? 'w-2.5 h-2.5' : 'w-2 h-2'}`}
+              className={`rounded-full shrink-0 w-2.5 h-2.5 ${active ? 'ring-2 ring-white/80' : ''}`}
               aria-hidden="true"
-              style={{ backgroundColor: active ? 'rgba(255,255,255,0.85)' : color }}
+              style={{ backgroundColor: color }}
             />
             {label}
+            {active && <Check className="w-3.5 h-3.5" aria-hidden="true" />}
           </button>
         )
       })}

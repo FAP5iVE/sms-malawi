@@ -543,8 +543,8 @@
   ]
  },
  "src/app/(auth)/attendance/page.tsx": {
-  "digest": "eb991b48cf576de1876f391369c7a97e39b369f3",
-  "tokens": 63,
+  "digest": "329521255edd2305cd82292fb37d7e420bd4421e",
+  "tokens": 65,
   "items": [
    {
     "k": "handler",
@@ -559,7 +559,7 @@
   ]
  },
  "src/app/(auth)/calendar/page.tsx": {
-  "digest": "81f90bf6641e9c53601f210164465c9100afcfcc",
+  "digest": "72b3b9f93ce70d952ed6b3bad6fdf9fb657571ef",
   "tokens": 140,
   "items": [
    {
@@ -3890,8 +3890,8 @@
   "items": []
  },
  "src/components/calendar/CalendarEventFormDialog.tsx": {
-  "digest": "8ace05a33c4c7ce77824f3d5a919edc8322ac880",
-  "tokens": 154,
+  "digest": "20d0d9447d17a5b7b44ce8a118d0f4afeceb9255",
+  "tokens": 155,
   "items": [
    {
     "k": "effect",
@@ -3966,8 +3966,8 @@
   ]
  },
  "src/components/calendar/CalendarEventListItem.tsx": {
-  "digest": "fa56c6385b400a3539b058346c2f1765f43cae88",
-  "tokens": 49,
+  "digest": "28c7f62e2560fed6556dcbdbd2db8a979381dc8b",
+  "tokens": 50,
   "items": [
    {
     "k": "handler",
@@ -3992,8 +3992,8 @@
   ]
  },
  "src/components/calendar/CategoryFilterBar.tsx": {
-  "digest": "e1db5793aba9d14844db74bcc6c0fc06e6751fd5",
-  "tokens": 23,
+  "digest": "c9eeb6ecbd2b1b19ad5e836b81cc6b2f43575125",
+  "tokens": 25,
   "items": [
    {
     "k": "handler",
@@ -4008,7 +4008,7 @@
   ]
  },
  "src/components/calendar/CategoryFilterDropdown.tsx": {
-  "digest": "6b8d918e262b5dc53895c9949f9ae7fc6c22de77",
+  "digest": "113fcd30ecd3e08a08aa451a162b4d662039c303",
   "tokens": 40,
   "items": [
    {
@@ -4034,7 +4034,7 @@
   ]
  },
  "src/components/calendar/DesktopCalendarView.tsx": {
-  "digest": "b502372b73fdcc3d13f143b0e6ef2b5a03155d01",
+  "digest": "c660fe139df5b51e350db39ca2cacaa07e316c0c",
   "tokens": 154,
   "items": [
    {
@@ -4166,8 +4166,8 @@
   ]
  },
  "src/components/calendar/MobileCalendarView.tsx": {
-  "digest": "99cef1f37c4644395567f7adf3dbbd168e82254c",
-  "tokens": 142,
+  "digest": "a080ea4a7e049687d8fb463ee2c433fba2f53126",
+  "tokens": 143,
   "items": [
    {
     "k": "handler",
@@ -4287,12 +4287,12 @@
   ]
  },
  "src/components/calendar/calendarConfig.ts": {
-  "digest": "c93a752bd8559cdf7238e81e33148413fbbec6fe",
+  "digest": "59de41b3a5982000c40b38cb250a312219c8a730",
   "tokens": 15,
   "items": []
  },
  "src/components/calendar/calendarUtils.ts": {
-  "digest": "74019857077f4ae0b7bba04bf28cebcaa41cc78d",
+  "digest": "21d04ceab0c18a08fed2ecf14e0fa4f077acee7f",
   "tokens": 59,
   "items": []
  },
@@ -7893,8 +7893,8 @@
   "items": []
  },
  "src/components/parent/ParentPanels.tsx": {
-  "digest": "687dfd4b2f326211580c5ccbc03acb202e4116b4",
-  "tokens": 248,
+  "digest": "8f513ea7fe58497943846152595ef2582cfb967d",
+  "tokens": 250,
   "items": [
    {
     "k": "handler",

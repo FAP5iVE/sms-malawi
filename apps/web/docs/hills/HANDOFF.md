@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-17 (after Phase 8c dashboards and parent portal, AT REVIEW GATE; 8b-3 delivered, 8e calendar next). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
+Last updated: 2026-11-18 (after Phase 8e calendar, AT REVIEW GATE; 8c delivered, 8f emails next). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -44,7 +44,8 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | 8b-2 pages: library, HR, announcements, approvals, settings, monitoring, reports (`hills/phase-8b2-pages`, off `hills/phase-8b1-pages`) | done, AT REVIEW GATE | review pack 8b-2 |
 | 8b-3 pages: assets, exams, finances, gallery admin, students, user management (`hills/phase-8b3-pages`, off `hills/phase-8b2-pages`) | done, AT REVIEW GATE | review pack 8b-3 |
 | 8c dashboards, greeting, parent portal, big dialogs as pages, bordered-card sweep (`hills/phase-8c-dashboards`, off `hills/phase-8b3-pages`) | done, AT REVIEW GATE | review pack 8c |
-| **8e** calendar (**NEXT**, after the 8c gate); **8f** emails; **8g** report cards + exports | after 8c; 8f and 8g exception APPROVED (presentation only) | |
+| 8e calendar, attendance calendars, greeting facts line decision (`hills/phase-8e-calendar`, off `hills/phase-8c-dashboards`) | done, AT REVIEW GATE | review pack 8e |
+| **8f** emails (**NEXT**, after the 8e gate); **8g** report cards + exports | after 8e; 8f and 8g exception APPROVED (presentation only) | |
 | **9** cleanup, ratchets (pills = 0, AI-tell count only down, contrast 100%) | last | |
 
 The user asked for Phases 0 to the logo step to be reviewed as ONE package. Phases 3 and 4 were each reviewed on their own. Phase 6 is split in two review drops (6a, then 6b). Next review gate is
@@ -460,6 +461,20 @@ after 6a.
     - **Found while capturing:** in the stocktake page the count box (`.input`, 100% wide) squeezed the item name away. Fixed with `max-w-24 shrink-0`; placeholder shortened to "Note (optional)".
     - **Checked in the real app** (fake session, `p8/pages81.mjs`, `p8/fixtures8c.mjs`): all nine role dashboards at 390 and 1280, light and dark, no sideways overflow; stocktake page at 390 and 1280, light and dark.
     - **Not covered / still open:** marks entry and payroll run in screen mode were not opened in the capture (need exam and payroll fixtures); dashboards were captured with empty data only, so filled charts and lists were not seen; student results and student detail dialogs still xl/2xl; R7.3 top-5 lists and R10.1 chart titles on dashboards were not changed (they would need data changes); parent report card dialog stays until 8g.
+
+24. **Phase 8e: calendar, attendance calendars, greeting facts line.** Branch `hills/phase-8e-calendar` off `hills/phase-8c-dashboards`. Looks only; logic gate clean against the 8c branch and `main` (89 tokens declared, all wording or display strings, append-only in the allowlist); contrast 502 pairs pass; 79 tests pass here (83 in the real repo, see the zip note below); handler inventory: the handler items of every changed file are identical, only the digests of the calendar files moved (merged into the baseline for those files only); eslint shows only 2 old unused-import warnings in the attendance page; tsc clean for changed files.
+    - **Facts line under the greeting: NO.** Debated and decided (RULEBOOK section 12 item 14, R4.11 amended). Reasons: every number lives inside a role dashboard, so each would have to pass one up (data change); it would be empty for some roles; stale counts break R6.3; the attention card already shows the live counts. Cheaper alternative if wanted: move the attention card to the top (layout only).
+    - **Calendar page:** the nested bordered container is gone (R1): the sidebar is one `app-tint` block, day cells are tint tiles, selected = `ring-2 ring-brand-teal`, today = thin ring, teal number and a dot with a hidden "Today" label, outside month = muted number with no tile. The subtitle (it repeated the heading and had an em dash) is deleted. "Calendar Hub" is now "Events" (banned word), "Selected Date" label deleted, month heading is an `h2` (the page has one `h1`).
+    - **Controls:** view toggle, Add event, create button and the phone filter badge use `bg-btn-brand text-btn-brand-fg` (no white on teal or navy). Category chips (desktop bar, phone sheet, event form picker) use `chipClass`; the category colour stays as a dot, selected chips also get a check. Filter popover: checkbox uses the brand pair, labels sentence case.
+    - **Event rows and cards:** no category pill; category is a coloured dot plus the word. On phones the row now names the category in text (time, category, place) so colour is not the only signal (R2.4). Titles wrap to two lines instead of truncating. Edit and delete targets are 44px on phones.
+    - **Phone:** a visible "Today" text button replaces the icon-only one (same handler, same aria-label); prev, next, search, filter, toggle and Add event are 44px; weekday names are three letters; the quick-add box and its button are `rounded-xl`, not pills.
+    - **Dates:** day before month ("Wednesday 18 November 2026", "Nov 2026"), no uppercase. Week still starts on Monday (R10b.3).
+    - **Event form:** sentence case labels, no "e.g." or "...", "Location or room", "Description or notes", Schedule block is a tint tile, "Save changes" / "Create event", and the save button reads "Saving…" while the request runs (R9.7). Dialog size is `l`.
+    - **Attendance calendars (student page and parent portal):** each day shows a status icon (tick, cross, clock) next to the coloured number, not a dot alone (R2.4); cells are tint tiles; weekday names are not uppercase.
+    - **Checked in the real app** (fake session, mocked calendar and attendance data; scripts in `capture-scripts/`): `/calendar` at 390 and 1280, light and dark, month, agenda, category filter, and event form; `/attendance` as a student at 390 and 1280, light and dark. No sideways overflow.
+    - **Zip note (important):** the zip had no git history and was missing the source of the 8d follow-up (`lib/hills/moreSheet.ts`, its test, and the updated `MobileBottomNav.tsx` and `PageHeader.tsx`). So `hills:inventory:check` already failed on those two files before 8e, and the test run is 79 not 83. 8e did not touch them. Please send the real repo state or that follow-up so it can be reconciled.
+    - **Open questions for the owner:** (1) Phones open the event form as a bottom sheet (`MotionBottomSheet`). R8.2 says a dialog with inputs is full screen on phones. Switching means passing the form through `Modal` with `onSubmit` and `footer`, which moves the save button out of the form and is a logic change. (2) Same for desktop: the form's buttons sit inside the form and scroll with it, not pinned in a footer (R8.3). (3) Attendance calendars have no Today button; adding one needs a handler. (4) The desktop day tooltip only opens on mouse hover; a keyboard version needs handlers. (5) The phone empty-day hint ("Use the box below...") shows even to people who cannot add events; fixing it needs a condition.
+    - **Not covered:** Firefox, Safari, real phones; month view with 4 or more events on one day at phone width; the calendar for roles other than admin (the page is the same for all); create, edit and delete round trips (mock only).
 
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database. Do not retry or work around. tsc errors from missing

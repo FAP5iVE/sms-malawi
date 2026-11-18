@@ -126,7 +126,7 @@ export function buildMonthGrid(monthDate: Date, events: CalendarEvent[]): Calend
   })
 }
 
-export const WEEK_HEADERS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+export const WEEK_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 export const WEEK_HEADERS_SHORT = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
 export function formatMonthYear(date: Date): string {
@@ -134,21 +134,21 @@ export function formatMonthYear(date: Date): string {
 }
 
 export function formatMonthShort(date: Date): string {
-  return format(date, 'MMM').toUpperCase()
+  return format(date, 'MMM')
 }
 
 export function formatDisplayDate(dateKey: string): string {
-  return format(parseISO(`${dateKey}T00:00:00`), 'EEEE, MMMM d, yyyy')
+  return format(parseISO(`${dateKey}T00:00:00`), 'EEEE d MMMM yyyy')
 }
 
 export function formatShortDate(dateKey: string): string {
-  return format(parseISO(`${dateKey}T00:00:00`), 'MMM d')
+  return format(parseISO(`${dateKey}T00:00:00`), 'd MMM')
 }
 
-/** "Fri, Sep 4" — used as the sticky date-group heading in the mobile
+/** "Fri 4 Sep" — used as the sticky date-group heading in the mobile
  *  Agenda list, where full weekday names (formatDisplayDate) would wrap. */
 export function formatGroupHeading(dateKey: string): string {
-  return format(parseISO(`${dateKey}T00:00:00`), 'EEE, MMM d')
+  return format(parseISO(`${dateKey}T00:00:00`), 'EEE d MMM')
 }
 
 /** Renders an event's time range, e.g. "8:00 AM – 5:00 PM", or "All day"
@@ -162,7 +162,7 @@ export function formatEventTimeRange(event: CalendarEvent): string {
   if (dfIsSameDay(start, end)) {
     return `${startLabel} – ${format(end, 'h:mm a')}`
   }
-  return `${startLabel} – ${format(end, 'MMM d, h:mm a')}`
+  return `${startLabel} – ${format(end, 'd MMM, h:mm a')}`
 }
 
 /** Compact time label for dense list rows, e.g. "08:00" or "All day". */
