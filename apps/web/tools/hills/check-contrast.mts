@@ -420,6 +420,62 @@ for (const dark of [false, true]) {
   }
 }
 
+// ── Phase 8f: emails (base.ts tokens and its dark-mode style block) ─────────
+// Read straight from src/server/templates/emails/base.ts so a colour change there
+// is checked. Light: body, dark and muted text on white, on the zebra row and on
+// the footer; each status tone on white and on its own tint; the band label and
+// button label on navy. Dark (the style block used by Apple Mail and Gmail dark):
+// the dark text tones on the dark card, the dark tint and the dark footer.
+{
+  const emailSrc = readFileSync(path.join(here, '../../src/server/templates/emails/base.ts'), 'utf8')
+  const tok = (n: string): RGBA => {
+    const m = new RegExp(`\\b${n}:\\s*'(#[0-9a-fA-F]{6})'`).exec(emailSrc)
+    if (!m) throw new Error(`email token ${n} not found in base.ts`)
+    return parseColor(m[1] as string)
+  }
+  const darkBlock = /@media \(prefers-color-scheme: dark\)\s*\{([\s\S]*?)\n  \}/.exec(emailSrc)?.[1] ?? ''
+  const dk = (cls: string, prop: string): RGBA => {
+    const rule = new RegExp(`\\.${cls}\\s*\\{([^}]*)\\}`).exec(darkBlock)?.[1] ?? ''
+    const m = new RegExp(`(?:^|[;\\s])${prop}:\\s*(#[0-9a-fA-F]{6})`).exec(rule)
+    if (!m) throw new Error(`email dark rule .${cls} ${prop} not found in base.ts`)
+    return parseColor(m[1] as string)
+  }
+  const white = parseColor('#ffffff')
+  const add = (name: string, need: number, a: RGBA, b: RGBA) =>
+    rows.push({ sky: 'email', pair: name, need, got: ratio(a, b) })
+  const navy = tok('PRIMARY')
+  const row = tok('BG_ROW')
+  const foot = tok('BG_FOOTER')
+  for (const [name, c] of [['TEXT_BODY', tok('TEXT_BODY')], ['TEXT_DARK', tok('TEXT_DARK')], ['TEXT_MUTED', tok('TEXT_MUTED')]] as [string, RGBA][]) {
+    add(`${name} on white (light)`, 4.5, c, white)
+    add(`${name} on zebra row (light)`, 4.5, c, row)
+  }
+  add('TEXT_MUTED on footer (light)', 4.5, tok('TEXT_MUTED'), foot)
+  add('white school name on navy band', 4.5, white, navy)
+  add('band label on navy band', 4.5, tok('BAND_TEXT'), navy)
+  add('button label (white) on navy button', 4.5, white, navy)
+  for (const [tone, textKey, tint] of [
+    ['red', 'ACCENT_RED', '#fef2f2'], ['green', 'ACCENT_GREEN', '#f0fdf4'], ['amber', 'ACCENT_AMBER', '#fffbeb'], ['blue', 'ACCENT_BLUE', '#eff6ff'],
+  ] as const) {
+    add(`${tone} text on white (light)`, 4.5, tok(textKey), white)
+    add(`${tone} text on its tint (light)`, 4.5, tok(textKey), parseColor(tint))
+    add(`${tone} text on zebra row (light)`, 4.5, tok(textKey), row)
+  }
+  const dCard = dk('em-card', 'background-color')
+  const dTint = dk('em-tint', 'background-color')
+  const dFoot = dk('em-foot', 'background-color')
+  add('dark body text on dark card', 4.5, dk('em-t', 'color'), dCard)
+  add('dark body text on dark tint', 4.5, dk('em-t', 'color'), dTint)
+  add('dark muted text on dark card', 4.5, dk('em-m', 'color'), dCard)
+  add('dark muted text on dark tint', 4.5, dk('em-m', 'color'), dTint)
+  add('dark muted text on dark footer', 4.5, dk('em-m', 'color'), dFoot)
+  for (const t of ['red', 'green', 'amber', 'blue']) {
+    add(`dark ${t} text on dark card`, 4.5, dk(`em-${t}`, 'color'), dCard)
+    add(`dark ${t} text on dark tint`, 4.5, dk(`em-${t}`, 'color'), dTint)
+  }
+  add('dark button label on dark button', 4.5, dk('em-btn', 'color'), dk('em-btn', 'background-color'))
+}
+
 const fails = rows.filter((r) => r.got < r.need)
 if (process.argv.includes('--table') || fails.length > 0) {
   for (const r of rows) {

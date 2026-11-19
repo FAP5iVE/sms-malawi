@@ -10,7 +10,7 @@
  */
 import 'server-only'
 
-import { buildEmailHtml, buildEmailText, TOKEN, type EmailMessage, type SchoolBranding } from './base'
+import { buildEmailHtml, buildEmailText, note, para, type EmailMessage, type SchoolBranding } from './base'
 
 export interface NewsletterConfirmData {
   name?:       string
@@ -21,28 +21,17 @@ export function renderNewsletterConfirm(
   data:   NewsletterConfirmData,
   school: SchoolBranding
 ): EmailMessage {
-  const subject = `Confirm your newsletter subscription — ${school.schoolName}`
+  const subject = 'Confirm your newsletter subscription'
   const greeting = data.name ? `Hello ${data.name},` : 'Hello,'
 
   const bodyHtml = `
-    <tr>
-      <td style="padding:32px 32px 0;font-family:${TOKEN.FONT_STACK};font-size:15px;color:${TOKEN.TEXT_BODY};line-height:1.7;">
-        <p style="margin:0 0 8px;">${greeting}</p>
-        <p style="margin:0;">
-          Thank you for subscribing to the ${school.schoolName} newsletter. Please confirm your
-          subscription using the button below.
-        </p>
-      </td>
-    </tr>
-
-    <tr>
-      <td style="padding:20px 32px 0;font-family:${TOKEN.FONT_STACK};font-size:12px;color:${TOKEN.TEXT_MUTED};line-height:1.6;">
-        If you did not request this subscription, you can safely ignore this email — no
-        further messages will be sent unless the link above is used.
-      </td>
-    </tr>
-
-    <tr><td style="padding:24px 0 0;"></td></tr>
+    ${para(
+      greeting,
+      `Thank you for subscribing to the ${school.schoolName} newsletter. Please confirm your
+          subscription using the button below.`,
+    )}
+    ${note(`If the button does not open, copy this link into your browser:<br /><span style="word-break:break-all;">${data.confirmUrl}</span>`)}
+    ${note('If you did not request this subscription, you can ignore this email. No further messages will be sent unless the button above is used.')}
   `
 
   const html = buildEmailHtml({
@@ -50,9 +39,8 @@ export function renderNewsletterConfirm(
     headerLabel: 'Newsletter',
     body:        bodyHtml,
     cta: {
-      label: 'Confirm Subscription',
+      label: 'Confirm subscription',
       url:   data.confirmUrl,
-      color: TOKEN.ACCENT_GREEN,
     },
     school,
   })
@@ -66,7 +54,7 @@ export function renderNewsletterConfirm(
       '',
       data.confirmUrl,
       '',
-      'If you did not request this subscription, you can safely ignore this email.',
+      'If you did not request this subscription, you can ignore this email.',
     ].join('\n'),
     school
   )

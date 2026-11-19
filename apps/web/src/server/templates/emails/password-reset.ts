@@ -9,7 +9,7 @@
  */
 import 'server-only'
 
-import { buildEmailHtml, buildEmailText, TOKEN, type EmailMessage, type SchoolBranding } from './base'
+import { buildEmailHtml, buildEmailText, note, para, type EmailMessage, type SchoolBranding } from './base'
 
 export interface PasswordResetData {
   /** Account holder's name when known; the greeting falls back to "Hello,". */
@@ -23,32 +23,22 @@ export interface PasswordResetData {
 export function renderPasswordReset(data: PasswordResetData, school: SchoolBranding): EmailMessage {
   const minutes = data.expiresInMinutes ?? 60
   const lifetime = minutes % 60 === 0 ? `${minutes / 60} hour${minutes === 60 ? '' : 's'}` : `${minutes} minutes`
-  const subject = `Reset your password — ${school.schoolName}`
+  const subject = `Reset your password (link works for ${lifetime})`
   const greeting = data.name ? `Hello ${data.name},` : 'Hello,'
 
   const bodyHtml = `
-    <tr>
-      <td style="padding:32px 32px 0;font-family:${TOKEN.FONT_STACK};font-size:15px;color:${TOKEN.TEXT_BODY};line-height:1.7;">
-        <p style="margin:0 0 8px;">${greeting}</p>
-        <p style="margin:0;">
-          We received a request to reset the password for your ${school.schoolName} account.
-          Use the button below to choose a new one. The link works for ${lifetime} and can be used once.
-        </p>
-      </td>
-    </tr>
-
-    <tr>
-      <td style="padding:20px 32px 0;font-family:${TOKEN.FONT_STACK};font-size:12px;color:${TOKEN.TEXT_MUTED};line-height:1.6;">
-        If you did not ask for this, you can ignore this email. Your password will not change.
-      </td>
-    </tr>
-
-    <tr><td style="padding:24px 0 0;"></td></tr>
+    ${para(
+      greeting,
+      `We received a request to reset the password for your ${school.schoolName} account.
+          Use the button below to choose a new one. The link works for <strong>${lifetime}</strong> and can be used once.`,
+    )}
+    ${note(`If the button does not open, copy this link into your browser:<br /><span style="word-break:break-all;">${data.resetUrl}</span>`)}
+    ${note('If you did not ask for this, you can ignore this email. Your password will not change.')}
   `
 
   const html = buildEmailHtml({
-    previewText: `Reset your ${school.schoolName} password`,
-    headerLabel: 'Password Reset',
+    previewText: `Reset your ${school.schoolName} password. The link works for ${lifetime}.`,
+    headerLabel: 'Password reset',
     body:        bodyHtml,
     cta: {
       label: 'Reset password',
