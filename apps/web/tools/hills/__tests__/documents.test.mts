@@ -19,13 +19,19 @@ import { toCsv } from '../../../src/lib/csv.js'
 // The services load jsPDF through require(), so use that same copy rather than an ESM import.
 const { jsPDF } = createRequire(import.meta.url)('jspdf') as { jsPDF: typeof JsPdf & { API: { events: unknown[] } } }
 let current: Map<number, string[]> | null = null
+/** The slice of a jsPDF document the recorder touches (the library's own types are narrower than what it does at run time). */
+interface Recordable {
+  text: (...a: unknown[]) => unknown
+  internal: { getCurrentPageInfo: () => { pageNumber: number } }
+}
 jsPDF.API.events.push([
   'initialized',
-  function hook(this: JsPdf & { text: (...a: unknown[]) => unknown }) {
-    const original = this.text.bind(this)
-    this.text = (...args: unknown[]) => {
+  function hook(this: unknown) {
+    const doc = this as Recordable
+    const original = doc.text.bind(doc)
+    doc.text = (...args: unknown[]) => {
       const t = args[0]
-      const page = this.internal.getCurrentPageInfo().pageNumber
+      const page = doc.internal.getCurrentPageInfo().pageNumber
       if (current) current.set(page, [...(current.get(page) ?? []), ...(Array.isArray(t) ? t.map(String) : [String(t)])])
       return original(...args)
     }

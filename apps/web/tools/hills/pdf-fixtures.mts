@@ -27,9 +27,9 @@ export interface PdfDoc { name: string; build: () => Buffer }
 const subj = (subject: string, ca: number, exam: number, grade: string, remarks: string) => ({ subject, caScore: ca, examScore: exam, total: ca + exam, grade, remarks, points: null, inAggregate: true })
 
 export async function pdfDocs(): Promise<PdfDoc[]> {
-  const receipt = await import('../../src/server/services/receiptService.ts')
-  const transcript = await import('../../src/server/services/transcriptService.ts')
-  const card = await import('../../src/server/services/reportCardService.ts')
+  const receipt = await import('../../src/server/services/receiptService.js')
+  const transcript = await import('../../src/server/services/transcriptService.js')
+  const card = await import('../../src/server/services/reportCardService.js')
   const officer = { name: 'Mrs Chikondi Banda', title: 'Bursar', unit: 'Finance and accounts' }
   const head = { name: 'Mr Peter Mwale', title: 'Head teacher', unit: 'Administration' }
 
