@@ -935,13 +935,15 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   // right-hand mark: shorten if it would crowd the centre text
   // Right-hand end of the footer: the document reference and the page count (R11.7).
   setFace(doc, 'bodyBold', 7.2, C.ink)
-  let official = `Ref: ${data.student.registrationNo} · Term ${data.term} ${data.academicYear}  ·  Page 1 of 1`
+  // The card is one page by design; the count is read from the document so the words can never disagree with it.
+  const pageWords = `Page ${doc.getNumberOfPages()} of ${doc.getNumberOfPages()}`
+  let official = `Ref: ${data.student.registrationNo} · Term ${data.term} ${data.academicYear}  ·  ${pageWords}`
   const nextLead = 'Next term begins: '
   const nextVal = data.nextTermDate ? fmtCardDate(data.nextTermDate, tz) : ''
   const nextW = nextVal ? labelledW(nextLead, nextVal) : 0
   setFace(doc, 'bodyBold', 7.2, C.ink)
   const roomForRight = CW - issuedW - nextW - 16
-  if (doc.getTextWidth(official) > roomForRight) official = 'Page 1 of 1'
+  if (doc.getTextWidth(official) > roomForRight) official = pageWords
   const officialShown = ellipsize(doc, official, Math.max(30, roomForRight))
   put(doc, officialShown, M_X + CW, fy + 4.6, 'right')
   if (nextVal) {

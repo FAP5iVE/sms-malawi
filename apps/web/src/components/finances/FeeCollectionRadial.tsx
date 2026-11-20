@@ -62,7 +62,7 @@ export function FeeCollectionRadial({
         ariaLabel={
           percent !== null
             ? `Fee collection is ${Math.round(percent)} percent of target for term ${term}, ${academicYear}`
-            : 'Fee collection chart — no data available'
+            : 'Fee collection chart: no data available'
         }
       />
     </ChartCard>

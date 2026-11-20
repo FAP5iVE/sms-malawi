@@ -1060,7 +1060,7 @@ function MarkConditionSection({ book, onClose }: { book: ApiBook; onClose: () =>
               Cancel
             </button>
             <button type="button" onClick={handleConfirm} disabled={markCondition.isPending}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60 ${picking === 'LOST' ? 'bg-brand-coral' : 'bg-brand-amber'}`}>
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold disabled:opacity-60 ${picking === 'LOST' ? 'bg-btn-danger text-btn-danger-fg' : 'bg-brand-amber text-white'}`}>
               {markCondition.isPending ? 'Saving…' : `Confirm ${picking === 'LOST' ? 'Lost' : 'Damaged'}`}
             </button>
           </div>
@@ -2455,7 +2455,7 @@ function LibraryContent() {
               <ModuleTabs<'fines' | 'circulation' | 'catalogDist' | 'clearance'>
                 tabs={[
                   { id: 'fines',       label: 'Fines and penalties ledger',        icon: AlertTriangle },
-                  { id: 'circulation', label: 'Circulation and popularity insights', icon: ArrowUpRight },
+                  { id: 'circulation', label: 'Circulation and popularity', icon: ArrowUpRight },
                   { id: 'catalogDist', label: 'Catalog distribution',            icon: BookMarked },
                   { id: 'clearance',   label: 'Clearance and audit reports',       icon: ClipboardList },
                 ]}

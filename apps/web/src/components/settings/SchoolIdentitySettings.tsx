@@ -525,7 +525,7 @@ export function SchoolIdentitySettings() {
                     <input
                       value={editDraft.title}
                       onChange={(e) => setEditDraft((p) => ({ ...p, title: e.target.value }))}
-                      placeholder="Title (e.g. Head Teacher)"
+                      placeholder="Title, for example Head teacher"
                       className={`${inputCls} min-h-9 text-xs`}
                     />
                   </div>
@@ -614,7 +614,7 @@ export function SchoolIdentitySettings() {
         <div className="pb-4 border-b border-base space-y-2">
           <div className="grid sm:grid-cols-2 gap-2">
             <input value={newLeader.name} onChange={(e) => setNewLeader((p) => ({ ...p, name: e.target.value }))} placeholder="Full name" className={`${inputCls} min-h-9 text-xs`} />
-            <input value={newLeader.title} onChange={(e) => setNewLeader((p) => ({ ...p, title: e.target.value }))} placeholder="Title (e.g. Head Teacher)" className={`${inputCls} min-h-9 text-xs`} />
+            <input value={newLeader.title} onChange={(e) => setNewLeader((p) => ({ ...p, title: e.target.value }))} placeholder="Title, for example Head teacher" className={`${inputCls} min-h-9 text-xs`} />
           </div>
           <textarea value={newLeader.bio} onChange={(e) => setNewLeader((p) => ({ ...p, bio: e.target.value }))} placeholder="Short bio (optional)" className={`${inputCls} min-h-15 text-xs`} />
           {/* [NEW] Photo attach — displayed on the public Leadership page. */}

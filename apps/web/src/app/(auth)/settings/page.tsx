@@ -234,7 +234,7 @@ function SettingsPageInner() {
       <div>
         <h1 className="font-heading text-2xl font-bold text-brand-navy">Settings</h1>
         <p className="text-sm text-muted mt-0.5">
-          Manage your account preferences and system configuration.
+          Account preferences and system configuration.
         </p>
       </div>
 

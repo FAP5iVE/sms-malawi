@@ -83,7 +83,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <button
               type="button"
               onClick={this.handleReload}
-              className="min-h-[44px] px-5 rounded-xl bg-brand-teal text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+              className="min-h-[44px] px-5 rounded-xl bg-btn-brand text-btn-brand-fg text-sm font-semibold hover:bg-btn-brand-hover hover:opacity-90 transition-opacity"
             >
               Reload page
             </button>

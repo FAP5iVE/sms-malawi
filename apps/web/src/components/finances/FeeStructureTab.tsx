@@ -458,8 +458,8 @@ function FeeFormModal({
           <span className="font-medium">Mandatory</span>
           <span className="block text-xs text-muted">
             {mandatory
-              ? 'Applies automatically to every student in scope — no per-student opt-in needed.'
-              : 'Optional add-on — students are billed only after being enrolled via Finance Fee Structure.'}
+              ? 'Applies automatically to every student in scope. No per-student opt-in is needed.'
+              : 'Optional add-on: students are billed only after being enrolled via Finance Fee Structure.'}
           </span>
         </span>
       </label>

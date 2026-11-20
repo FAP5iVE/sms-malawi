@@ -120,7 +120,7 @@ export function ManebPanel({ academicYear }: Props) {
       onSuccess: (result) => {
         setFeedback(
           `Imported ${result.created.length} record${result.created.length === 1 ? '' : 's'}` +
-            (result.errors.length > 0 ? ` — ${result.errors.length} row(s) failed (e.g. duplicate candidate number).` : '.'),
+            (result.errors.length > 0 ? ` — ${result.errors.length} row(s) failed, for example a duplicate candidate number.` : '.'),
         )
         if (result.errors.length === 0) {
           setRows([emptyRow()])

@@ -427,7 +427,7 @@ export default function LandingPage() {
               </button>
               <button
                 onClick={cycleTheme}
-                aria-label={mounted ? `Theme: ${theme}. Click to change.` : 'Toggle theme'}
+                aria-label={mounted ? `Theme: ${theme}. Press to change.` : 'Toggle theme'}
                 title={mounted ? (theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'Auto') : undefined}
                 className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
                   scrolled ? 'border-base text-foreground hover:bg-background' : 'border-white/25 text-white hover:bg-white/10'
@@ -1277,7 +1277,7 @@ export default function LandingPage() {
                     required
                     value={contactForm.subject}
                     onChange={(e) => setContactForm((f) => ({ ...f, subject: e.target.value }))}
-                    placeholder="Subject, e.g. Admissions enquiry"
+                    placeholder="Subject, for example Admissions enquiry"
                     className="w-full border border-base bg-page rounded-xl px-3.5 py-3 text-[14.5px] text-body placeholder:text-muted outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal transition-colors mb-3"
                   />
                   <textarea

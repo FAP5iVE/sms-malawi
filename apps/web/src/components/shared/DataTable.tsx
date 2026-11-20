@@ -80,6 +80,7 @@ import {
 } from 'lucide-react'
 import { useMotionEnabled } from '@/store/motionStore'
 import { useFlatSurface } from '@/components/shared/FlatSurface'
+import { chipClass } from '@/lib/hills/chip'
 import {
   LIST_CONTAINER_VARIANTS,
   LIST_ITEM_VARIANTS,
@@ -763,12 +764,7 @@ export function DataTable<T extends object>({
                 key={f.value}
                 type="button"
                 onClick={() => onQuickFilter?.(f.value)}
-                className={[
-                  'px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors',
-                  activeQuickFilter === f.value
-                    ? 'bg-brand-deep text-white border-brand-navy'
-                    : 'bg-surface border-base text-muted hover:border-brand-navy/40 hover:text-body',
-                ].join(' ')}
+                className={chipClass(activeQuickFilter === f.value)}
               >
                 {f.label}
               </button>

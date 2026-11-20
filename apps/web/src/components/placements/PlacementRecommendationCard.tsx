@@ -40,7 +40,7 @@ function buildVerdict(r: ApiPlacementRecommendation): string {
     return `You do not meet the mandatory subject prerequisite(s) for ${r.programmeName}: missing credit in ${r.missingSubjects.join(', ')}.`
   }
   if (r.meetsCutOff === true) {
-    return `Fully eligible! Your MSCE aggregate (${r.aggregate} points) comfortably meets or surpasses the typical cutoff (${r.cutOffPoints} points).`
+    return `Fully eligible. Your MSCE aggregate (${r.aggregate} points) comfortably meets or surpasses the typical cutoff (${r.cutOffPoints} points).`
   }
   if (r.meetsCutOff === false) {
     return `Prerequisites are met, but your aggregate (${r.aggregate} points) is above the typical competitive cutoff (${r.cutOffPoints} points).`

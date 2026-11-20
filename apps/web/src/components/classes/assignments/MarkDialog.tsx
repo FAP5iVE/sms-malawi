@@ -182,7 +182,7 @@ export function MarkDialog({ classId, assignmentId, dueDate, postedAt, marksEnab
             {derived && !mismatch && (
               <p className={`mt-1.5 text-xs font-medium ${derived === 'LATE' ? 'text-status-warning' : 'text-status-success'}`}>
                 {derived === 'LATE'
-                  ? `Late — ${daysBetween(dueDay, submittedOn)} day${daysBetween(dueDay, submittedOn) === 1 ? '' : 's'} after the due date`
+                  ? `Late by ${daysBetween(dueDay, submittedOn)} day${daysBetween(dueDay, submittedOn) === 1 ? '' : 's'} after the due date`
                   : 'On time'}{' '}· due {formatDay(dueDay)}
               </p>
             )}
@@ -200,7 +200,7 @@ export function MarkDialog({ classId, assignmentId, dueDate, postedAt, marksEnab
           {marksEnabled && (
             <div>
               <label htmlFor="mark-value" className="mb-1.5 block text-xs font-heading font-semibold uppercase tracking-wider text-muted">
-                Marks{maxMarks ? ` (out of ${maxMarks})` : ''} <span className="font-normal normal-case">— leave empty to mark later</span>
+                Marks{maxMarks ? ` (out of ${maxMarks})` : ''} <span className="font-normal normal-case">(leave empty to mark later)</span>
               </label>
               <input
                 id="mark-value"

@@ -92,11 +92,11 @@ const BTN_BASE =
   'transition-colors disabled:opacity-60 disabled:pointer-events-none'
 
 /** Filled teal — the dialog's main action (Save / Create / Allocate). */
-export const MODAL_BTN_PRIMARY = `${BTN_BASE} bg-brand-teal text-white hover:bg-brand-teal-light`
+export const MODAL_BTN_PRIMARY = `${BTN_BASE} bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover`
 /** Outlined — Cancel / Close. */
 export const MODAL_BTN_SECONDARY = `${BTN_BASE} border border-base text-muted hover:bg-page hover:text-body`
 /** Filled coral — destructive confirmations. */
-export const MODAL_BTN_DANGER = `${BTN_BASE} bg-brand-coral text-white hover:bg-brand-coral/90`
+export const MODAL_BTN_DANGER = `${BTN_BASE} bg-btn-danger text-btn-danger-fg hover:bg-btn-danger-hover`
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES

@@ -96,7 +96,7 @@ export function AssignmentsTab({
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand-teal px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-teal-light"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-btn-brand px-4 py-2 text-sm font-semibold text-btn-brand-fg transition-colors hover:bg-btn-brand-hover"
           >
             <Plus className="h-4 w-4" aria-hidden />
             New Assignment
@@ -123,7 +123,7 @@ export function AssignmentsTab({
       ) : assignments.length === 0 ? (
         <div className="rounded-xl border border-base py-12 text-center text-sm text-muted">
           {assignableSubjects.length > 0
-            ? 'No assignments yet. Click “New Assignment” to post one — students are notified straight away.'
+            ? 'No assignments yet. Use “New Assignment” to post one. Students are notified straight away.'
             : isStudent
               ? 'No assignments have been posted for your class yet.'
               : 'No assignments to show.'}

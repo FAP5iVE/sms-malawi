@@ -72,7 +72,7 @@ export function ReportProblemModal({ onClose }: { onClose: () => void }) {
       >
         <div className="flex flex-col items-center text-center py-4 gap-3">
           <CheckCircle2 className="w-10 h-10 text-status-success" aria-hidden />
-          <p className="font-heading font-semibold text-body">Thank you — your report was sent.</p>
+          <p className="font-heading font-semibold text-body">Thank you. Your report was sent.</p>
           <p className="text-sm text-muted">The administrators can now see it, together with your name and {idLabel.toLowerCase()}.</p>
         </div>
       </Modal>
@@ -127,7 +127,7 @@ export function ReportProblemModal({ onClose }: { onClose: () => void }) {
           value={idNumber}
           onChange={(e) => setIdNumber(e.target.value)}
           maxLength={PROBLEM_REPORT_LIMITS.idMax}
-          placeholder={role === 'student' ? 'e.g. SMS-2025-0001' : 'Your employee number'}
+          placeholder={role === 'student' ? 'Example: SMS-2025-0001' : 'Your employee number'}
           autoComplete="off"
           aria-required="true"
           aria-invalid={!!errors.idNumber}

@@ -380,7 +380,7 @@ export default function ApplyPage() {
               <div className="hills-apply__tick">
                 <CheckCircle2 className="w-9 h-9" />
               </div>
-              <h1 className="hills-apply__title">Application Submitted!</h1>
+              <h1 className="hills-apply__title">Application submitted</h1>
               <p className="hills-apply__note">
                 Thank you for applying. Your application has been received and is pending review. You
                 will be contacted by the school admissions office with further instructions.
@@ -561,7 +561,7 @@ export default function ApplyPage() {
                         <input
                           {...register('traditionalAuthority')}
                           className={`${inputCls} ${inputBase}`}
-                          placeholder="e.g. T/A Kuntaja"
+                          placeholder="Example: T/A Kuntaja"
                         />
                       </Field>
                       <Field label="Village" error={errors.village?.message} hint="Optional">
@@ -591,7 +591,7 @@ export default function ApplyPage() {
                       {...register('religion')}
                       list="apply-religions"
                       className={`${inputCls} ${inputBase}`}
-                      placeholder="e.g. Christianity, Islam"
+                      placeholder="Example: Christianity, Islam"
                     />
                     <datalist id="apply-religions">
                       {RELIGIONS.map((r) => <option key={r} value={r} />)}
@@ -602,7 +602,7 @@ export default function ApplyPage() {
                       {...register('homeLanguage')}
                       list="apply-languages"
                       className={`${inputCls} ${inputBase}`}
-                      placeholder="e.g. Chichewa, Chitumbuka"
+                      placeholder="Example: Chichewa, Chitumbuka"
                     />
                     <datalist id="apply-languages">
                       {HOME_LANGUAGES.map((l) => <option key={l} value={l} />)}
@@ -930,7 +930,7 @@ export default function ApplyPage() {
                       rows={2}
                       maxLength={500}
                       className={`${inputCls} resize-none ${errors.medicalAlert ? inputError : inputBase}`}
-                      placeholder="e.g. Asthma, carries an inhaler"
+                      placeholder="Example: Asthma, carries an inhaler"
                     />
                   </Field>
 
@@ -976,7 +976,7 @@ export default function ApplyPage() {
                                       onChange={(e) => setNote(n.type, e.target.value)}
                                       maxLength={300}
                                       className={`${inputCls} ${inputBase}`}
-                                      placeholder="e.g. Front-row seating, large print, hearing aid"
+                                      placeholder="Example: Front-row seating, large print, hearing aid"
                                     />
                                   </div>
                                 ))}

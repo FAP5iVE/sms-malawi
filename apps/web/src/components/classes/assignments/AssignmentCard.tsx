@@ -53,7 +53,7 @@ export function AssignmentCard({ a, isStudent, onOpen }: AssignmentCardProps) {
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
         <span className={`inline-flex items-center gap-1 font-medium ${due.overdue ? 'text-status-danger' : 'text-status-info'}`}>
           <CalendarClock className="h-3.5 w-3.5" aria-hidden />
-          {lateStillOpen ? `${due.text} — you can still hand in (it will be marked late)` : due.text}
+          {lateStillOpen ? `${due.text}. You can still hand in; it will be marked late.` : due.text}
         </span>
         {!!a.attachmentCount && (
           <span className="inline-flex items-center gap-1 text-muted">

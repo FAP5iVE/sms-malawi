@@ -91,8 +91,8 @@ export function ClassSubjectsField({ classId, readOnly = false }: Props) {
         <p className="flex items-start gap-2 text-xs text-muted bg-page border border-base rounded-xl px-3 py-2.5">
           <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden />
           Locked since{' '}
-          {meta.lockedAt ? new Date(meta.lockedAt).toDateString() : 'the edit window closed'} —
-          subjects can no longer be changed for the {meta.academicYear} academic year.
+          {meta.lockedAt ? new Date(meta.lockedAt).toDateString() : 'the edit window closed'}.
+          Subjects can no longer be changed for the {meta.academicYear} academic year.
         </p>
       ) : meta.subjectsSetAt ? (
         <p className="flex items-start gap-2 text-xs text-muted bg-page border border-base rounded-xl px-3 py-2.5">
@@ -103,7 +103,7 @@ export function ClassSubjectsField({ classId, readOnly = false }: Props) {
       ) : (
         !readOnly && (
           <p className="text-xs text-muted">
-            Choose the subjects this class takes. Once saved, you have 5 days to change them — after
+            Choose the subjects this class takes. Once saved, you have 5 days to change them. After
             that they are locked for the rest of the {meta.academicYear} academic year.
           </p>
         )

@@ -1163,7 +1163,7 @@ function RequestsTab() {
                   key={d.department}
                   type="button"
                   onClick={() => setDeptFilter(d.department)}
-                  className="text-xs bg-page rounded-full px-3 py-1 hover:bg-base"
+                  className="min-h-11 rounded-xl border border-base px-3.5 text-sm text-muted transition-colors hover:bg-page hover:text-body"
                 >
                   {d.department} <span className="font-semibold">({d.count})</span>
                 </button>

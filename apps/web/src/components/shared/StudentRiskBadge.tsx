@@ -225,7 +225,7 @@ function CardVariant({
         <p className="text-xs text-muted">
           {riskLevel === 'NONE'
             ? 'No risk factors identified. Student is on track.'
-            : 'Flagged by the risk engine — no further detail is available to your role.'}
+            : 'Flagged by the risk engine. No further detail is available to your role.'}
         </p>
       ) : (
         <ul className="space-y-2">

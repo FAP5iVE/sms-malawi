@@ -62,7 +62,7 @@ export function PayrollWorkspace({ defaultTab }: PayrollWorkspaceProps) {
     canRuns ? { id: 'runs' as const, label: 'Payroll runs and approvals', icon: ClipboardList } : null,
     canStructure ? { id: 'structure' as const, label: 'Salary structure and allowances', icon: Users } : null,
     canMyPay ? { id: 'mypay' as const, label: 'My pay (Self-Service)', icon: Wallet } : null,
-    canInsights ? { id: 'insights' as const, label: 'Financial insights and trends', icon: TrendingUp } : null,
+    canInsights ? { id: 'insights' as const, label: 'Financial trends', icon: TrendingUp } : null,
     canSettings ? { id: 'settings' as const, label: 'PAYE and Pension Settings', icon: Settings } : null,
   ].filter((t): t is NonNullable<typeof t> => t !== null) as TabItem<PayrollWorkspaceTab>[]
 

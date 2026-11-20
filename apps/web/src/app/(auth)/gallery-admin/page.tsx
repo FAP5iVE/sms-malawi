@@ -273,7 +273,7 @@ function GalleryContent() {
               </button>
               <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3">
                 {p.category && (
-                  <span className="inline-block text-xs font-heading font-bold text-white/90 bg-white/20 rounded-full px-2 py-0.5 mb-1">
+                  <span className="mb-1 block text-xs font-heading font-bold text-white/90">
                     {p.category}
                   </span>
                 )}

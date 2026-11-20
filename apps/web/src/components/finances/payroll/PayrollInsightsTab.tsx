@@ -73,7 +73,7 @@ export function PayrollInsightsTab() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="font-heading font-bold text-lg text-brand-navy flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" aria-hidden /> Financial insights and trends
+            <TrendingUp className="w-5 h-5" aria-hidden /> Financial trends
           </h2>
           <p className="text-sm text-muted mt-0.5">Payroll cost, tax, and pension trends over time.</p>
         </div>

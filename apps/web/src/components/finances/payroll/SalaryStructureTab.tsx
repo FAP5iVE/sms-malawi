@@ -373,7 +373,7 @@ function SalaryEditor({ staff }: { staff: ApiStaffProfile }) {
               <div className="min-w-0">
                 <p className="text-sm font-heading font-semibold text-body">{a.type}</p>
                 <p className="text-xs text-muted">
-                  {a.recurring ? 'Recurring, monthly' : `One-time — ${a.paidMonth}/${a.paidYear}`}
+                  {a.recurring ? 'Recurring, monthly' : `One-time, ${a.paidMonth}/${a.paidYear}`}
                   {a.notes ? ` • ${a.notes}` : ''}
                 </p>
               </div>

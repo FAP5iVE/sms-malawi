@@ -543,9 +543,14 @@
   ]
  },
  "src/app/(auth)/attendance/page.tsx": {
-  "digest": "329521255edd2305cd82292fb37d7e420bd4421e",
-  "tokens": 65,
+  "digest": "633c5fa2cc8dd85a71c1793b87d517f0f30dfe58",
+  "tokens": 69,
   "items": [
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "0df6f3ba"
+   },
    {
     "k": "handler",
     "n": "onClick",
@@ -559,8 +564,8 @@
   ]
  },
  "src/app/(auth)/calendar/page.tsx": {
-  "digest": "72b3b9f93ce70d952ed6b3bad6fdf9fb657571ef",
-  "tokens": 140,
+  "digest": "f7a7baa0f481a164b95505e357b70431d88bd620",
+  "tokens": 137,
   "items": [
    {
     "k": "handler",
@@ -808,7 +813,7 @@
   ]
  },
  "src/app/(auth)/exams/page.tsx": {
-  "digest": "6042bd398dc09e5ad297d052b0e188ab5ba2e84d",
+  "digest": "2d9e2bf0682e08d42ea0ad120622892bdb9c8d1c",
   "tokens": 271,
   "items": [
    {
@@ -1275,7 +1280,7 @@
   ]
  },
  "src/app/(auth)/library/page.tsx": {
-  "digest": "977a97b95558f666fc8d788650406c06351833ca",
+  "digest": "20c136ca2b9173a18d33eedd68886781075bf563",
   "tokens": 1359,
   "items": [
    {
@@ -2196,7 +2201,7 @@
   ]
  },
  "src/app/(auth)/students/[id]/page.tsx": {
-  "digest": "e3e4e1d2e1ae03876ca19e760721434086021883",
+  "digest": "e17d6373b5b0a25bfa69adb7c7a49390047e0d8d",
   "tokens": 86,
   "items": [
    {
@@ -2564,7 +2569,7 @@
   "items": []
  },
  "src/app/(public)/apply/page.tsx": {
-  "digest": "e8e790a8bdcd84bfbe9c4bf26d215cb1792d4a97",
+  "digest": "a22b00d7d1fc86e126ff147e4fa0722448d59e6f",
   "tokens": 399,
   "items": [
    {
@@ -2947,7 +2952,7 @@
   ]
  },
  "src/app/(public)/page.tsx": {
-  "digest": "a30d61a15182e97168679f98f371be95ed32114a",
+  "digest": "766c35717d530640ba80bb22981365bbe86d945e",
   "tokens": 363,
   "items": [
    {
@@ -3890,8 +3895,8 @@
   "items": []
  },
  "src/components/calendar/CalendarEventFormDialog.tsx": {
-  "digest": "20d0d9447d17a5b7b44ce8a118d0f4afeceb9255",
-  "tokens": 155,
+  "digest": "e849188c220ade2bdf88ebb05f69e8c5aa751ba6",
+  "tokens": 154,
   "items": [
    {
     "k": "effect",
@@ -3947,11 +3952,6 @@
     "k": "handler",
     "n": "onClick",
     "h": "9146e7ae"
-   },
-   {
-    "k": "handler",
-    "n": "onClose",
-    "h": "0171b538"
    },
    {
     "k": "handler",
@@ -4034,9 +4034,14 @@
   ]
  },
  "src/components/calendar/DesktopCalendarView.tsx": {
-  "digest": "c660fe139df5b51e350db39ca2cacaa07e316c0c",
-  "tokens": 154,
+  "digest": "0d04a9a2ac3d28ea779335e8558c2dfc0d69fdbc",
+  "tokens": 160,
   "items": [
+   {
+    "k": "handler",
+    "n": "onBlur",
+    "h": "40c3efb3"
+   },
    {
     "k": "handler",
     "n": "onChange",
@@ -4104,6 +4109,11 @@
    },
    {
     "k": "handler",
+    "n": "onFocus",
+    "h": "b9a76499"
+   },
+   {
+    "k": "handler",
     "n": "onKeyDown",
     "h": "134ace85"
    },
@@ -4166,8 +4176,8 @@
   ]
  },
  "src/components/calendar/MobileCalendarView.tsx": {
-  "digest": "a080ea4a7e049687d8fb463ee2c433fba2f53126",
-  "tokens": 143,
+  "digest": "5fa77c313f275e4a4d537ae62d784ba8917ca450",
+  "tokens": 144,
   "items": [
    {
     "k": "handler",
@@ -4297,7 +4307,7 @@
   "items": []
  },
  "src/components/classes/AssignmentForm.tsx": {
-  "digest": "eee443f0fc4500643ff87d019029c07ecc3755bb",
+  "digest": "6c706009b7d5cb70a44dc9035d8deabb8ede35ea",
   "tokens": 303,
   "items": [
    {
@@ -4403,7 +4413,7 @@
   ]
  },
  "src/components/classes/AttendanceSheet.tsx": {
-  "digest": "a6c309dd87f96de555caa9f53a37747d415cd10b",
+  "digest": "5eaa2bed63027e1ab72f8853021a33abdcc3b0e6",
   "tokens": 133,
   "items": [
    {
@@ -4486,7 +4496,7 @@
   ]
  },
  "src/components/classes/TimetableSlotForm.tsx": {
-  "digest": "a4124107ceda8ab1c9be132068ba84380657f88f",
+  "digest": "a26d3213dca117239e92908cc3c96735662aaa91",
   "tokens": 114,
   "items": [
    {
@@ -4528,7 +4538,7 @@
   ]
  },
  "src/components/classes/assignments/AssignmentCard.tsx": {
-  "digest": "2c546224139bc333f53731399cd97d8c7df504ec",
+  "digest": "54a11a680aa1d7cf696f01a850f6e59716983275",
   "tokens": 42,
   "items": [
    {
@@ -4600,7 +4610,7 @@
   ]
  },
  "src/components/classes/assignments/AssignmentsTab.tsx": {
-  "digest": "767279eda7967b143645705f295ac17fff982792",
+  "digest": "a92dc7fbc4519615c03893dfd2cb585427ee9898",
   "tokens": 86,
   "items": [
    {
@@ -4657,7 +4667,7 @@
   ]
  },
  "src/components/classes/assignments/MarkDialog.tsx": {
-  "digest": "8bb9e4dea6c9eb88ce5b2b877f2cbc58e013f456",
+  "digest": "62800a65829dfaf04d192a37303491a2bbf6e3b8",
   "tokens": 146,
   "items": [
    {
@@ -4744,7 +4754,7 @@
   ]
  },
  "src/components/classes/assignments/SubmissionPanel.tsx": {
-  "digest": "339a668d1d33c1e8d318d1d7b935e44e28e8374c",
+  "digest": "28ea5f2367fa3f4319d69ef7b41fb0ba30df3770",
   "tokens": 99,
   "items": [
    {
@@ -5005,7 +5015,7 @@
   ]
  },
  "src/components/exams/AnalyticsPanel.tsx": {
-  "digest": "e2a639542fd34f4807384d68efe1cf7363546e1f",
+  "digest": "ea9fb8ea2b59e80093368131b256a7f301721415",
   "tokens": 245,
   "items": [
    {
@@ -5047,7 +5057,7 @@
   ]
  },
  "src/components/exams/ManebPanel.tsx": {
-  "digest": "efa839e1e675221ff3412a0116588d477fda9da9",
+  "digest": "2798eafe69279efd735fe19b8ebd6adfec7d9d95",
   "tokens": 194,
   "items": [
    {
@@ -5255,8 +5265,8 @@
   ]
  },
  "src/components/exams/ReportCardGenerator.tsx": {
-  "digest": "2a4b165bf376dba1ba3908f597a82af4642e8bf1",
-  "tokens": 132,
+  "digest": "d33e8e15f389e158eb0eec0dc832550ba1a502fa",
+  "tokens": 149,
   "items": [
    {
     "k": "handler",
@@ -5272,6 +5282,11 @@
     "k": "handler",
     "n": "onClick",
     "h": "99e7819b"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "b35ce817"
    },
    {
     "k": "handler",
@@ -5347,7 +5362,7 @@
   ]
  },
  "src/components/exams/StudentResultsView.tsx": {
-  "digest": "49c21702149b197912299c43a96d8f3b4327cda7",
+  "digest": "17a58f5ccf40efb6760d0db7dfc6ea6907aa154e",
   "tokens": 85,
   "items": [
    {
@@ -5724,12 +5739,12 @@
   ]
  },
  "src/components/finances/FeeCollectionRadial.tsx": {
-  "digest": "36fbaa4d1d95680d38eaee7ff3013c60a52400e9",
+  "digest": "f4ee8debfbff5193e3d338d2dda91107fa5ee6a3",
   "tokens": 17,
   "items": []
  },
  "src/components/finances/FeeStructureTab.tsx": {
-  "digest": "b5f4440d44d470cd8653bc7f78c7614138a69922",
+  "digest": "46fd0d3bdc55dd56f92fbdbb53606b891d65727d",
   "tokens": 197,
   "items": [
    {
@@ -6060,7 +6075,7 @@
   ]
  },
  "src/components/finances/LibraryFinesTab.tsx": {
-  "digest": "f3d64d97587f4b5b30416bdb75f926f8eaeff169",
+  "digest": "b4ad43b234d8262b729d281bba626e13b0243c45",
   "tokens": 56,
   "items": [
    {
@@ -6587,7 +6602,7 @@
   ]
  },
  "src/components/finances/payroll/PayrollRunsTab.tsx": {
-  "digest": "2e8f98a40f27b84d8b6b416b7ec037f22aaa3c8c",
+  "digest": "5915e021d3124bd8c8997f8b09890b5a6155228d",
   "tokens": 282,
   "items": [
    {
@@ -6819,7 +6834,7 @@
   ]
  },
  "src/components/finances/payroll/PayrollWorkspace.tsx": {
-  "digest": "0af8079d70204083baa42adf094e8c6e52fc031b",
+  "digest": "a070f92d5c2d5bfcdccd400bab51fa1285f34fd6",
   "tokens": 33,
   "items": [
    {
@@ -6830,7 +6845,7 @@
   ]
  },
  "src/components/finances/payroll/SalaryStructureTab.tsx": {
-  "digest": "2bf4cafa1f743741c1c250495a0763c4f7933ad9",
+  "digest": "7814403243930a28f80413f21759955e435ae8bb",
   "tokens": 157,
   "items": [
    {
@@ -7893,9 +7908,14 @@
   "items": []
  },
  "src/components/parent/ParentPanels.tsx": {
-  "digest": "8f513ea7fe58497943846152595ef2582cfb967d",
-  "tokens": 250,
+  "digest": "5988e1b8f6eff1c1b89e0c36cdc6ad76d00d7519",
+  "tokens": 254,
   "items": [
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "02ad590e"
+   },
    {
     "k": "handler",
     "n": "onClick",
@@ -8152,7 +8172,7 @@
   ]
  },
  "src/components/placements/PlacementRecommendationCard.tsx": {
-  "digest": "949066a3617f5cd4483aa8f360c1c5ee8724dc61",
+  "digest": "4caf87fd1b35cde354b61a75037ed180daf7aabf",
   "tokens": 79,
   "items": [
    {
@@ -9810,7 +9830,7 @@
   ]
  },
  "src/components/settings/SchoolIdentitySettings.tsx": {
-  "digest": "67a16ed537d1e9fb089dbe369dbc62b45ae7b3a9",
+  "digest": "8901cc92677557b67d6438dd767bb209a18ba80b",
   "tokens": 292,
   "items": [
    {
@@ -10058,7 +10078,7 @@
   "items": []
  },
  "src/components/shared/AuditLogViewer.tsx": {
-  "digest": "45bdf8244e4c3fb323c401aeab3e438a98f7d8db",
+  "digest": "803e4ed3715b2b19255776e01b553501e515ae15",
   "tokens": 212,
   "items": [
    {
@@ -10196,7 +10216,7 @@
   ]
  },
  "src/components/shared/CopyableId.tsx": {
-  "digest": "43c12d0e4e28d2ac9b57ebefee7017b5e5ae86e1",
+  "digest": "cf2cf7aa6cad26522d773ca39550b268c9f6f1d6",
   "tokens": 19,
   "items": [
    {
@@ -10207,8 +10227,8 @@
   ]
  },
  "src/components/shared/DataTable.tsx": {
-  "digest": "f0363f9461bba55403dbfb93de7aff05c520ed82",
-  "tokens": 329,
+  "digest": "d0d9b7871505e52e92216158d9bb68e93cba6d9b",
+  "tokens": 330,
   "items": [
    {
     "k": "effect",
@@ -10622,7 +10642,7 @@
   ]
  },
  "src/components/shared/Modal.tsx": {
-  "digest": "d784124290e855ca69392bb47622360f2e30452b",
+  "digest": "c197e716f2e8aa4143e8dcd04dc50df4d4ff5faf",
   "tokens": 155,
   "items": [
    {
@@ -10688,7 +10708,7 @@
   ]
  },
  "src/components/shared/ModeToggle.tsx": {
-  "digest": "231b15e88f8fccda55bf6220232693832d88b462",
+  "digest": "08b1becae2c6710785a1242df920641760daac60",
   "tokens": 31,
   "items": [
    {
@@ -11000,7 +11020,7 @@
   "items": []
  },
  "src/components/shared/PrintableReportCard.tsx": {
-  "digest": "17bbfbab15b531f85ee1bebe0526539fc0c174ce",
+  "digest": "ceaaffd75ac838b79021f7f55460156d63003333",
   "tokens": 213,
   "items": [
    {
@@ -11074,7 +11094,7 @@
   ]
  },
  "src/components/shared/PublicThemeToggle.tsx": {
-  "digest": "75f13e55fc7e2802e22794347e8bf0e4ccccb58f",
+  "digest": "b7109e02a91889c0a2d4013669e74335b8f15ee7",
   "tokens": 19,
   "items": [
    {
@@ -11090,7 +11110,7 @@
   "items": []
  },
  "src/components/shared/ReportProblemModal.tsx": {
-  "digest": "63f125c7c5e99fe0099cbad725cb5a379c453d1f",
+  "digest": "7380eb7956371fed27189ba0603c93ee2c924b59",
   "tokens": 105,
   "items": [
    {
@@ -11480,7 +11500,7 @@
   "items": []
  },
  "src/components/shared/StudentRiskBadge.tsx": {
-  "digest": "fea03b1c133786dddf24e83c46efb40480c2942f",
+  "digest": "4fac5ea83fdb9902f4cf46aec75b4220dc20c006",
   "tokens": 68,
   "items": []
  },

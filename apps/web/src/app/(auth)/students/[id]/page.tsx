@@ -144,7 +144,7 @@ function ProfileContent() {
           <button
             onClick={() => setShowReportCard(true)}
             className="flex items-center gap-1.5 border border-base px-3 py-1.5 rounded-lg text-sm hover:bg-page"
-            title={`Report card for Term ${reportCardTerm}, ${academicYear} — change the period from the header`}
+            title={`Report card for Term ${reportCardTerm}, ${academicYear}. Change the period from the header.`}
           >
             <FileText className="w-3.5 h-3.5" /> Report Card · T{reportCardTerm}
           </button>

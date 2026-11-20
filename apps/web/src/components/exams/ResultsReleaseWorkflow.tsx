@@ -533,7 +533,7 @@ export function ResultsReleaseWorkflow({
 
       {!fetched && !fetchLoading && (
         <div className="text-center py-16 text-muted text-sm border border-dashed border-base rounded-xl">
-          Click Load Exams to view the release pipeline for this class and term.
+          Choose Load Exams to view the release pipeline for this class and term.
         </div>
       )}
 

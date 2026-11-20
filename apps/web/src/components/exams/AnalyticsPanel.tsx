@@ -105,7 +105,7 @@ function PerClassTable({ rows }: { rows: ApiClassAnalyticsSummary[] }) {
             <tr key={c.classId} className="hover:bg-page">
               <td className="px-4 py-3 font-medium text-body">{c.className}</td>
               <td className="px-4 py-3 text-xs text-muted">
-                {c.gradingTrack === 'MSCE' ? 'MSCE — points' : 'JCE — grades'}
+                {c.gradingTrack === 'MSCE' ? 'MSCE: points' : 'JCE: grades'}
               </td>
               <td className="px-4 py-3 text-muted">{c.total}</td>
               <td className="px-4 py-3">{c.classAverage != null ? `${c.classAverage.toFixed(1)}%` : '—'}</td>
@@ -207,7 +207,7 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
   })
   const metricLabel = subject
     ? `${subject} average`
-    : usePoints ? 'aggregate points — lower is better' : 'overall average'
+    : usePoints ? 'aggregate points (lower is better)' : 'overall average'
 
   return (
     <div className="space-y-5">
@@ -354,9 +354,9 @@ export function AnalyticsPanel({ academicYear, selectedClassId, term }: Props) {
               )}
 
               <div className="grid gap-4 lg:grid-cols-2">
-                <RankList title={`Top 10 — ${scopeLabel}`} rows={data.top}
+                <RankList title={`Top 10: ${scopeLabel}`} rows={data.top}
                   accent="text-tone-teal" usePoints={!!usePoints} />
-                <RankList title={`Bottom 10 — ${scopeLabel}`} rows={data.bottom}
+                <RankList title={`Bottom 10: ${scopeLabel}`} rows={data.bottom}
                   accent="text-tone-coral" usePoints={!!usePoints} />
               </div>
             </>

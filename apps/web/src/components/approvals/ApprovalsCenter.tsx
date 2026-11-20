@@ -410,7 +410,7 @@ export function ApprovalsCenter() {
           <p className="font-semibold text-body">We couldn’t load your approvals.</p>
           <p className="text-sm text-muted">{listQuery.error instanceof Error ? listQuery.error.message : 'Please try again.'}</p>
           <button type="button" onClick={refresh}
-            className="inline-flex min-h-[44px] items-center rounded-xl bg-brand-teal px-4 text-sm font-semibold text-white">
+            className="inline-flex min-h-[44px] items-center rounded-xl bg-btn-brand px-4 text-sm font-semibold text-btn-brand-fg">
             Try again
           </button>
         </div>

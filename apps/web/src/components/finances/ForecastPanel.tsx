@@ -336,7 +336,7 @@ export function ForecastPanel() {
 
       {!report && !loading && (
         <div className="text-center py-16 text-muted text-sm border border-dashed border-base rounded-xl">
-          Click Refresh to generate the forecast.
+          Choose Refresh to generate the forecast.
         </div>
       )}
     </div>

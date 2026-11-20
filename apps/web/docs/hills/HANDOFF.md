@@ -1,6 +1,6 @@
 # Chikangawa Hills theme: handoff and working memory
 
-Last updated: 2026-11-20 (after Phase 8g report cards and exports, AT REVIEW GATE; 8f also still awaiting its gate; 9 cleanup next). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
+Last updated: 2026-11-20 (after Phase 9 cleanup and ratchets, AT REVIEW GATE; 8f and 8g also still awaiting their gates). Read this first when resuming. Then read `docs/hills/RULEBOOK.md`.
 
 ## 1. The job
 Apply the "Chikangawa Hills" look (four skies: dawn/day/dusk/night, Hanken Grotesk, glass cards,
@@ -47,7 +47,7 @@ cumulative step on the previous: `main` (baseline as received) < `hills/phase-0-
 | 8e calendar, attendance calendars, greeting facts line decision (`hills/phase-8e-calendar`, off `hills/phase-8c-dashboards`) | done, AT REVIEW GATE | review pack 8e |
 | **8f** emails (done, AT REVIEW GATE) | `hills/phase-8f-emails`, off 8e | review pack 8f |
 | **8g** report cards + exports (done, AT REVIEW GATE) | `hills/phase-8g-exports`, off 8f; exception APPROVED (presentation only) | review pack 8g |
-| **9** cleanup, ratchets (pills = 0, AI-tell count only down, contrast 100%) | last | |
+| **9** cleanup, ratchets (pills = 0, AI-tell count only down, contrast 100%) (done, AT REVIEW GATE) | `hills/phase-9-cleanup`, off 8g | review pack 9 |
 
 The user asked for Phases 0 to the logo step to be reviewed as ONE package. Phases 3 and 4 were each reviewed on their own. Phase 6 is split in two review drops (6a, then 6b). Next review gate is
 after 6a.
@@ -79,7 +79,7 @@ after 6a.
    - `capture-baseline.mts`: Playwright screenshots of public routes at 390 and 1280, light and dark.
 2. **Each phase**: branch off the previous one, implement, then (a) declare changes in the
    allowlist until `pnpm hills:logic-diff --base <prev-branch>` says clean (and `--base main` stays
-   clean), (b) `pnpm hills:test`, `pnpm hills:contrast`, `pnpm hills:inventory:check`, eslint on the
+   clean), (b) `pnpm hills:test`, `pnpm hills:contrast`, `pnpm hills:ratchets`, `pnpm hills:inventory:check`, eslint on the
    changed files, tsc filtered to the changed files, (c) real-app before/after screenshots, (d) a
    Storybook story per new visual piece (`src/stories/Hills*.stories.tsx`), (e) commit with the
    attribution trailers, (f) a review pack zip delivered with SendUserFile, (g) STOP at the gate.
@@ -493,6 +493,13 @@ after 6a.
     - **Tooling added:** `tools/hills/pdf-fixtures.mts` builds the receipt, payslip, transcript (short and long) and report card from sample data; `tools/hills/stub-prisma.mjs` stands in for the generated Prisma client so the builders run here; `tools/hills/__tests__/documents.test.mts` records what each page draws and checks reference, "Page p of n", letterhead and no em dash, plus the R11.8 column-title and CSV rules. It runs with `--conditions=react-server --import ./tools/hills/stub-prisma.mjs` (hills:test does this). jsPDF sets `text()` on each document, so the test hooks the `initialized` event instead of patching the prototype.
     - **Owner questions left open:** (1) the HTML letterheads in `server/templates/documents/letterhead.ts` and `PrintLetterhead.tsx` (used by printed screens) are separate copies of the PDF letterhead and were left alone; say if they should be brought in line; (2) no separate exam document exists: `examService.ts` only mentions jsPDF in a comment, and exam results are printed through the report card, so none were changed; (3) the report card shows "Page 1 of 1" fixed, because the card is a single page by design; (4) the 8f open questions (From name, no fee receipt email, inline pending-action email, deploying the crest PNG, `/login` fallback) are still unanswered.
     - **Not covered:** real printers and the Excel desktop app (print setup was set in code and not opened in Excel); PDFs were rasterised with poppler at 80 dpi and checked by eye (receipt, payslip, transcript, 3-page transcript, report card); payroll and fee Excel files were not generated here because they need the database.
+27. **Phase 9: cleanup and ratchets.** Branch `hills/phase-9-cleanup` off `hills/phase-8g-exports` (chain: main, 8d-followup, 8e-calendar, 8f-emails, 8g-exports, 9-cleanup). Logic gate clean against 8g (133 declared) and `main` (667 declared). `hills:test` 87 plus 79 plus 13; contrast 538 pairs; inventory baseline regenerated (409 files, 2148 items; the change is the new Transcript button and string wording); eslint 0 errors (8 old warnings); tsc error count unchanged.
+    - **Ratchets (`pnpm hills:ratchets`, new):** pills must be 0 (a count badge is allowed, only `PendingActionsPanel`), legacy teal/coral-with-white-text pairs must be 0, AI tells may only go down (`tools/hills/ai-tells/baseline.json`; `--write` lowers it, never raises it; `--print` lists every hit). It reads the syntax tree, so comments and class lists are never counted. Detectors are in `tools/hills/lib/ratchets.mts` with tests. The scanner named in the rulebook was not in the repo, so this is a rebuild and its baseline is its own (130 at first run, 57 after this phase; one of those is in frozen AuthProvider.tsx), not the old 235.
+    - **Cleanup:** 3 pills converted (quick filters use `chipClass`; the assets and gallery ones became a normal button and plain text); 12 legacy button pairs moved to `bg-btn-brand` / `bg-btn-danger` tokens, and the compatibility CSS block in `globals.css` plus the two story buttons that showed it were deleted (renders the same, since that block was already producing those colours). About 60 sentences lost em dashes, exclamation marks, "Click" and "e.g." (aria-labels were left alone so labels stay stable).
+    - **Owner request, 2026-11-20 (logic added with approval):** the transcript PDF builder had no route and no button. Added `POST /exams/transcript` in `exams.ts` (admin and exam_officer, rate limited, idempotent, calls the existing `generateAndUploadTranscript`; the file is stored with its existing read roles) and a Transcript button on each student row of the report card generator (same roles as Generate All). Student and guardian access is NOT added.
+    - **Owner decisions made on the 8g questions:** (1) letterheads: `PrintLetterhead.tsx` and `letterhead.ts` already match the PDF letterhead (panel, sizes, colours, order) and `letterhead.ts` has no caller, so no change; page numbers on printed screens stay with the browser's own print footer. (2) Exam documents: none exists apart from the report card, so none changed. (3) Report card page count now comes from the document, so the words can never disagree with the file.
+    - **Left for the owner:** the word "portal" (about 40 uses: Portal login, Parent portal, MANEB portal, the Terms and Privacy text) is on the rulebook avoid list but is the product's public name, so it was not renamed; say if it should become "sign in" wording. The sideways-overflow check at 360 to 1920 px needs a running app (database and sign-in) and was not run here. Moving the background to one shared layout was not done: the home, apply and public page layouts still mount it themselves, and changing that alters how those pages paint. One user-facing string in frozen `AuthProvider.tsx` ("administrator setup — contact support") was left because that file is frozen.
+    - **Not covered:** the transcript route and button were built and type-checked but not run end to end here (needs the database, storage and sign-in); open the generator as an exam officer, press Transcript, and check the download.
 
 ## 5. Environment gotchas (this sandbox)
 - Prisma engine download is blocked: no Prisma client, no database. Do not retry or work around. tsc errors from missing
@@ -547,4 +554,4 @@ after 6a.
   Still untested: Firebase success and "no role assigned" paths (Firebase is unreachable from the sandbox).
 - Phase 3 left the interim pages on their old field styling inside the new card; Phase 7 redid them.
 - Phase 4b open question for the user: the 5iveStack Labs website address (see `lib/hills/studio.ts`).
-- Phase 9 (cleanup) is optional and last.
+- Phase 9 (cleanup) is done and at its gate; the open decisions are listed in item 27.

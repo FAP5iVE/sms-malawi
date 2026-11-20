@@ -141,7 +141,7 @@ export function LibraryFinesTab() {
         title="Waive this fine?"
         description={
           pendingWaive
-            ? `The ${formatMWK(pendingWaive.amount)} fine for ${fineStudentName(pendingWaive)} (${pendingWaive.bookTitle}) will be permanently waived — the amount will no longer be collectable.`
+            ? `The ${formatMWK(pendingWaive.amount)} fine for ${fineStudentName(pendingWaive)} (${pendingWaive.bookTitle}) will be permanently waived. The amount will no longer be collectable.`
             : ''
         }
         confirmLabel="Waive fine"

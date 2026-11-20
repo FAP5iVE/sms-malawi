@@ -440,7 +440,7 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
           <div style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: '12pt', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
             {maneb ? `MANEB ${maneb.examType} EXAMINATION RESULT` : 'STUDENT REPORT CARD'}
           </div>
-          <div style={{ fontSize: '8.2pt', color: PAPER.muted, marginTop: '1mm' }}>Academic Year {data.academicYear} — Term {data.term}</div>
+          <div style={{ fontSize: '8.2pt', color: PAPER.muted, marginTop: '1mm' }}>Academic year {data.academicYear} · Term {data.term}</div>
         </div>
 
         <StudentCard
@@ -479,7 +479,7 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                     <span style={{ ...labelStyle, color: PAPER.navy }}>{`Aggregate (best ${MSCE_AGGREGATE_SUBJECT_COUNT} subjects)`}</span>
-                    <span style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: '11pt', color: PAPER.navy }}>{maneb.points != null ? `${maneb.points} points` : `Not available — fewer than ${MSCE_AGGREGATE_SUBJECT_COUNT} subjects`}</span>
+                    <span style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: '11pt', color: PAPER.navy }}>{maneb.points != null ? `${maneb.points} points` : `Not available: fewer than ${MSCE_AGGREGATE_SUBJECT_COUNT} subjects`}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: '1.4mm' }}>
                     <span style={{ ...labelStyle, color: PAPER.navy }}>Certificate Status</span>
@@ -548,7 +548,7 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
               <div style={{ fontSize: '6.4pt', color: PAPER.muted, marginTop: '-1.6mm', paddingLeft: '1mm' }}>
                 {data.aggregatePoints != null
                   ? `Aggregate = sum of the points of the ${MSCE_AGGREGATE_SUBJECT_COUNT} best subjects (range ${MSCE_AGGREGATE_BEST}–${MSCE_AGGREGATE_WORST}; lower is better); highlighted points are the subjects counted. MSCE awards no overall grade.`
-                  : `Aggregate not available — ${MSCE_AGGREGATE_SUBJECT_COUNT} graded subjects are required to form an MSCE aggregate.`}
+                  : `Aggregate not available: ${MSCE_AGGREGATE_SUBJECT_COUNT} graded subjects are required to form an MSCE aggregate.`}
               </div>
             )}
           </>
@@ -599,7 +599,7 @@ export function PrintableReportCardPage({ data }: { data: ReportCardData }) {
           <span style={{ whiteSpace: 'nowrap' }}>Date Issued: <b style={{ color: PAPER.ink }}>{fmtDay(data.issueDate, tz)}</b></span>
           {data.nextTermDate && <span style={{ whiteSpace: 'nowrap' }}>Next Term Begins: <b style={{ color: PAPER.ink }}>{fmtDay(data.nextTermDate, tz)}</b></span>}
           <span style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: '6.2pt', letterSpacing: '0.05em', color: PAPER.neutral, textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            Official Document — {data.schoolName}
+            Official document · {data.schoolName}
           </span>
         </div>
       </div>

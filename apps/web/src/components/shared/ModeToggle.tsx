@@ -91,7 +91,7 @@ export function ModeToggle({ showLabel = false, className }: ModeToggleProps) {
             'text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
             className
           )}
-          aria-label={`Current theme: ${theme ?? 'system'}. Click to change theme.`}
+          aria-label={`Current theme: ${theme ?? 'system'}. Press to change theme.`}
         >
           <ActiveIcon resolvedTheme={resolvedTheme} />
           {showLabel && (

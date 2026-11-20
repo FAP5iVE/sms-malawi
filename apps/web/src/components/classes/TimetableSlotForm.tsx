@@ -238,7 +238,7 @@ export function TimetableSlotForm({ classId, academicYear, term, onClose }: Prop
           )}
           {!hasPresets && (
             <p className="text-xs text-muted mt-1">
-              This class has no preset subjects yet — every subject is selectable until they
+              This class has no preset subjects yet. Every subject is selectable until they
               are set.
             </p>
           )}
@@ -265,7 +265,7 @@ export function TimetableSlotForm({ classId, academicYear, term, onClose }: Prop
           <label className={lbl} htmlFor="ts-room">
             Room (optional)
           </label>
-          <input id="ts-room" {...register('room')} className={ic} placeholder="e.g. Lab 2" />
+          <input id="ts-room" {...register('room')} className={ic} placeholder="Example: Lab 2" />
         </div>
       </div>
       {submitError && (

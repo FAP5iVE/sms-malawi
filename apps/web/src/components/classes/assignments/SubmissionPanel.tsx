@@ -104,7 +104,7 @@ export function SubmissionPanel({ classId, d }: { classId: string; d: ApiAssignm
       ) : (
         <p className="text-sm text-muted">
           You haven&apos;t handed anything in yet.{' '}
-          {overdue ? 'The due date has passed — work handed in now is marked late.' : 'Work handed in after the due date is marked late.'}
+          {overdue ? 'The due date has passed. Work handed in now is marked late.' : 'Work handed in after the due date is marked late.'}
         </p>
       )}
 
@@ -113,7 +113,7 @@ export function SubmissionPanel({ classId, d }: { classId: string; d: ApiAssignm
           <p className="text-xs font-heading font-bold uppercase tracking-wider text-muted">Your mark</p>
           <p className="mt-0.5"><MarksText marks={mine!.marks as number} max={d.maxMarks} /></p>
           {mine!.feedback && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-body">{mine!.feedback}</p>}
-          <p className="mt-2 text-xs text-muted">Session mark — not counted toward exams or C.A.</p>
+          <p className="mt-2 text-xs text-muted">Session mark: not counted toward exams or continuous assessment.</p>
         </div>
       )}
 

@@ -206,7 +206,7 @@ function ExamsPageInner() {
 
   useEffect(() => {
     setTitle('Exams & Results')
-    setSubtitle(`${academicYear} — Term ${term}`)
+    setSubtitle(`${academicYear} · Term ${term}`)
     return () => {
       setTitle(null)
       setSubtitle(null)
@@ -524,7 +524,7 @@ function ExamsPageInner() {
                     ? 'You have not been assigned to a class yet, so there are no exams to show. Please check with the school office.'
                     : isStudent
                       ? 'No exams have been released for your class in this term yet.'
-                      : <>No exams scheduled yet.{canScheduleExam && ' Click "Schedule Exam" to add one.'}</>}
+                      : <>No exams scheduled yet.{canScheduleExam && ' Use "Schedule Exam" to add one.'}</>}
                 </div>
               )}
 

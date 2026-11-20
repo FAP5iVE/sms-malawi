@@ -108,7 +108,7 @@ export function RosterPanel({ classId, assignmentId, canOpenFiles }: { classId: 
       </div>
 
       {!assignment.canManage && (
-        <p className="text-xs text-muted">View only — recording is done by the subject teacher or the class teacher.</p>
+        <p className="text-xs text-muted">View only: recording is done by the subject teacher or the class teacher.</p>
       )}
 
       {rows.length === 0 ? (

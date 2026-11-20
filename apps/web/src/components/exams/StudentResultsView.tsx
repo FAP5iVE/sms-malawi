@@ -94,7 +94,7 @@ export function StudentResultsView({ studentId, bordered = true }: Props) {
         <AlertTriangle className={`w-5 h-5 mt-0.5 shrink-0 ${isFeeGate ? 'text-tone-coral' : 'text-muted'}`} />
         <div>
           <p className={`font-semibold ${isFeeGate ? 'text-tone-coral' : 'text-body'}`}>
-            {isFeeGate ? 'Results Unavailable — Outstanding Fee Balance' : 'Results Not Yet Released'}
+            {isFeeGate ? 'Results unavailable: outstanding fee balance' : 'Results Not Yet Released'}
           </p>
           <p className="text-sm text-muted mt-1">
             {isFeeGate

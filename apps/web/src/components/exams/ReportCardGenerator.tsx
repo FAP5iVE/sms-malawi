@@ -70,7 +70,7 @@ import {
   EASE,
 }                                       from '@/lib/motion'
 import { apiFetch }                     from '@/lib/api-client'
-import { openPdfPreview }               from '@/lib/pdfPreview'
+import { openPdfPreview, downloadProtectedFile } from '@/lib/pdfPreview'
 import type { BatchGenerationResult }   from '@/server/services/reportCardService'
 import { useClasses }                   from '@/hooks/useClasses'
 import { useEffectiveViewingPeriod }     from '@/hooks/useViewingPeriod'
@@ -128,10 +128,30 @@ interface StudentRow extends BatchGenerationResult {
 function StudentResultRow({
   row,
   onRetry,
+  canTranscript,
 }: {
-  row:     StudentRow
-  onRetry: (studentId: string) => void
+  row:           StudentRow
+  onRetry:       (studentId: string) => void
+  canTranscript: boolean
 }) {
+  // Transcript: builds the all-terms transcript for this student on the server
+  // (POST /exams/transcript, admin and exam officer only) and saves the PDF.
+  const [transcriptBusy, setTranscriptBusy] = useState(false)
+  const downloadTranscript = useCallback(async () => {
+    setTranscriptBusy(true)
+    try {
+      const { url } = await apiFetch<{ url: string }>('/exams/transcript', {
+        method: 'POST',
+        body:   JSON.stringify({ studentId: row.studentId }),
+      })
+      await downloadProtectedFile(url, `Transcript - ${row.fullName}.pdf`)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Could not build this transcript.')
+    } finally {
+      setTranscriptBusy(false)
+    }
+  }, [row.studentId, row.fullName])
+
   // [PDF PREVIEW] /api/files/[fileId] requires a live auth token, and a plain
   // browser navigation can never attach an Authorization header (an earlier
   // <a href> version returned {"error":"Unauthorised"} on every click).
@@ -168,6 +188,18 @@ function StudentResultRow({
 
       {/* Actions */}
       <div className="flex items-center gap-2 shrink-0">
+        {canTranscript && row.rowStatus !== 'generating' && (
+          <button
+            type="button"
+            onClick={downloadTranscript}
+            disabled={transcriptBusy}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-base px-3 text-sm font-medium text-body transition-colors hover:bg-page disabled:opacity-60"
+            aria-label={`Download transcript for ${row.fullName}`}
+          >
+            {transcriptBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <FileText className="h-4 w-4" aria-hidden />}
+            {transcriptBusy ? 'Building…' : 'Transcript'}
+          </button>
+        )}
         {row.rowStatus === 'done' && row.url && (
           <button
             type="button"
@@ -230,7 +262,7 @@ export function ReportCardGenerator() {
   // ── Generate all ──────────────────────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
     if (!classId) { setError('Please select a class.'); return }
-    if (!effectiveAcademicYear) { setError('Academic year is still loading — please try again shortly.'); return }
+    if (!effectiveAcademicYear) { setError('Academic year is still loading. Please try again shortly.'); return }
     setGenerating(true)
     setError(null)
     setDone(false)
@@ -381,7 +413,7 @@ export function ReportCardGenerator() {
         <div className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm text-tone-teal app-tint">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           {doneCount} report card{doneCount !== 1 ? 's' : ''} generated successfully.
-          {failedCount > 0 && ` ${failedCount} failed — use the retry button to regenerate.`}
+          {failedCount > 0 && ` ${failedCount} failed. Use the retry button to regenerate.`}
         </div>
       )}
 
@@ -401,7 +433,7 @@ export function ReportCardGenerator() {
               variants={itemVariants}
               transition={itemTransition}
             >
-              <StudentResultRow row={row} onRetry={handleRetry} />
+              <StudentResultRow row={row} onRetry={handleRetry} canTranscript={canGenerate} />
             </motion.div>
           ))}
         </motion.div>

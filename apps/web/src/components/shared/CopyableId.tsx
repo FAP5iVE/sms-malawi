@@ -38,7 +38,7 @@ export function CopyableId({ value, display }: { value: string; display?: React.
         type="button"
         onClick={handleCopy}
         aria-label={copied ? 'Copied to clipboard' : 'Copy full ID to clipboard'}
-        title={copied ? 'Copied!' : 'Copy full ID'}
+        title={copied ? 'Copied' : 'Copy full ID'}
         className="shrink-0 p-0.5 rounded text-muted/70 hover:text-brand-teal hover:bg-page transition-colors"
       >
         {copied ? <Check className="w-3 h-3 text-brand-teal" /> : <Copy className="w-3 h-3" />}

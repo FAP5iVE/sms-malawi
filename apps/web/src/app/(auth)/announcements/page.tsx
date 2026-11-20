@@ -782,7 +782,7 @@ function AnnouncementsContent() {
           <Megaphone className="w-5 h-5 text-tone-teal" aria-hidden="true" />
           <h1 className="font-heading font-bold text-xl text-brand-navy">Announcements</h1>
         </div>
-        <p className="text-sm text-muted mt-0.5">News, announcements, academic advertisements and events. All in one place.</p>
+        <p className="text-sm text-muted mt-0.5">News, announcements, academic advertisements and events.</p>
       </div>
 
       {/* [NEW] Content-type navigation — News / Academic Advertisements /

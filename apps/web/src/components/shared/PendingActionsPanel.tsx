@@ -44,7 +44,7 @@ export function PendingActionsPanel({ title = 'Pending Approvals', compactLimit 
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="font-heading text-base font-semibold text-body">{title}</h2>
         {total > 0 ? (
-          <span className="rounded-full bg-brand-coral px-2 text-xs font-bold leading-5 text-white">{total}</span>
+          <span className="rounded-full bg-btn-danger px-2 text-xs font-bold leading-5 text-btn-danger-fg">{total}</span>
         ) : null}
       </div>
 
@@ -66,7 +66,7 @@ export function PendingActionsPanel({ title = 'Pending Approvals', compactLimit 
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-6 text-center">
           <CheckCircle2 className="h-8 w-8 text-emerald-500" aria-hidden="true" />
-          <p className="text-sm text-muted">No pending approvals — everything is up to date.</p>
+          <p className="text-sm text-muted">No pending approvals. Everything is up to date.</p>
         </div>
       ) : (
         <ul className="space-y-1.5">

@@ -295,7 +295,7 @@ export default function AssignmentForm({ classId, onClose, subjectOptions, assig
           value={title}
           onChange={(e) => { setTitle(e.target.value); touch() }}
           maxLength={200}
-          placeholder="e.g. Chapter 4 Problem Set"
+          placeholder="Example: Chapter 4 problem set"
           className={inputCls}
         />
       </Field>

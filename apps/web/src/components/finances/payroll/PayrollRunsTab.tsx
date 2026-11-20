@@ -273,7 +273,7 @@ function RunActions({ run, showInlineMessages = true }: { run: ApiPayrollRun; sh
 
         {run.status === 'PENDING_APPROVAL' && canApprove && (
           <button type="button" onClick={() => setConfirmAction('approve')}
-            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-white bg-brand-teal hover:bg-brand-teal/90 transition-colors flex items-center gap-2">
+            className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold text-btn-brand-fg bg-btn-brand hover:bg-btn-brand-hover transition-colors flex items-center gap-2">
             {approveMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
             <ClipboardCheck className="w-4 h-4" aria-hidden /> Approve payroll
           </button>
@@ -497,7 +497,7 @@ function CurrentCycleCard({
                   : status === 'PENDING_APPROVAL'
                     ? 'Awaiting High Rank approval.'
                     : status === 'APPROVED'
-                      ? 'Approved — ready to lock and post the journal entry.'
+                      ? 'Approved: ready to lock and post the journal entry.'
                       : status === 'LOCKED'
                         ? 'Locked and posted. This month is permanently closed.'
                         : ''}
@@ -666,7 +666,7 @@ export function PayrollRunsTab() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
             <h3 className="font-heading font-bold text-body">Payroll runs history and ledger records</h3>
-            <p className="text-sm text-muted mt-0.5">Comprehensive registry of all monthly payroll batches, statutory remittances, and approval statuses.</p>
+            <p className="text-sm text-muted mt-0.5">Registry of all monthly payroll batches, statutory remittances, and approval statuses.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative">

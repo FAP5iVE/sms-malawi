@@ -69,7 +69,7 @@ export function PublicThemeToggle({ className = '' }: PublicThemeToggleProps) {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={mounted ? `Theme: ${theme}. Click to change.` : 'Toggle theme'}
+          aria-label={mounted ? `Theme: ${theme}. Press to change.` : 'Toggle theme'}
           className={`w-12 h-12 rounded-xl text-body hover:bg-black/5 dark:hover:bg-white/10 data-[state=open]:bg-black/5 dark:data-[state=open]:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/50 flex items-center justify-center transition-colors shrink-0 cursor-pointer ${className}`}
         >
           <ActiveIcon className="w-6 h-6" aria-hidden />

@@ -169,12 +169,6 @@ function Buttons({ dark }: { dark: boolean }) {
     <Page dark={dark}>
       <Surfaces>
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" className="inline-flex min-h-9 items-center rounded-lg bg-brand-teal px-4 text-sm font-semibold text-white">
-            Legacy teal
-          </button>
-          <button type="button" className="inline-flex min-h-9 items-center rounded-lg bg-brand-coral px-4 text-sm font-semibold text-white">
-            Legacy coral
-          </button>
           <Button variant="brand">Add student</Button>
           <Button variant="danger">Delete class</Button>
           <Button variant="brand" loading>

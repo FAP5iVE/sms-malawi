@@ -343,7 +343,7 @@ function MathPanel({ initialLatex, initialDisplay, editing, onApply, onRemove, o
             type="button"
             onClick={() => canApply && onApply(latex.trim(), display)}
             disabled={!canApply}
-            className="rounded-lg bg-brand-teal px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+            className="rounded-lg bg-btn-brand px-3 py-1.5 text-xs font-semibold text-btn-brand-fg hover:bg-btn-brand-hover disabled:opacity-40"
           >
             {editing ? 'Update formula' : 'Insert formula'}
           </button>

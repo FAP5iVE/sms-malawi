@@ -278,8 +278,8 @@ export function InactivityWarningDialog({
             className="
               flex-1 min-h-[44px] px-5 rounded-xl
               text-sm font-heading font-semibold
-              bg-brand-teal text-white
-              hover:bg-brand-teal/90 transition-colors
+              bg-btn-brand text-btn-brand-fg
+              hover:bg-btn-brand-hover transition-colors
             "
             autoFocus
           >

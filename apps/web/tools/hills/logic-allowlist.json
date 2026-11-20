@@ -16643,6 +16643,923 @@
       "kind": "logic",
       "pattern": "^drawDocumentFooters\\ \\(\\ doc\\ ,\\ \\{\\ x\\ :\\ M_X\\ ,\\ w\\ :\\ CW\\ ,\\ y\\ :\\ 282\\ ,\\ note\\ :\\ `Generated\\ on\\ \\$\\{\\ issued\\ \\}\\.\\ This\\ is\\ a\\ computer\\-generated\\ document\\.`\\ ,\\ reference\\ :\\ data\\ \\.\\ registrationNo\\ \\}\\ \\)$",
       "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/app/(auth)/exams/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^setSubtitle\\ \\(\\ `\\$\\{\\ academicYear\\ \\}\\ \u2014\\ Term\\ \\$\\{\\ term\\ \\}`\\ \\)$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(auth)/exams/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ canScheduleExam\\ \\&\\&\\ '\\ Click\\ \"Schedule\\ Exam\"\\ to\\ add\\ one\\.'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(auth)/exams/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^setSubtitle\\ \\(\\ `\\$\\{\\ academicYear\\ \\}\\ \u00b7\\ Term\\ \\$\\{\\ term\\ \\}`\\ \\)$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(auth)/exams/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ canScheduleExam\\ \\&\\&\\ '\\ Use\\ \"Schedule\\ Exam\"\\ to\\ add\\ one\\.'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(auth)/library/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^tabs=\\{\\ \\[\\ \\{\\ id\\ :\\ 'fines'\\ ,\\ label\\ :\\ 'Fines\\ and\\ penalties\\ ledger'\\ ,\\ icon\\ :\\ AlertTriangle\\ \\}\\ ,\\ \\{\\ id\\ :\\ 'circulation'\\ ,\\ label\\ :\\ 'Circulation\\ and\\ popularity\\ insights'\\ ,\\ icon\\ :\\ ArrowUpRight\\ \\}\\ ,\\ \\{\\ id\\ :\\ 'catalogDist'\\ ,\\ label\\ :\\ 'Catalog\\ distribution'\\ ,\\ icon\\ :\\ BookMarked\\ \\}\\ ,\\ \\{\\ id\\ :\\ 'clearance'\\ ,\\ label\\ :\\ 'Clearance\\ and\\ audit\\ reports'\\ ,\\ icon\\ :\\ ClipboardList\\ \\}\\ ,\\ \\]\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(auth)/library/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tabs=\\{\\ \\[\\ \\{\\ id\\ :\\ 'fines'\\ ,\\ label\\ :\\ 'Fines\\ and\\ penalties\\ ledger'\\ ,\\ icon\\ :\\ AlertTriangle\\ \\}\\ ,\\ \\{\\ id\\ :\\ 'circulation'\\ ,\\ label\\ :\\ 'Circulation\\ and\\ popularity'\\ ,\\ icon\\ :\\ ArrowUpRight\\ \\}\\ ,\\ \\{\\ id\\ :\\ 'catalogDist'\\ ,\\ label\\ :\\ 'Catalog\\ distribution'\\ ,\\ icon\\ :\\ BookMarked\\ \\}\\ ,\\ \\{\\ id\\ :\\ 'clearance'\\ ,\\ label\\ :\\ 'Clearance\\ and\\ audit\\ reports'\\ ,\\ icon\\ :\\ ClipboardList\\ \\}\\ ,\\ \\]\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ `Report\\ card\\ for\\ Term\\ \\$\\{\\ reportCardTerm\\ \\},\\ \\$\\{\\ academicYear\\ \\}\\ \u2014\\ change\\ the\\ period\\ from\\ the\\ header`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ `Report\\ card\\ for\\ Term\\ \\$\\{\\ reportCardTerm\\ \\},\\ \\$\\{\\ academicYear\\ \\}\\.\\ Change\\ the\\ period\\ from\\ the\\ header\\.`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ T/A\\ Kuntaja\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ Christianity,\\ Islam\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ Chichewa,\\ Chitumbuka\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ Asthma,\\ carries\\ an\\ inhaler\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ Front\\-row\\ seating,\\ large\\ print,\\ hearing\\ aid\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Example:\\ T/A\\ Kuntaja\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Example:\\ Christianity,\\ Islam\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Example:\\ Chichewa,\\ Chitumbuka\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Example:\\ Asthma,\\ carries\\ an\\ inhaler\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/apply/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Example:\\ Front\\-row\\ seating,\\ large\\ print,\\ hearing\\ aid\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ mounted\\ \\?\\ `Theme:\\ \\$\\{\\ theme\\ \\}\\.\\ Click\\ to\\ change\\.`\\ :\\ 'Toggle\\ theme'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Subject,\\ e\\.g\\.\\ Admissions\\ enquiry\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ mounted\\ \\?\\ `Theme:\\ \\$\\{\\ theme\\ \\}\\.\\ Press\\ to\\ change\\.`\\ :\\ 'Toggle\\ theme'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Subject,\\ for\\ example\\ Admissions\\ enquiry\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/AssignmentForm.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ Chapter\\ 4\\ Problem\\ Set\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/AssignmentForm.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Example:\\ Chapter\\ 4\\ problem\\ set\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/assignments/AssignmentCard.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{a\\ \\.\\ title\\}\\ New\\ \\{a\\ \\.\\ subject\\}\\ \u00b7\\ Due\\ \\{formatDueDate\\ \\(\\ a\\ \\.\\ dueDate\\ \\)\\}\\ \\{a\\ \\.\\ mine\\ \\?\\.\\ marks\\ !=\\ null\\ \\&\\&\\ <JSX/>\\}\\ \\{lateStillOpen\\ \\?\\ `\\$\\{\\ due\\ \\.\\ text\\ \\}\\ \u2014\\ you\\ can\\ still\\ hand\\ in\\ \\(it\\ will\\ be\\ marked\\ late\\)`\\ :\\ due\\ \\.\\ text\\}\\ \\{a\\ \\.\\ attachmentCount\\}\\ attachment\\ \\|s\\ Marked\\ out\\ of\\ \\{a\\ \\.\\ maxMarks\\}\\ \\{handedIn\\}\\ of\\ \\{stats\\ \\.\\ totalStudents\\}\\ handed\\ in\\ \\{`\\ \u00b7\\ \\$\\{\\ stats\\ \\.\\ viewed\\ \\}\\ opened`\\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/assignments/AssignmentCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ lateStillOpen\\ \\?\\ `\\$\\{\\ due\\ \\.\\ text\\ \\}\\ \u2014\\ you\\ can\\ still\\ hand\\ in\\ \\(it\\ will\\ be\\ marked\\ late\\)`\\ :\\ due\\ \\.\\ text\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/assignments/AssignmentCard.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{a\\ \\.\\ title\\}\\ New\\ \\{a\\ \\.\\ subject\\}\\ \u00b7\\ Due\\ \\{formatDueDate\\ \\(\\ a\\ \\.\\ dueDate\\ \\)\\}\\ \\{a\\ \\.\\ mine\\ \\?\\.\\ marks\\ !=\\ null\\ \\&\\&\\ <JSX/>\\}\\ \\{lateStillOpen\\ \\?\\ `\\$\\{\\ due\\ \\.\\ text\\ \\}\\.\\ You\\ can\\ still\\ hand\\ in;\\ it\\ will\\ be\\ marked\\ late\\.`\\ :\\ due\\ \\.\\ text\\}\\ \\{a\\ \\.\\ attachmentCount\\}\\ attachment\\ \\|s\\ Marked\\ out\\ of\\ \\{a\\ \\.\\ maxMarks\\}\\ \\{handedIn\\}\\ of\\ \\{stats\\ \\.\\ totalStudents\\}\\ handed\\ in\\ \\{`\\ \u00b7\\ \\$\\{\\ stats\\ \\.\\ viewed\\ \\}\\ opened`\\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/assignments/AssignmentCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ lateStillOpen\\ \\?\\ `\\$\\{\\ due\\ \\.\\ text\\ \\}\\.\\ You\\ can\\ still\\ hand\\ in;\\ it\\ will\\ be\\ marked\\ late\\.`\\ :\\ due\\ \\.\\ text\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/assignments/AssignmentsTab.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ assignableSubjects\\ \\.\\ length\\ >\\ 0\\ \\?\\ 'No\\ assignments\\ yet\\.\\ Click\\ \u201cNew\\ Assignment\u201d\\ to\\ post\\ one\\ \u2014\\ students\\ are\\ notified\\ straight\\ away\\.'\\ :\\ isStudent\\ \\?\\ 'No\\ assignments\\ have\\ been\\ posted\\ for\\ your\\ class\\ yet\\.'\\ :\\ 'No\\ assignments\\ to\\ show\\.'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/assignments/AssignmentsTab.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ assignableSubjects\\ \\.\\ length\\ >\\ 0\\ \\?\\ 'No\\ assignments\\ yet\\.\\ Use\\ \u201cNew\\ Assignment\u201d\\ to\\ post\\ one\\.\\ Students\\ are\\ notified\\ straight\\ away\\.'\\ :\\ isStudent\\ \\?\\ 'No\\ assignments\\ have\\ been\\ posted\\ for\\ your\\ class\\ yet\\.'\\ :\\ 'No\\ assignments\\ to\\ show\\.'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/assignments/MarkDialog.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ derived\\ ===\\ 'LATE'\\ \\?\\ `Late\\ \u2014\\ \\$\\{\\ daysBetween\\ \\(\\ dueDay\\ ,\\ submittedOn\\ \\)\\ \\}\\ day\\$\\{\\ daysBetween\\ \\(\\ dueDay\\ ,\\ submittedOn\\ \\)\\ ===\\ 1\\ \\?\\ ''\\ :\\ 's'\\ \\}\\ after\\ the\\ due\\ date`\\ :\\ 'On\\ time'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/assignments/MarkDialog.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Marks\\ \u2014\\ leave\\ empty\\ to\\ mark\\ later$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/assignments/MarkDialog.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ derived\\ ===\\ 'LATE'\\ \\?\\ `Late\\ by\\ \\$\\{\\ daysBetween\\ \\(\\ dueDay\\ ,\\ submittedOn\\ \\)\\ \\}\\ day\\$\\{\\ daysBetween\\ \\(\\ dueDay\\ ,\\ submittedOn\\ \\)\\ ===\\ 1\\ \\?\\ ''\\ :\\ 's'\\ \\}\\ after\\ the\\ due\\ date`\\ :\\ 'On\\ time'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/assignments/MarkDialog.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Marks\\ \\(leave\\ empty\\ to\\ mark\\ later\\)$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/assignments/SubmissionPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ overdue\\ \\?\\ 'The\\ due\\ date\\ has\\ passed\\ \u2014\\ work\\ handed\\ in\\ now\\ is\\ marked\\ late\\.'\\ :\\ 'Work\\ handed\\ in\\ after\\ the\\ due\\ date\\ is\\ marked\\ late\\.'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/assignments/SubmissionPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ overdue\\ \\?\\ 'The\\ due\\ date\\ has\\ passed\\.\\ Work\\ handed\\ in\\ now\\ is\\ marked\\ late\\.'\\ :\\ 'Work\\ handed\\ in\\ after\\ the\\ due\\ date\\ is\\ marked\\ late\\.'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/AttendanceSheet.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ ACTIVE_CLS\\ :\\ Record\\ <\\ Status\\ ,\\ string\\ >\\ =\\ \\{\\ PRESENT\\ :\\ 'bg\\-emerald\\-500\\ border\\-emerald\\-500\\ text\\-white'\\ ,\\ ABSENT\\ :\\ 'bg\\-brand\\-coral\\ border\\-brand\\-coral\\ text\\-white'\\ ,\\ LATE\\ :\\ 'bg\\-brand\\-amber\\ border\\-brand\\-amber\\ text\\-white'\\ ,\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/AttendanceSheet.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ACTIVE_CLS\\ :\\ Record\\ <\\ Status\\ ,\\ string\\ >\\ =\\ \\{\\ PRESENT\\ :\\ 'bg\\-emerald\\-500\\ border\\-emerald\\-500\\ text\\-white'\\ ,\\ ABSENT\\ :\\ 'bg\\-btn\\-danger\\ border\\-btn\\-danger\\ text\\-btn\\-danger\\-fg'\\ ,\\ LATE\\ :\\ 'bg\\-brand\\-amber\\ border\\-brand\\-amber\\ text\\-white'\\ ,\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/TimetableSlotForm.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"e\\.g\\.\\ Lab\\ 2\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/classes/TimetableSlotForm.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Example:\\ Lab\\ 2\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/exams/AnalyticsPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ c\\ \\.\\ gradingTrack\\ ===\\ 'MSCE'\\ \\?\\ 'MSCE\\ \u2014\\ points'\\ :\\ 'JCE\\ \u2014\\ grades'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/exams/AnalyticsPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ metricLabel\\ =\\ subject\\ \\?\\ `\\$\\{\\ subject\\ \\}\\ average`\\ :\\ usePoints\\ \\?\\ 'aggregate\\ points\\ \u2014\\ lower\\ is\\ better'\\ :\\ 'overall\\ average'$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/exams/AnalyticsPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ `Top\\ 10\\ \u2014\\ \\$\\{\\ scopeLabel\\ \\}`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/exams/AnalyticsPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ `Bottom\\ 10\\ \u2014\\ \\$\\{\\ scopeLabel\\ \\}`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/exams/AnalyticsPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ c\\ \\.\\ gradingTrack\\ ===\\ 'MSCE'\\ \\?\\ 'MSCE:\\ points'\\ :\\ 'JCE:\\ grades'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/exams/AnalyticsPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ metricLabel\\ =\\ subject\\ \\?\\ `\\$\\{\\ subject\\ \\}\\ average`\\ :\\ usePoints\\ \\?\\ 'aggregate\\ points\\ \\(lower\\ is\\ better\\)'\\ :\\ 'overall\\ average'$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/exams/AnalyticsPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ `Top\\ 10:\\ \\$\\{\\ scopeLabel\\ \\}`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/exams/AnalyticsPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ `Bottom\\ 10:\\ \\$\\{\\ scopeLabel\\ \\}`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/exams/ManebPanel.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^setFeedback\\ \\(\\ `Imported\\ \\$\\{\\ result\\ \\.\\ created\\ \\.\\ length\\ \\}\\ record\\$\\{\\ result\\ \\.\\ created\\ \\.\\ length\\ ===\\ 1\\ \\?\\ ''\\ :\\ 's'\\ \\}`\\ \\+\\ \\(\\ result\\ \\.\\ errors\\ \\.\\ length\\ >\\ 0\\ \\?\\ `\\ \u2014\\ \\$\\{\\ result\\ \\.\\ errors\\ \\.\\ length\\ \\}\\ row\\(s\\)\\ failed\\ \\(e\\.g\\.\\ duplicate\\ candidate\\ number\\)\\.`\\ :\\ '\\.'\\ \\)\\ ,\\ \\)$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/exams/ManebPanel.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^setFeedback\\ \\(\\ `Imported\\ \\$\\{\\ result\\ \\.\\ created\\ \\.\\ length\\ \\}\\ record\\$\\{\\ result\\ \\.\\ created\\ \\.\\ length\\ ===\\ 1\\ \\?\\ ''\\ :\\ 's'\\ \\}`\\ \\+\\ \\(\\ result\\ \\.\\ errors\\ \\.\\ length\\ >\\ 0\\ \\?\\ `\\ \u2014\\ \\$\\{\\ result\\ \\.\\ errors\\ \\.\\ length\\ \\}\\ row\\(s\\)\\ failed,\\ for\\ example\\ a\\ duplicate\\ candidate\\ number\\.`\\ :\\ '\\.'\\ \\)\\ ,\\ \\)$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ openPdfPreview\\ \\}\\ from\\ '@/lib/pdfPreview'$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^function\\ StudentResultRow\\ \\(\\ \\{\\ row\\ ,\\ onRetry\\ ,\\ \\}\\ :\\ \\{\\ row\\ :\\ StudentRow\\ onRetry\\ :\\ \\(\\ studentId\\ :\\ string\\ \\)\\ =>\\ void\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^setError\\ \\(\\ 'Academic\\ year\\ is\\ still\\ loading\\ \u2014\\ please\\ try\\ again\\ shortly\\.'\\ \\)\\ ;$",
+      "reason": "Phase 9: sentence wording only, no em dash (R4). Same message, same condition."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ failedCount\\ >\\ 0\\ \\&\\&\\ `\\ \\$\\{\\ failedCount\\ \\}\\ failed\\ \u2014\\ use\\ the\\ retry\\ button\\ to\\ regenerate\\.`\\ \\}$",
+      "reason": "Phase 9: sentence wording only, no em dash (R4). Same message, same condition."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ openPdfPreview\\ ,\\ downloadProtectedFile\\ \\}\\ from\\ '@/lib/pdfPreview'$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ StudentResultRow\\ \\(\\ \\{\\ row\\ ,\\ onRetry\\ ,\\ canTranscript\\ ,\\ \\}\\ :\\ \\{\\ row\\ :\\ StudentRow\\ onRetry\\ :\\ \\(\\ studentId\\ :\\ string\\ \\)\\ =>\\ void\\ canTranscript\\ :\\ boolean\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\[\\ transcriptBusy\\ ,\\ setTranscriptBusy\\ \\]\\ =\\ useState\\ \\(\\ false\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ downloadTranscript\\ =\\ useCallback\\ \\(\\ async\\ \\(\\ \\)\\ =>\\ \\{\\}\\ ,\\ \\[\\ row\\ \\.\\ studentId\\ ,\\ row\\ \\.\\ fullName\\ \\]\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^setTranscriptBusy\\ \\(\\ true\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^try\\ \\{\\}\\ catch\\ \\(\\ err\\ :\\ unknown\\ \\)\\ \\{\\}\\ finally\\ \\{\\}$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ url\\ \\}\\ =\\ await\\ apiFetch\\ <\\ \\{\\ url\\ :\\ string\\ \\}\\ >\\ \\(\\ '/exams/transcript'\\ ,\\ \\{\\ method\\ :\\ 'POST'\\ ,\\ body\\ :\\ JSON\\ \\.\\ stringify\\ \\(\\ \\{\\ studentId\\ :\\ row\\ \\.\\ studentId\\ \\}\\ \\)\\ ,\\ \\}\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^await\\ downloadProtectedFile\\ \\(\\ url\\ ,\\ `Transcript\\ \\-\\ \\$\\{\\ row\\ \\.\\ fullName\\ \\}\\.pdf`\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^toast\\ \\.\\ error\\ \\(\\ err\\ instanceof\\ Error\\ \\?\\ err\\ \\.\\ message\\ :\\ 'Could\\ not\\ build\\ this\\ transcript\\.'\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^setTranscriptBusy\\ \\(\\ false\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ canTranscript\\ \\&\\&\\ row\\ \\.\\ rowStatus\\ !==\\ 'generating'\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onClick=\\{\\ downloadTranscript\\ \\}$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^disabled=\\{\\ transcriptBusy\\ \\}$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ `Download\\ transcript\\ for\\ \\$\\{\\ row\\ \\.\\ fullName\\ \\}`\\ \\}$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{transcriptBusy\\ \\?\\ <JSX/>\\ :\\ <JSX/>\\}\\ Building\u2026\\|Transcript$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ transcriptBusy\\ \\?\\ <JSX/>\\ :\\ <JSX/>\\ \\}$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ transcriptBusy\\ \\?\\ 'Building\u2026'\\ :\\ 'Transcript'\\ \\}$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^setError\\ \\(\\ 'Academic\\ year\\ is\\ still\\ loading\\.\\ Please\\ try\\ again\\ shortly\\.'\\ \\)\\ ;$",
+      "reason": "Phase 9: sentence wording only, no em dash (R4). Same message, same condition."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^type=\"button\"$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ failedCount\\ >\\ 0\\ \\&\\&\\ `\\ \\$\\{\\ failedCount\\ \\}\\ failed\\.\\ Use\\ the\\ retry\\ button\\ to\\ regenerate\\.`\\ \\}$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/ReportCardGenerator.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^canTranscript=\\{\\ canGenerate\\ \\}$",
+      "reason": "Phase 9, owner request 2026-11-20: a Transcript button on each student row of the report card generator (admin and exam officer only, the same roles that already see Generate All). It calls the new POST /exams/transcript and saves the PDF with the existing downloadProtectedFile. Nothing existing changes."
+    },
+    {
+      "file": "src/components/exams/StudentResultsView.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ isFeeGate\\ \\?\\ 'Results\\ Unavailable\\ \u2014\\ Outstanding\\ Fee\\ Balance'\\ :\\ 'Results\\ Not\\ Yet\\ Released'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/exams/StudentResultsView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ isFeeGate\\ \\?\\ 'Results\\ unavailable:\\ outstanding\\ fee\\ balance'\\ :\\ 'Results\\ Not\\ Yet\\ Released'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/FeeCollectionRadial.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^ariaLabel=\\{\\ percent\\ !==\\ null\\ \\?\\ `Fee\\ collection\\ is\\ \\$\\{\\ Math\\ \\.\\ round\\ \\(\\ percent\\ \\)\\ \\}\\ percent\\ of\\ target\\ for\\ term\\ \\$\\{\\ term\\ \\},\\ \\$\\{\\ academicYear\\ \\}`\\ :\\ 'Fee\\ collection\\ chart\\ \u2014\\ no\\ data\\ available'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/FeeCollectionRadial.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ariaLabel=\\{\\ percent\\ !==\\ null\\ \\?\\ `Fee\\ collection\\ is\\ \\$\\{\\ Math\\ \\.\\ round\\ \\(\\ percent\\ \\)\\ \\}\\ percent\\ of\\ target\\ for\\ term\\ \\$\\{\\ term\\ \\},\\ \\$\\{\\ academicYear\\ \\}`\\ :\\ 'Fee\\ collection\\ chart:\\ no\\ data\\ available'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/FeeStructureTab.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Mandatory\\ Applies\\ automatically\\ to\\ every\\ student\\ in\\ scope\\ \u2014\\ no\\ per\\-student\\ opt\\-in\\ needed\\.\\|Optional\\ add\\-on\\ \u2014\\ students\\ are\\ billed\\ only\\ after\\ being\\ enrolled\\ via\\ Finance\\ Fee\\ Structure\\.$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/FeeStructureTab.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ mandatory\\ \\?\\ 'Applies\\ automatically\\ to\\ every\\ student\\ in\\ scope\\ \u2014\\ no\\ per\\-student\\ opt\\-in\\ needed\\.'\\ :\\ 'Optional\\ add\\-on\\ \u2014\\ students\\ are\\ billed\\ only\\ after\\ being\\ enrolled\\ via\\ Finance\\ Fee\\ Structure\\.'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/FeeStructureTab.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(label\\)=Mandatory\\ Applies\\ automatically\\ to\\ every\\ student\\ in\\ scope\\.\\ No\\ per\\-student\\ opt\\-in\\ is\\ needed\\.\\|Optional\\ add\\-on:\\ students\\ are\\ billed\\ only\\ after\\ being\\ enrolled\\ via\\ Finance\\ Fee\\ Structure\\.$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/FeeStructureTab.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ mandatory\\ \\?\\ 'Applies\\ automatically\\ to\\ every\\ student\\ in\\ scope\\.\\ No\\ per\\-student\\ opt\\-in\\ is\\ needed\\.'\\ :\\ 'Optional\\ add\\-on:\\ students\\ are\\ billed\\ only\\ after\\ being\\ enrolled\\ via\\ Finance\\ Fee\\ Structure\\.'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/LibraryFinesTab.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^description=\\{\\ pendingWaive\\ \\?\\ `The\\ \\$\\{\\ formatMWK\\ \\(\\ pendingWaive\\ \\.\\ amount\\ \\)\\ \\}\\ fine\\ for\\ \\$\\{\\ fineStudentName\\ \\(\\ pendingWaive\\ \\)\\ \\}\\ \\(\\$\\{\\ pendingWaive\\ \\.\\ bookTitle\\ \\}\\)\\ will\\ be\\ permanently\\ waived\\ \u2014\\ the\\ amount\\ will\\ no\\ longer\\ be\\ collectable\\.`\\ :\\ ''\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/LibraryFinesTab.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^description=\\{\\ pendingWaive\\ \\?\\ `The\\ \\$\\{\\ formatMWK\\ \\(\\ pendingWaive\\ \\.\\ amount\\ \\)\\ \\}\\ fine\\ for\\ \\$\\{\\ fineStudentName\\ \\(\\ pendingWaive\\ \\)\\ \\}\\ \\(\\$\\{\\ pendingWaive\\ \\.\\ bookTitle\\ \\}\\)\\ will\\ be\\ permanently\\ waived\\.\\ The\\ amount\\ will\\ no\\ longer\\ be\\ collectable\\.`\\ :\\ ''\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/payroll/PayrollRunsTab.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ !\\ currentRun\\ \\?\\ 'Payroll\\ for\\ this\\ month\\ has\\ not\\ been\\ run\\ yet\\.'\\ :\\ status\\ ===\\ 'PROCESSING'\\ \\?\\ 'Calculating\\ salaries,\\ PAYE,\\ and\\ pension\\ for\\ every\\ enrolled\\ staff\\ member\\.'\\ :\\ status\\ ===\\ 'COMPLETED'\\ \\?\\ 'Payroll\\ calculations\\ verified\\.\\ Ready\\ for\\ Finance\\ submission\\.'\\ :\\ status\\ ===\\ 'PENDING_APPROVAL'\\ \\?\\ 'Awaiting\\ High\\ Rank\\ approval\\.'\\ :\\ status\\ ===\\ 'APPROVED'\\ \\?\\ 'Approved\\ \u2014\\ ready\\ to\\ lock\\ and\\ post\\ the\\ journal\\ entry\\.'\\ :\\ status\\ ===\\ 'LOCKED'\\ \\?\\ 'Locked\\ and\\ posted\\.\\ This\\ month\\ is\\ permanently\\ closed\\.'\\ :\\ ''\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/payroll/PayrollRunsTab.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ !\\ currentRun\\ \\?\\ 'Payroll\\ for\\ this\\ month\\ has\\ not\\ been\\ run\\ yet\\.'\\ :\\ status\\ ===\\ 'PROCESSING'\\ \\?\\ 'Calculating\\ salaries,\\ PAYE,\\ and\\ pension\\ for\\ every\\ enrolled\\ staff\\ member\\.'\\ :\\ status\\ ===\\ 'COMPLETED'\\ \\?\\ 'Payroll\\ calculations\\ verified\\.\\ Ready\\ for\\ Finance\\ submission\\.'\\ :\\ status\\ ===\\ 'PENDING_APPROVAL'\\ \\?\\ 'Awaiting\\ High\\ Rank\\ approval\\.'\\ :\\ status\\ ===\\ 'APPROVED'\\ \\?\\ 'Approved:\\ ready\\ to\\ lock\\ and\\ post\\ the\\ journal\\ entry\\.'\\ :\\ status\\ ===\\ 'LOCKED'\\ \\?\\ 'Locked\\ and\\ posted\\.\\ This\\ month\\ is\\ permanently\\ closed\\.'\\ :\\ ''\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/payroll/PayrollWorkspace.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ tabs\\ =\\ \\[\\ canRuns\\ \\?\\ \\{\\ id\\ :\\ 'runs'\\ as\\ const\\ ,\\ label\\ :\\ 'Payroll\\ runs\\ and\\ approvals'\\ ,\\ icon\\ :\\ ClipboardList\\ \\}\\ :\\ null\\ ,\\ canStructure\\ \\?\\ \\{\\ id\\ :\\ 'structure'\\ as\\ const\\ ,\\ label\\ :\\ 'Salary\\ structure\\ and\\ allowances'\\ ,\\ icon\\ :\\ Users\\ \\}\\ :\\ null\\ ,\\ canMyPay\\ \\?\\ \\{\\ id\\ :\\ 'mypay'\\ as\\ const\\ ,\\ label\\ :\\ 'My\\ pay\\ \\(Self\\-Service\\)'\\ ,\\ icon\\ :\\ Wallet\\ \\}\\ :\\ null\\ ,\\ canInsights\\ \\?\\ \\{\\ id\\ :\\ 'insights'\\ as\\ const\\ ,\\ label\\ :\\ 'Financial\\ insights\\ and\\ trends'\\ ,\\ icon\\ :\\ TrendingUp\\ \\}\\ :\\ null\\ ,\\ canSettings\\ \\?\\ \\{\\ id\\ :\\ 'settings'\\ as\\ const\\ ,\\ label\\ :\\ 'PAYE\\ and\\ Pension\\ Settings'\\ ,\\ icon\\ :\\ Settings\\ \\}\\ :\\ null\\ ,\\ \\]\\ \\.\\ filter\\ \\(\\ \\(\\ t\\ \\)\\ :\\ t\\ is\\ NonNullable\\ <\\ typeof\\ t\\ >\\ =>\\ t\\ !==\\ null\\ \\)\\ as\\ TabItem\\ <\\ PayrollWorkspaceTab\\ >\\ \\[\\ \\]$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/payroll/PayrollWorkspace.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ tabs\\ =\\ \\[\\ canRuns\\ \\?\\ \\{\\ id\\ :\\ 'runs'\\ as\\ const\\ ,\\ label\\ :\\ 'Payroll\\ runs\\ and\\ approvals'\\ ,\\ icon\\ :\\ ClipboardList\\ \\}\\ :\\ null\\ ,\\ canStructure\\ \\?\\ \\{\\ id\\ :\\ 'structure'\\ as\\ const\\ ,\\ label\\ :\\ 'Salary\\ structure\\ and\\ allowances'\\ ,\\ icon\\ :\\ Users\\ \\}\\ :\\ null\\ ,\\ canMyPay\\ \\?\\ \\{\\ id\\ :\\ 'mypay'\\ as\\ const\\ ,\\ label\\ :\\ 'My\\ pay\\ \\(Self\\-Service\\)'\\ ,\\ icon\\ :\\ Wallet\\ \\}\\ :\\ null\\ ,\\ canInsights\\ \\?\\ \\{\\ id\\ :\\ 'insights'\\ as\\ const\\ ,\\ label\\ :\\ 'Financial\\ trends'\\ ,\\ icon\\ :\\ TrendingUp\\ \\}\\ :\\ null\\ ,\\ canSettings\\ \\?\\ \\{\\ id\\ :\\ 'settings'\\ as\\ const\\ ,\\ label\\ :\\ 'PAYE\\ and\\ Pension\\ Settings'\\ ,\\ icon\\ :\\ Settings\\ \\}\\ :\\ null\\ ,\\ \\]\\ \\.\\ filter\\ \\(\\ \\(\\ t\\ \\)\\ :\\ t\\ is\\ NonNullable\\ <\\ typeof\\ t\\ >\\ =>\\ t\\ !==\\ null\\ \\)\\ as\\ TabItem\\ <\\ PayrollWorkspaceTab\\ >\\ \\[\\ \\]$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/payroll/SalaryStructureTab.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ a\\ \\.\\ recurring\\ \\?\\ 'Recurring,\\ monthly'\\ :\\ `One\\-time\\ \u2014\\ \\$\\{\\ a\\ \\.\\ paidMonth\\ \\}/\\$\\{\\ a\\ \\.\\ paidYear\\ \\}`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/finances/payroll/SalaryStructureTab.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ a\\ \\.\\ recurring\\ \\?\\ 'Recurring,\\ monthly'\\ :\\ `One\\-time,\\ \\$\\{\\ a\\ \\.\\ paidMonth\\ \\}/\\$\\{\\ a\\ \\.\\ paidYear\\ \\}`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/placements/PlacementRecommendationCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return\\ `Fully\\ eligible!\\ Your\\ MSCE\\ aggregate\\ \\(\\$\\{\\ r\\ \\.\\ aggregate\\ \\}\\ points\\)\\ comfortably\\ meets\\ or\\ surpasses\\ the\\ typical\\ cutoff\\ \\(\\$\\{\\ r\\ \\.\\ cutOffPoints\\ \\}\\ points\\)\\.`$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/placements/PlacementRecommendationCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ `Fully\\ eligible\\.\\ Your\\ MSCE\\ aggregate\\ \\(\\$\\{\\ r\\ \\.\\ aggregate\\ \\}\\ points\\)\\ comfortably\\ meets\\ or\\ surpasses\\ the\\ typical\\ cutoff\\ \\(\\$\\{\\ r\\ \\.\\ cutOffPoints\\ \\}\\ points\\)\\.`$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/settings/SchoolIdentitySettings.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Title\\ \\(e\\.g\\.\\ Head\\ Teacher\\)\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/settings/SchoolIdentitySettings.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\"Title,\\ for\\ example\\ Head\\ teacher\"$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/AuditLogViewer.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ data\\ \\.\\ total\\ >\\ data\\ \\.\\ pageSize\\ \\&\\&\\ `\\ \u2014\\ page\\ \\$\\{\\ data\\ \\.\\ page\\ \\}\\ of\\ \\$\\{\\ data\\ \\.\\ pages\\ \\}`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/AuditLogViewer.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ data\\ \\.\\ total\\ >\\ data\\ \\.\\ pageSize\\ \\&\\&\\ `,\\ page\\ \\$\\{\\ data\\ \\.\\ page\\ \\}\\ of\\ \\$\\{\\ data\\ \\.\\ pages\\ \\}`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/CopyableId.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ copied\\ \\?\\ 'Copied!'\\ :\\ 'Copy\\ full\\ ID'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/CopyableId.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ copied\\ \\?\\ 'Copied'\\ :\\ 'Copy\\ full\\ ID'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/DataTable.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ chipClass\\ \\}\\ from\\ '@/lib/hills/chip'$",
+      "reason": "Phase 9: the quick filter chips use the shared chipClass (RULEBOOK R2.7) instead of their own pill classes. Class text only."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ MODAL_BTN_PRIMARY\\ =\\ `\\$\\{\\ BTN_BASE\\ \\}\\ bg\\-brand\\-teal\\ text\\-white\\ hover:bg\\-brand\\-teal\\-light`$",
+      "reason": "Phase 9: shared modal button classes move to the button colour tokens, so the compatibility rule for teal and coral with white text could be deleted. Class text only; same colours as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ MODAL_BTN_DANGER\\ =\\ `\\$\\{\\ BTN_BASE\\ \\}\\ bg\\-brand\\-coral\\ text\\-white\\ hover:bg\\-brand\\-coral/90`$",
+      "reason": "Phase 9: shared modal button classes move to the button colour tokens, so the compatibility rule for teal and coral with white text could be deleted. Class text only; same colours as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ MODAL_BTN_PRIMARY\\ =\\ `\\$\\{\\ BTN_BASE\\ \\}\\ bg\\-btn\\-brand\\ text\\-btn\\-brand\\-fg\\ hover:bg\\-btn\\-brand\\-hover`$",
+      "reason": "Phase 9: shared modal button classes move to the button colour tokens, so the compatibility rule for teal and coral with white text could be deleted. Class text only; same colours as before."
+    },
+    {
+      "file": "src/components/shared/Modal.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ MODAL_BTN_DANGER\\ =\\ `\\$\\{\\ BTN_BASE\\ \\}\\ bg\\-btn\\-danger\\ text\\-btn\\-danger\\-fg\\ hover:bg\\-btn\\-danger\\-hover`$",
+      "reason": "Phase 9: shared modal button classes move to the button colour tokens, so the compatibility rule for teal and coral with white text could be deleted. Class text only; same colours as before."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ `Current\\ theme:\\ \\$\\{\\ theme\\ \\?\\?\\ 'system'\\ \\}\\.\\ Click\\ to\\ change\\ theme\\.`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ `Current\\ theme:\\ \\$\\{\\ theme\\ \\?\\?\\ 'system'\\ \\}\\.\\ Press\\ to\\ change\\ theme\\.`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/PrintableReportCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ maneb\\ \\.\\ points\\ !=\\ null\\ \\?\\ `\\$\\{\\ maneb\\ \\.\\ points\\ \\}\\ points`\\ :\\ `Not\\ available\\ \u2014\\ fewer\\ than\\ \\$\\{\\ MSCE_AGGREGATE_SUBJECT_COUNT\\ \\}\\ subjects`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/PrintableReportCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ data\\ \\.\\ aggregatePoints\\ !=\\ null\\ \\?\\ `Aggregate\\ =\\ sum\\ of\\ the\\ points\\ of\\ the\\ \\$\\{\\ MSCE_AGGREGATE_SUBJECT_COUNT\\ \\}\\ best\\ subjects\\ \\(range\\ \\$\\{\\ MSCE_AGGREGATE_BEST\\ \\}\u2013\\$\\{\\ MSCE_AGGREGATE_WORST\\ \\};\\ lower\\ is\\ better\\);\\ highlighted\\ points\\ are\\ the\\ subjects\\ counted\\.\\ MSCE\\ awards\\ no\\ overall\\ grade\\.`\\ :\\ `Aggregate\\ not\\ available\\ \u2014\\ \\$\\{\\ MSCE_AGGREGATE_SUBJECT_COUNT\\ \\}\\ graded\\ subjects\\ are\\ required\\ to\\ form\\ an\\ MSCE\\ aggregate\\.`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/PrintableReportCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ maneb\\ \\.\\ points\\ !=\\ null\\ \\?\\ `\\$\\{\\ maneb\\ \\.\\ points\\ \\}\\ points`\\ :\\ `Not\\ available:\\ fewer\\ than\\ \\$\\{\\ MSCE_AGGREGATE_SUBJECT_COUNT\\ \\}\\ subjects`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/PrintableReportCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ data\\ \\.\\ aggregatePoints\\ !=\\ null\\ \\?\\ `Aggregate\\ =\\ sum\\ of\\ the\\ points\\ of\\ the\\ \\$\\{\\ MSCE_AGGREGATE_SUBJECT_COUNT\\ \\}\\ best\\ subjects\\ \\(range\\ \\$\\{\\ MSCE_AGGREGATE_BEST\\ \\}\u2013\\$\\{\\ MSCE_AGGREGATE_WORST\\ \\};\\ lower\\ is\\ better\\);\\ highlighted\\ points\\ are\\ the\\ subjects\\ counted\\.\\ MSCE\\ awards\\ no\\ overall\\ grade\\.`\\ :\\ `Aggregate\\ not\\ available:\\ \\$\\{\\ MSCE_AGGREGATE_SUBJECT_COUNT\\ \\}\\ graded\\ subjects\\ are\\ required\\ to\\ form\\ an\\ MSCE\\ aggregate\\.`\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ mounted\\ \\?\\ `Theme:\\ \\$\\{\\ theme\\ \\}\\.\\ Click\\ to\\ change\\.`\\ :\\ 'Toggle\\ theme'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ mounted\\ \\?\\ `Theme:\\ \\$\\{\\ theme\\ \\}\\.\\ Press\\ to\\ change\\.`\\ :\\ 'Toggle\\ theme'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/ReportProblemModal.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^placeholder=\\{\\ role\\ ===\\ 'student'\\ \\?\\ 'e\\.g\\.\\ SMS\\-2025\\-0001'\\ :\\ 'Your\\ employee\\ number'\\ \\}$",
+      "reason": "Phase 9: shared modal button classes move to the button colour tokens, so the compatibility rule for teal and coral with white text could be deleted. Class text only; same colours as before."
+    },
+    {
+      "file": "src/components/shared/ReportProblemModal.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^placeholder=\\{\\ role\\ ===\\ 'student'\\ \\?\\ 'Example:\\ SMS\\-2025\\-0001'\\ :\\ 'Your\\ employee\\ number'\\ \\}$",
+      "reason": "Phase 9: shared modal button classes move to the button colour tokens, so the compatibility rule for teal and coral with white text could be deleted. Class text only; same colours as before."
+    },
+    {
+      "file": "src/components/shared/StudentRiskBadge.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ riskLevel\\ ===\\ 'NONE'\\ \\?\\ 'No\\ risk\\ factors\\ identified\\.\\ Student\\ is\\ on\\ track\\.'\\ :\\ 'Flagged\\ by\\ the\\ risk\\ engine\\ \u2014\\ no\\ further\\ detail\\ is\\ available\\ to\\ your\\ role\\.'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/components/shared/StudentRiskBadge.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ riskLevel\\ ===\\ 'NONE'\\ \\?\\ 'No\\ risk\\ factors\\ identified\\.\\ Student\\ is\\ on\\ track\\.'\\ :\\ 'Flagged\\ by\\ the\\ risk\\ engine\\.\\ No\\ further\\ detail\\ is\\ available\\ to\\ your\\ role\\.'\\ \\}$",
+      "reason": "Phase 9 (looks only): visible wording changed to follow RULEBOOK R4: no em dash, no exclamation mark, no click, no e.g., plain words. Same condition, same data, same handlers."
+    },
+    {
+      "file": "src/server/routes/exams.ts",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ generateAndUploadTranscript\\ \\}\\ from\\ '@/server/services/transcriptService'$",
+      "reason": "Phase 9, owner request 2026-11-20: new route POST /exams/transcript, gated like the staff report card POST, calling the existing generateAndUploadTranscript. See the approvedFrozen entry."
+    },
+    {
+      "file": "src/server/routes/exams.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^examsRouter\\ \\.\\ post\\ \\(\\ '/transcript'\\ ,\\ verifyAuth\\ ,\\ requireRole\\ \\(\\ \\[\\ 'admin'\\ ,\\ 'exam_officer'\\ \\]\\ \\)\\ ,\\ rateLimit\\ \\(\\ 'export\\-generate'\\ \\)\\ ,\\ idempotent\\ \\(\\ \\)\\ ,\\ async\\ \\(\\ req\\ ,\\ res\\ \\)\\ =>\\ \\{\\}\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: new route POST /exams/transcript, gated like the staff report card POST, calling the existing generateAndUploadTranscript. See the approvedFrozen entry."
+    },
+    {
+      "file": "src/server/routes/exams.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ studentId\\ \\}\\ =\\ req\\ \\.\\ body\\ as\\ \\{\\ studentId\\ \\?\\ :\\ string\\ \\}$",
+      "reason": "Phase 9, owner request 2026-11-20: new route POST /exams/transcript, gated like the staff report card POST, calling the existing generateAndUploadTranscript. See the approvedFrozen entry."
+    },
+    {
+      "file": "src/server/routes/exams.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ !\\ studentId\\ \\)\\ return\\ res\\ \\.\\ status\\ \\(\\ 400\\ \\)\\ \\.\\ json\\ \\(\\ \\{\\ error\\ :\\ 'studentId\\ is\\ required'\\ \\}\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: new route POST /exams/transcript, gated like the staff report card POST, calling the existing generateAndUploadTranscript. See the approvedFrozen entry."
+    },
+    {
+      "file": "src/server/routes/exams.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ student\\ =\\ await\\ prisma\\ \\.\\ student\\ \\.\\ findUnique\\ \\(\\ \\{\\ where\\ :\\ \\{\\ id\\ :\\ studentId\\ \\}\\ ,\\ select\\ :\\ \\{\\ id\\ :\\ true\\ \\}\\ \\}\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: new route POST /exams/transcript, gated like the staff report card POST, calling the existing generateAndUploadTranscript. See the approvedFrozen entry."
+    },
+    {
+      "file": "src/server/routes/exams.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ !\\ student\\ \\)\\ return\\ res\\ \\.\\ status\\ \\(\\ 404\\ \\)\\ \\.\\ json\\ \\(\\ \\{\\ error\\ :\\ 'Student\\ not\\ found\\.'\\ \\}\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: new route POST /exams/transcript, gated like the staff report card POST, calling the existing generateAndUploadTranscript. See the approvedFrozen entry."
+    },
+    {
+      "file": "src/server/routes/exams.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ fileId\\ ,\\ url\\ \\}\\ =\\ await\\ generateAndUploadTranscript\\ \\(\\ student\\ \\.\\ id\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: new route POST /exams/transcript, gated like the staff report card POST, calling the existing generateAndUploadTranscript. See the approvedFrozen entry."
+    },
+    {
+      "file": "src/server/routes/exams.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ res\\ \\.\\ status\\ \\(\\ 201\\ \\)\\ \\.\\ json\\ \\(\\ \\{\\ fileId\\ ,\\ url\\ \\}\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: new route POST /exams/transcript, gated like the staff report card POST, calling the existing generateAndUploadTranscript. See the approvedFrozen entry."
+    },
+    {
+      "file": "src/server/routes/exams.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ sendError\\ \\(\\ res\\ ,\\ err\\ ,\\ \\{\\ tags\\ :\\ \\{\\ module\\ :\\ 'exams'\\ ,\\ route\\ :\\ 'transcript'\\ \\}\\ \\}\\ \\)$",
+      "reason": "Phase 9, owner request 2026-11-20: new route POST /exams/transcript, gated like the staff report card POST, calling the existing generateAndUploadTranscript. See the approvedFrozen entry."
+    },
+    {
+      "file": "src/server/routes/exams.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^try\\ \\{\\}\\ catch\\ \\(\\ err\\ :\\ unknown\\ \\)\\ \\{\\}$",
+      "reason": "Phase 9, owner request 2026-11-20: new route POST /exams/transcript, gated like the staff report card POST, calling the existing generateAndUploadTranscript. See the approvedFrozen entry."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^let\\ official\\ =\\ `Ref:\\ \\$\\{\\ data\\ \\.\\ student\\ \\.\\ registrationNo\\ \\}\\ \u00b7\\ Term\\ \\$\\{\\ data\\ \\.\\ term\\ \\}\\ \\$\\{\\ data\\ \\.\\ academicYear\\ \\}\\ \u00b7\\ Page\\ 1\\ of\\ 1`$",
+      "reason": "Phase 9: the footer reads the real page count from the document instead of a fixed 1 (R11.7). A report card is one page, so the words are the same; they can no longer disagree with the file."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ doc\\ \\.\\ getTextWidth\\ \\(\\ official\\ \\)\\ >\\ roomForRight\\ \\)\\ official\\ =\\ 'Page\\ 1\\ of\\ 1'$",
+      "reason": "Phase 9: the footer reads the real page count from the document instead of a fixed 1 (R11.7). A report card is one page, so the words are the same; they can no longer disagree with the file."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ pageWords\\ =\\ `Page\\ \\$\\{\\ doc\\ \\.\\ getNumberOfPages\\ \\(\\ \\)\\ \\}\\ of\\ \\$\\{\\ doc\\ \\.\\ getNumberOfPages\\ \\(\\ \\)\\ \\}`$",
+      "reason": "Phase 9: the footer reads the real page count from the document instead of a fixed 1 (R11.7). A report card is one page, so the words are the same; they can no longer disagree with the file."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^let\\ official\\ =\\ `Ref:\\ \\$\\{\\ data\\ \\.\\ student\\ \\.\\ registrationNo\\ \\}\\ \u00b7\\ Term\\ \\$\\{\\ data\\ \\.\\ term\\ \\}\\ \\$\\{\\ data\\ \\.\\ academicYear\\ \\}\\ \u00b7\\ \\$\\{\\ pageWords\\ \\}`$",
+      "reason": "Phase 9: the footer reads the real page count from the document instead of a fixed 1 (R11.7). A report card is one page, so the words are the same; they can no longer disagree with the file."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ doc\\ \\.\\ getTextWidth\\ \\(\\ official\\ \\)\\ >\\ roomForRight\\ \\)\\ official\\ =\\ pageWords$",
+      "reason": "Phase 9: the footer reads the real page count from the document instead of a fixed 1 (R11.7). A report card is one page, so the words are the same; they can no longer disagree with the file."
     }
   ],
   "approvedFrozen": [
@@ -16770,6 +17687,11 @@
       "file": "src/server/services/transcriptService.ts",
       "reason": "Phase 8g (RULEBOOK 12 item 1, owner-approved documents and exports exception, R11.7 and R11.8): presentation only. Document wording, labels, footer (reference line and Page x of y) and print setup. Data, timing, recipients, routes and permissions unchanged.",
       "approvedOn": "2026-11-19"
+    },
+    {
+      "file": "src/server/routes/exams.ts",
+      "reason": "Owner request 2026-11-20 (Phase 9): the transcript builder had no way to be called and no button. Adds one route, POST /exams/transcript, gated like the staff report card POST (admin and exam_officer, rate limited, idempotent), that calls the existing generateAndUploadTranscript. No existing route, permission, data shape or timing changes. Student and guardian access is not added.",
+      "approvedOn": "2026-11-20"
     }
   ]
 }

@@ -86,7 +86,7 @@ const STATUS_CONFIG: Record<Status, { icon: typeof CheckCircle2; label: string; 
 // too, for colour-blind accessibility).
 const ACTIVE_CLS: Record<Status, string> = {
   PRESENT: 'bg-emerald-500 border-emerald-500 text-white',
-  ABSENT:  'bg-brand-coral border-brand-coral text-white',
+  ABSENT:  'bg-btn-danger border-btn-danger text-btn-danger-fg',
   LATE:    'bg-brand-amber border-brand-amber text-white',
 }
 const BADGE_CLS: Record<Status, string> = {
@@ -234,7 +234,7 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
         <div className="mt-3 px-4 py-2 rounded-xl bg-brand-teal/8 flex items-start gap-2">
           <Lock className="w-3.5 h-3.5 text-tone-teal shrink-0 mt-0.5" aria-hidden />
           <p className="text-xs text-tone-teal">
-            View only — {classTeacherName
+            View only: {classTeacherName
               ? <>only the assigned class teacher, <span className="font-semibold">{classTeacherName}</span>, can mark attendance for this class.</>
               : 'only the assigned class teacher can mark attendance, and this class has no teacher assigned yet.'}
           </p>

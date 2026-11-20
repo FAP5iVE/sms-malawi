@@ -98,6 +98,7 @@ import * as examService        from '@/server/services/examService'
 import { getSignedViewUrl, canReadFile } from '@/lib/storage'
 import { prisma }              from '@/lib/prisma'
 import * as reportCardService  from '@/server/services/reportCardService'
+import { generateAndUploadTranscript } from '@/server/services/transcriptService'
 import { sendError } from '@/server/lib/sendError'
 import { serializeDecimals } from '@/lib/serialize'
 
@@ -487,6 +488,29 @@ examsRouter.post('/report-card/mine', verifyAuth,
     const result = await reportCardService.generateSingleReportCard(student.id, termNum, academicYear, req.user!.uid)
     if (result.error) return res.status(500).json({ error: result.error })
     return res.status(201).json(result)
+  })
+
+// POST /exams/transcript — build a student's academic transcript PDF (every
+// term on record) and return its signed link. Same gate as the staff report
+// card POST above: admin or exam_officer, rate limited, idempotent. The file is
+// stored under FILE_PREFIX.TRANSCRIPT, whose read roles are admin, high_rank,
+// exam_officer and the student themselves. Added 2026-11-20 at the owner's
+// request: the transcript builder existed but nothing could call it.
+examsRouter.post('/transcript', verifyAuth, requireRole(['admin', 'exam_officer']),
+  rateLimit('export-generate'), idempotent(),
+  async (req, res) => {
+    const { studentId } = req.body as { studentId?: string }
+    if (!studentId) return res.status(400).json({ error: 'studentId is required' })
+
+    const student = await prisma.student.findUnique({ where: { id: studentId }, select: { id: true } })
+    if (!student) return res.status(404).json({ error: 'Student not found.' })
+
+    try {
+      const { fileId, url } = await generateAndUploadTranscript(student.id)
+      return res.status(201).json({ fileId, url })
+    } catch (err: unknown) {
+      return sendError(res, err, { tags: { module: 'exams', route: 'transcript' } })
+    }
   })
 
 // GET /exams/analytics/class
