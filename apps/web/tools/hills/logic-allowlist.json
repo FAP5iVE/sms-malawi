@@ -15572,6 +15572,1077 @@
       "kind": "logic",
       "pattern": "^const\\ text\\ =\\ buildEmailText\\ \\(\\ \\[\\ `Dear\\ \\$\\{\\ data\\ \\.\\ studentName\\ \\},`\\ ,\\ ''\\ ,\\ `Your\\ Term\\ \\$\\{\\ data\\ \\.\\ term\\ \\}\\ \\$\\{\\ data\\ \\.\\ academicYear\\ \\}\\ results\\ for\\ \\$\\{\\ data\\ \\.\\ className\\ \\}\\ have\\ been\\ released\\.`\\ ,\\ ''\\ ,\\ \\.\\.\\.\\ \\(\\ data\\ \\.\\ summary\\ \\?\\ \\[\\ `Summary:`\\ ,\\ `\\ Average:\\ \\$\\{\\ data\\ \\.\\ summary\\ \\.\\ average\\ \\.\\ toFixed\\ \\(\\ 1\\ \\)\\ \\}%,\\ Grade\\ \\$\\{\\ data\\ \\.\\ summary\\ \\.\\ grade\\ \\}`\\ ,\\ \\.\\.\\.\\ \\(\\ data\\ \\.\\ summary\\ \\.\\ position\\ !=\\ null\\ \\?\\ \\[\\ `\\ Class\\ position:\\ \\$\\{\\ data\\ \\.\\ summary\\ \\.\\ position\\ \\}\\$\\{\\ data\\ \\.\\ summary\\ \\.\\ classSize\\ !=\\ null\\ \\?\\ `\\ of\\ \\$\\{\\ data\\ \\.\\ summary\\ \\.\\ classSize\\ \\}`\\ :\\ ''\\ \\}`\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ `\\ Result:\\ \\$\\{\\ data\\ \\.\\ summary\\ \\.\\ passStatus\\ \\?\\ 'Pass'\\ :\\ 'Fail'\\ \\}`\\ ,\\ ''\\ ,\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ 'Sign\\ in\\ to\\ the\\ school\\ portal\\ to\\ see\\ your\\ full\\ results\\ and\\ report\\ card\\.'\\ ,\\ ''\\ ,\\ `Results\\ are\\ only\\ available\\ once\\ all\\ outstanding\\ fees\\ are\\ paid\\.`\\ ,\\ ''\\ ,\\ `View\\ results:\\ \\$\\{\\ school\\ \\.\\ loginUrl\\ \\}/exams`\\ ,\\ \\]\\ \\.\\ join\\ \\(\\ '\\\\n'\\ \\)\\ ,\\ school\\ \\)$",
       "reason": "8f (RULEBOOK 12 item 1, owner-approved emails exception, presentation only): email markup, colours, wording and layout rebuilt on the shared helpers in base.ts (para, note, banner, details, tone). Same render function, same inputs and outputs, same data, same recipients and timing."
+    },
+    {
+      "file": "src/lib/reportExport.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ SEVERITY_LABEL\\ :\\ Record\\ <\\ PackInsight\\ \\[\\ 'severity'\\ \\]\\ ,\\ string\\ >\\ =\\ \\{\\ critical\\ :\\ 'CRITICAL'\\ ,\\ watch\\ :\\ 'WATCH'\\ ,\\ info\\ :\\ 'INFO'\\ ,\\ positive\\ :\\ 'GOOD'\\ ,\\ \\}$",
+      "reason": "8g: severity labels and export wording in plain words without em dashes (R4, R11.8). Same rows and columns."
+    },
+    {
+      "file": "src/lib/reportExport.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ lines\\ =\\ doc\\ \\.\\ splitTextToSize\\ \\(\\ `\\$\\{\\ ins\\ \\.\\ title\\ \\}\\ \u2014\\ \\$\\{\\ ins\\ \\.\\ detail\\ \\}`\\ ,\\ contentW\\ \\-\\ 60\\ \\)\\ as\\ string\\ \\[\\ \\]$",
+      "reason": "8g: severity labels and export wording in plain words without em dashes (R4, R11.8). Same rows and columns."
+    },
+    {
+      "file": "src/lib/reportExport.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^doc\\ \\.\\ text\\ \\(\\ `\\$\\{\\ matrix\\ \\.\\ length\\ \\-\\ 1\\ \\-\\ PDF_MAX_ROWS\\ \\}\\ more\\ rows\\ \u2014\\ export\\ to\\ Excel\\ for\\ the\\ full\\ table\\.`\\ ,\\ margin\\ ,\\ y\\ \\)$",
+      "reason": "8g: severity labels and export wording in plain words without em dashes (R4, R11.8). Same rows and columns."
+    },
+    {
+      "file": "src/lib/reportExport.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^doc\\ \\.\\ text\\ \\(\\ `\\$\\{\\ headerRow\\ \\.\\ length\\ \\-\\ cols\\ \\}\\ further\\ columns\\ omitted\\ \u2014\\ export\\ to\\ Excel\\ for\\ all\\ columns\\.`\\ ,\\ margin\\ ,\\ y\\ \\)$",
+      "reason": "8g: severity labels and export wording in plain words without em dashes (R4, R11.8). Same rows and columns."
+    },
+    {
+      "file": "src/lib/reportExport.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^doc\\ \\.\\ text\\ \\(\\ `\\$\\{\\ model\\ \\.\\ schoolName\\ \\}\\ \u2014\\ \\$\\{\\ model\\ \\.\\ title\\ \\}`\\ ,\\ margin\\ ,\\ pageH\\ \\-\\ 24\\ \\)$",
+      "reason": "8g: severity labels and export wording in plain words without em dashes (R4, R11.8). Same rows and columns."
+    },
+    {
+      "file": "src/lib/reportExport.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ pageSetup\\ =\\ \\{\\ paperSize\\ :\\ 9\\ ,\\ orientation\\ :\\ 'landscape'\\ ,\\ fitToPage\\ :\\ true\\ ,\\ fitToWidth\\ :\\ 1\\ ,\\ fitToHeight\\ :\\ 0\\ ,\\ printTitlesRow\\ :\\ '1:1'\\ \\}$",
+      "reason": "8g: print setup for the client Excel data sheets, Page x of y in the footer (R11.7). No data change."
+    },
+    {
+      "file": "src/lib/reportExport.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ headerFooter\\ \\.\\ oddFooter\\ =\\ `\\&L\\&8\\$\\{\\ names\\ \\[\\ i\\ \\]\\ \\}\\&C\\&8Generated\\ \\&D\\&R\\&8Page\\ \\&P\\ of\\ \\&N`$",
+      "reason": "8g: print setup for the client Excel data sheets, Page x of y in the footer (R11.7). No data change."
+    },
+    {
+      "file": "src/lib/reportExport.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ SEVERITY_LABEL\\ :\\ Record\\ <\\ PackInsight\\ \\[\\ 'severity'\\ \\]\\ ,\\ string\\ >\\ =\\ \\{\\ critical\\ :\\ 'Critical'\\ ,\\ watch\\ :\\ 'Watch'\\ ,\\ info\\ :\\ 'Info'\\ ,\\ positive\\ :\\ 'Good'\\ ,\\ \\}$",
+      "reason": "8g: severity labels and export wording in plain words without em dashes (R4, R11.8). Same rows and columns."
+    },
+    {
+      "file": "src/lib/reportExport.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ lines\\ =\\ doc\\ \\.\\ splitTextToSize\\ \\(\\ `\\$\\{\\ ins\\ \\.\\ title\\ \\}:\\ \\$\\{\\ ins\\ \\.\\ detail\\ \\}`\\ ,\\ contentW\\ \\-\\ 60\\ \\)\\ as\\ string\\ \\[\\ \\]$",
+      "reason": "8g: severity labels and export wording in plain words without em dashes (R4, R11.8). Same rows and columns."
+    },
+    {
+      "file": "src/lib/reportExport.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^doc\\ \\.\\ text\\ \\(\\ `\\$\\{\\ matrix\\ \\.\\ length\\ \\-\\ 1\\ \\-\\ PDF_MAX_ROWS\\ \\}\\ more\\ rows\\.\\ Export\\ to\\ Excel\\ for\\ the\\ full\\ table\\.`\\ ,\\ margin\\ ,\\ y\\ \\)$",
+      "reason": "8g: severity labels and export wording in plain words without em dashes (R4, R11.8). Same rows and columns."
+    },
+    {
+      "file": "src/lib/reportExport.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^doc\\ \\.\\ text\\ \\(\\ `\\$\\{\\ headerRow\\ \\.\\ length\\ \\-\\ cols\\ \\}\\ further\\ columns\\ left\\ out\\.\\ Export\\ to\\ Excel\\ for\\ all\\ columns\\.`\\ ,\\ margin\\ ,\\ y\\ \\)$",
+      "reason": "8g: severity labels and export wording in plain words without em dashes (R4, R11.8). Same rows and columns."
+    },
+    {
+      "file": "src/lib/reportExport.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^doc\\ \\.\\ text\\ \\(\\ `\\$\\{\\ model\\ \\.\\ schoolName\\ \\}\\ \u00b7\\ \\$\\{\\ model\\ \\.\\ title\\ \\}`\\ ,\\ margin\\ ,\\ pageH\\ \\-\\ 24\\ \\)$",
+      "reason": "8g: severity labels and export wording in plain words without em dashes (R4, R11.8). Same rows and columns."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ interface\\ DocumentFooterOptions\\ \\{\\ x\\ :\\ number\\ w\\ :\\ number\\ y\\ :\\ number\\ note\\ :\\ string\\ reference\\ \\?\\ :\\ string\\ \\|\\ undefined\\ \\}$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ drawDocumentFooters\\ \\(\\ doc\\ :\\ jsPDF\\ ,\\ o\\ :\\ DocumentFooterOptions\\ \\)\\ :\\ void\\ \\{\\}$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ pages\\ =\\ doc\\ \\.\\ getNumberOfPages\\ \\(\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^for\\ \\(\\ let\\ p\\ =\\ 1\\ ;\\ p\\ <=\\ pages\\ ;\\ p\\ \\+\\+\\ \\)\\ \\{\\}$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^doc\\ \\.\\ setPage\\ \\(\\ p\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^strokeColor\\ \\(\\ doc\\ ,\\ PDF_COLORS\\ \\.\\ border\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^doc\\ \\.\\ setLineWidth\\ \\(\\ 0\\.25\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^doc\\ \\.\\ line\\ \\(\\ o\\ \\.\\ x\\ ,\\ o\\ \\.\\ y\\ ,\\ o\\ \\.\\ x\\ \\+\\ o\\ \\.\\ w\\ ,\\ o\\ \\.\\ y\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ty\\ =\\ o\\ \\.\\ y\\ \\+\\ 4$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ pageText\\ =\\ `Page\\ \\$\\{\\ p\\ \\}\\ of\\ \\$\\{\\ pages\\ \\}`$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^setFace\\ \\(\\ doc\\ ,\\ 'bodyBold'\\ ,\\ 7\\ ,\\ PDF_COLORS\\ \\.\\ ink\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ pageW\\ =\\ doc\\ \\.\\ getTextWidth\\ \\(\\ pageText\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^put\\ \\(\\ doc\\ ,\\ pageText\\ ,\\ o\\ \\.\\ x\\ \\+\\ o\\ \\.\\ w\\ ,\\ ty\\ ,\\ 'right'\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^let\\ leftW\\ =\\ 0$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ o\\ \\.\\ reference\\ \\)\\ \\{\\}$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ lead\\ =\\ 'Ref:\\ '$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^setFace\\ \\(\\ doc\\ ,\\ 'body'\\ ,\\ 7\\ ,\\ PDF_COLORS\\ \\.\\ muted\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ leadW\\ =\\ doc\\ \\.\\ getTextWidth\\ \\(\\ lead\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ room\\ =\\ o\\ \\.\\ w\\ \\*\\ 0\\.34$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ref\\ =\\ ellipsize\\ \\(\\ doc\\ ,\\ o\\ \\.\\ reference\\ ,\\ room\\ \\-\\ leadW\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^leftW\\ =\\ leadW\\ \\+\\ doc\\ \\.\\ getTextWidth\\ \\(\\ ref\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^put\\ \\(\\ doc\\ ,\\ lead\\ ,\\ o\\ \\.\\ x\\ ,\\ ty\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^put\\ \\(\\ doc\\ ,\\ ref\\ ,\\ o\\ \\.\\ x\\ \\+\\ leadW\\ ,\\ ty\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ room\\ =\\ o\\ \\.\\ w\\ \\-\\ leftW\\ \\-\\ pageW\\ \\-\\ 12$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ centre\\ =\\ ellipsize\\ \\(\\ doc\\ ,\\ o\\ \\.\\ note\\ ,\\ Math\\ \\.\\ max\\ \\(\\ 40\\ ,\\ room\\ \\)\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ cx\\ =\\ Math\\ \\.\\ min\\ \\(\\ Math\\ \\.\\ max\\ \\(\\ o\\ \\.\\ x\\ \\+\\ o\\ \\.\\ w\\ /\\ 2\\ ,\\ o\\ \\.\\ x\\ \\+\\ leftW\\ \\+\\ 6\\ \\+\\ doc\\ \\.\\ getTextWidth\\ \\(\\ centre\\ \\)\\ /\\ 2\\ \\)\\ ,\\ o\\ \\.\\ x\\ \\+\\ o\\ \\.\\ w\\ \\-\\ pageW\\ \\-\\ 6\\ \\-\\ doc\\ \\.\\ getTextWidth\\ \\(\\ centre\\ \\)\\ /\\ 2\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^put\\ \\(\\ doc\\ ,\\ centre\\ ,\\ cx\\ ,\\ ty\\ ,\\ 'center'\\ \\)$",
+      "reason": "8g (RULEBOOK 12 item 1, documents exception, R11.7): new drawDocumentFooters helper and its option type. It only draws the footer line (reference, note, Page x of y) on each page of a document that already exists. No data is read or written."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ PDF_COLORS\\ as\\ C\\ ,\\ amountInWords\\ ,\\ createPdfDoc\\ ,\\ drawCard\\ ,\\ drawDocumentTitle\\ ,\\ drawFooterNote\\ ,\\ drawLetterhead\\ ,\\ drawSignatory\\ ,\\ drawStamp\\ ,\\ ellipsize\\ ,\\ fillColor\\ ,\\ fitFontSize\\ ,\\ fmtDate\\ ,\\ getPdfBranding\\ ,\\ money\\ ,\\ put\\ ,\\ resolveFinanceSignatory\\ ,\\ sectionLabel\\ ,\\ setFace\\ ,\\ strokeColor\\ ,\\ tint\\ ,\\ tracked\\ ,\\ PT\\ ,\\ type\\ PdfBranding\\ ,\\ type\\ PdfSignatory\\ ,\\ type\\ RGB\\ ,\\ \\}\\ from\\ '@/server/services/pdfBranding'$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ h1\\ =\\ drawFacts\\ \\(\\ doc\\ ,\\ M_X\\ ,\\ yTop\\ ,\\ cw\\ ,\\ 'Student'\\ ,\\ \\[\\ \\[\\ 'Name'\\ ,\\ d\\ \\.\\ studentName\\ \\]\\ ,\\ \\[\\ 'Reg\\.\\ No\\.'\\ ,\\ d\\ \\.\\ registrationNo\\ \\]\\ ,\\ \\[\\ 'Class\\ /\\ Form'\\ ,\\ d\\ \\.\\ className\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'Invoice\\ No\\.'\\ ,\\ d\\ \\.\\ invoiceNumber\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\]\\ \\)$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^drawFacts\\ \\(\\ doc\\ ,\\ M_X\\ \\+\\ cw\\ \\+\\ 8\\ ,\\ yTop\\ ,\\ cw\\ ,\\ 'Payment'\\ ,\\ \\[\\ \\[\\ 'Receipt\\ No\\.'\\ ,\\ receiptNo\\ \\]\\ ,\\ \\[\\ 'Date'\\ ,\\ fmtDate\\ \\(\\ d\\ \\.\\ paidAt\\ ,\\ 'long'\\ ,\\ tz\\ \\)\\ \\]\\ ,\\ \\[\\ 'Payment\\ Method'\\ ,\\ d\\ \\.\\ methodLabel\\ \\]\\ ,\\ \\[\\ 'Reference'\\ ,\\ d\\ \\.\\ reference\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\]\\ \\)$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ cols\\ :\\ Array\\ <\\ \\{\\ label\\ :\\ string\\ ;\\ w\\ :\\ number\\ ;\\ align\\ :\\ 'left'\\ \\|\\ 'right'\\ \\}\\ >\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Fee'\\ ,\\ w\\ :\\ 44\\ ,\\ align\\ :\\ 'left'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Fixed\\ Amount'\\ ,\\ w\\ :\\ 28\\ ,\\ align\\ :\\ 'right'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Balance\\ Before'\\ ,\\ w\\ :\\ 28\\ ,\\ align\\ :\\ 'right'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Allocated'\\ ,\\ w\\ :\\ 28\\ ,\\ align\\ :\\ 'right'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Balance\\ After'\\ ,\\ w\\ :\\ 28\\ ,\\ align\\ :\\ 'right'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Status'\\ ,\\ w\\ :\\ CW\\ \\-\\ 156\\ ,\\ align\\ :\\ 'left'\\ \\}\\ ,\\ \\]$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ stats\\ :\\ Array\\ <\\ \\[\\ string\\ ,\\ string\\ ,\\ RGB\\ \\]\\ >\\ =\\ \\[\\ \\[\\ 'Total\\ Fixed\\ Fees'\\ ,\\ money\\ \\(\\ d\\ \\.\\ invoice\\ \\.\\ fixedTotal\\ \\)\\ ,\\ C\\ \\.\\ ink\\ \\]\\ ,\\ \\[\\ 'Net\\ Total\\ Fees\\ Due'\\ ,\\ money\\ \\(\\ d\\ \\.\\ invoice\\ \\.\\ netDue\\ \\)\\ ,\\ C\\ \\.\\ ink\\ \\]\\ ,\\ \\[\\ 'Total\\ Paid\\ to\\ Date'\\ ,\\ money\\ \\(\\ d\\ \\.\\ invoice\\ \\.\\ paidToDate\\ \\)\\ ,\\ CLEARED\\ \\]\\ ,\\ \\[\\ 'Balance\\ Due'\\ ,\\ money\\ \\(\\ d\\ \\.\\ invoice\\ \\.\\ balanceDue\\ \\)\\ ,\\ d\\ \\.\\ invoice\\ \\.\\ balanceDue\\ <\\ CENT\\ \\?\\ CLEARED\\ :\\ OWED\\ \\]\\ ,\\ \\]$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^drawAuthRow\\ \\(\\ doc\\ ,\\ Math\\ \\.\\ min\\ \\(\\ y\\ ,\\ footerY\\ \\-\\ SIGN_H\\ \\)\\ ,\\ b\\ ,\\ \\{\\ heading\\ :\\ 'Received\\ By'\\ ,\\ sig\\ :\\ d\\ \\.\\ officer\\ ,\\ fallbackTitle\\ :\\ 'Authorised\\ Accounts\\ Officer'\\ ,\\ stampLabel\\ :\\ 'Paid'\\ ,\\ stampDate\\ :\\ fmtDate\\ \\(\\ d\\ \\.\\ paidAt\\ ,\\ 'short'\\ ,\\ tz\\ \\)\\ ,\\ stampColor\\ :\\ C\\ \\.\\ teal\\ ,\\ \\}\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^drawFooterNote\\ \\(\\ doc\\ ,\\ M_X\\ ,\\ CW\\ ,\\ footerY\\ ,\\ `Generated\\ on\\ \\$\\{\\ fmtDate\\ \\(\\ new\\ Date\\ \\(\\ \\)\\ ,\\ 'long'\\ ,\\ tz\\ \\)\\ \\}\\.\\ This\\ is\\ a\\ computer\\-generated\\ document\\.`\\ \\)$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ lines\\ :\\ EarningLine\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Base\\ Salary'\\ ,\\ amount\\ :\\ earnings\\ \\.\\ baseSalary\\ ,\\ allowance\\ :\\ false\\ \\}\\ ,\\ \\.\\.\\.\\ earnings\\ \\.\\ allowances\\ \\.\\ map\\ \\(\\ \\(\\ a\\ \\)\\ =>\\ \\(\\ \\{\\ label\\ :\\ `Allowance\\ \\(\\$\\{\\ a\\ \\.\\ type\\ \\}\\)`\\ ,\\ amount\\ :\\ a\\ \\.\\ amount\\ ,\\ allowance\\ :\\ true\\ \\}\\ \\)\\ \\)\\ ,\\ \\]$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return\\ \\[\\ \\{\\ label\\ :\\ 'Base\\ Salary'\\ ,\\ amount\\ :\\ gross\\ ,\\ allowance\\ :\\ false\\ \\}\\ \\]$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ facts\\ :\\ Array\\ <\\ \\[\\ string\\ ,\\ string\\ \\]\\ >\\ =\\ \\[\\ \\[\\ 'Employee\\ Name'\\ ,\\ d\\ \\.\\ staffName\\ \\]\\ ,\\ \\[\\ 'Employee\\ Number'\\ ,\\ d\\ \\.\\ employeeNo\\ \\]\\ ,\\ \\[\\ 'Job\\ Title'\\ ,\\ d\\ \\.\\ jobTitle\\ \\]\\ ,\\ \\[\\ 'Department'\\ ,\\ d\\ \\.\\ department\\ \\]\\ ,\\ \\]$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ d\\ \\.\\ loanDeduction\\ >\\ 0\\ \\)\\ deductions\\ \\.\\ push\\ \\(\\ \\[\\ 'Loan\\ Repayment'\\ ,\\ d\\ \\.\\ loanDeduction\\ \\]\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^total\\ \\(\\ 'Total\\ Gross\\ Monthly'\\ ,\\ d\\ \\.\\ grossSalary\\ ,\\ CLEARED\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^total\\ \\(\\ 'Total\\ Deductions'\\ ,\\ totalDeductions\\ ,\\ C\\ \\.\\ danger\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^drawAuthRow\\ \\(\\ doc\\ ,\\ y\\ ,\\ b\\ ,\\ \\{\\ heading\\ :\\ 'Authorised\\ By'\\ ,\\ sig\\ :\\ d\\ \\.\\ officer\\ ,\\ fallbackTitle\\ :\\ 'Authorised\\ Finance\\ Officer'\\ ,\\ stampLabel\\ :\\ 'Issued'\\ ,\\ stampDate\\ :\\ fmtDate\\ \\(\\ d\\ \\.\\ processedAt\\ ,\\ 'short'\\ ,\\ tz\\ \\)\\ ,\\ stampColor\\ :\\ C\\ \\.\\ navy\\ ,\\ meta\\ :\\ \\{\\ label\\ :\\ 'Processed\\ On'\\ ,\\ value\\ :\\ fmtDate\\ \\(\\ d\\ \\.\\ processedAt\\ ,\\ 'long'\\ ,\\ tz\\ \\)\\ \\}\\ ,\\ \\}\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^drawFooterNote\\ \\(\\ doc\\ ,\\ M_X\\ ,\\ CW\\ ,\\ 282\\ ,\\ `Generated\\ on\\ \\$\\{\\ fmtDate\\ \\(\\ new\\ Date\\ \\(\\ \\)\\ ,\\ 'long'\\ ,\\ tz\\ \\)\\ \\}\\.\\ This\\ is\\ a\\ computer\\-generated\\ document\\.`\\ \\)$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ PDF_COLORS\\ as\\ C\\ ,\\ amountInWords\\ ,\\ createPdfDoc\\ ,\\ drawCard\\ ,\\ drawDocumentFooters\\ ,\\ drawDocumentTitle\\ ,\\ drawLetterhead\\ ,\\ drawSignatory\\ ,\\ drawStamp\\ ,\\ ellipsize\\ ,\\ fillColor\\ ,\\ fitFontSize\\ ,\\ fmtDate\\ ,\\ getPdfBranding\\ ,\\ money\\ ,\\ put\\ ,\\ resolveFinanceSignatory\\ ,\\ sectionLabel\\ ,\\ setFace\\ ,\\ strokeColor\\ ,\\ tint\\ ,\\ tracked\\ ,\\ PT\\ ,\\ type\\ PdfBranding\\ ,\\ type\\ PdfSignatory\\ ,\\ type\\ RGB\\ ,\\ \\}\\ from\\ '@/server/services/pdfBranding'$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ h1\\ =\\ drawFacts\\ \\(\\ doc\\ ,\\ M_X\\ ,\\ yTop\\ ,\\ cw\\ ,\\ 'Student'\\ ,\\ \\[\\ \\[\\ 'Name'\\ ,\\ d\\ \\.\\ studentName\\ \\]\\ ,\\ \\[\\ 'Reg\\.\\ no\\.'\\ ,\\ d\\ \\.\\ registrationNo\\ \\]\\ ,\\ \\[\\ 'Class'\\ ,\\ d\\ \\.\\ className\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'Invoice\\ no\\.'\\ ,\\ d\\ \\.\\ invoiceNumber\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\]\\ \\)$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^drawFacts\\ \\(\\ doc\\ ,\\ M_X\\ \\+\\ cw\\ \\+\\ 8\\ ,\\ yTop\\ ,\\ cw\\ ,\\ 'Payment'\\ ,\\ \\[\\ \\[\\ 'Receipt\\ no\\.'\\ ,\\ receiptNo\\ \\]\\ ,\\ \\[\\ 'Date'\\ ,\\ fmtDate\\ \\(\\ d\\ \\.\\ paidAt\\ ,\\ 'long'\\ ,\\ tz\\ \\)\\ \\]\\ ,\\ \\[\\ 'Payment\\ method'\\ ,\\ d\\ \\.\\ methodLabel\\ \\]\\ ,\\ \\[\\ 'Payment\\ reference'\\ ,\\ d\\ \\.\\ reference\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\]\\ \\)$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ cols\\ :\\ Array\\ <\\ \\{\\ label\\ :\\ string\\ ;\\ w\\ :\\ number\\ ;\\ align\\ :\\ 'left'\\ \\|\\ 'right'\\ \\}\\ >\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Fee'\\ ,\\ w\\ :\\ 44\\ ,\\ align\\ :\\ 'left'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Fixed\\ amount'\\ ,\\ w\\ :\\ 28\\ ,\\ align\\ :\\ 'right'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Balance\\ before'\\ ,\\ w\\ :\\ 28\\ ,\\ align\\ :\\ 'right'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Allocated'\\ ,\\ w\\ :\\ 28\\ ,\\ align\\ :\\ 'right'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Balance\\ after'\\ ,\\ w\\ :\\ 28\\ ,\\ align\\ :\\ 'right'\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Status'\\ ,\\ w\\ :\\ CW\\ \\-\\ 156\\ ,\\ align\\ :\\ 'left'\\ \\}\\ ,\\ \\]$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ stats\\ :\\ Array\\ <\\ \\[\\ string\\ ,\\ string\\ ,\\ RGB\\ \\]\\ >\\ =\\ \\[\\ \\[\\ 'Total\\ fixed\\ fees'\\ ,\\ money\\ \\(\\ d\\ \\.\\ invoice\\ \\.\\ fixedTotal\\ \\)\\ ,\\ C\\ \\.\\ ink\\ \\]\\ ,\\ \\[\\ 'Net\\ total\\ fees\\ due'\\ ,\\ money\\ \\(\\ d\\ \\.\\ invoice\\ \\.\\ netDue\\ \\)\\ ,\\ C\\ \\.\\ ink\\ \\]\\ ,\\ \\[\\ 'Total\\ paid\\ to\\ date'\\ ,\\ money\\ \\(\\ d\\ \\.\\ invoice\\ \\.\\ paidToDate\\ \\)\\ ,\\ CLEARED\\ \\]\\ ,\\ \\[\\ 'Balance\\ due'\\ ,\\ money\\ \\(\\ d\\ \\.\\ invoice\\ \\.\\ balanceDue\\ \\)\\ ,\\ d\\ \\.\\ invoice\\ \\.\\ balanceDue\\ <\\ CENT\\ \\?\\ CLEARED\\ :\\ OWED\\ \\]\\ ,\\ \\]$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^drawAuthRow\\ \\(\\ doc\\ ,\\ Math\\ \\.\\ min\\ \\(\\ y\\ ,\\ footerY\\ \\-\\ SIGN_H\\ \\)\\ ,\\ b\\ ,\\ \\{\\ heading\\ :\\ 'Received\\ by'\\ ,\\ sig\\ :\\ d\\ \\.\\ officer\\ ,\\ fallbackTitle\\ :\\ 'Authorised\\ accounts\\ officer'\\ ,\\ stampLabel\\ :\\ 'Paid'\\ ,\\ stampDate\\ :\\ fmtDate\\ \\(\\ d\\ \\.\\ paidAt\\ ,\\ 'short'\\ ,\\ tz\\ \\)\\ ,\\ stampColor\\ :\\ C\\ \\.\\ teal\\ ,\\ \\}\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^drawDocumentFooters\\ \\(\\ doc\\ ,\\ \\{\\ x\\ :\\ M_X\\ ,\\ w\\ :\\ CW\\ ,\\ y\\ :\\ footerY\\ ,\\ note\\ :\\ `Generated\\ on\\ \\$\\{\\ fmtDate\\ \\(\\ new\\ Date\\ \\(\\ \\)\\ ,\\ 'long'\\ ,\\ tz\\ \\)\\ \\}\\.\\ This\\ is\\ a\\ computer\\-generated\\ document\\.`\\ ,\\ reference\\ :\\ receiptNo\\ \\}\\ \\)$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ lines\\ :\\ EarningLine\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Base\\ salary'\\ ,\\ amount\\ :\\ earnings\\ \\.\\ baseSalary\\ ,\\ allowance\\ :\\ false\\ \\}\\ ,\\ \\.\\.\\.\\ earnings\\ \\.\\ allowances\\ \\.\\ map\\ \\(\\ \\(\\ a\\ \\)\\ =>\\ \\(\\ \\{\\ label\\ :\\ `Allowance\\ \\(\\$\\{\\ a\\ \\.\\ type\\ \\}\\)`\\ ,\\ amount\\ :\\ a\\ \\.\\ amount\\ ,\\ allowance\\ :\\ true\\ \\}\\ \\)\\ \\)\\ ,\\ \\]$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ \\[\\ \\{\\ label\\ :\\ 'Base\\ salary'\\ ,\\ amount\\ :\\ gross\\ ,\\ allowance\\ :\\ false\\ \\}\\ \\]$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ facts\\ :\\ Array\\ <\\ \\[\\ string\\ ,\\ string\\ \\]\\ >\\ =\\ \\[\\ \\[\\ 'Employee\\ name'\\ ,\\ d\\ \\.\\ staffName\\ \\]\\ ,\\ \\[\\ 'Employee\\ number'\\ ,\\ d\\ \\.\\ employeeNo\\ \\]\\ ,\\ \\[\\ 'Job\\ title'\\ ,\\ d\\ \\.\\ jobTitle\\ \\]\\ ,\\ \\[\\ 'Department'\\ ,\\ d\\ \\.\\ department\\ \\]\\ ,\\ \\]$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ d\\ \\.\\ loanDeduction\\ >\\ 0\\ \\)\\ deductions\\ \\.\\ push\\ \\(\\ \\[\\ 'Loan\\ repayment'\\ ,\\ d\\ \\.\\ loanDeduction\\ \\]\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^total\\ \\(\\ 'Total\\ gross\\ monthly'\\ ,\\ d\\ \\.\\ grossSalary\\ ,\\ CLEARED\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^total\\ \\(\\ 'Total\\ deductions'\\ ,\\ totalDeductions\\ ,\\ C\\ \\.\\ danger\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^drawAuthRow\\ \\(\\ doc\\ ,\\ y\\ ,\\ b\\ ,\\ \\{\\ heading\\ :\\ 'Authorised\\ by'\\ ,\\ sig\\ :\\ d\\ \\.\\ officer\\ ,\\ fallbackTitle\\ :\\ 'Authorised\\ finance\\ officer'\\ ,\\ stampLabel\\ :\\ 'Issued'\\ ,\\ stampDate\\ :\\ fmtDate\\ \\(\\ d\\ \\.\\ processedAt\\ ,\\ 'short'\\ ,\\ tz\\ \\)\\ ,\\ stampColor\\ :\\ C\\ \\.\\ navy\\ ,\\ meta\\ :\\ \\{\\ label\\ :\\ 'Processed\\ on'\\ ,\\ value\\ :\\ fmtDate\\ \\(\\ d\\ \\.\\ processedAt\\ ,\\ 'long'\\ ,\\ tz\\ \\)\\ \\}\\ ,\\ \\}\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^drawDocumentFooters\\ \\(\\ doc\\ ,\\ \\{\\ x\\ :\\ M_X\\ ,\\ w\\ :\\ CW\\ ,\\ y\\ :\\ 282\\ ,\\ note\\ :\\ `Generated\\ on\\ \\$\\{\\ fmtDate\\ \\(\\ new\\ Date\\ \\(\\ \\)\\ ,\\ 'long'\\ ,\\ tz\\ \\)\\ \\}\\.\\ This\\ is\\ a\\ computer\\-generated\\ document\\.`\\ ,\\ reference\\ :\\ `\\$\\{\\ d\\ \\.\\ employeeNo\\ \\}\\ \u00b7\\ \\$\\{\\ d\\ \\.\\ period\\ \\}`\\ \\}\\ \\)$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ createPdfDoc\\ ,\\ drawCard\\ ,\\ drawLetterhead\\ ,\\ drawStamp\\ ,\\ ellipsize\\ ,\\ fillColor\\ ,\\ fmtDate\\ ,\\ gradeInk\\ ,\\ put\\ ,\\ resolveHeadTeacher\\ ,\\ resolveStaffSignatory\\ ,\\ sectionLabel\\ ,\\ setFace\\ ,\\ stampPlace\\ ,\\ strokeColor\\ ,\\ tint\\ ,\\ tracked\\ ,\\ trackedWidth\\ ,\\ PDF_COLORS\\ as\\ C\\ ,\\ PT\\ ,\\ type\\ PdfBranding\\ ,\\ type\\ RGB\\ ,\\ \\}\\ from\\ '@/server/services/pdfBranding'$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^put\\ \\(\\ doc\\ ,\\ `Academic\\ Year\\ \\$\\{\\ data\\ \\.\\ academicYear\\ \\}\\ \u2014\\ Term\\ \\$\\{\\ data\\ \\.\\ term\\ \\}`\\ ,\\ PAGE_W\\ /\\ 2\\ ,\\ y\\ \\+\\ 8\\.2\\ ,\\ 'center'\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^y\\ =\\ drawStudentCard\\ \\(\\ doc\\ ,\\ y\\ ,\\ \\[\\ \\[\\ 'Reg\\.\\ Number'\\ ,\\ data\\ \\.\\ student\\ \\.\\ registrationNo\\ \\]\\ ,\\ \\[\\ 'Class\\ /\\ Form'\\ ,\\ data\\ \\.\\ student\\ \\.\\ className\\ \\]\\ ,\\ \\[\\ 'Class\\ Teacher'\\ ,\\ data\\ \\.\\ classTeacher\\ \\]\\ ,\\ \\[\\ 'Date\\ of\\ Birth'\\ ,\\ dob\\ \\]\\ ,\\ \\]\\ ,\\ \\[\\ \\[\\ 'Full\\ Name'\\ ,\\ fullName\\ \\]\\ ,\\ \\[\\ 'Sex'\\ ,\\ sex\\ \\]\\ ,\\ maneb\\ \\?\\ \\[\\ 'Candidate\\ No\\.'\\ ,\\ maneb\\ \\.\\ candidateNo\\ \\|\\|\\ '\u2014'\\ \\]\\ :\\ \\[\\ 'Standing'\\ ,\\ standing\\ \\]\\ ,\\ maneb\\ \\?\\ \\[\\ 'Centre'\\ ,\\ maneb\\ \\.\\ centerNo\\ \\?\\ `\\$\\{\\ maneb\\ \\.\\ centerNo\\ \\}\\ \u2014\\ \\$\\{\\ maneb\\ \\.\\ centerName\\ \\|\\|\\ '\u2014'\\ \\}`\\ :\\ '\u2014'\\ \\]\\ :\\ \\[\\ 'Subjects'\\ ,\\ String\\ \\(\\ data\\ \\.\\ subjects\\ \\.\\ length\\ \\)\\ \\]\\ ,\\ \\]\\ ,\\ \\)$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^put\\ \\(\\ doc\\ ,\\ maneb\\ \\.\\ points\\ !=\\ null\\ \\?\\ `\\$\\{\\ maneb\\ \\.\\ points\\ \\}\\ points`\\ :\\ `Not\\ available\\ \u2014\\ fewer\\ than\\ \\$\\{\\ MSCE_AGGREGATE_SUBJECT_COUNT\\ \\}\\ subjects`\\ ,\\ M_X\\ \\+\\ CW\\ \\-\\ 4\\ ,\\ y\\ \\+\\ 6\\.4\\ ,\\ 'right'\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ note\\ =\\ data\\ \\.\\ aggregatePoints\\ !=\\ null\\ \\?\\ `Aggregate\\ =\\ sum\\ of\\ the\\ points\\ of\\ the\\ \\$\\{\\ MSCE_AGGREGATE_SUBJECT_COUNT\\ \\}\\ best\\ subjects\\ \\(range\\ \\$\\{\\ MSCE_AGGREGATE_BEST\\ \\}\u2013\\$\\{\\ MSCE_AGGREGATE_WORST\\ \\};\\ lower\\ is\\ better\\);\\ highlighted\\ points\\ are\\ the\\ subjects\\ counted\\.\\ MSCE\\ awards\\ no\\ overall\\ grade\\.`\\ :\\ `Aggregate\\ not\\ available\\ \u2014\\ \\$\\{\\ MSCE_AGGREGATE_SUBJECT_COUNT\\ \\}\\ graded\\ subjects\\ are\\ required\\ to\\ form\\ an\\ MSCE\\ aggregate\\.`$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ stats\\ :\\ Array\\ <\\ \\[\\ string\\ ,\\ string\\ \\]\\ >\\ =\\ \\[\\ \\[\\ 'Days\\ Present'\\ ,\\ String\\ \\(\\ data\\ \\.\\ daysPresent\\ \\)\\ \\]\\ ,\\ \\[\\ 'Days\\ Absent'\\ ,\\ String\\ \\(\\ data\\ \\.\\ daysAbsent\\ \\)\\ \\]\\ ,\\ \\[\\ 'Total\\ Days'\\ ,\\ String\\ \\(\\ data\\ \\.\\ totalSchoolDays\\ \\)\\ \\]\\ ,\\ \\[\\ 'Attendance\\ Rate'\\ ,\\ `\\$\\{\\ attPct\\ \\}%`\\ \\]\\ ,\\ \\]$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^drawSignCard\\ \\(\\ doc\\ ,\\ \\{\\ x\\ :\\ M_X\\ ,\\ y\\ ,\\ w\\ :\\ cardW\\ ,\\ h\\ :\\ SIGN_H\\ ,\\ title\\ :\\ maneb\\ \\?\\ 'Class\\ Teacher'\\ :\\ \"Class\\ Teacher's\\ Comment\"\\ ,\\ comment\\ :\\ maneb\\ \\?\\ null\\ :\\ data\\ \\.\\ classTeacherComment\\ ,\\ name\\ :\\ data\\ \\.\\ classTeacher\\ ,\\ role\\ :\\ data\\ \\.\\ classTeacherTitle\\ ,\\ stampSide\\ :\\ false\\ ,\\ \\}\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^drawSignCard\\ \\(\\ doc\\ ,\\ \\{\\ x\\ :\\ M_X\\ \\+\\ cardW\\ \\+\\ 4\\ ,\\ y\\ ,\\ w\\ :\\ cardW\\ ,\\ h\\ :\\ SIGN_H\\ ,\\ title\\ :\\ maneb\\ \\?\\ 'Head\\ Teacher'\\ :\\ \"Head\\ Teacher's\\ Comment\"\\ ,\\ comment\\ :\\ maneb\\ \\?\\ null\\ :\\ data\\ \\.\\ headTeacherComment\\ ,\\ name\\ :\\ data\\ \\.\\ headTeacher\\ ,\\ role\\ :\\ data\\ \\.\\ headTeacherTitle\\ ,\\ stampSide\\ :\\ true\\ ,\\ \\}\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ issuedLead\\ =\\ 'Date\\ Issued:\\ '$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^setFace\\ \\(\\ doc\\ ,\\ 'headingBold'\\ ,\\ 6\\.2\\ ,\\ C\\ \\.\\ neutral\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^let\\ official\\ =\\ `OFFICIAL\\ DOCUMENT\\ \u2014\\ \\$\\{\\ data\\ \\.\\ schoolName\\ \\.\\ toUpperCase\\ \\(\\ \\)\\ \\}`$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ nextLead\\ =\\ 'Next\\ Term\\ Begins:\\ '$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ trackedWidth\\ \\(\\ doc\\ ,\\ official\\ ,\\ 0\\.3\\ \\)\\ >\\ roomForRight\\ \\)\\ official\\ =\\ data\\ \\.\\ schoolName\\ \\.\\ toUpperCase\\ \\(\\ \\)$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^tracked\\ \\(\\ doc\\ ,\\ officialShown\\ ,\\ M_X\\ \\+\\ CW\\ ,\\ fy\\ \\+\\ 4\\.6\\ ,\\ 0\\.3\\ ,\\ 'right'\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ rightStart\\ =\\ M_X\\ \\+\\ CW\\ \\-\\ trackedWidth\\ \\(\\ doc\\ ,\\ officialShown\\ ,\\ 0\\.3\\ \\)$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ createPdfDoc\\ ,\\ drawCard\\ ,\\ drawLetterhead\\ ,\\ drawStamp\\ ,\\ ellipsize\\ ,\\ fillColor\\ ,\\ fmtDate\\ ,\\ gradeInk\\ ,\\ put\\ ,\\ resolveHeadTeacher\\ ,\\ resolveStaffSignatory\\ ,\\ sectionLabel\\ ,\\ setFace\\ ,\\ stampPlace\\ ,\\ strokeColor\\ ,\\ tint\\ ,\\ tracked\\ ,\\ PDF_COLORS\\ as\\ C\\ ,\\ PT\\ ,\\ type\\ PdfBranding\\ ,\\ type\\ RGB\\ ,\\ \\}\\ from\\ '@/server/services/pdfBranding'$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^put\\ \\(\\ doc\\ ,\\ `Academic\\ Year\\ \\$\\{\\ data\\ \\.\\ academicYear\\ \\}\\ \u00b7\\ Term\\ \\$\\{\\ data\\ \\.\\ term\\ \\}`\\ ,\\ PAGE_W\\ /\\ 2\\ ,\\ y\\ \\+\\ 8\\.2\\ ,\\ 'center'\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^y\\ =\\ drawStudentCard\\ \\(\\ doc\\ ,\\ y\\ ,\\ \\[\\ \\[\\ 'Reg\\.\\ no\\.'\\ ,\\ data\\ \\.\\ student\\ \\.\\ registrationNo\\ \\]\\ ,\\ \\[\\ 'Class'\\ ,\\ data\\ \\.\\ student\\ \\.\\ className\\ \\]\\ ,\\ \\[\\ 'Class\\ teacher'\\ ,\\ data\\ \\.\\ classTeacher\\ \\]\\ ,\\ \\[\\ 'Date\\ of\\ birth'\\ ,\\ dob\\ \\]\\ ,\\ \\]\\ ,\\ \\[\\ \\[\\ 'Full\\ name'\\ ,\\ fullName\\ \\]\\ ,\\ \\[\\ 'Sex'\\ ,\\ sex\\ \\]\\ ,\\ maneb\\ \\?\\ \\[\\ 'Candidate\\ no\\.'\\ ,\\ maneb\\ \\.\\ candidateNo\\ \\|\\|\\ '\u2014'\\ \\]\\ :\\ \\[\\ 'Standing'\\ ,\\ standing\\ \\]\\ ,\\ maneb\\ \\?\\ \\[\\ 'Centre'\\ ,\\ maneb\\ \\.\\ centerNo\\ \\?\\ `\\$\\{\\ maneb\\ \\.\\ centerNo\\ \\}\\ \u00b7\\ \\$\\{\\ maneb\\ \\.\\ centerName\\ \\|\\|\\ '\u2014'\\ \\}`\\ :\\ '\u2014'\\ \\]\\ :\\ \\[\\ 'Subjects'\\ ,\\ String\\ \\(\\ data\\ \\.\\ subjects\\ \\.\\ length\\ \\)\\ \\]\\ ,\\ \\]\\ ,\\ \\)$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^put\\ \\(\\ doc\\ ,\\ maneb\\ \\.\\ points\\ !=\\ null\\ \\?\\ `\\$\\{\\ maneb\\ \\.\\ points\\ \\}\\ points`\\ :\\ `Not\\ available:\\ fewer\\ than\\ \\$\\{\\ MSCE_AGGREGATE_SUBJECT_COUNT\\ \\}\\ subjects`\\ ,\\ M_X\\ \\+\\ CW\\ \\-\\ 4\\ ,\\ y\\ \\+\\ 6\\.4\\ ,\\ 'right'\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ note\\ =\\ data\\ \\.\\ aggregatePoints\\ !=\\ null\\ \\?\\ `Aggregate\\ =\\ sum\\ of\\ the\\ points\\ of\\ the\\ \\$\\{\\ MSCE_AGGREGATE_SUBJECT_COUNT\\ \\}\\ best\\ subjects\\ \\(range\\ \\$\\{\\ MSCE_AGGREGATE_BEST\\ \\}\u2013\\$\\{\\ MSCE_AGGREGATE_WORST\\ \\};\\ lower\\ is\\ better\\);\\ highlighted\\ points\\ are\\ the\\ subjects\\ counted\\.\\ MSCE\\ awards\\ no\\ overall\\ grade\\.`\\ :\\ `Aggregate\\ not\\ available:\\ \\$\\{\\ MSCE_AGGREGATE_SUBJECT_COUNT\\ \\}\\ graded\\ subjects\\ are\\ required\\ to\\ form\\ an\\ MSCE\\ aggregate\\.`$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ stats\\ :\\ Array\\ <\\ \\[\\ string\\ ,\\ string\\ \\]\\ >\\ =\\ \\[\\ \\[\\ 'Days\\ present'\\ ,\\ String\\ \\(\\ data\\ \\.\\ daysPresent\\ \\)\\ \\]\\ ,\\ \\[\\ 'Days\\ absent'\\ ,\\ String\\ \\(\\ data\\ \\.\\ daysAbsent\\ \\)\\ \\]\\ ,\\ \\[\\ 'Total\\ days'\\ ,\\ String\\ \\(\\ data\\ \\.\\ totalSchoolDays\\ \\)\\ \\]\\ ,\\ \\[\\ 'Attendance\\ rate'\\ ,\\ `\\$\\{\\ attPct\\ \\}%`\\ \\]\\ ,\\ \\]$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^drawSignCard\\ \\(\\ doc\\ ,\\ \\{\\ x\\ :\\ M_X\\ ,\\ y\\ ,\\ w\\ :\\ cardW\\ ,\\ h\\ :\\ SIGN_H\\ ,\\ title\\ :\\ maneb\\ \\?\\ 'Class\\ teacher'\\ :\\ \"Class\\ teacher's\\ comment\"\\ ,\\ comment\\ :\\ maneb\\ \\?\\ null\\ :\\ data\\ \\.\\ classTeacherComment\\ ,\\ name\\ :\\ data\\ \\.\\ classTeacher\\ ,\\ role\\ :\\ data\\ \\.\\ classTeacherTitle\\ ,\\ stampSide\\ :\\ false\\ ,\\ \\}\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^drawSignCard\\ \\(\\ doc\\ ,\\ \\{\\ x\\ :\\ M_X\\ \\+\\ cardW\\ \\+\\ 4\\ ,\\ y\\ ,\\ w\\ :\\ cardW\\ ,\\ h\\ :\\ SIGN_H\\ ,\\ title\\ :\\ maneb\\ \\?\\ 'Head\\ teacher'\\ :\\ \"Head\\ teacher's\\ comment\"\\ ,\\ comment\\ :\\ maneb\\ \\?\\ null\\ :\\ data\\ \\.\\ headTeacherComment\\ ,\\ name\\ :\\ data\\ \\.\\ headTeacher\\ ,\\ role\\ :\\ data\\ \\.\\ headTeacherTitle\\ ,\\ stampSide\\ :\\ true\\ ,\\ \\}\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ issuedLead\\ =\\ 'Date\\ issued:\\ '$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^setFace\\ \\(\\ doc\\ ,\\ 'bodyBold'\\ ,\\ 7\\.2\\ ,\\ C\\ \\.\\ ink\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^let\\ official\\ =\\ `Ref:\\ \\$\\{\\ data\\ \\.\\ student\\ \\.\\ registrationNo\\ \\}\\ \u00b7\\ Term\\ \\$\\{\\ data\\ \\.\\ term\\ \\}\\ \\$\\{\\ data\\ \\.\\ academicYear\\ \\}\\ \u00b7\\ Page\\ 1\\ of\\ 1`$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ nextLead\\ =\\ 'Next\\ term\\ begins:\\ '$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ doc\\ \\.\\ getTextWidth\\ \\(\\ official\\ \\)\\ >\\ roomForRight\\ \\)\\ official\\ =\\ 'Page\\ 1\\ of\\ 1'$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^put\\ \\(\\ doc\\ ,\\ officialShown\\ ,\\ M_X\\ \\+\\ CW\\ ,\\ fy\\ \\+\\ 4\\.6\\ ,\\ 'right'\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ rightStart\\ =\\ M_X\\ \\+\\ CW\\ \\-\\ doc\\ \\.\\ getTextWidth\\ \\(\\ officialShown\\ \\)$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^wb\\ \\.\\ creator\\ =\\ 'SMS\\ Malawi\\ Finance\\ System'$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^s\\ \\.\\ value\\ =\\ `\\$\\{\\ subtitle\\ \\}\\ \u00b7\\ Generated\\ \\$\\{\\ new\\ Date\\ \\(\\ \\)\\ \\.\\ toLocaleDateString\\ \\(\\ 'en\\-MW'\\ \\)\\ \\}`$",
+      "reason": "8g: dates written as day, month in words, year, so they read the same for every reader (R11.8). Same date values."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ ws\\ =\\ wb\\ \\.\\ addWorksheet\\ \\(\\ 'Fee\\ Collection'\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ cols\\ =\\ \\[\\ 'Student'\\ ,\\ 'Student\\ Reg\\ No'\\ ,\\ 'Academic\\ Year'\\ ,\\ 'Term'\\ ,\\ 'Total\\ \\(MWK\\)'\\ ,\\ 'Paid\\ \\(MWK\\)'\\ ,\\ 'Balance\\ \\(MWK\\)'\\ ,\\ 'Status'\\ ,\\ 'Due\\ Date'\\ ,\\ \\]$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^styleHeader\\ \\(\\ ws\\ ,\\ cols\\ ,\\ addBanner\\ \\(\\ ws\\ ,\\ brand\\ ,\\ 'Fee\\ Collection\\ Report'\\ ,\\ `Academic\\ Year\\ \\$\\{\\ academicYear\\ \\}\\ \u00b7\\ Term\\ \\$\\{\\ term\\ \\}`\\ ,\\ cols\\ \\.\\ length\\ \\)\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ addRow\\ \\(\\ \\[\\ inv\\ \\.\\ student\\ \\?\\ `\\$\\{\\ inv\\ \\.\\ student\\ \\.\\ firstName\\ \\}\\ \\$\\{\\ inv\\ \\.\\ student\\ \\.\\ lastName\\ \\}`\\ :\\ '\u2014'\\ ,\\ inv\\ \\.\\ student\\ \\?\\.\\ registrationNo\\ \\?\\?\\ '\u2014'\\ ,\\ inv\\ \\.\\ academicYear\\ ,\\ `Term\\ \\$\\{\\ inv\\ \\.\\ term\\ \\}`\\ ,\\ Number\\ \\(\\ inv\\ \\.\\ totalAmount\\ \\)\\ ,\\ Number\\ \\(\\ inv\\ \\.\\ paidAmount\\ \\)\\ ,\\ Number\\ \\(\\ inv\\ \\.\\ balance\\ \\)\\ ,\\ inv\\ \\.\\ status\\ ,\\ inv\\ \\.\\ dueDate\\ \\.\\ toLocaleDateString\\ \\(\\ 'en\\-MW'\\ \\)\\ ,\\ \\]\\ \\)$",
+      "reason": "8g: dates written as day, month in words, year, so they read the same for every reader (R11.8). Same date values."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ addRow\\ \\(\\ \\[\\ 'TOTALS'\\ ,\\ ''\\ ,\\ ''\\ ,\\ ''\\ ,\\ invoices\\ \\.\\ reduce\\ \\(\\ \\(\\ s\\ ,\\ i\\ \\)\\ =>\\ s\\ \\+\\ Number\\ \\(\\ i\\ \\.\\ totalAmount\\ \\)\\ ,\\ 0\\ \\)\\ ,\\ invoices\\ \\.\\ reduce\\ \\(\\ \\(\\ s\\ ,\\ i\\ \\)\\ =>\\ s\\ \\+\\ Number\\ \\(\\ i\\ \\.\\ paidAmount\\ \\)\\ ,\\ 0\\ \\)\\ ,\\ invoices\\ \\.\\ reduce\\ \\(\\ \\(\\ s\\ ,\\ i\\ \\)\\ =>\\ s\\ \\+\\ Number\\ \\(\\ i\\ \\.\\ balance\\ \\)\\ ,\\ 0\\ \\)\\ ,\\ \\]\\ \\)\\ \\.\\ font\\ =\\ \\{\\ bold\\ :\\ true\\ \\}$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ ws\\ =\\ wb\\ \\.\\ addWorksheet\\ \\(\\ 'Outstanding\\ Balances'\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ cols\\ =\\ \\[\\ 'Student'\\ ,\\ 'Student\\ Reg\\ No'\\ ,\\ 'Term'\\ ,\\ 'Balance\\ \\(MWK\\)'\\ ,\\ 'Status'\\ ,\\ 'Due\\ Date'\\ \\]$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^styleHeader\\ \\(\\ ws\\ ,\\ cols\\ ,\\ addBanner\\ \\(\\ ws\\ ,\\ brand\\ ,\\ 'Outstanding\\ Balances'\\ ,\\ `Academic\\ Year\\ \\$\\{\\ academicYear\\ \\}\\ \u00b7\\ Term\\ \\$\\{\\ term\\ \\}`\\ ,\\ cols\\ \\.\\ length\\ \\)\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ addRow\\ \\(\\ \\[\\ inv\\ \\.\\ student\\ \\?\\ `\\$\\{\\ inv\\ \\.\\ student\\ \\.\\ firstName\\ \\}\\ \\$\\{\\ inv\\ \\.\\ student\\ \\.\\ lastName\\ \\}`\\ :\\ '\u2014'\\ ,\\ inv\\ \\.\\ student\\ \\?\\.\\ registrationNo\\ \\?\\?\\ '\u2014'\\ ,\\ `Term\\ \\$\\{\\ inv\\ \\.\\ term\\ \\}`\\ ,\\ Number\\ \\(\\ inv\\ \\.\\ balance\\ \\)\\ ,\\ inv\\ \\.\\ status\\ ,\\ inv\\ \\.\\ dueDate\\ \\.\\ toLocaleDateString\\ \\(\\ 'en\\-MW'\\ \\)\\ ,\\ \\]\\ \\)$",
+      "reason": "8g: dates written as day, month in words, year, so they read the same for every reader (R11.8). Same date values."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ ws\\ =\\ wb\\ \\.\\ addWorksheet\\ \\(\\ 'Expense\\ Breakdown'\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^styleHeader\\ \\(\\ ws\\ ,\\ cols\\ ,\\ addBanner\\ \\(\\ ws\\ ,\\ brand\\ ,\\ 'Expense\\ Breakdown'\\ ,\\ `Academic\\ Year\\ \\$\\{\\ academicYear\\ \\}\\ \u00b7\\ Term\\ \\$\\{\\ term\\ \\}`\\ ,\\ cols\\ \\.\\ length\\ \\)\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ addRow\\ \\(\\ \\[\\ e\\ \\.\\ category\\ ,\\ e\\ \\.\\ description\\ ,\\ Number\\ \\(\\ e\\ \\.\\ amount\\ \\)\\ ,\\ e\\ \\.\\ incurredAt\\ \\.\\ toLocaleDateString\\ \\(\\ 'en\\-MW'\\ \\)\\ ,\\ e\\ \\.\\ status\\ ,\\ \\]\\ \\)$",
+      "reason": "8g: dates written as day, month in words, year, so they read the same for every reader (R11.8). Same date values."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ ws\\ =\\ wb\\ \\.\\ addWorksheet\\ \\(\\ 'Payroll\\ Summary'\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ cols\\ =\\ \\[\\ 'Month'\\ ,\\ 'Total\\ Gross\\ \\(MWK\\)'\\ ,\\ 'Total\\ Net\\ \\(MWK\\)'\\ ,\\ 'Status'\\ ,\\ 'Run\\ Date'\\ \\]$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^styleHeader\\ \\(\\ ws\\ ,\\ cols\\ ,\\ addBanner\\ \\(\\ ws\\ ,\\ brand\\ ,\\ 'Payroll\\ Summary'\\ ,\\ `Payroll\\ Year\\ \\$\\{\\ year\\ \\}`\\ ,\\ cols\\ \\.\\ length\\ \\)\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ addRow\\ \\(\\ \\[\\ monthName\\ ,\\ Number\\ \\(\\ r\\ \\.\\ totalGross\\ \\)\\ ,\\ Number\\ \\(\\ r\\ \\.\\ totalNet\\ \\)\\ ,\\ r\\ \\.\\ status\\ ,\\ r\\ \\.\\ completedAt\\ \\?\\.\\ toLocaleDateString\\ \\(\\ 'en\\-MW'\\ \\)\\ \\?\\?\\ '\u2014'\\ ,\\ \\]\\ \\)$",
+      "reason": "8g: dates written as day, month in words, year, so they read the same for every reader (R11.8). Same date values."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ statusWord\\ \\}\\ from\\ '@/lib/hills/statusWord'$",
+      "reason": "8g: status and category shown as words instead of raw enum values (R4.8, R11.8); workbook author set to the school name. Same rows."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^wb\\ \\.\\ creator\\ =\\ identity\\ \\.\\ schoolName$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^s\\ \\.\\ value\\ =\\ `\\$\\{\\ subtitle\\ \\}\\ \u00b7\\ Generated\\ \\$\\{\\ shortDate\\ \\(\\ new\\ Date\\ \\(\\ \\)\\ \\)\\ \\}`$",
+      "reason": "8g: dates written as day, month in words, year, so they read the same for every reader (R11.8). Same date values."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ shortDate\\ \\(\\ d\\ :\\ Date\\ \\)\\ :\\ string\\ \\{\\}$",
+      "reason": "8g: dates written as day, month in words, year, so they read the same for every reader (R11.8). Same date values."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ new\\ Intl\\ \\.\\ DateTimeFormat\\ \\(\\ 'en\\-GB'\\ ,\\ \\{\\ day\\ :\\ 'numeric'\\ ,\\ month\\ :\\ 'short'\\ ,\\ year\\ :\\ 'numeric'\\ \\}\\ \\)\\ \\.\\ format\\ \\(\\ d\\ \\)$",
+      "reason": "8g: dates written as day, month in words, year, so they read the same for every reader (R11.8). Same date values."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ pageSetup\\ =\\ \\{\\ paperSize\\ :\\ 9\\ ,\\ orientation\\ :\\ 'landscape'\\ ,\\ fitToPage\\ :\\ true\\ ,\\ fitToWidth\\ :\\ 1\\ ,\\ fitToHeight\\ :\\ 0\\ ,\\ printTitlesRow\\ :\\ `\\$\\{\\ rowNumber\\ \\}:\\$\\{\\ rowNumber\\ \\}`\\ \\}$",
+      "reason": "8g: print setup for the Excel report sheets, A4 landscape, one page wide, header row repeated, Page x of y in the footer (R11.7). Nothing about the data changes."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ headerFooter\\ \\.\\ oddFooter\\ =\\ `\\&L\\&8\\$\\{\\ ws\\ \\.\\ name\\ \\}\\&C\\&8Generated\\ \\&D\\&R\\&8Page\\ \\&P\\ of\\ \\&N`$",
+      "reason": "8g: print setup for the Excel report sheets, A4 landscape, one page wide, header row repeated, Page x of y in the footer (R11.7). Nothing about the data changes."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ws\\ =\\ wb\\ \\.\\ addWorksheet\\ \\(\\ 'Fee\\ collection'\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ cols\\ =\\ \\[\\ 'Student'\\ ,\\ 'Reg\\.\\ no\\.'\\ ,\\ 'Academic\\ year'\\ ,\\ 'Term'\\ ,\\ 'Total\\ \\(MWK\\)'\\ ,\\ 'Paid\\ \\(MWK\\)'\\ ,\\ 'Balance\\ \\(MWK\\)'\\ ,\\ 'Status'\\ ,\\ 'Due\\ date'\\ ,\\ \\]$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^styleHeader\\ \\(\\ ws\\ ,\\ cols\\ ,\\ addBanner\\ \\(\\ ws\\ ,\\ brand\\ ,\\ 'Fee\\ collection\\ report'\\ ,\\ `Academic\\ Year\\ \\$\\{\\ academicYear\\ \\}\\ \u00b7\\ Term\\ \\$\\{\\ term\\ \\}`\\ ,\\ cols\\ \\.\\ length\\ \\)\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ addRow\\ \\(\\ \\[\\ inv\\ \\.\\ student\\ \\?\\ `\\$\\{\\ inv\\ \\.\\ student\\ \\.\\ firstName\\ \\}\\ \\$\\{\\ inv\\ \\.\\ student\\ \\.\\ lastName\\ \\}`\\ :\\ '\u2014'\\ ,\\ inv\\ \\.\\ student\\ \\?\\.\\ registrationNo\\ \\?\\?\\ '\u2014'\\ ,\\ inv\\ \\.\\ academicYear\\ ,\\ `Term\\ \\$\\{\\ inv\\ \\.\\ term\\ \\}`\\ ,\\ Number\\ \\(\\ inv\\ \\.\\ totalAmount\\ \\)\\ ,\\ Number\\ \\(\\ inv\\ \\.\\ paidAmount\\ \\)\\ ,\\ Number\\ \\(\\ inv\\ \\.\\ balance\\ \\)\\ ,\\ statusWord\\ \\(\\ inv\\ \\.\\ status\\ \\)\\ ,\\ shortDate\\ \\(\\ inv\\ \\.\\ dueDate\\ \\)\\ ,\\ \\]\\ \\)$",
+      "reason": "8g: dates written as day, month in words, year, so they read the same for every reader (R11.8). Same date values."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ addRow\\ \\(\\ \\[\\ 'Total'\\ ,\\ ''\\ ,\\ ''\\ ,\\ ''\\ ,\\ invoices\\ \\.\\ reduce\\ \\(\\ \\(\\ s\\ ,\\ i\\ \\)\\ =>\\ s\\ \\+\\ Number\\ \\(\\ i\\ \\.\\ totalAmount\\ \\)\\ ,\\ 0\\ \\)\\ ,\\ invoices\\ \\.\\ reduce\\ \\(\\ \\(\\ s\\ ,\\ i\\ \\)\\ =>\\ s\\ \\+\\ Number\\ \\(\\ i\\ \\.\\ paidAmount\\ \\)\\ ,\\ 0\\ \\)\\ ,\\ invoices\\ \\.\\ reduce\\ \\(\\ \\(\\ s\\ ,\\ i\\ \\)\\ =>\\ s\\ \\+\\ Number\\ \\(\\ i\\ \\.\\ balance\\ \\)\\ ,\\ 0\\ \\)\\ ,\\ \\]\\ \\)\\ \\.\\ font\\ =\\ \\{\\ bold\\ :\\ true\\ \\}$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ws\\ =\\ wb\\ \\.\\ addWorksheet\\ \\(\\ 'Outstanding\\ balances'\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ cols\\ =\\ \\[\\ 'Student'\\ ,\\ 'Reg\\.\\ no\\.'\\ ,\\ 'Term'\\ ,\\ 'Balance\\ \\(MWK\\)'\\ ,\\ 'Status'\\ ,\\ 'Due\\ date'\\ \\]$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^styleHeader\\ \\(\\ ws\\ ,\\ cols\\ ,\\ addBanner\\ \\(\\ ws\\ ,\\ brand\\ ,\\ 'Outstanding\\ balances'\\ ,\\ `Academic\\ Year\\ \\$\\{\\ academicYear\\ \\}\\ \u00b7\\ Term\\ \\$\\{\\ term\\ \\}`\\ ,\\ cols\\ \\.\\ length\\ \\)\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ addRow\\ \\(\\ \\[\\ inv\\ \\.\\ student\\ \\?\\ `\\$\\{\\ inv\\ \\.\\ student\\ \\.\\ firstName\\ \\}\\ \\$\\{\\ inv\\ \\.\\ student\\ \\.\\ lastName\\ \\}`\\ :\\ '\u2014'\\ ,\\ inv\\ \\.\\ student\\ \\?\\.\\ registrationNo\\ \\?\\?\\ '\u2014'\\ ,\\ `Term\\ \\$\\{\\ inv\\ \\.\\ term\\ \\}`\\ ,\\ Number\\ \\(\\ inv\\ \\.\\ balance\\ \\)\\ ,\\ statusWord\\ \\(\\ inv\\ \\.\\ status\\ \\)\\ ,\\ shortDate\\ \\(\\ inv\\ \\.\\ dueDate\\ \\)\\ ,\\ \\]\\ \\)$",
+      "reason": "8g: dates written as day, month in words, year, so they read the same for every reader (R11.8). Same date values."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ws\\ =\\ wb\\ \\.\\ addWorksheet\\ \\(\\ 'Expense\\ breakdown'\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^styleHeader\\ \\(\\ ws\\ ,\\ cols\\ ,\\ addBanner\\ \\(\\ ws\\ ,\\ brand\\ ,\\ 'Expense\\ breakdown'\\ ,\\ `Academic\\ Year\\ \\$\\{\\ academicYear\\ \\}\\ \u00b7\\ Term\\ \\$\\{\\ term\\ \\}`\\ ,\\ cols\\ \\.\\ length\\ \\)\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ addRow\\ \\(\\ \\[\\ statusWord\\ \\(\\ e\\ \\.\\ category\\ \\)\\ ,\\ e\\ \\.\\ description\\ ,\\ Number\\ \\(\\ e\\ \\.\\ amount\\ \\)\\ ,\\ shortDate\\ \\(\\ e\\ \\.\\ incurredAt\\ \\)\\ ,\\ statusWord\\ \\(\\ e\\ \\.\\ status\\ \\)\\ ,\\ \\]\\ \\)$",
+      "reason": "8g: dates written as day, month in words, year, so they read the same for every reader (R11.8). Same date values."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ws\\ =\\ wb\\ \\.\\ addWorksheet\\ \\(\\ 'Payroll\\ summary'\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ cols\\ =\\ \\[\\ 'Month'\\ ,\\ 'Total\\ gross\\ \\(MWK\\)'\\ ,\\ 'Total\\ net\\ \\(MWK\\)'\\ ,\\ 'Status'\\ ,\\ 'Run\\ date'\\ \\]$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^styleHeader\\ \\(\\ ws\\ ,\\ cols\\ ,\\ addBanner\\ \\(\\ ws\\ ,\\ brand\\ ,\\ 'Payroll\\ summary'\\ ,\\ `Payroll\\ Year\\ \\$\\{\\ year\\ \\}`\\ ,\\ cols\\ \\.\\ length\\ \\)\\ \\)$",
+      "reason": "8g: sheet names, titles and column headers in sentence case matching the screen (R11.8). Same columns, same order, same rows, same totals."
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ws\\ \\.\\ addRow\\ \\(\\ \\[\\ monthName\\ ,\\ Number\\ \\(\\ r\\ \\.\\ totalGross\\ \\)\\ ,\\ Number\\ \\(\\ r\\ \\.\\ totalNet\\ \\)\\ ,\\ statusWord\\ \\(\\ r\\ \\.\\ status\\ \\)\\ ,\\ r\\ \\.\\ completedAt\\ \\?\\ shortDate\\ \\(\\ r\\ \\.\\ completedAt\\ \\)\\ :\\ ''\\ ,\\ \\]\\ \\)$",
+      "reason": "8g: dates written as day, month in words, year, so they read the same for every reader (R11.8). Same date values."
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ PDF_COLORS\\ as\\ C\\ ,\\ PT\\ ,\\ createPdfDoc\\ ,\\ drawCard\\ ,\\ drawDocumentTitle\\ ,\\ drawFooterNote\\ ,\\ drawLetterhead\\ ,\\ drawSignatory\\ ,\\ drawStamp\\ ,\\ ellipsize\\ ,\\ fillColor\\ ,\\ fmtDate\\ ,\\ gradeInk\\ ,\\ put\\ ,\\ resolveHeadTeacher\\ ,\\ setFace\\ ,\\ stampPlace\\ ,\\ strokeColor\\ ,\\ tint\\ ,\\ tracked\\ ,\\ type\\ GradeTier\\ ,\\ type\\ PdfBranding\\ ,\\ type\\ PdfSignatory\\ ,\\ \\}\\ from\\ '@/server/services/pdfBranding'$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ facts\\ :\\ Array\\ <\\ \\[\\ \\[\\ string\\ ,\\ string\\ \\]\\ ,\\ \\[\\ string\\ ,\\ string\\ \\]\\ \\]\\ >\\ =\\ \\[\\ \\[\\ \\[\\ 'Student'\\ ,\\ fullName\\ \\]\\ ,\\ \\[\\ 'Reg\\.\\ Number'\\ ,\\ data\\ \\.\\ registrationNo\\ \\]\\ \\]\\ ,\\ \\[\\ \\[\\ 'Sex'\\ ,\\ sex\\ \\]\\ ,\\ \\[\\ 'Date\\ of\\ Birth'\\ ,\\ data\\ \\.\\ dateOfBirth\\ \\?\\ fmtDate\\ \\(\\ data\\ \\.\\ dateOfBirth\\ ,\\ 'long'\\ ,\\ tz\\ \\)\\ :\\ '\u2014'\\ \\]\\ \\]\\ ,\\ \\]$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^put\\ \\(\\ doc\\ ,\\ `Academic\\ Transcript\\ \u2014\\ \\$\\{\\ fullName\\ \\}\\ \u00b7\\ \\$\\{\\ data\\ \\.\\ registrationNo\\ \\}`\\ ,\\ M_X\\ \\+\\ CW\\ ,\\ 13\\ ,\\ 'right'\\ \\)$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ sig\\ :\\ PdfSignatory\\ =\\ data\\ \\.\\ headTeacher\\ \\?\\?\\ \\{\\ name\\ :\\ null\\ ,\\ title\\ :\\ 'Head\\ Teacher'\\ ,\\ unit\\ :\\ null\\ \\}$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ pages\\ =\\ doc\\ \\.\\ getNumberOfPages\\ \\(\\ \\)$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^for\\ \\(\\ let\\ p\\ =\\ 1\\ ;\\ p\\ <=\\ pages\\ ;\\ p\\ \\+\\+\\ \\)\\ \\{\\}$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^doc\\ \\.\\ setPage\\ \\(\\ p\\ \\)$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^drawFooterNote\\ \\(\\ doc\\ ,\\ M_X\\ ,\\ CW\\ ,\\ 282\\ ,\\ `Generated\\ on\\ \\$\\{\\ issued\\ \\}\\.\\ This\\ is\\ a\\ computer\\-generated\\ document\\.\\ \u00b7\\ Page\\ \\$\\{\\ p\\ \\}\\ of\\ \\$\\{\\ pages\\ \\}`\\ \\)$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ PDF_COLORS\\ as\\ C\\ ,\\ PT\\ ,\\ createPdfDoc\\ ,\\ drawCard\\ ,\\ drawDocumentFooters\\ ,\\ drawDocumentTitle\\ ,\\ drawLetterhead\\ ,\\ drawSignatory\\ ,\\ drawStamp\\ ,\\ ellipsize\\ ,\\ fillColor\\ ,\\ fmtDate\\ ,\\ gradeInk\\ ,\\ put\\ ,\\ resolveHeadTeacher\\ ,\\ setFace\\ ,\\ stampPlace\\ ,\\ strokeColor\\ ,\\ tint\\ ,\\ tracked\\ ,\\ type\\ GradeTier\\ ,\\ type\\ PdfBranding\\ ,\\ type\\ PdfSignatory\\ ,\\ \\}\\ from\\ '@/server/services/pdfBranding'$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ facts\\ :\\ Array\\ <\\ \\[\\ \\[\\ string\\ ,\\ string\\ \\]\\ ,\\ \\[\\ string\\ ,\\ string\\ \\]\\ \\]\\ >\\ =\\ \\[\\ \\[\\ \\[\\ 'Student'\\ ,\\ fullName\\ \\]\\ ,\\ \\[\\ 'Reg\\.\\ no\\.'\\ ,\\ data\\ \\.\\ registrationNo\\ \\]\\ \\]\\ ,\\ \\[\\ \\[\\ 'Sex'\\ ,\\ sex\\ \\]\\ ,\\ \\[\\ 'Date\\ of\\ birth'\\ ,\\ data\\ \\.\\ dateOfBirth\\ \\?\\ fmtDate\\ \\(\\ data\\ \\.\\ dateOfBirth\\ ,\\ 'long'\\ ,\\ tz\\ \\)\\ :\\ '\u2014'\\ \\]\\ \\]\\ ,\\ \\]$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^put\\ \\(\\ doc\\ ,\\ `Academic\\ transcript\\ \u00b7\\ \\$\\{\\ fullName\\ \\}\\ \u00b7\\ \\$\\{\\ data\\ \\.\\ registrationNo\\ \\}`\\ ,\\ M_X\\ \\+\\ CW\\ ,\\ 13\\ ,\\ 'right'\\ \\)$",
+      "reason": "8g: footer reference line text (receipt number, employee number and period, or registration number) drawn from values the document already holds (R11.7)."
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ sig\\ :\\ PdfSignatory\\ =\\ data\\ \\.\\ headTeacher\\ \\?\\?\\ \\{\\ name\\ :\\ null\\ ,\\ title\\ :\\ 'Head\\ teacher'\\ ,\\ unit\\ :\\ null\\ \\}$",
+      "reason": "8g: label and heading wording in sentence case, no em dashes, no raw enum values (R4, R4.8). Text only; the values shown are unchanged."
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^drawDocumentFooters\\ \\(\\ doc\\ ,\\ \\{\\ x\\ :\\ M_X\\ ,\\ w\\ :\\ CW\\ ,\\ y\\ :\\ 282\\ ,\\ note\\ :\\ `Generated\\ on\\ \\$\\{\\ issued\\ \\}\\.\\ This\\ is\\ a\\ computer\\-generated\\ document\\.`\\ ,\\ reference\\ :\\ data\\ \\.\\ registrationNo\\ \\}\\ \\)$",
+      "reason": "8g: footer drawing switched to the shared drawDocumentFooters, so every document page shows its reference and Page x of y (R11.7). Same page count, same data."
     }
   ],
   "approvedFrozen": [
@@ -15668,6 +16739,36 @@
     {
       "file": "src/server/templates/emails/result-release.ts",
       "reason": "Owner-approved exception (RULEBOOK section 12 item 1, emails and exports), used for Phase 8f on 2026-11-19: presentation only. Markup, colours, wording and layout of the email templates; same render function, same data, same recipients and timing. Every changed token is declared above.",
+      "approvedOn": "2026-11-19"
+    },
+    {
+      "file": "src/lib/reportExport.ts",
+      "reason": "Phase 8g (RULEBOOK 12 item 1, owner-approved documents and exports exception, R11.7 and R11.8): presentation only. Document wording, labels, footer (reference line and Page x of y) and print setup. Data, timing, recipients, routes and permissions unchanged.",
+      "approvedOn": "2026-11-19"
+    },
+    {
+      "file": "src/server/services/pdfBranding.ts",
+      "reason": "Phase 8g (RULEBOOK 12 item 1, owner-approved documents and exports exception, R11.7 and R11.8): presentation only. Document wording, labels, footer (reference line and Page x of y) and print setup. Data, timing, recipients, routes and permissions unchanged.",
+      "approvedOn": "2026-11-19"
+    },
+    {
+      "file": "src/server/services/receiptService.ts",
+      "reason": "Phase 8g (RULEBOOK 12 item 1, owner-approved documents and exports exception, R11.7 and R11.8): presentation only. Document wording, labels, footer (reference line and Page x of y) and print setup. Data, timing, recipients, routes and permissions unchanged.",
+      "approvedOn": "2026-11-19"
+    },
+    {
+      "file": "src/server/services/reportCardService.ts",
+      "reason": "Phase 8g (RULEBOOK 12 item 1, owner-approved documents and exports exception, R11.7 and R11.8): presentation only. Document wording, labels, footer (reference line and Page x of y) and print setup. Data, timing, recipients, routes and permissions unchanged.",
+      "approvedOn": "2026-11-19"
+    },
+    {
+      "file": "src/server/services/reportExportService.ts",
+      "reason": "Phase 8g (RULEBOOK 12 item 1, owner-approved documents and exports exception, R11.7 and R11.8): presentation only. Document wording, labels, footer (reference line and Page x of y) and print setup. Data, timing, recipients, routes and permissions unchanged.",
+      "approvedOn": "2026-11-19"
+    },
+    {
+      "file": "src/server/services/transcriptService.ts",
+      "reason": "Phase 8g (RULEBOOK 12 item 1, owner-approved documents and exports exception, R11.7 and R11.8): presentation only. Document wording, labels, footer (reference line and Page x of y) and print setup. Data, timing, recipients, routes and permissions unchanged.",
       "approvedOn": "2026-11-19"
     }
   ]

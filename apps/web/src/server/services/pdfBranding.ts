@@ -22,6 +22,8 @@
  *     - SIGNATORY drawSignatory() + resolvers that derive the signing staff
  *                 member's NAME and TITLE from the staff directory (never
  *                 typed, never a generic "Head Teacher" placeholder).
+ *     - FOOTER    drawDocumentFooters(): reference, generated note and
+ *                 "Page x of y" on every page (RULEBOOK R11.7).
  *     - HELPERS   money/date/number-to-words formatting, tracked (letter-
  *                 spaced) text, truncation, circular text.
  *
@@ -737,4 +739,58 @@ export function drawFooterNote(doc: jsPDF, x: number, w: number, y: number, text
   doc.line(x, y, x + w, y)
   setFace(doc, 'body', 7, PDF_COLORS.muted)
   put(doc, text, x + w / 2, y + 4, 'center')
+}
+
+export interface DocumentFooterOptions {
+  x: number
+  w: number
+  /** Top of the footer hairline (mm). */
+  y: number
+  /** Centre text, for example "Generated on 19 November 2026. This is a computer-generated document." */
+  note: string
+  /** The document's own reference (receipt number, registration number and so on), left. Optional. */
+  reference?: string | undefined
+}
+
+/**
+ * The footer every document shares (RULEBOOK R11.7): hairline, then the document's reference on
+ * the left, the generated note in the centre and "Page x of y" on the right, on every page.
+ * Call once, after the last page is drawn.
+ */
+export function drawDocumentFooters(doc: jsPDF, o: DocumentFooterOptions): void {
+  const pages = doc.getNumberOfPages()
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p)
+    strokeColor(doc, PDF_COLORS.border)
+    doc.setLineWidth(0.25)
+    doc.line(o.x, o.y, o.x + o.w, o.y)
+    const ty = o.y + 4
+
+    const pageText = `Page ${p} of ${pages}`
+    setFace(doc, 'bodyBold', 7, PDF_COLORS.ink)
+    const pageW = doc.getTextWidth(pageText)
+    put(doc, pageText, o.x + o.w, ty, 'right')
+
+    let leftW = 0
+    if (o.reference) {
+      const lead = 'Ref: '
+      setFace(doc, 'body', 7, PDF_COLORS.muted)
+      const leadW = doc.getTextWidth(lead)
+      setFace(doc, 'bodyBold', 7, PDF_COLORS.ink)
+      const room = o.w * 0.34
+      const ref = ellipsize(doc, o.reference, room - leadW)
+      leftW = leadW + doc.getTextWidth(ref)
+      setFace(doc, 'body', 7, PDF_COLORS.muted)
+      put(doc, lead, o.x, ty)
+      setFace(doc, 'bodyBold', 7, PDF_COLORS.ink)
+      put(doc, ref, o.x + leadW, ty)
+    }
+
+    // The centre note takes what is left between the two sides, so it never runs into either.
+    setFace(doc, 'body', 7, PDF_COLORS.muted)
+    const room = o.w - leftW - pageW - 12
+    const centre = ellipsize(doc, o.note, Math.max(40, room))
+    const cx = Math.min(Math.max(o.x + o.w / 2, o.x + leftW + 6 + doc.getTextWidth(centre) / 2), o.x + o.w - pageW - 6 - doc.getTextWidth(centre) / 2)
+    put(doc, centre, cx, ty, 'center')
+  }
 }

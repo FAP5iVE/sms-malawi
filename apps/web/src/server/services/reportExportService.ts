@@ -32,6 +32,7 @@ import { uploadFile, getSignedViewUrl, FILE_PREFIX } from '@/lib/storage'
 import { formatMWK } from '@shared/constants/malawi'
 import { getRasterSchoolLogo } from '@/server/services/schoolLogoService'
 import { getIdentitySettings } from '@/server/services/settingsService'
+import { statusWord } from '@/lib/hills/statusWord'
 
 type ReportType =
   | 'fee_collection'
@@ -45,11 +46,11 @@ export async function generateFinancialReport(
   term: number
 ): Promise<string> {
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'SMS Malawi Finance System'
   wb.created = new Date()
 
   // Resolve the school identity + logo once; every sheet gets the same banner.
   const [identity, logo] = await Promise.all([getIdentitySettings(), getRasterSchoolLogo()])
+  wb.creator = identity.schoolName
   const brand: SheetBrand = {
     schoolName: identity.schoolName,
     logoImageId: wb.addImage({ base64: logo.base64, extension: logo.rasterFormat }),
@@ -124,7 +125,7 @@ function addBanner(ws: ExcelJS.Worksheet, brand: SheetBrand, title: string, subt
   ws.mergeCells(2, 2, 2, last)
 
   const s = ws.getCell('B3')
-  s.value = `${subtitle}  ·  Generated ${new Date().toLocaleDateString('en-MW')}`
+  s.value = `${subtitle}  ·  Generated ${shortDate(new Date())}`
   s.font = { size: 10, color: { argb: 'FF64748B' } }
   s.alignment = { vertical: 'middle' }
   ws.mergeCells(3, 2, 3, last)
@@ -132,7 +133,15 @@ function addBanner(ws: ExcelJS.Worksheet, brand: SheetBrand, title: string, subt
   return 5
 }
 
+/** "19 Nov 2026": the day and month in words, so it reads the same whichever way round the reader writes dates. */
+function shortDate(d: Date): string {
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(d)
+}
+
 function styleHeader(ws: ExcelJS.Worksheet, cols: string[], rowNumber = 1) {
+  // Printed pages (R11.7): A4 landscape, one page wide, header row repeated, "Page x of y" in the footer.
+  ws.pageSetup = { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: `${rowNumber}:${rowNumber}` }
+  ws.headerFooter.oddFooter = `&L&8${ws.name}&C&8Generated &D&R&8Page &P of &N`
   const headerRow = ws.getRow(rowNumber)
   cols.forEach((col, i) => {
     const cell = headerRow.getCell(i + 1)
@@ -145,23 +154,23 @@ function styleHeader(ws: ExcelJS.Worksheet, cols: string[], rowNumber = 1) {
 }
 
 async function buildFeeCollectionSheet(wb: ExcelJS.Workbook, academicYear: string, term: number, brand: SheetBrand) {
-  const ws = wb.addWorksheet('Fee Collection')
+  const ws = wb.addWorksheet('Fee collection')
   const cols = [
     'Student',
-    'Student Reg No',
-    'Academic Year',
+    'Reg. no.',
+    'Academic year',
     'Term',
     'Total (MWK)',
     'Paid (MWK)',
     'Balance (MWK)',
     'Status',
-    'Due Date',
+    'Due date',
   ]
   ws.columns = cols.map((h, i) => ({
     key: String(i),
     width: i > 3 && i < 7 ? 18 : 15,
   }))
-  styleHeader(ws, cols, addBanner(ws, brand, 'Fee Collection Report', `Academic Year ${academicYear} · Term ${term}`, cols.length))
+  styleHeader(ws, cols, addBanner(ws, brand, 'Fee collection report', `Academic Year ${academicYear} · Term ${term}`, cols.length))
 
   const invoices = await prisma.invoice.findMany({
     where: { academicYear, term },
@@ -178,15 +187,15 @@ async function buildFeeCollectionSheet(wb: ExcelJS.Workbook, academicYear: strin
       Number(inv.totalAmount),
       Number(inv.paidAmount),
       Number(inv.balance),
-      inv.status,
-      inv.dueDate.toLocaleDateString('en-MW'),
+      statusWord(inv.status),
+      shortDate(inv.dueDate),
     ])
   })
 
   // Summary row
   ws.addRow([])
   ws.addRow([
-    'TOTALS',
+    'Total',
     '',
     '',
     '',
@@ -197,10 +206,10 @@ async function buildFeeCollectionSheet(wb: ExcelJS.Workbook, academicYear: strin
 }
 
 async function buildOutstandingSheet(wb: ExcelJS.Workbook, academicYear: string, term: number, brand: SheetBrand) {
-  const ws = wb.addWorksheet('Outstanding Balances')
-  const cols = ['Student', 'Student Reg No', 'Term', 'Balance (MWK)', 'Status', 'Due Date']
+  const ws = wb.addWorksheet('Outstanding balances')
+  const cols = ['Student', 'Reg. no.', 'Term', 'Balance (MWK)', 'Status', 'Due date']
   ws.columns = cols.map(() => ({ width: 18 }))
-  styleHeader(ws, cols, addBanner(ws, brand, 'Outstanding Balances', `Academic Year ${academicYear} · Term ${term}`, cols.length))
+  styleHeader(ws, cols, addBanner(ws, brand, 'Outstanding balances', `Academic Year ${academicYear} · Term ${term}`, cols.length))
 
   const overdue = await prisma.invoice.findMany({
     where: { academicYear, term, status: { in: ['UNPAID', 'PARTIAL', 'OVERDUE'] } },
@@ -214,17 +223,17 @@ async function buildOutstandingSheet(wb: ExcelJS.Workbook, academicYear: string,
       inv.student?.registrationNo ?? '—',
       `Term ${inv.term}`,
       Number(inv.balance),
-      inv.status,
-      inv.dueDate.toLocaleDateString('en-MW'),
+      statusWord(inv.status),
+      shortDate(inv.dueDate),
     ])
   })
 }
 
 async function buildExpenseSheet(wb: ExcelJS.Workbook, academicYear: string, term: number, brand: SheetBrand) {
-  const ws = wb.addWorksheet('Expense Breakdown')
+  const ws = wb.addWorksheet('Expense breakdown')
   const cols = ['Category', 'Description', 'Amount (MWK)', 'Date', 'Status']
   ws.columns = cols.map((_, i) => ({ width: i === 1 ? 30 : 18 }))
-  styleHeader(ws, cols, addBanner(ws, brand, 'Expense Breakdown', `Academic Year ${academicYear} · Term ${term}`, cols.length))
+  styleHeader(ws, cols, addBanner(ws, brand, 'Expense breakdown', `Academic Year ${academicYear} · Term ${term}`, cols.length))
 
   const expenses = await prisma.expense.findMany({
     where: { academicYear, term },
@@ -233,20 +242,20 @@ async function buildExpenseSheet(wb: ExcelJS.Workbook, academicYear: string, ter
 
   expenses.forEach((e) => {
     ws.addRow([
-      e.category,
+      statusWord(e.category),
       e.description,
       Number(e.amount),
-      e.incurredAt.toLocaleDateString('en-MW'),
-      e.status,
+      shortDate(e.incurredAt),
+      statusWord(e.status),
     ])
   })
 }
 
 async function buildPayrollSheet(wb: ExcelJS.Workbook, year: number, brand: SheetBrand) {
-  const ws = wb.addWorksheet('Payroll Summary')
-  const cols = ['Month', 'Total Gross (MWK)', 'Total Net (MWK)', 'Status', 'Run Date']
+  const ws = wb.addWorksheet('Payroll summary')
+  const cols = ['Month', 'Total gross (MWK)', 'Total net (MWK)', 'Status', 'Run date']
   ws.columns = cols.map(() => ({ width: 20 }))
-  styleHeader(ws, cols, addBanner(ws, brand, 'Payroll Summary', `Payroll Year ${year}`, cols.length))
+  styleHeader(ws, cols, addBanner(ws, brand, 'Payroll summary', `Payroll Year ${year}`, cols.length))
 
   const runs = await prisma.payrollRun.findMany({
     where: { year },
@@ -259,8 +268,8 @@ async function buildPayrollSheet(wb: ExcelJS.Workbook, year: number, brand: Shee
       monthName,
       Number(r.totalGross),
       Number(r.totalNet),
-      r.status,
-      r.completedAt?.toLocaleDateString('en-MW') ?? '—',
+      statusWord(r.status),
+      r.completedAt ? shortDate(r.completedAt) : '',
     ])
   })
 }

@@ -71,7 +71,7 @@ import { uploadFile, getSignedViewUrl, FILE_PREFIX } from '@/lib/storage'
 import * as settingsService   from '@/server/services/settingsService'
 import { getRasterSchoolLogo } from '@/server/services/schoolLogoService'
 import {
-  PDF_COLORS as C, PT, createPdfDoc, drawCard, drawDocumentTitle, drawFooterNote, drawLetterhead, drawSignatory, drawStamp,
+  PDF_COLORS as C, PT, createPdfDoc, drawCard, drawDocumentFooters, drawDocumentTitle, drawLetterhead, drawSignatory, drawStamp,
   ellipsize, fillColor, fmtDate, gradeInk, put, resolveHeadTeacher, setFace, stampPlace, strokeColor, tint, tracked,
   type GradeTier, type PdfBranding, type PdfSignatory,
 } from '@/server/services/pdfBranding'
@@ -267,8 +267,8 @@ export function generateTranscriptPDF(data: TranscriptData): Buffer {
 
   const sex = data.sex ? data.sex.charAt(0).toUpperCase() + data.sex.slice(1).toLowerCase() : '—'
   const facts: Array<[[string, string], [string, string]]> = [
-    [['Student', fullName], ['Reg. Number', data.registrationNo]],
-    [['Sex', sex], ['Date of Birth', data.dateOfBirth ? fmtDate(data.dateOfBirth, 'long', tz) : '—']],
+    [['Student', fullName], ['Reg. no.', data.registrationNo]],
+    [['Sex', sex], ['Date of birth', data.dateOfBirth ? fmtDate(data.dateOfBirth, 'long', tz) : '—']],
   ]
   const rowH = 6.2
   const cardH = facts.length * rowH + 2.4
@@ -296,7 +296,7 @@ export function generateTranscriptPDF(data: TranscriptData): Buffer {
     setFace(doc, 'headingBold', 7.5, C.navy)
     put(doc, data.schoolName.toUpperCase(), M_X, 13)
     setFace(doc, 'body', 7.5, C.muted)
-    put(doc, `Academic Transcript — ${fullName} · ${data.registrationNo}`, M_X + CW, 13, 'right')
+    put(doc, `Academic transcript  ·  ${fullName}  ·  ${data.registrationNo}`, M_X + CW, 13, 'right')
     strokeColor(doc, C.border)
     doc.setLineWidth(0.25)
     doc.line(M_X, 15.5, M_X + CW, 15.5)
@@ -405,7 +405,7 @@ export function generateTranscriptPDF(data: TranscriptData): Buffer {
   tracked(doc, 'CERTIFIED CORRECT', M_X, y + 6.2, 0.55)
   setFace(doc, 'body', 7, C.muted)
   put(doc, `${data.schoolName}${data.schoolAddress ? `  ·  ${data.schoolAddress}` : ''}`, M_X, y + 10.4)
-  const sig: PdfSignatory = data.headTeacher ?? { name: null, title: 'Head Teacher', unit: null }
+  const sig: PdfSignatory = data.headTeacher ?? { name: null, title: 'Head teacher', unit: null }
   drawSignatory(doc, { x: M_X, y: y + 12, w: 72, sig, org: data.schoolName, space: 14 })
   drawStamp(doc, {
     cx: M_X + CW - 19, cy: y + 24, r: 15, schoolName: data.schoolName, place: data.schoolPlace ?? '',
@@ -413,11 +413,7 @@ export function generateTranscriptPDF(data: TranscriptData): Buffer {
   })
 
   // ── footer on every page: generated date + page x of y ─────────────────────
-  const pages = doc.getNumberOfPages()
-  for (let p = 1; p <= pages; p++) {
-    doc.setPage(p)
-    drawFooterNote(doc, M_X, CW, 282, `Generated on ${issued}. This is a computer-generated document.  ·  Page ${p} of ${pages}`)
-  }
+  drawDocumentFooters(doc, { x: M_X, w: CW, y: 282, note: `Generated on ${issued}. This is a computer-generated document.`, reference: data.registrationNo })
 
   return Buffer.from(doc.output('arraybuffer'))
 }

@@ -92,7 +92,7 @@ import { logger } from '@/lib/logger'
 import { prisma } from '@/lib/prisma'
 import { PAYMENT_METHOD_LABELS } from '@shared/constants/malawi'
 import {
-  PDF_COLORS as C, amountInWords, createPdfDoc, drawCard, drawDocumentTitle, drawFooterNote, drawLetterhead,
+  PDF_COLORS as C, amountInWords, createPdfDoc, drawCard, drawDocumentFooters, drawDocumentTitle, drawLetterhead,
   drawSignatory, drawStamp, ellipsize, fillColor, fitFontSize, fmtDate, getPdfBranding, money, put,
   resolveFinanceSignatory, sectionLabel, setFace, strokeColor, tint, tracked, PT,
   type PdfBranding, type PdfSignatory, type RGB,
@@ -324,15 +324,15 @@ export function buildReceiptPdf(b: PdfBranding, d: ReceiptContext, receiptNo: st
   const yTop = y
   const h1 = drawFacts(doc, M_X, yTop, cw, 'Student', [
     ['Name', d.studentName],
-    ['Reg. No.', d.registrationNo],
-    ['Class / Form', d.className ?? '—'],
-    ['Invoice No.', d.invoiceNumber ?? '—'],
+    ['Reg. no.', d.registrationNo],
+    ['Class', d.className ?? '—'],
+    ['Invoice no.', d.invoiceNumber ?? '—'],
   ])
   drawFacts(doc, M_X + cw + 8, yTop, cw, 'Payment', [
-    ['Receipt No.', receiptNo],
+    ['Receipt no.', receiptNo],
     ['Date', fmtDate(d.paidAt, 'long', tz)],
-    ['Payment Method', d.methodLabel],
-    ['Reference', d.reference ?? '—'],
+    ['Payment method', d.methodLabel],
+    ['Payment reference', d.reference ?? '—'],
   ])
   y = h1 + 7
 
@@ -354,10 +354,10 @@ export function buildReceiptPdf(b: PdfBranding, d: ReceiptContext, receiptNo: st
     y += 2.2
     const cols: Array<{ label: string; w: number; align: 'left' | 'right' }> = [
       { label: 'Fee', w: 44, align: 'left' },
-      { label: 'Fixed Amount', w: 28, align: 'right' },
-      { label: 'Balance Before', w: 28, align: 'right' },
+      { label: 'Fixed amount', w: 28, align: 'right' },
+      { label: 'Balance before', w: 28, align: 'right' },
       { label: 'Allocated', w: 28, align: 'right' },
-      { label: 'Balance After', w: 28, align: 'right' },
+      { label: 'Balance after', w: 28, align: 'right' },
       { label: 'Status', w: CW - 156, align: 'left' },
     ]
     const rows = d.lines.length + (d.credit > CENT ? 1 : 0)
@@ -449,10 +449,10 @@ export function buildReceiptPdf(b: PdfBranding, d: ReceiptContext, receiptNo: st
   if (d.invoice) {
     // no outer border — only the dividers between the four figures
     const stats: Array<[string, string, RGB]> = [
-      ['Total Fixed Fees', money(d.invoice.fixedTotal), C.ink],
-      ['Net Total Fees Due', money(d.invoice.netDue), C.ink],
-      ['Total Paid to Date', money(d.invoice.paidToDate), CLEARED],
-      ['Balance Due', money(d.invoice.balanceDue), d.invoice.balanceDue < CENT ? CLEARED : OWED],
+      ['Total fixed fees', money(d.invoice.fixedTotal), C.ink],
+      ['Net total fees due', money(d.invoice.netDue), C.ink],
+      ['Total paid to date', money(d.invoice.paidToDate), CLEARED],
+      ['Balance due', money(d.invoice.balanceDue), d.invoice.balanceDue < CENT ? CLEARED : OWED],
     ]
     const sw = CW / stats.length
     stats.forEach(([label, value, color], i) => {
@@ -472,15 +472,15 @@ export function buildReceiptPdf(b: PdfBranding, d: ReceiptContext, receiptNo: st
 
   // 5 — who received it, and the seal
   drawAuthRow(doc, Math.min(y, footerY - SIGN_H), b, {
-    heading: 'Received By',
+    heading: 'Received by',
     sig: d.officer,
-    fallbackTitle: 'Authorised Accounts Officer',
+    fallbackTitle: 'Authorised accounts officer',
     stampLabel: 'Paid',
     stampDate: fmtDate(d.paidAt, 'short', tz),
     stampColor: C.teal,
   })
 
-  drawFooterNote(doc, M_X, CW, footerY, `Generated on ${fmtDate(new Date(), 'long', tz)}. This is a computer-generated document.`)
+  drawDocumentFooters(doc, { x: M_X, w: CW, y: footerY, note: `Generated on ${fmtDate(new Date(), 'long', tz)}. This is a computer-generated document.`, reference: receiptNo })
   return Buffer.from(doc.output('arraybuffer'))
 }
 
@@ -506,13 +506,13 @@ interface EarningLine { label: string; amount: number; allowance: boolean }
 function earningLines(earnings: PayslipEarnings | null, gross: number): EarningLine[] {
   if (earnings) {
     const lines: EarningLine[] = [
-      { label: 'Base Salary', amount: earnings.baseSalary, allowance: false },
+      { label: 'Base salary', amount: earnings.baseSalary, allowance: false },
       ...earnings.allowances.map((a) => ({ label: `Allowance (${a.type})`, amount: a.amount, allowance: true })),
     ]
     const sum = lines.reduce((s, l) => s + l.amount, 0)
     if (Math.abs(sum - gross) < 0.01) return lines
   }
-  return [{ label: 'Base Salary', amount: gross, allowance: false }]
+  return [{ label: 'Base salary', amount: gross, allowance: false }]
 }
 
 /**
@@ -608,9 +608,9 @@ export function buildPayslipPdf(
 
   // 1 — employee: a labelled list, no box
   const facts: Array<[string, string]> = [
-    ['Employee Name', d.staffName],
-    ['Employee Number', d.employeeNo],
-    ['Job Title', d.jobTitle],
+    ['Employee name', d.staffName],
+    ['Employee number', d.employeeNo],
+    ['Job title', d.jobTitle],
     ['Department', d.department],
   ]
   const rowH = 6.6
@@ -633,7 +633,7 @@ export function buildPayslipPdf(
     ['PAYE Tax Withheld', d.paye],
     [`Pension (${d.pensionPercent}%)`, d.pension],
   ]
-  if (d.loanDeduction > 0) deductions.push(['Loan Repayment', d.loanDeduction])
+  if (d.loanDeduction > 0) deductions.push(['Loan repayment', d.loanDeduction])
   const totalDeductions = d.paye + d.pension + d.loanDeduction
 
   const HEAD = 8
@@ -685,10 +685,10 @@ export function buildPayslipPdf(
 
   section('Earnings', CLEARED)
   d.lines.forEach((l, i) => line(l.label, l.amount, l.allowance ? '+' : '', l.allowance ? CLEARED : C.ink, i === 0))
-  total('Total Gross Monthly', d.grossSalary, CLEARED)
+  total('Total gross monthly', d.grossSalary, CLEARED)
   section('Deductions', C.danger)
   deductions.forEach(([label, amount], i) => line(label, amount, '−', C.danger, i === 0))
-  total('Total Deductions', totalDeductions, C.danger)
+  total('Total deductions', totalDeductions, C.danger)
 
   strokeColor(doc, C.rule)
   doc.setLineWidth(0.3)
@@ -713,16 +713,16 @@ export function buildPayslipPdf(
 
   // 4 — authorised by the finance officer; processed date; seal
   drawAuthRow(doc, y, b, {
-    heading: 'Authorised By',
+    heading: 'Authorised by',
     sig: d.officer,
-    fallbackTitle: 'Authorised Finance Officer',
+    fallbackTitle: 'Authorised finance officer',
     stampLabel: 'Issued',
     stampDate: fmtDate(d.processedAt, 'short', tz),
     stampColor: C.navy,
-    meta: { label: 'Processed On', value: fmtDate(d.processedAt, 'long', tz) },
+    meta: { label: 'Processed on', value: fmtDate(d.processedAt, 'long', tz) },
   })
 
-  drawFooterNote(doc, M_X, CW, 282, `Generated on ${fmtDate(new Date(), 'long', tz)}. This is a computer-generated document.`)
+  drawDocumentFooters(doc, { x: M_X, w: CW, y: 282, note: `Generated on ${fmtDate(new Date(), 'long', tz)}. This is a computer-generated document.`, reference: `${d.employeeNo} · ${d.period}` })
   return Buffer.from(doc.output('arraybuffer'))
 }
 

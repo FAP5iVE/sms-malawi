@@ -114,7 +114,7 @@ import * as settingsService  from '@/server/services/settingsService'
 import { getRasterSchoolLogo } from '@/server/services/schoolLogoService'
 import {
   createPdfDoc, drawCard, drawLetterhead, drawStamp, ellipsize, fillColor, fmtDate, gradeInk, put, resolveHeadTeacher,
-  resolveStaffSignatory, sectionLabel, setFace, stampPlace, strokeColor, tint, tracked, trackedWidth,
+  resolveStaffSignatory, sectionLabel, setFace, stampPlace, strokeColor, tint, tracked,
   PDF_COLORS as C, PT, type PdfBranding, type RGB,
 } from '@/server/services/pdfBranding'
 import type { jsPDF } from 'jspdf'
@@ -642,7 +642,7 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   setFace(doc, 'headingBold', 12, C.ink)
   tracked(doc, (maneb ? `MANEB ${maneb.examType} EXAMINATION RESULT` : 'STUDENT REPORT CARD'), PAGE_W / 2, y + 3.6, 0.7, 'center')
   setFace(doc, 'body', 8.2, C.muted)
-  put(doc, `Academic Year ${data.academicYear} — Term ${data.term}`, PAGE_W / 2, y + 8.2, 'center')
+  put(doc, `Academic Year ${data.academicYear} · Term ${data.term}`, PAGE_W / 2, y + 8.2, 'center')
   y += 12.2
 
   // ── 2. Student card ────────────────────────────────────────────────────────
@@ -652,16 +652,16 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   y = drawStudentCard(
     doc, y,
     [
-      ['Reg. Number', data.student.registrationNo],
-      ['Class / Form', data.student.className],
-      ['Class Teacher', data.classTeacher],
-      ['Date of Birth', dob],
+      ['Reg. no.', data.student.registrationNo],
+      ['Class', data.student.className],
+      ['Class teacher', data.classTeacher],
+      ['Date of birth', dob],
     ],
     [
-      ['Full Name', fullName],
+      ['Full name', fullName],
       ['Sex', sex],
-      maneb ? ['Candidate No.', maneb.candidateNo || '—'] : ['Standing', standing],
-      maneb ? ['Centre', maneb.centerNo ? `${maneb.centerNo} — ${maneb.centerName || '—'}` : '—'] : ['Subjects', String(data.subjects.length)],
+      maneb ? ['Candidate no.', maneb.candidateNo || '—'] : ['Standing', standing],
+      maneb ? ['Centre', maneb.centerNo ? `${maneb.centerNo} · ${maneb.centerName || '—'}` : '—'] : ['Subjects', String(data.subjects.length)],
     ],
   )
   y += 3.2
@@ -743,7 +743,7 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
       setFace(doc, 'headingBold', 7.4, C.navy)
       tracked(doc, `AGGREGATE (BEST ${MSCE_AGGREGATE_SUBJECT_COUNT} SUBJECTS)`, M_X + 4, y + 6, 0.35)
       setFace(doc, 'headingBold', 11, C.navy)
-      put(doc, maneb.points != null ? `${maneb.points} points` : `Not available — fewer than ${MSCE_AGGREGATE_SUBJECT_COUNT} subjects`, M_X + CW - 4, y + 6.4, 'right')
+      put(doc, maneb.points != null ? `${maneb.points} points` : `Not available: fewer than ${MSCE_AGGREGATE_SUBJECT_COUNT} subjects`, M_X + CW - 4, y + 6.4, 'right')
       setFace(doc, 'headingBold', 7.4, C.navy)
       tracked(doc, 'CERTIFICATE STATUS', M_X + 4, y + 12.4, 0.35)
       setFace(doc, 'headingBold', 9.5, outInk)
@@ -842,7 +842,7 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
       setFace(doc, 'body', 6.4, C.muted)
       const note = data.aggregatePoints != null
         ? `Aggregate = sum of the points of the ${MSCE_AGGREGATE_SUBJECT_COUNT} best subjects (range ${MSCE_AGGREGATE_BEST}–${MSCE_AGGREGATE_WORST}; lower is better); highlighted points are the subjects counted. MSCE awards no overall grade.`
-        : `Aggregate not available — ${MSCE_AGGREGATE_SUBJECT_COUNT} graded subjects are required to form an MSCE aggregate.`
+        : `Aggregate not available: ${MSCE_AGGREGATE_SUBJECT_COUNT} graded subjects are required to form an MSCE aggregate.`
       put(doc, ellipsize(doc, note, CW), M_X + 1, y + 3.6)
       y += noteH
     }
@@ -853,10 +853,10 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   sectionLabel(doc, 'Attendance', M_X + 2, midY(y, ATT_H, 6.8), C.neutral)
   const attPct = data.totalSchoolDays > 0 ? Math.round((data.daysPresent / data.totalSchoolDays) * 100) : 0
   const stats: Array<[string, string]> = [
-    ['Days Present', String(data.daysPresent)],
-    ['Days Absent', String(data.daysAbsent)],
-    ['Total Days', String(data.totalSchoolDays)],
-    ['Attendance Rate', `${attPct}%`],
+    ['Days present', String(data.daysPresent)],
+    ['Days absent', String(data.daysAbsent)],
+    ['Total days', String(data.totalSchoolDays)],
+    ['Attendance rate', `${attPct}%`],
   ]
   const sx0 = M_X + 36
   const sw = (CW - 40) / stats.length
@@ -895,11 +895,11 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
   const cardW = (CW - 4) / 2
   const stampR = 10.5
   drawSignCard(doc, {
-    x: M_X, y, w: cardW, h: SIGN_H, title: maneb ? 'Class Teacher' : "Class Teacher's Comment",
+    x: M_X, y, w: cardW, h: SIGN_H, title: maneb ? 'Class teacher' : "Class teacher's comment",
     comment: maneb ? null : data.classTeacherComment, name: data.classTeacher, role: data.classTeacherTitle, stampSide: false,
   })
   drawSignCard(doc, {
-    x: M_X + cardW + 4, y, w: cardW, h: SIGN_H, title: maneb ? 'Head Teacher' : "Head Teacher's Comment",
+    x: M_X + cardW + 4, y, w: cardW, h: SIGN_H, title: maneb ? 'Head teacher' : "Head teacher's comment",
     comment: maneb ? null : data.headTeacherComment, name: data.headTeacher, role: data.headTeacherTitle, stampSide: true,
   })
   drawStamp(doc, {
@@ -927,24 +927,25 @@ export function generateReportCardPDF(data: ReportCardData): Buffer {
     setFace(doc, 'bodyBold', 7.2, C.ink)
     put(doc, val, x0 + lw, fy + 4.6)
   }
-  const issuedLead = 'Date Issued: '
+  const issuedLead = 'Date issued: '
   const issuedVal = fmtCardDate(data.issueDate, tz)
   const issuedW = labelledW(issuedLead, issuedVal)
   labelled(issuedLead, issuedVal, M_X)
 
   // right-hand mark: shorten if it would crowd the centre text
-  setFace(doc, 'headingBold', 6.2, C.neutral)
-  let official = `OFFICIAL DOCUMENT — ${data.schoolName.toUpperCase()}`
-  const nextLead = 'Next Term Begins: '
+  // Right-hand end of the footer: the document reference and the page count (R11.7).
+  setFace(doc, 'bodyBold', 7.2, C.ink)
+  let official = `Ref: ${data.student.registrationNo} · Term ${data.term} ${data.academicYear}  ·  Page 1 of 1`
+  const nextLead = 'Next term begins: '
   const nextVal = data.nextTermDate ? fmtCardDate(data.nextTermDate, tz) : ''
   const nextW = nextVal ? labelledW(nextLead, nextVal) : 0
-  setFace(doc, 'headingBold', 6.2, C.neutral)
+  setFace(doc, 'bodyBold', 7.2, C.ink)
   const roomForRight = CW - issuedW - nextW - 16
-  if (trackedWidth(doc, official, 0.3) > roomForRight) official = data.schoolName.toUpperCase()
+  if (doc.getTextWidth(official) > roomForRight) official = 'Page 1 of 1'
   const officialShown = ellipsize(doc, official, Math.max(30, roomForRight))
-  tracked(doc, officialShown, M_X + CW, fy + 4.6, 0.3, 'right')
+  put(doc, officialShown, M_X + CW, fy + 4.6, 'right')
   if (nextVal) {
-    const rightStart = M_X + CW - trackedWidth(doc, officialShown, 0.3)
+    const rightStart = M_X + CW - doc.getTextWidth(officialShown)
     const x0 = Math.min(PAGE_W / 2 - nextW / 2, rightStart - 6 - nextW)
     labelled(nextLead, nextVal, Math.max(M_X + issuedW + 6, x0))
   }

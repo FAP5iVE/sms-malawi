@@ -150,6 +150,9 @@ export async function downloadXlsx(label: string, tables: readonly ExportTable[]
     header.font = { bold: true }
     header.alignment = { vertical: 'middle' }
     ws.views = [{ state: 'frozen', ySplit: 1 }]
+    // Printed pages (R11.7): A4 landscape, one page wide, header row repeated, "Page x of y" in the footer.
+    ws.pageSetup = { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: '1:1' }
+    ws.headerFooter.oddFooter = `&L&8${names[i]}&C&8Generated &D&R&8Page &P of &N`
     ws.columns.forEach((col, idx) => {
       const widest = matrix.reduce((w, r) => Math.max(w, String(r[idx] ?? '').length), 8)
       col.width = Math.min(48, widest + 2)
@@ -169,10 +172,10 @@ export async function downloadXlsx(label: string, tables: readonly ExportTable[]
 // ─── PDF REPORT PACK ──────────────────────────────────────────────────────────
 
 const SEVERITY_LABEL: Record<PackInsight['severity'], string> = {
-  critical: 'CRITICAL',
-  watch: 'WATCH',
-  info: 'INFO',
-  positive: 'GOOD',
+  critical: 'Critical',
+  watch: 'Watch',
+  info: 'Info',
+  positive: 'Good',
 }
 
 /** The brand navy (--brand-navy, light mode) — a printed pack is paper, so it never re-themes. */
@@ -318,7 +321,7 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
   if (model.insights.length > 0) {
     heading('Findings')
     model.insights.forEach((ins) => {
-      const lines = doc.splitTextToSize(`${ins.title} — ${ins.detail}`, contentW - 60) as string[]
+      const lines = doc.splitTextToSize(`${ins.title}: ${ins.detail}`, contentW - 60) as string[]
       ensure(lines.length * 11 + 8)
       doc.setFont(fam.body, 'bold')
       doc.setFontSize(8)
@@ -372,7 +375,7 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
         doc.setFont(fam.body, italic)
         doc.setFontSize(8)
         doc.setTextColor(110)
-        doc.text(`${matrix.length - 1 - PDF_MAX_ROWS} more rows — export to Excel for the full table.`, margin, y)
+        doc.text(`${matrix.length - 1 - PDF_MAX_ROWS} more rows. Export to Excel for the full table.`, margin, y)
         y += 14
       }
       if (headerRow.length > cols) {
@@ -380,7 +383,7 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
         doc.setFont(fam.body, italic)
         doc.setFontSize(8)
         doc.setTextColor(110)
-        doc.text(`${headerRow.length - cols} further columns omitted — export to Excel for all columns.`, margin, y)
+        doc.text(`${headerRow.length - cols} further columns left out. Export to Excel for all columns.`, margin, y)
         y += 14
       }
       y += 10
@@ -393,7 +396,7 @@ export async function buildReportPdf(model: ReportPackModel): Promise<Blob> {
     doc.setFont(fam.body, 'normal')
     doc.setFontSize(8)
     doc.setTextColor(120)
-    doc.text(`${model.schoolName} — ${model.title}`, margin, pageH - 24)
+    doc.text(`${model.schoolName}  ·  ${model.title}`, margin, pageH - 24)
     doc.text(`Page ${p} of ${pages}`, pageW - margin, pageH - 24, { align: 'right' })
   }
 
