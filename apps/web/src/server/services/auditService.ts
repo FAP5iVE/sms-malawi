@@ -119,6 +119,7 @@ export const ACTION_SEVERITY: Readonly<Record<string, Severity>> = {
   'guardian.onboarding_dry_run':        SEVERITY.MEDIUM,
   'guardian.onboarding_applied':        SEVERITY.HIGH,
   'guardian.onboarding_rolled_back':    SEVERITY.HIGH,
+  'guardian.national_ids_backfilled':   SEVERITY.MEDIUM,
   'guardian.directory_synced':          SEVERITY.LOW,
 
   // ── Application

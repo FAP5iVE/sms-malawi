@@ -90,6 +90,11 @@ export async function dryRun(db: GuardianDb, scope: OnboardingScope, ctx: StaffC
   for (const part of chunks(emails, 500)) {
     for (const h of await db.guardianContact.findMany({ where: { kind: 'EMAIL', normalizedValue: { in: part } }, select: { profileId: true } })) profileIds.add(h.profileId as string)
   }
+  // A national ID is the strongest signal, so profiles holding one of these IDs are candidates too.
+  const nationalIds = [...new Set(proposals.map((p) => p.nationalId).filter((v): v is string => !!v))]
+  for (const part of chunks(nationalIds, 500)) {
+    for (const h of await db.guardianProfile.findMany({ where: { nationalId: { in: part } }, select: { id: true } })) profileIds.add(h.id as string)
+  }
   const existing: ExistingProfile[] = []
   for (const part of chunks([...profileIds], 500)) {
     existing.push(...((await db.guardianProfile.findMany({ where: { id: { in: part } }, include: { contacts: true } })) as ExistingProfile[]))
@@ -98,6 +103,7 @@ export async function dryRun(db: GuardianDb, scope: OnboardingScope, ctx: StaffC
   const byAction: Record<ItemAction, number> = { CREATE_NEW: 0, SUGGEST_MATCH: 0, SKIP_EXISTING: 0, SKIP_INVALID: 0 }
   const byFlag: Record<string, number> = {}
   const earlier = new Map<string, string[]>()   // phone -> names of earlier cards in THIS batch
+  const earlierIds = new Set<string>()          // national IDs of earlier cards in THIS batch
   const items: Record<string, unknown>[] = []
 
   cards.forEach((card, i) => {
@@ -110,12 +116,14 @@ export async function dryRun(db: GuardianDb, scope: OnboardingScope, ctx: StaffC
     else {
       const phoneValues = p.contacts.filter((c) => c.kind === 'PHONE').map((c) => c.normalizedValue)
       const email = p.contacts.find((c) => c.kind === 'EMAIL')?.normalizedValue ?? null
-      const matchesDb = suggestMatches({ name: p.fullName, phones: phoneValues, email }, existing).length > 0
-      const matchesEarlier = phoneValues.some((ph) => (earlier.get(ph) ?? []).some((n) => nameSimilarity(n, p.fullName) >= SAME_PERSON_THRESHOLD))
+      const matchesDb = suggestMatches({ name: p.fullName, phones: phoneValues, email, nationalId: p.nationalId }, existing).length > 0
+      const matchesEarlier = phoneValues.some((ph) => (earlier.get(ph) ?? []).some((n) => nameSimilarity(n, p.fullName) >= SAME_PERSON_THRESHOLD)) ||
+        (!!p.nationalId && earlierIds.has(p.nationalId))
       if (matchesDb) flags.push('MATCHES_EXISTING_PROFILE')
       if (matchesEarlier) flags.push('MATCHES_EARLIER_IN_BATCH')
       action = matchesDb || matchesEarlier ? 'SUGGEST_MATCH' : 'CREATE_NEW'
       for (const ph of phoneValues) earlier.set(ph, [...(earlier.get(ph) ?? []), p.fullName])
+      if (p.nationalId) earlierIds.add(p.nationalId)
     }
     byAction[action]++
     for (const f of flags) byFlag[f] = (byFlag[f] ?? 0) + 1

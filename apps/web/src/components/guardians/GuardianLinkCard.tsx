@@ -14,7 +14,7 @@
 
 import { useState } from 'react'
 import {
-  AlertTriangle, CheckCircle2, Mail, Phone, Send, ShieldOff, SlidersHorizontal, Users, XCircle,
+  AlertTriangle, CheckCircle2, Hash, Mail, Phone, Send, ShieldOff, SlidersHorizontal, Users, XCircle,
 } from 'lucide-react'
 import {
   GUARDIAN_CAPABILITY_LABELS, GUARDIAN_EVIDENCE_LABELS, GUARDIAN_EVIDENCE_LEVELS, GUARDIAN_INVITATION_STATUS_LABELS,
@@ -26,7 +26,7 @@ import { StatusText, type StatusTone } from '@/components/shared/StatusText'
 import { usePermissions } from '@/hooks/usePermissions'
 import {
   useConfirmReverified, useReinstateGuardianProfile, useRepointLink, useRevokeInvitation, useSetLinkEvidence,
-  type GuardianLinkDto, type LinkTransition,
+  type GuardianLinkDto, type GuardianRelatedStudent, type GuardianRelatedStudents, type LinkTransition,
 } from '@/hooks/useGuardians'
 import {
   ApproveDialog, CapabilitiesDialog, InviteDialog, ReasonDialog, SuspendProfileDialog,
@@ -42,6 +42,8 @@ const STATUS_TONE: Record<GuardianLinkStatusValue, StatusTone> = {
 }
 
 const MATCH_LABELS: Record<string, string> = {
+  NATIONAL_ID_NAME: 'the same national ID and a similar name',
+  NATIONAL_ID: 'the same national ID but a different name',
   EMAIL_NAME: 'the same e-mail and a similar name',
   EMAIL: 'the same e-mail',
   PHONE_NAME: 'the same phone number and a similar name',
@@ -60,6 +62,38 @@ type Open =
   | { kind: 'reason'; action: LinkTransition }
   | { kind: 'repoint' } | { kind: 'reinstateProfile' } | { kind: 'cancelInvitation'; id: string }
   | null
+
+/** What a student's place on a duplicate flag means, in words a clerk would use. */
+function relatedState(s: GuardianRelatedStudent): { text: string; tone: StatusTone } {
+  if (s.via === 'FLAGGED') return { text: 'waiting, also flagged', tone: 'warning' }
+  if (s.linkStatus === 'ACTIVE') return { text: 'approved', tone: 'success' }
+  if (s.linkStatus === 'SUSPENDED') return { text: 'suspended', tone: 'danger' }
+  return { text: 'waiting', tone: 'warning' }
+}
+
+/** The children this guardian appears for elsewhere, so staff can see the whole family before deciding. */
+function RelatedStudents({ heading, group }: { heading: string; group: GuardianRelatedStudents }) {
+  if (group.students.length === 0) return null
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium text-body">{heading}</p>
+      <ul className="space-y-1 text-sm">
+        {group.students.map((s) => {
+          const state = relatedState(s)
+          return (
+            <li key={s.id} className="flex flex-wrap items-baseline gap-x-2">
+              <span className="font-medium text-body">{s.name}</span>
+              {s.registrationNo ? <span className="text-muted">({s.registrationNo})</span> : null}
+              {s.relationship ? <span className="text-muted">{s.relationship}</span> : null}
+              <StatusText tone={state.tone}>{state.text}</StatusText>
+            </li>
+          )
+        })}
+        {group.moreStudents > 0 && <li className="text-muted">and {group.moreStudents} more</li>}
+      </ul>
+    </div>
+  )
+}
 
 function fmtDate(iso: string): string {
   const d = new Date(iso)
@@ -86,7 +120,7 @@ export function GuardianLinkCard({ link, showStudent = false, profileNames }: {
   const actions = availableLinkActions(link.status, (p) => can(p))
   const live = link.status === 'PENDING' || link.status === 'ACTIVE' || link.status === 'SUSPENDED'
   const profile = link.profile
-  const suggestedName = link.suggestion ? profileNames?.get(link.suggestion.profileId) : undefined
+  const suggestedName = link.suggestion ? (link.suggestion.profileName ?? profileNames?.get(link.suggestion.profileId)) : undefined
   const activeInvitation = link.invitations.find((i) => i.status === 'ACTIVE')
   const profileSuspended = profile?.status === 'SUSPENDED'
 
@@ -119,6 +153,12 @@ export function GuardianLinkCard({ link, showStudent = false, profileNames }: {
               <span className="break-all">{c.value}</span>
             </li>
           ))}
+          {profile.nationalIdMasked && (
+            <li className="inline-flex items-center gap-1.5">
+              <Hash className="w-3.5 h-3.5" aria-hidden />
+              <span>National ID {profile.nationalIdMasked}</span>
+            </li>
+          )}
         </ul>
       )}
 
@@ -145,12 +185,30 @@ export function GuardianLinkCard({ link, showStudent = false, profileNames }: {
               <strong>Possible duplicate.</strong> This entry has {MATCH_LABELS[link.suggestion.method ?? ''] ?? 'details in common'} with
               {suggestedName ? <> <strong>{suggestedName}</strong>, who is</> : ' a guardian'} already on file.
             </p>
+            {link.suggestion.method === 'NATIONAL_ID' && (
+              <p>The ID is the same, so check the name before deciding: a married name, a nickname or a spelling difference can explain it.</p>
+            )}
+            {link.suggestion.idConflict && (
+              <p>Their national IDs are <strong>different</strong>, so these may be two people who share a phone or e-mail.</p>
+            )}
+            {link.suggestion.students && link.suggestion.students.length > 0 && (
+              <RelatedStudents
+                heading={`${suggestedName ?? 'This guardian'} also appears for`}
+                group={{ students: link.suggestion.students, moreStudents: link.suggestion.moreStudents ?? 0 }}
+              />
+            )}
             {can('guardian.propose') && (
               <button type="button" className={BTN_OUTLINE} disabled={repoint.isPending} onClick={() => setOpen({ kind: 'repoint' })}>
                 <Users className="w-4 h-4" aria-hidden />They are the same person
               </button>
             )}
           </div>
+        </div>
+      )}
+
+      {link.alsoFlaggedOn && (
+        <div role="note" className="rounded-xl bg-page p-3 text-sm text-body">
+          <RelatedStudents heading="Waiting entries for these children may be the same person as this guardian" group={link.alsoFlaggedOn} />
         </div>
       )}
 

@@ -23,6 +23,7 @@
  *     link; it does not change who the person is.
  */
 import type { GuardianLinkSourceValue } from '@shared/constants/guardianPortal'
+import { normalizeNationalId } from '@/server/lib/guardian/nationalId'
 import { buildGuardianProposal, detectDirectoryDrift, type DirectoryEntryInput, type ProposalFlag } from '@/server/lib/guardian/proposal'
 import { suggestMatches, type ExistingProfile } from '@/server/lib/guardian/matching'
 import { isUniqueViolation, type Actor, type AuditRecord, type GuardianDb } from './db'
@@ -85,19 +86,21 @@ export async function proposeFromDirectoryEntry(db: GuardianDb, card: DirectoryC
   const proposal = buildGuardianProposal(card)
   if (!proposal.usable) return { outcome: 'SKIPPED', reason: 'NAME_PLACEHOLDER', flags: proposal.flags, audit: [] }
 
-  // Suggestions: existing profiles sharing a phone or email with this card.
+  // Suggestions: existing profiles sharing a national ID, phone or email with this card.
   const phones = proposal.contacts.filter((c) => c.kind === 'PHONE').map((c) => c.normalizedValue)
   const email = proposal.contacts.find((c) => c.kind === 'EMAIL')?.normalizedValue ?? null
+  const nationalId = proposal.nationalId
   let suggestion: { profileId: string; method: string; score: number } | null = null
-  if (phones.length > 0 || email) {
+  if (phones.length > 0 || email || nationalId) {
+    const ids = new Set<string>()
     const or: Record<string, unknown>[] = []
     if (phones.length) or.push({ kind: 'PHONE', normalizedValue: { in: phones } })
     if (email) or.push({ kind: 'EMAIL', normalizedValue: email })
-    const hits = await db.guardianContact.findMany({ where: { OR: or }, select: { profileId: true } })
-    const ids = [...new Set(hits.map((h) => h.profileId as string))]
-    if (ids.length) {
-      const profiles = (await db.guardianProfile.findMany({ where: { id: { in: ids } }, include: { contacts: true } })) as ExistingProfile[]
-      const best = suggestMatches({ name: proposal.fullName, phones, email }, profiles)[0]
+    if (or.length) for (const h of await db.guardianContact.findMany({ where: { OR: or }, select: { profileId: true } })) ids.add(h.profileId as string)
+    if (nationalId) for (const h of await db.guardianProfile.findMany({ where: { nationalId }, select: { id: true } })) ids.add(h.id as string)
+    if (ids.size) {
+      const profiles = (await db.guardianProfile.findMany({ where: { id: { in: [...ids] } }, include: { contacts: true } })) as ExistingProfile[]
+      const best = suggestMatches({ name: proposal.fullName, phones, email, nationalId }, profiles)[0]
       if (best && best.score >= MIN_SUGGESTION_SCORE) suggestion = { profileId: best.profileId, method: best.method, score: best.score }
     }
   }
@@ -111,6 +114,7 @@ export async function proposeFromDirectoryEntry(db: GuardianDb, card: DirectoryC
       data: {
         fullName: proposal.fullName,
         normalizedName: proposal.normalizedName,
+        nationalId: proposal.nationalId,
         createdSource: source,
         createdByUid: ctx.actor.uid,
       },
@@ -237,6 +241,28 @@ export async function suspendLinksForRemovedCard(db: GuardianDb, cardId: string,
   return { suspended, rejected, audit: records }
 }
 
+// ─── NATIONAL ID (fill only, never overwrite) ─────────────────────────────
+
+/**
+ * Gives the guardian profile behind this card its national ID when the profile has none yet
+ * (a card edited after the proposal, or a profile created before the column existed).
+ *
+ * Fill-only on purpose: the profile is never rewritten from the card, and an ID that is already
+ * there is never replaced. A card that now disagrees with its profile is a question for staff
+ * (it surfaces as a conflict on the duplicate flag), not something to resolve silently.
+ */
+export async function fillNationalIdFromCard(db: GuardianDb, card: DirectoryCard): Promise<boolean> {
+  const nationalId = normalizeNationalId(card.nrbNumber)
+  if (!nationalId) return false
+  const link = await db.guardianLink.findFirst({ where: { directoryEntryId: card.id }, select: { profileId: true } })
+  if (!link) return false
+  const res = await db.guardianProfile.updateMany({
+    where: { id: link.profileId, nationalId: null, status: 'ACTIVE' },
+    data: { nationalId },
+  })
+  return res.count === 1
+}
+
 // ─── WHOLE-STUDENT SYNC ───────────────────────────────────────────────────
 
 export interface SyncResult {
@@ -260,6 +286,7 @@ export async function syncStudentDirectory(db: GuardianDb, studentId: string, ct
     if (proposed.outcome === 'CREATED') { result.proposed++; continue }
     if (proposed.outcome === 'SKIPPED') { result.skipped++; continue }
     result.existing++
+    await fillNationalIdFromCard(db, card)
     const drift = await reconcileEntryDrift(db, card, ctx)
     result.flagged += drift.flagged
     result.audit.push(...drift.audit)

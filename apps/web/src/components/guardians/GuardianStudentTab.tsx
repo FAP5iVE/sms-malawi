@@ -6,8 +6,9 @@
  *   contacts into pending guardian links ("Read contacts"), and act on each link.
  *
  *   This is the entry point for any student who is not part of a bulk onboarding batch, and the
- *   only place that shows the raw contact cards next to the links built from them.
- * [DEPENDS ON]: @/hooks/useGuardians, ./GuardianLinkCard, ./GuardianStudentPicker
+ *   only place that shows the raw contact cards next to the links built from them. With no student
+ *   chosen it shows a browsable, searchable list (GuardianStudentBrowser) rather than a blank box.
+ * [DEPENDS ON]: @/hooks/useGuardians, ./GuardianLinkCard, ./GuardianStudentBrowser, ./GuardianStudentPicker
  */
 'use client'
 
@@ -16,6 +17,7 @@ import { Loader2, RefreshCw, Users } from 'lucide-react'
 import { usePermissions } from '@/hooks/usePermissions'
 import { useGuardianStudentView, useSyncStudentGuardians, type GuardianSyncResult } from '@/hooks/useGuardians'
 import { GuardianLinkCard } from './GuardianLinkCard'
+import { GuardianStudentBrowser } from './GuardianStudentBrowser'
 import { GuardianStudentPicker, type PickedStudent } from './GuardianStudentPicker'
 
 /** One plain sentence for what "Read contacts" did. Exported for its test. */
@@ -40,11 +42,15 @@ export function GuardianStudentTab() {
 
   return (
     <div className="space-y-4">
-      <GuardianStudentPicker
-        selected={student}
-        onSelect={(s) => { sync.reset(); setStudent(s) }}
-        onClear={() => { sync.reset(); setStudent(null) }}
-      />
+      {student ? (
+        <GuardianStudentPicker
+          selected={student}
+          onSelect={(s) => { sync.reset(); setStudent(s) }}
+          onClear={() => { sync.reset(); setStudent(null) }}
+        />
+      ) : (
+        <GuardianStudentBrowser onSelect={(s) => { sync.reset(); setStudent(s) }} />
+      )}
 
       {student && view.isLoading && (
         <div className="flex items-center gap-2 text-sm text-muted" role="status"><Loader2 className="w-4 h-4 animate-spin" aria-hidden />Loading guardians…</div>

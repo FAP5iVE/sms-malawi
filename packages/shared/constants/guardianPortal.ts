@@ -119,6 +119,7 @@ export const GUARDIAN_AUDIT_ACTIONS = [
   'guardian.onboarding_dry_run',
   'guardian.onboarding_applied',
   'guardian.onboarding_rolled_back',
+  'guardian.national_ids_backfilled',
   'guardian.directory_synced',
 ] as const
 export type GuardianAuditAction = (typeof GUARDIAN_AUDIT_ACTIONS)[number]

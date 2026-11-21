@@ -40,9 +40,27 @@ export const QueueQuerySchema = z.object({
   status: z.enum(GUARDIAN_LINK_STATUSES).optional(),
   reverify: z.enum(['true', 'false']).optional(),
   studentId: id.optional(),
+  /** Guardian name, phone, e-mail or national ID, or the student's name or registration number. */
+  search: z.string().trim().min(1).max(80).optional(),
   take: z.coerce.number().int().min(1).max(200).optional(),
   skip: z.coerce.number().int().min(0).max(100_000).optional(),
 }).strict()
+
+/** The Student tab's browse list: current students by default, everyone when searching. */
+export const StudentListQuerySchema = z.object({
+  search: z.string().trim().min(1).max(80).optional(),
+  sort: z.enum(['recent', 'name']).optional(),
+  take: z.coerce.number().int().min(1).max(50).optional(),
+  skip: z.coerce.number().int().min(0).max(100_000).optional(),
+}).strict()
+
+/** The Access log's default view: the students whose information was most recently opened. */
+export const RecentAccessQuerySchema = z.object({
+  take: z.coerce.number().int().min(1).max(100).optional(),
+}).strict()
+
+/** apply=false (default) is a preview that writes nothing. */
+export const NationalIdBackfillSchema = z.object({ apply: z.boolean().optional() }).strict()
 
 export const AccessLogQuerySchema = z.object({
   studentId: id.optional(),

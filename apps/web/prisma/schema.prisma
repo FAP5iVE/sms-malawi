@@ -3204,6 +3204,10 @@ model GuardianProfile {
   id             String                @id @default(cuid())
   fullName       String
   normalizedName String                // lower-case, no titles/punctuation: matching only
+  /// The guardian's national ID, upper-case letters and digits only (see lib/guardian/nationalId.ts).
+  /// Null when unknown or not a plausible ID. NOT unique on purpose: two profiles holding the same
+  /// ID is exactly what the duplicate flag exists to surface; a unique index would hide it behind an error.
+  nationalId     String?
   status         GuardianProfileStatus @default(ACTIVE)
   firebaseUid    String?               @unique
   claimedAt      DateTime?
@@ -3222,6 +3226,7 @@ model GuardianProfile {
   accessLogs     GuardianAccessLog[]
 
   @@index([normalizedName])
+  @@index([nationalId])
   @@index([status])
   @@map("guardian_profiles")
 }
@@ -3415,5 +3420,6 @@ model GuardianAccessLog {
 
   @@index([profileId, createdAt])
   @@index([studentId, createdAt])
+  @@index([createdAt])
   @@map("guardian_access_logs")
 }

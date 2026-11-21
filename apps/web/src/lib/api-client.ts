@@ -701,10 +701,12 @@ export const queryKeys = {
   // ── Guardian portal, STAFF side (/guardians/*). One root so any link change refreshes every view.
   guardians: {
     all: () => ['guardians'] as const,
-    queue: (f: { status?: string | null; reverify?: boolean; skip?: number }) => ['guardians', 'queue', f] as const,
+    queue: (f: { status?: string | null; reverify?: boolean; skip?: number; search?: string }) => ['guardians', 'queue', f] as const,
     student: (studentId: string) => ['guardians', 'student', studentId] as const,
     onboarding: (batchId: string, action?: string | null, skip?: number) => ['guardians', 'onboarding', batchId, action ?? null, skip ?? 0] as const,
     accessLog: (f: { studentId?: string | null; profileId?: string | null }) => ['guardians', 'access-log', f] as const,
+    studentList: (f: { search?: string; sort?: string; skip?: number }) => ['guardians', 'student-list', f] as const,
+    recentAccess: () => ['guardians', 'access-log', 'recent'] as const,
   },
 
   // ── Guardian portal, PARENT side (/parent/*). Keyed by the link id, never the student id.

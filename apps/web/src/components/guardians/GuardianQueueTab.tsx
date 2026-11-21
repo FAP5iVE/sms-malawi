@@ -4,8 +4,10 @@
  * [PHASE]: Guardian Portal — staff UI (T7a)
  * [PURPOSE]: The review queue: every guardian link across the school, filtered by status or by
  *   "needs re-verification", newest first, paged. Defaults to links awaiting approval, which is
- *   the work that blocks a parent from ever getting in.
- * [DEPENDS ON]: @/hooks/useGuardians, ./GuardianLinkCard
+ *   the work that blocks a parent from ever getting in. A search box finds one parent (name,
+ *   phone, e-mail or national ID) or one student's guardians without paging; it works inside the
+ *   chosen filter, and "All" removes the filter.
+ * [DEPENDS ON]: @/hooks/useGuardians, ./GuardianLinkCard, ./GuardianSearchBox
  */
 'use client'
 
@@ -15,28 +17,42 @@ import { GUARDIAN_LINK_STATUS_LABELS, type GuardianLinkStatusValue } from '@shar
 import { QUEUE_PAGE_SIZE, useGuardianQueue } from '@/hooks/useGuardians'
 import { CHIP, CHIP_ON, CHIP_OFF } from '@/lib/hills/chip'
 import { GuardianLinkCard } from './GuardianLinkCard'
+import { GuardianSearchBox, useDebouncedValue } from './GuardianSearchBox'
 
 const FILTERS: GuardianLinkStatusValue[] = ['PENDING', 'ACTIVE', 'SUSPENDED', 'REJECTED', 'REVOKED']
 
 
 export function GuardianQueueTab() {
-  const [status, setStatus] = useState<GuardianLinkStatusValue>('PENDING')
+  const [status, setStatus] = useState<GuardianLinkStatusValue | null>('PENDING')
   const [reverify, setReverify] = useState(false)
   const [skip, setSkip] = useState(0)
+  const [text, setText] = useState('')
+  const settled = useDebouncedValue(text.trim(), 300)
+  const search = settled.length >= 2 ? settled : ''
 
-  const queue = useGuardianQueue({ status: reverify ? null : status, reverify, skip })
+  const queue = useGuardianQueue({ status: reverify ? null : status, reverify, skip, search })
   const items = queue.data?.items ?? []
   const hasNext = items.length === QUEUE_PAGE_SIZE
 
   const profileNames = new Map<string, string>()
   for (const l of items) if (l.profile) profileNames.set(l.profile.id, l.profile.fullName)
 
-  const pick = (s: GuardianLinkStatusValue) => { setReverify(false); setStatus(s); setSkip(0) }
+  const pick = (s: GuardianLinkStatusValue | null) => { setReverify(false); setStatus(s); setSkip(0) }
   const toggleReverify = () => { setReverify((v) => !v); setSkip(0) }
+  const changeSearch = (next: string) => { setText(next); setSkip(0) }
+  const scopeLabel = reverify ? 'among guardians needing re-verification' : status ? `among guardians marked “${GUARDIAN_LINK_STATUS_LABELS[status]}”` : 'anywhere in the queue'
 
   return (
     <div className="space-y-4">
+      <GuardianSearchBox
+        id="guardian-queue-search" label="Search guardians" value={text} onChange={changeSearch}
+        placeholder="Guardian name, phone, e-mail or national ID, or a student"
+      />
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filter guardians">
+        <button type="button" aria-pressed={!reverify && status === null} onClick={() => pick(null)}
+          className={`${CHIP} ${!reverify && status === null ? CHIP_ON : CHIP_OFF}`}>
+          All
+        </button>
         {FILTERS.map((s) => (
           <button key={s} type="button" aria-pressed={!reverify && status === s} onClick={() => pick(s)}
             className={`${CHIP} ${!reverify && status === s ? CHIP_ON : CHIP_OFF}`}>
@@ -63,9 +79,16 @@ export function GuardianQueueTab() {
         <div className="app-tint rounded-xl p-10 text-center">
           <Inbox className="w-8 h-8 mx-auto text-muted mb-2" aria-hidden />
           <p className="font-medium text-body">
-            {skip > 0 ? 'No more guardians.' : reverify ? 'Nobody needs re-verifying.' : `Nothing ${GUARDIAN_LINK_STATUS_LABELS[status].toLowerCase()}.`}
+            {skip > 0
+              ? 'No more guardians.'
+              : search
+                ? `No guardian or student matches “${search}” ${scopeLabel}.`
+                : reverify ? 'Nobody needs re-verifying.' : status ? `Nothing ${GUARDIAN_LINK_STATUS_LABELS[status].toLowerCase()}.` : 'No guardians yet.'}
           </p>
-          {status === 'PENDING' && !reverify && skip === 0 && (
+          {search && skip === 0 && (reverify || status !== null) && (
+            <button type="button" className="mt-2 font-medium underline text-sm text-body" onClick={() => pick(null)}>Search in every status</button>
+          )}
+          {status === 'PENDING' && !reverify && skip === 0 && !search && (
             <p className="text-sm text-muted mt-1">New guardians appear here once a student’s contacts have been read. Use the Student or Onboarding tab to bring them in.</p>
           )}
         </div>

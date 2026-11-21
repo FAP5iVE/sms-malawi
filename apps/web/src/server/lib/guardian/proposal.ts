@@ -12,6 +12,7 @@
 import { defaultCapabilitiesFor, type GuardianCapability } from '@shared/constants/guardianPortal'
 import type { GuardianRelationship } from '@shared/constants/admissions'
 import { extractPhones, normalizeEmail } from './phone'
+import { normalizeNationalId } from './nationalId'
 import { isPlaceholderName, normalizeName } from './names'
 import { mapRelationship } from './relationship'
 
@@ -22,6 +23,8 @@ export interface DirectoryEntryInput {
   phone: string
   altPhone?: string | null
   email?: string | null
+  /** The guardian's national ID as typed on the card (StudentGuardian.nrbNumber). */
+  nrbNumber?: string | null
   isPrimary?: boolean
   isFeePayer?: boolean
 }
@@ -49,6 +52,8 @@ export interface GuardianProposal {
   relationship: GuardianRelationship
   relationshipNote: string | null
   contacts: ProposedContact[]
+  /** Normalised national ID from the card, or null when absent or not a plausible ID. */
+  nationalId: string | null
   isPrimaryContact: boolean
   isFinancialResponsible: boolean
   /** What staff would grant by default if they approve as-is. */
@@ -95,6 +100,7 @@ export function buildGuardianProposal(entry: DirectoryEntryInput): GuardianPropo
     relationship: rel.relationship,
     relationshipNote: rel.note,
     contacts,
+    nationalId: normalizeNationalId(entry.nrbNumber),
     isPrimaryContact: entry.isPrimary === true,
     isFinancialResponsible,
     suggestedCapabilities: defaultCapabilitiesFor({ isFinancialResponsible }),

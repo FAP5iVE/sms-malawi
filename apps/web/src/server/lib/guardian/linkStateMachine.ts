@@ -17,7 +17,7 @@
 import type { Permission } from '@shared/types/permissions'
 import type { GuardianLinkStatusValue, GuardianEvidenceValue } from '@shared/constants/guardianPortal'
 import { sanitizeCapabilities } from '@shared/constants/guardianPortal'
-import { isStrongMatch } from './matching'
+import { isStrongMatch, type MatchMethod } from './matching'
 
 export type LinkAction = 'approve' | 'reject' | 'suspend' | 'reinstate' | 'revoke' | 'reopen'
 
@@ -81,7 +81,7 @@ export function evaluateApproval(i: ApprovalInput): Problem[] {
   if (
     i.link.suggestedProfileId &&
     i.link.suggestedMethod &&
-    isStrongMatch({ method: i.link.suggestedMethod as 'EMAIL_NAME' | 'EMAIL' | 'PHONE_NAME' | 'PHONE_SHARED' }) &&
+    isStrongMatch({ method: i.link.suggestedMethod as MatchMethod }) &&
     i.acknowledgeSuggestion !== true
   ) {
     problems.push({ code: 'UNRESOLVED_MATCH', message: 'This looks like a guardian who is already on file. Link to that profile, or confirm they are a different person.' })

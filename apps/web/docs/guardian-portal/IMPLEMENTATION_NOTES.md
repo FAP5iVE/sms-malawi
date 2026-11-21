@@ -112,3 +112,41 @@ already has a permission gate; admin user schemas already exclude `parent`;
 
 - Run here (no `node_modules`, no installs): every guardian-related test file, the parent-fence, route-guard, security-docs and fence-completeness tests, through `tsx` with a throwaway vitest shim kept outside the project; a stub-typed `tsc` pass over all new and changed UI/server files; render smoke tests (real React, mocked hooks) of the parent panels, parent home and the staff link card, with deliberately injected faults (leaked withheld marks, a nested card) that the tests caught. Security docs were regenerated for the new route.
 - **Not run here, run before release**: `pnpm test` (real vitest), `tsc` against the real types, `next build`, `proxy.test.ts` and `superUser.test.ts` (they import `next/server`; their folder-vs-`PAGE_ACCESS` assertions were reproduced by script and pass), and a browser pass at phone width covering the report-card modal, the exam detail modal and the attendance calendar.
+
+## Guardians screens: national ID matching, search and default lists (21 Nov 2026)
+
+**Matching.** `GuardianProfile.nationalId` (normalised: upper-case letters and digits, see `lib/guardian/nationalId.ts`)
+is now a matching signal and ranks above every other one.
+- `NATIONAL_ID_NAME`: same ID and a similar name. `NATIONAL_ID`: same ID but the names differ a lot. Both are "strong":
+  they block approval until staff resolve them (repoint or confirm different). The second is worded as "check the name",
+  because a married name, a nickname or a mistyped ID can explain it.
+- Placeholders ("N/A", "00000000", "12345678") are never treated as an ID.
+- Phone stays a weak hint (households share handsets); e-mail and phone behave as before.
+- Two profiles that both have an ID and differ get an `idConflict` warning on the flag (two people sharing a phone or e-mail).
+- The ID is copied from the card at proposal time; a sync fills a blank profile ID and never replaces one; a repoint carries it
+  to the person on file when that person has none.
+- The full ID is never returned to the browser: staff see the last three characters.
+
+**The duplicate flag.** A flagged card lists every student the same person appears for: students already linked to the person
+on file (`LINKED`) and other waiting entries flagged as that same person (`FLAGGED`), capped at 12 with "and N more". The person
+on file shows the reverse (`alsoFlaggedOn`): which waiting entries may be them. Built at read time in
+`attachSuggestionDetail`, so it is always current.
+
+**Catch-up for existing guardians.** `POST /guardians/national-ids/backfill` (`guardian.backfill`), surfaced on the Onboarding
+tab as "Match guardians by national ID". Preview by default. Fills blank IDs from contact cards (a profile whose cards show two
+different IDs is left blank and counted), then flags the waiting entries of guardians that now share an ID against the oldest
+active one (preferring one with a portal account). Never merges, links or approves; skips links staff already decided and
+cases where a move would be refused; idempotent.
+
+**Review queue search.** `GET /guardians/queue?search=` matches guardian name (any word order), phone (0999…, 999… or +265…),
+e-mail, national ID (partial), and a student's name or registration number, inside the chosen status filter. There is now an "All" filter.
+
+**Student tab.** `GET /guardians/students` (`guardian.view`): with no search, current students (active, awaiting MANEB results),
+newest first or A to Z; with a search, every student in the school. Each row shows contact cards and link counts.
+
+**Access log.** `GET /guardians/access-log/recent` (`guardian.viewAccessLog`): one row per student from the latest 1,000
+events (index on `createdAt` added). The tab shows the search box first, the recent list below it, and a row opens that
+student's full log.
+
+Migration `20261121120000_guardian_national_id_matching`: one nullable column and two indexes, no data changed.
+

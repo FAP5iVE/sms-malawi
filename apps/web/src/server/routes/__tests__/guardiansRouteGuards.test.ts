@@ -15,8 +15,10 @@ const read = (p: string) => fs.readFileSync(path.join(webRoot, p), 'utf8').repla
 
 const EXPECTED: Record<string, { perm: string; rate: string | null }> = {
   'GET /guardians/queue':                      { perm: 'guardian.view', rate: null },
+  'GET /guardians/students':                   { perm: 'guardian.view', rate: null },
   'GET /guardians/students/:studentId':        { perm: 'guardian.view', rate: null },
   'GET /guardians/access-log':                 { perm: 'guardian.viewAccessLog', rate: null },
+  'GET /guardians/access-log/recent':          { perm: 'guardian.viewAccessLog', rate: null },
   'POST /guardians/students/:studentId/sync':  { perm: 'guardian.propose', rate: 'guardian-staff' },
   'POST /guardians/links/:id/evidence':        { perm: 'guardian.propose', rate: 'guardian-staff' },
   'POST /guardians/links/:id/repoint':         { perm: 'guardian.propose', rate: 'guardian-staff' },
@@ -36,6 +38,7 @@ const EXPECTED: Record<string, { perm: string; rate: string | null }> = {
   'GET /guardians/onboarding/:id':             { perm: 'guardian.backfill', rate: null },
   'POST /guardians/onboarding/:id/apply':      { perm: 'guardian.backfill', rate: 'bulk-mutation' },
   'POST /guardians/onboarding/:id/rollback':   { perm: 'guardian.backfill', rate: 'bulk-mutation' },
+  'POST /guardians/national-ids/backfill':     { perm: 'guardian.backfill', rate: 'bulk-mutation' },
 }
 
 const routes = collectAll(webRoot).express.filter((e) => e.fullPath.startsWith('/api/guardians'))

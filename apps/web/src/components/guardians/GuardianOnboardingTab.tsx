@@ -19,7 +19,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { useClasses } from '@/hooks/useClasses'
 import { CHIP, CHIP_ON, CHIP_OFF } from '@/lib/hills/chip'
 import {
-  useApplyOnboarding, useOnboardingDryRun, useOnboardingReport, useRollbackOnboarding,
+  useApplyOnboarding, useNationalIdBackfill, useOnboardingDryRun, useOnboardingReport, useRollbackOnboarding,
   type OnboardingRollbackResult,
 } from '@/hooks/useGuardians'
 
@@ -100,6 +100,7 @@ export function GuardianOnboardingTab() {
   const dryRun = useOnboardingDryRun()
   const apply = useApplyOnboarding()
   const rollback = useRollbackOnboarding()
+  const nationalIds = useNationalIdBackfill()
 
   const [classId, setClassId] = useState('')
   const [includeNotEnrolled, setIncludeNotEnrolled] = useState(false)
@@ -107,7 +108,7 @@ export function GuardianOnboardingTab() {
   const [totals, setTotals] = useState({ created: 0, skipped: 0 })
   const [running, setRunning] = useState(false)
   const [rolled, setRolled] = useState<OnboardingRollbackResult | null>(null)
-  const [confirm, setConfirm] = useState<'apply' | 'rollback' | null>(null)
+  const [confirm, setConfirm] = useState<'apply' | 'rollback' | 'nationalIds' | null>(null)
   const alive = useRef(true)
   useEffect(() => () => { alive.current = false }, [])
 
@@ -234,6 +235,68 @@ export function GuardianOnboardingTab() {
         </section>
       )}
 
+      <section className="app-tint rounded-xl p-4 space-y-4" aria-label="Match guardians by national ID">
+        <div>
+          <h2 className="font-heading font-semibold text-body">Match guardians by national ID</h2>
+          <p className="text-sm text-muted mt-1">
+            Guardians created earlier were not matched by national ID. This reads the ID written on each contact card, gives it to the
+            guardian, and flags guardians who share an ID as possible duplicates in the Review queue. It never merges anyone and never
+            gives anyone access. Check first: nothing changes until you apply.
+          </p>
+        </div>
+        <button type="button" disabled={nationalIds.isPending} onClick={() => nationalIds.mutate({ apply: false })}
+          className={`${BTN} border border-base text-body hover:bg-page`}>
+          {nationalIds.isPending && !confirm ? <><Loader2 className="w-4 h-4 animate-spin" aria-hidden />Checking…</> : 'Check national IDs'}
+        </button>
+
+        {nationalIds.data && (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-body" role="status">
+              {nationalIds.data.applied ? 'Done. This is what was changed.' : 'Preview only. Nothing has been changed.'}
+            </p>
+            <dl className="grid gap-2 sm:grid-cols-2">
+              {[
+                [nationalIds.data.applied ? 'Guardians given a national ID' : 'Guardians that will get a national ID', nationalIds.data.idsFilled],
+                ['Guardians whose cards show different IDs (left blank)', nationalIds.data.conflicts],
+                ['National IDs shared by more than one guardian', nationalIds.data.sharedIds],
+                [nationalIds.data.applied ? 'Entries flagged as possible duplicates' : 'Entries to flag as possible duplicates', nationalIds.data.entriesFlagged],
+              ].map(([label, n]) => (
+                <div key={String(label)} className="flex items-center justify-between rounded-xl border border-base px-3 py-2.5">
+                  <dt className="text-sm text-body">{label}</dt>
+                  <dd className="font-heading font-semibold text-body tabular-nums">{n}</dd>
+                </div>
+              ))}
+            </dl>
+            {nationalIds.data.samples.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-body mb-1">Examples of guardians sharing an ID</p>
+                <ul className="space-y-1">
+                  {nationalIds.data.samples.map((s, i) => (
+                    <li key={i} className="text-sm text-muted">{s.nationalIdMasked}: {s.names.join(', ')}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {!nationalIds.data.applied && (nationalIds.data.idsFilled > 0 || nationalIds.data.entriesFlagged > 0) && (
+              <button type="button" disabled={nationalIds.isPending} onClick={() => setConfirm('nationalIds')}
+                className={`${BTN} bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover`}>
+                <Play className="w-4 h-4" aria-hidden />Apply
+              </button>
+            )}
+            {!nationalIds.data.applied && nationalIds.data.idsFilled === 0 && nationalIds.data.entriesFlagged === 0 && (
+              <p className="text-sm text-muted">Nothing to do: every guardian with an ID on their card already has it recorded.</p>
+            )}
+          </div>
+        )}
+      </section>
+
+      <ConfirmDialog
+        open={confirm === 'nationalIds'} title="Match guardians by national ID?"
+        description={`This gives ${nationalIds.data?.idsFilled ?? 0} guardian${nationalIds.data?.idsFilled === 1 ? '' : 's'} their national ID and flags ${nationalIds.data?.entriesFlagged ?? 0} waiting entr${nationalIds.data?.entriesFlagged === 1 ? 'y' : 'ies'} as possible duplicates. Nobody is merged and nobody gets access.`}
+        confirmLabel="Apply" confirming={nationalIds.isPending} confirmingLabel="Applying…"
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => nationalIds.mutate({ apply: true }, { onSuccess: () => setConfirm(null), onError: () => setConfirm(null) })}
+      />
       <ConfirmDialog
         open={confirm === 'apply'} title="Create these guardians?"
         description={`This adds ${creatable} guardian${creatable === 1 ? '' : 's'} to the Review queue as awaiting approval. None of them can sign in or see anything until you approve them.`}

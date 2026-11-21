@@ -54,6 +54,19 @@ export interface GuardianStudentRef {
   classId: string | null
 }
 
+/** A student that appears on a duplicate flag: where the same parent may already be. */
+export interface GuardianRelatedStudent {
+  id: string
+  name: string
+  registrationNo: string | null
+  relationship: string | null
+  linkStatus: GuardianLinkStatusValue
+  /** LINKED: already linked to the guardian on file. FLAGGED: another waiting entry flagged as that guardian. */
+  via: 'LINKED' | 'FLAGGED'
+}
+
+export interface GuardianRelatedStudents { students: GuardianRelatedStudent[]; moreStudents: number }
+
 export interface GuardianLinkDto {
   id: string
   status: GuardianLinkStatusValue
@@ -66,8 +79,19 @@ export interface GuardianLinkDto {
   isFinancialResponsible: boolean
   reverifyRequired: boolean
   reverifyReason: string | null
-  /** A possible duplicate of an existing guardian. Only the id is exposed. */
-  suggestion: { profileId: string; method: string | null } | null
+  /** A possible duplicate of a guardian already on file, with the students that guardian already appears for. */
+  suggestion: ({
+    profileId: string
+    method: string | null
+    profileName?: string | null
+    profileStatus?: string | null
+    /** Last three characters only. */
+    nationalIdMasked?: string | null
+    /** Both have a national ID and the IDs differ: possibly two people sharing an e-mail or phone. */
+    idConflict?: boolean
+  } & Partial<GuardianRelatedStudents>) | null
+  /** Waiting entries on other children were flagged as THIS guardian. */
+  alsoFlaggedOn: GuardianRelatedStudents | null
   statusReason: string | null
   approvedAt: string | null
   createdAt: string
@@ -78,6 +102,8 @@ export interface GuardianLinkDto {
     fullName: string
     status: string
     hasAccount: boolean
+    /** Last three characters of the national ID, when one is on file. */
+    nationalIdMasked?: string | null
     contacts: GuardianContactDto[]
   } | null
   invitations: GuardianInvitationDto[]
@@ -161,6 +187,48 @@ export interface OnboardingApplyResult {
 
 export interface OnboardingRollbackResult { batchId: string; removed: number; kept: number }
 
+export interface GuardianStudentListRow {
+  id: string
+  firstName: string
+  lastName: string
+  registrationNo: string
+  status: string
+  className: string | null
+  createdAt: string
+  cards: number
+  links: { pending: number; active: number; other: number }
+}
+
+export interface GuardianStudentListResponse {
+  items: GuardianStudentListRow[]
+  hasMore: boolean
+  take: number
+  skip: number
+  sort: 'recent' | 'name'
+}
+
+export interface RecentGuardianAccessRow {
+  student: { id: string; firstName: string; lastName: string; registrationNo: string }
+  lastAccessAt: string
+  guardianName: string | null
+  module: string
+  outcome: string
+  reason: string | null
+  /** Events in the recent window for this student, and how many of them were refused. */
+  events: number
+  refused: number
+}
+
+export interface NationalIdBackfillReport {
+  applied: boolean
+  profilesScanned: number
+  idsFilled: number
+  conflicts: number
+  sharedIds: number
+  entriesFlagged: number
+  samples: Array<{ nationalIdMasked: string | null; names: string[] }>
+}
+
 export interface GuardianAccessLogRow {
   id: string
   profileId: string
@@ -176,18 +244,46 @@ export interface GuardianAccessLogRow {
 
 export const QUEUE_PAGE_SIZE = 50
 
-export interface QueueFilter { status?: GuardianLinkStatusValue | null; reverify?: boolean; skip?: number }
+export interface QueueFilter { status?: GuardianLinkStatusValue | null; reverify?: boolean; skip?: number; search?: string }
 
 /** The review queue. `status` and `reverify` are filters; the server pages with take/skip. */
 export function useGuardianQueue(filter: QueueFilter) {
   const params = new URLSearchParams()
   if (filter.status) params.set('status', filter.status)
   if (filter.reverify) params.set('reverify', 'true')
+  if (filter.search) params.set('search', filter.search)
   params.set('take', String(QUEUE_PAGE_SIZE))
   if (filter.skip) params.set('skip', String(filter.skip))
   return useQuery({
-    queryKey: queryKeys.guardians.queue({ status: filter.status ?? null, reverify: filter.reverify === true, skip: filter.skip ?? 0 }),
+    queryKey: queryKeys.guardians.queue({ status: filter.status ?? null, reverify: filter.reverify === true, skip: filter.skip ?? 0, search: filter.search ?? '' }),
     queryFn: () => apiFetch<GuardianQueueResponse>(`/guardians/queue?${params}`),
+  })
+}
+
+export const STUDENT_LIST_PAGE_SIZE = 20
+
+/**
+ * The Student tab's list. No search: current students, newest first or A–Z. With a search: every
+ * student in the school. Paged by `skip`; `hasMore` says whether a next page exists.
+ */
+export function useGuardianStudentList(filter: { search?: string; sort?: 'recent' | 'name'; skip?: number }) {
+  const params = new URLSearchParams()
+  if (filter.search) params.set('search', filter.search)
+  if (filter.sort) params.set('sort', filter.sort)
+  params.set('take', String(STUDENT_LIST_PAGE_SIZE))
+  if (filter.skip) params.set('skip', String(filter.skip))
+  return useQuery({
+    queryKey: queryKeys.guardians.studentList({ search: filter.search ?? '', sort: filter.sort ?? 'recent', skip: filter.skip ?? 0 }),
+    queryFn: () => apiFetch<GuardianStudentListResponse>(`/guardians/students?${params}`),
+    placeholderData: (prev) => prev,
+  })
+}
+
+/** The students whose information parents opened (or were refused) most recently, one row each. */
+export function useRecentGuardianAccess() {
+  return useQuery({
+    queryKey: queryKeys.guardians.recentAccess(),
+    queryFn: () => apiFetch<{ items: RecentGuardianAccessRow[]; window: number }>('/guardians/access-log/recent?take=50'),
   })
 }
 
@@ -331,6 +427,16 @@ export function useReinstateGuardianProfile() {
   return useGuardianMutation(
     (profileId: string) => post<unknown>(`/guardians/profiles/${profileId}/reinstate`),
     { successMessage: 'Guardian reinstated', failureTitle: 'Could not reinstate this guardian' },
+  )
+}
+
+// National IDs (catch-up for existing guardians) -----------------------------
+
+/** `apply: false` previews and writes nothing. `apply: true` fills blank IDs and flags duplicates. */
+export function useNationalIdBackfill() {
+  return useGuardianMutation(
+    ({ apply }: { apply: boolean }) => post<NationalIdBackfillReport>('/guardians/national-ids/backfill', { apply }),
+    { failureTitle: 'Could not match national IDs' },
   )
 }
 

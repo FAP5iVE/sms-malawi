@@ -19,10 +19,11 @@
 import { hasPermission, type Permission } from '@shared/types/permissions'
 import type { UserRole } from '@shared/types/roles'
 import {
-  GUARDIAN_EVIDENCE_LEVELS, defaultCapabilitiesFor, sanitizeCapabilities,
+  GUARDIAN_EVIDENCE_LEVELS, PARENT_VISIBLE_STUDENT_STATUSES, defaultCapabilitiesFor, sanitizeCapabilities,
   type GuardianCapability, type GuardianEvidenceValue,
 } from '@shared/constants/guardianPortal'
 import { evaluateApproval, evaluateReinstatement, nextStatus, permissionFor, type LinkAction } from '@/server/lib/guardian/linkStateMachine'
+import { maskNationalId, nationalIdsConflict } from '@/server/lib/guardian/nationalId'
 import type { Actor, AuditRecord, AuditSink, GuardianDb } from './db'
 import { GuardianError, conflict, forbidden, notFound, unprocessable } from './errors'
 import { snapshotOf } from './guardianIdentityService'
@@ -236,6 +237,11 @@ export async function repointLink(db: GuardianDb, linkId: string, targetProfileI
         data: { profileId: targetProfileId, kind: c.kind, value: c.value, normalizedValue: c.normalizedValue, isPreferred: false },
       })
     }
+    // The person on file may not have had their national ID recorded yet: carry it over. Never replace one.
+    if (!target.nationalId) {
+      const old = await tx.guardianProfile.findUnique({ where: { id: oldProfileId } })
+      if (old?.nationalId) await tx.guardianProfile.updateMany({ where: { id: targetProfileId, nationalId: null }, data: { nationalId: old.nationalId } })
+    }
     // Remove the throwaway profile only when nothing else uses it and nobody claimed it.
     const remaining = await tx.guardianLink.count({ where: { profileId: oldProfileId } })
     const old = await tx.guardianProfile.findUnique({ where: { id: oldProfileId } })
@@ -302,6 +308,7 @@ export interface QueueFilter {
   status?: string
   reverify?: boolean
   studentId?: string
+  search?: string
   take?: number
   skip?: number
 }
@@ -322,18 +329,135 @@ function toStaffLinkDto(l: Record<string, any>) { // eslint-disable-line @typesc
     evidence: l.evidence, source: l.source, capabilities: sanitizeCapabilities(l.capabilities),
     isPrimaryContact: l.isPrimaryContact === true, isFinancialResponsible: l.isFinancialResponsible === true,
     reverifyRequired: l.reverifyRequired === true, reverifyReason: l.reverifyReason ?? null,
-    suggestion: l.suggestedProfileId ? { profileId: l.suggestedProfileId, method: l.suggestedMethod ?? null } : null,
+    suggestion: l.suggestedProfileId ? { profileId: l.suggestedProfileId, method: l.suggestedMethod ?? null, ...(l.suggestionDetail ?? {}) } : null,
+    alsoFlaggedOn: l.alsoFlaggedOn ?? null,
     statusReason: l.statusReason ?? null, approvedAt: l.approvedAt ?? null, createdAt: l.createdAt,
     directoryEntryId: l.directoryEntryId ?? null,
     student: pick(l.student, STUDENT_FIELDS),
     profile: p ? {
       id: p.id, fullName: p.fullName, status: p.status, hasAccount: Boolean(p.firebaseUid),
+      nationalIdMasked: maskNationalId(p.nationalId),
       contacts: (p.contacts ?? []).map((c: Record<string, any>) => ({ id: c.id, kind: c.kind, value: c.value, verification: c.verification, isPreferred: c.isPreferred === true })), // eslint-disable-line @typescript-eslint/no-explicit-any
     } : null,
     invitations: (l.invitations ?? []).map((i: Record<string, any>) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
       id: i.id, ref: i.ref, channel: i.channel, status: i.status, expiresAt: i.expiresAt, issuedAt: i.issuedAt, failedAttempts: i.failedAttempts,
     })),
   }
+}
+
+// ─── DUPLICATE FLAG DETAIL ────────────────────────────────────────────────
+
+/** Students shown on one duplicate flag are capped so a parent with many children stays readable. */
+const SUGGESTION_STUDENTS_SHOWN = 12
+const NOT_REJECTED = ['PENDING', 'ACTIVE', 'SUSPENDED'] as const
+
+const studentLabel = (st: Record<string, any> | null | undefined) => // eslint-disable-line @typescript-eslint/no-explicit-any
+  st ? `${st.firstName ?? ''} ${st.lastName ?? ''}`.trim() : ''
+
+/**
+ * A PENDING link that was flagged as a possible duplicate says WHO it may be and WHICH STUDENTS that
+ * person already appears for. Two sources, merged per student:
+ *   LINKED   the student is linked (pending, active or suspended) to the person on file;
+ *   FLAGGED  another waiting entry was flagged against that same person (the same parent seen on a
+ *            second or third child before anyone has merged them).
+ * The card's own student and its own link are never listed. Attached as `suggestionDetail`.
+ */
+async function attachSuggestionDetail(db: GuardianDb, rows: Record<string, any>[]): Promise<void> { // eslint-disable-line @typescript-eslint/no-explicit-any
+  if (rows.length === 0) return
+  const flagged = rows.filter((r) => r.suggestedProfileId && r.status === 'PENDING')
+  const suggestedIds = [...new Set(flagged.map((r) => r.suggestedProfileId as string))]
+  const ownIds = [...new Set(rows.map((r) => r.profileId as string).filter(Boolean))]
+  const pointedAt = [...new Set([...suggestedIds, ...ownIds])]
+
+  const [profiles, linkedRows, flaggedRows] = await Promise.all([
+    suggestedIds.length ? db.guardianProfile.findMany({ where: { id: { in: suggestedIds } } }) : Promise.resolve([]),
+    suggestedIds.length ? db.guardianLink.findMany({ where: { profileId: { in: suggestedIds }, status: { in: [...NOT_REJECTED] } }, include: { student: true } }) : Promise.resolve([]),
+    db.guardianLink.findMany({ where: { suggestedProfileId: { in: pointedAt }, status: 'PENDING' }, include: { student: true } }),
+  ])
+  const profileById = new Map(profiles.map((p) => [p.id as string, p]))
+
+  const collect = (row: Record<string, any>, sources: Array<[Record<string, any>[], 'LINKED' | 'FLAGGED', (l: Record<string, any>) => boolean]>) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    const seen = new Map<string, Record<string, unknown>>()
+    for (const [list, via, belongs] of sources) {
+      for (const l of list) {
+        if (!belongs(l) || l.id === row.id || l.studentId === row.studentId || !l.student || seen.has(l.studentId)) continue
+        seen.set(l.studentId as string, {
+          id: l.student.id, name: studentLabel(l.student), registrationNo: l.student.registrationNo ?? null,
+          relationship: l.relationship ?? null, linkStatus: l.status, via,
+        })
+      }
+    }
+    const all = [...seen.values()].sort((a, b) => String(a.name).localeCompare(String(b.name)))
+    return { students: all.slice(0, SUGGESTION_STUDENTS_SHOWN), more: Math.max(all.length - SUGGESTION_STUDENTS_SHOWN, 0) }
+  }
+
+  for (const row of rows) {
+    if (row.suggestedProfileId && row.status === 'PENDING') {
+      const target = profileById.get(row.suggestedProfileId as string)
+      const { students, more } = collect(row, [
+        [linkedRows, 'LINKED', (l) => l.profileId === row.suggestedProfileId],
+        [flaggedRows, 'FLAGGED', (l) => l.suggestedProfileId === row.suggestedProfileId],
+      ])
+      row.suggestionDetail = {
+        profileName: target?.fullName ?? null,
+        profileStatus: target?.status ?? null,
+        nationalIdMasked: maskNationalId(target?.nationalId),
+        /** Both have an ID and they differ: these may be two people who share an e-mail or a phone. */
+        idConflict: nationalIdsConflict(row.profile?.nationalId, target?.nationalId),
+        students, moreStudents: more,
+      }
+    }
+    // The other direction: waiting entries on other children were flagged as THIS guardian.
+    const { students: alsoOn, more: alsoMore } = collect(row, [[flaggedRows, 'FLAGGED', (l) => l.suggestedProfileId === row.profileId]])
+    if (alsoOn.length > 0) row.alsoFlaggedOn = { students: alsoOn, moreStudents: alsoMore }
+  }
+}
+
+// ─── REVIEW QUEUE (with search) ───────────────────────────────────────────
+
+const SEARCH_ID_CAP = 500
+
+/** Every whitespace-separated word must appear (any order): "banda john" finds "John Banda". */
+function wordsAll(term: string, fields: string[]): Record<string, unknown> {
+  const words = term.split(/\s+/).filter(Boolean).slice(0, 4)
+  return { AND: words.map((w) => ({ OR: fields.map((f) => ({ [f]: { contains: w, mode: 'insensitive' } })) })) }
+}
+
+/**
+ * Turns the search box into "which guardian profiles and which students match", using plain
+ * lookups on the indexed columns, then the queue is filtered by those ids. Matches a guardian's
+ * name, phone (typed as 0999…, 999… or +265…), e-mail or national ID, and a student's name or
+ * registration number. Returns null when nothing matches at all.
+ */
+async function resolveQueueSearch(db: GuardianDb, raw: string): Promise<Record<string, unknown>[] | null> {
+  const term = raw.trim().slice(0, 80)
+  if (!term) return []
+  const profileIds = new Set<string>()
+  const studentIds = new Set<string>()
+
+  const digits = term.replace(/\D/g, '')
+  const phoneNeedles = digits.length >= 4 ? [...new Set([digits, digits.replace(/^0+/, ''), digits.replace(/^265/, '')].filter((d) => d.length >= 4))] : []
+  const idNeedle = term.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const profileOr: Record<string, unknown>[] = [wordsAll(term, ['fullName'])]
+  if (idNeedle.length >= 4) profileOr.push({ nationalId: { contains: idNeedle } })
+
+  const contactOr: Record<string, unknown>[] = []
+  if (term.length >= 3 && /[a-z@]/i.test(term)) contactOr.push({ kind: 'EMAIL', normalizedValue: { contains: term.toLowerCase() } })
+  for (const d of phoneNeedles) contactOr.push({ kind: 'PHONE', normalizedValue: { contains: d } })
+
+  const [byProfile, byContact, byStudent] = await Promise.all([
+    db.guardianProfile.findMany({ where: { OR: profileOr }, select: { id: true }, take: SEARCH_ID_CAP }),
+    contactOr.length ? db.guardianContact.findMany({ where: { OR: contactOr }, select: { profileId: true }, take: SEARCH_ID_CAP }) : Promise.resolve([]),
+    db.student.findMany({ where: { OR: [wordsAll(term, ['firstName', 'lastName', 'otherNames']), { registrationNo: { contains: term, mode: 'insensitive' } }] }, select: { id: true }, take: SEARCH_ID_CAP }),
+  ])
+  for (const p of byProfile) profileIds.add(p.id as string)
+  for (const c of byContact) profileIds.add(c.profileId as string)
+  for (const st of byStudent) studentIds.add(st.id as string)
+
+  const or: Record<string, unknown>[] = []
+  if (profileIds.size) or.push({ profileId: { in: [...profileIds] } })
+  if (studentIds.size) or.push({ studentId: { in: [...studentIds] } })
+  return or.length ? or : null
 }
 
 export async function listQueue(db: GuardianDb, f: QueueFilter, ctx: StaffCtx) {
@@ -343,10 +467,16 @@ export async function listQueue(db: GuardianDb, f: QueueFilter, ctx: StaffCtx) {
   if (f.reverify === true) where.reverifyRequired = true
   if (f.studentId) where.studentId = f.studentId
   const take = Math.min(Math.max(f.take ?? 50, 1), 200)
+  if (f.search && f.search.trim()) {
+    const or = await resolveQueueSearch(db, f.search)
+    if (!or) return { items: [], take }
+    where.OR = or
+  }
   const rows = await db.guardianLink.findMany({
     where, orderBy: { createdAt: 'desc' }, take, skip: Math.max(f.skip ?? 0, 0),
     include: { profile: { include: { contacts: true } }, student: true, invitations: true },
   })
+  await attachSuggestionDetail(db, rows)
   return { items: rows.map(toStaffLinkDto), take }
 }
 
@@ -361,10 +491,136 @@ export async function getStudentPortalView(db: GuardianDb, studentId: string, ct
       include: { profile: { include: { contacts: true } }, student: true, invitations: true },
     }),
   ])
+  await attachSuggestionDetail(db, links)
   return {
     student: pick(student, STUDENT_FIELDS),
     cards: cards.map((c) => pick(c, ['id', 'fullName', 'relation', 'phone', 'altPhone', 'email', 'isPrimary', 'isFeePayer', 'isEmergencyContact'])),
     links: links.map(toStaffLinkDto),
+  }
+}
+
+// ─── STUDENT TAB: BROWSE + SEARCH ─────────────────────────────────────────
+
+export interface StudentListFilter {
+  search?: string
+  sort?: 'recent' | 'name'
+  take?: number
+  skip?: number
+}
+
+/**
+ * The Student tab's list. With no search it browses CURRENT students (the ones whose parents use
+ * the portal), newest first or A–Z. With a search it covers EVERY student in the school, former
+ * ones included, so nobody is unreachable. Each row says how many contact cards and guardian links
+ * the student has, so staff can see who still needs work without opening them.
+ */
+export async function listStudentsForGuardians(db: GuardianDb, f: StudentListFilter, ctx: StaffCtx) {
+  assertCan(ctx, 'guardian.view')
+  const take = Math.min(Math.max(f.take ?? 20, 1), 50)
+  const skip = Math.max(f.skip ?? 0, 0)
+  const term = (f.search ?? '').trim().slice(0, 80)
+  const sort = f.sort === 'name' ? 'name' : 'recent'
+
+  const where: Record<string, unknown> = term
+    ? {
+      OR: [
+        wordsAll(term, ['firstName', 'lastName', 'otherNames']),
+        { registrationNo: { contains: term, mode: 'insensitive' } },
+        // The same extra fields the old student search covered: the guardian named on the student record.
+        { guardianName: { contains: term, mode: 'insensitive' } },
+        { guardianPhone: { contains: term } },
+      ],
+    }
+    : { status: { in: [...PARENT_VISIBLE_STUDENT_STATUSES] } }
+  const orderBy = sort === 'name'
+    ? [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }]
+    : [{ createdAt: 'desc' }, { id: 'desc' }]
+
+  // One extra row tells us whether there is a next page without a count query.
+  const rows = await db.student.findMany({ where, orderBy, take: take + 1, skip })
+  const hasMore = rows.length > take
+  const page = rows.slice(0, take)
+  const ids = page.map((r) => r.id as string)
+
+  const [cards, links, classes] = ids.length === 0 ? [[], [], []] : await Promise.all([
+    db.studentGuardian.findMany({ where: { studentId: { in: ids } }, select: { studentId: true } }),
+    db.guardianLink.findMany({ where: { studentId: { in: ids } }, select: { studentId: true, status: true } }),
+    db.class.findMany({ where: { id: { in: [...new Set(page.map((r) => r.classId).filter(Boolean))] } }, select: { id: true, name: true } }),
+  ])
+  const className = new Map(classes.map((c) => [c.id as string, c.name as string]))
+  const cardCount = new Map<string, number>()
+  for (const c of cards) cardCount.set(c.studentId as string, (cardCount.get(c.studentId as string) ?? 0) + 1)
+  const linkCount = new Map<string, { pending: number; active: number; other: number }>()
+  for (const l of links) {
+    const k = l.studentId as string
+    const t = linkCount.get(k) ?? { pending: 0, active: 0, other: 0 }
+    if (l.status === 'PENDING') t.pending++
+    else if (l.status === 'ACTIVE') t.active++
+    else t.other++
+    linkCount.set(k, t)
+  }
+
+  return {
+    items: page.map((r) => ({
+      id: r.id, firstName: r.firstName, lastName: r.lastName, registrationNo: r.registrationNo, status: r.status,
+      className: r.classId ? (className.get(r.classId as string) ?? null) : null,
+      createdAt: r.createdAt,
+      cards: cardCount.get(r.id as string) ?? 0,
+      links: linkCount.get(r.id as string) ?? { pending: 0, active: 0, other: 0 },
+    })),
+    hasMore, take, skip, sort,
+  }
+}
+
+// ─── ACCESS LOG: MOST RECENTLY OPENED STUDENTS ────────────────────────────
+
+/** How far back the "recent" view looks. Newest rows first, so this is the latest 1,000 events. */
+const RECENT_ACCESS_WINDOW = 1000
+
+/**
+ * One row per student, newest first: when a parent last opened (or was refused) that child's
+ * information, which guardian, which section, and how many events the recent window holds for
+ * the child. Clicking a row opens that student's full log.
+ */
+export async function listRecentAccess(db: GuardianDb, f: { take?: number }, ctx: StaffCtx) {
+  assertCan(ctx, 'guardian.viewAccessLog')
+  const take = Math.min(Math.max(f.take ?? 25, 1), 100)
+  const rows = await db.guardianAccessLog.findMany({
+    where: { studentId: { not: null } }, orderBy: { createdAt: 'desc' }, take: RECENT_ACCESS_WINDOW,
+  })
+
+  const byStudent = new Map<string, { latest: Record<string, any>; events: number; refused: number }>() // eslint-disable-line @typescript-eslint/no-explicit-any
+  for (const r of rows) {                       // newest first: the first row seen is the latest
+    const k = r.studentId as string
+    const e = byStudent.get(k) ?? { latest: r, events: 0, refused: 0 }
+    e.events++
+    if (r.outcome !== 'ALLOWED') e.refused++
+    byStudent.set(k, e)
+  }
+  const picked = [...byStudent.entries()].slice(0, take)
+  const studentIds = picked.map(([id]) => id)
+  const profileIds = [...new Set(picked.map(([, e]) => e.latest.profileId as string))]
+
+  const [students, profiles] = studentIds.length === 0 ? [[], []] : await Promise.all([
+    db.student.findMany({ where: { id: { in: studentIds } } }),
+    db.guardianProfile.findMany({ where: { id: { in: profileIds } } }),
+  ])
+  const studentById = new Map(students.map((s) => [s.id as string, s]))
+  const profileById = new Map(profiles.map((p) => [p.id as string, p]))
+
+  return {
+    items: picked.flatMap(([studentId, e]) => {
+      const st = studentById.get(studentId)
+      if (!st) return []                        // student since removed: nothing to open
+      return [{
+        student: pick(st, ['id', 'firstName', 'lastName', 'registrationNo']),
+        lastAccessAt: e.latest.createdAt,
+        guardianName: (profileById.get(e.latest.profileId as string)?.fullName as string | undefined) ?? null,
+        module: e.latest.module, outcome: e.latest.outcome, reason: e.latest.reason ?? null,
+        events: e.events, refused: e.refused,
+      }]
+    }),
+    window: RECENT_ACCESS_WINDOW,
   }
 }
 

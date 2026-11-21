@@ -15,7 +15,7 @@ type Row = Record<string, any>
 type RelSpec = { model: string; fk: string; many: boolean; fkOnParent?: boolean }
 
 const DEFAULTS: Record<string, () => Row> = {
-  guardianProfile: () => ({ status: 'ACTIVE', createdSource: 'ADMISSION', firebaseUid: null, claimedAt: null, mergedIntoId: null, createdByUid: null }),
+  guardianProfile: () => ({ nationalId: null, status: 'ACTIVE', createdSource: 'ADMISSION', firebaseUid: null, claimedAt: null, mergedIntoId: null, createdByUid: null }),
   guardianContact: () => ({ verification: 'UNVERIFIED', verifiedAt: null, isPreferred: false }),
   guardianLink: () => ({
     status: 'PENDING', source: 'ADMISSION', evidence: 'NONE', capabilities: [], isPrimaryContact: false,

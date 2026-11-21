@@ -2,9 +2,13 @@
  * [CHANGE TYPE]: NEW FILE
  * [FILE]: apps/web/src/components/guardians/GuardianAccessLogTab.tsx
  * [PHASE]: Guardian Portal — staff UI (T7a)
- * [PURPOSE]: Who looked at (or was refused) a child's information, most recent first. Scoped to
- *   one student because the API refuses an unscoped query, and names guardians by looking up the
- *   student's own links, since the log itself stores only ids.
+ * [PURPOSE]: Who looked at (or was refused) a child's information, most recent first. The full
+ *   log is scoped to one student because the API refuses an unscoped query, and names guardians by
+ *   looking up the student's own links, since the log itself stores only ids.
+ *
+ *   With no student chosen the tab is not empty: the search box comes first, and below it the
+ *   students whose information parents opened most recently, one row each. Choosing a row (or
+ *   searching for someone else) opens that student's full log.
  * [DEPENDS ON]: @/hooks/useGuardians, ./GuardianStudentPicker
  */
 'use client'
@@ -12,7 +16,7 @@
 import { useState } from 'react'
 import { Loader2, ScrollText } from 'lucide-react'
 import { GUARDIAN_CAPABILITY_LABELS, denyReasonLabel, isGuardianCapability } from '@shared/constants/guardianPortal'
-import { useGuardianAccessLog, useGuardianStudentView } from '@/hooks/useGuardians'
+import { useGuardianAccessLog, useGuardianStudentView, useRecentGuardianAccess, type RecentGuardianAccessRow } from '@/hooks/useGuardians'
 import { ListPager } from '@/components/shared/ListPager'
 import { StatusText } from '@/components/shared/StatusText'
 import { usePagedRows } from '@/lib/hills/usePagedRows'
@@ -20,6 +24,72 @@ import { GuardianStudentPicker, type PickedStudent } from './GuardianStudentPick
 
 /** Sections that are logged on their own but are not a grantable capability. */
 const EXTRA_MODULE_LABELS: Readonly<Record<string, string>> = { reportCard: 'Report card' }
+
+function sectionLabel(module: string): string {
+  return isGuardianCapability(module) ? GUARDIAN_CAPABILITY_LABELS[module].label : (EXTRA_MODULE_LABELS[module] ?? module)
+}
+
+/** The default view: one row per student, newest activity first. */
+function RecentAccess({ onOpen }: { onOpen: (s: PickedStudent) => void }) {
+  const recent = useRecentGuardianAccess()
+  const rows: RecentGuardianAccessRow[] = recent.data?.items ?? []
+  const paging = usePagedRows(rows, { resetKey: 'recent' })
+
+  return (
+    <section className="space-y-3" aria-label="Recently opened">
+      <div>
+        <h2 className="font-heading font-semibold text-body">Recently opened</h2>
+        <p className="text-sm text-muted">The students whose information parents opened most recently. Choose one to see their full log.</p>
+      </div>
+
+      {recent.isLoading && (
+        <div className="flex items-center gap-2 text-sm text-muted" role="status"><Loader2 className="w-4 h-4 animate-spin" aria-hidden />Loading…</div>
+      )}
+      {recent.isError && (
+        <div role="alert" className="rounded-xl bg-brand-coral/10 p-3 text-sm text-body">
+          Could not load recent activity.{' '}
+          <button type="button" className="font-medium underline" onClick={() => recent.refetch()}>Try again</button>
+        </div>
+      )}
+      {recent.data && rows.length === 0 && (
+        <div className="app-tint rounded-xl p-10 text-center">
+          <ScrollText className="w-8 h-8 mx-auto text-muted mb-2" aria-hidden />
+          <p className="font-medium text-body">No activity yet</p>
+          <p className="text-sm text-muted mt-1">Nobody has opened a child’s information through the parent portal.</p>
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <>
+          <ul className="rounded-xl border border-base bg-surface divide-y divide-[var(--border-base,rgba(0,0,0,0.08))] overflow-hidden">
+            {paging.visible.map((r) => (
+              <li key={r.student.id}>
+                <button
+                  type="button" className="w-full text-left px-4 py-3 min-h-11 hover:bg-page grid gap-x-4 gap-y-1 sm:grid-cols-[1fr_auto]"
+                  onClick={() => onOpen({ id: r.student.id, name: `${r.student.firstName} ${r.student.lastName}`.trim(), registrationNo: r.student.registrationNo })}
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-body">{r.student.firstName} {r.student.lastName}</span>
+                    <span className="block text-xs text-muted">
+                      {r.student.registrationNo} · {r.guardianName ?? 'Unknown guardian'} · {sectionLabel(r.module)}
+                    </span>
+                  </span>
+                  <span className="flex flex-wrap items-center gap-x-3 text-xs sm:justify-end">
+                    {r.outcome === 'ALLOWED'
+                      ? <StatusText tone="success">Viewed</StatusText>
+                      : <StatusText tone="danger">Refused</StatusText>}
+                    <span className="text-muted whitespace-nowrap">{fmtWhen(r.lastAccessAt)}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <ListPager paging={paging} />
+        </>
+      )}
+    </section>
+  )
+}
 
 function fmtWhen(iso: string): string {
   const d = new Date(iso)
@@ -44,7 +114,7 @@ export function GuardianAccessLogTab() {
     <div className="space-y-4">
       <GuardianStudentPicker selected={student} onSelect={setStudent} onClear={() => setStudent(null)} inputId="guardian-log-student" />
 
-      {!student && <p className="text-sm text-muted">Choose a student to see who has looked at their information.</p>}
+      {!student && <RecentAccess onOpen={setStudent} />}
 
       {student && log.isLoading && (
         <div className="flex items-center gap-2 text-sm text-muted" role="status"><Loader2 className="w-4 h-4 animate-spin" aria-hidden />Loading…</div>
@@ -81,7 +151,7 @@ export function GuardianAccessLogTab() {
                 <tr key={r.id} className="border-b border-base last:border-0 align-top">
                   <td className="px-4 py-3 whitespace-nowrap text-muted">{fmtWhen(r.createdAt)}</td>
                   <td className="px-4 py-3 text-body">{names.get(r.profileId) ?? 'Unknown guardian'}</td>
-                  <td className="px-4 py-3 text-body">{isGuardianCapability(r.module) ? GUARDIAN_CAPABILITY_LABELS[r.module].label : (EXTRA_MODULE_LABELS[r.module] ?? r.module)}</td>
+                  <td className="px-4 py-3 text-body">{sectionLabel(r.module)}</td>
                   <td className="px-4 py-3">
                     {r.outcome === 'ALLOWED'
                       ? <StatusText tone="success">Viewed</StatusText>

@@ -25,16 +25,17 @@ import { sendError } from '@/server/lib/sendError'
 import * as auditService from '@/server/services/auditService'
 import { logger } from '@/lib/logger'
 import {
-  AccessLogQuerySchema, ApproveLinkSchema, IssueInvitationSchema, OnboardingApplySchema, OnboardingDryRunSchema,
-  OnboardingReportQuerySchema, OptionalReasonSchema, QueueQuerySchema, RepointLinkSchema, RequiredReasonSchema,
-  SetCapabilitiesSchema, SetEvidenceSchema,
+  AccessLogQuerySchema, ApproveLinkSchema, IssueInvitationSchema, NationalIdBackfillSchema, OnboardingApplySchema,
+  OnboardingDryRunSchema, OnboardingReportQuerySchema, OptionalReasonSchema, QueueQuerySchema, RecentAccessQuerySchema,
+  RepointLinkSchema, RequiredReasonSchema, SetCapabilitiesSchema, SetEvidenceSchema, StudentListQuerySchema,
 } from '@shared/schemas/guardianPortal'
 import { prismaGuardianDb } from '@/server/services/guardian/prismaDb'
 import { GuardianError } from '@/server/services/guardian/errors'
 import {
-  approveLink, assertCan, confirmReverified, getStudentPortalView, listQueue, reinstateProfile, repointLink,
-  setCapabilities, setEvidence, suspendProfile, transitionLink, type StaffCtx,
+  approveLink, assertCan, confirmReverified, getStudentPortalView, listQueue, listRecentAccess, listStudentsForGuardians,
+  reinstateProfile, repointLink, setCapabilities, setEvidence, suspendProfile, transitionLink, type StaffCtx,
 } from '@/server/services/guardian/guardianLinkService'
+import { backfillNationalIds } from '@/server/services/guardian/guardianNationalIdService'
 import { issueInvitation, revokeInvitation } from '@/server/services/guardian/guardianInvitationService'
 import * as onboarding from '@/server/services/guardian/guardianOnboardingService'
 import { syncStudentDirectory } from '@/server/services/guardian/guardianIdentityService'
@@ -89,6 +90,23 @@ guardiansRouter.get(
       ...(q.data.status ? { status: q.data.status } : {}),
       ...(q.data.reverify === 'true' ? { reverify: true } : {}),
       ...(q.data.studentId ? { studentId: q.data.studentId } : {}),
+      ...(q.data.search ? { search: q.data.search } : {}),
+      ...(q.data.take ? { take: q.data.take } : {}),
+      ...(q.data.skip ? { skip: q.data.skip } : {}),
+    }, ctxOf(req)))
+  }),
+)
+
+// The Student tab's list: current students by default, the whole school when searching.
+guardiansRouter.get(
+  '/students',
+  requirePermission('guardian.view'),
+  handle('student-list', async (req, res) => {
+    const q = StudentListQuerySchema.safeParse(req.query)
+    if (!q.success) return badRequest(res, q.error.issues[0]?.message ?? 'Invalid query.')
+    res.json(await listStudentsForGuardians(db(), {
+      ...(q.data.search ? { search: q.data.search } : {}),
+      ...(q.data.sort ? { sort: q.data.sort } : {}),
       ...(q.data.take ? { take: q.data.take } : {}),
       ...(q.data.skip ? { skip: q.data.skip } : {}),
     }, ctxOf(req)))
@@ -100,6 +118,17 @@ guardiansRouter.get(
   requirePermission('guardian.view'),
   handle('student-view', async (req, res) => {
     res.json(await getStudentPortalView(db(), param(req, 'studentId'), ctxOf(req)))
+  }),
+)
+
+// The Access log's default view: one row per student, most recently opened first.
+guardiansRouter.get(
+  '/access-log/recent',
+  requirePermission('guardian.viewAccessLog'),
+  handle('access-log-recent', async (req, res) => {
+    const q = RecentAccessQuerySchema.safeParse(req.query)
+    if (!q.success) return badRequest(res, q.error.issues[0]?.message ?? 'Invalid query.')
+    res.json(await listRecentAccess(db(), { ...(q.data.take ? { take: q.data.take } : {}) }, ctxOf(req)))
   }),
 )
 
@@ -356,6 +385,21 @@ guardiansRouter.post(
   requirePermission('guardian.backfill'),
   handle('onboarding-rollback', async (req, res) => {
     res.json(await onboarding.rollback(db(), param(req, 'id'), ctxOf(req)))
+  }),
+)
+
+// ─── NATIONAL IDs (catch-up for guardians created before IDs took part in matching) ──
+// Preview by default (writes nothing); `apply: true` fills blank IDs and flags duplicates. It never
+// merges, links or approves anyone.
+
+guardiansRouter.post(
+  '/national-ids/backfill',
+  rateLimit('bulk-mutation'),
+  requirePermission('guardian.backfill'),
+  handle('national-ids-backfill', async (req, res) => {
+    const b = NationalIdBackfillSchema.safeParse(req.body ?? {})
+    if (!b.success) return badRequest(res, b.error.issues[0]?.message ?? 'Invalid request.')
+    res.json(await backfillNationalIds(db(), { apply: b.data.apply === true }, ctxOf(req)))
   }),
 )
 

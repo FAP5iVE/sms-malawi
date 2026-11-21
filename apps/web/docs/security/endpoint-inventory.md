@@ -8,15 +8,15 @@ Every server entry point, extracted from source by `test/security/endpointInvent
 
 | Measure | Count |
 |---|---:|
-| Express endpoints (mounted under `/api`) | 605 |
-| — mutations (non-GET) | 279 |
-| — with a role/permission gate | 519 (250 mutations) |
+| Express endpoints (mounted under `/api`) | 610 |
+| — mutations (non-GET) | 282 |
+| — with a role/permission gate | 523 (252 mutations) |
 | — signed-in only, with a declared policy | 62 |
-| — public (no identity) | 24 |
+| — public (no identity) | 25 |
 | — declared `cron-or-admin` | 1 |
 | — declared `object-checked` | 32 |
 | — declared `own-data` | 24 |
-| — declared `public-site` | 22 |
+| — declared `public-site` | 23 |
 | — declared `public-telemetry` | 1 |
 | — declared `reference-data` | 6 |
 | Next.js route handlers | 14 |
@@ -333,6 +333,7 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 |  | GET | `/api/exams/report-cards/:classId/:term` | `requireRole([admin, exam_officer])` |  | :classId, :term, query |
 |  | GET | `/api/exams/results/:studentId` | signed-in user | object-checked | :studentId, query |
 |  | GET | `/api/exams/results/:studentId/class-standing` | signed-in user | object-checked | :studentId, query |
+| ● | POST | `/api/exams/transcript` | `requireRole([admin, exam_officer])` |  | body |
 
 ### finances
 
@@ -406,6 +407,7 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | M | Method | Path | Access | Declared policy | Client IDs |
 |:-:|---|---|---|---|---|
 |  | GET | `/api/guardians/access-log` | `requirePermission(guardian.viewAccessLog)` |  | query |
+|  | GET | `/api/guardians/access-log/recent` | `requirePermission(guardian.viewAccessLog)` |  | query |
 | ● | DELETE | `/api/guardians/invitations/:id` | `requirePermission(guardian.invite)` |  | :id |
 | ● | POST | `/api/guardians/links/:id/approve` | `requirePermission(guardian.approve)` |  | :id, body |
 | ● | PATCH | `/api/guardians/links/:id/capabilities` | `requirePermission(guardian.restrict)` |  | :id, body |
@@ -418,6 +420,7 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | ● | POST | `/api/guardians/links/:id/reverified` | `requirePermission(guardian.approve)` |  | :id |
 | ● | POST | `/api/guardians/links/:id/revoke` | `requirePermission(guardian.restrict)` |  | :id, body |
 | ● | POST | `/api/guardians/links/:id/suspend` | `requirePermission(guardian.restrict)` |  | :id, body |
+| ● | POST | `/api/guardians/national-ids/backfill` | `requirePermission(guardian.backfill)` |  | body |
 |  | GET | `/api/guardians/onboarding/:id` | `requirePermission(guardian.backfill)` |  | :id, query |
 | ● | POST | `/api/guardians/onboarding/:id/apply` | `requirePermission(guardian.backfill)` |  | :id, body |
 | ● | POST | `/api/guardians/onboarding/:id/rollback` | `requirePermission(guardian.backfill)` |  | :id |
@@ -425,6 +428,7 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | ● | POST | `/api/guardians/profiles/:id/reinstate` | `requirePermission(guardian.approve)` |  | :id |
 | ● | POST | `/api/guardians/profiles/:id/suspend` | `requirePermission(guardian.restrict)` |  | :id, body |
 |  | GET | `/api/guardians/queue` | `requirePermission(guardian.view)` |  | query |
+|  | GET | `/api/guardians/students` | `requirePermission(guardian.view)` |  | query |
 |  | GET | `/api/guardians/students/:studentId` | `requirePermission(guardian.view)` |  | :studentId |
 | ● | POST | `/api/guardians/students/:studentId/sync` | `requirePermission(guardian.propose)` |  | :studentId |
 
@@ -707,6 +711,7 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 |  | GET | `/api/public/newsletter/confirm` | **none (public)** | public-site | query |
 | ● | POST | `/api/public/newsletter/subscribe` | **none (public)** | public-site | body |
 |  | GET | `/api/public/newsletter/unsubscribe` | **none (public)** | public-site | query |
+| ● | POST | `/api/public/password-reset` | **none (public)** | public-site | body |
 |  | GET | `/api/public/placement-stats` | **none (public)** | public-site | query |
 |  | GET | `/api/public/placements` | **none (public)** | public-site | query |
 |  | GET | `/api/public/school-info` | **none (public)** | public-site | — |
