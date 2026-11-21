@@ -45,6 +45,7 @@
  * Risk colours map to CSS custom properties so dark mode works correctly.
  */
 
+import { statusWord } from '@/lib/hills/statusWord'
 import Link from 'next/link'
 import { AlertTriangle, ShieldCheck, Info, AlertCircle, ArrowUpRight, Lightbulb } from 'lucide-react'
 import type { ApiRiskFactor, ApiRiskDomain } from '@shared/types/api'
@@ -71,8 +72,8 @@ const RISK_CONFIG: Record<RiskLevel, {
     icon:      AlertTriangle,
     badge:     'text-brand-coral',
     dot:       'bg-red-500',
-    card:      'border-red-200 bg-red-50/50 dark:border-red-800/40 dark:bg-red-950/15',
-    cardTitle: 'text-red-700 dark:text-red-400',
+    card:      'border-l-tone-coral',
+    cardTitle: 'text-tone-coral',
   },
   MEDIUM: {
     label:     'Medium risk',
@@ -89,24 +90,24 @@ const RISK_CONFIG: Record<RiskLevel, {
     // already works correctly for every other risk level.
     badge:     'text-brand-amber',
     dot:       'bg-amber-500',
-    card:      'border-amber-200 bg-amber-50/50 dark:border-amber-800/40 dark:bg-amber-950/15',
-    cardTitle: 'text-amber-700 dark:text-amber-400',
+    card:      'border-l-tone-amber',
+    cardTitle: 'text-tone-amber',
   },
   LOW: {
     label:     'Low risk',
     icon:      Info,
     badge:     'text-brand-navy',
     dot:       'bg-blue-400',
-    card:      'border-blue-200 bg-blue-50/50 dark:border-blue-800/40',
-    cardTitle: 'text-blue-600 dark:text-blue-400',
+    card:      'border-l-status-info',
+    cardTitle: 'text-status-info',
   },
   NONE: {
     label:     'On track',
     icon:      ShieldCheck,
     badge:     'text-brand-teal',
     dot:       'bg-emerald-500',
-    card:      'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800/40',
-    cardTitle: 'text-emerald-700 dark:text-emerald-400',
+    card:      'border-l-tone-teal',
+    cardTitle: 'text-tone-teal',
   },
 }
 
@@ -208,7 +209,7 @@ function CardVariant({
     superUser || (role != null && (getAllowedRolesForPath(href)?.includes(role) ?? false))
 
   return (
-    <div className={`rounded-xl border p-4 ${card}`}>
+    <div className={`app-tint rounded-xl border border-base border-l-4 p-4 ${card}`}>
       <div className="flex items-center gap-2 mb-3">
         <Icon className={`w-5 h-5 shrink-0 ${cardTitle}`} aria-hidden />
         <span className={`font-heading font-bold text-sm ${cardTitle}`}>
@@ -222,7 +223,7 @@ function CardVariant({
       </div>
 
       {factors.length === 0 ? (
-        <p className="text-xs text-muted">
+        <p className="text-sm text-muted">
           {riskLevel === 'NONE'
             ? 'No risk factors identified. Student is on track.'
             : 'Flagged by the risk engine. No further detail is available to your role.'}
@@ -232,16 +233,16 @@ function CardVariant({
           {factors.map((f) => {
             const href = domainHref(f.domain, classId)
             return (
-              <li key={f.id} className="text-xs flex items-start gap-2">
+              <li key={f.id} className="text-sm flex items-start gap-2">
                 <span
                   className={`
-                    shrink-0 mt-0.5 text-[9px] font-bold uppercase tracking-wide
+                    w-14 shrink-0 text-xs font-semibold
                     ${f.severity === 'HIGH'   ? 'text-status-danger'
                     : f.severity === 'MEDIUM' ? 'text-status-warning'
                     :                           'text-status-info'}
                   `}
                 >
-                  {f.severity}
+                  {statusWord(f.severity)}
                 </span>
                 <span className="text-body leading-relaxed flex-1">
                   <strong>{FACTOR_LABELS[f.id] ?? f.id}:</strong>{' '}
@@ -250,7 +251,7 @@ function CardVariant({
                 {canOpen(href) && (
                   <Link
                     href={href}
-                    className="shrink-0 inline-flex items-center gap-0.5 text-[11px] text-brand-teal hover:underline"
+                    className="shrink-0 inline-flex items-center gap-0.5 text-xs text-tone-teal hover:underline"
                     aria-label={`Open ${DOMAIN_LABELS[f.domain]}`}
                   >
                     {DOMAIN_LABELS[f.domain]}
@@ -266,7 +267,7 @@ function CardVariant({
       {insights.length > 0 && (
         <div className="mt-3 pt-3 border-t border-base space-y-1.5">
           {insights.map((text) => (
-            <p key={text} className="text-xs text-muted flex items-start gap-1.5 leading-relaxed">
+            <p key={text} className="text-sm text-muted flex items-start gap-1.5 leading-relaxed">
               <Lightbulb className="w-3 h-3 shrink-0 mt-0.5" aria-hidden />
               {text}
             </p>

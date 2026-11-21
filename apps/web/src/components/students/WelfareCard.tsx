@@ -18,6 +18,7 @@
  * [DEPENDS ON]: hooks/useStudents welfare hooks, shared welfare constants/schemas
  */
 
+import { FactList } from '@/components/students/FactList'
 import { useState, type FormEvent } from 'react'
 import { ShieldAlert, Pencil, Plus, Trash2, Loader2 } from 'lucide-react'
 import { Modal } from '@/components/shared/Modal'
@@ -145,9 +146,9 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-heading font-semibold text-xs text-muted flex items-center gap-1.5">
-            <ShieldAlert className="w-3.5 h-3.5" /> Welfare
-          </p>
+          <h2 className="font-heading text-sm font-semibold text-body flex items-center gap-1.5">
+            <ShieldAlert className="w-4 h-4" aria-hidden /> Welfare
+          </h2>
           <p className="text-xs text-muted mt-0.5">
             Sensitive. Visible to the headteacher, administrators and HR only.
           </p>
@@ -156,38 +157,33 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
           <button
             type="button"
             onClick={openWelfare}
-            className="min-h-[36px] px-3 rounded-lg text-xs font-semibold text-brand-deep border border-base hover:bg-page flex items-center gap-1 shrink-0"
+            className="min-h-11 px-3.5 rounded-xl text-sm font-medium text-body border border-base hover:bg-page flex items-center gap-1.5 shrink-0"
           >
             <Pencil className="w-3.5 h-3.5" /> Edit
           </button>
         )}
       </div>
 
-      <div className="space-y-2.5">
-        {[
+      <FactList
+        rows={[
           ['Orphan status', ORPHAN_STATUS_LABELS[welfare.orphanStatus]],
           ['Vulnerable', welfare.isVulnerable ? 'Yes' : 'No'],
           ...(welfare.isVulnerable || welfare.vulnerabilityNote
-            ? [['Vulnerability note', welfare.vulnerabilityNote ?? '—'], ['Last reviewed', formatDate(welfare.vulnerabilityReviewedAt)]]
+            ? ([['Vulnerability note', welfare.vulnerabilityNote], ['Last reviewed', formatDate(welfare.vulnerabilityReviewedAt)]] as const)
             : []),
           ['Health / medical alert', welfare.medicalAlert ?? 'None recorded'],
-          ...(welfare.exitNote ? [['Exit note', welfare.exitNote]] : []),
-        ].map(([label, value]) => (
-          <div key={label} className="flex justify-between text-sm gap-4">
-            <span className="text-muted shrink-0">{label}</span>
-            <span className="font-medium text-body text-right whitespace-pre-line">{value}</span>
-          </div>
-        ))}
-      </div>
+          ...(welfare.exitNote ? ([['Exit note', welfare.exitNote]] as const) : []),
+        ]}
+      />
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-heading font-semibold text-muted">Special needs</p>
+          <h3 className="text-sm font-heading font-semibold text-body">Special needs</h3>
           {canEdit && (
             <button
               type="button"
               onClick={() => openNeed('new')}
-              className="min-h-[32px] px-2.5 rounded-lg text-xs font-semibold text-brand-deep border border-base hover:bg-page flex items-center gap-1"
+              className="min-h-11 px-3.5 rounded-xl text-sm font-medium text-body border border-base hover:bg-page flex items-center gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" /> Add
             </button>
@@ -207,10 +203,10 @@ export function WelfareCard({ studentId, canEdit }: { studentId: string; canEdit
                 </div>
                 {canEdit && (
                   <div className="flex gap-1 shrink-0">
-                    <button type="button" onClick={() => openNeed(n)} aria-label="Edit special need" className="p-2 rounded-lg hover:bg-page text-muted">
+                    <button type="button" onClick={() => openNeed(n)} aria-label="Edit special need" className="grid h-11 w-11 place-items-center rounded-xl hover:bg-page text-muted">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <button type="button" onClick={() => setNeedDeleting(n)} aria-label="Remove special need" className="p-2 rounded-lg hover:bg-page text-tone-coral">
+                    <button type="button" onClick={() => setNeedDeleting(n)} aria-label="Remove special need" className="grid h-11 w-11 place-items-center rounded-xl hover:bg-page text-tone-coral">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>

@@ -78,7 +78,7 @@ import {
   GripVertical,
 } from 'lucide-react'
 import type { CalendarEvent, CalendarEventCategory } from '@shared/types/calendar'
-import { CATEGORY_LEGEND, categoryColor } from './calendarConfig'
+import { CATEGORY_LEGEND, categoryColor, categoryLabel } from './calendarConfig'
 import { CategoryFilterDropdown } from './CategoryFilterDropdown'
 import { CalendarEventListItem } from './CalendarEventListItem'
 import { MiniMonthCalendar } from './MiniMonthCalendar'
@@ -95,6 +95,11 @@ const SIDEBAR_MIN = 240
 const SIDEBAR_MAX = 520
 const SIDEBAR_DEFAULT = 336
 const SIDEBAR_STORAGE_KEY = 'sms:calendar:sidebarWidth'
+
+/** The kinds of event on a day, in the order they first appear. */
+function dayCategories(events: ReadonlyArray<{ category: CalendarEventCategory }>): CalendarEventCategory[] {
+  return [...new Set(events.map((e) => e.category))]
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
@@ -252,9 +257,9 @@ export function DesktopCalendarView({
           />
         </div>
 
-        <div className="px-5 pt-3 pb-2 border-t border-base flex items-center justify-between">
+        <div className="px-5 pt-3 pb-2 border-t border-base flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
           <div className="min-w-0">
-            <h3 className="text-sm font-heading font-semibold text-body truncate">
+            <h3 className="text-sm font-heading font-semibold text-body">
               {formatDisplayDate(selectedDateKey)}
             </h3>
           </div>
@@ -476,7 +481,7 @@ export function DesktopCalendarView({
                 className="grid grid-cols-7 gap-2.5 flex-1 min-h-0"
                 style={{ gridTemplateRows: `repeat(${days.length / 7}, minmax(0, 1fr))` }}
               >
-                {days.map((cell) => {
+                {days.map((cell, cellIndex) => {
                   const isSelected = cell.dateKey === selectedDateKey
                   const isHovered = hoveredDateKey === cell.dateKey
                   const hasEvents = cell.events.length > 0
@@ -489,10 +494,14 @@ export function DesktopCalendarView({
                       onClick={() => onSelectDate(cell.dateKey)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') onSelectDate(cell.dateKey)
+                        if (e.key === 'Escape') setHoveredDateKey(null)
                       }}
                       onMouseEnter={() => setHoveredDateKey(cell.dateKey)}
                       onMouseLeave={() => setHoveredDateKey(null)}
-                      className={`relative flex flex-col justify-between p-2.5 lg:p-3 rounded-2xl transition-colors cursor-pointer outline-none ${
+                      onFocus={() => setHoveredDateKey(cell.dateKey)}
+                      onBlur={() => setHoveredDateKey(null)}
+                      aria-describedby={isHovered && hasEvents ? `cal-tip-${cell.dateKey}` : undefined}
+                      className={`relative flex min-h-0 min-w-0 flex-col justify-between p-2 lg:p-2.5 rounded-2xl transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-brand-teal ${
                         isSelected
                           ? 'app-tint ring-2 ring-brand-teal'
                           : cell.isToday
@@ -522,48 +531,60 @@ export function DesktopCalendarView({
                         )}
                       </div>
 
-                      {/* [PRODUCTION FIX] Event bars previously ran h-1.5/h-2
-                         tall, up to 4 of them, inset just 2px (px-0.5) from
-                         the cell edge — on a day with many events this read
-                         as a dense, edge-to-edge block that looked like it
-                         was spilling past the day's ring/highlight rather
-                         than sitting inside it. Thinner bars (h-1/h-1.5),
-                         one fewer of them (3, not 4), and a wider inset
-                         (px-1.5) give every bar clear space from the cell's
-                         own border on all sides. */}
-                      <div className="flex flex-col gap-1 my-auto w-full px-1.5">
-                        {cell.events.slice(0, 3).map((evt) => (
-                          <div
-                            key={evt.id}
-                            className="h-1 lg:h-1.5 w-full rounded-full"
-                            style={{ backgroundColor: categoryColor(evt.category) }}
-                            title={evt.title}
-                          />
-                        ))}
-                        {cell.events.length > 3 && (
-                          <span className="text-xs font-semibold text-muted text-center leading-none">
-                            +{cell.events.length - 3} more
-                          </span>
-                        )}
-                      </div>
-
-                      {isHovered && hasEvents && (
-                        <div className="absolute z-30 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 rounded-xl bg-body text-page shadow-2xl pointer-events-none text-left">
-                          <p className="text-xs font-bold pb-1 border-b border-white/15">
-                            {formatDisplayDate(cell.dateKey)}
-                          </p>
-                          <div className="mt-1.5 space-y-1.5 max-h-36 overflow-hidden">
-                            {cell.events.map((e) => (
-                              <div key={e.id} className="flex items-center gap-1.5 text-xs">
-                                <span
-                                  className="w-2 h-2 rounded-full shrink-0"
-                                  style={{ backgroundColor: categoryColor(e.category) }}
-                                  aria-hidden="true"
-                                />
-                                <span className="truncate font-medium">{e.title}</span>
-                              </div>
+                      {/* Busy-ness at a glance, fixed to the foot of the day and never taller than
+                         one line: a dot for each kind of event on that day (at most three) and the
+                         total on the right. Earlier, one bar per event stacked up and spilled into
+                         the day below; this row is the same height whether the day has 1 event or 40. */}
+                      {hasEvents && (
+                        <div className="mt-1 flex min-w-0 items-center justify-between gap-2">
+                          <span className="flex min-w-0 items-center gap-0.5 2xl:gap-1" aria-hidden="true">
+                            {dayCategories(cell.events).slice(0, 3).map((category) => (
+                              <span
+                                key={category}
+                                className="h-1.5 w-1.5 shrink-0 rounded-full 2xl:h-2 2xl:w-2"
+                                style={{ backgroundColor: categoryColor(category) }}
+                              />
                             ))}
-                          </div>
+                          </span>
+                          <span className="shrink-0 text-xs font-semibold tabular-nums text-muted">
+                            {cell.events.length}
+                            <span className="sr-only"> {cell.events.length === 1 ? 'event' : 'events'}</span>
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Hover and focus tip: the date, then either the titles (three or fewer) or a count
+                         per kind of event. A day with 36 timetable lessons used to print 36 clipped lines.
+                         Cells in the outer columns anchor to their own edge so the tip is never cut off. */}
+                      {isHovered && hasEvents && (
+                        <div
+                          id={`cal-tip-${cell.dateKey}`}
+                          role="tooltip"
+                          className={`absolute z-30 w-60 ${cellIndex % 7 <= 1 ? 'left-0' : cellIndex % 7 >= 5 ? 'right-0' : 'left-1/2 -translate-x-1/2'} ${cellIndex < 7 ? 'top-full mt-2' : 'bottom-full mb-2'} pointer-events-none rounded-xl border border-base bg-surface p-3 text-left text-body shadow-lg`}
+                        >
+                          <p className="text-sm font-semibold">{formatDisplayDate(cell.dateKey)}</p>
+                          <p className="mb-2 text-xs text-muted">
+                            {cell.events.length} {cell.events.length === 1 ? 'event' : 'events'}
+                          </p>
+                          <ul className="space-y-1.5 border-t border-base pt-2">
+                            {cell.events.length <= 3
+                              ? cell.events.map((e) => (
+                                  <li key={e.id} className="flex items-start gap-2 text-sm">
+                                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: categoryColor(e.category) }} aria-hidden="true" />
+                                    <span className="min-w-0 [overflow-wrap:anywhere]">{e.title}</span>
+                                  </li>
+                                ))
+                              : dayCategories(cell.events).map((category) => (
+                                  <li key={category} className="flex items-center gap-2 text-sm">
+                                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: categoryColor(category) }} aria-hidden="true" />
+                                    <span className="min-w-0 flex-1 truncate">{categoryLabel(category)}</span>
+                                    <span className="shrink-0 tabular-nums text-muted">{cell.events.filter((e) => e.category === category).length}</span>
+                                  </li>
+                                ))}
+                          </ul>
+                          {cell.events.length > 3 && (
+                            <p className="mt-2 text-xs text-muted">Select the day to see them all.</p>
+                          )}
                         </div>
                       )}
                     </div>

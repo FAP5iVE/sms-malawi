@@ -377,19 +377,21 @@ export default function LandingPage() {
           }`}
         >
           <div className="hills-container hills-container--nav h-[72px] flex items-center gap-6">
-            <button onClick={() => scrollTo('top')} aria-label="Back to top" className="flex items-center gap-3 shrink-0">
+            <button onClick={() => scrollTo('top')} aria-label="Back to top" className="flex min-w-0 shrink items-center gap-3">
               <SchoolMark kind="emblem" tone={scrolled ? 'auto' : 'onDark'} width={56} height={56} className="w-14 h-14 object-contain shrink-0" />
-              <div className="text-left leading-tight hidden sm:block">
-                <div className={`font-heading font-extrabold text-sm tracking-tight transition-colors ${scrolled ? 'text-brand-navy dark:text-white' : 'text-white'}`}>
+              {/* min-w-0 and truncate: a long school name or tagline shortens with an ellipsis
+                  instead of pushing the menu and Login button off the right edge. */}
+              <div className="hidden min-w-0 text-left leading-tight sm:block" title={schoolInfo?.systemTagline ?? undefined}>
+                <div className={`truncate font-heading font-extrabold text-sm tracking-tight transition-colors ${scrolled ? 'text-brand-navy dark:text-white' : 'text-white'}`}>
                   {schoolInfo?.schoolName?.toUpperCase() ?? 'SMS MALAWI'}
                 </div>
-                <div className={`text-[11px] tracking-wide transition-colors ${scrolled ? 'text-muted' : 'text-white/60'}`}>
+                <div className={`truncate text-[11px] tracking-wide transition-colors ${scrolled ? 'text-muted' : 'text-white/60'}`}>
                   {schoolInfo?.systemTagline ?? 'Secondary School Management System'}
                 </div>
               </div>
             </button>
 
-            <nav className="hidden xl:flex items-center gap-1 ml-auto font-heading text-[12.5px] font-semibold whitespace-nowrap">
+            <nav className="hidden shrink-0 items-center gap-1 ml-auto font-heading text-[12.5px] font-semibold whitespace-nowrap xl:flex">
               {NAV_LINKS.map((l) =>
                 l.anchor ? (
                   <button

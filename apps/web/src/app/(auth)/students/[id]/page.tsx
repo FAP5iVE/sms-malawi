@@ -57,6 +57,11 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { ArrowLeft, Pencil, Printer, FileText, Loader2, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { Modal } from '@/components/shared/Modal'
+import { ModuleSurface } from '@/components/shared/ModuleSurface'
+import { FactList } from '@/components/students/FactList'
+import { statusWord } from '@/lib/hills/statusWord'
+
+const sectionHeading = 'mb-3 font-heading text-sm font-semibold text-body'
 
 export default function StudentProfilePage() {
   return (
@@ -109,152 +114,135 @@ function ProfileContent() {
     )
   if (!student) return <p className="text-muted">Student not found.</p>
 
+  const actionBtn =
+    'inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-base px-3.5 text-sm font-medium text-body transition-colors hover:bg-page'
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3">
+      {/* Title block, then the actions on their own wrapping row, so nothing is pushed past the
+          right edge of a phone. */}
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-3">
         <Link
           href="/students"
-          className="p-1.5 rounded-lg hover:bg-page border border-base"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-base hover:bg-page"
           aria-label="Back to students"
         >
           <ArrowLeft className="w-4 h-4 text-muted" />
         </Link>
-        <h1 className="font-heading text-xl font-bold text-brand-navy">
-          {student.firstName} {student.otherNames ? `${student.otherNames} ` : ''}{student.lastName}
-        </h1>
-        <span className="ml-auto font-mono text-xs text-muted">
-          {student.registrationNo}
-        </span>
-        <PermissionGuard permission="student.edit">
+        <div className="min-w-0 flex-1 basis-48">
+          <h1 className="font-heading text-xl font-bold text-brand-navy [overflow-wrap:anywhere]">
+            {student.firstName} {student.otherNames ? `${student.otherNames} ` : ''}{student.lastName}
+          </h1>
+          <p className="mt-0.5 font-mono text-xs text-muted">{student.registrationNo}</p>
+        </div>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <PermissionGuard permission="student.edit">
+            <button
+              onClick={() => setEditing(true)}
+              className={actionBtn}
+              aria-label="Edit student"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Edit
+            </button>
+          </PermissionGuard>
           <button
-            onClick={() => setEditing(true)}
-            className="flex items-center gap-1.5 border border-base px-3 py-1.5 rounded-lg text-sm hover:bg-page"
-            aria-label="Edit student"
+            onClick={handlePrint}
+            className={actionBtn}
           >
-            <Pencil className="w-3.5 h-3.5" /> Edit
+            <Printer className="w-3.5 h-3.5" /> Print
           </button>
-        </PermissionGuard>
-        <button
-          onClick={handlePrint}
-          className="flex items-center gap-1.5 border border-base px-3 py-1.5 rounded-lg text-sm hover:bg-page"
-        >
-          <Printer className="w-3.5 h-3.5" /> Print
-        </button>
-        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setShowReportCard(true)}
-            className="flex items-center gap-1.5 border border-base px-3 py-1.5 rounded-lg text-sm hover:bg-page"
+            className={actionBtn}
             title={`Report card for Term ${reportCardTerm}, ${academicYear}. Change the period from the header.`}
           >
-            <FileText className="w-3.5 h-3.5" /> Report Card · T{reportCardTerm}
+            <FileText className="w-3.5 h-3.5" /> Report card · T{reportCardTerm}
           </button>
         </div>
       </div>
 
       <div ref={printRef}>
-        {/* [PRODUCTION FIX 2026-07-28] Was three separate bordered/rounded
-            cards (Personal Details, Guardian & Status, Fee Status) — merged
-            into one unified section on a solid background, with section
-            headers/dividers doing the visual organization instead of
-            separate card chrome. Fee/risk data is now also gated behind
-            student.viewFeeStatus / student.viewRiskStatus, matching the
-            same permission check the student list page already applies —
-            this detail page had no such gate before, showing financial and
-            risk data to every role that could reach it. */}
-        <div className="bg-surface rounded-xl p-5 sm:p-6 divide-y divide-base">
-          {/* Two stacks rather than one grid row-by-row, so a short block on one side
-              (Class & Status) doesn't leave a hole beside a tall one on the other.
-              Left: who the student is and where they come from. Right: enrolment,
-              guardians and welfare. */}
-          <div className="grid sm:grid-cols-2 gap-x-8 gap-y-6 pb-5">
-            <div className="space-y-6">
-              <div>
-                <p className="font-heading font-semibold text-xs text-muted mb-3">
-                  Personal details
-                </p>
-                <div className="space-y-2.5">
-                  {[
-                    ['Date of Birth', new Date(student.dateOfBirth).toLocaleDateString()],
-                    ['Sex', student.sex],
+        {/* The same full-width surface every module page uses (edge to edge on a phone). Fee and
+            risk data stay behind student.viewFeeStatus / student.viewRiskStatus. Two stacks on a
+            wide screen so a short block on one side leaves no hole beside a tall one: left is who
+            the student is and how to reach them, right is enrolment, guardians and welfare. */}
+        <ModuleSurface contentClassName="space-y-6 [&>*+*]:border-t [&>*+*]:border-base [&>*+*]:pt-6">
+          <div className="grid gap-x-10 gap-y-6 lg:grid-cols-2">
+            <div className="space-y-6 [&>*+*]:border-t [&>*+*]:border-base [&>*+*]:pt-6">
+              <section>
+                <h2 className={sectionHeading}>Identity</h2>
+                <FactList
+                  rows={[
+                    ['Date of birth', new Date(student.dateOfBirth).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })],
+                    ['Sex', statusWord(student.sex)],
                     ['Nationality', student.nationality],
-                    ['District', student.district],
-                    ['Traditional Authority', student.traditionalAuthority ?? '—'],
-                    ['Village', student.village ?? '—'],
-                    ['Address', student.address ?? '—'],
-                    ['NRB / Birth Cert. No.', student.nrbNumber ?? '—'],
-                    ['Religion', student.religion ?? '—'],
-                    ['Home Language', student.homeLanguage ?? '—'],
-                    ['Phone', student.phone ?? '—'],
-                    ['Email', student.email ?? '—'],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex justify-between text-sm gap-4">
-                      <span className="text-muted shrink-0">{label}</span>
-                      <span className="font-medium text-body text-right break-words min-w-0">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                    ['Religion', student.religion],
+                    ['Home language', student.homeLanguage],
+                    ['NRB / birth cert. no.', student.nrbNumber],
+                  ]}
+                />
+              </section>
 
-              <div>
-                <p className="font-heading font-semibold text-xs text-muted mb-3">
-                  Home and admission
-                </p>
-                <div className="space-y-2.5">
-                  {[
-                    ['Stays', student.residenceType ? RESIDENCE_TYPE_LABELS[student.residenceType] : '—'],
-                    ['Travel to School', student.travelMinutes != null ? `${student.travelMinutes} min` : '—'],
+              <section>
+                <h2 className={sectionHeading}>Contact and address</h2>
+                <FactList
+                  rows={[
+                    ['Phone', student.phone],
+                    ['Email', student.email],
+                    ['Address', student.address],
+                    ['Village', student.village],
+                    ['Traditional authority', student.traditionalAuthority],
+                    ['District', student.district],
+                  ]}
+                />
+              </section>
+
+              <section>
+                <h2 className={sectionHeading}>Home and admission</h2>
+                <FactList
+                  rows={[
+                    ['Stays', student.residenceType ? RESIDENCE_TYPE_LABELS[student.residenceType] : null],
+                    ['Travel to school', student.travelMinutes != null ? `${student.travelMinutes} min` : null],
                     ['Admission', ADMISSION_TYPE_LABELS[student.admissionType ?? 'NEW_INTAKE']],
-                    ['Previous School', student.previousSchool ?? '—'],
-                    ['Reason for Transfer', student.reasonForTransfer ?? '—'],
+                    ['Previous school', student.previousSchool],
+                    ['Reason for transfer', student.reasonForTransfer],
                     ...(student.yearOutcomes && student.yearOutcomes.length > 0
-                      ? [
-                          ['Times Repeated', String(student.yearOutcomes.filter((y) => y.outcome === 'REPEATED').length)],
-                          ['Year History', student.yearOutcomes.map((y) => `${y.academicYear} F${y.form} ${y.outcome === 'REPEATED' ? 'repeated' : y.outcome === 'PROMOTED' ? 'promoted' : y.outcome === 'AWAITING_MANEB' ? 'MANEB' : 'graduated'}`).join(', ')],
-                        ]
+                      ? ([
+                          ['Times repeated', String(student.yearOutcomes.filter((y) => y.outcome === 'REPEATED').length)],
+                          ['Year history', student.yearOutcomes.map((y) => `${y.academicYear} F${y.form} ${y.outcome === 'REPEATED' ? 'repeated' : y.outcome === 'PROMOTED' ? 'promoted' : y.outcome === 'AWAITING_MANEB' ? 'MANEB' : 'graduated'}`).join(', ')],
+                        ] as const)
                       : []),
                     ...(student.exitReason
-                      ? [
-                          ['Reason for Leaving', EXIT_REASON_LABELS[student.exitReason]],
-                          ['Date Left', student.exitDate ? new Date(student.exitDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'],
-                        ]
+                      ? ([
+                          ['Reason for leaving', EXIT_REASON_LABELS[student.exitReason]],
+                          ['Date left', student.exitDate ? new Date(student.exitDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null],
+                        ] as const)
                       : []),
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex justify-between text-sm gap-4">
-                      <span className="text-muted shrink-0">{label}</span>
-                      <span className="font-medium text-body text-right">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                  ]}
+                />
+              </section>
             </div>
 
-            <div className="space-y-6">
-              <div>
-                <p className="font-heading font-semibold text-xs text-muted mb-3">
-                  Class and status
-                </p>
-                <div className="space-y-2.5">
-                  {[
-                    ['Class', student.class?.name ?? '—'],
-                    ['Status', student.status],
+            <div className="space-y-6 max-lg:border-t max-lg:border-base max-lg:pt-6 [&>*+*]:border-t [&>*+*]:border-base [&>*+*]:pt-6">
+              <section>
+                <h2 className={sectionHeading}>Class and status</h2>
+                <FactList
+                  rows={[
+                    ['Class', student.class?.name],
+                    ['Status', statusWord(student.status)],
                     // The Guardians section below lists every guardian, primary included,
                     // so repeating the primary here was a duplicate. These three rows
                     // remain only for a viewer who can't see that section (no student.view).
                     ...(can('student.view')
                       ? []
-                      : [
+                      : ([
                           ['Guardian', student.guardianName],
                           ['Relation', student.guardianRelation],
-                          ['Guardian Phone', student.guardianPhone],
-                        ]),
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex justify-between text-sm">
-                      <span className="text-muted">{label}</span>
-                      <span className="font-medium text-body">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                          ['Guardian phone', student.guardianPhone],
+                        ] as const)),
+                  ]}
+                />
+              </section>
 
               {/* Guardians: visible to anyone who can open the record; only admin,
                   the headteacher and other non-lower_rank editors can change them
@@ -281,31 +269,27 @@ function ProfileContent() {
           </div>
 
           {can('student.viewFeeStatus') && (
-            <div className="pt-5">
-              <p className="font-heading font-semibold text-xs text-muted mb-3">
-                Fee status
-              </p>
+            <section>
+              <h2 className={sectionHeading}>Fee status</h2>
               <div>
                 <p className="text-xs text-muted mb-1">Outstanding balance</p>
                 <p
-                  className={`text-lg font-heading font-bold ${
+                  className={`text-xl font-heading font-bold ${
                     (student.feeBalance ?? 0) > 0 ? 'text-tone-coral' : 'text-tone-teal'
                   }`}
                 >
                   {formatMWK(student.feeBalance ?? 0)}
                 </p>
               </div>
-            </div>
+            </section>
           )}
 
           {/* Risk is a composite of fees, exam results, attendance and library
               (riskService), so it gets its own section rather than sitting under
               "Fee Status". Each factor links to the module that owns it. */}
           {can('student.viewRiskStatus') && (
-            <div className="pt-5">
-              <p className="font-heading font-semibold text-xs text-muted mb-3">
-                Risk overview
-              </p>
+            <section>
+              <h2 className={sectionHeading}>Risk overview</h2>
               <StudentRiskBadge
                 riskLevel={student.riskLevel ?? 'NONE'}
                 variant="card"
@@ -314,9 +298,9 @@ function ProfileContent() {
                 insights={student.riskInsights}
                 classId={student.classId}
               />
-            </div>
+            </section>
           )}
-        </div>
+        </ModuleSurface>
       </div>
 
       {editing && <StudentForm studentId={id} onClose={() => setEditing(false)} />}

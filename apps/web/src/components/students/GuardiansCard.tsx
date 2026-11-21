@@ -138,13 +138,13 @@ export function GuardiansCard({ studentId, canEdit }: { studentId: string; canEd
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <p className="font-heading font-semibold text-xs text-muted">Guardians</p>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <h2 className="font-heading text-sm font-semibold text-body">Guardians</h2>
         {canEdit && (
           <button
             type="button"
             onClick={openNew}
-            className="min-h-[36px] px-3 rounded-lg text-xs font-semibold text-brand-deep border border-base hover:bg-page flex items-center gap-1"
+            className="min-h-11 px-3.5 rounded-xl text-sm font-medium text-body border border-base hover:bg-page flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" /> Add guardian
           </button>
@@ -160,11 +160,11 @@ export function GuardiansCard({ studentId, canEdit }: { studentId: string; canEd
         // card inside the profile, same as every other section of the page.
         <div className="divide-y divide-base">
           {guardians.map((g) => (
-            <div key={g.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
+            <div key={g.id} className="py-4 first:pt-0 last:pb-0 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-body truncate">{g.fullName}</p>
-                  <p className="text-xs text-muted">{g.relation}</p>
+                  <p className="text-base font-semibold text-body [overflow-wrap:anywhere]">{g.fullName}</p>
+                  <p className="text-sm text-muted">{g.relation}</p>
                 </div>
                 {canEdit && (
                   <div className="flex gap-1 shrink-0">
@@ -172,33 +172,33 @@ export function GuardiansCard({ studentId, canEdit }: { studentId: string; canEd
                       type="button"
                       onClick={() => openEdit(g)}
                       aria-label={`Edit ${g.fullName}`}
-                      className="p-2 rounded-lg hover:bg-page text-muted"
+                      className="grid h-11 w-11 place-items-center rounded-xl hover:bg-page text-muted"
                     >
-                      <Pencil className="w-3.5 h-3.5" />
+                      <Pencil className="w-4 h-4" />
                     </button>
                     {!g.isPrimary && (
                       <button
                         type="button"
                         onClick={() => setDeleting(g)}
                         aria-label={`Remove ${g.fullName}`}
-                        className="p-2 rounded-lg hover:bg-page text-tone-coral"
+                        className="grid h-11 w-11 place-items-center rounded-xl hover:bg-page text-tone-coral"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                   </div>
                 )}
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {g.isPrimary && <Badge tone="teal">Primary</Badge>}
                 {g.isFeePayer && <Badge tone="amber">Pays fees</Badge>}
                 {g.isEmergencyContact && <Badge tone="coral">Emergency contact</Badge>}
                 {g.livesWithStudent === true && <Badge tone="teal">Lives with student</Badge>}
               </div>
-              <div className="text-xs text-body space-y-0.5">
-                <p className="flex items-center gap-1.5"><Phone className="w-3 h-3 text-muted" />{g.phone}{g.altPhone ? ` · ${g.altPhone}` : ''}</p>
-                {g.email && <p className="flex items-center gap-1.5 break-all"><Mail className="w-3 h-3 text-muted" />{g.email}</p>}
-                {g.address && <p className="flex items-center gap-1.5"><MapPin className="w-3 h-3 text-muted" />{g.address}</p>}
+              <div className="text-sm text-body space-y-2">
+                <p className="flex items-start gap-2.5"><Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden /><span className="min-w-0 [overflow-wrap:anywhere]">{g.phone}{g.altPhone ? ` · ${g.altPhone}` : ''}</span></p>
+                {g.email && <p className="flex items-start gap-2.5"><Mail className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden /><span className="min-w-0 [overflow-wrap:anywhere]">{g.email}</span></p>}
+                {g.address && <p className="flex items-start gap-2.5"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden /><span className="min-w-0 [overflow-wrap:anywhere]">{g.address}</span></p>}
               </div>
             </div>
           ))}

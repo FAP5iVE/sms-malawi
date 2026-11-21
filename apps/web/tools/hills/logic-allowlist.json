@@ -148,6 +148,10 @@
     {
       "file": "src/lib/hills/statusWord.ts",
       "reason": "Phase 8b-3: pure display helper. statusWord() turns a raw status code into a sentence-case word and statusTone() picks the StatusText tone (RULEBOOK R2, R4). Callers keep using the raw code for every comparison, request and condition. Under src/lib/hills (allowed)."
+    },
+    {
+      "file": "src/components/students/FactList.tsx",
+      "reason": "Phase 9b: presentational label and value list used by the student profile and the welfare card. No data, auth or routing code"
     }
   ],
   "deletedFiles": [],
@@ -17560,6 +17564,377 @@
       "kind": "logic",
       "pattern": "^if\\ \\(\\ doc\\ \\.\\ getTextWidth\\ \\(\\ official\\ \\)\\ >\\ roomForRight\\ \\)\\ official\\ =\\ pageWords$",
       "reason": "Phase 9: the footer reads the real page count from the document instead of a fixed 1 (R11.7). A report card is one page, so the words are the same; they can no longer disagree with the file."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Report\\ Card\\ \u00b7\\ T\\ \\{reportCardTerm\\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ \\[\\ \\[\\ 'Date\\ of\\ Birth'\\ ,\\ new\\ Date\\ \\(\\ student\\ \\.\\ dateOfBirth\\ \\)\\ \\.\\ toLocaleDateString\\ \\(\\ \\)\\ \\]\\ ,\\ \\[\\ 'Sex'\\ ,\\ student\\ \\.\\ sex\\ \\]\\ ,\\ \\[\\ 'Nationality'\\ ,\\ student\\ \\.\\ nationality\\ \\]\\ ,\\ \\[\\ 'District'\\ ,\\ student\\ \\.\\ district\\ \\]\\ ,\\ \\[\\ 'Traditional\\ Authority'\\ ,\\ student\\ \\.\\ traditionalAuthority\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'Village'\\ ,\\ student\\ \\.\\ village\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'Address'\\ ,\\ student\\ \\.\\ address\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'NRB\\ /\\ Birth\\ Cert\\.\\ No\\.'\\ ,\\ student\\ \\.\\ nrbNumber\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'Religion'\\ ,\\ student\\ \\.\\ religion\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'Home\\ Language'\\ ,\\ student\\ \\.\\ homeLanguage\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'Phone'\\ ,\\ student\\ \\.\\ phone\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'Email'\\ ,\\ student\\ \\.\\ email\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\]\\ \\.\\ map\\ \\(\\ \\(\\ \\[\\ label\\ ,\\ value\\ \\]\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ label\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ label\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ value\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ \\[\\ \\[\\ 'Stays'\\ ,\\ student\\ \\.\\ residenceType\\ \\?\\ RESIDENCE_TYPE_LABELS\\ \\[\\ student\\ \\.\\ residenceType\\ \\]\\ :\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'Travel\\ to\\ School'\\ ,\\ student\\ \\.\\ travelMinutes\\ !=\\ null\\ \\?\\ `\\$\\{\\ student\\ \\.\\ travelMinutes\\ \\}\\ min`\\ :\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'Admission'\\ ,\\ ADMISSION_TYPE_LABELS\\ \\[\\ student\\ \\.\\ admissionType\\ \\?\\?\\ 'NEW_INTAKE'\\ \\]\\ \\]\\ ,\\ \\[\\ 'Previous\\ School'\\ ,\\ student\\ \\.\\ previousSchool\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'Reason\\ for\\ Transfer'\\ ,\\ student\\ \\.\\ reasonForTransfer\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\.\\.\\.\\ \\(\\ student\\ \\.\\ yearOutcomes\\ \\&\\&\\ student\\ \\.\\ yearOutcomes\\ \\.\\ length\\ >\\ 0\\ \\?\\ \\[\\ \\[\\ 'Times\\ Repeated'\\ ,\\ String\\ \\(\\ student\\ \\.\\ yearOutcomes\\ \\.\\ filter\\ \\(\\ \\(\\ y\\ \\)\\ =>\\ y\\ \\.\\ outcome\\ ===\\ 'REPEATED'\\ \\)\\ \\.\\ length\\ \\)\\ \\]\\ ,\\ \\[\\ 'Year\\ History'\\ ,\\ student\\ \\.\\ yearOutcomes\\ \\.\\ map\\ \\(\\ \\(\\ y\\ \\)\\ =>\\ `\\$\\{\\ y\\ \\.\\ academicYear\\ \\}\\ F\\$\\{\\ y\\ \\.\\ form\\ \\}\\ \\$\\{\\ y\\ \\.\\ outcome\\ ===\\ 'REPEATED'\\ \\?\\ 'repeated'\\ :\\ y\\ \\.\\ outcome\\ ===\\ 'PROMOTED'\\ \\?\\ 'promoted'\\ :\\ y\\ \\.\\ outcome\\ ===\\ 'AWAITING_MANEB'\\ \\?\\ 'MANEB'\\ :\\ 'graduated'\\ \\}`\\ \\)\\ \\.\\ join\\ \\(\\ ',\\ '\\ \\)\\ \\]\\ ,\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\.\\.\\.\\ \\(\\ student\\ \\.\\ exitReason\\ \\?\\ \\[\\ \\[\\ 'Reason\\ for\\ Leaving'\\ ,\\ EXIT_REASON_LABELS\\ \\[\\ student\\ \\.\\ exitReason\\ \\]\\ \\]\\ ,\\ \\[\\ 'Date\\ Left'\\ ,\\ student\\ \\.\\ exitDate\\ \\?\\ new\\ Date\\ \\(\\ student\\ \\.\\ exitDate\\ \\)\\ \\.\\ toLocaleDateString\\ \\(\\ 'en\\-GB'\\ ,\\ \\{\\ day\\ :\\ 'numeric'\\ ,\\ month\\ :\\ 'short'\\ ,\\ year\\ :\\ 'numeric'\\ \\}\\ \\)\\ :\\ '\u2014'\\ \\]\\ ,\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\]\\ \\.\\ map\\ \\(\\ \\(\\ \\[\\ label\\ ,\\ value\\ \\]\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ \\[\\ \\[\\ 'Class'\\ ,\\ student\\ \\.\\ class\\ \\?\\.\\ name\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'Status'\\ ,\\ student\\ \\.\\ status\\ \\]\\ ,\\ \\.\\.\\.\\ \\(\\ can\\ \\(\\ 'student\\.view'\\ \\)\\ \\?\\ \\[\\ \\]\\ :\\ \\[\\ \\[\\ 'Guardian'\\ ,\\ student\\ \\.\\ guardianName\\ \\]\\ ,\\ \\[\\ 'Relation'\\ ,\\ student\\ \\.\\ guardianRelation\\ \\]\\ ,\\ \\[\\ 'Guardian\\ Phone'\\ ,\\ student\\ \\.\\ guardianPhone\\ \\]\\ ,\\ \\]\\ \\)\\ ,\\ \\]\\ \\.\\ map\\ \\(\\ \\(\\ \\[\\ label\\ ,\\ value\\ \\]\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ statusWord\\ \\}\\ from\\ '@/lib/hills/statusWord'$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ sectionHeading\\ =\\ 'mb\\-3\\ font\\-heading\\ text\\-sm\\ font\\-semibold\\ text\\-body'$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ actionBtn\\ =\\ 'inline\\-flex\\ min\\-h\\-11\\ items\\-center\\ gap\\-1\\.5\\ rounded\\-xl\\ border\\ border\\-base\\ px\\-3\\.5\\ text\\-sm\\ font\\-medium\\ text\\-body\\ transition\\-colors\\ hover:bg\\-page'$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Report\\ card\\ \u00b7\\ T\\ \\{reportCardTerm\\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^contentClassName=\"space\\-y\\-6\\ \\[\\&>\\*\\+\\*\\]:border\\-t\\ \\[\\&>\\*\\+\\*\\]:border\\-base\\ \\[\\&>\\*\\+\\*\\]:pt\\-6\"$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^rows=\\{\\ \\[\\ \\[\\ 'Date\\ of\\ birth'\\ ,\\ new\\ Date\\ \\(\\ student\\ \\.\\ dateOfBirth\\ \\)\\ \\.\\ toLocaleDateString\\ \\(\\ 'en\\-GB'\\ ,\\ \\{\\ day\\ :\\ 'numeric'\\ ,\\ month\\ :\\ 'long'\\ ,\\ year\\ :\\ 'numeric'\\ \\}\\ \\)\\ \\]\\ ,\\ \\[\\ 'Sex'\\ ,\\ statusWord\\ \\(\\ student\\ \\.\\ sex\\ \\)\\ \\]\\ ,\\ \\[\\ 'Nationality'\\ ,\\ student\\ \\.\\ nationality\\ \\]\\ ,\\ \\[\\ 'Religion'\\ ,\\ student\\ \\.\\ religion\\ \\]\\ ,\\ \\[\\ 'Home\\ language'\\ ,\\ student\\ \\.\\ homeLanguage\\ \\]\\ ,\\ \\[\\ 'NRB\\ /\\ birth\\ cert\\.\\ no\\.'\\ ,\\ student\\ \\.\\ nrbNumber\\ \\]\\ ,\\ \\]\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^rows=\\{\\ \\[\\ \\[\\ 'Phone'\\ ,\\ student\\ \\.\\ phone\\ \\]\\ ,\\ \\[\\ 'Email'\\ ,\\ student\\ \\.\\ email\\ \\]\\ ,\\ \\[\\ 'Address'\\ ,\\ student\\ \\.\\ address\\ \\]\\ ,\\ \\[\\ 'Village'\\ ,\\ student\\ \\.\\ village\\ \\]\\ ,\\ \\[\\ 'Traditional\\ authority'\\ ,\\ student\\ \\.\\ traditionalAuthority\\ \\]\\ ,\\ \\[\\ 'District'\\ ,\\ student\\ \\.\\ district\\ \\]\\ ,\\ \\]\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^rows=\\{\\ \\[\\ \\[\\ 'Stays'\\ ,\\ student\\ \\.\\ residenceType\\ \\?\\ RESIDENCE_TYPE_LABELS\\ \\[\\ student\\ \\.\\ residenceType\\ \\]\\ :\\ null\\ \\]\\ ,\\ \\[\\ 'Travel\\ to\\ school'\\ ,\\ student\\ \\.\\ travelMinutes\\ !=\\ null\\ \\?\\ `\\$\\{\\ student\\ \\.\\ travelMinutes\\ \\}\\ min`\\ :\\ null\\ \\]\\ ,\\ \\[\\ 'Admission'\\ ,\\ ADMISSION_TYPE_LABELS\\ \\[\\ student\\ \\.\\ admissionType\\ \\?\\?\\ 'NEW_INTAKE'\\ \\]\\ \\]\\ ,\\ \\[\\ 'Previous\\ school'\\ ,\\ student\\ \\.\\ previousSchool\\ \\]\\ ,\\ \\[\\ 'Reason\\ for\\ transfer'\\ ,\\ student\\ \\.\\ reasonForTransfer\\ \\]\\ ,\\ \\.\\.\\.\\ \\(\\ student\\ \\.\\ yearOutcomes\\ \\&\\&\\ student\\ \\.\\ yearOutcomes\\ \\.\\ length\\ >\\ 0\\ \\?\\ \\(\\ \\[\\ \\[\\ 'Times\\ repeated'\\ ,\\ String\\ \\(\\ student\\ \\.\\ yearOutcomes\\ \\.\\ filter\\ \\(\\ \\(\\ y\\ \\)\\ =>\\ y\\ \\.\\ outcome\\ ===\\ 'REPEATED'\\ \\)\\ \\.\\ length\\ \\)\\ \\]\\ ,\\ \\[\\ 'Year\\ history'\\ ,\\ student\\ \\.\\ yearOutcomes\\ \\.\\ map\\ \\(\\ \\(\\ y\\ \\)\\ =>\\ `\\$\\{\\ y\\ \\.\\ academicYear\\ \\}\\ F\\$\\{\\ y\\ \\.\\ form\\ \\}\\ \\$\\{\\ y\\ \\.\\ outcome\\ ===\\ 'REPEATED'\\ \\?\\ 'repeated'\\ :\\ y\\ \\.\\ outcome\\ ===\\ 'PROMOTED'\\ \\?\\ 'promoted'\\ :\\ y\\ \\.\\ outcome\\ ===\\ 'AWAITING_MANEB'\\ \\?\\ 'MANEB'\\ :\\ 'graduated'\\ \\}`\\ \\)\\ \\.\\ join\\ \\(\\ ',\\ '\\ \\)\\ \\]\\ ,\\ \\]\\ as\\ const\\ \\)\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\.\\.\\.\\ \\(\\ student\\ \\.\\ exitReason\\ \\?\\ \\(\\ \\[\\ \\[\\ 'Reason\\ for\\ leaving'\\ ,\\ EXIT_REASON_LABELS\\ \\[\\ student\\ \\.\\ exitReason\\ \\]\\ \\]\\ ,\\ \\[\\ 'Date\\ left'\\ ,\\ student\\ \\.\\ exitDate\\ \\?\\ new\\ Date\\ \\(\\ student\\ \\.\\ exitDate\\ \\)\\ \\.\\ toLocaleDateString\\ \\(\\ 'en\\-GB'\\ ,\\ \\{\\ day\\ :\\ 'numeric'\\ ,\\ month\\ :\\ 'short'\\ ,\\ year\\ :\\ 'numeric'\\ \\}\\ \\)\\ :\\ null\\ \\]\\ ,\\ \\]\\ as\\ const\\ \\)\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\]\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(auth)/students/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^rows=\\{\\ \\[\\ \\[\\ 'Class'\\ ,\\ student\\ \\.\\ class\\ \\?\\.\\ name\\ \\]\\ ,\\ \\[\\ 'Status'\\ ,\\ statusWord\\ \\(\\ student\\ \\.\\ status\\ \\)\\ \\]\\ ,\\ \\.\\.\\.\\ \\(\\ can\\ \\(\\ 'student\\.view'\\ \\)\\ \\?\\ \\[\\ \\]\\ :\\ \\(\\ \\[\\ \\[\\ 'Guardian'\\ ,\\ student\\ \\.\\ guardianName\\ \\]\\ ,\\ \\[\\ 'Relation'\\ ,\\ student\\ \\.\\ guardianRelation\\ \\]\\ ,\\ \\[\\ 'Guardian\\ phone'\\ ,\\ student\\ \\.\\ guardianPhone\\ \\]\\ ,\\ \\]\\ as\\ const\\ \\)\\ \\)\\ ,\\ \\]\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: student profile regrouped into sections inside one full-width surface (Identity, Contact and address, Home and admission, Class and status, Guardians, Welfare, Fee status, Risk overview). Same data, same permission checks (can student.view, viewWelfare, viewFeeStatus, viewRiskStatus), same handlers. The date of birth reads in long form and sex and status go through statusWord (R4.8). Layout and wording only."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ schoolInfo\\ \\?\\.\\ systemTagline\\ \\?\\?\\ undefined\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: the home header brand block can shrink and truncate its subtitle so the Login button can never be pushed off screen. Class text and a title attribute only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ CATEGORY_LEGEND\\ ,\\ categoryColor\\ \\}\\ from\\ '\\./calendarConfig'$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ evt\\ \\.\\ id\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ cell\\ \\.\\ events\\ \\.\\ slice\\ \\(\\ 0\\ ,\\ 3\\ \\)\\ \\.\\ map\\ \\(\\ \\(\\ evt\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ evt\\ \\.\\ title\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ cell\\ \\.\\ events\\ \\.\\ length\\ \\-\\ 3\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ cell\\ \\.\\ events\\ \\.\\ map\\ \\(\\ \\(\\ e\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ CATEGORY_LEGEND\\ ,\\ categoryColor\\ ,\\ categoryLabel\\ \\}\\ from\\ '\\./calendarConfig'$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ dayCategories\\ \\(\\ events\\ :\\ ReadonlyArray\\ <\\ \\{\\ category\\ :\\ CalendarEventCategory\\ \\}\\ >\\ \\)\\ :\\ CalendarEventCategory\\ \\[\\ \\]\\ \\{\\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ \\[\\ \\.\\.\\.\\ new\\ Set\\ \\(\\ events\\ \\.\\ map\\ \\(\\ \\(\\ e\\ \\)\\ =>\\ e\\ \\.\\ category\\ \\)\\ \\)\\ \\]$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ hasEvents\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ dayCategories\\ \\(\\ cell\\ \\.\\ events\\ \\)\\ \\.\\ slice\\ \\(\\ 0\\ ,\\ 3\\ \\)\\ \\.\\ map\\ \\(\\ \\(\\ category\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ category\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ cell\\ \\.\\ events\\ \\.\\ length\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ cell\\ \\.\\ events\\ \\.\\ length\\ ===\\ 1\\ \\?\\ 'event'\\ :\\ 'events'\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ cell\\ \\.\\ events\\ \\.\\ length\\ <=\\ 3\\ \\?\\ cell\\ \\.\\ events\\ \\.\\ map\\ \\(\\ \\(\\ e\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ :\\ dayCategories\\ \\(\\ cell\\ \\.\\ events\\ \\)\\ \\.\\ map\\ \\(\\ \\(\\ category\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ categoryLabel\\ \\(\\ category\\ \\)\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/calendar/DesktopCalendarView.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ cell\\ \\.\\ events\\ \\.\\ filter\\ \\(\\ \\(\\ e\\ \\)\\ =>\\ e\\ \\.\\ category\\ ===\\ category\\ \\)\\ \\.\\ length\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: calendar day cells show up to three category dots plus a count instead of event pills, so a busy day stays inside its own box; the hover tooltip is rewritten to a short summary. Reads the same events, same click handlers, same selection. Presentation only."
+    },
+    {
+      "file": "src/components/shared/StudentRiskBadge.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ RISK_CONFIG\\ :\\ Record\\ <\\ RiskLevel\\ ,\\ \\{\\ label\\ :\\ string\\ icon\\ :\\ React\\ \\.\\ ElementType\\ badge\\ :\\ string\\ dot\\ :\\ string\\ card\\ :\\ string\\ cardTitle\\ :\\ string\\ \\}\\ >\\ =\\ \\{\\ HIGH\\ :\\ \\{\\ label\\ :\\ 'High\\ risk'\\ ,\\ icon\\ :\\ AlertTriangle\\ ,\\ badge\\ :\\ 'text\\-brand\\-coral'\\ ,\\ dot\\ :\\ 'bg\\-red\\-500'\\ ,\\ card\\ :\\ 'border\\-red\\-200\\ bg\\-red\\-50/50\\ dark:border\\-red\\-800/40\\ dark:bg\\-red\\-950/15'\\ ,\\ cardTitle\\ :\\ 'text\\-red\\-700\\ dark:text\\-red\\-400'\\ ,\\ \\}\\ ,\\ MEDIUM\\ :\\ \\{\\ label\\ :\\ 'Medium\\ risk'\\ ,\\ icon\\ :\\ AlertCircle\\ ,\\ badge\\ :\\ 'text\\-brand\\-amber'\\ ,\\ dot\\ :\\ 'bg\\-amber\\-500'\\ ,\\ card\\ :\\ 'border\\-amber\\-200\\ bg\\-amber\\-50/50\\ dark:border\\-amber\\-800/40\\ dark:bg\\-amber\\-950/15'\\ ,\\ cardTitle\\ :\\ 'text\\-amber\\-700\\ dark:text\\-amber\\-400'\\ ,\\ \\}\\ ,\\ LOW\\ :\\ \\{\\ label\\ :\\ 'Low\\ risk'\\ ,\\ icon\\ :\\ Info\\ ,\\ badge\\ :\\ 'text\\-brand\\-navy'\\ ,\\ dot\\ :\\ 'bg\\-blue\\-400'\\ ,\\ card\\ :\\ 'border\\-blue\\-200\\ bg\\-blue\\-50/50\\ dark:border\\-blue\\-800/40'\\ ,\\ cardTitle\\ :\\ 'text\\-blue\\-600\\ dark:text\\-blue\\-400'\\ ,\\ \\}\\ ,\\ NONE\\ :\\ \\{\\ label\\ :\\ 'On\\ track'\\ ,\\ icon\\ :\\ ShieldCheck\\ ,\\ badge\\ :\\ 'text\\-brand\\-teal'\\ ,\\ dot\\ :\\ 'bg\\-emerald\\-500'\\ ,\\ card\\ :\\ 'border\\-emerald\\-200\\ bg\\-emerald\\-50/50\\ dark:border\\-emerald\\-800/40'\\ ,\\ cardTitle\\ :\\ 'text\\-emerald\\-700\\ dark:text\\-emerald\\-400'\\ ,\\ \\}\\ ,\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: risk overview card colours moved to theme tokens so it reads in dark mode; severity label goes through statusWord. Same risk data and levels."
+    },
+    {
+      "file": "src/components/shared/StudentRiskBadge.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ f\\ \\.\\ severity\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: risk overview card colours moved to theme tokens so it reads in dark mode; severity label goes through statusWord. Same risk data and levels."
+    },
+    {
+      "file": "src/components/shared/StudentRiskBadge.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ statusWord\\ \\}\\ from\\ '@/lib/hills/statusWord'$",
+      "reason": "Phase 9b, owner request 2026-11-20: risk overview card colours moved to theme tokens so it reads in dark mode; severity label goes through statusWord. Same risk data and levels."
+    },
+    {
+      "file": "src/components/shared/StudentRiskBadge.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ RISK_CONFIG\\ :\\ Record\\ <\\ RiskLevel\\ ,\\ \\{\\ label\\ :\\ string\\ icon\\ :\\ React\\ \\.\\ ElementType\\ badge\\ :\\ string\\ dot\\ :\\ string\\ card\\ :\\ string\\ cardTitle\\ :\\ string\\ \\}\\ >\\ =\\ \\{\\ HIGH\\ :\\ \\{\\ label\\ :\\ 'High\\ risk'\\ ,\\ icon\\ :\\ AlertTriangle\\ ,\\ badge\\ :\\ 'text\\-brand\\-coral'\\ ,\\ dot\\ :\\ 'bg\\-red\\-500'\\ ,\\ card\\ :\\ 'border\\-l\\-tone\\-coral'\\ ,\\ cardTitle\\ :\\ 'text\\-tone\\-coral'\\ ,\\ \\}\\ ,\\ MEDIUM\\ :\\ \\{\\ label\\ :\\ 'Medium\\ risk'\\ ,\\ icon\\ :\\ AlertCircle\\ ,\\ badge\\ :\\ 'text\\-brand\\-amber'\\ ,\\ dot\\ :\\ 'bg\\-amber\\-500'\\ ,\\ card\\ :\\ 'border\\-l\\-tone\\-amber'\\ ,\\ cardTitle\\ :\\ 'text\\-tone\\-amber'\\ ,\\ \\}\\ ,\\ LOW\\ :\\ \\{\\ label\\ :\\ 'Low\\ risk'\\ ,\\ icon\\ :\\ Info\\ ,\\ badge\\ :\\ 'text\\-brand\\-navy'\\ ,\\ dot\\ :\\ 'bg\\-blue\\-400'\\ ,\\ card\\ :\\ 'border\\-l\\-status\\-info'\\ ,\\ cardTitle\\ :\\ 'text\\-status\\-info'\\ ,\\ \\}\\ ,\\ NONE\\ :\\ \\{\\ label\\ :\\ 'On\\ track'\\ ,\\ icon\\ :\\ ShieldCheck\\ ,\\ badge\\ :\\ 'text\\-brand\\-teal'\\ ,\\ dot\\ :\\ 'bg\\-emerald\\-500'\\ ,\\ card\\ :\\ 'border\\-l\\-tone\\-teal'\\ ,\\ cardTitle\\ :\\ 'text\\-tone\\-teal'\\ ,\\ \\}\\ ,\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: risk overview card colours moved to theme tokens so it reads in dark mode; severity label goes through statusWord. Same risk data and levels."
+    },
+    {
+      "file": "src/components/shared/StudentRiskBadge.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ statusWord\\ \\(\\ f\\ \\.\\ severity\\ \\)\\ \\}$",
+      "reason": "Phase 9b, owner request 2026-11-20: risk overview card colours moved to theme tokens so it reads in dark mode; severity label goes through statusWord. Same risk data and levels."
+    },
+    {
+      "file": "src/components/students/FactList.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ type\\ \\{\\ ReactNode\\ \\}\\ from\\ 'react'$",
+      "reason": "Phase 9b: new presentational list of label and value rows."
+    },
+    {
+      "file": "src/components/students/FactList.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ type\\ FactRow\\ =\\ readonly\\ \\[\\ label\\ :\\ string\\ ,\\ value\\ :\\ ReactNode\\ \\|\\ null\\ \\|\\ undefined\\ \\]$",
+      "reason": "Phase 9b: new presentational list of label and value rows."
+    },
+    {
+      "file": "src/components/students/FactList.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ FactList\\ \\(\\ \\{\\ rows\\ \\}\\ :\\ \\{\\ rows\\ :\\ ReadonlyArray\\ <\\ FactRow\\ >\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 9b: new presentational list of label and value rows."
+    },
+    {
+      "file": "src/components/students/FactList.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ \\(\\ <JSX/>\\ \\)$",
+      "reason": "Phase 9b: new presentational list of label and value rows."
+    },
+    {
+      "file": "src/components/students/FactList.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ rows\\ \\.\\ map\\ \\(\\ \\(\\ \\[\\ label\\ ,\\ value\\ \\]\\ \\)\\ =>\\ \\{\\}\\ \\)\\ \\}$",
+      "reason": "Phase 9b: new presentational list of label and value rows."
+    },
+    {
+      "file": "src/components/students/FactList.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ empty\\ =\\ value\\ ==\\ null\\ \\|\\|\\ value\\ ===\\ ''$",
+      "reason": "Phase 9b: new presentational list of label and value rows."
+    },
+    {
+      "file": "src/components/students/FactList.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ label\\ \\}$",
+      "reason": "Phase 9b: new presentational list of label and value rows."
+    },
+    {
+      "file": "src/components/students/FactList.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ label\\ \\}$",
+      "reason": "Phase 9b: new presentational list of label and value rows."
+    },
+    {
+      "file": "src/components/students/FactList.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ empty\\ \\?\\ 'Not\\ recorded'\\ :\\ value\\ \\}$",
+      "reason": "Phase 9b: new presentational list of label and value rows."
+    },
+    {
+      "file": "src/components/students/WelfareCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ \\[\\ \\[\\ 'Orphan\\ status'\\ ,\\ ORPHAN_STATUS_LABELS\\ \\[\\ welfare\\ \\.\\ orphanStatus\\ \\]\\ \\]\\ ,\\ \\[\\ 'Vulnerable'\\ ,\\ welfare\\ \\.\\ isVulnerable\\ \\?\\ 'Yes'\\ :\\ 'No'\\ \\]\\ ,\\ \\.\\.\\.\\ \\(\\ welfare\\ \\.\\ isVulnerable\\ \\|\\|\\ welfare\\ \\.\\ vulnerabilityNote\\ \\?\\ \\[\\ \\[\\ 'Vulnerability\\ note'\\ ,\\ welfare\\ \\.\\ vulnerabilityNote\\ \\?\\?\\ '\u2014'\\ \\]\\ ,\\ \\[\\ 'Last\\ reviewed'\\ ,\\ formatDate\\ \\(\\ welfare\\ \\.\\ vulnerabilityReviewedAt\\ \\)\\ \\]\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\[\\ 'Health\\ /\\ medical\\ alert'\\ ,\\ welfare\\ \\.\\ medicalAlert\\ \\?\\?\\ 'None\\ recorded'\\ \\]\\ ,\\ \\.\\.\\.\\ \\(\\ welfare\\ \\.\\ exitNote\\ \\?\\ \\[\\ \\[\\ 'Exit\\ note'\\ ,\\ welfare\\ \\.\\ exitNote\\ \\]\\ \\]\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\]\\ \\.\\ map\\ \\(\\ \\(\\ \\[\\ label\\ ,\\ value\\ \\]\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 9b: welfare facts render through the new FactList instead of inline flex rows. Same rows, same values, same edit and delete handlers."
+    },
+    {
+      "file": "src/components/students/WelfareCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ label\\ \\}$",
+      "reason": "Phase 9b: welfare facts render through the new FactList instead of inline flex rows. Same rows, same values, same edit and delete handlers."
+    },
+    {
+      "file": "src/components/students/WelfareCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ label\\ \\}$",
+      "reason": "Phase 9b: welfare facts render through the new FactList instead of inline flex rows. Same rows, same values, same edit and delete handlers."
+    },
+    {
+      "file": "src/components/students/WelfareCard.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ value\\ \\}$",
+      "reason": "Phase 9b: welfare facts render through the new FactList instead of inline flex rows. Same rows, same values, same edit and delete handlers."
+    },
+    {
+      "file": "src/components/students/WelfareCard.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^rows=\\{\\ \\[\\ \\[\\ 'Orphan\\ status'\\ ,\\ ORPHAN_STATUS_LABELS\\ \\[\\ welfare\\ \\.\\ orphanStatus\\ \\]\\ \\]\\ ,\\ \\[\\ 'Vulnerable'\\ ,\\ welfare\\ \\.\\ isVulnerable\\ \\?\\ 'Yes'\\ :\\ 'No'\\ \\]\\ ,\\ \\.\\.\\.\\ \\(\\ welfare\\ \\.\\ isVulnerable\\ \\|\\|\\ welfare\\ \\.\\ vulnerabilityNote\\ \\?\\ \\(\\ \\[\\ \\[\\ 'Vulnerability\\ note'\\ ,\\ welfare\\ \\.\\ vulnerabilityNote\\ \\]\\ ,\\ \\[\\ 'Last\\ reviewed'\\ ,\\ formatDate\\ \\(\\ welfare\\ \\.\\ vulnerabilityReviewedAt\\ \\)\\ \\]\\ \\]\\ as\\ const\\ \\)\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\[\\ 'Health\\ /\\ medical\\ alert'\\ ,\\ welfare\\ \\.\\ medicalAlert\\ \\?\\?\\ 'None\\ recorded'\\ \\]\\ ,\\ \\.\\.\\.\\ \\(\\ welfare\\ \\.\\ exitNote\\ \\?\\ \\(\\ \\[\\ \\[\\ 'Exit\\ note'\\ ,\\ welfare\\ \\.\\ exitNote\\ \\]\\ \\]\\ as\\ const\\ \\)\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\]\\ \\}$",
+      "reason": "Phase 9b: welfare facts render through the new FactList instead of inline flex rows. Same rows, same values, same edit and delete handlers."
     }
   ],
   "approvedFrozen": [

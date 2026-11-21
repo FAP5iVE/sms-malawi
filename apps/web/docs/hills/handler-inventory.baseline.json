@@ -2201,8 +2201,8 @@
   ]
  },
  "src/app/(auth)/students/[id]/page.tsx": {
-  "digest": "e17d6373b5b0a25bfa69adb7c7a49390047e0d8d",
-  "tokens": 86,
+  "digest": "7edc2d55a310a5649fe6960f9ccc6bda2915d28a",
+  "tokens": 82,
   "items": [
    {
     "k": "handler",
@@ -2952,8 +2952,8 @@
   ]
  },
  "src/app/(public)/page.tsx": {
-  "digest": "766c35717d530640ba80bb22981365bbe86d945e",
-  "tokens": 363,
+  "digest": "e87ad695174fcff48477ae36f6974ae71731de25",
+  "tokens": 364,
   "items": [
    {
     "k": "effect",
@@ -4034,8 +4034,8 @@
   ]
  },
  "src/components/calendar/DesktopCalendarView.tsx": {
-  "digest": "0d04a9a2ac3d28ea779335e8558c2dfc0d69fdbc",
-  "tokens": 160,
+  "digest": "9410101c4dc0df29036242c5e851229aad6f6e06",
+  "tokens": 168,
   "items": [
    {
     "k": "handler",
@@ -11500,8 +11500,8 @@
   "items": []
  },
  "src/components/shared/StudentRiskBadge.tsx": {
-  "digest": "4fac5ea83fdb9902f4cf46aec75b4220dc20c006",
-  "tokens": 68,
+  "digest": "568f9bb1b1c302db1863b35d338d8e6f46c8e5ae",
+  "tokens": 69,
   "items": []
  },
  "src/components/shared/SuperUserRoleSwitcher.tsx": {
@@ -11580,6 +11580,11 @@
  "src/components/shared/chart/types.ts": {
   "digest": "c9647b3d47731041adcab80bd53dad3a176ca788",
   "tokens": 6,
+  "items": []
+ },
+ "src/components/students/FactList.tsx": {
+  "digest": "106e5118ceaea69885f4e8bbd915cf171b78d772",
+  "tokens": 10,
   "items": []
  },
  "src/components/students/GuardiansCard.tsx": {
@@ -11846,8 +11851,8 @@
   ]
  },
  "src/components/students/WelfareCard.tsx": {
-  "digest": "b69a711a3de8029c4f9ce8cebaae2ef491c459ce",
-  "tokens": 206,
+  "digest": "c08942732d317f5eda744b8665235c376b205a0d",
+  "tokens": 203,
   "items": [
    {
     "k": "handler",
