@@ -204,7 +204,8 @@ const STAFF_IDENTITY_KEYS = [
   'nextOfKinName', 'nextOfKinPhone', 'nextOfKinRelation',
   // Compliance / payroll-adjacent fields are HR-only as well.
   'payrollNo', 'tcmRegistrationNo', 'tcmLicenceNo', 'tcmLicenceExpiry',
-  'highestQualification', 'qualificationProgram', 'trainingRoute',
+  'highestQualification', 'qualifiedInEducation', 'trainingRoute',
+  'housingStatus',
 ] as const
 
 hrRouter.get('/:id', verifyAuth, requireRole([...REVIEWERS]),
@@ -365,6 +366,26 @@ hrRouter.get('/alerts/contracts-upcoming', verifyAuth, requireRole([...HR_ADMIN]
   })
 
 // ── LEAVE ──
+// Self-service: the signed-in staff member's own requests. (The reviewer list
+// below is for HR and cannot be used for this: it is role-gated and keyed by
+// StaffProfile.id, not the sign-in uid.)
+hrRouter.get('/leave/mine', verifyAuth,
+  async (req, res) => {
+    return res.json(await hrService.listMyLeaveRequests(req.user!.uid))
+  })
+
+// What this person can ask for, the days left, and how each type is paid.
+hrRouter.get('/leave/options', verifyAuth,
+  async (req, res) => {
+    return res.json(await hrService.getMyLeaveOptions(req.user!.uid))
+  })
+
+// Who is away today. Not filtered by request status: it is about dates.
+hrRouter.get('/leave/on-leave', verifyAuth, requireRole([...REVIEWERS]),
+  async (_req, res) => {
+    return res.json(await hrService.listOnLeaveNow())
+  })
+
 hrRouter.get('/leave/requests', verifyAuth, requireRole([...REVIEWERS]),
   async (req, res) => {
     const { staffId, status } = req.query as Record<string, string>

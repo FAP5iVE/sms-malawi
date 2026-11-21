@@ -71,6 +71,37 @@ export type InstallmentOption = 2 | 3 | 4
  * of truth. Keys are department names; each value is the list of job
  * titles available within that department, in display order.
  */
+/**
+ * Leave types, in the order they are offered. Mirrors the LeaveType enum in
+ * schema.prisma; kept here so the settings registry, the HR schemas and the
+ * UI share one list.
+ */
+export const LEAVE_TYPES = ['ANNUAL', 'SICK', 'MATERNITY', 'PATERNITY', 'STUDY', 'UNPAID', 'EMERGENCY'] as const
+export type LeaveTypeKey = (typeof LEAVE_TYPES)[number]
+
+export const LEAVE_TYPE_LABELS: Record<LeaveTypeKey, string> = {
+  ANNUAL:    'Annual leave',
+  SICK:      'Sick leave',
+  MATERNITY: 'Maternity leave',
+  PATERNITY: 'Paternity leave',
+  STUDY:     'Study leave',
+  UNPAID:    'Unpaid leave',
+  EMERGENCY: 'Emergency leave',
+}
+
+/** Leave types that are only offered to one sex (when the profile records it). */
+export const LEAVE_TYPE_SEX: Partial<Record<LeaveTypeKey, 'MALE' | 'FEMALE'>> = {
+  MATERNITY: 'FEMALE',
+  PATERNITY: 'MALE',
+}
+
+/**
+ * Percent of normal pay a leave type attracts: 100 full pay, 50 half pay,
+ * 0 unpaid. For SICK this is the pay on the full-pay days; the days after
+ * those (HR_SICK_HALF_PAY_DAYS) are always paid at half.
+ */
+export type LeavePayPercent = Record<LeaveTypeKey, number>
+
 export interface DepartmentTitles {
   [departmentName: string]: string[]
 }
@@ -226,6 +257,8 @@ export const SETTING_KEYS = {
   HR_PATERNITY_LEAVE_DAYS:        'hr_paternity_leave_days',
   HR_STUDY_LEAVE_DAYS:            'hr_study_leave_days',
   HR_EMERGENCY_LEAVE_DAYS:        'hr_emergency_leave_days',
+  HR_SICK_HALF_PAY_DAYS:          'hr_sick_half_pay_days',
+  HR_LEAVE_PAY_PERCENT:           'hr_leave_pay_percent',
 
   // ── HR — contract management
   HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS: 'hr_contract_expiry_lookahead_days',
@@ -375,6 +408,8 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS]:     number
   readonly [SETTING_KEYS.HR_STUDY_LEAVE_DAYS]:         number
   readonly [SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS]:     number
+  readonly [SETTING_KEYS.HR_SICK_HALF_PAY_DAYS]:       number
+  readonly [SETTING_KEYS.HR_LEAVE_PAY_PERCENT]:        LeavePayPercent
   readonly [SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS]: number  // days
   readonly [SETTING_KEYS.HR_RETIREMENT_AGE]: number                   // years
   readonly [SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT]: string
@@ -867,42 +902,64 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     key: SETTING_KEYS.HR_ANNUAL_LEAVE_DAYS,
     category: SETTING_CATEGORIES.HR,
     isPublic: false,
-    description: 'Default annual leave entitlement in days per calendar year.',
-    defaultValue: 18,
+    description: 'Annual leave entitlement in working days per calendar year. The Employment Act minimum for a five-day week is 15. Unused days do not carry over to the next year.',
+    defaultValue: 15,
   },
   [SETTING_KEYS.HR_SICK_LEAVE_DAYS]: {
     key: SETTING_KEYS.HR_SICK_LEAVE_DAYS,
     category: SETTING_CATEGORIES.HR,
     isPublic: false,
-    description: 'Default sick leave entitlement in days per calendar year.',
-    defaultValue: 10,
+    description: 'Sick leave on full pay, in working days per calendar year. The Employment Act minimum is four weeks (20 days on a five-day week).',
+    defaultValue: 20,
+  },
+  [SETTING_KEYS.HR_SICK_HALF_PAY_DAYS]: {
+    key: SETTING_KEYS.HR_SICK_HALF_PAY_DAYS,
+    category: SETTING_CATEGORIES.HR,
+    isPublic: false,
+    description: 'Sick leave on half pay, in working days per calendar year, used after the full-pay days. The Employment Act minimum is eight weeks (40 days on a five-day week).',
+    defaultValue: 40,
+  },
+  [SETTING_KEYS.HR_LEAVE_PAY_PERCENT]: {
+    key: SETTING_KEYS.HR_LEAVE_PAY_PERCENT,
+    category: SETTING_CATEGORIES.HR,
+    isPublic: false,
+    description: 'Percent of normal pay each leave type attracts: 100 full pay, 50 half pay, 0 unpaid. Payroll applies it to the pay for the month the leave falls in.',
+    defaultValue: {
+      ANNUAL:    100,
+      SICK:      100,
+      MATERNITY: 100,
+      PATERNITY: 100,
+      STUDY:     0,
+      UNPAID:    0,
+      EMERGENCY: 100,
+    },
   },
   [SETTING_KEYS.HR_MATERNITY_LEAVE_DAYS]: {
     key: SETTING_KEYS.HR_MATERNITY_LEAVE_DAYS,
     category: SETTING_CATEGORIES.HR,
     isPublic: false,
-    description: 'Maternity leave entitlement in days.',
-    defaultValue: 90,
+    description: 'Maternity leave allowed per request, in working days. The Employment Act minimum is eight weeks (40 days on a five-day week), on full pay.',
+    defaultValue: 40,
   },
   [SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS]: {
     key: SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS,
     category: SETTING_CATEGORIES.HR,
     isPublic: false,
-    description: 'Paternity leave entitlement in days.',
-    defaultValue: 5,
+    description: 'Paternity leave allowed per request, in working days. The Employment Act minimum is two weeks (10 days on a five-day week).',
+    defaultValue: 10,
   },
   [SETTING_KEYS.HR_STUDY_LEAVE_DAYS]: {
     key: SETTING_KEYS.HR_STUDY_LEAVE_DAYS,
     category: SETTING_CATEGORIES.HR,
     isPublic: false,
-    description: 'Study leave entitlement in days per calendar year.',
+    description: 'Study leave allowed per request, in working days.',
     defaultValue: 10,
   },
   [SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS]: {
     key: SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS,
     category: SETTING_CATEGORIES.HR,
     isPublic: false,
-    description: 'Emergency leave entitlement in days per calendar year.',
+    description: 'Emergency leave in working days per calendar year.',
     defaultValue: 3,
   },
   [SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS]: {

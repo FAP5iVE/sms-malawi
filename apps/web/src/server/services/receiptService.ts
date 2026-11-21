@@ -492,9 +492,11 @@ export function buildReceiptPdf(b: PdfBranding, d: ReceiptContext, receiptNo: st
 export interface PayslipEarnings {
   baseSalary: number
   allowances: Array<{ type: string; amount: number }>
+  /** Pay withheld for half-paid / unpaid leave that month (a positive amount, shown as a deduction line). */
+  leaveAdjustment?: { label: string; amount: number }
 }
 
-interface EarningLine { label: string; amount: number; allowance: boolean }
+interface EarningLine { label: string; amount: number; allowance: boolean; /** pay withheld for leave: drawn as a minus line */ leave?: boolean }
 
 /**
  * Earnings rows named as the Payroll UI names them ("Base Salary",
@@ -508,6 +510,9 @@ function earningLines(earnings: PayslipEarnings | null, gross: number): EarningL
     const lines: EarningLine[] = [
       { label: 'Base salary', amount: earnings.baseSalary, allowance: false },
       ...earnings.allowances.map((a) => ({ label: `Allowance (${a.type})`, amount: a.amount, allowance: true })),
+      ...(earnings.leaveAdjustment && earnings.leaveAdjustment.amount > 0
+        ? [{ label: earnings.leaveAdjustment.label, amount: -earnings.leaveAdjustment.amount, allowance: false, leave: true }]
+        : []),
     ]
     const sum = lines.reduce((s, l) => s + l.amount, 0)
     if (Math.abs(sum - gross) < 0.01) return lines
@@ -521,7 +526,7 @@ function earningLines(earnings: PayslipEarnings | null, gross: number): EarningL
  * already existed, plus one-time ones for exactly that month). Falls back to
  * null (-> single gross line) whenever the numbers do not reconcile.
  */
-async function reconstructEarnings(staffUid: string, month: number, year: number, gross: number): Promise<PayslipEarnings | null> {
+async function reconstructEarnings(staffUid: string, month: number, year: number, gross: number, leaveDeduction = 0): Promise<PayslipEarnings | null> {
   try {
     const endOfPeriod = new Date(Date.UTC(year, month, 1))
     const rows = await prisma.staffAllowance.findMany({
@@ -535,8 +540,14 @@ async function reconstructEarnings(staffUid: string, month: number, year: number
     })
     const allowances = rows.map((r) => ({ type: r.type, amount: Number(r.amount) }))
     const total = allowances.reduce((s, a) => s + a.amount, 0)
-    if (allowances.length === 0 || total > gross) return null
-    return { baseSalary: gross - total, allowances }
+    // `gross` is already net of leave, so add the leave deduction back to recover the full salary.
+    const fullGross = gross + leaveDeduction
+    if (allowances.length === 0 || total > fullGross) return null
+    return {
+      baseSalary: fullGross - total,
+      allowances,
+      ...(leaveDeduction > 0 ? { leaveAdjustment: { label: 'Leave pay adjustment', amount: leaveDeduction } } : {}),
+    }
   } catch {
     return null
   }
@@ -550,6 +561,8 @@ export interface PayslipData {
   pension: number
   pensionPercent: number
   loanDeduction: number
+  /** Pay withheld for half-paid / unpaid leave. grossSalary is already net of it. */
+  leaveDeduction?: number
   netSalary: number
   /** Exact lines from the payroll run; omitted -> rebuilt from allowances. */
   earnings?: PayslipEarnings | undefined
@@ -577,7 +590,7 @@ export async function generatePayslipPdf(
     }),
     resolveFinanceSignatory(data.runByUid),
   ])
-  const earnings = data.earnings ?? (await reconstructEarnings(data.staffUid, month, year, data.grossSalary))
+  const earnings = data.earnings ?? (await reconstructEarnings(data.staffUid, month, year, data.grossSalary, data.leaveDeduction ?? 0))
   const pdfBuffer = buildPayslipPdf(b, {
     ...data,
     period: new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, 1))),
@@ -684,7 +697,10 @@ export function buildPayslipPdf(
   }
 
   section('Earnings', CLEARED)
-  d.lines.forEach((l, i) => line(l.label, l.amount, l.allowance ? '+' : '', l.allowance ? CLEARED : C.ink, i === 0))
+  d.lines.forEach((l, i) =>
+    l.leave
+      ? line(l.label, Math.abs(l.amount), '−', C.danger, i === 0)
+      : line(l.label, l.amount, l.allowance ? '+' : '', l.allowance ? CLEARED : C.ink, i === 0))
   total('Total gross monthly', d.grossSalary, CLEARED)
   section('Deductions', C.danger)
   deductions.forEach(([label, amount], i) => line(label, amount, '−', C.danger, i === 0))

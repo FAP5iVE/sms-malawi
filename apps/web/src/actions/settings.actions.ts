@@ -308,6 +308,8 @@ export async function updateHRSettings(
       { key: SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS,     value: d.paternityLeaveDays },
       { key: SETTING_KEYS.HR_STUDY_LEAVE_DAYS,         value: d.studyLeaveDays },
       { key: SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS,     value: d.emergencyLeaveDays },
+      { key: SETTING_KEYS.HR_SICK_HALF_PAY_DAYS,       value: d.sickHalfPayDays },
+      { key: SETTING_KEYS.HR_LEAVE_PAY_PERCENT,        value: d.leavePayPercent },
     ],
     gate.caller.uid
   )

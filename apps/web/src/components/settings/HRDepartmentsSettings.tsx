@@ -18,8 +18,39 @@ import { useState, useEffect } from 'react'
 import { StatusText } from '@/components/shared/StatusText'
 import { Loader2, Save, Plus, X, Building2 } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
-import type { DepartmentTitles } from '@shared/types/settings'
+import type { DepartmentTitles, LeavePayPercent, LeaveTypeKey } from '@shared/types/settings'
+import { LEAVE_TYPES, LEAVE_TYPE_LABELS } from '@shared/types/settings'
 
+/** The leave rules HR sets here. Mirrors the `leave` object of GET/PATCH /settings/hr. */
+interface LeaveConfig {
+  annualDays: number
+  sickFullDays: number
+  sickHalfDays: number
+  emergencyDays: number
+  maternityDays: number
+  paternityDays: number
+  studyDays: number
+  maxConcurrentPct: number
+  payPercent: LeavePayPercent
+}
+
+const PAY_CHOICES: Array<{ value: number; label: string }> = [
+  { value: 100, label: 'Full pay' },
+  { value: 50,  label: 'Half pay' },
+  { value: 0,   label: 'Unpaid' },
+]
+
+// The days each type is allowed, and what the number means for that type.
+const LEAVE_DAY_FIELDS: Array<{ key: keyof Omit<LeaveConfig, 'payPercent'>; label: string; hint: string; max: number }> = [
+  { key: 'annualDays',       label: 'Annual leave (days a year)',          hint: 'Statutory minimum is 15 on a five-day week. Does not carry over.', max: 365 },
+  { key: 'sickFullDays',     label: 'Sick leave on full pay (days a year)', hint: 'Statutory minimum is 4 weeks (20 days).', max: 365 },
+  { key: 'sickHalfDays',     label: 'Sick leave on half pay (days a year)', hint: 'Used after the full-pay days. Statutory minimum is 8 weeks (40 days).', max: 365 },
+  { key: 'emergencyDays',    label: 'Emergency leave (days a year)',       hint: 'Funeral and urgent family matters.', max: 30 },
+  { key: 'maternityDays',    label: 'Maternity leave (days per request)',  hint: 'Statutory minimum is 8 weeks (40 days) on full pay.', max: 365 },
+  { key: 'paternityDays',    label: 'Paternity leave (days per request)',  hint: 'Statutory minimum is 2 weeks (10 days).', max: 60 },
+  { key: 'studyDays',        label: 'Study leave (days per request)',      hint: 'Longest single request.', max: 180 },
+  { key: 'maxConcurrentPct', label: 'Most staff away at once (%)',         hint: 'Per department. Warns HR when approving would go over.', max: 100 },
+]
 const inputCls =
   'w-full min-h-[44px] border border-base rounded-xl px-3 py-2.5 text-sm bg-page text-body ' +
   'focus:outline-none focus:ring-2 focus:ring-brand-teal/25'
@@ -38,12 +69,19 @@ export function HRDepartmentsSettings() {
   const [ageSaving, setAgeSaving]           = useState(false)
   const [ageSaved, setAgeSaved]             = useState(false)
   const [ageError, setAgeError]             = useState<string | null>(null)
+  // Leave days and leave pay: their own card and their own save, like the
+  // retirement age, so one never blocks the other.
+  const [leave, setLeave]                   = useState<LeaveConfig | null>(null)
+  const [leaveSaving, setLeaveSaving]       = useState(false)
+  const [leaveSaved, setLeaveSaved]         = useState(false)
+  const [leaveError, setLeaveError]         = useState<string | null>(null)
 
   useEffect(() => {
-    apiFetch<{ departmentTitles: DepartmentTitles; retirementAge?: number }>('/settings/hr')
+    apiFetch<{ departmentTitles: DepartmentTitles; retirementAge?: number; leave?: LeaveConfig }>('/settings/hr')
       .then((d) => {
         setData(d.departmentTitles ?? {})
         if (typeof d.retirementAge === 'number') setRetirementAge(String(d.retirementAge))
+        if (d.leave) setLeave(d.leave)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false))
@@ -90,6 +128,27 @@ export function HRDepartmentsSettings() {
     }
   }
 
+  async function handleSaveLeave() {
+    if (!leave) return
+    for (const f of LEAVE_DAY_FIELDS) {
+      const v = leave[f.key]
+      const min = f.key === 'sickHalfDays' || f.key === 'maxConcurrentPct' ? 0 : 1
+      if (!Number.isInteger(v) || v < min || v > f.max) {
+        setLeaveError(`${f.label}: enter a whole number from ${min} to ${f.max}.`)
+        return
+      }
+    }
+    setLeaveSaving(true); setLeaveError(null); setLeaveSaved(false)
+    try {
+      await apiFetch('/settings/hr', { method: 'PATCH', body: JSON.stringify({ leave }) })
+      setLeaveSaved(true); setTimeout(() => setLeaveSaved(false), 3000)
+    } catch (err) {
+      setLeaveError(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setLeaveSaving(false)
+    }
+  }
+
   async function handleSaveRetirementAge() {
     const age = Number(retirementAge)
     if (!Number.isInteger(age) || age < 50 || age > 75) {
@@ -122,6 +181,80 @@ export function HRDepartmentsSettings() {
 
   return (
     <div className="space-y-6">
+      {/* Leave: how many days, and how each type is paid. HR / high_rank decide
+          each request; these are the allowances and the pay rule payroll applies. */}
+      {leave && (
+        <div className="bg-surface rounded-xl p-5 space-y-5 max-w-3xl">
+          <div>
+            <h2 className="font-heading font-bold text-lg text-brand-navy">Leave days and pay</h2>
+            <p className="text-sm text-muted mt-0.5">
+              Days are working days, Monday to Friday, public holidays not counted. Annual, sick and
+              emergency leave are yearly allowances that start fresh each January (nothing carries
+              over). Saving updates everyone&apos;s balance for this year straight away.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            {LEAVE_DAY_FIELDS.map((f) => (
+              <div key={f.key}>
+                <label className="block text-xs font-heading font-semibold text-muted mb-1.5">{f.label}</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={f.key === 'sickHalfDays' || f.key === 'maxConcurrentPct' ? 0 : 1}
+                  max={f.max}
+                  value={leave[f.key]}
+                  onChange={(e) => setLeave({ ...leave, [f.key]: e.target.value === '' ? 0 : Number(e.target.value) })}
+                  className={inputCls}
+                />
+                <p className="text-xs text-muted mt-1">{f.hint}</p>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <h3 className="font-heading font-semibold text-sm text-body">Pay while on leave</h3>
+            <p className="text-xs text-muted mt-0.5 mb-3">
+              Payroll applies this to the month the leave falls in: half-paid and unpaid days are
+              deducted from that month&apos;s pay, and PAYE and pension are worked out on the reduced
+              pay. For sick leave this is the pay on the full-pay days; the half-pay days are always
+              paid at half.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {LEAVE_TYPES.map((t: LeaveTypeKey) => (
+                <div key={t} className="flex items-center justify-between gap-3">
+                  <label htmlFor={`leave-pay-${t}`} className="text-sm text-body">{LEAVE_TYPE_LABELS[t]}</label>
+                  <select
+                    id={`leave-pay-${t}`}
+                    value={leave.payPercent[t]}
+                    onChange={(e) => setLeave({ ...leave, payPercent: { ...leave.payPercent, [t]: Number(e.target.value) } })}
+                    className="border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-[40px]"
+                  >
+                    {PAY_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    {!PAY_CHOICES.some((c) => c.value === leave.payPercent[t]) && (
+                      <option value={leave.payPercent[t]}>{leave.payPercent[t]}% pay</option>
+                    )}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {leaveError && <p className="text-sm text-tone-coral">{leaveError}</p>}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSaveLeave}
+              disabled={leaveSaving}
+              className="min-h-[44px] px-5 rounded-xl text-sm font-heading font-semibold bg-brand-navy text-white hover:bg-brand-navy/90 transition-colors disabled:opacity-60 flex items-center gap-2"
+            >
+              {leaveSaving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : <><Save className="w-4 h-4" /> Save leave rules</>}
+            </button>
+            {leaveSaved && <StatusText tone="success" size="md">Saved</StatusText>}
+          </div>
+        </div>
+      )}
+
       {/* Retirement age — drives the retirement date shown on each staff profile
           (date of birth + this value) and the "retiring soon" list for HR. */}
       <div className="bg-surface rounded-xl p-5 space-y-3 max-w-xl">

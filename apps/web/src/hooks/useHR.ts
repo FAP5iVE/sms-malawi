@@ -22,7 +22,7 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { CreateStaffInput, UpdateStaffInput, UpdateOwnDetailsInput, TerminateStaffInput, StaffResponsibilityInput, LeaveRequestInput, ReviewLeaveInput, LoanRequestInput, PerformanceNoteInput, UpdateSalaryInput, CreateAllowanceInput } from '@shared/schemas/hr'
-import type { ApiStaffLoan, ApiLeaveRequest, ApiContractAlert, ApiStaffProfile, ApiStaffPickerOption } from '@shared/types/api'
+import type { ApiStaffLoan, ApiLeaveRequest, ApiContractAlert, ApiStaffProfile, ApiStaffPickerOption, ApiLeaveOption, ApiOnLeaveNow } from '@shared/types/api'
 import type { ConflictCheckResult } from '@/server/services/leaveConflictService'
 import { apiFetch, queryKeys } from '@/lib/api-client'
 import { STALE } from '@/components/providers/QueryProvider'
@@ -171,14 +171,49 @@ export function useDeleteAllowance() {
   })
 }
 
-export function useLeaveRequests(filters: { staffId?: string; status?: string } = {}) {
+export function useLeaveRequests(
+  filters: { staffId?: string; status?: string } = {},
+  opts: { enabled?: boolean } = {},
+) {
   const params = new URLSearchParams()
   Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v) })
   return useQuery({
     queryKey: queryKeys.hr.leaveRequests(filters),
     queryFn: () => apiFetch(`/hr/leave/requests?${params}`),
+    // The reviewer list is role-gated server-side; non-reviewers must not call it.
+    enabled: opts.enabled ?? true,
     // Same fix and same reasoning as useLoans() above — a submission in
     // one session doesn't invalidate another already-open session's cache.
+    staleTime: STALE.REALTIME,
+    refetchInterval: STALE.REALTIME,
+  })
+}
+
+/** The signed-in staff member's own leave requests (the "My leave" list). */
+export function useMyLeaveRequests() {
+  return useQuery({
+    queryKey: queryKeys.hr.myLeave(),
+    queryFn: () => apiFetch<ApiLeaveRequest[]>('/hr/leave/mine'),
+    staleTime: STALE.REALTIME,
+    refetchInterval: STALE.REALTIME,
+  })
+}
+
+/** Leave types this person can request, with days left and how each is paid. */
+export function useMyLeaveOptions() {
+  return useQuery({
+    queryKey: queryKeys.hr.leaveOptions(),
+    queryFn: () => apiFetch<ApiLeaveOption[]>('/hr/leave/options'),
+    staleTime: STALE.REALTIME,
+  })
+}
+
+/** Everyone whose approved leave covers today. HR, admin and high_rank only. */
+export function useOnLeaveNow(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.hr.onLeaveNow(),
+    queryFn: () => apiFetch<ApiOnLeaveNow[]>('/hr/leave/on-leave'),
+    enabled,
     staleTime: STALE.REALTIME,
     refetchInterval: STALE.REALTIME,
   })

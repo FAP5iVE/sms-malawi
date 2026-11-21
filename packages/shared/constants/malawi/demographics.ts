@@ -128,10 +128,9 @@ export const SPONSOR_TYPE_LABELS: Record<SponsorTypeValue, string> = {
 }
 
 // ── Staff teaching, qualifications, housing, exit ────────────────────────────
-export const EMPLOYMENT_CATEGORIES = ['GOVERNMENT_POSTED', 'SCHOOL_EMPLOYED', 'COMMUNITY_PAID', 'VOLUNTEER', 'OTHER'] as const
+export const EMPLOYMENT_CATEGORIES = ['SCHOOL_EMPLOYED', 'COMMUNITY_PAID', 'VOLUNTEER', 'OTHER'] as const
 export type EmploymentCategoryValue = (typeof EMPLOYMENT_CATEGORIES)[number]
 export const EMPLOYMENT_CATEGORY_LABELS: Record<EmploymentCategoryValue, string> = {
-  GOVERNMENT_POSTED: 'Government-posted',
   SCHOOL_EMPLOYED:   'School-employed',
   COMMUNITY_PAID:    'Community-paid',
   VOLUNTEER:         'Volunteer',

@@ -93,6 +93,8 @@ export const ENDPOINT_POLICY: Readonly<Record<string, EndpointPolicy>> = {
   "POST /api/notifications/register-token": { category: 'own-data', reason: "Subject is the verified uid from the token; no client-supplied owner id is trusted." },
   "DELETE /api/notifications/unregister-token": { category: 'own-data', reason: "Subject is the verified uid from the token; no client-supplied owner id is trusted." },
   "GET /api/notifications/token-status": { category: 'own-data', reason: "Subject is the verified uid from the token; no client-supplied owner id is trusted." },
+  "GET /api/hr/leave/mine": { category: 'own-data', reason: "hrService.listMyLeaveRequests resolves the staff profile from the verified uid and returns only that person's requests; no id is read from the request." },
+  "GET /api/hr/leave/options": { category: 'own-data', reason: "hrService.getMyLeaveOptions resolves the staff profile from the verified uid; it returns the caller's own balances and the school's pay rules." },
   "POST /api/hr/leave/apply": { category: 'own-data', reason: "Subject is the verified uid from the token; no client-supplied owner id is trusted." },
   "PATCH /api/hr/leave/requests/:id/cancel": { category: 'object-checked', reason: "hrService.cancelLeave compares the request owner with the verified uid (403 otherwise)." },
   "GET /api/hr/loans/mine": { category: 'own-data', reason: "Subject is the verified uid from the token; no client-supplied owner id is trusted." },

@@ -218,9 +218,13 @@ describe('guardian migration: safety properties', () => {
     expect(models.find((m) => m.table === 'guardian_invitations')!.fields.map((f) => f.name)).toContain('secretHash')
   })
 
-  it('sorts after every existing migration', () => {
+  it('sorts after every migration that existed when it was written', () => {
+    // Later migrations may follow it; what matters is that nothing sorts between the
+    // last pre-guardian migration and this one, so it applies on top of them.
     const dirs = fs.readdirSync(path.join(webRoot, 'prisma/migrations')).filter((d) => /^\d{14}_/.test(d)).sort()
-    expect(dirs[dirs.length - 1]).toBe('20261104120000_guardian_portal')
+    const at = dirs.indexOf('20261104120000_guardian_portal')
+    expect(at).toBeGreaterThan(0)
+    expect(dirs[at - 1]).toBe('20261104010000_application_welfare_home')
   })
 })
 

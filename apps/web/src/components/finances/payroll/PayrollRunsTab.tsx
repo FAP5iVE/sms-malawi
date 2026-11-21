@@ -369,6 +369,7 @@ function RunDetailModal({ runId, onClose }: { runId: string; onClose: () => void
   const columns: DataColumn<ApiPayslip>[] = [
     { key: 'staffName', label: 'Staff member', priority: 'critical' },
     { key: 'grossSalary', label: 'Gross pay', priority: 'important', render: (p) => formatMWK(p.grossSalary) },
+    { key: 'leaveDeduction', label: 'Leave adj.', priority: 'optional', render: (p) => Number(p.leaveDeduction ?? 0) > 0 ? <span className="text-tone-coral" title="Pay withheld for half-paid or unpaid leave. Gross pay is already after this.">-{formatMWK(Number(p.leaveDeduction))}</span> : <span className="text-muted">-</span> },
     { key: 'paye', label: 'PAYE Tax', priority: 'important', render: (p) => <span className="text-tone-coral">-{formatMWK(p.paye)}</span> },
     { key: 'pension', label: 'Pension', priority: 'optional', render: (p) => <span className="text-tone-coral">-{formatMWK(p.pension)}</span> },
     { key: 'loanDeduction', label: 'Loan ded.', priority: 'optional', render: (p) => p.loanDeduction > 0 ? <span className="text-tone-coral">-{formatMWK(p.loanDeduction)}</span> : <span className="text-muted">-</span> },

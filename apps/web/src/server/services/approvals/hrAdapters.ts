@@ -34,7 +34,7 @@ const leaveInclude = {
 
 type LeaveRow = Prisma.LeaveRequestGetPayload<{ include: typeof leaveInclude }>
 
-function leaveItem(r: LeaveRow, names: Map<string, string>): AdapterItem {
+function leaveItem(r: LeaveRow, names: Map<string, string>, payNotes: Record<string, string>): AdapterItem {
   const staffName = fullName(r.staff.firstName, r.staff.lastName)
   const type = humanize(r.leaveType)
   return makeItem('leave', {
@@ -51,6 +51,8 @@ function leaveItem(r: LeaveRow, names: Map<string, string>): AdapterItem {
       ['From', shortDate(r.startDate)],
       ['To', shortDate(r.endDate)],
       ['Working days', r.days],
+      // What approving costs in pay, so the reviewer sees it before deciding.
+      ['Pay while away', payNotes[r.leaveType] ?? 'Full pay'],
       ['Reason', r.reason],
     ]),
     createdAt: r.createdAt,
@@ -78,8 +80,11 @@ export const leaveAdapter: ApprovalAdapter = {
       orderBy: { createdAt: q.order },
       take: q.take,
     })
-    const names = await lookupNames(rows.map((r) => r.reviewedByUid))
-    return rows.map((r) => leaveItem(r, names))
+    const [names, payNotes] = await Promise.all([
+      lookupNames(rows.map((r) => r.reviewedByUid)),
+      hrService.getLeavePayNotes(),
+    ])
+    return rows.map((r) => leaveItem(r, names, payNotes))
   },
 
   async counts(requesterUid) {
@@ -94,7 +99,7 @@ export const leaveAdapter: ApprovalAdapter = {
   async get(id) {
     const r = await prisma.leaveRequest.findUnique({ where: { id }, include: leaveInclude })
     if (!r) return null
-    return leaveItem(r, await lookupNames([r.reviewedByUid]))
+    return leaveItem(r, await lookupNames([r.reviewedByUid]), await hrService.getLeavePayNotes())
   },
 
   async approve(id, actor, input) {

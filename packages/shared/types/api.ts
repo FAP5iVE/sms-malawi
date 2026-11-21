@@ -626,6 +626,8 @@ export interface ApiPayslip {
   paye: number
   pension: number
   loanDeduction: number
+  /** Pay withheld for half-paid or unpaid leave that month. grossSalary is already net of it. */
+  leaveDeduction?: number
   netSalary: number
   payslipUrl?: string // signed URL from R2
   /** Present on GET /payroll/my-payslips (payrollService.getStaffPayslips's
@@ -1117,7 +1119,7 @@ export interface ApiStaffDetail extends ApiStaffProfile {
   tcmRegistrationNo?: string | null
   tcmLicenceNo?: string | null
   tcmLicenceExpiry?: string | null
-  employmentCategory?: 'GOVERNMENT_POSTED' | 'SCHOOL_EMPLOYED' | 'COMMUNITY_PAID' | 'VOLUNTEER' | 'OTHER' | null
+  employmentCategory?: 'SCHOOL_EMPLOYED' | 'COMMUNITY_PAID' | 'VOLUNTEER' | 'OTHER' | null
   payrollNo?: string | null
   highestQualification?: 'MSCE' | 'DIPLOMA' | 'DEGREE' | 'POSTGRADUATE' | 'OTHER' | null
   qualificationProgram?: string | null
@@ -1161,10 +1163,53 @@ export interface ApiLeaveRequest {
   startDate: string
   endDate: string
   days: number
+  /** How the days are paid, set when the request is approved. Zero until then. */
+  fullPayDays?: number
+  halfPayDays?: number
+  unpaidDays?: number
   reason: string
   status: string
   reviewNotes?: string
+  reviewedAt?: string | null
+  createdAt?: string
+  /** How the days are (or will be) paid, e.g. "Full pay", "Unpaid" or "10 full pay, 5 half pay". */
+  payNote?: string
   staff?: { firstName: string; lastName: string; department: string }
+}
+
+/**
+ * GET /hr/leave/options: what the signed-in staff member can ask for, with
+ * the balance left and how it is paid. Drives the Request leave form.
+ */
+export interface ApiLeaveOption {
+  leaveType: string
+  label: string
+  /** Percent of normal pay (100 full, 50 half, 0 unpaid). For sick leave, the pay on the full-pay days. */
+  payPercent: number
+  /** One line the form shows under the type, e.g. "Unpaid" or "Full pay, then half pay after 20 days". */
+  payNote: string
+  /** Largest request allowed: the balance left, or the per-request cap. Null means no cap. */
+  maxDays: number | null
+  /** Days left this year for balance-tracked types (annual, sick, emergency). Null for the rest. */
+  remainingDays: number | null
+  totalDays: number | null
+}
+
+/** GET /hr/leave/on-leave: one person whose approved leave covers today. */
+export interface ApiOnLeaveNow {
+  requestId: string
+  staffId: string
+  firstName: string
+  lastName: string
+  department: string
+  jobTitle: string
+  leaveType: string
+  startDate: string
+  endDate: string
+  /** First working day back (the Monday after a Friday end date). */
+  returnDate: string
+  /** Working days still to go, counting today. */
+  daysLeft: number
 }
 
 export interface ApiContractAlert {

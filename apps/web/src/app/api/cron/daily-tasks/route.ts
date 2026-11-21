@@ -32,6 +32,7 @@ import { dailyLatePenaltiesJob } from '@/server/jobs/latePenaltiesJob'
 import { overdueLibraryJob } from '@/server/jobs/overdueLibraryJob'
 import { runRiskAssessmentJob } from '@/server/services/riskJob'
 import * as settingsService from '@/server/services/settingsService'
+import * as hrService from '@/server/services/hrService'
 import { SETTING_KEYS } from '@shared/types/settings'
 import * as Sentry from '@sentry/nextjs'
 
@@ -79,6 +80,11 @@ export async function GET() {
         await runTask('installment-check', dailyInstallmentCheckJob),
         await runTask('late-penalties', dailyLatePenaltiesJob),
         await runTask('risk-detection', () => runRiskAssessmentJob(academicTerm, academicYear)),
+        // Leave: staff whose approved leave has ended go back to ACTIVE (and
+        // those whose leave starts today go ON_LEAVE); on 1 January this also
+        // creates the new year's balances from zero, so nothing carries over.
+        await runTask('leave-status-sync', hrService.syncLeaveStatuses),
+        await runTask('leave-balances', () => hrService.refreshLeaveBalances()),
       ]
     },
     {

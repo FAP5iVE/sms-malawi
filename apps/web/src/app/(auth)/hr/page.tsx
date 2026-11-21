@@ -63,9 +63,15 @@ import { ModuleSurface }    from '@/components/shared/ModuleSurface'
 import { useAuthStore }     from '@/store/authStore'
 import { usePermissions }   from '@/hooks/usePermissions'
 import type { LeaveRequestInput } from '@shared/schemas/hr'
+import { LEAVE_TYPE_LABELS } from '@shared/types/settings'
+import type { LeaveTypeKey } from '@shared/types/settings'
+import { countLeaveDays, isWeekendDay, toUtcDay } from '@shared/utils/leave'
 import {
   useStaffDirectory,
   useLeaveRequests,
+  useMyLeaveRequests,
+  useMyLeaveOptions,
+  useOnLeaveNow,
   useApplyForLeave,
   useUpcomingContractExpiries,
   useReviewLeave,
@@ -139,7 +145,7 @@ export default function HRPage() {
 }
 
 function HRContent() {
-  const { role, user }  = useAuthStore()
+  const { role }  = useAuthStore()
   const { can }   = usePermissions()
 
   // R19 — the active tab is derived from ?tab= during render via Next's
@@ -195,11 +201,16 @@ function HRContent() {
   // the filter away from Pending doesn't make the badge lie about how many
   // requests are actually awaiting review.
   const [leaveStatusFilter, setLeaveStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | ''>('PENDING')
-  const { data: leaveRequests = [] }                           = useLeaveRequests({ status: leaveStatusFilter || undefined })
-  const { data: pendingLeaveForBadge = [] }                    = useLeaveRequests({ status: 'PENDING' })
-  // [PRODUCTION FIX 2026-07-28] Self-service leave request — mirrors the
-  // loans tab's existing my-loans / apply-for-loan pattern exactly.
-  const { data: myLeaveRequests = [] } = useLeaveRequests({ staffId: user?.uid })
+  // The reviewer list is role-gated on the server, so only HR/admin/high_rank ask for it.
+  const { data: leaveRequests = [] }                           = useLeaveRequests({ status: leaveStatusFilter || undefined }, { enabled: isHR })
+  const { data: pendingLeaveForBadge = [] }                    = useLeaveRequests({ status: 'PENDING' }, { enabled: isHR })
+  // Self-service leave: the signed-in person's own requests (resolved on the
+  // server; the old call passed the sign-in uid as a staff id and returned
+  // nothing, or a 403 for non-reviewers) and what they may ask for.
+  const { data: myLeaveRequests = [] } = useMyLeaveRequests()
+  const { data: leaveOptions = [] }    = useMyLeaveOptions()
+  // Everyone whose approved leave covers today — NOT filtered by request status.
+  const { data: onLeaveNow = [] }      = useOnLeaveNow(isHR)
   const applyForLeave = useApplyForLeave()
   const [showLeaveForm, setShowLeaveForm] = useState(false)
   const [leaveType, setLeaveType]         = useState<LeaveRequestInput['leaveType']>('ANNUAL')
@@ -207,8 +218,23 @@ function HRContent() {
   const [leaveEndDate, setLeaveEndDate]     = useState('')
   const [leaveReason, setLeaveReason]       = useState('')
 
+  // Live check of the dates against the same day-counting the server uses
+  // (Monday to Friday, public holidays not counted).
+  const selectedLeave   = leaveOptions.find((o) => o.leaveType === leaveType)
+  const leaveDatesSet   = Boolean(leaveStartDate && leaveEndDate)
+  const leaveDatesOrder = leaveDatesSet && leaveEndDate >= leaveStartDate
+  const requestedDays   = leaveDatesOrder ? countLeaveDays(leaveStartDate, leaveEndDate) : 0
+  const leaveOnWeekend  = leaveDatesSet && (isWeekendDay(toUtcDay(leaveStartDate)) || isWeekendDay(toUtcDay(leaveEndDate)))
+  const leaveOverLimit  = selectedLeave?.maxDays != null && requestedDays > selectedLeave.maxDays
+  const leaveDateError  =
+    leaveDatesSet && !leaveDatesOrder ? 'The end date must be on or after the start date.'
+    : leaveOnWeekend ? 'Leave cannot start or end on a weekend.'
+    : leaveDatesOrder && requestedDays === 0 ? 'Those dates have no working days (weekends and public holidays are not counted).'
+    : leaveOverLimit ? `That is ${requestedDays} working days; the most you can ask for is ${selectedLeave?.maxDays}.`
+    : null
+
   function submitLeaveRequest() {
-    if (!leaveStartDate || !leaveEndDate || leaveReason.trim().length < 10) return
+    if (!leaveStartDate || !leaveEndDate || leaveReason.trim().length < 10 || leaveDateError) return
     applyForLeave.mutate(
       { leaveType, startDate: leaveStartDate, endDate: leaveEndDate, reason: leaveReason.trim() },
       {
@@ -485,8 +511,13 @@ function HRContent() {
                       onChange={(e) => setLeaveType(e.target.value as LeaveRequestInput['leaveType'])}
                       className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11"
                     >
-                      {['ANNUAL', 'SICK', 'MATERNITY', 'PATERNITY', 'STUDY', 'UNPAID', 'EMERGENCY'].map((t) => (
-                        <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>
+                      {(leaveOptions.length > 0
+                        ? leaveOptions
+                        : [{ leaveType: 'ANNUAL', label: LEAVE_TYPE_LABELS.ANNUAL, remainingDays: null }]
+                      ).map((o) => (
+                        <option key={o.leaveType} value={o.leaveType}>
+                          {o.label}{o.remainingDays !== null ? ` (${o.remainingDays} days left)` : ''}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -501,6 +532,16 @@ function HRContent() {
                       className="w-full border border-base rounded-lg px-3 py-2 text-sm bg-page min-h-11" />
                   </div>
                 </div>
+                {selectedLeave && (
+                  <p className="text-xs text-muted">
+                    <span className="font-semibold text-body">{selectedLeave.payNote}.</span>{' '}
+                    {selectedLeave.maxDays !== null
+                      ? `Up to ${selectedLeave.maxDays} working days.`
+                      : 'No fixed limit; HR decides.'}
+                    {leaveDatesOrder && requestedDays > 0 && ` This request is ${requestedDays} working day${requestedDays === 1 ? '' : 's'}.`}
+                  </p>
+                )}
+                {leaveDateError && <p className="text-sm text-tone-coral">{leaveDateError}</p>}
                 <div>
                   <label htmlFor="leave-reason" className="text-xs text-muted mb-1 block">Reason (at least 10 characters)</label>
                   <textarea id="leave-reason" rows={2} value={leaveReason} onChange={(e) => setLeaveReason(e.target.value)}
@@ -509,7 +550,7 @@ function HRContent() {
                 <button
                   type="button"
                   onClick={submitLeaveRequest}
-                  disabled={applyForLeave.isPending}
+                  disabled={applyForLeave.isPending || Boolean(leaveDateError)}
                   className="bg-brand-deep text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 min-h-11"
                 >
                   {applyForLeave.isPending ? 'Submitting…' : 'Submit Request'}
@@ -522,6 +563,17 @@ function HRContent() {
               </div>
             )}
 
+            {/* This year's balances: annual, sick and emergency leave have a yearly allowance that does not carry over. */}
+            {leaveOptions.some((o) => o.remainingDays !== null) && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {leaveOptions.filter((o) => o.remainingDays !== null).map((o) => (
+                  <span key={o.leaveType} className="app-tint rounded-lg px-3 py-1.5 text-xs text-body">
+                    <span className="font-semibold">{o.label}:</span> {o.remainingDays} of {o.totalDays} days left
+                  </span>
+                ))}
+              </div>
+            )}
+
             {(myLeaveRequests as ApiLeaveRequest[]).length === 0 ? (
               <p className="text-sm text-muted">You haven&apos;t requested any leave yet.</p>
             ) : (
@@ -529,8 +581,8 @@ function HRContent() {
                 {(myLeaveRequests as ApiLeaveRequest[]).map((req) => (
                   <div key={req.id} className="flex items-center justify-between border-b border-base py-2.5 last:border-b-0">
                     <div>
-                      <p className="text-sm font-medium text-body">{req.leaveType} · {req.days} day(s)</p>
-                      <p className="text-xs text-muted">{new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()}</p>
+                      <p className="text-sm font-medium text-body">{LEAVE_TYPE_LABELS[req.leaveType as LeaveTypeKey] ?? req.leaveType} · {req.days} working day{req.days === 1 ? '' : 's'}</p>
+                      <p className="text-xs text-muted">{new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()}{req.payNote ? ` · ${req.payNote}` : ''}</p>
                     </div>
                     <span className={`text-xs font-semibold ${
                       req.status === 'APPROVED' ? 'text-status-success'
@@ -548,6 +600,34 @@ function HRContent() {
           {/* Manage — HR only, unchanged from before */}
           {isHR && (
         <div className="space-y-3">
+          {/* Who is away today. Driven by dates, not by request status, so it
+              never depends on the filter below. */}
+          <div className="border-b border-base pb-4 mb-2">
+            <h2 className="font-heading font-semibold text-body mb-3">
+              On leave today{onLeaveNow.length > 0 ? ` (${onLeaveNow.length})` : ''}
+            </h2>
+            {onLeaveNow.length === 0 ? (
+              <p className="text-sm text-muted">Nobody is on leave today.</p>
+            ) : (
+              <div className="space-y-2">
+                {onLeaveNow.map((p) => (
+                  <div key={p.requestId} className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <p className="text-sm font-medium text-body">{p.firstName} {p.lastName}</p>
+                      <p className="text-xs text-muted">
+                        {p.department} · {LEAVE_TYPE_LABELS[p.leaveType as LeaveTypeKey] ?? p.leaveType}
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted text-right">
+                      Until {new Date(p.endDate).toLocaleDateString()}
+                      <br />
+                      Back {new Date(p.returnDate).toLocaleDateString()} · {p.daysLeft} working day{p.daysLeft === 1 ? '' : 's'} left
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="flex items-center justify-end">
             <select
               value={leaveStatusFilter}
@@ -576,10 +656,11 @@ function HRContent() {
                   {req.staff?.firstName} {req.staff?.lastName}
                 </p>
                 <p className="text-sm text-muted">
-                  {req.leaveType} · {req.days} day(s) ·{' '}
+                  {LEAVE_TYPE_LABELS[req.leaveType as LeaveTypeKey] ?? req.leaveType} · {req.days} working day{req.days === 1 ? '' : 's'} ·{' '}
                   {new Date(req.startDate).toLocaleDateString()} –{' '}
                   {new Date(req.endDate).toLocaleDateString()}
                 </p>
+                {req.payNote && <p className="text-xs text-muted mt-0.5">Pay: {req.payNote}</p>}
                 <p className="text-xs text-muted mt-1">{req.reason}</p>
               </div>
               {req.status === 'PENDING' ? (

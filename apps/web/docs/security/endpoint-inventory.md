@@ -9,13 +9,13 @@ Every server entry point, extracted from source by `test/security/endpointInvent
 | Measure | Count |
 |---|---:|
 | Express endpoints (mounted under `/api`) | 610 |
-| — mutations (non-GET) | 282 |
-| — with a role/permission gate | 523 (252 mutations) |
-| — signed-in only, with a declared policy | 62 |
+| — mutations (non-GET) | 281 |
+| — with a role/permission gate | 521 (251 mutations) |
+| — signed-in only, with a declared policy | 64 |
 | — public (no identity) | 25 |
 | — declared `cron-or-admin` | 1 |
 | — declared `object-checked` | 32 |
-| — declared `own-data` | 24 |
+| — declared `own-data` | 26 |
 | — declared `public-site` | 23 |
 | — declared `public-telemetry` | 1 |
 | — declared `reference-data` | 6 |
@@ -407,7 +407,6 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | M | Method | Path | Access | Declared policy | Client IDs |
 |:-:|---|---|---|---|---|
 |  | GET | `/api/guardians/access-log` | `requirePermission(guardian.viewAccessLog)` |  | query |
-|  | GET | `/api/guardians/access-log/recent` | `requirePermission(guardian.viewAccessLog)` |  | query |
 | ● | DELETE | `/api/guardians/invitations/:id` | `requirePermission(guardian.invite)` |  | :id |
 | ● | POST | `/api/guardians/links/:id/approve` | `requirePermission(guardian.approve)` |  | :id, body |
 | ● | PATCH | `/api/guardians/links/:id/capabilities` | `requirePermission(guardian.restrict)` |  | :id, body |
@@ -420,7 +419,6 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | ● | POST | `/api/guardians/links/:id/reverified` | `requirePermission(guardian.approve)` |  | :id |
 | ● | POST | `/api/guardians/links/:id/revoke` | `requirePermission(guardian.restrict)` |  | :id, body |
 | ● | POST | `/api/guardians/links/:id/suspend` | `requirePermission(guardian.restrict)` |  | :id, body |
-| ● | POST | `/api/guardians/national-ids/backfill` | `requirePermission(guardian.backfill)` |  | body |
 |  | GET | `/api/guardians/onboarding/:id` | `requirePermission(guardian.backfill)` |  | :id, query |
 | ● | POST | `/api/guardians/onboarding/:id/apply` | `requirePermission(guardian.backfill)` |  | :id, body |
 | ● | POST | `/api/guardians/onboarding/:id/rollback` | `requirePermission(guardian.backfill)` |  | :id |
@@ -428,7 +426,6 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 | ● | POST | `/api/guardians/profiles/:id/reinstate` | `requirePermission(guardian.approve)` |  | :id |
 | ● | POST | `/api/guardians/profiles/:id/suspend` | `requirePermission(guardian.restrict)` |  | :id, body |
 |  | GET | `/api/guardians/queue` | `requirePermission(guardian.view)` |  | query |
-|  | GET | `/api/guardians/students` | `requirePermission(guardian.view)` |  | query |
 |  | GET | `/api/guardians/students/:studentId` | `requirePermission(guardian.view)` |  | :studentId |
 | ● | POST | `/api/guardians/students/:studentId/sync` | `requirePermission(guardian.propose)` |  | :studentId |
 
@@ -469,6 +466,9 @@ Columns: **Client IDs** = path params plus `body` / `query` when the handler rea
 |  | GET | `/api/hr/alerts/contracts-upcoming` | `requireRole([...HR_ADMIN])` |  | query |
 | ● | DELETE | `/api/hr/allowances/:allowanceId` | `requireAnyPermission([hr.manageSalaryStructure, finance.manageSalaryStructure])` |  | :allowanceId |
 | ● | POST | `/api/hr/leave/apply` | signed-in user | own-data | body |
+|  | GET | `/api/hr/leave/mine` | signed-in user | own-data | — |
+|  | GET | `/api/hr/leave/on-leave` | `requireRole([...REVIEWERS])` |  | — |
+|  | GET | `/api/hr/leave/options` | signed-in user | own-data | — |
 |  | GET | `/api/hr/leave/requests` | `requireRole([...REVIEWERS])` |  | query |
 | ● | PATCH | `/api/hr/leave/requests/:id/cancel` | signed-in user | object-checked | :id |
 | ● | PATCH | `/api/hr/leave/requests/:id/review` | `requireRole([...REVIEWERS])` |  | :id, body |

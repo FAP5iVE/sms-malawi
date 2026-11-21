@@ -405,6 +405,9 @@ export const queryKeys = {
       ['hr', 'leave', 'requests', filters ?? {}] as const,
     leaveBalances: (staffId: string, year: number) =>
       ['hr', 'leave', 'balances', staffId, year] as const,
+    myLeave:      () => ['hr', 'leave', 'mine'] as const,
+    leaveOptions: () => ['hr', 'leave', 'options'] as const,
+    onLeaveNow:   () => ['hr', 'leave', 'on-leave'] as const,
     loans: (filters?: Record<string, unknown>) =>
       ['hr', 'loans', filters ?? {}] as const,
     loanDetail: (id: string) => ['hr', 'loans', id] as const,

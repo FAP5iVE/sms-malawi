@@ -65,9 +65,9 @@ import {
   invalidateGradeCache,
 }                            from '@/server/services/gradeService'
 import * as settingsService  from '@/server/services/settingsService'
+import * as hrService          from '@/server/services/hrService'
 import { SETTING_KEYS, SETTING_META } from '@shared/types/settings'
 import { validateCaConfig } from '@shared/constants/exams'
-import { validateIdFormat } from '@shared/constants/malawi/registration'
 import type { SettingKey, DepartmentTitles } from '@shared/types/settings'
 import { logger }            from '@/lib/logger'
 import { sendError } from '@/server/lib/sendError'
@@ -386,26 +386,60 @@ settingsRouter
 // this value is a real JSON object (Record<department, title[]>), not a flat
 // scalar, and settingsService.set() carries its own Zod validation
 // (SETTING_VALUE_SCHEMAS) which the generic helpers don't apply.
+// Leave settings: the field the form sends -> the setting it is saved under.
+const LEAVE_FIELD_KEYS = {
+  annualDays:       SETTING_KEYS.HR_ANNUAL_LEAVE_DAYS,
+  sickFullDays:     SETTING_KEYS.HR_SICK_LEAVE_DAYS,
+  sickHalfDays:     SETTING_KEYS.HR_SICK_HALF_PAY_DAYS,
+  emergencyDays:    SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS,
+  maternityDays:    SETTING_KEYS.HR_MATERNITY_LEAVE_DAYS,
+  paternityDays:    SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS,
+  studyDays:        SETTING_KEYS.HR_STUDY_LEAVE_DAYS,
+  maxConcurrentPct: SETTING_KEYS.HR_MAX_CONCURRENT_LEAVE_PCT,
+  payPercent:       SETTING_KEYS.HR_LEAVE_PAY_PERCENT,
+} as const
+const LEAVE_SETTING_KEYS = Object.values(LEAVE_FIELD_KEYS)
+
 settingsRouter
   .route('/hr')
   .get(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
-    const [departmentTitles, retirementAge] = await Promise.all([
+    const [departmentTitles, retirementAge, leave] = await Promise.all([
       settingsService.get(SETTING_KEYS.HR_DEPARTMENT_TITLES),
       settingsService.get(SETTING_KEYS.HR_RETIREMENT_AGE),
+      settingsService.getMany(LEAVE_SETTING_KEYS),
     ])
-    return res.json({ departmentTitles, retirementAge })
+    return res.json({
+      departmentTitles,
+      retirementAge,
+      leave: {
+        annualDays:      leave[SETTING_KEYS.HR_ANNUAL_LEAVE_DAYS],
+        sickFullDays:    leave[SETTING_KEYS.HR_SICK_LEAVE_DAYS],
+        sickHalfDays:    leave[SETTING_KEYS.HR_SICK_HALF_PAY_DAYS],
+        emergencyDays:   leave[SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS],
+        maternityDays:   leave[SETTING_KEYS.HR_MATERNITY_LEAVE_DAYS],
+        paternityDays:   leave[SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS],
+        studyDays:       leave[SETTING_KEYS.HR_STUDY_LEAVE_DAYS],
+        maxConcurrentPct: leave[SETTING_KEYS.HR_MAX_CONCURRENT_LEAVE_PCT],
+        payPercent:      leave[SETTING_KEYS.HR_LEAVE_PAY_PERCENT],
+      },
+    })
   })
   .patch(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
     // Either field may be sent on its own (the department editor and the
     // retirement-age card save independently), but at least one is required.
-    const { departmentTitles, retirementAge } = req.body as {
+    const { departmentTitles, retirementAge, leave } = req.body as {
       departmentTitles?: unknown
       retirementAge?: unknown
+      leave?: Record<string, unknown>
     }
     const hasTitles = departmentTitles !== undefined
     const hasAge    = retirementAge !== undefined
-    if (!hasTitles && !hasAge) {
-      return res.status(400).json({ error: 'departmentTitles or retirementAge is required.' })
+    const hasLeave  = leave !== undefined
+    if (!hasTitles && !hasAge && !hasLeave) {
+      return res.status(400).json({ error: 'departmentTitles, retirementAge or leave is required.' })
+    }
+    if (hasLeave && (!leave || typeof leave !== 'object')) {
+      return res.status(400).json({ error: 'leave must be an object.' })
     }
     if (hasTitles && (!departmentTitles || typeof departmentTitles !== 'object')) {
       return res.status(400).json({ error: 'departmentTitles must be an object.' })
@@ -421,50 +455,19 @@ settingsRouter
       if (hasAge) {
         await settingsService.set(SETTING_KEYS.HR_RETIREMENT_AGE, retirementAge as number, req.user!.uid)
       }
-    } catch (err) {
-      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Invalid HR settings.', tags: { module: 'settings' } })
-    }
-    return res.json({ ok: true })
-  })
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ID NUMBER FORMATS  (admin | hr | high_rank) — 2026-11-21
-// ─────────────────────────────────────────────────────────────────────────────
-// How new employee numbers and student registration numbers are laid out, e.g.
-// 'EMP-{YYYY}-000'. Staff and student numbers are generated from these (see
-// hrService.createStaff and studentService.nextRegistrationNo); records that
-// already have a number are never changed. Either field may be sent alone.
-settingsRouter
-  .route('/id-numbers')
-  .get(requireRole(['admin', 'hr', 'high_rank']), async (_req, res) => {
-    const [employeeNoFormat, studentRegistrationNoFormat] = await Promise.all([
-      settingsService.get(SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT),
-      settingsService.get(SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT),
-    ])
-    return res.json({ employeeNoFormat, studentRegistrationNoFormat })
-  })
-  .patch(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
-    const { employeeNoFormat, studentRegistrationNoFormat } = req.body as {
-      employeeNoFormat?: unknown
-      studentRegistrationNoFormat?: unknown
-    }
-    const updates: Array<[typeof SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT | typeof SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT, unknown]> = []
-    if (employeeNoFormat !== undefined) updates.push([SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT, employeeNoFormat])
-    if (studentRegistrationNoFormat !== undefined) updates.push([SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT, studentRegistrationNoFormat])
-    if (updates.length === 0) {
-      return res.status(400).json({ error: 'employeeNoFormat or studentRegistrationNoFormat is required.' })
-    }
-    for (const [, value] of updates) {
-      if (typeof value !== 'string') return res.status(400).json({ error: 'The format must be text.' })
-      const problem = validateIdFormat(value)
-      if (problem) return res.status(400).json({ error: problem })
-    }
-    try {
-      for (const [key, value] of updates) {
-        await settingsService.set(key, (value as string).trim(), req.user!.uid)
+      // Leave days and leave pay. Each value is validated by its own schema in
+      // settingsService.set(); then this year's balances are rebuilt so the new
+      // days apply to everyone straight away (used / pending days are kept).
+      if (hasLeave && leave) {
+        const map: Array<[keyof typeof LEAVE_FIELD_KEYS, SettingKey]> = Object.entries(LEAVE_FIELD_KEYS) as never
+        const entries = map.filter(([field]) => leave[field] !== undefined)
+        for (const [field, key] of entries) {
+          await settingsService.set(key, leave[field] as never, req.user!.uid)
+        }
+        if (entries.length > 0) await hrService.refreshLeaveBalances()
       }
     } catch (err) {
-      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Invalid ID number format.', tags: { module: 'settings' } })
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Invalid HR settings.', tags: { module: 'settings' } })
     }
     return res.json({ ok: true })
   })

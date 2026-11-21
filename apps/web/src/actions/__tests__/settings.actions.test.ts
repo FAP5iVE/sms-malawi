@@ -65,7 +65,11 @@ const VALID = {
   },
   hr: {
     maxConcurrentLeavePct: 20, annualLeaveDays: 21, sickLeaveDays: 14,
-    maternityLeaveDays: 90, paternityLeaveDays: 7, studyLeaveDays: 30, emergencyLeaveDays: 5,
+    maternityLeaveDays: 40, paternityLeaveDays: 10, studyLeaveDays: 30, emergencyLeaveDays: 5,
+    sickHalfPayDays: 40,
+    leavePayPercent: {
+      ANNUAL: 100, SICK: 100, MATERNITY: 100, PATERNITY: 100, STUDY: 0, UNPAID: 0, EMERGENCY: 100,
+    },
   },
 }
 

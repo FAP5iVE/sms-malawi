@@ -891,6 +891,9 @@ model Payslip {
   paye          Decimal    @db.Decimal(12, 2)  // income tax
   pension       Decimal    @db.Decimal(12, 2)
   loanDeduction Decimal    @db.Decimal(12, 2) @default(0)
+  // Pay withheld for half-paid / unpaid leave in this month. grossSalary is
+  // already net of it, so PAYE and pension are worked out on the reduced pay.
+  leaveDeduction Decimal   @db.Decimal(12, 2) @default(0)
   netSalary     Decimal    @db.Decimal(12, 2)
   payslipKey    String?    // R2 object key for PDF payslip
   createdAt     DateTime   @default(now())
@@ -1440,7 +1443,6 @@ enum EmploymentType {
   TEMPORARY 
   }
 enum EmploymentCategory {
-  GOVERNMENT_POSTED
   SCHOOL_EMPLOYED
   COMMUNITY_PAID
   VOLUNTEER
@@ -1526,7 +1528,13 @@ model LeaveRequest {
   leaveType    LeaveType
   startDate    DateTime
   endDate      DateTime
-  days         Int
+  days         Int          // working days (Mon-Fri, public holidays excluded)
+  // How the days are paid, fixed at approval (see hrService.reviewLeave). The
+  // three always add up to `days`. Payroll reads these to dock pay; a request
+  // approved before this change was backfilled as fully paid (unpaid for UNPAID).
+  fullPayDays  Int          @default(0)
+  halfPayDays  Int          @default(0)
+  unpaidDays   Int          @default(0)
   reason       String
   status       LeaveStatus  @default(PENDING)
   reviewedByUid String?

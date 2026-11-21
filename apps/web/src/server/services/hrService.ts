@@ -68,7 +68,7 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { sendEmail } from '@/lib/email'
 import { generateTempPassword } from '@/lib/tempPassword'
-import { differenceInBusinessDays, isWeekend, addDays, startOfDay, endOfDay } from 'date-fns'
+import { addDays, startOfDay, endOfDay } from 'date-fns'
 import * as auditService from '@/server/services/auditService'
 import { assertNotSelfReview } from '@/server/lib/selfReview'
 
@@ -87,12 +87,19 @@ import * as algolia from '@/server/services/algoliaService'
 import { checkLeaveConflicts, type ConflictCheckResult } from '@/server/services/leaveConflictService'
 import * as notificationService from '@/server/services/notificationService'
 import * as settingsService from '@/server/services/settingsService'
-import { SETTING_KEYS } from '@shared/types/settings'
+import { SETTING_KEYS, LEAVE_TYPES, LEAVE_TYPE_LABELS, LEAVE_TYPE_SEX } from '@shared/types/settings'
+import type { LeaveTypeKey, LeavePayPercent } from '@shared/types/settings'
+import type { ApiLeaveOption, ApiOnLeaveNow } from '@shared/types/api'
+import {
+  toUtcDay, toDayString, isWeekendDay, countLeaveDays, nextWorkingDay,
+  splitLeavePay, proRatedEntitlement, todayInMalawi,
+} from '@shared/utils/leave'
   
 // ─── STAFF PROFILES ─────────────────────────────────────
 export async function listStaff(filters: {
   department?: string; jobTitle?: string; status?: string; search?: string; role?: string
 } = {}) {
+  await ensureLeaveStatusesFresh()
   const where:  Prisma.StaffProfileWhereInput = {}
   if (filters.department) where.department = filters.department
   if (filters.jobTitle) where.jobTitle = filters.jobTitle
@@ -191,10 +198,12 @@ export function redactStaffSensitive<T extends Record<string, unknown>>(profile:
 }
 
 export async function getStaffProfile(id: string) {
+  // Balances for this year exist and match today's settings before they are shown.
+  await refreshLeaveBalances({ staffId: id }).catch((err) => logger.error({ event: 'leave.balance_refresh_failed', err }))
   const profile = await prisma.staffProfile.findUniqueOrThrow({
     where: { id },
     include: {
-      leaveBalances: true,
+      leaveBalances: { where: { year: todayInMalawi().getUTCFullYear() }, orderBy: { leaveType: 'asc' } },
       leaveRequests: { orderBy: { createdAt: 'desc' }, take: 10 },
       loans: { where: { status: { in: ['APPROVED','DISBURSED','REPAYING'] } } },
       performanceNotes: { orderBy: { createdAt: 'desc' }, take: 5 },
@@ -591,15 +600,9 @@ export async function createStaff(data: CreateStaffInput, actorUid: string) {
     })
     staff = await createWithNextEmployeeNo(createProfile)
 
-    // Initialise annual leave balance for the current year
-    const year = new Date().getFullYear()
-    await prisma.leaveBalance.createMany({
-      data: [
-        { staffId: staff.id, leaveType: 'ANNUAL',    totalDays: 21, year },
-        { staffId: staff.id, leaveType: 'SICK',      totalDays: 10, year },
-        { staffId: staff.id, leaveType: 'EMERGENCY', totalDays: 3,  year },
-      ],
-    })
+    // Yearly leave balances (annual, sick, emergency) from Settings -> HR;
+    // annual leave is pro-rated if they join part way through the year.
+    await refreshLeaveBalances({ staffId: staff.id })
   } catch (dbErr) {
     // Roll back the orphaned Auth account before rethrowing.
     try {
@@ -670,48 +673,227 @@ export async function attachStaffPhoto(staffId: string, fileId: string): Promise
 }
 
 // ─── LEAVE MANAGEMENT ────────────────────────────────────
-// [BUGFIX — ERR-1 / ERR-2, 2026-09-16] These four validation throws below
-// were plain `new Error(...)` with no `.status`. globalErrorHandler
-// (server/middleware/inputSanitise.ts) treats any error with no `.status`
-// as a 500 — and in production, 5xx messages are always replaced with the
-// generic "An internal server error occurred." before reaching the client.
-// So a staff member applying for a weekend leave date or over their
-// balance got that generic string (easy to miss, and useless — it doesn't
-// say what was actually wrong), while the real, specific message
-// ("Leave cannot start or end on a weekend.", "Insufficient ANNUAL leave
-// balance. Available: 12 days.") only ever reached Sentry. The frontend
-// (hr/page.tsx's applyForLeave.isError block) was already correctly
-// wired to display whatever message came back — it just never got the
-// real one. Tagging these `{ status: 400 }`, same convention as the
-// 400/409s already thrown elsewhere in this file (see createStaff above),
-// routes them through globalErrorHandler's 4xx branch instead, which
-// passes `err.message` straight through.
+// How leave works (2026-11 overhaul):
+//  - A day of leave is a working day, Monday to Friday, not a public holiday
+//    (shared/utils/leave.ts). The school is on a five-day week.
+//  - Annual, sick and emergency leave are drawn from a yearly balance. The
+//    entitlement comes from Settings -> HR (Employment Act minimums by
+//    default), is rebuilt for every year, and never carries over: a new year
+//    starts a fresh balance. Maternity, paternity and study leave have no
+//    balance, only a longest-request cap from the same settings; unpaid leave
+//    has no limit. HR / high_rank approve or reject every request.
+//  - Each type has a pay percent in Settings (100 full, 50 half, 0 unpaid).
+//    When a request is approved its days are split into full-pay / half-pay /
+//    unpaid days and saved on the request. Payroll docks pay from that split.
+//    Sick leave uses the full-pay days first, then the half-pay days.
+//  - Staff status follows the dates, not the approval: ON_LEAVE while an
+//    approved leave covers today, ACTIVE again the day after it ends
+//    (syncLeaveStatuses, run daily by the cron and refreshed on read).
+// Validation throws carry `.status` so globalErrorHandler passes the real
+// message to the client instead of the generic 500 text.
+
+/** Leave types drawn from a yearly balance. */
+const BALANCE_TYPES: readonly LeaveType[] = ['ANNUAL', 'SICK', 'EMERGENCY']
+
+interface LeavePolicy {
+  annualDays:     number
+  sickFullDays:   number
+  sickHalfDays:   number
+  emergencyDays:  number
+  maternityDays:  number
+  paternityDays:  number
+  studyDays:      number
+  payPercent:     LeavePayPercent
+}
+
+async function getLeavePolicy(): Promise<LeavePolicy> {
+  const s = await settingsService.getMany([
+    SETTING_KEYS.HR_ANNUAL_LEAVE_DAYS,
+    SETTING_KEYS.HR_SICK_LEAVE_DAYS,
+    SETTING_KEYS.HR_SICK_HALF_PAY_DAYS,
+    SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS,
+    SETTING_KEYS.HR_MATERNITY_LEAVE_DAYS,
+    SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS,
+    SETTING_KEYS.HR_STUDY_LEAVE_DAYS,
+    SETTING_KEYS.HR_LEAVE_PAY_PERCENT,
+  ] as const)
+  return {
+    annualDays:    s[SETTING_KEYS.HR_ANNUAL_LEAVE_DAYS],
+    sickFullDays:  s[SETTING_KEYS.HR_SICK_LEAVE_DAYS],
+    sickHalfDays:  s[SETTING_KEYS.HR_SICK_HALF_PAY_DAYS],
+    emergencyDays: s[SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS],
+    maternityDays: s[SETTING_KEYS.HR_MATERNITY_LEAVE_DAYS],
+    paternityDays: s[SETTING_KEYS.HR_PATERNITY_LEAVE_DAYS],
+    studyDays:     s[SETTING_KEYS.HR_STUDY_LEAVE_DAYS],
+    payPercent:    s[SETTING_KEYS.HR_LEAVE_PAY_PERCENT],
+  }
+}
+
+function entitlementFor(type: LeaveType, policy: LeavePolicy, dateJoined: Date, year: number): number {
+  switch (type) {
+    case 'ANNUAL':    return proRatedEntitlement(policy.annualDays, dateJoined, year)
+    case 'SICK':      return policy.sickFullDays + policy.sickHalfDays
+    case 'EMERGENCY': return policy.emergencyDays
+    default:          return 0
+  }
+}
+
+/** Longest single request for the types that have a cap instead of a balance. */
+function perRequestCap(type: LeaveType, policy: LeavePolicy): number | null {
+  if (type === 'MATERNITY') return policy.maternityDays
+  if (type === 'PATERNITY') return policy.paternityDays
+  if (type === 'STUDY')     return policy.studyDays
+  return null
+}
+
+function payNoteFor(type: LeaveType, policy: LeavePolicy): string {
+  const pct = policy.payPercent[type]
+  const rate = pct >= 100 ? 'Full pay' : pct <= 0 ? 'Unpaid' : `${pct}% pay`
+  if (type === 'SICK' && policy.sickHalfDays > 0) {
+    return `${rate} for the first ${policy.sickFullDays} days, then half pay for up to ${policy.sickHalfDays} more`
+  }
+  return rate
+}
+
+/**
+ * Makes sure the yearly balances exist for `year` (default: this year) and
+ * match the current settings. One staff member, or everyone not terminated.
+ * Used/pending days are never touched. A new year has no rows yet, so it
+ * starts from zero used: there is no carry-over.
+ */
+export async function refreshLeaveBalances(opts: { staffId?: string; year?: number } = {}) {
+  const year = opts.year ?? todayInMalawi().getUTCFullYear()
+  const [policy, people] = await Promise.all([
+    getLeavePolicy(),
+    prisma.staffProfile.findMany({
+      where:  { ...(opts.staffId ? { id: opts.staffId } : {}), status: { not: 'TERMINATED' } },
+      select: { id: true, dateJoined: true },
+    }),
+  ])
+  const ops = people.flatMap((p) =>
+    BALANCE_TYPES.map((leaveType) => {
+      const totalDays = entitlementFor(leaveType, policy, p.dateJoined, year)
+      return prisma.leaveBalance.upsert({
+        where:  { staffId_leaveType_year: { staffId: p.id, leaveType, year } },
+        create: { staffId: p.id, leaveType, year, totalDays },
+        update: { totalDays },
+      })
+    }),
+  )
+  for (let i = 0; i < ops.length; i += 100) await prisma.$transaction(ops.slice(i, i + 100))
+  return { staff: people.length, year }
+}
+
+/**
+ * Puts every staff member's status in line with their approved leave:
+ * ON_LEAVE while a leave covers today (Malawi date), ACTIVE once it is over.
+ * Only ACTIVE <-> ON_LEAVE moves; SUSPENDED and TERMINATED are never touched.
+ * Leave that has not started yet leaves the person ACTIVE.
+ */
+export async function syncLeaveStatuses() {
+  const today = todayInMalawi()
+  const covering = await prisma.leaveRequest.findMany({
+    where:  { status: 'APPROVED', startDate: { lte: today }, endDate: { gte: today } },
+    select: { staffId: true },
+  })
+  const awayIds = [...new Set(covering.map((c) => c.staffId))]
+  const [toOnLeave, toActive] = await Promise.all([
+    prisma.staffProfile.updateMany({ where: { id: { in: awayIds }, status: 'ACTIVE' }, data: { status: 'ON_LEAVE' } }),
+    prisma.staffProfile.updateMany({ where: { id: { notIn: awayIds }, status: 'ON_LEAVE' }, data: { status: 'ACTIVE' } }),
+  ])
+  lastStatusSync = Date.now()
+  return { toOnLeave: toOnLeave.count, toActive: toActive.count }
+}
+
+let lastStatusSync = 0
+/** Cheap guard for read paths: re-sync at most every five minutes per server instance. */
+async function ensureLeaveStatusesFresh() {
+  if (Date.now() - lastStatusSync < 5 * 60 * 1000) return
+  try {
+    await syncLeaveStatuses()
+  } catch (err) {
+    logger.error({ event: 'leave.status_sync_failed', err })
+  }
+}
+
+function leaveError(message: string, status = 400) {
+  return Object.assign(new Error(message), { status })
+}
+
 export async function applyForLeave(staffId: string, data: LeaveRequestInput) {
-  const start = new Date(data.startDate)
-  const end   = new Date(data.endDate)
-  const days  = differenceInBusinessDays(end, start) + 1
+  const start = toUtcDay(data.startDate)
+  const end   = toUtcDay(data.endDate)
+  const leaveType = data.leaveType as LeaveType
 
-  if (days <= 0) throw Object.assign(new Error('End date must be after start date.'), { status: 400 })
-  if (isWeekend(start) || isWeekend(end)) throw Object.assign(new Error('Leave cannot start or end on a weekend.'), { status: 400 })
+  if (end.getTime() < start.getTime()) throw leaveError('End date must be on or after the start date.')
+  if (isWeekendDay(start) || isWeekendDay(end)) throw leaveError('Leave cannot start or end on a weekend.')
 
-  // Check balance for annual/sick leave
-  if (['ANNUAL', 'SICK'].includes(data.leaveType)) {
-    const year = start.getFullYear()
-    const balance = await prisma.leaveBalance.findUnique({
-      where: { staffId_leaveType_year: { staffId, leaveType: data.leaveType as LeaveType, year } },
-    })
-    const remaining = (balance?.totalDays ?? 0) - (balance?.usedDays ?? 0) - (balance?.pendingDays ?? 0)
-    if (days > remaining) throw Object.assign(new Error(`Insufficient ${data.leaveType} leave balance. Available: ${remaining} days.`), { status: 400 })
-    // Reserve pending days
-    await prisma.leaveBalance.update({
-      where: { staffId_leaveType_year: { staffId, leaveType: data.leaveType as LeaveType, year } },
-      data: { pendingDays: { increment: days } },
-    })
+  const days = countLeaveDays(start, end)
+  if (days <= 0) throw leaveError('Those dates contain no working days. Weekends and public holidays are not counted as leave.')
+
+  const staff = await prisma.staffProfile.findUniqueOrThrow({
+    where:  { id: staffId },
+    select: { sex: true, status: true },
+  })
+  if (staff.status === 'TERMINATED') throw leaveError('A terminated staff account cannot apply for leave.', 403)
+
+  const onlyFor = LEAVE_TYPE_SEX[leaveType as LeaveTypeKey]
+  if (onlyFor && staff.sex && staff.sex !== onlyFor) {
+    throw leaveError(`${LEAVE_TYPE_LABELS[leaveType as LeaveTypeKey]} is not available for this staff profile.`)
   }
 
-  const request = await prisma.leaveRequest.create({
-    data: { staffId, leaveType: data.leaveType as LeaveType, startDate: start, endDate: end, days, reason: data.reason },
+  const overlap = await prisma.leaveRequest.findFirst({
+    where: {
+      staffId,
+      status:    { in: ['PENDING', 'APPROVED'] },
+      startDate: { lte: end },
+      endDate:   { gte: start },
+    },
+    select: { startDate: true, endDate: true, status: true },
   })
+  if (overlap) {
+    throw leaveError(
+      `You already have a ${overlap.status.toLowerCase()} leave request from ${toDayString(overlap.startDate)} to ${toDayString(overlap.endDate)} that overlaps these dates.`,
+      409,
+    )
+  }
+
+  const policy = await getLeavePolicy()
+  const cap = perRequestCap(leaveType, policy)
+  if (cap !== null && days > cap) {
+    throw leaveError(`${LEAVE_TYPE_LABELS[leaveType as LeaveTypeKey]} is limited to ${cap} working days per request. You asked for ${days}.`)
+  }
+
+  const create = {
+    staffId, leaveType, startDate: start, endDate: end, days, reason: data.reason,
+  }
+
+  if (BALANCE_TYPES.includes(leaveType)) {
+    const year = start.getUTCFullYear()
+    if (end.getUTCFullYear() !== year) {
+      throw leaveError('Leave cannot run across two calendar years. Please submit one request for each year.')
+    }
+    await refreshLeaveBalances({ staffId, year })
+    const balance = await prisma.leaveBalance.findUniqueOrThrow({
+      where: { staffId_leaveType_year: { staffId, leaveType, year } },
+    })
+    const remaining = balance.totalDays - balance.usedDays - balance.pendingDays
+    if (days > remaining) {
+      throw leaveError(`Not enough ${LEAVE_TYPE_LABELS[leaveType as LeaveTypeKey].toLowerCase()} left for ${year}. You asked for ${days} working days and ${Math.max(0, remaining)} are available.`)
+    }
+    // Reserve the days and create the request together so neither can happen alone.
+    const [request] = await prisma.$transaction([
+      prisma.leaveRequest.create({ data: create }),
+      prisma.leaveBalance.update({
+        where: { staffId_leaveType_year: { staffId, leaveType, year } },
+        data:  { pendingDays: { increment: days } },
+      }),
+    ])
+    logger.info({ event: 'leave.applied', requestId: request.id, staffId, days })
+    return request
+  }
+
+  const request = await prisma.leaveRequest.create({ data: create })
   logger.info({ event: 'leave.applied', requestId: request.id, staffId, days })
   return request
 }
@@ -741,28 +923,54 @@ export async function reviewLeave(requestId: string, data: ReviewLeaveInput, act
     })
   }
 
-  const updated = await prisma.leaveRequest.update({
-    where: { id: requestId },
-    data: { status: data.status, reviewedByUid: actorUid, reviewedAt: new Date(), reviewNotes: data.reviewNotes ?? null },
-  })
+  const isBalanceType = BALANCE_TYPES.includes(req.leaveType)
+  const year = req.startDate.getUTCFullYear()
+  const balanceKey = { staffId_leaveType_year: { staffId: req.staffId, leaveType: req.leaveType, year } }
 
-  if (['ANNUAL', 'SICK'].includes(req.leaveType)) {
-    const year = req.startDate.getFullYear()
-    const key = { staffId: req.staffId, leaveType: req.leaveType, year }
-    if (data.status === 'APPROVED') {
-      await prisma.leaveBalance.update({
-        where: { staffId_leaveType_year: key },
-        data: { pendingDays: { decrement: req.days }, usedDays: { increment: req.days } },
-      })
-      // Update staff status to ON_LEAVE
-      await prisma.staffProfile.update({ where: { id: req.staffId }, data: { status: 'ON_LEAVE' } })
+  // Fix how the days are paid at the moment of approval. Sick leave depends on
+  // how much of the year's full-pay allowance is already used, so it is worked
+  // out here, not at application time.
+  let pay: { fullPayDays: number; halfPayDays: number; unpaidDays: number } | undefined
+  if (data.status === 'APPROVED') {
+    const policy = await getLeavePolicy()
+    const percent = policy.payPercent[req.leaveType as LeaveTypeKey]
+    if (req.leaveType === 'SICK') {
+      const balance = await prisma.leaveBalance.findUnique({ where: balanceKey })
+      const used = balance?.usedDays ?? 0
+      const fullTierLeft = Math.max(0, policy.sickFullDays - used)
+      const halfTierLeft = Math.max(0, policy.sickHalfDays - Math.max(0, used - policy.sickFullDays))
+      pay = splitLeavePay(req.days, percent, { fullTierLeft, halfTierLeft })
     } else {
-      // Rejected — release pending days
-      await prisma.leaveBalance.update({
-        where: { staffId_leaveType_year: key },
-        data: { pendingDays: { decrement: req.days } },
-      })
+      pay = splitLeavePay(req.days, percent)
     }
+  }
+
+  const reviewData = {
+    status: data.status, reviewedByUid: actorUid, reviewedAt: new Date(), reviewNotes: data.reviewNotes ?? null,
+    ...(pay ?? {}),
+  }
+  const updateRequest = prisma.leaveRequest.update({ where: { id: requestId }, data: reviewData })
+
+  let updated: Awaited<typeof updateRequest>
+  if (isBalanceType) {
+    // Move the reserved days to used (approved) or hand them back (rejected).
+    const balanceChange = data.status === 'APPROVED'
+      ? { pendingDays: { decrement: req.days }, usedDays: { increment: req.days } }
+      : { pendingDays: { decrement: req.days } }
+    ;[updated] = await prisma.$transaction([
+      updateRequest,
+      prisma.leaveBalance.updateMany({
+        where: { staffId: req.staffId, leaveType: req.leaveType, year },
+        data:  balanceChange,
+      }),
+    ])
+  } else {
+    updated = await updateRequest
+  }
+
+  // Status follows the dates: ON_LEAVE only if the approved leave covers today.
+  if (data.status === 'APPROVED') {
+    await syncLeaveStatuses().catch((err) => logger.error({ event: 'leave.status_sync_failed', err }))
   }
 
   // [R11] Reconnect the leave-review workflow to email — staff were
@@ -820,16 +1028,21 @@ export async function cancelLeave(requestId: string, actorUid: string) {
     throw Object.assign(new Error('Only a pending leave request can be withdrawn.'), { status: 409 })
   }
 
-  const updated = await prisma.leaveRequest.update({
+  const updateRequest = prisma.leaveRequest.update({
     where: { id: requestId },
     data:  { status: 'CANCELLED', reviewedAt: new Date(), reviewNotes: 'Withdrawn by the applicant.' },
   })
-
-  if (['ANNUAL', 'SICK'].includes(req.leaveType)) {
-    await prisma.leaveBalance.update({
-      where: { staffId_leaveType_year: { staffId: req.staffId, leaveType: req.leaveType, year: req.startDate.getFullYear() } },
-      data:  { pendingDays: { decrement: req.days } },
-    })
+  let updated: Awaited<typeof updateRequest>
+  if (BALANCE_TYPES.includes(req.leaveType)) {
+    ;[updated] = await prisma.$transaction([
+      updateRequest,
+      prisma.leaveBalance.updateMany({
+        where: { staffId: req.staffId, leaveType: req.leaveType, year: req.startDate.getUTCFullYear() },
+        data:  { pendingDays: { decrement: req.days } },
+      }),
+    ])
+  } else {
+    updated = await updateRequest
   }
 
   logger.info({ event: 'leave.cancelled', requestId, actorUid })
@@ -837,14 +1050,105 @@ export async function cancelLeave(requestId: string, actorUid: string) {
 }
 
 export async function listLeaveRequests(filters: { staffId?: string; status?: string } = {}) {
-  return prisma.leaveRequest.findMany({
-    where: {
-      ...(filters.staffId ? { staffId: filters.staffId } : {}),
-      ...(filters.status  ? { status: filters.status as 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' } : {}),
-    },
-    include: { staff: { select: { firstName: true, lastName: true, department: true, photoKey: true } } },
-    orderBy: { createdAt: 'desc' },
+  const [rows, payNotes] = await Promise.all([
+    prisma.leaveRequest.findMany({
+      where: {
+        ...(filters.staffId ? { staffId: filters.staffId } : {}),
+        ...(filters.status  ? { status: filters.status as 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' } : {}),
+      },
+      include: { staff: { select: { firstName: true, lastName: true, department: true, photoKey: true } } },
+      orderBy: { createdAt: 'desc' },
+    }),
+    getLeavePayNotes(),
+  ])
+  // Once approved, the request carries its real pay split; before that, show
+  // how the type is paid under the current settings.
+  return rows.map((r) => {
+    const approved = r.status === 'APPROVED'
+    const parts = [
+      r.fullPayDays > 0 ? `${r.fullPayDays} full pay` : '',
+      r.halfPayDays > 0 ? `${r.halfPayDays} half pay` : '',
+      r.unpaidDays  > 0 ? `${r.unpaidDays} unpaid` : '',
+    ].filter(Boolean)
+    return { ...r, payNote: approved && parts.length > 0 ? parts.join(', ') : (payNotes[r.leaveType] ?? 'Full pay') }
   })
+}
+
+/** One-line pay description per leave type ("Full pay", "Unpaid"...), for approval screens. */
+export async function getLeavePayNotes(): Promise<Record<string, string>> {
+  const policy = await getLeavePolicy()
+  return Object.fromEntries(LEAVE_TYPES.map((t) => [t, payNoteFor(t as LeaveType, policy)]))
+}
+
+/** The signed-in staff member's own requests (the "My leave" list). */
+export async function listMyLeaveRequests(uid: string) {
+  const me = await prisma.staffProfile.findFirst({ where: { uid }, select: { id: true } })
+  if (!me) return []
+  return listLeaveRequests({ staffId: me.id })
+}
+
+/**
+ * What the signed-in staff member can ask for, with the days left and how it
+ * is paid. Maternity / paternity are left out for the other sex when the
+ * profile records it. Backs the Request leave form.
+ */
+export async function getMyLeaveOptions(uid: string): Promise<ApiLeaveOption[]> {
+  const me = await prisma.staffProfile.findFirst({ where: { uid }, select: { id: true, sex: true } })
+  if (!me) return []
+  const year = todayInMalawi().getUTCFullYear()
+  await refreshLeaveBalances({ staffId: me.id, year })
+  const [policy, balances] = await Promise.all([
+    getLeavePolicy(),
+    prisma.leaveBalance.findMany({ where: { staffId: me.id, year } }),
+  ])
+  return LEAVE_TYPES
+    .filter((t) => { const only = LEAVE_TYPE_SEX[t]; return !only || !me.sex || me.sex === only })
+    .map((t) => {
+      const b = balances.find((x) => x.leaveType === t)
+      const remaining = b ? b.totalDays - b.usedDays - b.pendingDays : null
+      return {
+        leaveType:     t,
+        label:         LEAVE_TYPE_LABELS[t],
+        payPercent:    policy.payPercent[t],
+        payNote:       payNoteFor(t as LeaveType, policy),
+        maxDays:       BALANCE_TYPES.includes(t as LeaveType) ? Math.max(0, remaining ?? 0) : perRequestCap(t as LeaveType, policy),
+        remainingDays: BALANCE_TYPES.includes(t as LeaveType) ? Math.max(0, remaining ?? 0) : null,
+        totalDays:     b?.totalDays ?? null,
+      }
+    })
+}
+
+/**
+ * Everyone whose approved leave covers today, with the day they are back.
+ * Deliberately NOT filtered by request status or a date range: this is the
+ * "who is away right now" list, separate from the request queue.
+ */
+export async function listOnLeaveNow(): Promise<ApiOnLeaveNow[]> {
+  await ensureLeaveStatusesFresh()
+  const today = todayInMalawi()
+  const rows = await prisma.leaveRequest.findMany({
+    where: {
+      status:    'APPROVED',
+      startDate: { lte: today },
+      endDate:   { gte: today },
+      staff:     { status: { not: 'TERMINATED' } },
+    },
+    include: { staff: { select: { id: true, firstName: true, lastName: true, department: true, jobTitle: true } } },
+    orderBy: { endDate: 'asc' },
+  })
+  return rows.map((r) => ({
+    requestId:  r.id,
+    staffId:    r.staff.id,
+    firstName:  r.staff.firstName,
+    lastName:   r.staff.lastName,
+    department: r.staff.department,
+    jobTitle:   r.staff.jobTitle,
+    leaveType:  r.leaveType,
+    startDate:  toDayString(r.startDate),
+    endDate:    toDayString(r.endDate),
+    returnDate: nextWorkingDay(r.endDate),
+    daysLeft:   countLeaveDays(today, r.endDate),
+  }))
 }
 
 // ─── STAFF LOANS ─────────────────────────────────────────

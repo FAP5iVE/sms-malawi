@@ -86,6 +86,7 @@ import { SETTING_KEYS } from '@shared/types/settings'
 import type { PayeBracket } from '@shared/types/settings'
 import type { ApiPayrollRunWindow, ApiSalaryStructure } from '@shared/types/api'
 import type { UserRole } from '@shared/types/roles'
+import { monthLeaveReduction, leaveDeductionAmount } from '@shared/utils/leave'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RUN WINDOW — payroll_day_of_month / payroll_run_window_days
@@ -264,9 +265,10 @@ export async function processMonthlyPayroll(
     )
   }
 
-  // Get all active salary structures
-  const salaries = await prisma.salaryStructure.findMany()
-  if (salaries.length === 0) throw new Error('No salary structures found')
+  // Salary structures of everyone still employed. A terminated staff member
+  // keeps their salary row but must not be paid again.
+  const allSalaries = await prisma.salaryStructure.findMany()
+  if (allSalaries.length === 0) throw new Error('No salary structures found')
 
   // [R10 fix 1] Real, configured PAYE brackets and pension rate instead
   // of hardcoded constants.
@@ -279,11 +281,15 @@ export async function processMonthlyPayroll(
   // [R10 fix 3] Real staff names — SalaryStructure.staffUid is a Firebase
   // UID plain string with no Prisma relation, so this is a manual
   // StaffProfile lookup, not an `include`.
-  const staffUids = salaries.map((s) => s.staffUid)
-  const staffProfiles = await prisma.staffProfile.findMany({
-    where: { uid: { in: staffUids } },
-    select: { id: true, uid: true, firstName: true, lastName: true },
+  const allStaffProfiles = await prisma.staffProfile.findMany({
+    where: { uid: { in: allSalaries.map((s) => s.staffUid) } },
+    select: { id: true, uid: true, firstName: true, lastName: true, status: true },
   })
+  const terminatedUids = new Set(allStaffProfiles.filter((p) => p.status === 'TERMINATED').map((p) => p.uid))
+  const salaries = allSalaries.filter((s) => !terminatedUids.has(s.staffUid))
+  if (salaries.length === 0) throw new Error('No active salary structures found')
+  const staffUids = salaries.map((s) => s.staffUid)
+  const staffProfiles = allStaffProfiles.filter((p) => !terminatedUids.has(p.uid))
   const staffNameByUid = new Map(staffProfiles.map((s) => [s.uid, `${s.firstName} ${s.lastName}`]))
   const staffIdByUid = new Map(staffProfiles.map((s) => [s.uid, s.id]))
 
@@ -312,6 +318,29 @@ export async function processMonthlyPayroll(
   }
   const earningsByUid = new Map<string, PayslipEarnings>()
 
+  // Approved leave that touches this month. Half-paid and unpaid days dock
+  // pay (the split was fixed when HR approved the request); paid days do not.
+  const monthStart = new Date(Date.UTC(year, month - 1, 1))
+  const monthEnd   = new Date(Date.UTC(year, month, 0))
+  const leaveRows = await prisma.leaveRequest.findMany({
+    where: {
+      status:    'APPROVED',
+      startDate: { lte: monthEnd },
+      endDate:   { gte: monthStart },
+      staff:     { uid: { in: staffUids } },
+    },
+    select: {
+      startDate: true, endDate: true, fullPayDays: true, halfPayDays: true, unpaidDays: true,
+      staff: { select: { uid: true } },
+    },
+  })
+  const leaveByUid = new Map<string, typeof leaveRows>()
+  for (const r of leaveRows) {
+    const list = leaveByUid.get(r.staff.uid) ?? []
+    list.push(r)
+    leaveByUid.set(r.staff.uid, list)
+  }
+
   let totalGross = 0
   let totalNet = 0
   const payslipData: {
@@ -321,11 +350,18 @@ export async function processMonthlyPayroll(
     paye: number
     pension: number
     loanDeduction: number
+    leaveDeduction: number
     netSalary: number
   }[] = []
 
   for (const sal of salaries) {
-    const gross = Number(sal.baseSalary) + (allowanceTotalByUid.get(sal.staffUid) ?? 0)
+    const fullGross = Number(sal.baseSalary) + (allowanceTotalByUid.get(sal.staffUid) ?? 0)
+    // Leave docks the day rate (gross over the month's weekdays) for each
+    // unpaid day and half of it for each half-pay day. PAYE and pension are
+    // then worked out on the reduced pay, not on the full salary.
+    const leave = monthLeaveReduction(leaveByUid.get(sal.staffUid) ?? [], month, year)
+    const leaveDeduction = leaveDeductionAmount(fullGross, leave.reductionDays, month, year)
+    const gross = fullGross - leaveDeduction
     const paye = calculateMonthlyPAYE(gross, payeBrackets)
     const pension = gross * (pensionPercent / 100)
     const loanDeduction = Number(sal.monthlyLoanDeduction)
@@ -334,9 +370,16 @@ export async function processMonthlyPayroll(
     totalGross += gross
     totalNet += net
 
+    const leaveParts = [
+      leave.unpaidDays > 0 ? `${leave.unpaidDays} unpaid` : '',
+      leave.halfPayDays > 0 ? `${leave.halfPayDays} half-pay` : '',
+    ].filter(Boolean).join(', ')
     earningsByUid.set(sal.staffUid, {
       baseSalary: Number(sal.baseSalary),
       allowances: allowanceLinesByUid.get(sal.staffUid) ?? [],
+      ...(leaveDeduction > 0
+        ? { leaveAdjustment: { label: `Leave pay adjustment (${leaveParts} day${leave.unpaidDays + leave.halfPayDays === 1 ? '' : 's'})`, amount: leaveDeduction } }
+        : {}),
     })
 
     payslipData.push({
@@ -346,6 +389,7 @@ export async function processMonthlyPayroll(
       paye,
       pension,
       loanDeduction,
+      leaveDeduction,
       netSalary: net,
     })
   }
@@ -549,6 +593,7 @@ export async function ensurePayslipPdf(payslipId: string): Promise<string> {
       pensionPercent,
       loanDeduction: Number(payslip.loanDeduction),
       netSalary: Number(payslip.netSalary),
+      leaveDeduction: Number(payslip.leaveDeduction),
       // No earnings here: this payslip pre-dates its PDF, so the breakdown is
       // rebuilt inside generatePayslipPdf from the staff allowances in force
       // for that month (the stored gross stays the source of truth).
