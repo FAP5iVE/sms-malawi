@@ -209,7 +209,7 @@ export function GuardianLinkCard({ link, showStudent = false, profileNames }: {
                   <span className="text-muted"> · {GUARDIAN_INVITATION_STATUS_LABELS[i.status]}{i.status === 'ACTIVE' ? `, until ${fmtDate(i.expiresAt)}` : ''}</span>
                 </span>
                 {i.status === 'ACTIVE' && can('guardian.invite') && (
-                  <button type="button" className="text-sm font-medium text-tone-coral hover:underline min-h-11 px-2" onClick={() => setOpen({ kind: 'cancelInvitation', id: i.id })}>
+                  <button type="button" className="text-sm font-medium text-tone-coral app-action min-h-11 px-2" onClick={() => setOpen({ kind: 'cancelInvitation', id: i.id })}>
                     Cancel
                   </button>
                 )}

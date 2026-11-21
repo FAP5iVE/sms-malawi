@@ -255,7 +255,7 @@ export function StudentPortalStatementTab({
                   type="button"
                   disabled={fetchReceipt.isPending}
                   onClick={() => fetchReceipt.mutate(p.id)}
-                  className="inline-flex items-center gap-1.5 text-sm font-medium text-tone-teal hover:underline disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-tone-teal app-action disabled:opacity-50"
                 >
                   {fetchReceipt.isPending ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

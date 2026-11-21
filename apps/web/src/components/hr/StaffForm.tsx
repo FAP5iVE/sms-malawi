@@ -703,7 +703,7 @@ function SalarySection({ staffId }: { staffId: string }) {
               <button
                 type="button"
                 onClick={() => setShowAddAllowance((v) => !v)}
-                className="text-xs font-semibold text-tone-teal hover:underline"
+                className="text-xs font-semibold text-tone-teal app-action"
               >
                 {showAddAllowance ? 'Cancel' : '+ Add allowance'}
               </button>
@@ -734,7 +734,7 @@ function SalarySection({ staffId }: { staffId: string }) {
                       disabled={deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id}
                       aria-busy={deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id}
                       aria-label={`Remove ${a.type} allowance`}
-                      className="shrink-0 text-tone-coral hover:underline text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1"
+                      className="shrink-0 text-tone-coral app-action text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1"
                     >
                       {deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id && <Loader2 className="w-3 h-3 animate-spin" aria-hidden />}
                       {deleteAllowance.isPending && deleteAllowance.variables?.allowanceId === a.id ? 'Removing…' : 'Remove'}

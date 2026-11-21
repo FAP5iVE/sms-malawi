@@ -142,7 +142,7 @@ export function MarkDialog({ classId, assignmentId, dueDate, postedAt, marksEnab
             <button
               type="button"
               onClick={() => void openAssignmentSubmissionFile(classId, assignmentId, row.studentId, row.fileName ?? 'hand-in').catch((e) => notifyError('Could not open the file', e))}
-              className="inline-flex max-w-full items-center gap-1.5 text-xs font-semibold text-tone-teal hover:underline"
+              className="inline-flex max-w-full items-center gap-1.5 text-xs font-semibold text-tone-teal app-action"
             >
               <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden /> <span className="truncate">{row.fileName ?? 'Open file'}</span>
             </button>

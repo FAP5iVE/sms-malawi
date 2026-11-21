@@ -11,12 +11,21 @@ import {
   HILLS_SKY_SCRIPT,
   HILLS_THEME_STORAGE_KEY,
   malawiHour,
+  modeForSky,
+  normalizeChoice,
+  resolveMode,
   resolveSky,
   skyForHour,
 } from '../../../src/lib/hills/sky.js'
 
 function runScript(stored: string | null | 'throws', utc: Date): string | null {
+  return runScriptFull(stored, utc).sky
+}
+
+function runScriptFull(stored: string | null | 'throws', utc: Date): { sky: string | null; dark: boolean; scheme: string | null } {
   let sky: string | null = null
+  let dark = false
+  let scheme: string | null = null
   const RealDate = Date
   const sandbox = {
     localStorage: {
@@ -30,6 +39,19 @@ function runScript(stored: string | null | 'throws', utc: Date): string | null {
         setAttribute(name: string, value: string) {
           if (name === 'data-sky') sky = value
         },
+        classList: {
+          add(name: string) {
+            if (name === 'dark') dark = true
+          },
+          remove(name: string) {
+            if (name === 'dark') dark = false
+          },
+        },
+        style: {
+          set colorScheme(v: string) {
+            scheme = v
+          },
+        },
       },
     },
     Date: class extends RealDate {
@@ -39,7 +61,7 @@ function runScript(stored: string | null | 'throws', utc: Date): string | null {
     },
   }
   vm.runInNewContext(HILLS_SKY_SCRIPT, sandbox)
-  return sky
+  return { sky, dark, scheme }
 }
 
 test('skyForHour boundaries follow the plan (05, 08, 16, 19)', () => {
@@ -78,4 +100,40 @@ test('inline script equals resolveSky for every hour and every stored value', ()
 
 test('script never throws when the document is unusable', () => {
   assert.doesNotThrow(() => vm.runInNewContext(HILLS_SKY_SCRIPT, {}))
+})
+
+test('only the night sky is dark', () => {
+  assert.equal(modeForSky('night'), 'dark')
+  for (const sky of ['dawn', 'day', 'dusk'] as const) assert.equal(modeForSky(sky), 'light')
+})
+
+test('Light is always light, Dark is always dark, Auto follows the clock, at every hour', () => {
+  for (let h = 0; h < 24; h++) {
+    const now = new Date(Date.UTC(2026, 2, 2, h, 15))
+    assert.equal(resolveMode('light', now), 'light')
+    assert.equal(resolveMode('dark', now), 'dark')
+    const local = malawiHour(now)
+    const night = local >= 19 || local < 5
+    assert.equal(resolveMode('system', now), night ? 'dark' : 'light', `auto at Malawi hour ${local}`)
+  }
+})
+
+test('an unknown stored value behaves as Auto', () => {
+  assert.equal(normalizeChoice('weird'), 'system')
+  assert.equal(normalizeChoice(null), 'system')
+  assert.equal(normalizeChoice(undefined), 'system')
+  assert.equal(normalizeChoice('light'), 'light')
+  assert.equal(normalizeChoice('dark'), 'dark')
+})
+
+test('the inline script sets the dark class and colour scheme exactly as resolveMode says', () => {
+  for (const stored of ['light', 'dark', 'system', null, 'something-else', 'throws'] as const) {
+    for (let h = 0; h < 24; h++) {
+      const now = new Date(Date.UTC(2026, 5, 15, h, 20))
+      const expected = resolveMode(stored === 'throws' ? null : stored, now)
+      const got = runScriptFull(stored, now)
+      assert.equal(got.dark, expected === 'dark', `class: stored=${String(stored)} utc hour ${h}`)
+      assert.equal(got.scheme, expected, `color-scheme: stored=${String(stored)} utc hour ${h}`)
+    }
+  }
 })

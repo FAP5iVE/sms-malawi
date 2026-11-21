@@ -383,7 +383,7 @@ function RunDetailModal({ runId, onClose }: { runId: string; onClose: () => void
             onClick={() => downloadPayslipMutation.mutate(p.id)}
             disabled={isDownloading}
             aria-busy={isDownloading}
-            className="inline-flex items-center gap-1.5 text-xs font-heading font-semibold text-brand-navy hover:underline disabled:opacity-60 disabled:pointer-events-none"
+            className="inline-flex items-center gap-1.5 text-xs font-heading font-semibold text-brand-navy app-action disabled:opacity-60 disabled:pointer-events-none"
           >
             {isDownloading
               ? <><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> Opening…</>

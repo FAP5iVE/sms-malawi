@@ -177,7 +177,7 @@ export function PlacementAdvisoryChecker() {
           type="button"
           onClick={addGradeRow}
           disabled={grades.length >= MALAWI_SUBJECTS.length}
-          className="mt-2 flex items-center gap-1.5 text-sm text-tone-teal font-semibold hover:underline disabled:opacity-40"
+          className="mt-2 flex items-center gap-1.5 text-sm text-tone-teal font-semibold app-action disabled:opacity-40"
         >
           <Plus className="w-4 h-4" /> Add subject
         </button>
@@ -238,7 +238,7 @@ export function PlacementAdvisoryChecker() {
               type="button"
               onClick={addChosenRow}
               disabled={chosen.length >= 20}
-              className="flex items-center gap-1.5 text-sm text-tone-teal font-semibold hover:underline disabled:opacity-40"
+              className="flex items-center gap-1.5 text-sm text-tone-teal font-semibold app-action disabled:opacity-40"
             >
               <Plus className="w-4 h-4" /> Add programme
             </button>

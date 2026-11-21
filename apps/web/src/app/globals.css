@@ -455,13 +455,34 @@
     font-family: inherit;
   }
 
-  /* Default link colour */
+  /* Default link colour. Hover standard (R9.5): a link inside a sentence is
+     underlined all the time and gets thicker on hover; every other link or
+     action shows a soft tint on hover (.app-action or .app-hover). Nothing
+     gains an underline only when the pointer arrives, because touch and
+     keyboard users never see that. */
   a {
     color: var(--color-brand-teal);
     text-decoration: none;
   }
-  a:hover {
+  :where(p, li, dd, blockquote, figcaption) a:not([class]),
+  .prose a {
     text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  :where(p, li, dd, blockquote, figcaption) a:not([class]):hover,
+  .prose a:hover,
+  :where(a, button).underline:hover {
+    text-decoration-thickness: 2px;
+  }
+
+  /* One pointer for anything that can be pressed. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='menuitem']:not([aria-disabled='true']),
+  summary,
+  a[href] {
+    cursor: pointer;
   }
 
   /* Focus ring — accessible, school-branded */
@@ -1662,9 +1683,15 @@ span[data-math] .katex-display {
 @keyframes hills-rise {
   from { opacity: 0; transform: translateY(14px); }
 }
+/* The wave front travels from the peak to the edge of the screen. It is a soft
+   ring of light that grows and fades; the contour mask on the layer means it is
+   only ever visible ON the contour lines, so it reads as a ripple running
+   through the hills and not as circles floating over them. */
 @keyframes hills-ripple {
-  from { transform: scale(0.2); opacity: 0.6; }
-  to   { transform: scale(2.2); opacity: 0; }
+  0%   { transform: translate(-50%, -50%) scale(0.02); opacity: 0; }
+  10%  { opacity: 1; }
+  70%  { opacity: 0.7; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
 }
 
 /* Per-sky switches for the crossfading words and the crest. Same selectors as
@@ -1991,8 +2018,10 @@ span[data-math] .katex-display {
 .hills-link {
   display: inline-flex;
   align-items: center;
-  padding: 10px 0;
-  margin: -10px 0;
+  /* 10px above and below keeps a 44px tap target; 6px at the sides gives the
+     hover pill room around the word. */
+  padding: 10px 6px;
+  margin: -10px -6px;
   font-size: 15px;
   font-weight: 700;
   color: var(--c-acc);
@@ -2000,8 +2029,6 @@ span[data-math] .katex-display {
   text-underline-offset: 4px;
   text-decoration-thickness: 1.5px;
 }
-.hills-link:hover,
-.hills-link:focus-visible { text-decoration: underline; }
 .hills-link:focus-visible { outline: 2px solid var(--c-acc); outline-offset: 2px; border-radius: 2px; }
 
 .hills-alt {
@@ -2075,7 +2102,12 @@ span[data-math] .katex-display {
 .hills-alert--danger { --c-x: var(--c-danger); }
 .hills-alert--warn { --c-x: var(--c-warn); }
 
-/* ── Typing ripple: one expanding contour ring per burst of typing ───────── */
+/* ── Typing ripple: a wave that runs along the contour lines ─────────────────
+   The layer fills the screen and is masked by the SAME contour artwork, with the
+   same stretch, as the faint lines in the background (.hills-bg__map), so each
+   wave lights up the real lines. Every keystroke (at most one per 140ms) adds a
+   ring of light centred on the peak (71.7% / 36.3% of the artwork) that spreads
+   to the screen edge and fades. */
 
 .hills-ripple {
   position: fixed;
@@ -2087,24 +2119,33 @@ span[data-math] .katex-display {
 }
 .hills-ripple__cover {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: max(100cqw, 150cqh);
-  height: max(66.667cqw, 100cqh);
-  transform: translate(-50%, -50%);
+  inset: 0;
+  -webkit-mask: url('/hills/contours.svg') center / 100% 100% no-repeat;
+  mask: url('/hills/contours.svg') center / 100% 100% no-repeat;
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--hills-accent) 70%, transparent));
 }
-/* Centred on the peak of the contour artwork (71.7% / 36.3%). */
 .hills-ripple__ring {
   position: absolute;
   left: 71.7%;
   top: 36.3%;
-  width: 14%;
+  /* At full size the front (96% of the radius) just clears the farthest corner,
+     so the wave is on screen for its whole life. */
+  width: calc(max(100cqw, 100cqh) * 2.1);
   aspect-ratio: 1;
-  margin: -7% 0 0 -7%;
-  border: 1.6px solid var(--hills-accent);
-  border-radius: 48% 52% 54% 46% / 52% 46% 54% 48%;
+  border-radius: 50%;
+  /* A bright front with a soft trail behind it, so the light seems to flow. */
+  background: radial-gradient(
+    circle closest-side,
+    transparent 0%,
+    transparent 62%,
+    color-mix(in srgb, var(--hills-accent) 38%, transparent) 84%,
+    var(--hills-accent) 96%,
+    transparent 100%
+  );
   opacity: 0;
-  animation: hills-ripple 1.7s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+  transform: translate(-50%, -50%) scale(0.02);
+  will-change: transform, opacity;
+  animation: hills-ripple 2.6s cubic-bezier(0.33, 0.45, 0.55, 1) forwards;
 }
 
 /* ── "Signing in" scene: a dashboard-shaped skeleton replaces the headline ── */
@@ -2316,7 +2357,6 @@ span[data-math] .katex-display {
 .hills-studio__five { font-size: 0.72em; font-weight: 800; }
 .hills-studio__labs { font-weight: 500; }
 .hills-studio__credit-name { color: var(--hills-studio); font-weight: 700; }
-a.hills-studio__credit-name:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 @supports (animation-timeline: view()) {
   .hills-studio__mark {
@@ -2877,7 +2917,6 @@ a.hills-studio__credit-name:hover { text-decoration: underline; text-underline-o
   line-height: 1.35;
   text-decoration: none;
 }
-.hills-page__toc a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .hills-page__toc a.is-active { border-left-color: var(--hills-ink); font-weight: 700; }
 .hills-page__toc a:focus-visible { outline: 2px solid var(--hills-ink); outline-offset: 2px; border-radius: 2px; }
 
@@ -3031,7 +3070,6 @@ a.hills-studio__credit-name:hover { text-decoration: underline; text-underline-o
   font-weight: 600;
   text-decoration: none;
 }
-.hills-page__back:hover { text-decoration: underline; text-underline-offset: 3px; }
 .hills-page__back:focus-visible { outline: 2px solid var(--hills-ink); outline-offset: 2px; border-radius: 4px; }
 
 .hills-page__eyebrow {
@@ -3136,7 +3174,7 @@ a.hills-studio__credit-name:hover { text-decoration: underline; text-underline-o
 }
 .hills-back svg { width: 16px; height: 16px; }
 .hills-back:hover,
-.hills-back:focus-visible { color: var(--c-ink); text-decoration: underline; text-underline-offset: 4px; }
+.hills-back:focus-visible { color: var(--c-ink); }
 .hills-back:focus-visible { outline: 2px solid var(--c-acc); outline-offset: 2px; border-radius: 2px; }
 
 .hills-hint { margin: 8px 0 0; font-size: 15px; line-height: 1.4; color: var(--c-ink2); }
@@ -3298,6 +3336,49 @@ a.hills-go { text-decoration: none; }
               color var(--dur-hover) var(--ease-standard);
 }
 .app-hover:hover { background-color: hsl(var(--app-tint)); }
+@media (hover: none) {
+  .app-hover:hover { background-color: transparent; }
+}
+
+/* The hover standard, in full (R9.5, Phase 10b). Four rules, no others:
+   1. Anything with a box (row, card, menu item, quiet button): a background
+      tint, 120ms. Use .app-hover or the existing hover:bg-page tokens.
+   2. Words that do something but have no box ("Edit", "Open reports", "Remove"):
+      .app-action. A soft pill of the word's OWN colour appears behind it. It is
+      drawn with a shadow, so nothing moves or reflows. Keyboard focus shows the
+      same pill plus the focus ring, so every way of arriving looks alike.
+   3. A link inside a sentence is underlined at rest and 2px on hover (base layer).
+   4. Filled buttons use their own hover colour token (bg-btn-*-hover).
+   Never: lift, scale, glow, or an underline that exists only on hover. Pointer
+   devices only: touch screens do not get a hover state that sticks after a tap. */
+.app-action {
+  border-radius: 6px;
+  transition: background-color var(--dur-hover) var(--ease-standard),
+              box-shadow var(--dur-hover) var(--ease-standard),
+              color var(--dur-hover) var(--ease-standard);
+}
+@media (hover: hover) {
+  .app-action:hover:not(:disabled):not([aria-disabled='true']) {
+    background-color: color-mix(in srgb, currentColor 10%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 10%, transparent);
+  }
+}
+.app-action:focus-visible {
+  background-color: color-mix(in srgb, currentColor 10%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 10%, transparent);
+}
+
+/* The same pill for the public pages' quiet text links, so a link looks the
+   same on a hover whether it sits on the sky or in the app. */
+.hills-link,
+.hills-back,
+.hills-page__back,
+.hills-page__toc a,
+a.hills-studio__credit-name {
+  transition: background-color var(--dur-hover, 120ms) var(--ease-standard, ease),
+              box-shadow var(--dur-hover, 120ms) var(--ease-standard, ease),
+              color var(--dur-hover, 120ms) var(--ease-standard, ease);
+}
 
 /* A waiting indicator that stays hidden for the first second (R9.6: nothing for
    waits under 1 second). Put it on a spinner or skeleton; it fades in after. */
@@ -3343,3 +3424,42 @@ a.hills-go { text-decoration: none; }
   .app-dialog { transform: none !important; }
 }
 
+
+/* Hover pills for the public pages' quiet links (see the hover standard above).
+   Kept at the end so it sits after every .hills-* rule it joins. */
+@media (hover: hover) {
+  .hills-link:hover {
+    /* A pill as tall as the text only, not the whole tap area. */
+    background-image: linear-gradient(
+      color-mix(in srgb, currentColor 10%, transparent),
+      color-mix(in srgb, currentColor 10%, transparent)
+    );
+    background-size: 100% calc(100% - 20px);
+    background-position: center;
+    background-repeat: no-repeat;
+    border-radius: 6px;
+  }
+  .hills-back:hover,
+  .hills-page__back:hover,
+  .hills-page__toc a:hover,
+  a.hills-studio__credit-name:hover {
+    border-radius: 4px;
+    background-color: color-mix(in srgb, currentColor 10%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 10%, transparent);
+  }
+}
+.hills-back:focus-visible,
+.hills-page__back:focus-visible {
+  background-color: color-mix(in srgb, currentColor 10%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 10%, transparent);
+}
+.hills-link:focus-visible {
+  background-image: linear-gradient(
+    color-mix(in srgb, currentColor 10%, transparent),
+    color-mix(in srgb, currentColor 10%, transparent)
+  );
+  background-size: 100% calc(100% - 20px);
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 6px;
+}

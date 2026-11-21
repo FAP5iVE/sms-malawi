@@ -573,7 +573,7 @@ export function SchoolIdentitySettings() {
                       type="button"
                       onClick={cancelEditLeader}
                       disabled={savingLeadership}
-                      className="text-xs text-muted hover:underline font-medium px-2 disabled:opacity-40"
+                      className="text-xs text-muted app-action font-medium px-2 disabled:opacity-40"
                     >
                       Cancel
                     </button>
@@ -599,10 +599,10 @@ export function SchoolIdentitySettings() {
                     {/* [NEW] Edit — the missing piece; add/remove already
                         existed but there was no way to change an existing
                         member's name/title/bio/photo in place. */}
-                    <button type="button" onClick={() => startEditLeader(i)} disabled={savingLeadership} className="text-xs text-tone-teal hover:underline font-medium disabled:opacity-40">
+                    <button type="button" onClick={() => startEditLeader(i)} disabled={savingLeadership} className="text-xs text-tone-teal app-action font-medium disabled:opacity-40">
                       Edit
                     </button>
-                    <button type="button" onClick={() => removeLeader(i)} disabled={savingLeadership} className="text-xs text-tone-coral hover:underline font-medium disabled:opacity-40">
+                    <button type="button" onClick={() => removeLeader(i)} disabled={savingLeadership} className="text-xs text-tone-coral app-action font-medium disabled:opacity-40">
                       Remove
                     </button>
                   </div>

@@ -385,7 +385,7 @@ function RegisterTab({ preset }: { preset: RegisterPreset }) {
                   <button
                     type="button"
                     onClick={() => setDetailAssetId(a.id)}
-                    className="font-medium text-left hover:underline"
+                    className="font-medium text-left app-action"
                   >
                     {a.name}
                   </button>
@@ -848,14 +848,14 @@ function ConditionModal({ asset, onClose }: { asset: ApiAsset; onClose: () => vo
                     { onSuccess: onClose }
                   )
                 }
-                className="text-xs font-semibold text-tone-coral hover:underline shrink-0"
+                className="text-xs font-semibold text-tone-coral app-action shrink-0"
               >
                 Confirm
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmDispose(false)}
-                className="text-xs text-muted hover:underline shrink-0"
+                className="text-xs text-muted app-action shrink-0"
               >
                 Cancel
               </button>
@@ -864,7 +864,7 @@ function ConditionModal({ asset, onClose }: { asset: ApiAsset; onClose: () => vo
             <button
               type="button"
               onClick={() => setConfirmDispose(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-coral hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-coral app-action"
             >
               <Trash2 className="w-3.5 h-3.5" /> Mark disposed
             </button>
@@ -1107,7 +1107,7 @@ function RequestsTab() {
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy app-action"
             >
               <Plus className="w-3.5 h-3.5" /> New request
             </button>

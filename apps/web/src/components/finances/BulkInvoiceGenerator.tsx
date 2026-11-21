@@ -536,14 +536,14 @@ export function BulkInvoiceGenerator() {
               <button
                 type="button"
                 onClick={() => setSelected(new Set(eligibleRows.map((s) => s.studentId)))}
-                className="text-xs font-medium text-tone-teal hover:underline"
+                className="text-xs font-medium text-tone-teal app-action"
               >
                 Select all eligible
               </button>
               <button
                 type="button"
                 onClick={() => setSelected(new Set())}
-                className="text-xs font-medium text-muted hover:underline"
+                className="text-xs font-medium text-muted app-action"
               >
                 Deselect all
               </button>

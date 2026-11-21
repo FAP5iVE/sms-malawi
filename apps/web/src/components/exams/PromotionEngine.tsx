@@ -350,7 +350,7 @@ export function PromotionEngine() {
             <button
               type="button"
               onClick={() => setFilterOutcome('ALL')}
-              className="text-xs text-tone-teal font-heading font-semibold hover:underline"
+              className="text-xs text-tone-teal font-heading font-semibold app-action"
             >
               Clear filter
             </button>

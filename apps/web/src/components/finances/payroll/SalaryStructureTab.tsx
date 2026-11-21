@@ -347,7 +347,7 @@ function SalaryEditor({ staff }: { staff: ApiStaffProfile }) {
             <button
               type="button"
               onClick={() => setShowAddForm(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-heading font-semibold text-brand-navy hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs font-heading font-semibold text-brand-navy app-action"
             >
               <Plus className="w-3.5 h-3.5" aria-hidden /> Add allowance
             </button>

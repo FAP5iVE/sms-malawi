@@ -1,6 +1,6 @@
 'use client'
 
-import { useTheme }     from 'next-themes'
+import { useTheme }     from '@/components/providers/ThemeProvider'
 import { useEffect, useState }    from 'react'
 import { Sun, Moon, Monitor, Check } from 'lucide-react'
 import { Button }       from '@/components/ui/button'
@@ -91,8 +91,9 @@ export function ModeToggle({ showLabel = false, className }: ModeToggleProps) {
             'text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
             className
           )}
-          aria-label={`Current theme: ${theme ?? 'system'}. Press to change theme.`}
+          aria-label={`Current theme: ${theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'Auto'}. Press to change theme.`}
         >
+          {theme === 'system' && <span aria-hidden className="pointer-events-none absolute bottom-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-tone-teal" />}
           <ActiveIcon resolvedTheme={resolvedTheme} />
           {showLabel && (
             <span className="text-sm font-medium capitalize">

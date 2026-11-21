@@ -125,7 +125,7 @@ export function DebtsLoansTab() {
           </h2>
           <Link
             href="/hr?tab=loans"
-            className="text-xs font-semibold text-tone-teal hover:underline inline-flex items-center gap-1"
+            className="text-xs font-semibold text-tone-teal app-action inline-flex items-center gap-1"
           >
             Manage in HR <ArrowUpRight className="w-3 h-3" aria-hidden />
           </Link>

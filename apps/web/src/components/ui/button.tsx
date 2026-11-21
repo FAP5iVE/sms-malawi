@@ -28,7 +28,7 @@ const buttonVariants = cva(
           "bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover",
         danger:
           "bg-btn-danger text-btn-danger-fg hover:bg-btn-danger-hover",
-        link: "text-primary underline-offset-4 hover:underline",
+        link: "text-primary underline-offset-4 app-action",
       },
       size: {
         // 44px on phones (R8.5), 32 / 36px from 768px.

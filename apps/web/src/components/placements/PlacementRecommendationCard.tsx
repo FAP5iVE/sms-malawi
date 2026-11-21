@@ -193,7 +193,7 @@ export function PlacementRecommendationCard({ recommendation: r, action, rank, g
             <button
               type="button"
               onClick={() => askAI()}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy app-action"
             >
               <Sparkles className="w-3.5 h-3.5" /> Ask AI to explain this
             </button>

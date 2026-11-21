@@ -96,7 +96,7 @@ export function PendingActionsPanel({ title = 'Pending Approvals', compactLimit 
 
       <Link
         href="/approvals"
-        className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-brand-teal hover:underline"
+        className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-brand-teal app-action"
       >
         {total > items.length ? `View all ${total}` : 'Open approvals'} <ArrowRight className="h-4 w-4" aria-hidden="true" />
       </Link>

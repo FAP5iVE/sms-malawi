@@ -2952,7 +2952,7 @@
   ]
  },
  "src/app/(public)/page.tsx": {
-  "digest": "e87ad695174fcff48477ae36f6974ae71731de25",
+  "digest": "eeb0359126ae663553fa3692b2232fadcf3e51ce",
   "tokens": 364,
   "items": [
    {
@@ -5439,8 +5439,8 @@
   ]
  },
  "src/components/finances/BudgetTab.tsx": {
-  "digest": "d1c6782aca7caad17f4955cbe1e22210ce17fc75",
-  "tokens": 134,
+  "digest": "f2892e18df1b1d15e8a1b1734fdb02e8ba4125d7",
+  "tokens": 133,
   "items": [
    {
     "k": "handler",
@@ -8407,9 +8407,19 @@
   "items": []
  },
  "src/components/providers/ThemeProvider.tsx": {
-  "digest": "24c3e584c502e6107df57bf6364768da233671ee",
-  "tokens": 26,
+  "digest": "2f4b72c38ff2394fcf5bd0ccf3bd6dc28d66d3f4",
+  "tokens": 73,
   "items": [
+   {
+    "k": "effect",
+    "n": "useEffect",
+    "h": "00529d47"
+   },
+   {
+    "k": "effect",
+    "n": "useEffect",
+    "h": "223d8da8"
+   },
    {
     "k": "effect",
     "n": "useEffect",
@@ -10506,8 +10516,8 @@
   ]
  },
  "src/components/shared/HillsCelestial.tsx": {
-  "digest": "98c8ae779e3e3c889864e4589ec9ea94ed0b141b",
-  "tokens": 22,
+  "digest": "b3eaa787044b034b855baa4d99ec7be719fef1e3",
+  "tokens": 21,
   "items": [
    {
     "k": "effect",
@@ -10520,17 +10530,6 @@
   "digest": "811500916975b92bc556e299a72e798a4bab63f2",
   "tokens": 8,
   "items": []
- },
- "src/components/shared/HillsSkySync.tsx": {
-  "digest": "b079e57b4cd961ac66c1655195fe7ce19b27d3ff",
-  "tokens": 13,
-  "items": [
-   {
-    "k": "effect",
-    "n": "useEffect",
-    "h": "0c5772df"
-   }
-  ]
  },
  "src/components/shared/InactivityWarningDialog.tsx": {
   "digest": "293358a941f06187d2f4117c182d859ff95753b2",
@@ -10708,7 +10707,7 @@
   ]
  },
  "src/components/shared/ModeToggle.tsx": {
-  "digest": "08b1becae2c6710785a1242df920641760daac60",
+  "digest": "6b08eeedff79db5cfeac55218414c99abc7612b8",
   "tokens": 31,
   "items": [
    {
@@ -11094,8 +11093,8 @@
   ]
  },
  "src/components/shared/PublicThemeToggle.tsx": {
-  "digest": "b7109e02a91889c0a2d4013669e74335b8f15ee7",
-  "tokens": 19,
+  "digest": "6c5fe68cb57f94263f36cb88db2f8affafeada0b",
+  "tokens": 20,
   "items": [
    {
     "k": "handler",
@@ -11558,8 +11557,8 @@
   ]
  },
  "src/components/shared/chart/ApexChartRenderer.tsx": {
-  "digest": "c0a874470c9c6b4795daf75976b4205f7074d572",
-  "tokens": 93,
+  "digest": "9a2b142e409a4161415db0dba64218728765d29c",
+  "tokens": 92,
   "items": []
  },
  "src/components/shared/chart/RechartsRenderer.tsx": {
@@ -11982,7 +11981,7 @@
   "items": []
  },
  "src/components/ui/badge.tsx": {
-  "digest": "a9631154898447a35eb6f40ee715c8a7ae2745d9",
+  "digest": "e4cd98df5415b00cf5b2bbe2db5311313513461e",
   "tokens": 10,
   "items": []
  },
@@ -11997,7 +11996,7 @@
   "items": []
  },
  "src/components/ui/button.tsx": {
-  "digest": "a0d1b723bcb20dd78586cf61f24c890ab4f160e7",
+  "digest": "a038dcd16601500079755caf3d109d6ac6dce59a",
   "tokens": 12,
   "items": []
  },
@@ -12246,8 +12245,8 @@
   "items": []
  },
  "src/components/ui/sonner.tsx": {
-  "digest": "5a7646c362e366224e21a6f86fc90077608fbc48",
-  "tokens": 12,
+  "digest": "bf91478e4b337eca5e10ee7d8546c35d833f2393",
+  "tokens": 11,
   "items": []
  },
  "src/components/ui/spinner.tsx": {

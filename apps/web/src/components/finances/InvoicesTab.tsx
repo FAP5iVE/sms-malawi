@@ -704,7 +704,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
               <button
                 type="button"
                 onClick={changeStudent}
-                className="text-sm font-medium text-tone-teal hover:underline"
+                className="text-sm font-medium text-tone-teal app-action"
               >
                 Change
               </button>
@@ -749,7 +749,7 @@ function InvoiceEntryAllocation({ academicYear, term }: { academicYear: string; 
                   type="button"
                   onClick={autoDistribute}
                   disabled={paymentCommitted <= 0 || isBusy}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-teal hover:underline disabled:opacity-40 disabled:no-underline"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-teal app-action disabled:opacity-40 disabled:no-underline"
                 >
                   <Wand2 className="w-3.5 h-3.5" /> Auto-Distribute Payment
                 </button>
@@ -1280,7 +1280,7 @@ function StudentPaymentHistory({ studentId }: { studentId: string }) {
                           type="button"
                           disabled={fetchReceipt.isPending}
                           onClick={() => fetchReceipt.mutate(p.id)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-tone-teal hover:underline disabled:opacity-50 whitespace-nowrap"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-tone-teal app-action disabled:opacity-50 whitespace-nowrap"
                         >
                           <ReceiptIcon className="w-3.5 h-3.5" /> View receipt <ExternalLink className="w-3 h-3" />
                         </button>

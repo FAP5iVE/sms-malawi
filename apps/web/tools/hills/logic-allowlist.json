@@ -154,7 +154,12 @@
       "reason": "Phase 9b: presentational label and value list used by the student profile and the welfare card. No data, auth or routing code"
     }
   ],
-  "deletedFiles": [],
+  "deletedFiles": [
+    {
+      "file": "src/components/shared/HillsSkySync.tsx",
+      "reason": "Phase 10a: its work (setting data-sky from the clock) moved into ThemeProvider, which now owns the dark class, color-scheme and data-sky together."
+    }
+  ],
   "entries": [
     {
       "file": "src/app/layout.tsx",
@@ -17935,6 +17940,874 @@
       "kind": "logic",
       "pattern": "^rows=\\{\\ \\[\\ \\[\\ 'Orphan\\ status'\\ ,\\ ORPHAN_STATUS_LABELS\\ \\[\\ welfare\\ \\.\\ orphanStatus\\ \\]\\ \\]\\ ,\\ \\[\\ 'Vulnerable'\\ ,\\ welfare\\ \\.\\ isVulnerable\\ \\?\\ 'Yes'\\ :\\ 'No'\\ \\]\\ ,\\ \\.\\.\\.\\ \\(\\ welfare\\ \\.\\ isVulnerable\\ \\|\\|\\ welfare\\ \\.\\ vulnerabilityNote\\ \\?\\ \\(\\ \\[\\ \\[\\ 'Vulnerability\\ note'\\ ,\\ welfare\\ \\.\\ vulnerabilityNote\\ \\]\\ ,\\ \\[\\ 'Last\\ reviewed'\\ ,\\ formatDate\\ \\(\\ welfare\\ \\.\\ vulnerabilityReviewedAt\\ \\)\\ \\]\\ \\]\\ as\\ const\\ \\)\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\[\\ 'Health\\ /\\ medical\\ alert'\\ ,\\ welfare\\ \\.\\ medicalAlert\\ \\?\\?\\ 'None\\ recorded'\\ \\]\\ ,\\ \\.\\.\\.\\ \\(\\ welfare\\ \\.\\ exitNote\\ \\?\\ \\(\\ \\[\\ \\[\\ 'Exit\\ note'\\ ,\\ welfare\\ \\.\\ exitNote\\ \\]\\ \\]\\ as\\ const\\ \\)\\ :\\ \\[\\ \\]\\ \\)\\ ,\\ \\]\\ \\}$",
       "reason": "Phase 9b: welfare facts render through the new FactList instead of inline flex rows. Same rows, same values, same edit and delete handlers."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useTheme\\ \\}\\ from\\ 'next\\-themes'$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ theme\\ ,\\ setTheme\\ \\}\\ =\\ useTheme\\ \\(\\ \\)$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ themeIcons\\ :\\ Record\\ <\\ string\\ ,\\ React\\ \\.\\ ReactNode\\ >\\ =\\ \\{\\ light\\ :\\ <JSX/>\\ ,\\ dark\\ :\\ <JSX/>\\ ,\\ system\\ :\\ <JSX/>\\ ,\\ \\}$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ order\\ =\\ \\[\\ 'light'\\ ,\\ 'dark'\\ ,\\ 'system'\\ \\]$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ mounted\\ \\?\\ `Theme:\\ \\$\\{\\ theme\\ \\}\\.\\ Press\\ to\\ change\\.`\\ :\\ 'Toggle\\ theme'\\ \\}$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=system$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ mounted\\ \\?\\ themeIcons\\ \\[\\ theme\\ \\?\\?\\ 'system'\\ \\]\\ :\\ <JSX/>\\ \\}$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ type\\ \\{\\ ThemeChoice\\ \\}\\ from\\ '@/lib/hills/sky'$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ theme\\ ,\\ setTheme\\ ,\\ resolvedTheme\\ \\}\\ =\\ useTheme\\ \\(\\ \\)$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ order\\ :\\ ThemeChoice\\ \\[\\ \\]\\ =\\ \\[\\ 'light'\\ ,\\ 'dark'\\ ,\\ 'system'\\ \\]$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ mounted\\ \\?\\ `Theme:\\ \\$\\{\\ theme\\ ===\\ 'light'\\ \\?\\ 'Light'\\ :\\ theme\\ ===\\ 'dark'\\ \\?\\ 'Dark'\\ :\\ 'Auto'\\ \\}\\.\\ Press\\ to\\ change\\.`\\ :\\ 'Toggle\\ theme'\\ \\}$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=system\\ dark$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ mounted\\ \\&\\&\\ theme\\ ===\\ 'system'\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ mounted\\ \\&\\&\\ resolvedTheme\\ ===\\ 'dark'\\ \\?\\ <JSX/>\\ :\\ <JSX/>\\ \\}$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/finances/BudgetTab.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useTheme\\ \\}\\ from\\ 'next\\-themes'$",
+      "reason": "Phase 10a: useTheme import repointed from next-themes to the in-house provider; same fields read."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useEffect\\ \\}\\ from\\ 'react'$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ ThemeProvider\\ as\\ NextThemesProvider\\ ,\\ type\\ ThemeProviderProps\\ \\}\\ from\\ 'next\\-themes'$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^interface\\ Props\\ \\{\\ children\\ :\\ React\\ \\.\\ ReactNode\\ \\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ ThemeProvider\\ \\(\\ \\{\\ children\\ \\}\\ :\\ Props\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^attribute=\"class\"$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^defaultTheme=\"system\"$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^enableSystem=true$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^disableTransitionOnChange=true$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^storageKey=\"sms\\-malawi\\-theme\"$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ createContext\\ ,\\ useCallback\\ ,\\ useContext\\ ,\\ useEffect\\ ,\\ useMemo\\ ,\\ useState\\ ,\\ useSyncExternalStore\\ ,\\ type\\ ReactNode\\ ,\\ \\}\\ from\\ 'react'$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ HILLS_THEME_STORAGE_KEY\\ ,\\ malawiHour\\ ,\\ modeForSky\\ ,\\ normalizeChoice\\ ,\\ resolveSky\\ ,\\ skyForHour\\ ,\\ type\\ HillsMode\\ ,\\ type\\ HillsSky\\ ,\\ type\\ ThemeChoice\\ ,\\ \\}\\ from\\ '@/lib/hills/sky'$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^interface\\ ThemeContextValue\\ \\{\\ theme\\ :\\ ThemeChoice\\ \\|\\ undefined\\ setTheme\\ :\\ \\(\\ choice\\ :\\ ThemeChoice\\ \\)\\ =>\\ void\\ resolvedTheme\\ :\\ HillsMode\\ \\|\\ undefined\\ sky\\ :\\ HillsSky\\ \\|\\ undefined\\ \\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ThemeContext\\ =\\ createContext\\ <\\ ThemeContextValue\\ >\\ \\(\\ \\{\\ theme\\ :\\ undefined\\ ,\\ setTheme\\ :\\ \\(\\ \\)\\ =>\\ \\{\\}\\ ,\\ resolvedTheme\\ :\\ undefined\\ ,\\ sky\\ :\\ undefined\\ ,\\ \\}\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ useTheme\\ \\(\\ \\)\\ :\\ ThemeContextValue\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ useContext\\ \\(\\ ThemeContext\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ listeners\\ =\\ new\\ Set\\ <\\ \\(\\ \\)\\ =>\\ void\\ >\\ \\(\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ readChoice\\ \\(\\ \\)\\ :\\ ThemeChoice\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^try\\ \\{\\}\\ catch\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ normalizeChoice\\ \\(\\ window\\ \\.\\ localStorage\\ \\.\\ getItem\\ \\(\\ HILLS_THEME_STORAGE_KEY\\ \\)\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ 'system'$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ subscribeChoice\\ \\(\\ onChange\\ :\\ \\(\\ \\)\\ =>\\ void\\ \\)\\ :\\ \\(\\ \\)\\ =>\\ void\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^listeners\\ \\.\\ add\\ \\(\\ onChange\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ onStorage\\ =\\ \\(\\ e\\ :\\ StorageEvent\\ \\)\\ =>\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ e\\ \\.\\ key\\ ===\\ null\\ \\|\\|\\ e\\ \\.\\ key\\ ===\\ HILLS_THEME_STORAGE_KEY\\ \\)\\ onChange\\ \\(\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^window\\ \\.\\ addEventListener\\ \\(\\ 'storage'\\ ,\\ onStorage\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ \\(\\ \\)\\ =>\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^listeners\\ \\.\\ delete\\ \\(\\ onChange\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^window\\ \\.\\ removeEventListener\\ \\(\\ 'storage'\\ ,\\ onStorage\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^let\\ memoryChoice\\ :\\ ThemeChoice\\ \\|\\ null\\ =\\ null$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ writeChoice\\ \\(\\ choice\\ :\\ ThemeChoice\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^window\\ \\.\\ localStorage\\ \\.\\ setItem\\ \\(\\ HILLS_THEME_STORAGE_KEY\\ ,\\ choice\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^memoryChoice\\ =\\ null$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^memoryChoice\\ =\\ choice$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^listeners\\ \\.\\ forEach\\ \\(\\ \\(\\ l\\ \\)\\ =>\\ l\\ \\(\\ \\)\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ readChoiceOrMemory\\ =\\ \\(\\ \\)\\ :\\ ThemeChoice\\ =>\\ memoryChoice\\ \\?\\?\\ readChoice\\ \\(\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ applyToDocument\\ \\(\\ sky\\ :\\ HillsSky\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ root\\ =\\ document\\ \\.\\ documentElement$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ mode\\ =\\ modeForSky\\ \\(\\ sky\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^root\\ \\.\\ dataset\\ \\.\\ sky\\ =\\ sky$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^root\\ \\.\\ classList\\ \\.\\ toggle\\ \\(\\ 'dark'\\ ,\\ mode\\ ===\\ 'dark'\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^root\\ \\.\\ style\\ \\.\\ colorScheme\\ =\\ mode$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ ThemeProvider\\ \\(\\ \\{\\ children\\ \\}\\ :\\ \\{\\ children\\ :\\ ReactNode\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ choice\\ =\\ useSyncExternalStore\\ <\\ ThemeChoice\\ \\|\\ null\\ >\\ \\(\\ subscribeChoice\\ ,\\ readChoiceOrMemory\\ ,\\ \\(\\ \\)\\ =>\\ null\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\[\\ clockSky\\ ,\\ setClockSky\\ \\]\\ =\\ useState\\ <\\ HillsSky\\ \\|\\ null\\ >\\ \\(\\ null\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^useEffect\\ \\(\\ \\(\\ \\)\\ =>\\ \\{\\}\\ ,\\ \\[\\ \\]\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ tick\\ =\\ \\(\\ \\)\\ =>\\ setClockSky\\ \\(\\ skyForHour\\ \\(\\ malawiHour\\ \\(\\ new\\ Date\\ \\(\\ \\)\\ \\)\\ \\)\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^tick\\ \\(\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ id\\ =\\ window\\ \\.\\ setInterval\\ \\(\\ tick\\ ,\\ 30_000\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ wake\\ =\\ \\(\\ \\)\\ =>\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ document\\ \\.\\ visibilityState\\ ===\\ 'visible'\\ \\)\\ tick\\ \\(\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^document\\ \\.\\ addEventListener\\ \\(\\ 'visibilitychange'\\ ,\\ wake\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^window\\ \\.\\ addEventListener\\ \\(\\ 'focus'\\ ,\\ tick\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^window\\ \\.\\ clearInterval\\ \\(\\ id\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^document\\ \\.\\ removeEventListener\\ \\(\\ 'visibilitychange'\\ ,\\ wake\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^window\\ \\.\\ removeEventListener\\ \\(\\ 'focus'\\ ,\\ tick\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ sky\\ :\\ HillsSky\\ \\|\\ null\\ =\\ choice\\ ===\\ null\\ \\|\\|\\ clockSky\\ ===\\ null\\ \\?\\ null\\ :\\ choice\\ ===\\ 'light'\\ \\?\\ 'day'\\ :\\ choice\\ ===\\ 'dark'\\ \\?\\ 'night'\\ :\\ clockSky$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^useEffect\\ \\(\\ \\(\\ \\)\\ =>\\ \\{\\}\\ ,\\ \\[\\ sky\\ \\]\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ sky\\ \\)\\ applyToDocument\\ \\(\\ sky\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ setTheme\\ =\\ useCallback\\ \\(\\ \\(\\ next\\ :\\ ThemeChoice\\ \\)\\ =>\\ \\{\\}\\ ,\\ \\[\\ \\]\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^applyToDocument\\ \\(\\ resolveSky\\ \\(\\ next\\ ,\\ new\\ Date\\ \\(\\ \\)\\ \\)\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^writeChoice\\ \\(\\ normalizeChoice\\ \\(\\ next\\ \\)\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ value\\ =\\ useMemo\\ <\\ ThemeContextValue\\ >\\ \\(\\ \\(\\ \\)\\ =>\\ \\(\\ \\{\\ theme\\ :\\ choice\\ \\?\\?\\ undefined\\ ,\\ setTheme\\ ,\\ resolvedTheme\\ :\\ sky\\ \\?\\ modeForSky\\ \\(\\ sky\\ \\)\\ :\\ undefined\\ ,\\ sky\\ :\\ sky\\ \\?\\?\\ undefined\\ ,\\ \\}\\ \\)\\ ,\\ \\[\\ choice\\ ,\\ setTheme\\ ,\\ sky\\ \\]\\ ,\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/providers/ThemeProvider.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^value=\\{\\ value\\ \\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: one theme source of truth. next-themes is replaced by an in-house provider with the same hook shape (theme, setTheme, resolvedTheme) and the same storage key and values. Auto now follows the Malawi clock (night dark, otherwise light) instead of the device colour setting, and the dark class, color-scheme and data-sky are always set together. Explicitly owner-requested behaviour change."
+    },
+    {
+      "file": "src/components/shared/chart/ApexChartRenderer.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useTheme\\ \\}\\ from\\ 'next\\-themes'$",
+      "reason": "Phase 10a: useTheme import repointed from next-themes to the in-house provider; same fields read."
+    },
+    {
+      "file": "src/components/shared/HillsCelestial.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useTheme\\ \\}\\ from\\ 'next\\-themes'$",
+      "reason": "Phase 10a: useTheme import repointed from next-themes to the in-house provider; same fields read."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useTheme\\ \\}\\ from\\ 'next\\-themes'$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ `Current\\ theme:\\ \\$\\{\\ theme\\ \\?\\?\\ 'system'\\ \\}\\.\\ Press\\ to\\ change\\ theme\\.`\\ \\}$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=system\\|Auto\\|Auto\\ Toggle\\ theme$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ `Current\\ theme:\\ \\$\\{\\ theme\\ ===\\ 'light'\\ \\?\\ 'Light'\\ :\\ theme\\ ===\\ 'dark'\\ \\?\\ 'Dark'\\ :\\ 'Auto'\\ \\}\\.\\ Press\\ to\\ change\\ theme\\.`\\ \\}$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=system\\ system\\|Auto\\|Auto\\ Toggle\\ theme$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ theme\\ ===\\ 'system'\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useTheme\\ \\}\\ from\\ 'next\\-themes'$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ THEME_ICONS\\ =\\ \\{\\ light\\ :\\ Sun\\ ,\\ dark\\ :\\ Moon\\ ,\\ system\\ :\\ Monitor\\ ,\\ \\}\\ as\\ const$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ theme\\ ,\\ setTheme\\ \\}\\ =\\ useTheme\\ \\(\\ \\)$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ ActiveIcon\\ =\\ mounted\\ \\?\\ THEME_ICONS\\ \\[\\ \\(\\ theme\\ as\\ keyof\\ typeof\\ THEME_ICONS\\ \\)\\ \\?\\?\\ 'system'\\ \\]\\ :\\ Monitor$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ mounted\\ \\?\\ `Theme:\\ \\$\\{\\ theme\\ \\}\\.\\ Press\\ to\\ change\\.`\\ :\\ 'Toggle\\ theme'\\ \\}$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ theme\\ ,\\ setTheme\\ ,\\ resolvedTheme\\ \\}\\ =\\ useTheme\\ \\(\\ \\)$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ActiveIcon\\ =\\ mounted\\ \\&\\&\\ resolvedTheme\\ ===\\ 'dark'\\ \\?\\ Moon\\ :\\ Sun$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ choiceLabel\\ =\\ theme\\ ===\\ 'light'\\ \\?\\ 'Light'\\ :\\ theme\\ ===\\ 'dark'\\ \\?\\ 'Dark'\\ :\\ 'Auto'$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ mounted\\ \\?\\ `Theme:\\ \\$\\{\\ choiceLabel\\ \\}\\.\\ Press\\ to\\ change\\.`\\ :\\ 'Toggle\\ theme'\\ \\}$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ mounted\\ \\?\\ `Theme:\\ \\$\\{\\ choiceLabel\\ \\}`\\ :\\ undefined\\ \\}$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=system$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ mounted\\ \\&\\&\\ theme\\ ===\\ 'system'\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 10a: all three theme buttons show the sun or moon for the colours on screen, show an Auto dot when Auto is chosen, and use the same labels (Light, Dark, Auto). Import now points at the in-house provider. Owner-requested consistency."
+    },
+    {
+      "file": "src/components/ui/sonner.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useTheme\\ \\}\\ from\\ \"next\\-themes\"$",
+      "reason": "Phase 10a: toast theme reads the colours actually showing (resolvedTheme) instead of the device setting."
+    },
+    {
+      "file": "src/components/ui/sonner.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ theme\\ \\}\\ =\\ useTheme\\ \\(\\ \\)$",
+      "reason": "Phase 10a: toast theme reads the colours actually showing (resolvedTheme) instead of the device setting."
+    },
+    {
+      "file": "src/components/ui/sonner.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ resolvedTheme\\ =\\ \\(\\ propTheme\\ \\?\\?\\ theme\\ \\?\\?\\ \"system\"\\ \\)\\ as\\ NonNullable\\ <\\ ToasterProps\\ \\[\\ \"theme\"\\ \\]\\ >$",
+      "reason": "Phase 10a: toast theme reads the colours actually showing (resolvedTheme) instead of the device setting."
+    },
+    {
+      "file": "src/components/ui/sonner.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ resolvedTheme\\ :\\ shown\\ \\}\\ =\\ useTheme\\ \\(\\ \\)$",
+      "reason": "Phase 10a: toast theme reads the colours actually showing (resolvedTheme) instead of the device setting."
+    },
+    {
+      "file": "src/components/ui/sonner.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ resolvedTheme\\ =\\ \\(\\ propTheme\\ \\?\\?\\ shown\\ \\?\\?\\ \"light\"\\ \\)\\ as\\ NonNullable\\ <\\ ToasterProps\\ \\[\\ \"theme\"\\ \\]\\ >$",
+      "reason": "Phase 10a: toast theme reads the colours actually showing (resolvedTheme) instead of the device setting."
+    },
+    {
+      "file": "src/lib/hills/sky.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ HILLS_SKY_SCRIPT\\ =\\ `\\(function\\(\\)\\{try\\{var\\ t=null;try\\{t=localStorage\\.getItem\\(\\$\\{\\ JSON\\ \\.\\ stringify\\ \\(\\ HILLS_THEME_STORAGE_KEY\\ ,\\ \\)\\ \\}\\)\\}catch\\(e\\)\\{\\}var\\ s;if\\(t==='light'\\)s='day';else\\ if\\(t==='dark'\\)s='night';else\\{var\\ h=\\(new\\ Date\\(\\)\\.getUTCHours\\(\\)\\+\\$\\{\\ MALAWI_UTC_OFFSET_HOURS\\ \\}\\)%24;s=h>=5\\&\\&h<8\\?'dawn':h>=8\\&\\&h<16\\?'day':h>=16\\&\\&h<19\\?'dusk':'night'\\}document\\.documentElement\\.setAttribute\\('data\\-sky',s\\)\\}catch\\(e\\)\\{\\}\\}\\)\\(\\);`$",
+      "reason": "Phase 10a, owner request 2026-11-21: adds modeForSky, resolveMode and normalizeChoice, and the pre-paint script now also sets the dark class and color-scheme from the same sky, so first paint matches the provider. Owner-requested theme behaviour."
+    },
+    {
+      "file": "src/lib/hills/sky.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ type\\ HillsMode\\ =\\ 'light'\\ \\|\\ 'dark'$",
+      "reason": "Phase 10a, owner request 2026-11-21: adds modeForSky, resolveMode and normalizeChoice, and the pre-paint script now also sets the dark class and color-scheme from the same sky, so first paint matches the provider. Owner-requested theme behaviour."
+    },
+    {
+      "file": "src/lib/hills/sky.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ modeForSky\\ \\(\\ sky\\ :\\ HillsSky\\ \\)\\ :\\ HillsMode\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: adds modeForSky, resolveMode and normalizeChoice, and the pre-paint script now also sets the dark class and color-scheme from the same sky, so first paint matches the provider. Owner-requested theme behaviour."
+    },
+    {
+      "file": "src/lib/hills/sky.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ sky\\ ===\\ 'night'\\ \\?\\ 'dark'\\ :\\ 'light'$",
+      "reason": "Phase 10a, owner request 2026-11-21: adds modeForSky, resolveMode and normalizeChoice, and the pre-paint script now also sets the dark class and color-scheme from the same sky, so first paint matches the provider. Owner-requested theme behaviour."
+    },
+    {
+      "file": "src/lib/hills/sky.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ resolveMode\\ \\(\\ theme\\ :\\ string\\ \\|\\ null\\ \\|\\ undefined\\ ,\\ now\\ :\\ Date\\ \\)\\ :\\ HillsMode\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: adds modeForSky, resolveMode and normalizeChoice, and the pre-paint script now also sets the dark class and color-scheme from the same sky, so first paint matches the provider. Owner-requested theme behaviour."
+    },
+    {
+      "file": "src/lib/hills/sky.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ modeForSky\\ \\(\\ resolveSky\\ \\(\\ theme\\ ,\\ now\\ \\)\\ \\)$",
+      "reason": "Phase 10a, owner request 2026-11-21: adds modeForSky, resolveMode and normalizeChoice, and the pre-paint script now also sets the dark class and color-scheme from the same sky, so first paint matches the provider. Owner-requested theme behaviour."
+    },
+    {
+      "file": "src/lib/hills/sky.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ type\\ ThemeChoice\\ =\\ 'light'\\ \\|\\ 'dark'\\ \\|\\ 'system'$",
+      "reason": "Phase 10a, owner request 2026-11-21: adds modeForSky, resolveMode and normalizeChoice, and the pre-paint script now also sets the dark class and color-scheme from the same sky, so first paint matches the provider. Owner-requested theme behaviour."
+    },
+    {
+      "file": "src/lib/hills/sky.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ normalizeChoice\\ \\(\\ value\\ :\\ string\\ \\|\\ null\\ \\|\\ undefined\\ \\)\\ :\\ ThemeChoice\\ \\{\\}$",
+      "reason": "Phase 10a, owner request 2026-11-21: adds modeForSky, resolveMode and normalizeChoice, and the pre-paint script now also sets the dark class and color-scheme from the same sky, so first paint matches the provider. Owner-requested theme behaviour."
+    },
+    {
+      "file": "src/lib/hills/sky.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ value\\ ===\\ 'light'\\ \\|\\|\\ value\\ ===\\ 'dark'\\ \\?\\ value\\ :\\ 'system'$",
+      "reason": "Phase 10a, owner request 2026-11-21: adds modeForSky, resolveMode and normalizeChoice, and the pre-paint script now also sets the dark class and color-scheme from the same sky, so first paint matches the provider. Owner-requested theme behaviour."
+    },
+    {
+      "file": "src/lib/hills/sky.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ HILLS_SKY_SCRIPT\\ =\\ `\\(function\\(\\)\\{try\\{var\\ t=null;try\\{t=localStorage\\.getItem\\(\\$\\{\\ JSON\\ \\.\\ stringify\\ \\(\\ HILLS_THEME_STORAGE_KEY\\ ,\\ \\)\\ \\}\\)\\}catch\\(e\\)\\{\\}var\\ s;if\\(t==='light'\\)s='day';else\\ if\\(t==='dark'\\)s='night';else\\{var\\ h=\\(new\\ Date\\(\\)\\.getUTCHours\\(\\)\\+\\$\\{\\ MALAWI_UTC_OFFSET_HOURS\\ \\}\\)%24;s=h>=5\\&\\&h<8\\?'dawn':h>=8\\&\\&h<16\\?'day':h>=16\\&\\&h<19\\?'dusk':'night'\\}var\\ r=document\\.documentElement;r\\.setAttribute\\('data\\-sky',s\\);var\\ d=s==='night';if\\(d\\)r\\.classList\\.add\\('dark'\\);else\\ r\\.classList\\.remove\\('dark'\\);r\\.style\\.colorScheme=d\\?'dark':'light'\\}catch\\(e\\)\\{\\}\\}\\)\\(\\);`$",
+      "reason": "Phase 10a, owner request 2026-11-21: adds modeForSky, resolveMode and normalizeChoice, and the pre-paint script now also sets the dark class and color-scheme from the same sky, so first paint matches the provider. Owner-requested theme behaviour."
+    },
+    {
+      "file": "src/components/ui/badge.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ badgeVariants\\ =\\ cva\\ \\(\\ \"group/badge\\ inline\\-flex\\ w\\-fit\\ shrink\\-0\\ items\\-center\\ justify\\-center\\ gap\\-1\\ text\\-xs\\ font\\-semibold\\ whitespace\\-nowrap\\ transition\\-colors\\ focus\\-visible:outline\\-none\\ focus\\-visible:ring\\-\\[3px\\]\\ focus\\-visible:ring\\-ring/50\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-1\\.5\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-1\\.5\\ \\[\\&>svg\\]:pointer\\-events\\-none\\ \\[\\&>svg\\]:size\\-3!\"\\ ,\\ \\{\\ variants\\ :\\ \\{\\ variant\\ :\\ \\{\\ default\\ :\\ \"text\\-primary\"\\ ,\\ secondary\\ :\\ \"text\\-muted\\-foreground\"\\ ,\\ destructive\\ :\\ \"text\\-status\\-danger\"\\ ,\\ outline\\ :\\ \"text\\-foreground\"\\ ,\\ ghost\\ :\\ \"text\\-muted\\-foreground\"\\ ,\\ link\\ :\\ \"text\\-primary\\ underline\\-offset\\-4\\ hover:underline\"\\ ,\\ \\}\\ ,\\ \\}\\ ,\\ defaultVariants\\ :\\ \\{\\ variant\\ :\\ \"default\"\\ ,\\ \\}\\ ,\\ \\}\\ \\)$",
+      "reason": "Phase 10b: hover standard and ripple, presentation only, see the entries for this file."
+    },
+    {
+      "file": "src/components/ui/badge.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ badgeVariants\\ =\\ cva\\ \\(\\ \"group/badge\\ inline\\-flex\\ w\\-fit\\ shrink\\-0\\ items\\-center\\ justify\\-center\\ gap\\-1\\ text\\-xs\\ font\\-semibold\\ whitespace\\-nowrap\\ transition\\-colors\\ focus\\-visible:outline\\-none\\ focus\\-visible:ring\\-\\[3px\\]\\ focus\\-visible:ring\\-ring/50\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-1\\.5\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-1\\.5\\ \\[\\&>svg\\]:pointer\\-events\\-none\\ \\[\\&>svg\\]:size\\-3!\"\\ ,\\ \\{\\ variants\\ :\\ \\{\\ variant\\ :\\ \\{\\ default\\ :\\ \"text\\-primary\"\\ ,\\ secondary\\ :\\ \"text\\-muted\\-foreground\"\\ ,\\ destructive\\ :\\ \"text\\-status\\-danger\"\\ ,\\ outline\\ :\\ \"text\\-foreground\"\\ ,\\ ghost\\ :\\ \"text\\-muted\\-foreground\"\\ ,\\ link\\ :\\ \"text\\-primary\\ underline\\-offset\\-4\\ app\\-action\"\\ ,\\ \\}\\ ,\\ \\}\\ ,\\ defaultVariants\\ :\\ \\{\\ variant\\ :\\ \"default\"\\ ,\\ \\}\\ ,\\ \\}\\ \\)$",
+      "reason": "Phase 10b: hover standard and ripple, presentation only, see the entries for this file."
+    },
+    {
+      "file": "src/components/ui/button.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ buttonVariants\\ =\\ cva\\ \\(\\ \"group/button\\ inline\\-flex\\ shrink\\-0\\ items\\-center\\ justify\\-center\\ rounded\\-lg\\ border\\ border\\-transparent\\ bg\\-clip\\-padding\\ text\\-sm\\ font\\-medium\\ whitespace\\-nowrap\\ transition\\-all\\ outline\\-none\\ select\\-none\\ focus\\-visible:border\\-ring\\ focus\\-visible:ring\\-3\\ focus\\-visible:ring\\-ring/50\\ active:not\\-aria\\-\\[haspopup\\]:translate\\-y\\-px\\ disabled:pointer\\-events\\-none\\ disabled:opacity\\-50\\ aria\\-invalid:border\\-destructive\\ aria\\-invalid:ring\\-3\\ aria\\-invalid:ring\\-destructive/20\\ dark:aria\\-invalid:border\\-destructive/50\\ dark:aria\\-invalid:ring\\-destructive/40\\ \\[\\&_svg\\]:pointer\\-events\\-none\\ \\[\\&_svg\\]:shrink\\-0\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-4\"\\ ,\\ \\{\\ variants\\ :\\ \\{\\ variant\\ :\\ \\{\\ default\\ :\\ \"bg\\-primary\\ text\\-primary\\-foreground\\ \\[a\\]:hover:bg\\-primary/80\"\\ ,\\ outline\\ :\\ \"border\\-border\\ bg\\-background\\ hover:bg\\-muted\\ hover:text\\-foreground\\ aria\\-expanded:bg\\-muted\\ aria\\-expanded:text\\-foreground\\ dark:border\\-input\\ dark:bg\\-input/30\\ dark:hover:bg\\-input/50\"\\ ,\\ secondary\\ :\\ \"bg\\-secondary\\ text\\-secondary\\-foreground\\ hover:bg\\-secondary/80\\ aria\\-expanded:bg\\-secondary\\ aria\\-expanded:text\\-secondary\\-foreground\"\\ ,\\ ghost\\ :\\ \"hover:bg\\-muted\\ hover:text\\-foreground\\ aria\\-expanded:bg\\-muted\\ aria\\-expanded:text\\-foreground\\ dark:hover:bg\\-muted/50\"\\ ,\\ destructive\\ :\\ \"bg\\-destructive/10\\ text\\-tone\\-coral\\ hover:bg\\-destructive/20\\ focus\\-visible:border\\-destructive/40\\ focus\\-visible:ring\\-destructive/20\\ dark:bg\\-destructive/20\\ dark:hover:bg\\-destructive/30\\ dark:focus\\-visible:ring\\-destructive/40\"\\ ,\\ brand\\ :\\ \"bg\\-btn\\-brand\\ text\\-btn\\-brand\\-fg\\ hover:bg\\-btn\\-brand\\-hover\"\\ ,\\ danger\\ :\\ \"bg\\-btn\\-danger\\ text\\-btn\\-danger\\-fg\\ hover:bg\\-btn\\-danger\\-hover\"\\ ,\\ link\\ :\\ \"text\\-primary\\ underline\\-offset\\-4\\ hover:underline\"\\ ,\\ \\}\\ ,\\ size\\ :\\ \\{\\ default\\ :\\ \"h\\-8\\ max\\-md:h\\-11\\ gap\\-1\\.5\\ px\\-2\\.5\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-2\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-2\"\\ ,\\ xs\\ :\\ \"h\\-6\\ gap\\-1\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),10px\\)\\]\\ px\\-2\\ text\\-xs\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-1\\.5\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-1\\.5\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-3\"\\ ,\\ sm\\ :\\ \"h\\-7\\ gap\\-1\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),12px\\)\\]\\ px\\-2\\.5\\ text\\-\\[0\\.8rem\\]\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-1\\.5\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-1\\.5\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-3\\.5\"\\ ,\\ lg\\ :\\ \"h\\-9\\ max\\-md:h\\-11\\ gap\\-1\\.5\\ px\\-2\\.5\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-2\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-2\"\\ ,\\ icon\\ :\\ \"size\\-8\"\\ ,\\ \"icon\\-xs\"\\ :\\ \"size\\-6\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),10px\\)\\]\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-3\"\\ ,\\ \"icon\\-sm\"\\ :\\ \"size\\-7\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),12px\\)\\]\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\"\\ ,\\ \"icon\\-lg\"\\ :\\ \"size\\-9\"\\ ,\\ \\}\\ ,\\ \\}\\ ,\\ defaultVariants\\ :\\ \\{\\ variant\\ :\\ \"default\"\\ ,\\ size\\ :\\ \"default\"\\ ,\\ \\}\\ ,\\ \\}\\ \\)$",
+      "reason": "Phase 10b: hover standard and ripple, presentation only, see the entries for this file."
+    },
+    {
+      "file": "src/components/ui/button.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ buttonVariants\\ =\\ cva\\ \\(\\ \"group/button\\ inline\\-flex\\ shrink\\-0\\ items\\-center\\ justify\\-center\\ rounded\\-lg\\ border\\ border\\-transparent\\ bg\\-clip\\-padding\\ text\\-sm\\ font\\-medium\\ whitespace\\-nowrap\\ transition\\-all\\ outline\\-none\\ select\\-none\\ focus\\-visible:border\\-ring\\ focus\\-visible:ring\\-3\\ focus\\-visible:ring\\-ring/50\\ active:not\\-aria\\-\\[haspopup\\]:translate\\-y\\-px\\ disabled:pointer\\-events\\-none\\ disabled:opacity\\-50\\ aria\\-invalid:border\\-destructive\\ aria\\-invalid:ring\\-3\\ aria\\-invalid:ring\\-destructive/20\\ dark:aria\\-invalid:border\\-destructive/50\\ dark:aria\\-invalid:ring\\-destructive/40\\ \\[\\&_svg\\]:pointer\\-events\\-none\\ \\[\\&_svg\\]:shrink\\-0\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-4\"\\ ,\\ \\{\\ variants\\ :\\ \\{\\ variant\\ :\\ \\{\\ default\\ :\\ \"bg\\-primary\\ text\\-primary\\-foreground\\ \\[a\\]:hover:bg\\-primary/80\"\\ ,\\ outline\\ :\\ \"border\\-border\\ bg\\-background\\ hover:bg\\-muted\\ hover:text\\-foreground\\ aria\\-expanded:bg\\-muted\\ aria\\-expanded:text\\-foreground\\ dark:border\\-input\\ dark:bg\\-input/30\\ dark:hover:bg\\-input/50\"\\ ,\\ secondary\\ :\\ \"bg\\-secondary\\ text\\-secondary\\-foreground\\ hover:bg\\-secondary/80\\ aria\\-expanded:bg\\-secondary\\ aria\\-expanded:text\\-secondary\\-foreground\"\\ ,\\ ghost\\ :\\ \"hover:bg\\-muted\\ hover:text\\-foreground\\ aria\\-expanded:bg\\-muted\\ aria\\-expanded:text\\-foreground\\ dark:hover:bg\\-muted/50\"\\ ,\\ destructive\\ :\\ \"bg\\-destructive/10\\ text\\-tone\\-coral\\ hover:bg\\-destructive/20\\ focus\\-visible:border\\-destructive/40\\ focus\\-visible:ring\\-destructive/20\\ dark:bg\\-destructive/20\\ dark:hover:bg\\-destructive/30\\ dark:focus\\-visible:ring\\-destructive/40\"\\ ,\\ brand\\ :\\ \"bg\\-btn\\-brand\\ text\\-btn\\-brand\\-fg\\ hover:bg\\-btn\\-brand\\-hover\"\\ ,\\ danger\\ :\\ \"bg\\-btn\\-danger\\ text\\-btn\\-danger\\-fg\\ hover:bg\\-btn\\-danger\\-hover\"\\ ,\\ link\\ :\\ \"text\\-primary\\ underline\\-offset\\-4\\ app\\-action\"\\ ,\\ \\}\\ ,\\ size\\ :\\ \\{\\ default\\ :\\ \"h\\-8\\ max\\-md:h\\-11\\ gap\\-1\\.5\\ px\\-2\\.5\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-2\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-2\"\\ ,\\ xs\\ :\\ \"h\\-6\\ gap\\-1\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),10px\\)\\]\\ px\\-2\\ text\\-xs\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-1\\.5\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-1\\.5\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-3\"\\ ,\\ sm\\ :\\ \"h\\-7\\ gap\\-1\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),12px\\)\\]\\ px\\-2\\.5\\ text\\-\\[0\\.8rem\\]\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-1\\.5\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-1\\.5\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-3\\.5\"\\ ,\\ lg\\ :\\ \"h\\-9\\ max\\-md:h\\-11\\ gap\\-1\\.5\\ px\\-2\\.5\\ has\\-data\\-\\[icon=inline\\-end\\]:pr\\-2\\ has\\-data\\-\\[icon=inline\\-start\\]:pl\\-2\"\\ ,\\ icon\\ :\\ \"size\\-8\"\\ ,\\ \"icon\\-xs\"\\ :\\ \"size\\-6\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),10px\\)\\]\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\\ \\[\\&_svg:not\\(\\[class\\*='size\\-'\\]\\)\\]:size\\-3\"\\ ,\\ \"icon\\-sm\"\\ :\\ \"size\\-7\\ rounded\\-\\[min\\(var\\(\\-\\-radius\\-md\\),12px\\)\\]\\ in\\-data\\-\\[slot=button\\-group\\]:rounded\\-lg\"\\ ,\\ \"icon\\-lg\"\\ :\\ \"size\\-9\"\\ ,\\ \\}\\ ,\\ \\}\\ ,\\ defaultVariants\\ :\\ \\{\\ variant\\ :\\ \"default\"\\ ,\\ size\\ :\\ \"default\"\\ ,\\ \\}\\ ,\\ \\}\\ \\)$",
+      "reason": "Phase 10b: hover standard and ripple, presentation only, see the entries for this file."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ RIPPLE_CLEANUP_MS\\ =\\ 2200$",
+      "reason": "Phase 10b, owner request 2026-11-21: the typing ripple is again a wave that runs along the contour lines. The ring lasts 2.6s so clean-up moves to 3.2s, and at most 6 waves exist at once (the oldest is removed first) so fast typing cannot stack a flood. Presentation of the existing decorative effect only: same input listener, same gap, no data or request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ RIPPLE_CLEANUP_MS\\ =\\ 3200$",
+      "reason": "Phase 10b, owner request 2026-11-21: the typing ripple is again a wave that runs along the contour lines. The ring lasts 2.6s so clean-up moves to 3.2s, and at most 6 waves exist at once (the oldest is removed first) so fast typing cannot stack a flood. Presentation of the existing decorative effect only: same input listener, same gap, no data or request."
+    },
+    {
+      "file": "src/lib/hills/ripple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ RIPPLE_MAX_RINGS\\ =\\ 6$",
+      "reason": "Phase 10b, owner request 2026-11-21: the typing ripple is again a wave that runs along the contour lines. The ring lasts 2.6s so clean-up moves to 3.2s, and at most 6 waves exist at once (the oldest is removed first) so fast typing cannot stack a flood. Presentation of the existing decorative effect only: same input listener, same gap, no data or request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ RIPPLE_CLEANUP_MS\\ ,\\ shouldAddRipple\\ \\}\\ from\\ '@/lib/hills/ripple'$",
+      "reason": "Phase 10b, owner request 2026-11-21: the typing ripple is again a wave that runs along the contour lines. The ring lasts 2.6s so clean-up moves to 3.2s, and at most 6 waves exist at once (the oldest is removed first) so fast typing cannot stack a flood. Presentation of the existing decorative effect only: same input listener, same gap, no data or request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ RIPPLE_CLEANUP_MS\\ ,\\ RIPPLE_MAX_RINGS\\ ,\\ shouldAddRipple\\ \\}\\ from\\ '@/lib/hills/ripple'$",
+      "reason": "Phase 10b, owner request 2026-11-21: the typing ripple is again a wave that runs along the contour lines. The ring lasts 2.6s so clean-up moves to 3.2s, and at most 6 waves exist at once (the oldest is removed first) so fast typing cannot stack a flood. Presentation of the existing decorative effect only: same input listener, same gap, no data or request."
+    },
+    {
+      "file": "src/lib/hills/useTypingRipple.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^while\\ \\(\\ rings\\ \\.\\ childElementCount\\ >\\ RIPPLE_MAX_RINGS\\ \\)\\ rings\\ \\.\\ firstElementChild\\ \\?\\.\\ remove\\ \\(\\ \\)$",
+      "reason": "Phase 10b, owner request 2026-11-21: the typing ripple is again a wave that runs along the contour lines. The ring lasts 2.6s so clean-up moves to 3.2s, and at most 6 waves exist at once (the oldest is removed first) so fast typing cannot stack a flood. Presentation of the existing decorative effect only: same input listener, same gap, no data or request."
     }
   ],
   "approvedFrozen": [

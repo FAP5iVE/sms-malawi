@@ -210,7 +210,7 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
                       <button
                         onClick={() => viewReceipt(e.id)}
                         disabled={isFetchingUrl}
-                        className="flex items-center gap-1 text-xs text-tone-teal hover:underline font-medium min-h-[44px]"
+                        className="flex items-center gap-1 text-xs text-tone-teal app-action font-medium min-h-[44px]"
                         type="button"
                         aria-label={`View receipt for ${e.description}`}
                       >
@@ -238,7 +238,7 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
                             <button
                               onClick={() => approveExpense({ expenseId: e.id, paidImmediately: true })}
                               disabled={isApproving}
-                              className="flex items-center gap-1 text-xs text-emerald-700 hover:underline font-medium min-h-[44px]"
+                              className="flex items-center gap-1 text-xs text-emerald-700 app-action font-medium min-h-[44px]"
                               type="button"
                               aria-label={`Approve expense ${e.description} as paid`}
                               title="Approve: already paid in cash"
@@ -248,7 +248,7 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
                             <button
                               onClick={() => approveExpense({ expenseId: e.id, paidImmediately: false })}
                               disabled={isApproving}
-                              className="flex items-center gap-1 text-xs text-tone-amber hover:underline font-medium min-h-[44px]"
+                              className="flex items-center gap-1 text-xs text-tone-amber app-action font-medium min-h-[44px]"
                               type="button"
                               aria-label={`Approve expense ${e.description} as owed`}
                               title="Approve: owed to vendor, not yet paid (tracked as a debt)"
@@ -261,7 +261,7 @@ export function ExpensesTab({ academicYear, term }: { academicYear: string; term
                           <button
                             onClick={() => rejectExpense(e.id)}
                             disabled={isRejecting}
-                            className="flex items-center gap-1 text-xs text-tone-coral hover:underline font-medium min-h-[44px]"
+                            className="flex items-center gap-1 text-xs text-tone-coral app-action font-medium min-h-[44px]"
                             type="button"
                             aria-label={`Reject expense ${e.description}`}
                           >

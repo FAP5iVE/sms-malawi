@@ -1,6 +1,6 @@
 "use client"
 
-import { useTheme } from "next-themes"
+import { useTheme } from '@/components/providers/ThemeProvider'
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import {
   CircleCheckIcon,
@@ -11,10 +11,11 @@ import {
 } from "lucide-react"
 
 const Toaster = ({ theme: propTheme, ...props }: ToasterProps) => {
-  const { theme } = useTheme()
+  const { resolvedTheme: shown } = useTheme()
 
-  // propTheme (caller) wins; fall back to next-themes; then hardcoded default
-  const resolvedTheme = (propTheme ?? theme ?? "system") as NonNullable<ToasterProps["theme"]>
+  // propTheme (caller) wins; then the colours actually showing (Auto already
+  // follows the Malawi clock); light until the page has hydrated.
+  const resolvedTheme = (propTheme ?? shown ?? "light") as NonNullable<ToasterProps["theme"]>
 
   return (
     <Sonner

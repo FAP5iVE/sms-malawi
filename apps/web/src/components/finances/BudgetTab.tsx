@@ -9,7 +9,7 @@ import { MOBILE_BREAKPOINT } from '@shared/constants/breakpoints'
 import { formatChartValue } from '@/components/shared/chart/chartLabels'
 import { Plus, Loader2 } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import { useTheme } from 'next-themes'
+import { useTheme } from '@/components/providers/ThemeProvider'
 
 // ApexCharts must be dynamically imported — it's not SSR-compatible
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false })

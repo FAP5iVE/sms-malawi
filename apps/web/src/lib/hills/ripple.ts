@@ -6,17 +6,21 @@
  *   apart from React so they can be tested with the plain node test runner
  *   (tools/hills/__tests__/ripple.test.mts).
  *
- *   Typing in a field adds one expanding contour ring to the sky, at most once
- *   every RIPPLE_MIN_GAP_MS. Nothing is drawn when the visitor asked for reduced
+ *   Typing in a field sends one wave of light along the contour lines, from the
+ *   peak to the screen edge, at most once every RIPPLE_MIN_GAP_MS. Nothing is drawn when the visitor asked for reduced
  *   motion or switched the app's own motion setting off.
  */
 
 /** Shortest time between two rings. */
 export const RIPPLE_MIN_GAP_MS = 110
 
-/** The ring animation lasts 1.7s (globals.css); remove a ring that never fires
+/** The ring animation lasts 2.6s (globals.css); remove a ring that never fires
  *  `animationend` (hidden tab, display:none) shortly after. */
-export const RIPPLE_CLEANUP_MS = 2200
+export const RIPPLE_CLEANUP_MS = 3200
+
+/** Most waves alive at once. Fast typing would otherwise stack a dozen, which
+ *  looks like a flood and costs paint time; the oldest goes first. */
+export const RIPPLE_MAX_RINGS = 6
 
 export interface RippleGateInput {
   /** performance.now() at the input event. */

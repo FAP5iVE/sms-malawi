@@ -54,7 +54,7 @@ export function HierarchicalPhotoGrid({ photos, onPhotoClick, className }: Hiera
               src={photo.url}
               alt={photo.alt}
               loading="lazy"
-              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+              className="h-full w-full object-cover"
             />
             <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/0 to-black/0 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
             <Maximize2Icon className="absolute top-2 right-2 size-4 text-white opacity-0 drop-shadow transition-opacity duration-200 group-hover:opacity-100" />

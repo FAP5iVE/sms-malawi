@@ -65,7 +65,7 @@ export function QuickActions({ actions, compact = false }: QuickActionsProps) {
               className="flex flex-col items-center gap-1.5 sm:gap-2 p-2 sm:p-3 min-h-11 rounded-lg hover:bg-brand-teal/10 transition-colors group text-center"
             >
               <div
-                className={`w-10 h-10 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 ${action.color ?? 'bg-brand-navy/8'}`}
+                className={`w-10 h-10 rounded-lg flex items-center justify-center ${action.color ?? 'bg-brand-navy/8'}`}
               >
                 <Icon className={`w-5 h-5 ${action.text ?? 'text-brand-navy'}`} />
               </div>

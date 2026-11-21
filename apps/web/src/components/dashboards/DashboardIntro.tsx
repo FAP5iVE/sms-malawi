@@ -46,7 +46,7 @@ export function DashboardIntro({
         {reportsHref ? (
           <Link
             href={reportsHref}
-            className="inline-flex items-center gap-0.5 font-medium text-tone-teal hover:underline"
+            className="inline-flex items-center gap-0.5 font-medium text-tone-teal app-action"
           >
             Open reports
             <ArrowUpRight className="h-3 w-3" aria-hidden />

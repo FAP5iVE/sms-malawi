@@ -158,7 +158,7 @@ export function ManebPanel({ academicYear }: Props) {
             </button>
           )}
           <a href="https://www.maneb.edu.mw/" target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-sm text-tone-teal hover:underline">
+            className="flex items-center gap-1.5 text-sm text-tone-teal app-action">
             <ExternalLink className="w-3.5 h-3.5" /> MANEB Portal
           </a>
         </div>
@@ -303,7 +303,7 @@ export function ManebPanel({ academicYear }: Props) {
           </div>
 
           <div className="flex items-center gap-3">
-            <button onClick={addRow} className="inline-flex items-center gap-1.5 text-sm text-tone-teal font-semibold hover:underline">
+            <button onClick={addRow} className="inline-flex items-center gap-1.5 text-sm text-tone-teal font-semibold app-action">
               <Plus className="w-4 h-4" /> Add candidate
             </button>
             <button onClick={submit} disabled={bulkCreate.isPending}

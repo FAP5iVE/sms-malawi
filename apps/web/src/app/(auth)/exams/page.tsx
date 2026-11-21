@@ -340,7 +340,7 @@ function ExamsPageInner() {
               (EXAM_MARKS_ENTERABLE_STATUSES as readonly string[]).includes(exam.status) && (
                 <button
                   onClick={() => setMarksExamId(exam.id)}
-                  className="text-xs text-tone-teal hover:underline flex items-center gap-1 min-h-11 md:min-h-0"
+                  className="text-xs text-tone-teal app-action flex items-center gap-1 min-h-11 md:min-h-0"
                 >
                   Enter marks <ChevronRight className="w-3 h-3" />
                 </button>
@@ -348,7 +348,7 @@ function ExamsPageInner() {
             {(canApprove || canCorrect) && (exam.status === 'MARKS_FINAL' || exam.status === 'RESULTS_APPROVED') && (
               <button
                 onClick={() => setReviewExamId(exam.id)}
-                className="text-xs text-tone-teal hover:underline flex items-center gap-1 min-h-11 md:min-h-0"
+                className="text-xs text-tone-teal app-action flex items-center gap-1 min-h-11 md:min-h-0"
               >
                 {canCorrect ? 'Review / Correct' : 'Review Marks'} <ChevronRight className="w-3 h-3" />
               </button>
@@ -579,7 +579,7 @@ function ExamsPageInner() {
                             <button
                               type="button"
                               onClick={() => exam.status === 'RESULTS_RELEASED' ? setViewMarksExamId(exam.id) : setDetailExamId(exam.id)}
-                              className="text-left hover:underline"
+                              className="text-left app-action"
                               title={exam.status === 'RESULTS_RELEASED' ? 'View released marks' : 'View exam details'}
                             >
                               <p className="font-medium text-body">{exam.title}</p>

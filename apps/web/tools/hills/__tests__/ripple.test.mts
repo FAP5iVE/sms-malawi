@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { RIPPLE_MIN_GAP_MS, shouldAddRipple } from '../../../src/lib/hills/ripple.js'
+import { RIPPLE_CLEANUP_MS, RIPPLE_MAX_RINGS, RIPPLE_MIN_GAP_MS, shouldAddRipple } from '../../../src/lib/hills/ripple.js'
 
 const on = { motionEnabled: true, prefersReducedMotion: false }
 
@@ -43,4 +43,9 @@ test('nothing is drawn under prefers-reduced-motion', () => {
 
 test('nothing is drawn when the app motion setting is off', () => {
   assert.equal(shouldAddRipple({ now: 5000, last: 0, motionEnabled: false, prefersReducedMotion: false }), false)
+})
+
+test('a ring is cleaned up after its 2.6s animation, and the pile is capped', () => {
+  assert.ok(RIPPLE_CLEANUP_MS > 2600)
+  assert.ok(RIPPLE_MAX_RINGS >= 3 && RIPPLE_MAX_RINGS <= 8)
 })

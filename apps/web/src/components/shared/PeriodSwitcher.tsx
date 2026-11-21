@@ -233,7 +233,7 @@ export function PeriodBanner() {
       <button
         type="button"
         onClick={reset}
-        className="inline-flex items-center gap-1.5 font-heading font-semibold text-brand-teal hover:underline"
+        className="inline-flex items-center gap-1.5 font-heading font-semibold text-brand-teal app-action"
       >
         <RotateCcw className="w-3.5 h-3.5" aria-hidden />
         Return to Term {currentTerm} · {currentYear}

@@ -218,7 +218,7 @@ export function AssetsTab() {
                   sortValue: (r) => r.label,
                   cell: (r) =>
                     r.uid ? (
-                      <button type="button" onClick={() => setCustodianUid(r.uid ?? '')} className="text-left text-brand-navy underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-navy/20 rounded">
+                      <button type="button" onClick={() => setCustodianUid(r.uid ?? '')} className="text-left text-brand-navy underline-offset-2 app-action focus:outline-none focus:ring-2 focus:ring-brand-navy/20 rounded">
                         {r.label}
                       </button>
                     ) : (

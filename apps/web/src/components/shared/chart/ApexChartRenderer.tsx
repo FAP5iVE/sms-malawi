@@ -42,7 +42,7 @@
 'use client'
 
 import type { ApexOptions } from 'apexcharts'
-import { useTheme } from 'next-themes'
+import { useTheme } from '@/components/providers/ThemeProvider'
 import dynamic from 'next/dynamic'
 import type { ComponentType } from 'react'
 import { useMemo } from 'react'

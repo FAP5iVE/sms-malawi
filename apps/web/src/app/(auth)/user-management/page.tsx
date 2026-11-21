@@ -215,7 +215,7 @@ function UserManagementContent() {
       <tr key={u.uid} className="hover:bg-page/60">
         <td className="px-4 py-3">
           {profileHref ? (
-            <Link href={profileHref} className="block hover:underline">
+            <Link href={profileHref} className="block app-action">
               <p className="font-medium text-body">{u.displayName || u.email}</p>
               <p className="text-xs text-muted">{u.email}</p>
               <p className="text-xs text-muted font-mono mt-0.5">{u.uid}</p>

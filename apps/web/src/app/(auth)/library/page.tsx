@@ -384,11 +384,11 @@ function BookFormModal({
           {confirmArchive ? (
             <div className="flex items-center gap-3">
               <p className="text-xs text-muted flex-1">Archive this book? It will be removed from the searchable catalog (copies set to 0).</p>
-              <button type="button" onClick={handleArchive} disabled={pending} className="text-xs font-semibold text-tone-coral hover:underline shrink-0">Confirm</button>
-              <button type="button" onClick={() => setConfirmArchive(false)} className="text-xs text-muted hover:underline shrink-0">Cancel</button>
+              <button type="button" onClick={handleArchive} disabled={pending} className="text-xs font-semibold text-tone-coral app-action shrink-0">Confirm</button>
+              <button type="button" onClick={() => setConfirmArchive(false)} className="text-xs text-muted app-action shrink-0">Cancel</button>
             </div>
           ) : (
-            <button type="button" onClick={() => setConfirmArchive(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-coral hover:underline">
+            <button type="button" onClick={() => setConfirmArchive(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-coral app-action">
               <Archive className="w-3.5 h-3.5" /> Archive this book
             </button>
           )}
@@ -2539,10 +2539,10 @@ function LibraryContent() {
                           {f.status === 'PENDING' ? (
                             <div className="flex items-center gap-3 shrink-0">
                               <PermissionGuard permission="library.clearFine">
-                                <button type="button" onClick={() => clearFine.mutate(f.id)} disabled={clearFine.isPending} className="text-xs font-semibold text-tone-teal hover:underline disabled:opacity-50">Mark paid</button>
+                                <button type="button" onClick={() => clearFine.mutate(f.id)} disabled={clearFine.isPending} className="text-xs font-semibold text-tone-teal app-action disabled:opacity-50">Mark paid</button>
                               </PermissionGuard>
                               <PermissionGuard permission="library.waiveFine">
-                                <button type="button" onClick={() => waiveFine.mutate(f.id)} disabled={waiveFine.isPending} className="text-xs font-semibold text-muted hover:underline disabled:opacity-50">Waive</button>
+                                <button type="button" onClick={() => waiveFine.mutate(f.id)} disabled={waiveFine.isPending} className="text-xs font-semibold text-muted app-action disabled:opacity-50">Waive</button>
                               </PermissionGuard>
                             </div>
                           ) : (

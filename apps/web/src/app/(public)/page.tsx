@@ -138,11 +138,12 @@ import { ScrollProgress } from '@/components/motion/ScrollProgress'
 import { StudioCredit, StudioWordmark } from '@/components/brand/StudioWordmark'
 import { staggerDelay } from '@/lib/hills/motion'
 import Link from 'next/link'
-import { useTheme } from 'next-themes'
+import { useTheme } from '@/components/providers/ThemeProvider'
+import type { ThemeChoice } from '@/lib/hills/sky'
 import { useHasMounted } from '@/hooks/useHasMounted'
 import { FaFacebook, FaTwitter, FaInstagram, FaYoutube, FaLinkedin } from 'react-icons/fa'
 import {
-  Sun, Moon, Monitor, Search, ArrowRight, Menu, X,
+  Sun, Moon, Search, ArrowRight, Menu, X,
   ExternalLink, Send, Loader2, CheckCircle2,
   CalendarDays, LogIn,
 } from 'lucide-react'
@@ -200,7 +201,7 @@ const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', '
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, resolvedTheme } = useTheme()
   const mounted = useHasMounted()
   const [menuOpen, setMenuOpen]     = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -322,13 +323,8 @@ export default function LandingPage() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [menuOpen, searchOpen])
 
-  const themeIcons: Record<string, React.ReactNode> = {
-    light: <Sun className="w-4 h-4" />,
-    dark: <Moon className="w-4 h-4" />,
-    system: <Monitor className="w-4 h-4" />,
-  }
   const cycleTheme = () => {
-    const order = ['light', 'dark', 'system']
+    const order: ThemeChoice[] = ['light', 'dark', 'system']
     setTheme(order[(order.indexOf(theme ?? 'system') + 1) % order.length] ?? 'system')
   }
 
@@ -429,13 +425,14 @@ export default function LandingPage() {
               </button>
               <button
                 onClick={cycleTheme}
-                aria-label={mounted ? `Theme: ${theme}. Press to change.` : 'Toggle theme'}
+                aria-label={mounted ? `Theme: ${theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'Auto'}. Press to change.` : 'Toggle theme'}
                 title={mounted ? (theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'Auto') : undefined}
-                className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
+                className={`relative w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
                   scrolled ? 'border-base text-foreground hover:bg-background' : 'border-white/25 text-white hover:bg-white/10'
                 }`}
               >
-                {mounted ? themeIcons[theme ?? 'system'] : <Monitor className="w-4 h-4" aria-hidden />}
+                {mounted && theme === 'system' && <span aria-hidden className="pointer-events-none absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-tone-teal" />}
+                {mounted && resolvedTheme === 'dark' ? <Moon className="w-4 h-4" aria-hidden /> : <Sun className="w-4 h-4" aria-hidden />}
               </button>
               <Link
                 href="/login"
@@ -648,7 +645,7 @@ export default function LandingPage() {
               ) : (
                 railItems.map((a) => (
                   <Link href={`/notices/${a.id}`} key={a.id} className="border-l-2 border-brand-teal-light/55 pl-4.5 block group">
-                    <h3 className="font-heading font-bold text-[15px] text-white mb-1.5 leading-snug line-clamp-2 group-hover:underline">
+                    <h3 className="font-heading font-bold text-[15px] text-white mb-1.5 leading-snug line-clamp-2 transition-colors group-hover:text-white/80">
                       {a.title}
                     </h3>
                     <p className="text-[13.5px] text-white/50 mb-2 leading-relaxed line-clamp-2">{a.body}</p>
@@ -710,7 +707,7 @@ export default function LandingPage() {
                   </h3>
                   <div className="font-mono text-[11.5px] text-muted mb-3">{formatRelativeDate(newsItems[0]!.createdAt)}</div>
                   <p className="text-[15.5px] leading-relaxed text-muted mb-4 line-clamp-4">{stripHtml(newsItems[0]!.body)}</p>
-                  <Link href={`/news/${newsItems[0]!.id}`} className="font-heading font-bold text-[13.5px] text-brand-teal hover:underline">
+                  <Link href={`/news/${newsItems[0]!.id}`} className="font-heading font-bold text-[13.5px] text-brand-teal app-action">
                     Read more →
                   </Link>
                 </Reveal>
@@ -730,7 +727,7 @@ export default function LandingPage() {
                           {a.title}
                         </h3>
                         <div className="font-mono text-[11px] text-muted mb-2">{formatRelativeDate(a.createdAt)}</div>
-                        <Link href={`/news/${a.id}`} className="font-heading font-bold text-xs text-brand-teal hover:underline">
+                        <Link href={`/news/${a.id}`} className="font-heading font-bold text-xs text-brand-teal app-action">
                           Read more →
                         </Link>
                       </div>
@@ -885,7 +882,7 @@ export default function LandingPage() {
                 <h3 className="font-heading font-bold text-xl tracking-tight text-brand-navy dark:text-white">
                   Life at our school
                 </h3>
-                <Link href="/gallery" className="font-heading font-bold text-[13px] text-brand-teal hover:underline">
+                <Link href="/gallery" className="font-heading font-bold text-[13px] text-brand-teal app-action">
                   View our gallery →
                 </Link>
               </div>
@@ -1108,7 +1105,7 @@ export default function LandingPage() {
                           {ev.title}
                         </h3>
                         <p className="text-[13.5px] text-muted mb-3.5 line-clamp-2">{stripHtml(ev.body)}</p>
-                        <Link href={`/events/${ev.id}`} className="font-heading font-bold text-xs text-brand-teal hover:underline">
+                        <Link href={`/events/${ev.id}`} className="font-heading font-bold text-xs text-brand-teal app-action">
                           Read more →
                         </Link>
                       </div>

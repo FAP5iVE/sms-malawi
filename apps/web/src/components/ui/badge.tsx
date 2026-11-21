@@ -17,7 +17,7 @@ const badgeVariants = cva(
         destructive: "text-status-danger",
         outline: "text-foreground",
         ghost: "text-muted-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        link: "text-primary underline-offset-4 app-action",
       },
     },
     defaultVariants: {

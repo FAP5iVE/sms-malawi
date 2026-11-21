@@ -240,7 +240,7 @@ function ClassDetailContent() {
         priority: 'important' as const,
         render: (s: RosterStudent) =>
           canViewStudentProfile ? (
-            <Link href={`/students/${s.id}`} className="text-tone-teal text-xs font-medium hover:underline">
+            <Link href={`/students/${s.id}`} className="text-tone-teal text-xs font-medium app-action">
               Profile
             </Link>
           ) : null,

@@ -5,7 +5,7 @@
  *
  * [CHANGE TYPE]: NEW FILE (Chikangawa Hills theme, Phase 3)
  * [PURPOSE]: "Effect A" from the approved mockup: while someone types in the
- *   sign-in family, a contour ring spreads out from the peak in the sky.
+ *   sign-in family, a wave of light runs along the contour lines from the peak to the edge.
  *
  *   It listens for `input` events that bubble up to the page wrapper (event
  *   delegation), so the forms' own onChange handlers are never touched or
@@ -19,7 +19,7 @@
 
 import { useEffect, type RefObject } from 'react'
 import { useMotionEnabled } from '@/store/motionStore'
-import { RIPPLE_CLEANUP_MS, shouldAddRipple } from '@/lib/hills/ripple'
+import { RIPPLE_CLEANUP_MS, RIPPLE_MAX_RINGS, shouldAddRipple } from '@/lib/hills/ripple'
 
 export function useTypingRipple(
   listenOn: RefObject<HTMLElement | null>,
@@ -45,6 +45,7 @@ export function useTypingRipple(
       ring.addEventListener('animationend', remove, { once: true })
       window.setTimeout(remove, RIPPLE_CLEANUP_MS)
       rings.appendChild(ring)
+      while (rings.childElementCount > RIPPLE_MAX_RINGS) rings.firstElementChild?.remove()
     }
 
     host.addEventListener('input', onInput)

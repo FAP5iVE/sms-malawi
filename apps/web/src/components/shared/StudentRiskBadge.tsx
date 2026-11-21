@@ -251,7 +251,7 @@ function CardVariant({
                 {canOpen(href) && (
                   <Link
                     href={href}
-                    className="shrink-0 inline-flex items-center gap-0.5 text-xs text-tone-teal hover:underline"
+                    className="shrink-0 inline-flex items-center gap-0.5 text-xs text-tone-teal app-action"
                     aria-label={`Open ${DOMAIN_LABELS[f.domain]}`}
                   >
                     {DOMAIN_LABELS[f.domain]}

@@ -208,7 +208,7 @@ export function FinanceSettings() {
                     <label className="text-xs text-muted mb-1 block">Rate (%)</label>
                     <input type="number" min={0} max={100} value={b.ratePercent} onChange={(e) => updateBracket(i, { ratePercent: Number(e.target.value) })} className={`${inputCls} min-h-[36px] text-xs`} />
                   </div>
-                  <button type="button" onClick={() => removeBracket(i)} className="text-tone-coral hover:underline text-xs font-medium flex items-center gap-1 justify-center min-h-[36px]">
+                  <button type="button" onClick={() => removeBracket(i)} className="text-tone-coral app-action text-xs font-medium flex items-center gap-1 justify-center min-h-[36px]">
                     <X className="w-3.5 h-3.5" /> Remove
                   </button>
                 </div>

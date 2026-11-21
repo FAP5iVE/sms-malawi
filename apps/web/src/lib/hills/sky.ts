@@ -13,7 +13,11 @@
  *       05:00 to 07:59 dawn, 08:00 to 15:59 day, 16:00 to 18:59 dusk,
  *       19:00 to 04:59 night.
  *   - The result is written to <html data-sky="...">. Only elements inside a
- *     `.hills` scope read it, so the signed-in app never changes at 4pm.
+ *     `.hills` scope read the sky palette.
+ *   - Phase 10a: the light or dark MODE (the `dark` class on <html>) comes from
+ *     the same sky: night is dark, dawn, day and dusk are light. Auto therefore
+ *     moves the whole app, public and signed in, with the clock, and no longer
+ *     follows the device's own colour setting. Light and Dark never move.
  *
  * [CLOCK]: Malawi is on Central Africa Time, UTC+2 all year with no daylight
  *   saving, so the hour is simply the UTC hour plus two. That avoids Intl in
@@ -60,6 +64,25 @@ export function resolveSky(theme: string | null | undefined, now: Date): HillsSk
  * (next-themes has not hydrated yet) and sets data-sky on <html>. Every step is
  * guarded: if storage is blocked the sky simply follows the clock.
  */
+/** Light or dark colours for a sky. Only the night sky is dark. */
+export type HillsMode = 'light' | 'dark'
+
+export function modeForSky(sky: HillsSky): HillsMode {
+  return sky === 'night' ? 'dark' : 'light'
+}
+
+/** The colour mode for a stored theme value at a given moment. */
+export function resolveMode(theme: string | null | undefined, now: Date): HillsMode {
+  return modeForSky(resolveSky(theme, now))
+}
+
+/** The three choices a person can make. "system" is shown as Auto. */
+export type ThemeChoice = 'light' | 'dark' | 'system'
+
+export function normalizeChoice(value: string | null | undefined): ThemeChoice {
+  return value === 'light' || value === 'dark' ? value : 'system'
+}
+
 export const HILLS_SKY_SCRIPT = `(function(){try{var t=null;try{t=localStorage.getItem(${JSON.stringify(
   HILLS_THEME_STORAGE_KEY,
-)})}catch(e){}var s;if(t==='light')s='day';else if(t==='dark')s='night';else{var h=(new Date().getUTCHours()+${MALAWI_UTC_OFFSET_HOURS})%24;s=h>=5&&h<8?'dawn':h>=8&&h<16?'day':h>=16&&h<19?'dusk':'night'}document.documentElement.setAttribute('data-sky',s)}catch(e){}})();`
+)})}catch(e){}var s;if(t==='light')s='day';else if(t==='dark')s='night';else{var h=(new Date().getUTCHours()+${MALAWI_UTC_OFFSET_HOURS})%24;s=h>=5&&h<8?'dawn':h>=8&&h<16?'day':h>=16&&h<19?'dusk':'night'}var r=document.documentElement;r.setAttribute('data-sky',s);var d=s==='night';if(d)r.classList.add('dark');else r.classList.remove('dark');r.style.colorScheme=d?'dark':'light'}catch(e){}})();`

@@ -152,7 +152,7 @@ export function ReportsExportPanel({ academicYear, term }: { academicYear: strin
                     type="button"
                     onClick={() => void toggleView(r.type)}
                     aria-label={`View ${r.label} report`}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-teal hover:underline"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-tone-teal app-action"
                   >
                     {viewingType === r.type ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     {viewingType === r.type ? 'Hide' : 'View'}
@@ -163,7 +163,7 @@ export function ReportsExportPanel({ academicYear, term }: { academicYear: strin
                     onClick={() => void exportReport(r.type)}
                     disabled={exporting === r.type}
                     aria-label={`Export ${r.label} report`}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy app-action disabled:opacity-50"
                   >
                     {exporting === r.type ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
                     Export .xlsx

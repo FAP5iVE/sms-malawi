@@ -213,7 +213,7 @@ export function DashboardSection({
           <div className="space-y-4">
             {children}
             {href ? (
-              <Link href={href} className="inline-flex min-h-11 items-center gap-0.5 text-xs font-medium text-tone-teal hover:underline">
+              <Link href={href} className="inline-flex min-h-11 items-center gap-0.5 text-xs font-medium text-tone-teal app-action">
                 {hrefLabel}
                 <ArrowUpRight className="h-3 w-3" aria-hidden />
               </Link>

@@ -42,7 +42,7 @@ export function ReportCard({
           {href ? (
             <Link
               href={href}
-              className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-tone-teal hover:underline focus:outline-none focus:ring-2 focus:ring-brand-teal/30 rounded"
+              className="inline-flex items-center gap-0.5 whitespace-nowrap text-xs font-medium text-tone-teal app-action focus:outline-none focus:ring-2 focus:ring-brand-teal/30 rounded"
             >
               {hrefLabel}
               <ArrowUpRight className="h-3 w-3" aria-hidden />

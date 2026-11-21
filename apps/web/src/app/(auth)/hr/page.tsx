@@ -795,7 +795,7 @@ function LoansTab({
               <button
                 type="button"
                 onClick={() => setShowRequestForm(true)}
-                className="text-xs font-semibold text-tone-teal hover:underline min-h-11"
+                className="text-xs font-semibold text-tone-teal app-action min-h-11"
               >
                 New request
               </button>

@@ -371,7 +371,7 @@ export function MobileCalendarView({
               <div className="flex flex-col items-center justify-center text-center py-8 text-muted">
                 <CalendarDays className="w-8 h-8 mb-2 opacity-60" aria-hidden="true" />
                 <p className="text-sm font-medium">No events for this date</p>
-                <p className="text-xs mt-1">Use the box below to add something to this day.</p>
+                {canCreate && <p className="text-xs mt-1">Use the box below to add something to this day.</p>}
               </div>
             ) : (
               selectedDayEvents.map((evt) => (
@@ -437,7 +437,7 @@ export function MobileCalendarView({
                       onSelectDate(group.dateKey)
                       onViewModeChange('month')
                     }}
-                    className="text-sm font-heading font-bold text-tone-teal min-h-11 inline-flex items-center hover:underline"
+                    className="text-sm font-heading font-bold text-tone-teal min-h-11 inline-flex items-center app-action"
                   >
                     {formatGroupHeading(group.dateKey)}
                   </button>

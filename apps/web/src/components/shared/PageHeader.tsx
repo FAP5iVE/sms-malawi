@@ -269,7 +269,7 @@ function NotificationList({
             onClose()
             onViewAll()
           }}
-          className="text-xs text-tone-teal font-heading font-semibold hover:underline"
+          className="text-xs text-tone-teal font-heading font-semibold app-action"
         >
           View all announcements
         </button>

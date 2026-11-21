@@ -13,7 +13,6 @@ import { AuthProvider }         from '@/components/providers/AuthProvider'
 import { QueryProvider }        from '@/components/providers/QueryProvider'
 import { ThemeProvider }        from '@/components/providers/ThemeProvider'
 import { Toaster }              from '@/components/ui/sonner'
-import { HillsSkySync }         from '@/components/shared/HillsSkySync'
 import { HILLS_SKY_SCRIPT }     from '@/lib/hills/sky'
 
 // Per-page titles and descriptions live in each route segment's layout.tsx
@@ -73,7 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       suppressHydrationWarning
       data-scroll-behavior="smooth"
-      // suppressHydrationWarning is required because next-themes
+      // suppressHydrationWarning is required because ThemeProvider
       // modifies the class attribute on <html> client-side to apply
       // the user's saved theme preference ("dark" or nothing).
       // Without this, React raises a hydration warning because the
@@ -91,7 +90,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <ThemeProvider>
-          <HillsSkySync />
           <QueryProvider>
             {/*
               AuthProvider must wrap BOTH the (public) and (auth) route
@@ -112,17 +110,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {children}
             </AuthProvider>
           </QueryProvider>
+
+          {/* [PRODUCTION FIX, user-requested] sonner was an installed
+             dependency with a fully themed Toaster wrapper
+             (components/ui/sonner.tsx) that was never mounted anywhere,
+             every toast() call anywhere in the app was a silent no-op.
+             Surfaced first by downloadPayslip() in usePayroll.ts, whose
+             rejected promise (a 403/404 from the payslip download route)
+             had nowhere to go, so "View Payslip" looked like it did nothing
+             at all when it actually failed. Mounted once, here, so any
+             future toast() call anywhere in the app also just works.
+             Phase 10a: it now sits INSIDE ThemeProvider, so toasts follow the
+             chosen theme instead of the device's colour setting. */}
+          <Toaster />
+
         </ThemeProvider>
-        {/* [PRODUCTION FIX, user-requested] sonner was an installed
-           dependency with a fully themed Toaster wrapper
-           (components/ui/sonner.tsx) that was never mounted anywhere,
-           every toast() call anywhere in the app was a silent no-op.
-           Surfaced first by downloadPayslip() in usePayroll.ts, whose
-           rejected promise (a 403/404 from the payslip download route)
-           had nowhere to go, so "View Payslip" looked like it did nothing
-           at all when it actually failed. Mounted once, here, so any
-           future toast() call anywhere in the app also just works. */}
-        <Toaster />
         <Analytics />
       </body>
     </html>

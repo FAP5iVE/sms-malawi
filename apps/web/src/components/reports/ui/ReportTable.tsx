@@ -183,7 +183,7 @@ export function ReportTable<T>({
                       )}
                     >
                       {href && ci === 0 ? (
-                        <Link href={href} className="font-medium text-tone-teal hover:underline">
+                        <Link href={href} className="font-medium text-tone-teal app-action">
                           {content}
                         </Link>
                       ) : (

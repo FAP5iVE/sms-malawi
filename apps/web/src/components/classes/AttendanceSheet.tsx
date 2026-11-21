@@ -211,7 +211,7 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
             <button
               type="button"
               onClick={() => setViewDate(new Date())}
-              className="text-xs font-semibold text-tone-teal hover:underline ml-1"
+              className="text-xs font-semibold text-tone-teal app-action ml-1"
             >
               Today
             </button>
@@ -255,7 +255,7 @@ export function AttendanceSheet({ classId, students, readOnly = false, classTeac
             type="button"
             onClick={markAllPresent}
             disabled={saving}
-            className="text-xs font-semibold text-status-success hover:underline disabled:opacity-50 min-h-11"
+            className="text-xs font-semibold text-status-success app-action disabled:opacity-50 min-h-11"
           >
             Mark all present
           </button>

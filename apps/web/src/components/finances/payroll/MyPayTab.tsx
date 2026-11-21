@@ -174,7 +174,7 @@ export function MyPayTab({ canViewAnyPayslips }: { canViewAnyPayslips: boolean }
           <button type="button" onClick={() => downloadPayslipMutation.mutate(p.id)}
             disabled={isDownloading}
             aria-busy={isDownloading}
-            className="inline-flex items-center gap-1.5 text-xs font-heading font-semibold text-brand-navy hover:underline whitespace-nowrap disabled:opacity-60 disabled:pointer-events-none">
+            className="inline-flex items-center gap-1.5 text-xs font-heading font-semibold text-brand-navy app-action whitespace-nowrap disabled:opacity-60 disabled:pointer-events-none">
             {isDownloading
               ? <><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> Opening…</>
               : <><Download className="w-3.5 h-3.5" aria-hidden /> View Payslip</>}

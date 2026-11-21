@@ -32,7 +32,7 @@
  *   it to the far end of a flex row that isn't already `justify-between`).
  */
 
-import { useTheme } from 'next-themes'
+import { useTheme } from '@/components/providers/ThemeProvider'
 import { Sun, Moon, Monitor, Check } from 'lucide-react'
 import { useHasMounted } from '@/hooks/useHasMounted'
 import {
@@ -48,30 +48,30 @@ const THEME_OPTIONS = [
   { value: 'system', label: 'Auto',   icon: Monitor },
 ] as const
 
-const THEME_ICONS = {
-  light: Sun,
-  dark: Moon,
-  system: Monitor,
-} as const
-
 interface PublicThemeToggleProps {
   className?: string
 }
 
 export function PublicThemeToggle({ className = '' }: PublicThemeToggleProps) {
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, resolvedTheme } = useTheme()
   const mounted = useHasMounted()
 
-  const ActiveIcon = mounted ? THEME_ICONS[(theme as keyof typeof THEME_ICONS) ?? 'system'] : Monitor
+  // The icon shows what is on screen (sun or moon), the same as the signed-in
+  // toggle, so Auto at night shows the moon on every page. Which choice is
+  // active is told by the tick in the menu and by the label.
+  const ActiveIcon = mounted && resolvedTheme === 'dark' ? Moon : Sun
+  const choiceLabel = theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'Auto'
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={mounted ? `Theme: ${theme}. Press to change.` : 'Toggle theme'}
-          className={`w-12 h-12 rounded-xl text-body hover:bg-black/5 dark:hover:bg-white/10 data-[state=open]:bg-black/5 dark:data-[state=open]:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/50 flex items-center justify-center transition-colors shrink-0 cursor-pointer ${className}`}
+          aria-label={mounted ? `Theme: ${choiceLabel}. Press to change.` : 'Toggle theme'}
+          title={mounted ? `Theme: ${choiceLabel}` : undefined}
+          className={`w-12 h-12 rounded-xl text-body hover:bg-black/5 dark:hover:bg-white/10 data-[state=open]:bg-black/5 dark:data-[state=open]:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/50 relative flex items-center justify-center transition-colors shrink-0 cursor-pointer ${className}`}
         >
+          {mounted && theme === 'system' && <span aria-hidden className="pointer-events-none absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-tone-teal" />}
           <ActiveIcon className="w-6 h-6" aria-hidden />
         </button>
       </DropdownMenuTrigger>

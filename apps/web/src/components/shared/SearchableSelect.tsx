@@ -216,7 +216,7 @@ export function SearchableSelect({
                   <button
                     type="button"
                     onClick={onRetry}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-teal hover:underline"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-teal app-action"
                   >
                     <RefreshCw className="w-3 h-3" aria-hidden /> Try again
                   </button>

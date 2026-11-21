@@ -210,7 +210,7 @@ export function HRDepartmentsSettings() {
                 <button
                   type="button"
                   onClick={() => removeDepartment(dept)}
-                  className="text-xs text-tone-coral hover:underline font-medium"
+                  className="text-xs text-tone-coral app-action font-medium"
                 >
                   Remove department
                 </button>
