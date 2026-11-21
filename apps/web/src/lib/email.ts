@@ -29,13 +29,23 @@ function getResendClient(): Resend | null {
 //  CONSTANTS
 // ─────────────────────────────────────────────────────────
 
-/** From address used for all outgoing mail. Must be a verified Resend domain. */
-const FROM_ADDRESS = process.env.EMAIL_FROM_ADDRESS ?? 'noreply@school.mw'
-const FROM_NAME    = process.env.EMAIL_FROM_NAME    ?? 'SMS Malawi'
+/**
+ * Resend's own test sender. It needs no domain, but Resend delivers it ONLY to the email
+ * address of the Resend account itself; any other recipient is rejected with a 403.
+ */
+const RESEND_TEST_SENDER = 'onboarding@resend.dev'
+
+/**
+ * From address used for all outgoing mail: EMAIL_FROM_ADDRESS (Vercel → Settings →
+ * Environment Variables), or Resend's test sender when it is unset or blank. To send to
+ * everyone, set it to an address on a domain you own and have verified in Resend → Domains.
+ */
+const FROM_ADDRESS = process.env.EMAIL_FROM_ADDRESS?.trim() || RESEND_TEST_SENDER
+const FROM_NAME    = process.env.EMAIL_FROM_NAME?.trim()    || 'SMS Malawi'
 const FROM         = `${FROM_NAME} <${FROM_ADDRESS}>`
 
-/** Reply-to address for mail that users may respond to. */
-const REPLY_TO = process.env.EMAIL_REPLY_TO ?? FROM_ADDRESS
+/** Reply-to address for mail that users may respond to. Set EMAIL_REPLY_TO to a mailbox someone reads. */
+const REPLY_TO = process.env.EMAIL_REPLY_TO?.trim() || FROM_ADDRESS
 
 /**
  * Resend's free tier rate limit is 2 emails/second with a daily cap of
@@ -749,7 +759,7 @@ export function extractEmailAddress(combined: string): string {
 
 /**
  * Build a "From" string combining display name and address.
- * e.g. buildFromAddress('SMS Malawi', 'noreply@school.mw') → "SMS Malawi <noreply@school.mw>"
+ * e.g. buildFromAddress('SMS Malawi', 'ict@example.org') → "SMS Malawi <ict@example.org>"
  */
 export function buildFromAddress(name: string, address: string): string {
   return `${name} <${address}>`
