@@ -147,6 +147,19 @@ const SYSTEM_KEYS = [
   'session_timeout_hr',
 ]
 
+// Read-only, any authenticated user. useInactivityTimer.ts needs the admin's
+// Session Timeout on every role's browser, but GET /system below is admin-only.
+// Falls back to 5 (the dropdown's default) if the value is missing or invalid.
+settingsRouter.get('/session-timeout', async (_req, res) => {
+  try {
+    const data  = await readSettings(['session_timeout_hr'])
+    const hours = Number(data.session_timeout_hr)
+    return res.json({ hours: Number.isFinite(hours) && hours > 0 ? hours : 5 })
+  } catch (err: unknown) {
+    return sendError(res, err, { tags: { module: 'settings', route: 'session-timeout-get' } })
+  }
+})
+
 settingsRouter
   .route('/system')
   .get(requireRole(['admin']), async (req, res) => {

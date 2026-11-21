@@ -50,6 +50,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter }                         from 'next/navigation'
 import { logout as authLogout }              from '@/components/providers/AuthProvider'
 import { auth }                              from '@/lib/firebase'
+import { apiFetch }                          from '@/lib/api-client'
 import { useAuthStore }                      from '@/store/authStore'
 
 // Milliseconds before logout at which the warning dialog is shown
@@ -76,9 +77,35 @@ export function useInactivityTimer(): {
   keepAlive: () => void
 } {
   const router = useRouter()
-  const { role } = useAuthStore()
+  const { role, initialized, user } = useAuthStore()
+  const isAuthenticated = initialized && !!user
 
-  const timeout = role === 'student' ? TIMEOUTS.student! : TIMEOUTS.default!
+  // Admin-configured Session Timeout (Settings > System configuration), in
+  // hours. null until loaded, or if the request fails — the hardcoded
+  // TIMEOUTS defaults below apply in that case.
+  const [configuredHours, setConfiguredHours] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+    let cancelled = false
+    apiFetch<{ hours: number }>('/settings/session-timeout')
+      .then((data) => {
+        if (!cancelled && Number.isFinite(data.hours) && data.hours > 0) {
+          setConfiguredHours(data.hours)
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [isAuthenticated])
+
+  // The setting applies to staff and guardians. Students keep their 1-hour
+  // cap, and a shorter configured value still applies to them.
+  const staffTimeout = configuredHours !== null
+    ? configuredHours * 60 * 60 * 1000
+    : TIMEOUTS.default!
+  const timeout = role === 'student'
+    ? Math.min(TIMEOUTS.student!, staffTimeout)
+    : staffTimeout
 
   // Warning fires this many ms before logout
   const warnDelay = Math.max(10_000, timeout - WARNING_BEFORE_MS)
