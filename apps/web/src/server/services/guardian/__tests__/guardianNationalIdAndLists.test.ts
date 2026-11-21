@@ -57,8 +57,11 @@ describe('proposing a card with a national ID', () => {
       card('g1', 's1', 'Mary Banda', '0999111111', { nrbNumber: 'AB12CD34' }),
       card('g2', 's2', 'Mary Banda', '0888222222', { nrbNumber: 'AB12 CD34' }),   // different phone: ID is what links them
     ])
-    expect(a!.outcome === 'CREATED' && a.suggestion).toBeNull()
-    expect(b!.outcome === 'CREATED' && b.suggestion?.method).toBe('NATIONAL_ID_NAME')
+    if (a === undefined || b === undefined) {
+      throw new Error('Expected a proposal result for each guardian directory card')
+    }
+    expect(a.outcome === 'CREATED' && a.suggestion).toBeNull()
+    expect(b.outcome === 'CREATED' && b.suggestion?.method).toBe('NATIONAL_ID_NAME')
     expect(linkFor('s2')).toMatchObject({ suggestedProfileId: linkFor('s1').profileId, suggestedMethod: 'NATIONAL_ID_NAME' })
   })
 
