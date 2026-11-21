@@ -22,6 +22,7 @@
  */
 import { z } from 'zod'
 import { USER_ROLES } from '../types/roles'
+import { LEAVE_TYPES } from '../types/settings'
 import {
   NRB_NUMBER_MIN,
   NRB_NUMBER_MAX,
@@ -208,7 +209,7 @@ export const UpdateSalarySchema = z.object({
 })
 
 export const LeaveRequestSchema = z.object({
-  leaveType:  z.enum(['ANNUAL','SICK','MATERNITY','PATERNITY','STUDY','UNPAID','EMERGENCY']),
+  leaveType:  z.enum(LEAVE_TYPES),
   startDate:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   reason:     z.string().min(10).max(500),

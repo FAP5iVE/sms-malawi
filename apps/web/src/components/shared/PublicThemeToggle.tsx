@@ -33,7 +33,8 @@
  */
 
 import { useTheme } from '@/components/providers/ThemeProvider'
-import { Sun, Moon, Monitor, Check } from 'lucide-react'
+import { Check } from 'lucide-react'
+import { THEME_OPTIONS, ThemeIcon, themeLabel } from '@/components/shared/themeOptions'
 import { useHasMounted } from '@/hooks/useHasMounted'
 import {
   DropdownMenu,
@@ -42,25 +43,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-const THEME_OPTIONS = [
-  { value: 'light',  label: 'Light',  icon: Sun     },
-  { value: 'dark',   label: 'Dark',   icon: Moon    },
-  { value: 'system', label: 'Auto',   icon: Monitor },
-] as const
-
 interface PublicThemeToggleProps {
   className?: string
 }
 
 export function PublicThemeToggle({ className = '' }: PublicThemeToggleProps) {
-  const { theme, setTheme, resolvedTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
   const mounted = useHasMounted()
 
-  // The icon shows what is on screen (sun or moon), the same as the signed-in
-  // toggle, so Auto at night shows the moon on every page. Which choice is
-  // active is told by the tick in the menu and by the label.
-  const ActiveIcon = mounted && resolvedTheme === 'dark' ? Moon : Sun
-  const choiceLabel = theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'Auto'
+  // The button shows the icon of the chosen setting (sun, moon, or sun-and-moon
+  // for Auto), so Auto is visible on the button itself. The tick in the menu
+  // and the label say the same.
+  const choiceLabel = themeLabel(theme)
 
   return (
     <DropdownMenu>
@@ -71,8 +65,7 @@ export function PublicThemeToggle({ className = '' }: PublicThemeToggleProps) {
           title={mounted ? `Theme: ${choiceLabel}` : undefined}
           className={`w-12 h-12 rounded-xl text-body hover:bg-black/5 dark:hover:bg-white/10 data-[state=open]:bg-black/5 dark:data-[state=open]:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/50 relative flex items-center justify-center transition-colors shrink-0 cursor-pointer ${className}`}
         >
-          {mounted && theme === 'system' && <span aria-hidden className="pointer-events-none absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-tone-teal" />}
-          <ActiveIcon className="w-6 h-6" aria-hidden />
+          <ThemeIcon choice={mounted ? theme : 'light'} className="w-6 h-6" />
         </button>
       </DropdownMenuTrigger>
 
@@ -85,7 +78,7 @@ export function PublicThemeToggle({ className = '' }: PublicThemeToggleProps) {
           >
             <Icon className="h-3.5 w-3.5 shrink-0" />
             <span className="flex-1 text-sm">{label}</span>
-            {theme === value && (
+            {mounted && theme === value && (
               <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
             )}
           </DropdownMenuItem>

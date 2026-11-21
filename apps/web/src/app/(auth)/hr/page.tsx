@@ -105,6 +105,7 @@ import {
 import Link                 from 'next/link'
 import { ModuleTabs }       from '@/components/shared/ModuleTabs'
 import { formatMWK }        from '@shared/constants/malawi'
+import { statusWord }       from '@/lib/hills/statusWord'
 import { PayrollWorkspace } from '@/components/finances/payroll/PayrollWorkspace'
 import type { ApiStaffProfile, ApiLeaveRequest, ApiContractAlert, ApiStaffLoan } from '@shared/types/api'
 import { Modal } from '@/components/shared/Modal'
@@ -806,6 +807,109 @@ const LOAN_STATUS_COLORS: Record<string, string> = {
   REJECTED:  'text-status-danger',
 }
 
+// Only these two statuses count as "active": the money is out and not yet paid back.
+const ACTIVE_LOAN_STATUSES: ReadonlyArray<ApiStaffLoan['status']> = ['DISBURSED', 'REPAYING']
+
+function ActiveLoansView({ loans, isLoading }: { loans: ApiStaffLoan[]; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2].map((i) => <div key={i} className="h-28 rounded-xl bg-surface animate-pulse" />)}
+      </div>
+    )
+  }
+
+  const active = loans
+    .filter((l) => ACTIVE_LOAN_STATUSES.includes(l.status))
+    .sort((a, b) => b.balance - a.balance)
+
+  if (active.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted text-sm">
+        No active loans. A loan shows here once it is disbursed, until it is settled.
+      </div>
+    )
+  }
+
+  const sum = (pick: (l: ApiStaffLoan) => number) => active.reduce((n, l) => n + pick(l), 0)
+  const totals = [
+    { label: 'Staff with a loan',   value: String(active.length) },
+    { label: 'Lent out',            value: formatMWK(sum((l) => l.amount)) },
+    { label: 'Repaid so far',       value: formatMWK(sum((l) => l.totalRepaid)) },
+    { label: 'Still owed',          value: formatMWK(sum((l) => l.balance)) },
+    { label: 'Deducted each month', value: formatMWK(sum((l) => l.monthlyDeduction)) },
+  ]
+
+  return (
+    <div>
+      <dl className="grid grid-cols-2 sm:grid-cols-5 gap-x-6 gap-y-3 pb-4 border-b border-base">
+        {totals.map((t) => (
+          <div key={t.label}>
+            <dt className="text-xs text-muted">{t.label}</dt>
+            <dd className="font-heading font-semibold text-body tabular-nums">{t.value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <ul>
+        {active.map((loan) => {
+          const name = loan.staff ? `${loan.staff.firstName} ${loan.staff.lastName}` : loan.staffId
+          const pct = loan.amount > 0 ? Math.min(100, Math.max(0, Math.round((loan.totalRepaid / loan.amount) * 100))) : 0
+          return (
+            <li key={loan.id} className="py-4 border-b border-base last:border-b-0">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <p className="font-semibold text-body">
+                    {name}
+                    {loan.staff && <span className="text-xs text-muted ml-2">({loan.staff.employeeNo})</span>}
+                  </p>
+                  {loan.staff?.department && <p className="text-xs text-muted">{loan.staff.department}</p>}
+                </div>
+                <span className={`text-xs font-semibold ${LOAN_STATUS_COLORS[loan.status] ?? ''}`}>
+                  {statusWord(loan.status)}
+                </span>
+              </div>
+
+              <dl className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2">
+                <div>
+                  <dt className="text-xs text-muted">Loan amount</dt>
+                  <dd className="text-sm font-semibold text-body tabular-nums">{formatMWK(loan.amount)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted">Repaid so far</dt>
+                  <dd className="text-sm font-semibold text-body tabular-nums">{formatMWK(loan.totalRepaid)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted">Balance</dt>
+                  <dd className="text-sm font-semibold text-body tabular-nums">{formatMWK(loan.balance)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted">Monthly deduction</dt>
+                  <dd className="text-sm font-semibold text-body tabular-nums">{formatMWK(loan.monthlyDeduction)}</dd>
+                </div>
+              </dl>
+
+              <div className="mt-3 flex items-center gap-3">
+                <div
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={pct}
+                  aria-label={`${name} has repaid ${pct}% of the loan`}
+                  className="h-2 flex-1 rounded-full bg-page border border-base overflow-hidden"
+                >
+                  <div className="h-full bg-status-success" style={{ width: `${pct}%` }} />
+                </div>
+                <span className="w-10 text-right text-xs text-muted tabular-nums">{pct}%</span>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
 function LoansTab({
   canApplyLoan,
   isHR,
@@ -832,7 +936,11 @@ function LoansTab({
   // one. '' = all statuses.
   const [loanStatusFilter, setLoanStatusFilter] = useState<'' | ApiStaffLoan['status']>('')
 
+  const [loanView, setLoanView] = useState<'requests' | 'active'>('requests')
+
   const { data: loans = [], isLoading } = useLoans(loanStatusFilter || undefined)
+  // Same query as the list above when no status is picked, so it costs no extra request then.
+  const { data: allLoans = [], isLoading: allLoansLoading } = useLoans()
   const { data: myLoans = [], isLoading: myLoansLoading } = useMyLoans()
   const requestLoan    = useRequestLoan()
   const approveLoan    = useApproveLoan()
@@ -985,9 +1093,27 @@ function LoansTab({
       {/* Manage Loan Requests */}
       {canManage && (
         <div>
+          <div className="flex gap-2 mb-4" role="group" aria-label="Loans view">
+            {([['requests', 'Requests'], ['active', 'Active loans']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setLoanView(key)}
+                aria-pressed={loanView === key}
+                className={[
+                  'min-h-11 px-4 rounded-lg border text-sm font-semibold transition-colors',
+                  loanView === key
+                    ? 'bg-brand-deep text-white border-brand-navy'
+                    : 'border-base text-muted hover:text-body hover:bg-page',
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <h2 className="font-heading font-semibold text-body">Manage loan requests</h2>
-            <select
+            <h2 className="font-heading font-semibold text-body">{loanView === 'active' ? 'Active loans' : 'Manage loan requests'}</h2>
+            {loanView === 'requests' && <select
               value={loanStatusFilter}
               onChange={(e) => setLoanStatusFilter(e.target.value as '' | ApiStaffLoan['status'])}
               className="border border-base rounded-lg px-3 py-2 text-sm bg-surface min-h-[36px]"
@@ -1000,9 +1126,11 @@ function LoansTab({
               <option value="REPAYING">Repaying</option>
               <option value="SETTLED">Settled</option>
               <option value="REJECTED">Rejected</option>
-            </select>
+            </select>}
           </div>
-          {isLoading ? (
+          {loanView === 'active' ? (
+            <ActiveLoansView loans={allLoans as ApiStaffLoan[]} isLoading={allLoansLoading} />
+          ) : isLoading ? (
             <div className="space-y-2">
               {[1, 2].map((i) => <div key={i} className="h-20 rounded-xl bg-surface animate-pulse" />)}
             </div>

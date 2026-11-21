@@ -41,6 +41,17 @@ const percentSchema = (label: string) =>
     .min(0, `${label} cannot be negative`)
     .max(100, `${label} cannot exceed 100`)
 
+// Pay percent for each leave type: 100 full pay, 50 half pay, 0 unpaid.
+const leavePayPercentSchema = z.object({
+  ANNUAL:    percentSchema('Annual leave pay'),
+  SICK:      percentSchema('Sick leave pay'),
+  MATERNITY: percentSchema('Maternity leave pay'),
+  PATERNITY: percentSchema('Paternity leave pay'),
+  STUDY:     percentSchema('Study leave pay'),
+  UNPAID:    percentSchema('Unpaid leave pay'),
+  EMERGENCY: percentSchema('Emergency leave pay'),
+})
+
 const positiveIntSchema = (label: string) =>
   z
     .number()
@@ -262,6 +273,9 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
     positiveIntSchema('Study leave days').max(180),
   [SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS]:
     positiveIntSchema('Emergency leave days').max(30),
+  [SETTING_KEYS.HR_SICK_HALF_PAY_DAYS]:
+    nonNegativeIntSchema('Sick leave half-pay days').max(365),
+  [SETTING_KEYS.HR_LEAVE_PAY_PERCENT]: leavePayPercentSchema,
   // R15 (typecheck cleanup): SETTING_KEYS gained
   // HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS in R14 but this exhaustive
   // { [K in SettingKey] } map was never extended — a blocking type error
@@ -432,6 +446,8 @@ export const HRSettingsFormSchema = z.object({
   paternityLeaveDays:    positiveIntSchema('Paternity leave days').max(60),
   studyLeaveDays:        positiveIntSchema('Study leave days').max(180),
   emergencyLeaveDays:    positiveIntSchema('Emergency leave days').max(30),
+  sickHalfPayDays:       nonNegativeIntSchema('Sick leave half-pay days').max(365),
+  leavePayPercent:       leavePayPercentSchema,
 })
 
 export type HRSettingsFormInput = z.infer<typeof HRSettingsFormSchema>

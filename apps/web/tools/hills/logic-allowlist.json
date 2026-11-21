@@ -160,6 +160,10 @@
     {
       "file": "src/lib/hills/parentNav.ts",
       "reason": "Phase 10c: pure list of the guardian's pages, tested in parentNav.test.mts"
+    },
+    {
+      "file": "src/components/shared/themeOptions.tsx",
+      "reason": "Phase 10d: one list of theme choices and icons shared by the three theme menus"
     }
   ],
   "deletedFiles": [
@@ -19866,6 +19870,762 @@
       "kind": "logic",
       "pattern": "^return\\ items\\ \\.\\ slice\\ \\(\\ 0\\ ,\\ 1\\ \\+\\ PARENT_BAR_CHILD_SLOTS\\ \\)$",
       "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ type\\ \\{\\ ThemeChoice\\ \\}\\ from\\ '@/lib/hills/sky'$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ theme\\ ,\\ setTheme\\ ,\\ resolvedTheme\\ \\}\\ =\\ useTheme\\ \\(\\ \\)$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ cycleTheme\\ =\\ \\(\\ \\)\\ =>\\ \\{\\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ order\\ :\\ ThemeChoice\\ \\[\\ \\]\\ =\\ \\[\\ 'light'\\ ,\\ 'dark'\\ ,\\ 'system'\\ \\]$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^setTheme\\ \\(\\ order\\ \\[\\ \\(\\ order\\ \\.\\ indexOf\\ \\(\\ theme\\ \\?\\?\\ 'system'\\ \\)\\ \\+\\ 1\\ \\)\\ %\\ order\\ \\.\\ length\\ \\]\\ \\?\\?\\ 'system'\\ \\)$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^onClick=\\{\\ cycleTheme\\ \\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ mounted\\ \\?\\ `Theme:\\ \\$\\{\\ theme\\ ===\\ 'light'\\ \\?\\ 'Light'\\ :\\ theme\\ ===\\ 'dark'\\ \\?\\ 'Dark'\\ :\\ 'Auto'\\ \\}\\.\\ Press\\ to\\ change\\.`\\ :\\ 'Toggle\\ theme'\\ \\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ mounted\\ \\?\\ \\(\\ theme\\ ===\\ 'light'\\ \\?\\ 'Light'\\ :\\ theme\\ ===\\ 'dark'\\ \\?\\ 'Dark'\\ :\\ 'Auto'\\ \\)\\ :\\ undefined\\ \\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=system\\ dark$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ mounted\\ \\&\\&\\ theme\\ ===\\ 'system'\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ mounted\\ \\&\\&\\ resolvedTheme\\ ===\\ 'dark'\\ \\?\\ <JSX/>\\ :\\ <JSX/>\\ \\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ theme\\ ,\\ setTheme\\ \\}\\ =\\ useTheme\\ \\(\\ \\)$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^type=\"button\"$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ mounted\\ \\?\\ `Theme:\\ \\$\\{\\ themeLabel\\ \\(\\ theme\\ \\)\\ \\}\\.\\ Press\\ to\\ change\\.`\\ :\\ 'Toggle\\ theme'\\ \\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ mounted\\ \\?\\ `Theme:\\ \\$\\{\\ themeLabel\\ \\(\\ theme\\ \\)\\ \\}`\\ :\\ undefined\\ \\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^choice=\\{\\ mounted\\ \\?\\ theme\\ :\\ 'light'\\ \\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ THEME_OPTIONS\\ \\.\\ map\\ \\(\\ \\(\\ \\{\\ value\\ ,\\ label\\ ,\\ icon\\ :\\ Icon\\ \\}\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ value\\ \\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onClick=\\{\\ \\(\\ \\)\\ =>\\ setTheme\\ \\(\\ value\\ \\)\\ \\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ label\\ \\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ mounted\\ \\&\\&\\ theme\\ ===\\ value\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/app/(public)/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=$",
+      "reason": "Home header theme button is a Light / Dark / Auto dropdown again (was a cycle button); same setTheme call, same stored values. The unused cycle helper and the Auto dot are gone."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ type\\ \\{\\ ThemeMode\\ \\}\\ from\\ '@/store/themeStore'$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^function\\ ActiveIcon\\ \\(\\ \\{\\ resolvedTheme\\ \\}\\ :\\ \\{\\ resolvedTheme\\ :\\ string\\ \\|\\ undefined\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ resolvedTheme\\ ===\\ 'dark'\\ \\)\\ \\{\\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^return\\ <JSX/>$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ theme\\ ,\\ setTheme\\ ,\\ resolvedTheme\\ \\}\\ =\\ useTheme\\ \\(\\ \\)$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ `Current\\ theme:\\ \\$\\{\\ theme\\ ===\\ 'light'\\ \\?\\ 'Light'\\ :\\ theme\\ ===\\ 'dark'\\ \\?\\ 'Dark'\\ :\\ 'Auto'\\ \\}\\.\\ Press\\ to\\ change\\ theme\\.`\\ \\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=system\\ system\\|Auto\\|Auto\\ Toggle\\ theme$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ theme\\ ===\\ 'system'\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^resolvedTheme=\\{\\ resolvedTheme\\ \\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ theme\\ ===\\ 'system'\\ \\?\\ 'Auto'\\ :\\ \\(\\ theme\\ \\?\\?\\ 'Auto'\\ \\)\\ \\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ theme\\ ,\\ setTheme\\ \\}\\ =\\ useTheme\\ \\(\\ \\)$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ `Current\\ theme:\\ \\$\\{\\ themeLabel\\ \\(\\ theme\\ \\)\\ \\}\\.\\ Press\\ to\\ change\\ theme\\.`\\ \\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{themeLabel\\ \\(\\ theme\\ \\)\\}\\ Toggle\\ theme$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^choice=\\{\\ theme\\ \\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/ModeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ themeLabel\\ \\(\\ theme\\ \\)\\ \\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ theme\\ ,\\ setTheme\\ ,\\ resolvedTheme\\ \\}\\ =\\ useTheme\\ \\(\\ \\)$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ ActiveIcon\\ =\\ mounted\\ \\&\\&\\ resolvedTheme\\ ===\\ 'dark'\\ \\?\\ Moon\\ :\\ Sun$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ choiceLabel\\ =\\ theme\\ ===\\ 'light'\\ \\?\\ 'Light'\\ :\\ theme\\ ===\\ 'dark'\\ \\?\\ 'Dark'\\ :\\ 'Auto'$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=system$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ mounted\\ \\&\\&\\ theme\\ ===\\ 'system'\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ theme\\ ===\\ value\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ theme\\ ,\\ setTheme\\ \\}\\ =\\ useTheme\\ \\(\\ \\)$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ choiceLabel\\ =\\ themeLabel\\ \\(\\ theme\\ \\)$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^choice=\\{\\ mounted\\ \\?\\ theme\\ :\\ 'light'\\ \\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/PublicThemeToggle.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ mounted\\ \\&\\&\\ theme\\ ===\\ value\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/themeOptions.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ type\\ \\{\\ ThemeChoice\\ \\}\\ from\\ '@/lib/hills/sky'$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/themeOptions.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ THEME_OPTIONS\\ :\\ ReadonlyArray\\ <\\ \\{\\ value\\ :\\ ThemeChoice\\ label\\ :\\ string\\ icon\\ :\\ typeof\\ Sun\\ \\}\\ >\\ =\\ \\[\\ \\{\\ value\\ :\\ 'light'\\ ,\\ label\\ :\\ 'Light'\\ ,\\ icon\\ :\\ Sun\\ \\}\\ ,\\ \\{\\ value\\ :\\ 'dark'\\ ,\\ label\\ :\\ 'Dark'\\ ,\\ icon\\ :\\ Moon\\ \\}\\ ,\\ \\{\\ value\\ :\\ 'system'\\ ,\\ label\\ :\\ 'Auto'\\ ,\\ icon\\ :\\ SunMoon\\ \\}\\ ,\\ \\]$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/themeOptions.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ themeLabel\\ \\(\\ choice\\ :\\ string\\ \\|\\ undefined\\ \\)\\ :\\ string\\ \\{\\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/themeOptions.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ THEME_OPTIONS\\ \\.\\ find\\ \\(\\ o\\ =>\\ o\\ \\.\\ value\\ ===\\ choice\\ \\)\\ \\?\\.\\ label\\ \\?\\?\\ 'Auto'$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/themeOptions.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ ThemeIcon\\ \\(\\ \\{\\ choice\\ ,\\ className\\ \\}\\ :\\ \\{\\ choice\\ :\\ string\\ \\|\\ undefined\\ ;\\ className\\ \\?\\ :\\ string\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/themeOptions.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ choice\\ ===\\ 'light'\\ \\)\\ return\\ <JSX/>$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/themeOptions.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ choice\\ ===\\ 'dark'\\ \\)\\ return\\ <JSX/>$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/components/shared/themeOptions.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ <JSX/>$",
+      "reason": "Theme menus share one list of choices and icons (themeOptions); button icon shows the chosen setting (Sun, Moon, Sun-and-Moon for Auto). setTheme and the three stored values are unchanged."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ isLoading\\ \\?\\ \\(\\ <JSX/>\\ \\)\\ :\\ \\(\\ loans\\ as\\ ApiStaffLoan\\ \\[\\ \\]\\ \\)\\ \\.\\ length\\ ===\\ 0\\ \\?\\ \\(\\ <JSX/>\\ \\)\\ :\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ statusWord\\ \\}\\ from\\ '@/lib/hills/statusWord'$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ACTIVE_LOAN_STATUSES\\ :\\ ReadonlyArray\\ <\\ ApiStaffLoan\\ \\[\\ 'status'\\ \\]\\ >\\ =\\ \\[\\ 'DISBURSED'\\ ,\\ 'REPAYING'\\ \\]$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ ActiveLoansView\\ \\(\\ \\{\\ loans\\ ,\\ isLoading\\ \\}\\ :\\ \\{\\ loans\\ :\\ ApiStaffLoan\\ \\[\\ \\]\\ ;\\ isLoading\\ :\\ boolean\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ isLoading\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ active\\ =\\ loans\\ \\.\\ filter\\ \\(\\ \\(\\ l\\ \\)\\ =>\\ ACTIVE_LOAN_STATUSES\\ \\.\\ includes\\ \\(\\ l\\ \\.\\ status\\ \\)\\ \\)\\ \\.\\ sort\\ \\(\\ \\(\\ a\\ ,\\ b\\ \\)\\ =>\\ b\\ \\.\\ balance\\ \\-\\ a\\ \\.\\ balance\\ \\)$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ active\\ \\.\\ length\\ ===\\ 0\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ \\(\\ <JSX/>\\ \\)$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ sum\\ =\\ \\(\\ pick\\ :\\ \\(\\ l\\ :\\ ApiStaffLoan\\ \\)\\ =>\\ number\\ \\)\\ =>\\ active\\ \\.\\ reduce\\ \\(\\ \\(\\ n\\ ,\\ l\\ \\)\\ =>\\ n\\ \\+\\ pick\\ \\(\\ l\\ \\)\\ ,\\ 0\\ \\)$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ totals\\ =\\ \\[\\ \\{\\ label\\ :\\ 'Staff\\ with\\ a\\ loan'\\ ,\\ value\\ :\\ String\\ \\(\\ active\\ \\.\\ length\\ \\)\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Lent\\ out'\\ ,\\ value\\ :\\ formatMWK\\ \\(\\ sum\\ \\(\\ \\(\\ l\\ \\)\\ =>\\ l\\ \\.\\ amount\\ \\)\\ \\)\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Repaid\\ so\\ far'\\ ,\\ value\\ :\\ formatMWK\\ \\(\\ sum\\ \\(\\ \\(\\ l\\ \\)\\ =>\\ l\\ \\.\\ totalRepaid\\ \\)\\ \\)\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Still\\ owed'\\ ,\\ value\\ :\\ formatMWK\\ \\(\\ sum\\ \\(\\ \\(\\ l\\ \\)\\ =>\\ l\\ \\.\\ balance\\ \\)\\ \\)\\ \\}\\ ,\\ \\{\\ label\\ :\\ 'Deducted\\ each\\ month'\\ ,\\ value\\ :\\ formatMWK\\ \\(\\ sum\\ \\(\\ \\(\\ l\\ \\)\\ =>\\ l\\ \\.\\ monthlyDeduction\\ \\)\\ \\)\\ \\}\\ ,\\ \\]$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ totals\\ \\.\\ map\\ \\(\\ \\(\\ t\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ t\\ \\.\\ label\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ t\\ \\.\\ label\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ t\\ \\.\\ value\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ active\\ \\.\\ map\\ \\(\\ \\(\\ loan\\ \\)\\ =>\\ \\{\\}\\ \\)\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ name\\ =\\ loan\\ \\.\\ staff\\ \\?\\ `\\$\\{\\ loan\\ \\.\\ staff\\ \\.\\ firstName\\ \\}\\ \\$\\{\\ loan\\ \\.\\ staff\\ \\.\\ lastName\\ \\}`\\ :\\ loan\\ \\.\\ staffId$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ pct\\ =\\ loan\\ \\.\\ amount\\ >\\ 0\\ \\?\\ Math\\ \\.\\ min\\ \\(\\ 100\\ ,\\ Math\\ \\.\\ max\\ \\(\\ 0\\ ,\\ Math\\ \\.\\ round\\ \\(\\ \\(\\ loan\\ \\.\\ totalRepaid\\ /\\ loan\\ \\.\\ amount\\ \\)\\ \\*\\ 100\\ \\)\\ \\)\\ \\)\\ :\\ 0$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ name\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ loan\\ \\.\\ staff\\ \\?\\.\\ department\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ loan\\ \\.\\ staff\\ \\.\\ department\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ statusWord\\ \\(\\ loan\\ \\.\\ status\\ \\)\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ formatMWK\\ \\(\\ loan\\ \\.\\ totalRepaid\\ \\)\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^role=\"progressbar\"$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria\\-valuemin=\\{\\ 0\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria\\-valuemax=\\{\\ 100\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria\\-valuenow=\\{\\ pct\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ `\\$\\{\\ name\\ \\}\\ has\\ repaid\\ \\$\\{\\ pct\\ \\}%\\ of\\ the\\ loan`\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ pct\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\[\\ loanView\\ ,\\ setLoanView\\ \\]\\ =\\ useState\\ <\\ 'requests'\\ \\|\\ 'active'\\ >\\ \\(\\ 'requests'\\ \\)$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ data\\ :\\ allLoans\\ =\\ \\[\\ \\]\\ ,\\ isLoading\\ :\\ allLoansLoading\\ \\}\\ =\\ useLoans\\ \\(\\ \\)$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^role=\"group\"$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"Loans\\ view\"$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ \\(\\ \\[\\ \\[\\ 'requests'\\ ,\\ 'Requests'\\ \\]\\ ,\\ \\[\\ 'active'\\ ,\\ 'Active\\ loans'\\ \\]\\ \\]\\ as\\ const\\ \\)\\ \\.\\ map\\ \\(\\ \\(\\ \\[\\ key\\ ,\\ label\\ \\]\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ \\)\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ key\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onClick=\\{\\ \\(\\ \\)\\ =>\\ setLoanView\\ \\(\\ key\\ \\)\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria\\-pressed=\\{\\ loanView\\ ===\\ key\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{label\\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ label\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ loanView\\ ===\\ 'active'\\ \\?\\ 'Active\\ loans'\\ :\\ 'Manage\\ loan\\ requests'\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ loanView\\ ===\\ 'requests'\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ loanView\\ ===\\ 'active'\\ \\?\\ \\(\\ <JSX/>\\ \\)\\ :\\ isLoading\\ \\?\\ \\(\\ <JSX/>\\ \\)\\ :\\ \\(\\ loans\\ as\\ ApiStaffLoan\\ \\[\\ \\]\\ \\)\\ \\.\\ length\\ ===\\ 0\\ \\?\\ \\(\\ <JSX/>\\ \\)\\ :\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^loans=\\{\\ allLoans\\ as\\ ApiStaffLoan\\ \\[\\ \\]\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^isLoading=\\{\\ allLoansLoading\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ \\[\\ 1\\ ,\\ 2\\ \\]\\ \\.\\ map\\ \\(\\ \\(\\ i\\ \\)\\ =>\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ i\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ loan\\ \\.\\ id\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ loan\\ \\.\\ staff\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ loan\\ \\.\\ staff\\ \\.\\ employeeNo\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ formatMWK\\ \\(\\ loan\\ \\.\\ amount\\ \\)\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ formatMWK\\ \\(\\ loan\\ \\.\\ monthlyDeduction\\ \\)\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ formatMWK\\ \\(\\ loan\\ \\.\\ balance\\ \\)\\ \\}$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
+    },
+    {
+      "file": "src/app/(auth)/hr/page.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^type=\"button\"$",
+      "reason": "Phase 10d: HR Loans tab gets a Requests / Active loans switch (view state only). Active loans reads the existing useLoans() list, shows only Disbursed and Repaying loans with totals and a progress bar. No new request, no new action, same permissions (canManage)."
     }
   ],
   "approvedFrozen": [

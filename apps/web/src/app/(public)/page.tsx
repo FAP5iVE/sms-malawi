@@ -139,11 +139,14 @@ import { StudioCredit, StudioWordmark } from '@/components/brand/StudioWordmark'
 import { staggerDelay } from '@/lib/hills/motion'
 import Link from 'next/link'
 import { useTheme } from '@/components/providers/ThemeProvider'
-import type { ThemeChoice } from '@/lib/hills/sky'
+import { THEME_OPTIONS, ThemeIcon, themeLabel } from '@/components/shared/themeOptions'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useHasMounted } from '@/hooks/useHasMounted'
 import { FaFacebook, FaTwitter, FaInstagram, FaYoutube, FaLinkedin } from 'react-icons/fa'
 import {
-  Sun, Moon, Search, ArrowRight, Menu, X,
+  Check, Search, ArrowRight, Menu, X,
   ExternalLink, Send, Loader2, CheckCircle2,
   CalendarDays, LogIn,
 } from 'lucide-react'
@@ -201,7 +204,7 @@ const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', '
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
-  const { theme, setTheme, resolvedTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
   const mounted = useHasMounted()
   const [menuOpen, setMenuOpen]     = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -323,11 +326,6 @@ export default function LandingPage() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [menuOpen, searchOpen])
 
-  const cycleTheme = () => {
-    const order: ThemeChoice[] = ['light', 'dark', 'system']
-    setTheme(order[(order.indexOf(theme ?? 'system') + 1) % order.length] ?? 'system')
-  }
-
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
     setMenuOpen(false)
@@ -423,17 +421,33 @@ export default function LandingPage() {
               >
                 <Search className="w-4 h-4" />
               </button>
-              <button
-                onClick={cycleTheme}
-                aria-label={mounted ? `Theme: ${theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'Auto'}. Press to change.` : 'Toggle theme'}
-                title={mounted ? (theme === 'light' ? 'Light' : theme === 'dark' ? 'Dark' : 'Auto') : undefined}
-                className={`relative w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
-                  scrolled ? 'border-base text-foreground hover:bg-background' : 'border-white/25 text-white hover:bg-white/10'
-                }`}
-              >
-                {mounted && theme === 'system' && <span aria-hidden className="pointer-events-none absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-tone-teal" />}
-                {mounted && resolvedTheme === 'dark' ? <Moon className="w-4 h-4" aria-hidden /> : <Sun className="w-4 h-4" aria-hidden />}
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={mounted ? `Theme: ${themeLabel(theme)}. Press to change.` : 'Toggle theme'}
+                    title={mounted ? `Theme: ${themeLabel(theme)}` : undefined}
+                    className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-colors ${
+                      scrolled ? 'border-base text-foreground hover:bg-background' : 'border-white/25 text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <ThemeIcon choice={mounted ? theme : 'light'} className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-36 min-w-0">
+                  {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
+                    <DropdownMenuItem
+                      key={value}
+                      onClick={() => setTheme(value)}
+                      className="flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                      <span className="flex-1 text-sm">{label}</span>
+                      {mounted && theme === value && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Link
                 href="/login"
                 aria-label="Login Portal"

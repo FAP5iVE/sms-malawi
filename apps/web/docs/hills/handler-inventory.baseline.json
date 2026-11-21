@@ -1103,8 +1103,8 @@
   ]
  },
  "src/app/(auth)/hr/page.tsx": {
-  "digest": "05de4c57be37a7d336e6d16a2fc979802422b6b6",
-  "tokens": 389,
+  "digest": "d49bec5082389cc32e3f08c90c4288055134bf79",
+  "tokens": 442,
   "items": [
    {
     "k": "handler",
@@ -1205,6 +1205,11 @@
     "k": "handler",
     "n": "onClick",
     "h": "62e2dd92"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "650cb9f8"
    },
    {
     "k": "handler",
@@ -2957,7 +2962,7 @@
   ]
  },
  "src/app/(public)/page.tsx": {
-  "digest": "eeb0359126ae663553fa3692b2232fadcf3e51ce",
+  "digest": "6b340b3383d3a2a3791bab877e17268cc06b5ddc",
   "tokens": 364,
   "items": [
    {
@@ -3023,17 +3028,17 @@
    {
     "k": "handler",
     "n": "onClick",
-    "h": "38c16f93"
-   },
-   {
-    "k": "handler",
-    "n": "onClick",
     "h": "3e7abdd0"
    },
    {
     "k": "handler",
     "n": "onClick",
     "h": "3fe6cae8"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "4c43ee36"
    },
    {
     "k": "handler",
@@ -10743,8 +10748,8 @@
   ]
  },
  "src/components/shared/ModeToggle.tsx": {
-  "digest": "6b08eeedff79db5cfeac55218414c99abc7612b8",
-  "tokens": 31,
+  "digest": "85ad2006f4ddb8ad9e0df42603227475a3e9135d",
+  "tokens": 24,
   "items": [
    {
     "k": "effect",
@@ -11129,8 +11134,8 @@
   ]
  },
  "src/components/shared/PublicThemeToggle.tsx": {
-  "digest": "6c5fe68cb57f94263f36cb88db2f8affafeada0b",
-  "tokens": 20,
+  "digest": "54ae810a237b902a223acdfb60ef82cc25c1874c",
+  "tokens": 18,
   "items": [
    {
     "k": "handler",
@@ -11615,6 +11620,11 @@
  "src/components/shared/chart/types.ts": {
   "digest": "c9647b3d47731041adcab80bd53dad3a176ca788",
   "tokens": 6,
+  "items": []
+ },
+ "src/components/shared/themeOptions.tsx": {
+  "digest": "847c46ddb30524653eb0f1d5db3def5df7788d3c",
+  "tokens": 8,
   "items": []
  },
  "src/components/students/FactList.tsx": {
