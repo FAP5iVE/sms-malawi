@@ -31,6 +31,7 @@ const expressApp = createApiApp()
 
 export async function GET(req: NextRequest)    { return handleRequest(req) }
 export async function POST(req: NextRequest)   { return handleRequest(req) }
+export async function PUT(req: NextRequest)    { return handleRequest(req) }
 export async function PATCH(req: NextRequest)  { return handleRequest(req) }
 export async function DELETE(req: NextRequest) { return handleRequest(req) }
 export async function OPTIONS(req: NextRequest){ return handleRequest(req) }
