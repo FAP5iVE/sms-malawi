@@ -18,7 +18,7 @@
  *   of "who's logged in now" / force logout / duration tracking:
  *     - log-login-success now also opens a UserSession row (unchanged
  *       AuditLog write kept exactly as-is, same reasoning as above).
- *     - POST /auth/heartbeat — pinged every ~60s by useSessionHeartbeat.ts
+ *     - POST /auth/heartbeat — pinged every ~4 min (visible tabs only) by useSessionHeartbeat.ts
  *       while a tab is open, bumping the session's lastSeenAt so "active
  *       now" reflects real recent activity, not just "never logged out".
  *     - POST /auth/log-logout — called by AuthProvider's logout() BEFORE

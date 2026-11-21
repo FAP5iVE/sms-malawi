@@ -19,7 +19,7 @@ import 'server-only'
  *
  *   "Currently active" is NOT merely "never logged out" — a browser
  *   closed without a clean sign-out would otherwise look active forever.
- *   It's computed from lastSeenAt (bumped by a ~60s client heartbeat,
+ *   It's computed from lastSeenAt (bumped by a ~4 min client heartbeat,
  *   POST /auth/heartbeat) falling inside ACTIVE_GRACE_MS of now.
  * [DEPENDS ON]: W/lib/prisma.ts, W/server/services/auditService.ts
  *   (queryByActor — reused as-is for the per-session activity drill-down,
@@ -53,10 +53,11 @@ function getAuth() { return admin.auth(getAdminApp()) }
 
 // A session counts as "active now" if we've heard from it (heartbeat or
 // any authenticated request that bumps lastSeenAt) within this long.
-// Comfortably wider than the ~60s heartbeat interval so one missed beat
-// (a backgrounded tab, a flaky connection) doesn't flip someone to
-// "offline" and back every other poll.
-export const ACTIVE_GRACE_MS = 3 * 60 * 1000 // 3 minutes
+// 3x the client heartbeat interval (HEARTBEAT_INTERVAL_MS in
+// hooks/useSessionHeartbeat.ts, 4 min) so one missed beat (a flaky
+// connection) doesn't flip someone to "offline" and back every other poll.
+// Keep the two in sync.
+export const ACTIVE_GRACE_MS = 12 * 60 * 1000 // 12 minutes
 
 export type SessionWindow = '10m' | '30m' | '1h' | 'all'
 

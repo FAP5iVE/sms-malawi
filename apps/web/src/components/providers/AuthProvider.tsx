@@ -237,7 +237,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined>
 // with. Bounded by the same LOGOUT_CLEANUP_TIMEOUT_MS as the FCM step —
 // a hung request here must never delay sign-out. If this is missed for
 // any reason, the session simply ages out of "active now" once its
-// heartbeat (~60s) goes stale, rather than being marked as cleanly logged
+// heartbeat (~4 min) goes stale, rather than being marked as cleanly logged
 // out — the Sessions tab still reflects reality within a few minutes.
 async function logSessionEnd(authToken?: string): Promise<void> {
   try {

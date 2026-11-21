@@ -23,7 +23,7 @@ import { useEffect } from 'react'
 import { apiFetch } from '@/lib/api-client'
 import { useAuthStore } from '@/store/authStore'
 
-const HEARTBEAT_INTERVAL_MS = 60 * 1000 // 60s — see sessionService's ACTIVE_GRACE_MS (3x this)
+const HEARTBEAT_INTERVAL_MS = 4 * 60 * 1000 // 4 min — see sessionService's ACTIVE_GRACE_MS (3x this)
 
 export function useSessionHeartbeat(): void {
   const { initialized, user } = useAuthStore()
@@ -32,15 +32,45 @@ export function useSessionHeartbeat(): void {
   useEffect(() => {
     if (!isAuthenticated) return
 
+    let intervalId: ReturnType<typeof setInterval> | undefined
+    let lastPingAt = 0
+
     function ping() {
+      lastPingAt = Date.now()
       // Fire-and-forget — a missed heartbeat just means this session looks
       // "inactive" a little sooner; it must never surface as a user-facing
       // error or interrupt whatever the person is doing.
       apiFetch<void>('/auth/heartbeat', { method: 'POST' }).catch(() => {})
     }
 
-    ping() // immediate beat on mount / re-auth, not just after the first interval
-    const id = setInterval(ping, HEARTBEAT_INTERVAL_MS)
-    return () => clearInterval(id)
+    function start() {
+      if (intervalId !== undefined) return
+      // Beat right away on mount / re-auth, and when returning to the tab
+      // after a full interval or more. A quick tab-switch (less than one
+      // interval since the last beat) just restarts the timer.
+      if (Date.now() - lastPingAt >= HEARTBEAT_INTERVAL_MS) ping()
+      intervalId = setInterval(ping, HEARTBEAT_INTERVAL_MS)
+    }
+
+    function stop() {
+      if (intervalId === undefined) return
+      clearInterval(intervalId)
+      intervalId = undefined
+    }
+
+    // Hidden tabs don't beat — a tab left open in the background must not
+    // keep hitting the server. A tab hidden for longer than ACTIVE_GRACE_MS
+    // shows as not "active now" in the Sessions tab until it is visible again.
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') start()
+      else stop()
+    }
+
+    if (document.visibilityState === 'visible') start()
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      stop()
+    }
   }, [isAuthenticated])
 }
