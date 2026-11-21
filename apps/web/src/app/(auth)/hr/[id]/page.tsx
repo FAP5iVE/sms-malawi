@@ -30,7 +30,6 @@ import {
   EMPLOYMENT_CATEGORY_LABELS,
   QUALIFICATION_LEVEL_LABELS,
   TRAINING_ROUTE_LABELS,
-  HOUSING_STATUS_LABELS,
   STAFF_EXIT_REASON_LABELS,
   LICENCE_EXPIRY_WARNING_DAYS,
 } from '@shared/constants/malawi'
@@ -151,7 +150,8 @@ function StaffProfileContent() {
                 ['Sex', staff.sex === 'MALE' ? 'Male' : staff.sex === 'FEMALE' ? 'Female' : 'Not recorded'],
                 ['Employment Type', staff.employmentType.replace('_', '-')],
                 ['Date Joined', new Date(staff.dateJoined).toLocaleDateString()],
-                ['Contract Expiry', staff.contractExpiry ? new Date(staff.contractExpiry).toLocaleDateString() : '-'],
+                // Full-time staff are employed indefinitely, so they have no end date.
+                ['Contract Expiry', staff.contractExpiry ? new Date(staff.contractExpiry).toLocaleDateString() : staff.employmentType === 'FULL_TIME' ? 'Indefinite' : '-'],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between text-sm gap-4">
                   <span className="text-muted">{label}</span>
@@ -264,6 +264,8 @@ function StaffProfileContent() {
                     ? [
                         ['TCM Registration No.', staff.tcmRegistrationNo ?? '-'],
                         ['TCM Licence No.', staff.tcmLicenceNo ?? 'Missing'],
+                        ['Training Route', staff.trainingRoute ? TRAINING_ROUTE_LABELS[staff.trainingRoute] : '-'],
+                        ['Qualified Subjects', staff.qualifiedSubjects && staff.qualifiedSubjects.length > 0 ? staff.qualifiedSubjects.map((q) => q.subject).join(', ') : '-'],
                       ]
                     : []),
                 ].map(([label, value]) => (
@@ -307,10 +309,7 @@ function StaffProfileContent() {
                   ['Category', staff.employmentCategory ? EMPLOYMENT_CATEGORY_LABELS[staff.employmentCategory] : '-'],
                   ['Payroll No.', staff.payrollNo ?? '-'],
                   ['Highest Qualification', staff.highestQualification ? QUALIFICATION_LEVEL_LABELS[staff.highestQualification] : '-'],
-                  ['Training Route', staff.trainingRoute ? TRAINING_ROUTE_LABELS[staff.trainingRoute] : '-'],
-                  ['Qualified in Education', staff.qualifiedInEducation == null ? '-' : staff.qualifiedInEducation ? 'Yes' : 'No'],
-                  ['Qualified Subjects', staff.qualifiedSubjects && staff.qualifiedSubjects.length > 0 ? staff.qualifiedSubjects.map((q) => q.subject).join(', ') : '-'],
-                  ['Housing', staff.housingStatus ? HOUSING_STATUS_LABELS[staff.housingStatus] : '-'],
+                  ...(staff.qualificationProgram ? [['Programme Studied', staff.qualificationProgram]] : []),
                   ...(staff.exitReason
                     ? [
                         ['Reason for Leaving', STAFF_EXIT_REASON_LABELS[staff.exitReason]],

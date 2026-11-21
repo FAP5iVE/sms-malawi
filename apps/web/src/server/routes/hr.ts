@@ -204,8 +204,7 @@ const STAFF_IDENTITY_KEYS = [
   'nextOfKinName', 'nextOfKinPhone', 'nextOfKinRelation',
   // Compliance / payroll-adjacent fields are HR-only as well.
   'payrollNo', 'tcmRegistrationNo', 'tcmLicenceNo', 'tcmLicenceExpiry',
-  'highestQualification', 'qualifiedInEducation', 'trainingRoute',
-  'housingStatus',
+  'highestQualification', 'qualificationProgram', 'trainingRoute',
 ] as const
 
 hrRouter.get('/:id', verifyAuth, requireRole([...REVIEWERS]),

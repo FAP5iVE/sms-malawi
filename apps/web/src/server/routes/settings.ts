@@ -67,6 +67,7 @@ import {
 import * as settingsService  from '@/server/services/settingsService'
 import { SETTING_KEYS, SETTING_META } from '@shared/types/settings'
 import { validateCaConfig } from '@shared/constants/exams'
+import { validateIdFormat } from '@shared/constants/malawi/registration'
 import type { SettingKey, DepartmentTitles } from '@shared/types/settings'
 import { logger }            from '@/lib/logger'
 import { sendError } from '@/server/lib/sendError'
@@ -146,19 +147,6 @@ async function writeUserSettings(
 const SYSTEM_KEYS = [
   'session_timeout_hr',
 ]
-
-// Read-only, any authenticated user. useInactivityTimer.ts needs the admin's
-// Session Timeout on every role's browser, but GET /system below is admin-only.
-// Falls back to 5 (the dropdown's default) if the value is missing or invalid.
-settingsRouter.get('/session-timeout', async (_req, res) => {
-  try {
-    const data  = await readSettings(['session_timeout_hr'])
-    const hours = Number(data.session_timeout_hr)
-    return res.json({ hours: Number.isFinite(hours) && hours > 0 ? hours : 5 })
-  } catch (err: unknown) {
-    return sendError(res, err, { tags: { module: 'settings', route: 'session-timeout-get' } })
-  }
-})
 
 settingsRouter
   .route('/system')
@@ -435,6 +423,48 @@ settingsRouter
       }
     } catch (err) {
       return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Invalid HR settings.', tags: { module: 'settings' } })
+    }
+    return res.json({ ok: true })
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ID NUMBER FORMATS  (admin | hr | high_rank) — 2026-11-21
+// ─────────────────────────────────────────────────────────────────────────────
+// How new employee numbers and student registration numbers are laid out, e.g.
+// 'EMP-{YYYY}-000'. Staff and student numbers are generated from these (see
+// hrService.createStaff and studentService.nextRegistrationNo); records that
+// already have a number are never changed. Either field may be sent alone.
+settingsRouter
+  .route('/id-numbers')
+  .get(requireRole(['admin', 'hr', 'high_rank']), async (_req, res) => {
+    const [employeeNoFormat, studentRegistrationNoFormat] = await Promise.all([
+      settingsService.get(SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT),
+      settingsService.get(SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT),
+    ])
+    return res.json({ employeeNoFormat, studentRegistrationNoFormat })
+  })
+  .patch(requireRole(['admin', 'hr', 'high_rank']), async (req, res) => {
+    const { employeeNoFormat, studentRegistrationNoFormat } = req.body as {
+      employeeNoFormat?: unknown
+      studentRegistrationNoFormat?: unknown
+    }
+    const updates: Array<[typeof SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT | typeof SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT, unknown]> = []
+    if (employeeNoFormat !== undefined) updates.push([SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT, employeeNoFormat])
+    if (studentRegistrationNoFormat !== undefined) updates.push([SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT, studentRegistrationNoFormat])
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'employeeNoFormat or studentRegistrationNoFormat is required.' })
+    }
+    for (const [, value] of updates) {
+      if (typeof value !== 'string') return res.status(400).json({ error: 'The format must be text.' })
+      const problem = validateIdFormat(value)
+      if (problem) return res.status(400).json({ error: problem })
+    }
+    try {
+      for (const [key, value] of updates) {
+        await settingsService.set(key, (value as string).trim(), req.user!.uid)
+      }
+    } catch (err) {
+      return sendError(res, err, { defaultStatus: 400, fallbackMessage: 'Invalid ID number format.', tags: { module: 'settings' } })
     }
     return res.json({ ok: true })
   })

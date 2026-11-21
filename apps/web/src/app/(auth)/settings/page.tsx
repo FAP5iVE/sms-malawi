@@ -54,6 +54,7 @@ import {
   CalendarDays, 
   Search,
   Building2,
+  Hash,
 }                               from 'lucide-react'
 import { useAuthStore }         from '@/store/authStore'
 import { ModuleSurface }        from '@/components/shared/ModuleSurface'
@@ -66,6 +67,7 @@ import { FinanceSettings }      from '@/components/settings/FinanceSettings'
 import { LibrarySettings }      from '@/components/settings/LibrarySettings'
 import { HRDepartmentsSettings } from '@/components/settings/HRDepartmentsSettings'
 import { SchoolIdentitySettings } from '@/components/settings/SchoolIdentitySettings'
+import { IdNumberSettings } from '@/components/settings/IdNumberSettings'
 import { ClassroomSettings }    from '@/components/settings/ClassroomSettings'
 import { NotificationSettings } from '@/components/settings/NotificationSettings'
 import type { UserRole }        from '@shared/types/roles'
@@ -87,6 +89,7 @@ type SectionId =
   | 'library'
   | 'hr-departments'
   | 'school-identity'
+  | 'id-numbers'
   | 'classroom'
   | 'notifications'
 
@@ -159,6 +162,12 @@ const SECTIONS: Section[] = [
     roles: ['admin', 'hr', 'high_rank'],
   },
   {
+    id:    'id-numbers',
+    label: 'ID numbers',
+    icon:  Hash,
+    roles: ['admin', 'hr', 'high_rank'],
+  },
+  {
     id:    'classroom',
     label: 'Classroom preferences',
     icon:  LayoutList,
@@ -186,6 +195,7 @@ function SectionContent({ sectionId }: { sectionId: SectionId }) {
     case 'library':          return <LibrarySettings />
     case 'hr-departments':   return <HRDepartmentsSettings />
     case 'school-identity':  return <SchoolIdentitySettings />
+    case 'id-numbers':       return <IdNumberSettings />
     case 'classroom':        return <ClassroomSettings />
     case 'notifications':    return <NotificationSettings />
     case 'holidays':         return <HolidaysManager />

@@ -49,7 +49,7 @@ import {
 } from '@prisma/client'
 import type { UserRole } from '@shared/types/roles'
 import type { ResidenceTypeValue, AdmissionTypeValue, ExitReasonValue } from '@shared/constants/malawi'
-import { SUPPORT_NEED_TYPES, type SupportNeedTypeValue } from '@shared/constants/malawi'
+import { SUPPORT_NEED_TYPES, type SupportNeedTypeValue, idNumberParts, nextIdSequence, formatIdNumber } from '@shared/constants/malawi'
 import type { ApiStudentGuardian } from '@shared/types/api'
 import type {
   GuardianInput,
@@ -68,10 +68,12 @@ import { generateTempPassword } from '@/lib/tempPassword'
 
 // ─────────────────────────────────────────────────────────
 //  REGISTRATION NUMBER GENERATOR
-//  Format: SMS-YYYY-NNNN  (e.g. SMS-2025-0042)
-//  Sequence is per academic year, zero-padded to 4 digits.
-//  Uses a Prisma aggregate to find the current year's max seq, wrapped in a
-//  bounded retry loop: two concurrent createStudent() calls can both read
+//  The layout comes from Settings → ID numbers (STUDENT_REGISTRATION_NO_FORMAT,
+//  default SMS-{YYYY}-0000 → SMS-2025-0042). The last run of zeros is the
+//  running number; {YYYY} / {YY} are the year the student is registered. Numbers
+//  already issued keep their value; only new students follow a changed format.
+//  Finds the highest running number already issued in the current layout and
+//  adds one, wrapped in a bounded retry loop: two concurrent createStudent() calls can both read
 //  the same "last" sequence before either writes, so the actual duplicate
 //  is only detectable by the registrationNo @unique constraint rejecting
 //  the second insert (P2002) — at which point we simply recompute the next
@@ -81,21 +83,23 @@ import { generateTempPassword } from '@/lib/tempPassword'
 const REGISTRATION_NO_MAX_ATTEMPTS = 5
 
 async function nextRegistrationNo(): Promise<string> {
-  const year   = new Date().getFullYear()
-  const prefix = `SMS-${year}-`
+  const format = await settingsService.get(SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT)
+  const parts  = idNumberParts(format)
 
-  const last = await prisma.student.findFirst({
-    where:   { registrationNo: { startsWith: prefix } },
-    orderBy: { registrationNo: 'desc' },
-    select:  { registrationNo: true },
+  // Only numbers that start and end the way this layout does can set the next
+  // running number. Compared in code (not by sorting the text) so a number that
+  // grows a digit, e.g. 9999 → 10000, still counts as the highest.
+  const issued = await prisma.student.findMany({
+    where: {
+      registrationNo: {
+        startsWith: parts.prefix,
+        ...(parts.suffix ? { endsWith: parts.suffix } : {}),
+      },
+    },
+    select: { registrationNo: true },
   })
 
-  const lastSeq = last
-    ? parseInt(last.registrationNo.replace(prefix, ''), 10)
-    : 0
-
-  const nextSeq = lastSeq + 1
-  return `${prefix}${String(nextSeq).padStart(4, '0')}`
+  return formatIdNumber(format, nextIdSequence(issued.map((s) => s.registrationNo), parts))
 }
 
 function isUniqueConstraintError(err: unknown): boolean {

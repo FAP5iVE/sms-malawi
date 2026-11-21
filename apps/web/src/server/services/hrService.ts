@@ -80,6 +80,9 @@ import type {
 import type { LeaveType, Prisma, StaffRole } from '@prisma/client'
 import { getRetirementInfo, type RetirementInfo } from '@shared/utils/retirement'
 import type { TerminateStaffInput, StaffResponsibilityInput, UpdateOwnDetailsInput } from '@shared/schemas/hr'
+import { contractExpiryRequired, CONTRACT_EXPIRY_REQUIRED_MESSAGE } from '@shared/schemas/hr'
+import { qualificationNeedsProgram } from '@shared/constants/malawi/demographics'
+import { idNumberParts, nextIdSequence, formatIdNumber } from '@shared/constants/malawi/registration'
 import * as algolia from '@/server/services/algoliaService'
 import { checkLeaveConflicts, type ConflictCheckResult } from '@/server/services/leaveConflictService'
 import * as notificationService from '@/server/services/notificationService'
@@ -171,8 +174,8 @@ const STAFF_SENSITIVE_FIELDS = [
   'dateOfBirth', 'nationality', 'homeDistrict', 'nrbNumber', 'tpin',
   'nextOfKinName', 'nextOfKinPhone', 'nextOfKinRelation', 'retirement',
   'payrollNo', 'tcmRegistrationNo', 'tcmLicenceNo', 'tcmLicenceExpiry',
-  'highestQualification', 'qualifiedInEducation', 'trainingRoute',
-  'housingStatus', 'exitReason', 'exitDate',
+  'highestQualification', 'qualificationProgram', 'trainingRoute',
+  'exitReason', 'exitDate',
 ] as const
 
 /**
@@ -297,7 +300,22 @@ export async function updateStaff(
   if (input.department        !== undefined) updateData.department        = input.department
   if (input.jobTitle          !== undefined) updateData.jobTitle          = input.jobTitle
   if (input.employmentType    !== undefined) updateData.employmentType    = input.employmentType
-  if (input.contractExpiry    !== undefined) updateData.contractExpiry    = new Date(input.contractExpiry)
+  // Full-time staff are employed indefinitely: no end date is kept for them.
+  // Every other type must end up with one, whether it arrives in this edit or is
+  // already on file. Only checked when the edit touches either field, so an
+  // unrelated edit never trips over an older record.
+  if (input.employmentType === 'FULL_TIME') {
+    updateData.contractExpiry = null
+  } else if (input.contractExpiry !== undefined) {
+    updateData.contractExpiry = input.contractExpiry ? new Date(input.contractExpiry) : null
+  }
+  if (input.employmentType !== undefined || input.contractExpiry !== undefined) {
+    const finalType   = input.employmentType ?? before.employmentType
+    const finalExpiry = updateData.contractExpiry !== undefined ? updateData.contractExpiry : before.contractExpiry
+    if (contractExpiryRequired(finalType) && !finalExpiry) {
+      throw Object.assign(new Error(CONTRACT_EXPIRY_REQUIRED_MESSAGE), { status: 400 })
+    }
+  }
 
   // Identity fields ('' clears). Names of changed fields go to the audit log,
   // never their values (NRB / TPIN / date of birth are identity data).
@@ -326,9 +344,24 @@ export async function updateStaff(
   if (input.employmentCategory   !== undefined) { updateData.employmentCategory   = enumOrNull(input.employmentCategory);     complianceChanged.push('employmentCategory') }
   if (input.payrollNo            !== undefined) { updateData.payrollNo            = blankToNull(input.payrollNo);              complianceChanged.push('payrollNo') }
   if (input.highestQualification !== undefined) { updateData.highestQualification = enumOrNull(input.highestQualification);   complianceChanged.push('highestQualification') }
-  if (input.qualifiedInEducation !== undefined) { updateData.qualifiedInEducation = input.qualifiedInEducation;                complianceChanged.push('qualifiedInEducation') }
+  if (input.qualificationProgram !== undefined) { updateData.qualificationProgram = blankToNull(input.qualificationProgram);   complianceChanged.push('qualificationProgram') }
   if (input.trainingRoute        !== undefined) { updateData.trainingRoute        = enumOrNull(input.trainingRoute);           complianceChanged.push('trainingRoute') }
-  if (input.housingStatus        !== undefined) { updateData.housingStatus        = enumOrNull(input.housingStatus);           complianceChanged.push('housingStatus') }
+
+  // The programme studied only exists for a diploma or a degree: any other
+  // highest qualification clears it.
+  if (input.highestQualification !== undefined && !qualificationNeedsProgram(input.highestQualification)) {
+    updateData.qualificationProgram = null
+  }
+
+  // Teaching details belong to teaching staff only. Marking someone as not
+  // teaching clears the licence, training route and qualified subjects.
+  const clearTeaching = input.isTeaching === false
+  if (clearTeaching) {
+    updateData.tcmRegistrationNo = null
+    updateData.tcmLicenceNo      = null
+    updateData.tcmLicenceExpiry  = null
+    updateData.trainingRoute     = null
+  }
 
   const updated = await prisma.staffProfile.update({
     where: { id },
@@ -336,8 +369,8 @@ export async function updateStaff(
   })
 
   // Subjects the teacher is qualified to teach: replace the whole set.
-  if (input.qualifiedSubjects !== undefined) {
-    const subjects = [...new Set(input.qualifiedSubjects)]
+  if (input.qualifiedSubjects !== undefined || clearTeaching) {
+    const subjects = clearTeaching ? [] : [...new Set(input.qualifiedSubjects ?? [])]
     await prisma.$transaction([
       prisma.staffQualifiedSubject.deleteMany({ where: { staffId: id } }),
       prisma.staffQualifiedSubject.createMany({ data: subjects.map((subject) => ({ staffId: id, subject })) }),
@@ -396,6 +429,46 @@ export async function updateStaff(
   })
 
   return getStaffProfile(id)
+}
+
+// ─── EMPLOYEE NUMBER GENERATOR ───────────────────────────
+// The layout comes from Settings → ID numbers (HR_EMPLOYEE_NO_FORMAT, default
+// EMP-{YYYY}-0000). The last run of zeros is the running number; {YYYY} / {YY}
+// are the year the staff member is created. Numbers already issued keep their
+// value; only new staff follow a changed layout. The next number is one more
+// than the highest already issued in the current layout. Two people created at
+// the same moment can read the same "highest", so a clash on the unique
+// employeeNo column recomputes and retries (same approach as the student
+// registration number in studentService).
+const EMPLOYEE_NO_MAX_ATTEMPTS = 5
+
+async function nextEmployeeNo(): Promise<string> {
+  const format = await settingsService.get(SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT)
+  const parts  = idNumberParts(format)
+  const issued = await prisma.staffProfile.findMany({
+    where: {
+      employeeNo: {
+        startsWith: parts.prefix,
+        ...(parts.suffix ? { endsWith: parts.suffix } : {}),
+      },
+    },
+    select: { employeeNo: true },
+  })
+  return formatIdNumber(format, nextIdSequence(issued.map((s) => s.employeeNo), parts))
+}
+
+async function createWithNextEmployeeNo<T>(create: (employeeNo: string) => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    const employeeNo = await nextEmployeeNo()
+    try {
+      return await create(employeeNo)
+    } catch (err) {
+      const e = err as { code?: string; meta?: { target?: unknown } }
+      const employeeNoClash = e?.code === 'P2002' && String(e.meta?.target ?? '').includes('employeeNo')
+      if (!employeeNoClash || attempt >= EMPLOYEE_NO_MAX_ATTEMPTS - 1) throw err
+      logger.warn({ event: 'hrService.employeeNo_collision', attempt: attempt + 1, employeeNo }, '[hrService] Employee number collision — retrying')
+    }
+  }
 }
 
 // Creating a staff member now provisions their login end-to-end, mirroring
@@ -476,9 +549,9 @@ export async function createStaff(data: CreateStaffInput, actorUid: string) {
   //    of this fails, roll back the Auth account so it isn't orphaned.
   let staff: Awaited<ReturnType<typeof prisma.staffProfile.create>>
   try {
-    staff = await prisma.staffProfile.create({
+    const createProfile = (employeeNo: string) => prisma.staffProfile.create({
       data: {
-        employeeNo:        data.employeeNo,
+        employeeNo,
         firstName:         data.firstName,
         lastName:          data.lastName,
         sex:               data.sex ?? null,
@@ -489,7 +562,8 @@ export async function createStaff(data: CreateStaffInput, actorUid: string) {
         employmentType:    data.employmentType,
         dateJoined:        new Date(data.dateJoined),
         uid:               authUser.uid,   // the real Firebase Auth UID — not a form placeholder
-        contractExpiry:    data.contractExpiry ? new Date(data.contractExpiry) : null,
+        // Full-time staff have no end date, even if one was sent.
+        contractExpiry:    data.employmentType !== 'FULL_TIME' && data.contractExpiry ? new Date(data.contractExpiry) : null,
         phone:             data.phone ?? null,
         salaryStructureId: data.salaryStructureId ?? null,
         dateOfBirth:       data.dateOfBirth ? new Date(data.dateOfBirth) : null,
@@ -500,21 +574,22 @@ export async function createStaff(data: CreateStaffInput, actorUid: string) {
         nextOfKinName:     blankToNull(data.nextOfKinName),
         nextOfKinPhone:    blankToNull(data.nextOfKinPhone),
         nextOfKinRelation: blankToNull(data.nextOfKinRelation),
+        // Licence, training route and qualified subjects are kept for teaching staff only.
         isTeaching:           data.isTeaching ?? false,
-        tcmRegistrationNo:    blankToNull(data.tcmRegistrationNo),
-        tcmLicenceNo:         blankToNull(data.tcmLicenceNo),
-        tcmLicenceExpiry:     data.tcmLicenceExpiry ? new Date(data.tcmLicenceExpiry) : null,
+        tcmRegistrationNo:    data.isTeaching ? blankToNull(data.tcmRegistrationNo) : null,
+        tcmLicenceNo:         data.isTeaching ? blankToNull(data.tcmLicenceNo) : null,
+        tcmLicenceExpiry:     data.isTeaching && data.tcmLicenceExpiry ? new Date(data.tcmLicenceExpiry) : null,
         employmentCategory:   data.employmentCategory ? data.employmentCategory : null,
         payrollNo:            blankToNull(data.payrollNo),
         highestQualification: data.highestQualification ? data.highestQualification : null,
-        qualifiedInEducation: data.qualifiedInEducation ?? null,
-        trainingRoute:        data.trainingRoute ? data.trainingRoute : null,
-        housingStatus:        data.housingStatus ? data.housingStatus : null,
-        qualifiedSubjects:    data.qualifiedSubjects?.length
+        qualificationProgram: qualificationNeedsProgram(data.highestQualification) ? blankToNull(data.qualificationProgram) : null,
+        trainingRoute:        data.isTeaching && data.trainingRoute ? data.trainingRoute : null,
+        qualifiedSubjects:    data.isTeaching && data.qualifiedSubjects?.length
           ? { create: [...new Set(data.qualifiedSubjects)].map((subject) => ({ subject })) }
           : undefined,
       },
     })
+    staff = await createWithNextEmployeeNo(createProfile)
 
     // Initialise annual leave balance for the current year
     const year = new Date().getFullYear()

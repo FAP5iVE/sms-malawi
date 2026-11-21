@@ -21,6 +21,7 @@
  */
 
 import { DEFAULT_PAYE_BRACKETS } from '../constants/malawi/finance'
+import { EMPLOYEE_NO_FORMAT_DEFAULT, STUDENT_REGISTRATION_NO_FORMAT_DEFAULT } from '../constants/malawi/registration'
 import { getAcademicYearForDate, getCurrentTerm, getTermDatesForYear, parseAcademicYear } from '../constants/malawi/academic'
 
 // First-install defaults for the academic period, DERIVED from the calendar
@@ -233,6 +234,12 @@ export const SETTING_KEYS = {
   // policy value moves every staff member's date at once.
   HR_RETIREMENT_AGE:              'hr_retirement_age',
 
+  // ── ID numbers — how new employee and student registration numbers are laid out
+  // (e.g. 'EMP-{YYYY}-000'). The last run of zeros is the running number. See
+  // constants/malawi/registration.ts. Only new records follow a changed format.
+  HR_EMPLOYEE_NO_FORMAT:          'hr_employee_no_format',
+  STUDENT_REGISTRATION_NO_FORMAT: 'student_registration_no_format',
+
   // ── HR — department & job title taxonomy (production fix, 2026-07-27)
   HR_DEPARTMENT_TITLES:           'hr_department_titles',
 
@@ -370,6 +377,8 @@ export interface SettingValueMap {
   readonly [SETTING_KEYS.HR_EMERGENCY_LEAVE_DAYS]:     number
   readonly [SETTING_KEYS.HR_CONTRACT_EXPIRY_LOOKAHEAD_DAYS]: number  // days
   readonly [SETTING_KEYS.HR_RETIREMENT_AGE]: number                   // years
+  readonly [SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT]: string
+  readonly [SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT]: string
   readonly [SETTING_KEYS.HR_DEPARTMENT_TITLES]: DepartmentTitles
 
   // ── Security
@@ -909,6 +918,20 @@ export const SETTING_META: { readonly [K in SettingKey]: SettingMeta<K> } = {
     isPublic: false,
     description: 'Retirement age in years. Each staff member\'s retirement date is their date of birth plus this value.',
     defaultValue: 60,
+  },
+  [SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT]: {
+    key: SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT,
+    category: SETTING_CATEGORIES.HR,
+    isPublic: false,
+    description: 'Layout of new employee numbers, e.g. EMP-{YYYY}-000. The last run of zeros is the running number. Set under Settings → ID numbers.',
+    defaultValue: EMPLOYEE_NO_FORMAT_DEFAULT,
+  },
+  [SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT]: {
+    key: SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT,
+    category: SETTING_CATEGORIES.ACADEMIC,
+    isPublic: false,
+    description: 'Layout of new student registration numbers, e.g. SMS-{YYYY}-0000. The last run of zeros is the running number. Set under Settings → ID numbers.',
+    defaultValue: STUDENT_REGISTRATION_NO_FORMAT_DEFAULT,
   },
 
   [SETTING_KEYS.HR_DEPARTMENT_TITLES]: {

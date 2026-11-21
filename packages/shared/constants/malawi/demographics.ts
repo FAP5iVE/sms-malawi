@@ -148,6 +148,15 @@ export const QUALIFICATION_LEVEL_LABELS: Record<QualificationLevelValue, string>
   OTHER:        'Other',
 }
 
+/**
+ * Qualification levels where the person also says WHICH programme they did
+ * (e.g. "Bachelor of Education"). MSCE, postgraduate and other do not ask for it.
+ */
+export const QUALIFICATION_LEVELS_WITH_PROGRAM: readonly QualificationLevelValue[] = ['DIPLOMA', 'DEGREE']
+export function qualificationNeedsProgram(level: string | null | undefined): boolean {
+  return !!level && (QUALIFICATION_LEVELS_WITH_PROGRAM as readonly string[]).includes(level)
+}
+
 export const TRAINING_ROUTES = [
   'UNIVERSITY_EDUCATION_DEGREE', 'EDUCATION_DIPLOMA', 'TEACHER_CERTIFICATE', 'ODL', 'UNTRAINED', 'OTHER',
 ] as const
@@ -159,14 +168,6 @@ export const TRAINING_ROUTE_LABELS: Record<TrainingRouteValue, string> = {
   ODL:                         'Open and distance learning (ODL)',
   UNTRAINED:                   'Untrained',
   OTHER:                       'Other',
-}
-
-export const HOUSING_STATUSES = ['SCHOOL_HOUSE', 'RENT_ALLOWANCE', 'OWN_ARRANGEMENT'] as const
-export type HousingStatusValue = (typeof HOUSING_STATUSES)[number]
-export const HOUSING_STATUS_LABELS: Record<HousingStatusValue, string> = {
-  SCHOOL_HOUSE:    'School house',
-  RENT_ALLOWANCE:  'Rent allowance',
-  OWN_ARRANGEMENT: 'Own arrangement',
 }
 
 export const STAFF_EXIT_REASONS = ['RESIGNED', 'TRANSFERRED', 'RETIRED', 'CONTRACT_ENDED', 'DISMISSED', 'DECEASED', 'OTHER'] as const

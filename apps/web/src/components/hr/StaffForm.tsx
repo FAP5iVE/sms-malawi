@@ -35,7 +35,7 @@ import { z } from 'zod'
 import { useForm, useWatch } from 'react-hook-form'
 import type { Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CreateStaffSchema, UpdateStaffSchema } from '@shared/schemas/hr'
+import { CreateStaffSchema, UpdateStaffSchema, contractExpiryRequired, CONTRACT_EXPIRY_REQUIRED_MESSAGE } from '@shared/schemas/hr'
 import type { CreateStaffInput, UpdateStaffInput } from '@shared/schemas/hr'
 import type { ApiStaffDetail } from '@shared/types/api'
 type StaffFormValues = z.input<typeof CreateStaffSchema>
@@ -49,8 +49,7 @@ import {
   QUALIFICATION_LEVEL_LABELS,
   TRAINING_ROUTES,
   TRAINING_ROUTE_LABELS,
-  HOUSING_STATUSES,
-  HOUSING_STATUS_LABELS,
+  qualificationNeedsProgram,
 } from '@shared/constants/malawi'
 import { useCreateStaff, useUpdateStaff, useStaffProfile, useSalary, useUpdateSalary, useAllowances, useAddAllowance, useDeleteAllowance } from '@/hooks/useHR'
 import { useDepartmentTitles } from '@/hooks/useSettings'
@@ -103,6 +102,7 @@ export function StaffForm({ onClose, staffId }: Props) {
     control,
     setValue,
     reset,
+    setError,
     formState: { errors },
   } = useForm<StaffFormValues, unknown, CreateStaffInput>({
     // The ternary picks between two schemas with different (but
@@ -131,6 +131,13 @@ export function StaffForm({ onClose, staffId }: Props) {
   const { data: departmentTitles = {}, isLoading: deptLoading } = useDepartmentTitles()
   const departments = Object.keys(departmentTitles).sort()
   const isTeaching = useWatch({ control, name: 'isTeaching' })
+  // Full-time staff are employed indefinitely, so the contract end date only
+  // appears (and is required) for part-time, contract and temporary staff.
+  const employmentType = useWatch({ control, name: 'employmentType' })
+  const needsContractExpiry = contractExpiryRequired(employmentType)
+  // A diploma or degree also asks which programme was studied.
+  const highestQualification = useWatch({ control, name: 'highestQualification' })
+  const needsProgram = qualificationNeedsProgram(highestQualification)
   const selectedDept = useWatch({ control, name: 'department' })
   const titlesForDept = selectedDept ? (departmentTitles[selectedDept] ?? []) : []
 
@@ -144,7 +151,13 @@ export function StaffForm({ onClose, staffId }: Props) {
   function onSubmit(data: CreateStaffInput) {
     setSubmitError(null)
     if (isEdit) {
-      const { firstName, lastName, sex, email, phone, department, jobTitle, employmentType, contractExpiry } = data
+      const { firstName, lastName, sex, email, phone, department, jobTitle, employmentType: editedType, contractExpiry: editedExpiry } = data
+      // Same rule the server applies: everyone except full-time needs an end date.
+      if (contractExpiryRequired(editedType) && !editedExpiry) {
+        setError('contractExpiry', { type: 'required', message: CONTRACT_EXPIRY_REQUIRED_MESSAGE })
+        return
+      }
+      const contractExpiry = contractExpiryRequired(editedType) ? editedExpiry : ''
       // Identity fields are sent only by roles that can see (and so edit) them;
       // the server rejects them from anyone else.
       const identity = can('hr.viewStaffSensitive')
@@ -155,13 +168,16 @@ export function StaffForm({ onClose, staffId }: Props) {
             isTeaching: data.isTeaching, tcmRegistrationNo: data.tcmRegistrationNo,
             tcmLicenceNo: data.tcmLicenceNo, tcmLicenceExpiry: data.tcmLicenceExpiry,
             employmentCategory: data.employmentCategory, payrollNo: data.payrollNo,
-            highestQualification: data.highestQualification, qualifiedInEducation: data.qualifiedInEducation,
-            trainingRoute: data.trainingRoute, housingStatus: data.housingStatus,
-            qualifiedSubjects: data.qualifiedSubjects,
+            highestQualification: data.highestQualification,
+            qualificationProgram: qualificationNeedsProgram(data.highestQualification) ? data.qualificationProgram : '',
+            // Licence, training route and subjects are for teaching staff only;
+            // the server clears them when isTeaching is false.
+            trainingRoute: data.isTeaching ? data.trainingRoute : '',
+            qualifiedSubjects: data.isTeaching ? data.qualifiedSubjects : [],
           }
         : {}
       updateStaff.mutate(
-        { id: staffId!, data: { firstName, lastName, sex, email, phone, department, jobTitle, employmentType, contractExpiry, ...identity } as UpdateStaffInput },
+        { id: staffId!, data: { firstName, lastName, sex, email, phone, department, jobTitle, employmentType: editedType, contractExpiry, ...identity } as UpdateStaffInput },
         {
           onSuccess: () => onClose(),
           onError: (err) => {
@@ -313,9 +329,8 @@ export function StaffForm({ onClose, staffId }: Props) {
             </div>
             {!isEdit && (
               <div>
-                <label className={lbl} htmlFor="sf-employeeNo">Employee no.</label>
-                <input id="sf-employeeNo" {...register('employeeNo')} className={ic} placeholder="EMP-014" />
-                {errors.employeeNo && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.employeeNo.message}</p>}
+                <span className={lbl}>Employee no.</span>
+                <p className="text-sm text-muted min-h-[44px] flex items-center">Assigned automatically when you save.</p>
               </div>
             )}
             <div>
@@ -335,7 +350,16 @@ export function StaffForm({ onClose, staffId }: Props) {
             )}
             <div>
               <label className={lbl} htmlFor="sf-employmentType">Employment type</label>
-              <select id="sf-employmentType" {...register('employmentType')} className={ic}>
+              <select
+                id="sf-employmentType"
+                {...register('employmentType', {
+                  // Switching to full-time drops any end date that was typed.
+                  onChange: (e: { target: { value: string } }) => {
+                    if (!contractExpiryRequired(e.target.value)) setValue('contractExpiry', '', { shouldValidate: false })
+                  },
+                })}
+                className={ic}
+              >
                 {EMPLOYMENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
@@ -381,11 +405,13 @@ export function StaffForm({ onClose, staffId }: Props) {
                 {errors.dateJoined && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.dateJoined.message}</p>}
               </div>
             )}
-            <div>
-              <label className={lbl} htmlFor="sf-contractExpiry">Contract expiry (optional)</label>
-              <input id="sf-contractExpiry" type="date" {...register('contractExpiry')} className={ic} />
-              {errors.contractExpiry && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.contractExpiry.message}</p>}
-            </div>
+            {needsContractExpiry && (
+              <div>
+                <label className={lbl} htmlFor="sf-contractExpiry">Contract end date</label>
+                <input id="sf-contractExpiry" type="date" {...register('contractExpiry')} className={ic} />
+                {errors.contractExpiry && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.contractExpiry.message}</p>}
+              </div>
+            )}
           </div>
 
           {/* Identity & next of kin. Date of birth drives the computed
@@ -441,15 +467,60 @@ export function StaffForm({ onClose, staffId }: Props) {
             </div>
           )}
 
-          {/* Teaching, licensing, qualifications, housing. HR-only data. TCM
-              details apply to teaching staff only, so they appear once
-              "Teaching staff" is ticked (isTeaching is never inferred from role). */}
+          {/* Qualifications and teaching. HR-only data. Employment category,
+              payroll number and highest qualification apply to every member of
+              staff (a diploma or degree also asks which programme was studied).
+              The TCM licence, training route and subjects qualified to teach
+              apply to teaching staff only, so they appear once "Teaching staff"
+              is ticked (isTeaching is never inferred from role). */}
           {can('hr.viewStaffSensitive') && (
             <div className="mt-6">
               <p className="text-xs font-heading font-bold text-muted mb-3">
-                Teaching, licensing and qualifications
+                Qualifications and teaching
               </p>
               <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={lbl} htmlFor="sf-empCat">Employment category</label>
+                  <select id="sf-empCat" {...register('employmentCategory')} className={ic} defaultValue="">
+                    <option value="">Not recorded</option>
+                    {EMPLOYMENT_CATEGORIES.map((c) => <option key={c} value={c}>{EMPLOYMENT_CATEGORY_LABELS[c]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl} htmlFor="sf-payrollNo">Payroll / IPPE number</label>
+                  <input id="sf-payrollNo" {...register('payrollNo')} className={ic} autoComplete="off" />
+                </div>
+                <div>
+                  <label className={lbl} htmlFor="sf-qual">Highest qualification</label>
+                  <select
+                    id="sf-qual"
+                    {...register('highestQualification', {
+                      // The programme only applies to a diploma or a degree.
+                      onChange: (e: { target: { value: string } }) => {
+                        if (!qualificationNeedsProgram(e.target.value)) setValue('qualificationProgram', '', { shouldValidate: false })
+                      },
+                    })}
+                    className={ic}
+                    defaultValue=""
+                  >
+                    <option value="">Not recorded</option>
+                    {QUALIFICATION_LEVELS.map((q) => <option key={q} value={q}>{QUALIFICATION_LEVEL_LABELS[q]}</option>)}
+                  </select>
+                </div>
+                {needsProgram && (
+                  <div>
+                    <label className={lbl} htmlFor="sf-qualProgram">Programme studied</label>
+                    <input
+                      id="sf-qualProgram"
+                      {...register('qualificationProgram')}
+                      className={ic}
+                      placeholder="Bachelor of Education"
+                      autoComplete="off"
+                    />
+                    {errors.qualificationProgram && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.qualificationProgram.message}</p>}
+                  </div>
+                )}
+
                 <label className="col-span-2 flex items-center gap-2 text-sm text-body">
                   <input type="checkbox" {...register('isTeaching')} />
                   Teaching staff (requires a TCM licence)
@@ -466,71 +537,32 @@ export function StaffForm({ onClose, staffId }: Props) {
                       <input id="sf-tcmLic" {...register('tcmLicenceNo')} className={ic} />
                       {errors.tcmLicenceNo && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.tcmLicenceNo.message}</p>}
                     </div>
-                    <div className="col-span-2">
+                    <div>
                       <label className={lbl} htmlFor="sf-tcmExp">TCM licence expiry</label>
                       <input id="sf-tcmExp" type="date" {...register('tcmLicenceExpiry')} className={ic} />
                       {errors.tcmLicenceExpiry && <p className="text-xs text-tone-coral mt-1" role="alert">{errors.tcmLicenceExpiry.message}</p>}
                     </div>
+                    <div>
+                      <label className={lbl} htmlFor="sf-route">Training route</label>
+                      <select id="sf-route" {...register('trainingRoute')} className={ic} defaultValue="">
+                        <option value="">Not recorded</option>
+                        {TRAINING_ROUTES.map((r) => <option key={r} value={r}>{TRAINING_ROUTE_LABELS[r]}</option>)}
+                      </select>
+                    </div>
+
+                    <fieldset className="col-span-2">
+                      <legend className={lbl}>Subjects qualified to teach</legend>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+                        {MALAWI_SUBJECTS.map((subject) => (
+                          <label key={subject} className="flex items-center gap-2 text-sm text-body">
+                            <input type="checkbox" value={subject} {...register('qualifiedSubjects')} />
+                            {subject}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
                   </>
                 )}
-
-                <div>
-                  <label className={lbl} htmlFor="sf-empCat">Employment category</label>
-                  <select id="sf-empCat" {...register('employmentCategory')} className={ic} defaultValue="">
-                    <option value="">Not recorded</option>
-                    {EMPLOYMENT_CATEGORIES.map((c) => <option key={c} value={c}>{EMPLOYMENT_CATEGORY_LABELS[c]}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={lbl} htmlFor="sf-payrollNo">Payroll / IPPE number</label>
-                  <input id="sf-payrollNo" {...register('payrollNo')} className={ic} autoComplete="off" />
-                </div>
-                <div>
-                  <label className={lbl} htmlFor="sf-qual">Highest qualification</label>
-                  <select id="sf-qual" {...register('highestQualification')} className={ic} defaultValue="">
-                    <option value="">Not recorded</option>
-                    {QUALIFICATION_LEVELS.map((q) => <option key={q} value={q}>{QUALIFICATION_LEVEL_LABELS[q]}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={lbl} htmlFor="sf-route">Training route</label>
-                  <select id="sf-route" {...register('trainingRoute')} className={ic} defaultValue="">
-                    <option value="">Not recorded</option>
-                    {TRAINING_ROUTES.map((r) => <option key={r} value={r}>{TRAINING_ROUTE_LABELS[r]}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={lbl} htmlFor="sf-qedu">Qualified in education?</label>
-                  <select
-                    id="sf-qedu"
-                    {...register('qualifiedInEducation', { setValueAs: (v) => (v === '' || v == null ? null : v === 'true' || v === true) })}
-                    className={ic}
-                    defaultValue=""
-                  >
-                    <option value="">Not recorded</option>
-                    <option value="true">Yes</option>
-                    <option value="false">No</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={lbl} htmlFor="sf-housing">Housing</label>
-                  <select id="sf-housing" {...register('housingStatus')} className={ic} defaultValue="">
-                    <option value="">Not recorded</option>
-                    {HOUSING_STATUSES.map((h) => <option key={h} value={h}>{HOUSING_STATUS_LABELS[h]}</option>)}
-                  </select>
-                </div>
-
-                <fieldset className="col-span-2">
-                  <legend className={lbl}>Subjects qualified to teach</legend>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
-                    {MALAWI_SUBJECTS.map((subject) => (
-                      <label key={subject} className="flex items-center gap-2 text-sm text-body">
-                        <input type="checkbox" value={subject} {...register('qualifiedSubjects')} />
-                        {subject}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
               </div>
             </div>
           )}
@@ -868,7 +900,7 @@ function mapStaffToFormValues(s: ApiStaffDetail): Partial<StaffFormValues> {
     department:        s.department,
     jobTitle:          s.jobTitle,
     employmentType:    s.employmentType as StaffFormValues['employmentType'],
-    contractExpiry:    s.contractExpiry?.slice(0, 10),
+    contractExpiry:    s.contractExpiry?.slice(0, 10) ?? '',
     isTeaching:           s.isTeaching ?? false,
     tcmRegistrationNo:    s.tcmRegistrationNo ?? '',
     tcmLicenceNo:         s.tcmLicenceNo ?? '',
@@ -876,9 +908,8 @@ function mapStaffToFormValues(s: ApiStaffDetail): Partial<StaffFormValues> {
     employmentCategory:   s.employmentCategory ?? '',
     payrollNo:            s.payrollNo ?? '',
     highestQualification: s.highestQualification ?? '',
-    qualifiedInEducation: s.qualifiedInEducation ?? null,
+    qualificationProgram: s.qualificationProgram ?? '',
     trainingRoute:        s.trainingRoute ?? '',
-    housingStatus:        s.housingStatus ?? '',
     qualifiedSubjects:    (s.qualifiedSubjects ?? []).map((q) => q.subject) as StaffFormValues['qualifiedSubjects'],
     dateOfBirth:       s.dateOfBirth?.slice(0, 10) ?? '',
     nationality:       s.nationality ?? '',
@@ -889,4 +920,4 @@ function mapStaffToFormValues(s: ApiStaffDetail): Partial<StaffFormValues> {
     nextOfKinPhone:    s.nextOfKinPhone ?? '',
     nextOfKinRelation: s.nextOfKinRelation ?? '',
   }
-}
+}

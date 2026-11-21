@@ -59,7 +59,7 @@
  *   record creation via a POST /students/:id/photo multipart request.
  */
 
-import { useState, useEffect }      from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useIsMobileSync }          from '@/hooks/use-mobile'
 import { createPortal }             from 'react-dom'
 import { z }                        from 'zod'
@@ -85,6 +85,14 @@ import { apiFetch }                 from '@/lib/api-client'
 import { StudentFeeStructure } from '@/components/students/StudentFeeStructure'
 import { uploadFileDirectly } from '@/lib/directUpload'
 import { useMotionEnabled }         from '@/store/motionStore'
+import {
+  decideClose,
+  isUserEdit,
+  UNSAVED_TITLE,
+  UNSAVED_BODY,
+  UNSAVED_KEEP,
+  UNSAVED_DISCARD,
+} from '@/lib/hills/unsaved'
 import {
   SHEET_UP_VARIANTS,
   OVERLAY_VARIANTS,
@@ -343,6 +351,14 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   const [direction, setDirection]     = useState<1 | -1>(1)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+  // Unsaved-changes warning — the same rule and wording as the staff form (the
+  // shared dialog, lib/hills/unsaved.ts): once anything has been entered, the X,
+  // an outside click and Escape ask "Keep editing / Discard changes" instead of
+  // closing silently. A form nobody has typed in closes at once. The footer's
+  // Cancel button and the close after a successful save are unchanged.
+  const [typedIn, setTypedIn] = useState(false)
+  const [asking, setAsking]   = useState(false)
+
   // Live breakpoint (was a one-shot read at mount, so resizing or rotating
   // with the form open left the wrong layout). Form state lives in this
   // component, so switching sheet <-> dialog keeps everything the user typed.
@@ -351,7 +367,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     trigger,
     reset,
   } = useForm<StudentFormValues, unknown, CreateStudentInput>({
@@ -371,6 +387,39 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
   function handleClose() {
     setVisible(false)
     // onClose() is called by AnimatePresence onExitComplete
+  }
+
+  // Anything entered counts: typed or picked fields (user-caused input events),
+  // fields set from code that react-hook-form tracks, a chosen photo, or welfare.
+  const dirty = typedIn || isDirty || photoFile !== null || welfare !== EMPTY_WELFARE_DRAFT
+
+  /** Close request from the X, the backdrop or Escape. */
+  function attemptClose() {
+    const decision = decideClose({ busy: isPending, guarded: true, dirty, asking })
+    if (decision === 'close') handleClose()
+    else if (decision === 'ask') setAsking(true)
+    else if (decision === 'keep-editing') setAsking(false)
+  }
+  const attemptCloseRef = useRef(attemptClose)
+  useEffect(() => {
+    attemptCloseRef.current = attemptClose
+  })
+
+  useEffect(() => {
+    if (!visible) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      // A picker inside the form may call preventDefault() on Escape to close itself first.
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      e.preventDefault()
+      attemptCloseRef.current()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [visible])
+
+  /** Marks the form as typed in; fired by input events bubbling up from any field. */
+  function handleFormInput(e: React.FormEvent<HTMLFormElement>) {
+    if (isUserEdit(e.nativeEvent)) setTypedIn(true)
   }
 
   function handlePhotoChange(file: File, preview: string) {
@@ -540,6 +589,43 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
       : []),
   ]
 
+  // The question shown over the form (same markup and wording as the shared dialog).
+  const unsavedPrompt = (
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="student-form-unsaved-title"
+      aria-describedby="student-form-unsaved-body"
+      className="app-unsaved absolute inset-0 z-10 flex items-end justify-center bg-brand-navy/40 p-4 sm:items-center"
+    >
+      <div className="w-full max-w-sm rounded-[14px] border border-base bg-surface p-5 shadow-xl">
+        <h3 id="student-form-unsaved-title" className="font-heading text-base font-bold text-brand-navy">
+          {UNSAVED_TITLE}
+        </h3>
+        <p id="student-form-unsaved-body" className="mt-1 text-sm text-muted">
+          {UNSAVED_BODY}
+        </p>
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold transition-colors border border-base text-tone-coral hover:bg-page"
+          >
+            {UNSAVED_DISCARD}
+          </button>
+          <button
+            type="button"
+            autoFocus
+            onClick={() => setAsking(false)}
+            className="inline-flex items-center justify-center gap-2 min-h-11 px-5 rounded-xl text-sm font-heading font-semibold transition-colors bg-btn-brand text-btn-brand-fg hover:bg-btn-brand-hover"
+          >
+            {UNSAVED_KEEP}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
   // [PRODUCTION FIX] Both render paths below now portal directly under
   // <body> instead of rendering inline in the page tree — same reasoning
   // as AnnouncementForm.tsx/StaffForm.tsx: escapes the page-transition
@@ -564,7 +650,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
               exit="exit"
               transition={backdropTransition}
               className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px]"
-              onClick={handleClose}
+              onClick={attemptClose}
               aria-hidden
             />
 
@@ -581,6 +667,8 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
               aria-label={isEdit ? 'Edit student' : 'Add new student'}
               aria-modal="true"
             >
+              {asking && unsavedPrompt}
+
               {/* Drag handle */}
               <div className="flex justify-center pt-3 pb-1 shrink-0" aria-hidden>
                 <span className="w-10 h-1 rounded-full bg-muted/25" />
@@ -605,7 +693,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
                   />
                   <button
                     type="button"
-                    onClick={handleClose}
+                    onClick={attemptClose}
                     className="min-h-11 min-w-11 flex items-center justify-center rounded-xl text-muted hover:bg-page hover:text-body transition-colors"
                     aria-label="Close form"
                   >
@@ -617,6 +705,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
               {/* Scrollable step content */}
               <form
                 onSubmit={handleSubmit(onSubmit, onInvalid)}
+                onInput={handleFormInput}
                 className="flex-1 min-h-0 overflow-hidden flex flex-col"
               >
                 {/* Photo upload — Step 1 only */}
@@ -739,7 +828,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
           {/* Dim backdrop */}
           <div
             className="absolute inset-0 bg-brand-navy/50 backdrop-blur-sm"
-            onClick={handleClose}
+            onClick={attemptClose}
             aria-hidden
           />
 
@@ -756,6 +845,8 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
             aria-label={isEdit ? 'Edit student' : 'Add new student'}
             aria-modal="true"
           >
+            {asking && unsavedPrompt}
+
             {/* Dialog header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-base shrink-0">
               <div>
@@ -770,7 +861,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
               </div>
               <button
                 type="button"
-                onClick={handleClose}
+                onClick={attemptClose}
                 className="min-h-11 min-w-11 flex items-center justify-center rounded-xl hover:bg-page text-muted hover:text-body transition-colors"
                 aria-label="Close dialog"
               >
@@ -781,6 +872,7 @@ export function StudentForm({ onClose, studentId }: StudentFormProps) {
             {/* Scrollable form body */}
             <form
               onSubmit={handleSubmit(onSubmit, onInvalid)}
+              onInput={handleFormInput}
               className="flex-1 overflow-y-auto flex flex-col"
             >
               {/* Photo upload row */}

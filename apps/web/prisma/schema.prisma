@@ -1395,9 +1395,8 @@ model StaffProfile {
   employmentCategory    EmploymentCategory?
   payrollNo             String?             // HR-only
   highestQualification  QualificationLevel?
-  qualifiedInEducation  Boolean?
-  trainingRoute         TrainingRoute?
-  housingStatus         HousingStatus?
+  qualificationProgram  String?             // programme studied, e.g. "Bachelor of Education" (diploma / degree only)
+  trainingRoute         TrainingRoute?      // teaching staff only
   exitReason            StaffExitReason?
   exitDate              DateTime?
   qualifiedSubjects     StaffQualifiedSubject[]
@@ -1461,11 +1460,6 @@ enum TrainingRoute {
   ODL
   UNTRAINED
   OTHER
-}
-enum HousingStatus {
-  SCHOOL_HOUSE
-  RENT_ALLOWANCE
-  OWN_ARRANGEMENT
 }
 enum StaffExitReason {
   RESIGNED

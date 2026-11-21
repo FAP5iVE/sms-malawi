@@ -1120,9 +1120,8 @@ export interface ApiStaffDetail extends ApiStaffProfile {
   employmentCategory?: 'GOVERNMENT_POSTED' | 'SCHOOL_EMPLOYED' | 'COMMUNITY_PAID' | 'VOLUNTEER' | 'OTHER' | null
   payrollNo?: string | null
   highestQualification?: 'MSCE' | 'DIPLOMA' | 'DEGREE' | 'POSTGRADUATE' | 'OTHER' | null
-  qualifiedInEducation?: boolean | null
+  qualificationProgram?: string | null
   trainingRoute?: 'UNIVERSITY_EDUCATION_DEGREE' | 'EDUCATION_DIPLOMA' | 'TEACHER_CERTIFICATE' | 'ODL' | 'UNTRAINED' | 'OTHER' | null
-  housingStatus?: 'SCHOOL_HOUSE' | 'RENT_ALLOWANCE' | 'OWN_ARRANGEMENT' | null
   exitReason?: 'RESIGNED' | 'TRANSFERRED' | 'RETIRED' | 'CONTRACT_ENDED' | 'DISMISSED' | 'DECEASED' | 'OTHER' | null
   exitDate?: string | null
   qualifiedSubjects?: Array<{ subject: string }>

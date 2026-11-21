@@ -10,6 +10,7 @@
  */
 import { z } from 'zod'
 import { SETTING_KEYS, type SettingKey } from '../types/settings'
+import { validateIdFormat } from '../constants/malawi/registration'
 
 // ─────────────────────────────────────────────────────────
 //  INDIVIDUAL VALUE SCHEMAS
@@ -272,6 +273,17 @@ export const SETTING_VALUE_SCHEMAS: { readonly [K in SettingKey]: z.ZodType } = 
   // mark every member of staff as already retired.
   [SETTING_KEYS.HR_RETIREMENT_AGE]:
     positiveIntSchema('Retirement age').min(50).max(75),
+  // ID number layouts: the same plain-language rules the Settings screen shows.
+  [SETTING_KEYS.HR_EMPLOYEE_NO_FORMAT]:
+    z.string().trim().superRefine((v, ctx) => {
+      const problem = validateIdFormat(v)
+      if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem })
+    }),
+  [SETTING_KEYS.STUDENT_REGISTRATION_NO_FORMAT]:
+    z.string().trim().superRefine((v, ctx) => {
+      const problem = validateIdFormat(v)
+      if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem })
+    }),
 
   // [PRODUCTION FIX 2026-07-27] Department name -> non-empty list of job
   // titles. Both department names and title names must be non-blank after
