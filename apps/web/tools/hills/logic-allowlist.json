@@ -152,6 +152,14 @@
     {
       "file": "src/components/students/FactList.tsx",
       "reason": "Phase 9b: presentational label and value list used by the student profile and the welfare card. No data, auth or routing code"
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "reason": "Phase 10c: guardian frame (sidebar, header, phone bar). Lists existing guardian pages only"
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "reason": "Phase 10c: pure list of the guardian's pages, tested in parentNav.test.mts"
     }
   ],
   "deletedFiles": [
@@ -18808,6 +18816,1056 @@
       "kind": "logic",
       "pattern": "^while\\ \\(\\ rings\\ \\.\\ childElementCount\\ >\\ RIPPLE_MAX_RINGS\\ \\)\\ rings\\ \\.\\ firstElementChild\\ \\?\\.\\ remove\\ \\(\\ \\)$",
       "reason": "Phase 10b, owner request 2026-11-21: the typing ripple is again a wave that runs along the contour lines. The ring lasts 2.6s so clean-up moves to 3.2s, and at most 6 waves exist at once (the oldest is removed first) so fast typing cannot stack a flood. Presentation of the existing decorative effect only: same input listener, same gap, no data or request."
+    },
+    {
+      "file": "src/app/(auth)/classes/[id]/page.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useParams\\ ,\\ useSearchParams\\ \\}\\ from\\ 'next/navigation'$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): tapping or clicking a student in a class roster opens that student's profile (router.push to /students/<id>), only for the roles that already see the Profile link (canViewStudentProfile). The Profile link stops the click reaching the row so the page opens once. Sex shows as a word through statusWord (R4.8). No new request or permission."
+    },
+    {
+      "file": "src/app/(auth)/classes/[id]/page.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ rosterColumns\\ :\\ DataColumn\\ <\\ RosterStudent\\ >\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ key\\ :\\ 'firstName'\\ ,\\ label\\ :\\ 'Name'\\ ,\\ priority\\ :\\ 'critical'\\ ,\\ render\\ :\\ \\(\\ s\\ \\)\\ =>\\ `\\$\\{\\ s\\ \\.\\ firstName\\ \\}\\ \\$\\{\\ s\\ \\.\\ lastName\\ \\}`\\ ,\\ \\}\\ ,\\ \\.\\.\\.\\ \\(\\ isStudent\\ \\?\\ \\[\\ \\]\\ :\\ \\[\\ \\{\\ key\\ :\\ 'registrationNo'\\ ,\\ label\\ :\\ 'Reg\\ No'\\ ,\\ priority\\ :\\ 'important'\\ as\\ const\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'sex'\\ ,\\ label\\ :\\ 'Sex'\\ ,\\ priority\\ :\\ 'optional'\\ as\\ const\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'riskLevel'\\ ,\\ label\\ :\\ 'Risk'\\ ,\\ priority\\ :\\ 'optional'\\ as\\ const\\ ,\\ render\\ :\\ \\(\\ s\\ :\\ RosterStudent\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'profile'\\ ,\\ label\\ :\\ ''\\ ,\\ priority\\ :\\ 'important'\\ as\\ const\\ ,\\ render\\ :\\ \\(\\ s\\ :\\ RosterStudent\\ \\)\\ =>\\ canViewStudentProfile\\ \\?\\ \\(\\ <JSX/>\\ \\)\\ :\\ null\\ ,\\ \\}\\ ,\\ \\]\\ \\)\\ ,\\ \\]$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): tapping or clicking a student in a class roster opens that student's profile (router.push to /students/<id>), only for the roles that already see the Profile link (canViewStudentProfile). The Profile link stops the click reaching the row so the page opens once. Sex shows as a word through statusWord (R4.8). No new request or permission."
+    },
+    {
+      "file": "src/app/(auth)/classes/[id]/page.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useParams\\ ,\\ useRouter\\ ,\\ useSearchParams\\ \\}\\ from\\ 'next/navigation'$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): tapping or clicking a student in a class roster opens that student's profile (router.push to /students/<id>), only for the roles that already see the Profile link (canViewStudentProfile). The Profile link stops the click reaching the row so the page opens once. Sex shows as a word through statusWord (R4.8). No new request or permission."
+    },
+    {
+      "file": "src/app/(auth)/classes/[id]/page.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ statusWord\\ \\}\\ from\\ '@/lib/hills/statusWord'$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): tapping or clicking a student in a class roster opens that student's profile (router.push to /students/<id>), only for the roles that already see the Profile link (canViewStudentProfile). The Profile link stops the click reaching the row so the page opens once. Sex shows as a word through statusWord (R4.8). No new request or permission."
+    },
+    {
+      "file": "src/app/(auth)/classes/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ router\\ =\\ useRouter\\ \\(\\ \\)$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): tapping or clicking a student in a class roster opens that student's profile (router.push to /students/<id>), only for the roles that already see the Profile link (canViewStudentProfile). The Profile link stops the click reaching the row so the page opens once. Sex shows as a word through statusWord (R4.8). No new request or permission."
+    },
+    {
+      "file": "src/app/(auth)/classes/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ rosterColumns\\ :\\ DataColumn\\ <\\ RosterStudent\\ >\\ \\[\\ \\]\\ =\\ \\[\\ \\{\\ key\\ :\\ 'firstName'\\ ,\\ label\\ :\\ 'Name'\\ ,\\ priority\\ :\\ 'critical'\\ ,\\ render\\ :\\ \\(\\ s\\ \\)\\ =>\\ `\\$\\{\\ s\\ \\.\\ firstName\\ \\}\\ \\$\\{\\ s\\ \\.\\ lastName\\ \\}`\\ ,\\ \\}\\ ,\\ \\.\\.\\.\\ \\(\\ isStudent\\ \\?\\ \\[\\ \\]\\ :\\ \\[\\ \\{\\ key\\ :\\ 'registrationNo'\\ ,\\ label\\ :\\ 'Reg\\ No'\\ ,\\ priority\\ :\\ 'important'\\ as\\ const\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'sex'\\ ,\\ label\\ :\\ 'Sex'\\ ,\\ priority\\ :\\ 'optional'\\ as\\ const\\ ,\\ render\\ :\\ \\(\\ s\\ :\\ RosterStudent\\ \\)\\ =>\\ statusWord\\ \\(\\ s\\ \\.\\ sex\\ \\)\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'riskLevel'\\ ,\\ label\\ :\\ 'Risk'\\ ,\\ priority\\ :\\ 'optional'\\ as\\ const\\ ,\\ render\\ :\\ \\(\\ s\\ :\\ RosterStudent\\ \\)\\ =>\\ \\(\\ <JSX/>\\ \\)\\ ,\\ \\}\\ ,\\ \\{\\ key\\ :\\ 'profile'\\ ,\\ label\\ :\\ ''\\ ,\\ priority\\ :\\ 'important'\\ as\\ const\\ ,\\ render\\ :\\ \\(\\ s\\ :\\ RosterStudent\\ \\)\\ =>\\ canViewStudentProfile\\ \\?\\ \\(\\ <JSX/>\\ \\)\\ :\\ null\\ ,\\ \\}\\ ,\\ \\]\\ \\)\\ ,\\ \\]$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): tapping or clicking a student in a class roster opens that student's profile (router.push to /students/<id>), only for the roles that already see the Profile link (canViewStudentProfile). The Profile link stops the click reaching the row so the page opens once. Sex shows as a word through statusWord (R4.8). No new request or permission."
+    },
+    {
+      "file": "src/app/(auth)/classes/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onClick=\\{\\ \\(\\ e\\ \\)\\ =>\\ e\\ \\.\\ stopPropagation\\ \\(\\ \\)\\ \\}$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): tapping or clicking a student in a class roster opens that student's profile (router.push to /students/<id>), only for the roles that already see the Profile link (canViewStudentProfile). The Profile link stops the click reaching the row so the page opens once. Sex shows as a word through statusWord (R4.8). No new request or permission."
+    },
+    {
+      "file": "src/app/(auth)/classes/[id]/page.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onRowClick=\\{\\ canViewStudentProfile\\ \\?\\ \\(\\ s\\ \\)\\ =>\\ router\\ \\.\\ push\\ \\(\\ `/students/\\$\\{\\ s\\ \\.\\ id\\ \\}`\\ \\)\\ :\\ undefined\\ \\}$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): tapping or clicking a student in a class roster opens that student's profile (router.push to /students/<id>), only for the roles that already see the Profile link (canViewStudentProfile). The Profile link stops the click reaching the row so the page opens once. Sex shows as a word through statusWord (R4.8). No new request or permission."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ usePathname\\ ,\\ useRouter\\ \\}\\ from\\ 'next/navigation'$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useParentMe\\ \\}\\ from\\ '@/hooks/useParentPortal'$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ router\\ =\\ useRouter\\ \\(\\ \\)$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^await\\ logout\\ \\(\\ \\)$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^router\\ \\.\\ replace\\ \\(\\ '/login'\\ \\)$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^function\\ ParentShell\\ \\(\\ \\{\\ children\\ \\}\\ :\\ \\{\\ children\\ :\\ ReactNode\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ pathname\\ =\\ usePathname\\ \\(\\ \\)$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ me\\ =\\ useParentMe\\ \\(\\ \\)$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^const\\ signOut\\ =\\ async\\ \\(\\ \\)\\ =>\\ \\{\\}$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^href=\"/parent\"$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ me\\ \\.\\ data\\ \\?\\.\\ displayName\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^\\{\\ me\\ \\.\\ data\\ \\.\\ displayName\\ \\}$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^type=\"button\"$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^onClick=\\{\\ signOut\\ \\}$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Sign\\ out$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "removed",
+      "kind": "logic",
+      "pattern": "^resetKey=\\{\\ pathname\\ \\}$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useRouter\\ \\}\\ from\\ 'next/navigation'$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/app/(parent)/layout.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ ParentFrame\\ \\(\\ \\{\\ children\\ \\}\\ :\\ \\{\\ children\\ :\\ ReactNode\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10c, owner request 2026-11-21 (approved): the guardian frame moves into ParentShell (sidebar, header, phone bar like the staff frame). RoleGuard for the parent role, the session manager and idle sign-out are unchanged. Sign out and theme switch moved into ParentShell with the same logout() call."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^'use\\ client'$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useEffect\\ ,\\ useRef\\ ,\\ useState\\ ,\\ type\\ ReactNode\\ \\}\\ from\\ 'react'$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ usePathname\\ ,\\ useRouter\\ \\}\\ from\\ 'next/navigation'$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useParentChildren\\ ,\\ useParentMe\\ \\}\\ from\\ '@/hooks/useParentPortal'$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ usePublicSchoolInfo\\ \\}\\ from\\ '@/hooks/usePublic'$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ useAuthStore\\ \\}\\ from\\ '@/store/authStore'$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "import",
+      "pattern": "^import\\ \\{\\ buildParentNav\\ ,\\ parentBarItems\\ ,\\ parentPageTitle\\ ,\\ PARENT_HOME_HREF\\ ,\\ type\\ ParentNavItem\\ \\}\\ from\\ '@/lib/hills/parentNav'$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ useGuardianNav\\ \\(\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ pathname\\ =\\ usePathname\\ \\(\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ kids\\ =\\ useParentChildren\\ \\(\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ children\\ =\\ kids\\ \\.\\ data\\ \\?\\.\\ children\\ \\?\\?\\ \\[\\ \\]$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ items\\ =\\ buildParentNav\\ \\(\\ children\\ ,\\ pathname\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ \\{\\ items\\ ,\\ title\\ :\\ parentPageTitle\\ \\(\\ children\\ ,\\ pathname\\ \\)\\ ,\\ pathname\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ iconFor\\ \\(\\ item\\ :\\ ParentNavItem\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ item\\ \\.\\ kind\\ ===\\ 'dashboard'\\ \\?\\ LayoutDashboard\\ :\\ UserRound$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ ParentSidebar\\ \\(\\ \\{\\ items\\ \\}\\ :\\ \\{\\ items\\ :\\ ParentNavItem\\ \\[\\ \\]\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ data\\ :\\ schoolInfo\\ \\}\\ =\\ usePublicSchoolInfo\\ \\(\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ top\\ =\\ items\\ \\.\\ filter\\ \\(\\ \\(\\ i\\ \\)\\ =>\\ i\\ \\.\\ kind\\ ===\\ 'dashboard'\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ kids\\ =\\ items\\ \\.\\ filter\\ \\(\\ \\(\\ i\\ \\)\\ =>\\ i\\ \\.\\ kind\\ ===\\ 'child'\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ link\\ =\\ \\(\\ item\\ :\\ ParentNavItem\\ \\)\\ =>\\ \\{\\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ Icon\\ =\\ iconFor\\ \\(\\ item\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ \\(\\ <JSX/>\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^key=\\{\\ item\\ \\.\\ href\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^href=\\{\\ item\\ \\.\\ href\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ item\\ \\.\\ label\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria\\-current=\\{\\ item\\ \\.\\ active\\ \\?\\ 'page'\\ :\\ undefined\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ item\\ \\.\\ label\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"Main\\ navigation\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^href=\\{\\ PARENT_HOME_HREF\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"Go\\ to\\ Dashboard\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^kind=\"emblem\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ schoolInfo\\ \\?\\.\\ schoolName\\ \\?\\?\\ ''\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"Page\\ navigation\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ top\\ \\.\\ map\\ \\(\\ link\\ \\)\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ kids\\ \\.\\ length\\ >\\ 0\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^role=\"group\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"Children\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ kids\\ \\.\\ map\\ \\(\\ link\\ \\)\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ ParentHeader\\ \\(\\ \\{\\ title\\ \\}\\ :\\ \\{\\ title\\ :\\ string\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ router\\ =\\ useRouter\\ \\(\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ me\\ =\\ useParentMe\\ \\(\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ user\\ =\\ useAuthStore\\ \\(\\ \\(\\ s\\ \\)\\ =>\\ s\\ \\.\\ user\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\[\\ open\\ ,\\ setOpen\\ \\]\\ =\\ useState\\ \\(\\ false\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\[\\ reportOpen\\ ,\\ setReportOpen\\ \\]\\ =\\ useState\\ \\(\\ false\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ ref\\ =\\ useRef\\ <\\ HTMLDivElement\\ >\\ \\(\\ null\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ displayName\\ =\\ me\\ \\.\\ data\\ \\?\\.\\ displayName\\ \\?\\?\\ user\\ \\?\\.\\ displayName\\ \\?\\?\\ user\\ \\?\\.\\ email\\ \\?\\.\\ split\\ \\(\\ '@'\\ \\)\\ \\[\\ 0\\ \\]\\ \\?\\?\\ 'Guardian'$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ initials\\ =\\ displayName\\ \\.\\ slice\\ \\(\\ 0\\ ,\\ 2\\ \\)\\ \\.\\ toUpperCase\\ \\(\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^useEffect\\ \\(\\ \\(\\ \\)\\ =>\\ \\{\\}\\ ,\\ \\[\\ open\\ \\]\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ !\\ open\\ \\)\\ return$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ onDown\\ =\\ \\(\\ e\\ :\\ MouseEvent\\ \\)\\ =>\\ \\{\\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ ref\\ \\.\\ current\\ \\&\\&\\ !\\ ref\\ \\.\\ current\\ \\.\\ contains\\ \\(\\ e\\ \\.\\ target\\ as\\ Node\\ \\)\\ \\)\\ setOpen\\ \\(\\ false\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ onKey\\ =\\ \\(\\ e\\ :\\ KeyboardEvent\\ \\)\\ =>\\ \\{\\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^if\\ \\(\\ e\\ \\.\\ key\\ ===\\ 'Escape'\\ \\)\\ setOpen\\ \\(\\ false\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^document\\ \\.\\ addEventListener\\ \\(\\ 'mousedown'\\ ,\\ onDown\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^document\\ \\.\\ addEventListener\\ \\(\\ 'keydown'\\ ,\\ onKey\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ \\(\\ \\)\\ =>\\ \\{\\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^document\\ \\.\\ removeEventListener\\ \\(\\ 'mousedown'\\ ,\\ onDown\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^document\\ \\.\\ removeEventListener\\ \\(\\ 'keydown'\\ ,\\ onKey\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ signOut\\ =\\ async\\ \\(\\ \\)\\ =>\\ \\{\\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^await\\ logout\\ \\(\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^router\\ \\.\\ replace\\ \\(\\ '/login'\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^data\\-page\\-header=\"\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ title\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^ref=\\{\\ ref\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^type=\"button\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onClick=\\{\\ \\(\\ \\)\\ =>\\ setOpen\\ \\(\\ \\(\\ v\\ \\)\\ =>\\ !\\ v\\ \\)\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria\\-expanded=\\{\\ open\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^aria\\-haspopup=\"true\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ `Account\\ menu,\\ \\$\\{\\ displayName\\ \\}`\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=\\{initials\\}\\ \\{displayName\\}\\ Parent\\ or\\ guardian$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ initials\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ displayName\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ open\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^role=\"menu\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"Account\\ options\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ user\\ \\?\\.\\ email\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ user\\ \\.\\ email\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^role=\"menuitem\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onClick=\\{\\ \\(\\ \\)\\ =>\\ \\{\\}\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^setOpen\\ \\(\\ false\\ \\)\\ ;$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^setReportOpen\\ \\(\\ true\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Report\\ a\\ problem$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onClick=\\{\\ signOut\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^text\\(button\\)=Sign\\ out$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ reportOpen\\ \\&\\&\\ <JSX/>\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^onClose=\\{\\ \\(\\ \\)\\ =>\\ setReportOpen\\ \\(\\ false\\ \\)\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ ParentBottomNav\\ \\(\\ \\{\\ items\\ \\}\\ :\\ \\{\\ items\\ :\\ ParentNavItem\\ \\[\\ \\]\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ bar\\ =\\ parentBarItems\\ \\(\\ items\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\"Mobile\\ navigation\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^data\\-mobile\\-nav=\"\"$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ bar\\ \\.\\ map\\ \\(\\ \\(\\ item\\ \\)\\ =>\\ \\{\\}\\ \\)\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ Icon\\ =\\ item\\ \\.\\ kind\\ ===\\ 'dashboard'\\ \\?\\ LayoutDashboard\\ :\\ GraduationCap$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ item\\ \\.\\ mobileLabel\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ ParentShell\\ \\(\\ \\{\\ children\\ \\}\\ :\\ \\{\\ children\\ :\\ ReactNode\\ \\}\\ \\)\\ \\{\\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ \\{\\ items\\ ,\\ title\\ ,\\ pathname\\ \\}\\ =\\ useGuardianNav\\ \\(\\ \\)$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^items=\\{\\ items\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^title=\\{\\ title\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^resetKey=\\{\\ pathname\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/parent/ParentShell.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ children\\ \\}$",
+      "reason": "Phase 10c: new guardian frame. Lists only Dashboard and the guardian's own children from the existing useParentChildren query; sign out calls the same logout() and replaces to /login. No new route, request or permission; staff-only data (search, announcements, approvals) is deliberately not loaded."
+    },
+    {
+      "file": "src/components/shared/DataTable.tsx",
+      "side": "removed",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ onRowClick\\ \\?\\ `View\\ details\\ for\\ \\$\\{\\ id\\ \\}`\\ :\\ undefined\\ \\}$",
+      "reason": "Phase 10c: a clickable card shows a chevron when it has no actions button, and its screen-reader label uses the card title instead of the raw row id. Presentation and label only; the click handler is the caller's existing onRowClick."
+    },
+    {
+      "file": "src/components/shared/DataTable.tsx",
+      "side": "added",
+      "kind": "selector",
+      "pattern": "^aria\\-label=\\{\\ onRowClick\\ \\?\\ `View\\ details\\ for\\ \\$\\{\\ typeof\\ titleValue\\ ===\\ 'string'\\ \\?\\ titleValue\\ :\\ id\\ \\}`\\ :\\ undefined\\ \\}$",
+      "reason": "Phase 10c: a clickable card shows a chevron when it has no actions button, and its screen-reader label uses the card title instead of the raw row id. Presentation and label only; the click handler is the caller's existing onRowClick."
+    },
+    {
+      "file": "src/components/shared/DataTable.tsx",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^\\{\\ onRowClick\\ \\&\\&\\ !\\ \\(\\ mobileActions\\ \\&\\&\\ mobileActions\\ \\.\\ length\\ >\\ 0\\ \\)\\ \\&\\&\\ \\(\\ <JSX/>\\ \\)\\ \\}$",
+      "reason": "Phase 10c: a clickable card shows a chevron when it has no actions button, and its screen-reader label uses the card title instead of the raw row id. Presentation and label only; the click handler is the caller's existing onRowClick."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ interface\\ ParentNavChild\\ \\{\\ id\\ :\\ string\\ firstName\\ :\\ string\\ \\|\\ null\\ lastName\\ :\\ string\\ \\|\\ null\\ \\}$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ interface\\ ParentNavItem\\ \\{\\ href\\ :\\ string\\ label\\ :\\ string\\ mobileLabel\\ :\\ string\\ kind\\ :\\ 'dashboard'\\ \\|\\ 'child'\\ active\\ :\\ boolean\\ \\}$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ PARENT_HOME_HREF\\ =\\ '/parent'$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ const\\ PARENT_BAR_CHILD_SLOTS\\ =\\ 4$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ fullName\\ \\(\\ c\\ :\\ ParentNavChild\\ \\)\\ :\\ string\\ \\{\\}$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ `\\$\\{\\ c\\ \\.\\ firstName\\ \\?\\?\\ ''\\ \\}\\ \\$\\{\\ c\\ \\.\\ lastName\\ \\?\\?\\ ''\\ \\}`\\ \\.\\ trim\\ \\(\\ \\)\\ \\|\\|\\ 'Student'$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^function\\ shortName\\ \\(\\ c\\ :\\ ParentNavChild\\ \\)\\ :\\ string\\ \\{\\}$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ first\\ =\\ \\(\\ c\\ \\.\\ firstName\\ \\?\\?\\ ''\\ \\)\\ \\.\\ trim\\ \\(\\ \\)\\ \\|\\|\\ fullName\\ \\(\\ c\\ \\)$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ first\\ \\.\\ length\\ >\\ 9\\ \\?\\ `\\$\\{\\ first\\ \\.\\ slice\\ \\(\\ 0\\ ,\\ 8\\ \\)\\ \\}\u2026`\\ :\\ first$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ childHref\\ \\(\\ id\\ :\\ string\\ \\)\\ :\\ string\\ \\{\\}$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ `\\$\\{\\ PARENT_HOME_HREF\\ \\}/\\$\\{\\ encodeURIComponent\\ \\(\\ id\\ \\)\\ \\}`$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ buildParentNav\\ \\(\\ children\\ :\\ readonly\\ ParentNavChild\\ \\[\\ \\]\\ ,\\ pathname\\ :\\ string\\ \\)\\ :\\ ParentNavItem\\ \\[\\ \\]\\ \\{\\}$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ home\\ :\\ ParentNavItem\\ =\\ \\{\\ href\\ :\\ PARENT_HOME_HREF\\ ,\\ label\\ :\\ 'Dashboard'\\ ,\\ mobileLabel\\ :\\ 'Home'\\ ,\\ kind\\ :\\ 'dashboard'\\ ,\\ active\\ :\\ pathname\\ ===\\ PARENT_HOME_HREF\\ ,\\ \\}$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ kids\\ =\\ children\\ \\.\\ map\\ <\\ ParentNavItem\\ >\\ \\(\\ \\(\\ c\\ \\)\\ =>\\ \\{\\}\\ \\)$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ href\\ =\\ childHref\\ \\(\\ c\\ \\.\\ id\\ \\)$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ \\{\\ href\\ ,\\ label\\ :\\ fullName\\ \\(\\ c\\ \\)\\ ,\\ mobileLabel\\ :\\ shortName\\ \\(\\ c\\ \\)\\ ,\\ kind\\ :\\ 'child'\\ ,\\ active\\ :\\ pathname\\ ===\\ href\\ \\|\\|\\ pathname\\ \\.\\ startsWith\\ \\(\\ `\\$\\{\\ href\\ \\}/`\\ \\)\\ \\}$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ \\[\\ home\\ ,\\ \\.\\.\\.\\ kids\\ \\]$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ parentPageTitle\\ \\(\\ children\\ :\\ readonly\\ ParentNavChild\\ \\[\\ \\]\\ ,\\ pathname\\ :\\ string\\ \\)\\ :\\ string\\ \\{\\}$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^const\\ item\\ =\\ buildParentNav\\ \\(\\ children\\ ,\\ pathname\\ \\)\\ \\.\\ find\\ \\(\\ \\(\\ i\\ \\)\\ =>\\ i\\ \\.\\ active\\ \\)$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ item\\ \\?\\ item\\ \\.\\ label\\ :\\ 'Dashboard'$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^export\\ function\\ parentBarItems\\ \\(\\ items\\ :\\ readonly\\ ParentNavItem\\ \\[\\ \\]\\ \\)\\ :\\ ParentNavItem\\ \\[\\ \\]\\ \\{\\}$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
+    },
+    {
+      "file": "src/lib/hills/parentNav.ts",
+      "side": "added",
+      "kind": "logic",
+      "pattern": "^return\\ items\\ \\.\\ slice\\ \\(\\ 0\\ ,\\ 1\\ \\+\\ PARENT_BAR_CHILD_SLOTS\\ \\)$",
+      "reason": "Phase 10c: new pure helper listing the guardian's pages (Dashboard and one per child)."
     }
   ],
   "approvedFrozen": [

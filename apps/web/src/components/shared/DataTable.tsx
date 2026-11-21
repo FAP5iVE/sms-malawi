@@ -547,7 +547,7 @@ function MobileCardList<T extends object>({
               }
               role={onRowClick ? 'button' : 'listitem'}
               tabIndex={onRowClick ? 0 : undefined}
-              aria-label={onRowClick ? `View details for ${id}` : undefined}
+              aria-label={onRowClick ? `View details for ${typeof titleValue === 'string' ? titleValue : id}` : undefined}
               className={[
                 flat && !onRowClick ? 'app-tint rounded-xl px-4 py-3' : 'bg-surface border border-base rounded-xl px-4 py-3',
                 'flex items-start justify-between gap-3',
@@ -583,6 +583,12 @@ function MobileCardList<T extends object>({
                   ))}
                 </div>
               </div>
+
+              {/* Right: a chevron says the whole card opens something. Cards with a
+                  ⋯ actions button keep that button instead. */}
+              {onRowClick && !(mobileActions && mobileActions.length > 0) && (
+                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden />
+              )}
 
               {/* Right: ⋯ button — only when mobileActions is provided */}
               {mobileActions && mobileActions.length > 0 && (

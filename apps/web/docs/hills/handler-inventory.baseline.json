@@ -700,13 +700,18 @@
   ]
  },
  "src/app/(auth)/classes/[id]/page.tsx": {
-  "digest": "17cbda27239a3f8b3ba5d862ecd1dc8d9f58c1bc",
-  "tokens": 108,
+  "digest": "c5a853fcf6d68f48977fea434621f6045706f304",
+  "tokens": 112,
   "items": [
    {
     "k": "handler",
     "n": "onChange",
     "h": "f6d000c2"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "52975bb9"
    },
    {
     "k": "handler",
@@ -722,6 +727,11 @@
     "k": "handler",
     "n": "onRetry",
     "h": "51f73bc0"
+   },
+   {
+    "k": "handler",
+    "n": "onRowClick",
+    "h": "eca3515e"
    }
   ]
  },
@@ -2470,14 +2480,9 @@
   ]
  },
  "src/app/(parent)/layout.tsx": {
-  "digest": "8fc8dc7f883e12105bec29c72adbe63f1d36e2ed",
-  "tokens": 37,
+  "digest": "304388d2d1011d4058f1da9cd3eb0809851f3e6c",
+  "tokens": 23,
   "items": [
-   {
-    "k": "handler",
-    "n": "onClick",
-    "h": "3d5484ea"
-   },
    {
     "k": "handler",
     "n": "onKeepAlive",
@@ -8003,6 +8008,37 @@
    }
   ]
  },
+ "src/components/parent/ParentShell.tsx": {
+  "digest": "07f08b5ede1020de332780166f26dfd19c48effa",
+  "tokens": 115,
+  "items": [
+   {
+    "k": "effect",
+    "n": "useEffect",
+    "h": "f5e80b64"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "27ca4c85"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "3d5484ea"
+   },
+   {
+    "k": "handler",
+    "n": "onClick",
+    "h": "5d23ada2"
+   },
+   {
+    "k": "handler",
+    "n": "onClose",
+    "h": "105fa8b1"
+   }
+  ]
+ },
  "src/components/placements/ClaimsVerificationPanel.tsx": {
   "digest": "4bd547ab3d32921bf1b5e4f1e0678a8a3625316d",
   "tokens": 99,
@@ -10237,8 +10273,8 @@
   ]
  },
  "src/components/shared/DataTable.tsx": {
-  "digest": "d0d9b7871505e52e92216158d9bb68e93cba6d9b",
-  "tokens": 330,
+  "digest": "c8712db52b1bb36e7d6d5ee761a2bcd24e76ff6e",
+  "tokens": 331,
   "items": [
    {
     "k": "effect",

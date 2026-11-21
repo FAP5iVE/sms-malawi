@@ -61,8 +61,9 @@
 'use client'
 
 import { Suspense, useState } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { statusWord } from '@/lib/hills/statusWord'
 import { useClass, useClassTimetable, useClassAssignments, useClassSubjectAssignments } from '@/hooks/useClasses'
 import { useAuthStore } from '@/store/authStore'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -122,6 +123,7 @@ interface RosterStudent {
 }
 
 function ClassDetailContent() {
+  const router = useRouter()
   const { id } = useParams<{ id: string }>()
   const { data: cls, isLoading } = useClass(id)
   const { role, user } = useAuthStore()
@@ -221,7 +223,7 @@ function ClassDetailContent() {
     },
     ...(isStudent ? [] : [
       { key: 'registrationNo', label: 'Reg No', priority: 'important' as const },
-      { key: 'sex', label: 'Sex', priority: 'optional' as const },
+      { key: 'sex', label: 'Sex', priority: 'optional' as const, render: (s: RosterStudent) => statusWord(s.sex) },
       {
         key: 'riskLevel',
         label: 'Risk',
@@ -240,7 +242,13 @@ function ClassDetailContent() {
         priority: 'important' as const,
         render: (s: RosterStudent) =>
           canViewStudentProfile ? (
-            <Link href={`/students/${s.id}`} className="text-tone-teal text-xs font-medium app-action">
+            <Link
+              href={`/students/${s.id}`}
+              // The whole row opens the profile too (onRowClick below); stop this
+              // click reaching the row so the page is opened once, not twice.
+              onClick={(e) => e.stopPropagation()}
+              className="text-tone-teal text-xs font-medium app-action"
+            >
               Profile
             </Link>
           ) : null,
@@ -318,6 +326,8 @@ function ClassDetailContent() {
           rowKey="id"
           bordered={false}
           emptyMessage="No students assigned to this class yet."
+          // Tap or click a student to open their profile, for the roles that may see it.
+          onRowClick={canViewStudentProfile ? (s) => router.push(`/students/${s.id}`) : undefined}
         />
       )}
 
